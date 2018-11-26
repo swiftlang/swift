@@ -142,6 +142,9 @@ func test_14705150() {
 
 }
 
+postfix operator ++
+prefix operator ++
+
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
@@ -204,7 +207,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
@@ -352,6 +355,7 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+    // FIXME: Better would be: use of '=' in a boolean context, did you mean '=='?
+    if x == x && x = x { } // expected-error{{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
 }

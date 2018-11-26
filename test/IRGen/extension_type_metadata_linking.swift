@@ -10,26 +10,26 @@
 
 import Foundation
 
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE4BaseCMm" = global
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE4BaseCMn" = constant
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE4BaseCMf" = internal global
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCMm" = global
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCMn" = constant
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCMf" = internal global
 
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMm" = global
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMn" = constant
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMf" = internal global
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMm" = global
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMn" = constant
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMf" = internal global
 
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE6StructVMn" = constant
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE6StructVMf" = internal constant
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVMn" = constant
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVMf" = internal constant
 
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE4BaseCN" = alias
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE7DerivedCN" = alias
-// CHECK-LABEL: @"$SSo8NSNumberC31extension_type_metadata_linkingE6StructVN" = alias
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCN" = alias
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCN" = alias
+// CHECK-LABEL: @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVN" = alias
 
-// CHECK-LABEL: define %swift.type* @"$SSo8NSNumberC31extension_type_metadata_linkingE4BaseCMa"()
-// CHECK-LABEL: define %swift.type* @"$SSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMa"
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo8NSNumberC31extension_type_metadata_linkingE4BaseCMa"
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo8NSNumberC31extension_type_metadata_linkingE7DerivedCMa"
 
 // FIXME: Not needed
-// CHECK-LABEL: define %swift.type* @"$SSo8NSNumberC31extension_type_metadata_linkingE6StructVMa"
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$sSo8NSNumberC31extension_type_metadata_linkingE6StructVMa"
 
 extension NSNumber {
   public class Base : CustomStringConvertible {

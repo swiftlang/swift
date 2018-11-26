@@ -1,26 +1,26 @@
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | %FileCheck %s -check-prefix=EXPECT_OINT
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | %FileCheck %s -check-prefix=ARG-NAME1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | %FileCheck %s -check-prefix=EXPECT_OINT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | %FileCheck %s -check-prefix=ARG-NAME1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | %FileCheck %s -check-prefix=ARG-NAME2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG4 | %FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG5 | %FileCheck %s -check-prefix=EXPECT_OSTRING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | %FileCheck %s -check-prefix=ARG-NAME2
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME1
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
 
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | %FileCheck %s -check-prefix=OVERLOAD1
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
 
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | %FileCheck %s -check-prefix=MEMBER3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | %FileCheck %s -check-prefix=MEMBER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | %FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | %FileCheck %s -check-prefix=MEMBER4
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | %FileCheck %s -check-prefix=MEMBER7
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | %FileCheck %s -check-prefix=MEMBER8
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | %FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | %FileCheck %s -check-prefix=MEMBER7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | %FileCheck %s -check-prefix=MEMBER8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | %FileCheck %s -check-prefix=MEMBER1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG1 | %FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG2 | %FileCheck %s -check-prefix=EXPECT_STRING
@@ -40,6 +40,24 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_1 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_2 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CALLARG_IUO | %FileCheck %s -check-prefix=CALLARG_IUO
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TO_GENERIC | %FileCheck %s -check-prefix=GENERIC_TO_GENERIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE | %FileCheck %s -check-prefix=NESTED_CLOSURE
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_1 | %FileCheck %s -check-prefix=SHUFFLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_2 | %FileCheck %s -check-prefix=SHUFFLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_3 | %FileCheck %s -check-prefix=SHUFFLE_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | %FileCheck %s -check-prefix=SUBSCRIPT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_1_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2 | %FileCheck %s -check-prefix=SUBSCRIPT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_2_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3 | %FileCheck %s -check-prefix=SUBSCRIPT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_3_DOT
 
 var i1 = 1
 var i2 = 2
@@ -84,6 +102,10 @@ class Gen {
 
 func GenGenerator(_ i : Int) -> Gen { return Gen() }
 
+enum SimpleEnum {
+  case foo, bar, baz
+}
+
 class C1 {
   func f1() {
     foo(3, b: #^ARG1^#)
@@ -119,8 +141,6 @@ class C1 {
 // ARG-NAME2-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
 
 // EXPECT_OINT: Begin completions
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: i2[#Int#]; name=i2
@@ -176,7 +196,7 @@ class C2 {
 // EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // EXPECT_STRING-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_STRING-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: stringGen()[#String#]; name=stringGen()
-// EXPECT_STRING-DAT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: String[#String#]
+// EXPECT_STRING-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: String[#String#]
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os1[#String?#]; name=os1
@@ -369,17 +389,123 @@ struct TestBoundGeneric1 {
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
 }
 
+func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
+  _ = zip(lhs, #^GENERIC_TO_GENERIC^#)
+}
+// GENERIC_TO_GENERIC: Begin completions
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: lhs[#Collection#]; name=lhs
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: rhs[#Collection#]; name=rhs
+// GENERIC_TO_GENERIC: End completions
+
 func emptyOverload() {}
 func emptyOverload(foo foo: Int) {}
 emptyOverload(foo: #^EMPTY_OVERLOAD_1^#)
 struct EmptyOverload {
   init() {}
-  init(frame: Int) {}
+  init(foo: Int) {}
 }
 _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
-// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
-// check it's not empty.
 // EMPTY_OVERLOAD: Begin completions
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i2[#Int#];
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i1[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i1[#Int#];
 // EMPTY_OVERLOAD: End completions
+
+public func fopen() -> TestBoundGeneric1! { fatalError() }
+func other() {
+  _ = fopen(#^CALLARG_IUO^#)
+// CALLARG_IUO-NOT: Begin completions
+// CALLARG_IUO-NOT: End completions
+}
+
+class Foo { let x: Int }
+class Bar {
+  var collectionView: Foo!
+
+  func foo() {
+    self.collectionView? .#^BOUND_IUO^#x
+    self.collectionView! .#^FORCED_IUO^#x
+  }
+  // MEMBEROF_IUO: Begin completions, 2 items
+  // MEMBEROF_IUO: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+  // MEMBEROF_IUO: Decl[InstanceVar]/CurrNominal: x[#Int#]; name=x
+  // MEMBEROF_IUO: End completions
+}
+
+func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
+  return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
+  // NESTED_CLOSURE: Begin completions
+  // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
+}
+
+func trailingClosureLocal(x: Int, fn: (Int) -> Void) {
+  trailingClosureLocal(x: 1) { localArg in
+    var localVar = 1
+    if #^TRAILING_CLOSURE_LOCAL^#
+  }
+  // TRAILING_CLOSURE_LOCAL: Begin completions
+  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localArg[#Int#]; name=localArg
+  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localVar[#Int#]; name=localVar
+}
+
+func shuffled(_ x: Int ..., y: String = "", z: SimpleEnum = .foo) {}
+func testTupleShuffle() {
+  let _ = shuffled(1, 2, 3, 4, #^SHUFFLE_1^#, z: .foo)
+  let _ = shuffled(1, 2, 3, y: #^SHUFFLE_2^#
+  let _ = shuffled(z: .#^SHUFFLE_3^#)
+}
+// SHUFFLE_1: Begin completions
+// SHUFFLE_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
+// SHUFFLE_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
+
+// SHUFFLE_2: Begin completions
+// SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
+// SHUFFLE_2-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
+
+// SHUFFLE_3: Begin completions, 3 items
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     foo[#SimpleEnum#]; name=foo
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     bar[#SimpleEnum#]; name=bar
+// SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     baz[#SimpleEnum#]; name=baz
+
+class HasSubscript {
+  subscript(idx: Int) -> String {}
+  subscript(idx: Int, default defaultValue: String) -> String {}
+}
+func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
+  let _ = obj[#^SUBSCRIPT_1^#
+// SUBSCRIPT_1: Begin completions
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s1[#String#]; name=s1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s2[#String#]; name=s2
+
+  let _ = obj[.#^SUBSCRIPT_1_DOT^#
+// SUBSCRIPT_1_DOT: Begin completions
+// SUBSCRIPT_1_DOT-NOT: i1
+// SUBSCRIPT_1_DOT-NOT: s1
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+
+  let _ = obj[42, #^SUBSCRIPT_2^#
+// SUBSCRIPT_2: Begin completions, 1 items
+// SUBSCRIPT_2-NEXT: Keyword/ExprSpecific:               default: [#Argument name#]; name=default: 
+
+  let _ = obj[42, .#^SUBSCRIPT_2_DOT^#
+// SUBSCRIPT_2_DOT-NOT: Begin completions
+
+  let _ = obj[42, default: #^SUBSCRIPT_3^#
+// SUBSCRIPT_3: Begin completions
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i1[#Int#]; name=i1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i2[#Int#]; name=i2
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
+
+  let _ = obj[42, default: .#^SUBSCRIPT_3_DOT^#
+// SUBSCRIPT_3_DOT: Begin completions
+// SUBSCRIPT_3_DOT-NOT: i1
+// SUBSCRIPT_3_DOT-NOT: s1
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#String#]; name=init()
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+
+}

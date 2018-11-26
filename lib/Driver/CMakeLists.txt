@@ -1,24 +1,25 @@
 set(swiftDriver_sources
   Action.cpp
   Compilation.cpp
+  DarwinToolChains.cpp
   DependencyGraph.cpp
   Driver.cpp
   FrontendUtil.cpp
   Job.cpp
-  OutputFileMap.cpp
   ParseableOutput.cpp
   PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
-  Types.cpp
+  UnixToolChains.cpp
+  WindowsToolChains.cpp
   )
 
 set(swiftDriver_targetDefines)
 
-add_swift_library(swiftDriver STATIC
+add_swift_host_library(swiftDriver STATIC
   ${swiftDriver_sources}
   DEPENDS SwiftOptions
-  LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)
+  LINK_LIBRARIES swiftAST swiftBasic swiftOption)
 
 # Generate the static-stdlib-args.lnk file used by -static-stdlib option
 # for 'GenericUnix' (eg linux)
@@ -27,13 +28,13 @@ if(SWIFT_BUILD_STATIC_STDLIB)
   foreach(sdk ${SWIFT_CONFIGURED_SDKS})
     if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
       string(TOLOWER "${sdk}" lowercase_sdk)
-      if(SWIFT_LINUX_ICU_STATICLIB)
+      if(SWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB)
         set(ICU_STATICLIB "TRUE")
       else()
         set(ICU_STATICLIB "FALSE")
         find_package(ICU REQUIRED COMPONENTS uc i18n)
-        get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARY}" DIRECTORY)
-        get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARY}" DIRECTORY)
+        get_filename_component(ICU_UC_LIBDIR "${ICU_UC_LIBRARIES}" DIRECTORY)
+        get_filename_component(ICU_I18N_LIBDIR "${ICU_I18N_LIBRARIES}" DIRECTORY)
       endif()
       set(linkfile "${lowercase_sdk}/static-stdlib-args.lnk")
       add_custom_command_target(swift_static_stdlib_${sdk}_args

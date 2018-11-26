@@ -1,18 +1,23 @@
 {
+  "id": 18,
   "kind": "SourceFile",
   "layout": [
     {
+      "id": 17,
       "kind": "CodeBlockItemList",
       "layout": [
         {
+          "id": 8,
           "kind": "CodeBlockItem",
           "layout": [
             {
+              "id": 7,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
+                  "id": 1,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -27,7 +32,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -43,6 +48,7 @@
                   "presence": "Present"
                 },
                 {
+                  "id": 2,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "A"
@@ -60,9 +66,11 @@
                 null,
                 null,
                 {
+                  "id": 6,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
+                      "id": 3,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -71,11 +79,13 @@
                       "presence": "Present"
                     },
                     {
-                      "kind": "DeclList",
+                      "id": 4,
+                      "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present"
                     },
                     {
+                      "id": 5,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -94,19 +104,23 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"
         },
         {
+          "id": 14,
           "kind": "CodeBlockItem",
           "layout": [
             {
+              "id": 13,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
+                  "id": 9,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -125,6 +139,7 @@
                   "presence": "Present"
                 },
                 {
+                  "id": 10,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "B"
@@ -142,9 +157,11 @@
                 null,
                 null,
                 {
+                  "id": 12,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
+                      "id": 3,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -153,11 +170,13 @@
                       "presence": "Present"
                     },
                     {
-                      "kind": "DeclList",
+                      "id": 11,
+                      "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present"
                     },
                     {
+                      "id": 5,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -176,6 +195,7 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"
@@ -184,8 +204,10 @@
       "presence": "Present"
     },
     {
+      "id": 16,
       "tokenKind": {
-        "kind": "eof"
+        "kind": "eof",
+        "text": ""
       },
       "leadingTrivia": [
         {

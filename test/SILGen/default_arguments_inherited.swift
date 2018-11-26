@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // When we synthesize an inherited designated initializer, the default
 // arguments are still conceptually rooted on the base declaration.
@@ -18,23 +18,23 @@ class Goldfish<T> {
   class Shark<U> : Puppy<T, U> {}
 }
 
-// CHECK-LABEL: sil hidden @$S27default_arguments_inherited4doItyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s27default_arguments_inherited4doItyyF : $@convention(thin) () -> () {
 func doIt() {
-  // CHECK: [[ARG1:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
+  // CHECK: [[ARG1:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
   // CHECK: apply [[ARG1]]<Int, String>({{.*}})
-  // CHECK: [[ARG2:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
+  // CHECK: [[ARG2:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
   // CHECK: apply [[ARG2]]<Int, String>({{.*}})
   _ = Chipmunk()
 
-  // CHECK: [[ARG1:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
+  // CHECK: [[ARG1:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
   // CHECK: apply [[ARG1]]<Int, String>(%{{.*}})
-  // CHECK: [[ARG2:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
+  // CHECK: [[ARG2:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
   // CHECK: apply [[ARG2]]<Int, String>(%{{.*}})
   _ = Kitten<String>()
 
-  // CHECK: [[ARG1:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
+  // CHECK: [[ARG1:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA_
   // CHECK: apply [[ARG1]]<String, Int>(%{{.*}})
-  // CHECK: [[ARG2:%.*]] = function_ref @$S27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
+  // CHECK: [[ARG2:%.*]] = function_ref @$s27default_arguments_inherited5PuppyC1t1uACyxq_GxSg_q_SgtcfcfA0_
   // CHECK: apply [[ARG2]]<String, Int>(%{{.*}})
   _ = Goldfish<String>.Shark<Int>()
 }

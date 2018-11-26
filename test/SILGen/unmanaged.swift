@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil %s | %FileCheck %s
+
+// RUN: %target-swift-emit-sil -module-name unmanaged -enable-sil-ownership %s | %FileCheck %s
 
 class C {}
 
@@ -6,7 +7,7 @@ struct Holder {
   unowned(unsafe) var value: C
 }
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @$S9unmanaged6HolderV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @$s9unmanaged6HolderV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
 // CHECK: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C
@@ -16,9 +17,9 @@ _ = Holder(value: C())
 func set(holder holder: inout Holder) {
   holder.value = C()
 }
-// CHECK-LABEL:sil hidden @$S9unmanaged3set6holderyAA6HolderVz_tF : $@convention(thin) (@inout Holder) -> ()
+// CHECK-LABEL:sil hidden @$s9unmanaged3set6holderyAA6HolderVz_tF : $@convention(thin) (@inout Holder) -> ()
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK:        [[T0:%.*]] = function_ref @$S9unmanaged1CC{{[_0-9a-zA-Z]*}}fC
+// CHECK:        [[T0:%.*]] = function_ref @$s9unmanaged1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
 // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [static] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[WRITE]] : $*Holder, #Holder.value
@@ -32,7 +33,7 @@ func set(holder holder: inout Holder) {
 func get(holder holder: inout Holder) -> C {
   return holder.value
 }
-// CHECK-LABEL:sil hidden @$S9unmanaged3get6holderAA1CCAA6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C
+// CHECK-LABEL:sil hidden @$s9unmanaged3get6holderAA1CCAA6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [static] [[ADDR]] : $*Holder
@@ -46,9 +47,9 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL:sil hidden @$S9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C
+// CHECK-LABEL: sil hidden @$s9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C
 // CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
-// CHECK: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = unmanaged_to_ref [[T1]]

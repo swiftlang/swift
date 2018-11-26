@@ -23,8 +23,6 @@
 namespace swift {
 namespace irgen {
 
-class WeakTypeInfo;
-class UnownedTypeInfo;
 class TypeConverter;
   
 /// \brief An abstract class designed for use when implementing a type
@@ -35,7 +33,7 @@ protected:
   ReferenceTypeInfo(llvm::Type *type, Size size, SpareBitVector spareBits,
                     Alignment align, IsPOD_t pod = IsNotPOD)
     : LoadableTypeInfo(type, size, spareBits, align, pod,
-                       IsFixedSize, STIK_Reference)
+                       IsFixedSize, SpecialTypeInfoKind::Reference)
   {}
 
 public:
@@ -47,62 +45,48 @@ public:
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
                              Atomicity atomicity) const = 0;
 
-  /// Strongly retains a value that has come from a safe [unowned] reference.
-  /// This operation is not supported for all reference types.
-  virtual void strongRetainUnowned(IRGenFunction &IGF, Explosion &in,
-                                   Atomicity atomicity) const = 0;
-
-  /// Strongly retains a value that has come from a safe [unowned] reference.
-  /// This operation is not supported for all reference types.
-  virtual void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                          Explosion &in,
-                                          Atomicity atomicity) const = 0;
-
-  /// Weakly retains a value in the manner of a safe [unowned] reference.
-  /// This operation is not supported for all reference types.
-  virtual void unownedRetain(IRGenFunction &IGF, Explosion &in,
-                             Atomicity atomicity) const = 0;
-
-  /// Weakly releases a value in the manner of a safe [unowned] reference.
-  /// This operation is not supported for all reference types.
-  virtual void unownedRelease(IRGenFunction &IGF, Explosion &in,
+#define REF_STORAGE_HELPER(Name) \
+  virtual const TypeInfo *create##Name##StorageType(TypeConverter &TC, \
+                                                    bool isOptional) const = 0;
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  virtual void name##TakeStrong(IRGenFunction &IGF, Address addr, \
+                                 Explosion &out, bool isOptional) const = 0; \
+  virtual void name##LoadStrong(IRGenFunction &IGF, Address addr, \
+                                 Explosion &out, bool isOptional) const = 0; \
+  virtual void name##Init(IRGenFunction &IGF, Explosion &in, \
+                           Address dest, bool isOptional) const = 0; \
+  virtual void name##Assign(IRGenFunction &IGF, Explosion &in, \
+                             Address dest, bool isOptional) const = 0;
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  virtual void strongRetain##Name(IRGenFunction &IGF, Explosion &in, \
+                                  Atomicity atomicity) const = 0; \
+  virtual void strongRetain##Name##Release(IRGenFunction &IGF, \
+                                           Explosion &in, \
+                                           Atomicity atomicity) const = 0; \
+  virtual void name##Retain(IRGenFunction &IGF, Explosion &in, \
+                             Atomicity atomicity) const = 0; \
+  virtual void name##Release(IRGenFunction &IGF, Explosion &in, \
                               Atomicity atomicity) const = 0;
-
-  /// Load a reference from a safe [unowned] reference in memory and
-  /// destroy the [unowned] location.
-  virtual void unownedTakeStrong(IRGenFunction &IGF, Address addr,
-                                 Explosion &out) const = 0;
-
-  /// Load a reference from a safe [unowned] reference in memory.
-  virtual void unownedLoadStrong(IRGenFunction &IGF, Address addr,
-                                 Explosion &out) const = 0;
-
-  /// Initialize a safe [unowned] reference in memory.
-  virtual void unownedInit(IRGenFunction &IGF, Explosion &in,
-                           Address dest) const = 0;
-
-  /// Assign to an initialized safe [unowned] reference in memory.
-  virtual void unownedAssign(IRGenFunction &IGF, Explosion &in,
-                             Address dest) const = 0;
-
-  /// Produce the storage information for [weak] storage.
-  virtual const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const = 0;
-
-  /// Produce the storage information for [unowned] storage.
-  ///
-  /// The reference-counting operations done by the value operations
-  /// on the [unowned] storage type are assumed to be basically the
-  /// same operations as weakRetain and weakRelease.
-  virtual const TypeInfo *createUnownedStorageType(TypeConverter &TC)
-    const = 0;
-
-  /// Produce the storage information for @unowned(unsafe) storage.
-  virtual const TypeInfo *createUnmanagedStorageType(TypeConverter &TC)
-    const = 0;
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  REF_STORAGE_HELPER(Name)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  REF_STORAGE_HELPER(Name)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
+  REF_STORAGE_HELPER(Name)
+#define UNCHECKED_REF_STORAGE(Name, name, ...) \
+  REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef REF_STORAGE_HELPER
+#undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
+#undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
   static bool classof(const ReferenceTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
-    return type->getSpecialTypeInfoKind() == STIK_Reference;
+    return type->getSpecialTypeInfoKind() == SpecialTypeInfoKind::Reference;
   }
 };
 

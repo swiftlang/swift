@@ -12,9 +12,6 @@
 
 import SwiftShims
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_transparent
 internal func _abstract(
   methodName: StaticString = #function,
   file: StaticString = #file, line: UInt = #line
@@ -30,41 +27,49 @@ internal func _abstract(
 // MARK: Type-erased abstract base classes
 
 /// A type-erased key path, from any root type to any resulting value type.
-@_fixed_layout // FIXME(sil-serialize-all)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
-  @_inlineable
+  @inlinable
   public static var rootType: Any.Type {
     return _rootAndValueType.root
   }
 
   /// The value type for this key path.
-  @_inlineable
+  @inlinable
   public static var valueType: Any.Type {
     return _rootAndValueType.value
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
   
-  @_inlineable // FIXME(sil-serialize-all)
+  /// The hash value.
   final public var hashValue: Int {
-    var hash = 0
-    withBuffer {
+    return _hashValue(for: self)
+  }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @_effects(releasenone)
+  final public func hash(into hasher: inout Hasher) {
+    ObjectIdentifier(type(of: self)).hash(into: &hasher)
+    return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty { return }
       while true {
         let (component, type) = buffer.next()
-        hash ^= _mixInt(component.value.hashValue)
+        hasher.combine(component.value)
         if let type = type {
-          hash ^= _mixInt(unsafeBitCast(type, to: Int.self))
+          hasher.combine(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
       }
     }
-    return hash
   }
-  @_inlineable // FIXME(sil-serialize-all)
+  
   public static func ==(a: AnyKeyPath, b: AnyKeyPath) -> Bool {
     // Fast-path identical objects
     if a === b {
@@ -84,6 +89,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
           return false
         }
         
+        // Identity is equal to identity
+        if aBuffer.data.isEmpty {
+          return bBuffer.data.isEmpty
+        }
+
         while true {
           let (aComponent, aType) = aBuffer.next()
           let (bComponent, bType) = bBuffer.next()
@@ -104,7 +114,6 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
-  @_inlineable // FIXME(sil-serialize-all)
   public var _kvcKeyPathString: String? {
     guard let ptr = _kvcKeyPathStringPtr else { return nil }
 
@@ -115,24 +124,16 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal init() {
     _sanityCheckFailure("use _create(...)")
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  deinit {}
-  
-  // internal-with-availability
-  @_inlineable // FIXME(sil-serialize-all)
-  public class var _rootAndValueType: (root: Any.Type, value: Any.Type) {
+  @usableFromInline
+  internal class var _rootAndValueType: (root: Any.Type, value: Any.Type) {
     _abstract()
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static func _create(
+  internal static func _create(
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
@@ -147,34 +148,50 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return result
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
     return try f(KeyPathBuffer(base: base))
   }
+
+  @usableFromInline // Exposed as public API by MemoryLayout<Root>.offset(of:)
+  internal var _storedInlineOffset: Int? {
+    return withBuffer {
+      var buffer = $0
+
+      // The identity key path is effectively a stored keypath of type Self
+      // at offset zero
+      if buffer.data.isEmpty { return 0 }
+
+      var offset = 0
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
+
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap, .external:
+          return .none
+        }
+
+        if optNextType == nil { return .some(offset) }
+      }
+    }
+  }
 }
 
 /// A partially type-erased key path, from a concrete root type to any
 /// resulting value type.
-@_fixed_layout // FIXME(sil-serialize-all)
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathKind { case readOnly, value, reference }
 
 /// A key path from a specific root type to a specific resulting value type.
-@_fixed_layout // FIXME(sil-serialize-all)
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
-  public typealias _Root = Root
-  public typealias _Value = Value
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public final override class var _rootAndValueType: (
+  @usableFromInline
+  internal final override class var _rootAndValueType: (
     root: Any.Type,
     value: Any.Type
   ) {
@@ -183,12 +200,8 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   
   // MARK: Implementation
   internal typealias Kind = KeyPathKind
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal class var kind: Kind { return .readOnly }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal static func appendedType<AppendedValue>(
     with t: KeyPath<Value, AppendedValue>.Type
   ) -> KeyPath<Root, AppendedValue>.Type {
@@ -212,13 +225,15 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal final func projectReadOnly(from root: Root) -> Value {
+  @usableFromInline
+  internal final func _projectReadOnly(from root: Root) -> Value {
     // TODO: For perf, we could use a local growable buffer instead of Any
     var curBase: Any = root
     return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty {
+        return unsafeBitCast(root, to: Value.self)
+      }
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let valueType = optNextType ?? Value.self
@@ -226,7 +241,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         
         func project<CurValue>(_ base: CurValue) -> Value? {
           func project2<NewValue>(_: NewValue.Type) -> Value? {
-            switch rawComponent.projectReadOnly(base,
+            switch rawComponent._projectReadOnly(base,
               to: NewValue.self, endingWith: Value.self) {
             case .continue(let newBase):
               if isLast {
@@ -252,26 +267,21 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
   deinit {
     withBuffer { $0.destroy() }
   }
 }
 
 /// A key path that supports reading from and writing to the resulting value.
-@_fixed_layout // FIXME(sil-serialize-all)
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // MARK: Implementation detail
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal override class var kind: Kind { return .value }
 
   // `base` is assumed to be undergoing a formal access for the duration of the
   // call, so must not be mutated by an alias
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func projectMutableAddress(from base: UnsafePointer<Root>)
+  @usableFromInline
+  internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var p = UnsafeRawPointer(base)
     var type: Any.Type = Root.self
@@ -283,13 +293,20 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       _sanityCheck(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
+      if buffer.data.isEmpty {
+        return (
+          UnsafeMutablePointer<Value>(
+            mutating: p.assumingMemoryBound(to: Value.self)),
+          nil)
+      }
+
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let nextType = optNextType ?? Value.self
         
         func project<CurValue>(_: CurValue.Type) {
           func project2<NewValue>(_: NewValue.Type) {
-            p = rawComponent.projectMutableAddress(p,
+            p = rawComponent._projectMutableAddress(p,
                                            from: CurValue.self,
                                            to: NewValue.self,
                                            isRoot: p == UnsafeRawPointer(base),
@@ -310,34 +327,27 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
               owner: keepAlive)
     }
   }
-
 }
 
 /// A key path that supports reading from and writing to the resulting value
 /// with reference semantics.
-@_fixed_layout // FIXME(sil-serialize-all)
 public class ReferenceWritableKeyPath<
   Root, Value
 > : WritableKeyPath<Root, Value> {
   // MARK: Implementation detail
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal final override class var kind: Kind { return .reference }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal final override func projectMutableAddress(
+  internal final override func _projectMutableAddress(
     from base: UnsafePointer<Root>
   ) -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     // Since we're a ReferenceWritableKeyPath, we know we don't mutate the base
     // in practice.
-    return projectMutableAddress(from: base.pointee)
+    return _projectMutableAddress(from: base.pointee)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal final func projectMutableAddress(from origBase: Root)
+  @usableFromInline
+  internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
     var address: UnsafeMutablePointer<Value> = withBuffer {
@@ -352,7 +362,7 @@ public class ReferenceWritableKeyPath<
         
         func project<NewValue>(_: NewValue.Type) -> Any {
           func project2<CurValue>(_ base: CurValue) -> Any {
-            return rawComponent.projectReadOnly(
+            return rawComponent._projectReadOnly(
               base, to: NewValue.self, endingWith: Value.self)
               .assumingContinue
           }
@@ -374,7 +384,7 @@ public class ReferenceWritableKeyPath<
             let nextType = optNextType ?? Value.self
             func project<CurValue>(_: CurValue.Type) {
               func project2<NewValue>(_: NewValue.Type) {
-                p = rawComponent.projectMutableAddress(p,
+                p = rawComponent._projectMutableAddress(p,
                                              from: CurValue.self,
                                              to: NewValue.self,
                                              isRoot: p == baseBytes.baseAddress,
@@ -400,9 +410,10 @@ public class ReferenceWritableKeyPath<
 
 // MARK: Implementation details
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponentKind {
+  /// The keypath references an externally-defined property or subscript whose
+  /// component describes how to interact with the key path.
+  case external
   /// The keypath projects within the storage of the outer value, like a
   /// stored property in a struct.
   case `struct`
@@ -421,26 +432,17 @@ internal enum KeyPathComponentKind {
   case optionalWrap
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal struct ComputedPropertyID: Hashable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal init(value: Int, isStoredProperty: Bool, isTableOffset: Bool) {
     self.value = value
     self.isStoredProperty = isStoredProperty
     self.isTableOffset = isTableOffset
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   internal var value: Int
-  @_versioned // FIXME(sil-serialize-all)
   internal var isStoredProperty: Bool
-  @_versioned // FIXME(sil-serialize-all)
   internal var isTableOffset: Bool
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal static func ==(
     x: ComputedPropertyID, y: ComputedPropertyID
   ) -> Bool {
@@ -449,19 +451,13 @@ internal struct ComputedPropertyID: Hashable {
       && x.isTableOffset == x.isTableOffset
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    var hash = 0
-    hash ^= _mixInt(value)
-    hash ^= _mixInt(isStoredProperty ? 13 : 17)
-    hash ^= _mixInt(isTableOffset ? 19 : 23)
-    return hash
+  internal func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+    hasher.combine(isStoredProperty)
+    hasher.combine(isTableOffset)
   }
 }
 
-@_versioned // FIXME(sil-serialize-all)
-@_fixed_layout // FIXME(sil-serialize-all)
 internal struct ComputedArgumentWitnesses {
   internal typealias Destroy = @convention(thin)
     (_ instanceArguments: UnsafeMutableRawPointer, _ size: Int) -> ()
@@ -473,40 +469,32 @@ internal struct ComputedArgumentWitnesses {
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
+  // FIXME(hasher) Combine to an inout Hasher instead
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
 
-  @_versioned // FIXME(sil-serialize-all)
   internal let destroy: Destroy?
-  @_versioned // FIXME(sil-serialize-all)
   internal let copy: Copy
-  @_versioned // FIXME(sil-serialize-all)
   internal let equals: Equals
-  @_versioned // FIXME(sil-serialize-all)
   internal let hash: Hash
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponent: Hashable {
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal struct ArgumentRef {
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal init(
       data: UnsafeRawBufferPointer,
-      witnesses: UnsafePointer<ComputedArgumentWitnesses>
+      witnesses: UnsafePointer<ComputedArgumentWitnesses>,
+      witnessSizeAdjustment: Int
     ) {
       self.data = data
       self.witnesses = witnesses
+      self.witnessSizeAdjustment = witnessSizeAdjustment
     }
 
-    @_versioned // FIXME(sil-serialize-all)
     internal var data: UnsafeRawBufferPointer
-    @_versioned // FIXME(sil-serialize-all)
     internal var witnesses: UnsafePointer<ComputedArgumentWitnesses>
+    internal var witnessSizeAdjustment: Int
   }
 
   /// The keypath projects within the storage of the outer value, like a
@@ -537,8 +525,6 @@ internal enum KeyPathComponent: Hashable {
   /// The keypath wraps a value in an optional.
   case optionalWrap
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
     switch (a, b) {
     case (.struct(offset: let a), .struct(offset: let b)),
@@ -563,7 +549,7 @@ internal enum KeyPathComponent: Hashable {
         return arg1.witnesses.pointee.equals(
           arg1.data.baseAddress.unsafelyUnwrapped,
           arg2.data.baseAddress.unsafelyUnwrapped,
-          arg1.data.count)
+          arg1.data.count - arg1.witnessSizeAdjustment)
       }
       // If only one component has arguments, that should indicate that the
       // only arguments in that component were generic captures and therefore
@@ -580,101 +566,128 @@ internal enum KeyPathComponent: Hashable {
       return false
     }
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    var hash: Int = 0
-    func mixHashFromArgument(_ argument: KeyPathComponent.ArgumentRef?) {
+
+  @_effects(releasenone)
+  internal func hash(into hasher: inout Hasher) {
+    func appendHashFromArgument(
+      _ argument: KeyPathComponent.ArgumentRef?
+    ) {
       if let argument = argument {
-        let addedHash = argument.witnesses.pointee.hash(
+        let hash = argument.witnesses.pointee.hash(
           argument.data.baseAddress.unsafelyUnwrapped,
-          argument.data.count)
+          argument.data.count - argument.witnessSizeAdjustment)
         // Returning 0 indicates that the arguments should not impact the
         // hash value of the overall key path.
-        if addedHash != 0 {
-          hash ^= _mixInt(addedHash)
+        // FIXME(hasher): hash witness should just mutate hasher directly
+        if hash != 0 {
+          hasher.combine(hash)
         }
       }
     }
     switch self {
     case .struct(offset: let a):
-      hash ^= _mixInt(0)
-      hash ^= _mixInt(a)
+      hasher.combine(0)
+      hasher.combine(a)
     case .class(offset: let b):
-      hash ^= _mixInt(1)
-      hash ^= _mixInt(b)
+      hasher.combine(1)
+      hasher.combine(b)
     case .optionalChain:
-      hash ^= _mixInt(2)
+      hasher.combine(2)
     case .optionalForce:
-      hash ^= _mixInt(3)
+      hasher.combine(3)
     case .optionalWrap:
-      hash ^= _mixInt(4)
+      hasher.combine(4)
     case .get(id: let id, get: _, argument: let argument):
-      hash ^= _mixInt(5)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.combine(5)
+      hasher.combine(id)
+      appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(6)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.combine(6)
+      hasher.combine(id)
+      appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(7)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.combine(7)
+      hasher.combine(id)
+      appendHashFromArgument(argument)
     }
-    return hash
   }
 }
 
 // A class that maintains ownership of another object while a mutable projection
-// into it is underway.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal final class ClassHolder {
-  @_versioned // FIXME(sil-serialize-all)
-  internal let previous: AnyObject?
-  @_versioned // FIXME(sil-serialize-all)
-  internal let instance: AnyObject
+// into it is underway. The lifetime of the instance of this class is also used
+// to begin and end exclusive 'modify' access to the projected address.
+internal final class ClassHolder<ProjectionType> {
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  /// The type of the scratch record passed to the runtime to record
+  /// accesses to guarantee exlcusive access.
+  internal typealias AccessRecord = Builtin.UnsafeValueBuffer
+
+  internal var previous: AnyObject?
+  internal var instance: AnyObject
+
   internal init(previous: AnyObject?, instance: AnyObject) {
     self.previous = previous
     self.instance = instance
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  deinit {}
+
+  internal final class func _create(
+      previous: AnyObject?,
+      instance: AnyObject,
+      accessingAddress address: UnsafeRawPointer,
+      type: ProjectionType.Type
+  ) -> ClassHolder {
+
+    // Tail allocate the UnsafeValueBuffer used as the AccessRecord.
+    // This avoids a second heap allocation since there is no source-level way to
+    // initialize a Builtin.UnsafeValueBuffer type and thus we cannot have a
+    // stored property of that type.
+    let holder: ClassHolder = Builtin.allocWithTailElems_1(self,
+                                                          1._builtinWordValue,
+                                                          AccessRecord.self)
+
+    // Initialize the ClassHolder's instance variables. This is done via
+    // withUnsafeMutablePointer(to:) because the instance was just allocated with
+    // allocWithTailElems_1 and so we need to make sure to use an initialization
+    // rather than an assignment.
+    withUnsafeMutablePointer(to: &holder.previous) {
+      $0.initialize(to: previous)
+    }
+
+    withUnsafeMutablePointer(to: &holder.instance) {
+      $0.initialize(to: instance)
+    }
+
+    let accessRecordPtr = Builtin.projectTailElems(holder, AccessRecord.self)
+
+    // Begin a 'modify' access to the address. This access is ended in
+    // ClassHolder's deinitializer.
+    Builtin.beginUnpairedModifyAccess(address._rawValue, accessRecordPtr, type)
+
+    return holder
+  }
+
+  deinit {
+    let accessRecordPtr = Builtin.projectTailElems(self, AccessRecord.self)
+
+    // Ends the access begun in _create().
+    Builtin.endUnpairedAccess(accessRecordPtr)
+  }
 }
 
 // A class that triggers writeback to a pointer when destroyed.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal final class MutatingWritebackBuffer<CurValue, NewValue> {
-  @_versioned // FIXME(sil-serialize-all)
   internal let previous: AnyObject?
-  @_versioned // FIXME(sil-serialize-all)
   internal let base: UnsafeMutablePointer<CurValue>
-  @_versioned // FIXME(sil-serialize-all)
   internal let set: @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer, Int) -> ()
-  @_versioned // FIXME(sil-serialize-all)
   internal let argument: UnsafeRawPointer
-  @_versioned // FIXME(sil-serialize-all)
   internal let argumentSize: Int
-  @_versioned // FIXME(sil-serialize-all)
   internal var value: NewValue
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {
     set(value, &base.pointee, argument, argumentSize)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal
-  init(previous: AnyObject?,
+  internal init(previous: AnyObject?,
        base: UnsafeMutablePointer<CurValue>,
        set: @escaping @convention(thin) (NewValue, inout CurValue, UnsafeRawPointer, Int) -> (),
        argument: UnsafeRawPointer,
@@ -690,30 +703,18 @@ internal final class MutatingWritebackBuffer<CurValue, NewValue> {
 }
 
 // A class that triggers writeback to a non-mutated value when destroyed.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
-  @_versioned // FIXME(sil-serialize-all)
   internal let previous: AnyObject?
-  @_versioned // FIXME(sil-serialize-all)
   internal let base: CurValue
-  @_versioned // FIXME(sil-serialize-all)
   internal let set: @convention(thin) (NewValue, CurValue, UnsafeRawPointer, Int) -> ()
-  @_versioned // FIXME(sil-serialize-all)
   internal let argument: UnsafeRawPointer
-  @_versioned // FIXME(sil-serialize-all)
   internal let argumentSize: Int
-  @_versioned // FIXME(sil-serialize-all)
   internal var value: NewValue
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {
     set(value, base, argument, argumentSize)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal
   init(previous: AnyObject?,
        base: CurValue,
@@ -730,146 +731,148 @@ internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
   }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal struct RawKeyPathComponent {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal init(header: Header, body: UnsafeRawBufferPointer) {
     self.header = header
     self.body = body
   }
 
-  @_versioned // FIXME(sil-serialize-all)
   internal var header: Header
-  @_versioned // FIXME(sil-serialize-all)
   internal var body: UnsafeRawBufferPointer
   
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal struct Header {
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var payloadMask: UInt32 {
       return _SwiftKeyPathComponentHeader_PayloadMask
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var discriminatorMask: UInt32 {
       return _SwiftKeyPathComponentHeader_DiscriminatorMask
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var discriminatorShift: UInt32 {
       return _SwiftKeyPathComponentHeader_DiscriminatorShift
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal static var externalTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_ExternalTag
+    }
     internal static var structTag: UInt32 {
       return _SwiftKeyPathComponentHeader_StructTag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var computedTag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedTag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var classTag: UInt32 {
       return _SwiftKeyPathComponentHeader_ClassTag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var optionalTag: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalTag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var optionalChainPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalChainPayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var optionalWrapPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalWrapPayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var optionalForcePayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OptionalForcePayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+
     internal static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal static var storedMutableFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredMutableFlag
+    }
+    internal static var storedOffsetPayloadMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
+    }
     internal static var outOfLineOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var unresolvedFieldOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var unresolvedIndirectOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal static var maximumOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_MaximumOffsetPayload
+    }
+
+    internal var isStoredMutable: Bool {
+      _sanityCheck(kind == .struct || kind == .class)
+      return _value & Header.storedMutableFlag != 0
+    }
+
     internal static var computedMutatingFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal var isComputedMutating: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedMutatingFlag != 0
+    }
+
     internal static var computedSettableFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedSettableFlag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal var isComputedSettable: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedSettableFlag != 0
+    }
+
     internal static var computedIDByStoredPropertyFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var computedIDByVTableOffsetFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+
     internal static var computedHasArgumentsFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
     }
+    internal var hasComputedArguments: Bool {
+      _sanityCheck(kind == .computed)
+      return _value & Header.computedHasArgumentsFlag != 0
+    }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    // If a computed component is instantiated from an external property
+    // descriptor, and both components carry arguments, we need to carry some
+    // extra matter to be able to map between the client and external generic
+    // contexts.
+    internal static var computedInstantiatedFromExternalWithArgumentsFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_ComputedInstantiatedFromExternalWithArgumentsFlag
+    }
+    internal var isComputedInstantiatedFromExternalWithArguments: Bool {
+      get {
+        _sanityCheck(kind == .computed)
+        return
+          _value & Header.computedInstantiatedFromExternalWithArgumentsFlag != 0
+      }
+      set {
+        _sanityCheck(kind == .computed)
+        _value =
+            _value & ~Header.computedInstantiatedFromExternalWithArgumentsFlag
+          | (newValue ? Header.computedInstantiatedFromExternalWithArgumentsFlag
+                      : 0)
+      }
+    }
+    internal static var externalWithArgumentsExtraSize: Int {
+      return MemoryLayout<Int>.size
+    }
+
     internal static var computedIDResolutionMask: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolutionMask
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var computedIDResolved: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDResolved
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var computedIDUnresolvedIndirectPointer: UInt32 {
       return _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
     }
     
-    @_versioned // FIXME(sil-serialize-all)
     internal var _value: UInt32
     
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var discriminator: UInt32 {
       return (_value & Header.discriminatorMask) >> Header.discriminatorShift
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var payload: UInt32 {
       get {
         return _value & Header.payloadMask
@@ -880,8 +883,20 @@ internal struct RawKeyPathComponent {
         _value = _value & ~Header.payloadMask | newValue
       }
     }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    internal var storedOffsetPayload: UInt32 {
+      get {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        return _value & Header.storedOffsetPayloadMask
+      }
+      set {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        _sanityCheck(newValue & Header.storedOffsetPayloadMask == newValue,
+                     "payload too big")
+        _value = _value & ~Header.storedOffsetPayloadMask | newValue
+      }
+    }
     internal var endOfReferencePrefix: Bool {
       get {
         return _value & Header.endOfReferencePrefixFlag != 0
@@ -895,10 +910,10 @@ internal struct RawKeyPathComponent {
       }
     }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var kind: KeyPathComponentKind {
       switch (discriminator, payload) {
+      case (Header.externalTag, _):
+        return .external
       case (Header.structTag, _):
         return .struct
       case (Header.classTag, _):
@@ -918,60 +933,122 @@ internal struct RawKeyPathComponent {
 
     // The component header is 4 bytes, but may be followed by an aligned
     // pointer field for some kinds of component, forcing padding.
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal static var pointerAlignmentSkew: Int {
       return MemoryLayout<Int>.size - MemoryLayout<Int32>.size
     }
 
+    internal var isTrivialPropertyDescriptor: Bool {
+      return _value ==
+        _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker
+    }
+
+    /// If this is the header for a component in a key path pattern, return
+    /// the size of the body of the component.
+    internal var patternComponentBodySize: Int {
+      return _componentBodySize(forPropertyDescriptor: false)
+    }
+
+    /// If this is the header for a property descriptor, return
+    /// the size of the body of the component.
+    internal var propertyDescriptorBodySize: Int {
+      if isTrivialPropertyDescriptor { return 0 }
+      return _componentBodySize(forPropertyDescriptor: true)
+    }
+
+    internal func _componentBodySize(forPropertyDescriptor: Bool) -> Int {
+      switch kind {
+      case .struct, .class:
+        if storedOffsetPayload == Header.unresolvedFieldOffsetPayload
+           || storedOffsetPayload == Header.outOfLineOffsetPayload {
+          // A 32-bit offset is stored in the body.
+          return MemoryLayout<UInt32>.size
+        }
+        if storedOffsetPayload == Header.unresolvedIndirectOffsetPayload {
+          // A pointer-aligned, pointer-sized pointer is stored in the body.
+          return Header.pointerAlignmentSkew + MemoryLayout<Int>.size
+        }
+        // Otherwise, there's no body.
+        return Header.pointerAlignmentSkew
+
+      case .external:
+        // The body holds a pointer to the external property descriptor,
+        // and some number of substitution arguments, the count of which is
+        // in the payload.
+        return Header.pointerAlignmentSkew
+          + MemoryLayout<Int>.size * (1 + Int(payload))
+
+      case .computed:
+        // The body holds at minimum the id and getter.
+        var size = Header.pointerAlignmentSkew + MemoryLayout<Int>.size * 2
+        // If settable, it also holds the setter.
+        if isComputedSettable {
+          size += MemoryLayout<Int>.size
+        }
+        // If there are arguments, there's also a layout function,
+        // witness table, and initializer function.
+        // Property descriptors never carry argument information, though.
+        if !forPropertyDescriptor && hasComputedArguments {
+          size += MemoryLayout<Int>.size * 3
+        }
+
+        return size
+
+      case .optionalForce, .optionalChain, .optionalWrap:
+        // Otherwise, there's no body.
+        return Header.pointerAlignmentSkew
+      }
+    }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var bodySize: Int {
+    let ptrSize = MemoryLayout<Int>.size
     switch header.kind {
     case .struct, .class:
-      if header.payload == Header.payloadMask { return 4 } // overflowed
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
+        return 4 // overflowed
+      }
       return 0
+    case .external:
+      // align to pointer + pointer to external descriptor
+      // + N generic argument accessors (N in payload)
+      return Header.pointerAlignmentSkew + ptrSize * (1 + Int(header.payload))
     case .optionalChain, .optionalForce, .optionalWrap:
       return 0
     case .computed:
-      let ptrSize = MemoryLayout<Int>.size
       // align to pointer, minimum two pointers for id and get
       var total = Header.pointerAlignmentSkew + ptrSize * 2
       // additional word for a setter
-      if header.payload & Header.computedSettableFlag != 0 {
+      if header.isComputedSettable {
         total += ptrSize
       }
       // include the argument size
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         // two words for argument header: size, witnesses
         total += ptrSize * 2
         // size of argument area
         total += _computedArgumentSize
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          total += Header.externalWithArgumentsExtraSize
+        }
       }
       return total
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _structOrClassOffset: Int {
     _sanityCheck(header.kind == .struct || header.kind == .class,
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
-    if header.payload == Header.outOfLineOffsetPayload {
+    if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
       _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
-    return Int(header.payload)
+    return Int(header.storedOffsetPayload)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedIDValue: Int {
     _sanityCheck(header.kind == .computed,
                  "not a computed property")
@@ -979,8 +1056,6 @@ internal struct RawKeyPathComponent {
                      as: Int.self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedID: ComputedPropertyID {
     let payload = header.payload
     return ComputedPropertyID(
@@ -989,8 +1064,6 @@ internal struct RawKeyPathComponent {
       isTableOffset: payload & Header.computedIDByVTableOffsetFlag != 0)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedGetter: UnsafeRawPointer {
     _sanityCheck(header.kind == .computed,
                  "not a computed property")
@@ -1000,12 +1073,8 @@ internal struct RawKeyPathComponent {
       as: UnsafeRawPointer.self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedSetter: UnsafeRawPointer {
-    _sanityCheck(header.kind == .computed,
-                 "not a computed property")
-    _sanityCheck(header.payload & Header.computedSettableFlag != 0,
+    _sanityCheck(header.isComputedSettable,
                  "not a settable property")
 
     return body.load(
@@ -1019,27 +1088,18 @@ internal struct RawKeyPathComponent {
     (_ patternArguments: UnsafeRawPointer,
      _ instanceArguments: UnsafeMutableRawPointer) -> ()
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedArgumentHeaderPointer: UnsafeRawPointer {
-    _sanityCheck(header.kind == .computed,
-                 "not a computed property")
-    _sanityCheck(header.payload & Header.computedHasArgumentsFlag != 0,
-                 "no arguments")
+    _sanityCheck(header.hasComputedArguments, "no arguments")
 
     return body.baseAddress.unsafelyUnwrapped
       + Header.pointerAlignmentSkew
       + MemoryLayout<Int>.size *
-         (header.payload & Header.computedSettableFlag != 0 ? 3 : 2)
+         (header.isComputedSettable ? 3 : 2)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedArgumentSize: Int {
     return _computedArgumentHeaderPointer.load(as: Int.self)
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal
   var _computedArgumentWitnesses: UnsafePointer<ComputedArgumentWitnesses> {
     return _computedArgumentHeaderPointer.load(
@@ -1047,19 +1107,29 @@ internal struct RawKeyPathComponent {
       as: UnsafePointer<ComputedArgumentWitnesses>.self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedArguments: UnsafeRawPointer {
-    return _computedArgumentHeaderPointer + MemoryLayout<Int>.size * 2
+    var base = _computedArgumentHeaderPointer + MemoryLayout<Int>.size * 2
+    // If the component was instantiated from an external property descriptor
+    // with its own arguments, we include some additional capture info to
+    // be able to map to the original argument context by adjusting the size
+    // passed to the witness operations.
+    if header.isComputedInstantiatedFromExternalWithArguments {
+      base += Header.externalWithArgumentsExtraSize
+    }
+    return base
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var _computedMutableArguments: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(mutating: _computedArguments)
   }
+  internal var _computedArgumentWitnessSizeAdjustment: Int {
+    if header.isComputedInstantiatedFromExternalWithArguments {
+      return _computedArguments.load(
+        fromByteOffset: -Header.externalWithArgumentsExtraSize,
+        as: Int.self)
+    }
+    return 0
+  }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var value: KeyPathComponent {
     switch header.kind {
     case .struct:
@@ -1073,19 +1143,19 @@ internal struct RawKeyPathComponent {
     case .optionalWrap:
       return .optionalWrap
     case .computed:
-      let isSettable = header.payload & Header.computedSettableFlag != 0
-      let isMutating = header.payload & Header.computedMutatingFlag != 0
+      let isSettable = header.isComputedSettable
+      let isMutating = header.isComputedMutating
 
       let id = _computedID
       let get = _computedGetter
-      // Argument value is unused if there are no arguments, so pick something
-      // likely to already be in a register as a default.
+      // Argument value is unused if there are no arguments.
       let argument: KeyPathComponent.ArgumentRef?
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
         argument = KeyPathComponent.ArgumentRef(
           data: UnsafeRawBufferPointer(start: _computedArguments,
                                        count: _computedArgumentSize),
-          witnesses: _computedArgumentWitnesses)
+          witnesses: _computedArgumentWitnesses,
+          witnessSizeAdjustment: _computedArgumentWitnessSizeAdjustment)
       } else {
         argument = nil
       }
@@ -1106,11 +1176,11 @@ internal struct RawKeyPathComponent {
       case (false, true):
         _sanityCheckFailure("impossible")
       }
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal func destroy() {
     switch header.kind {
     case .struct,
@@ -1122,15 +1192,16 @@ internal struct RawKeyPathComponent {
       break
     case .computed:
       // Run destructor, if any
-      if header.payload & Header.computedHasArgumentsFlag != 0,
+      if header.hasComputedArguments,
          let destructor = _computedArgumentWitnesses.pointee.destroy {
-        destructor(_computedMutableArguments, _computedArgumentSize)
+        destructor(_computedMutableArguments,
+                 _computedArgumentSize - _computedArgumentWitnessSizeAdjustment)
       }
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal func clone(into buffer: inout UnsafeMutableRawBufferPointer,
              endOfReferencePrefix: Bool) {
     var newHeader = header
@@ -1141,7 +1212,7 @@ internal struct RawKeyPathComponent {
     switch header.kind {
     case .struct,
          .class:
-      if header.payload == Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
         let overflowOffset = body.load(as: UInt32.self)
         buffer.storeBytes(of: overflowOffset, toByteOffset: 4,
                           as: UInt32.self)
@@ -1155,46 +1226,68 @@ internal struct RawKeyPathComponent {
       // Fields are pointer-aligned after the header
       componentSize += Header.pointerAlignmentSkew
       buffer.storeBytes(of: _computedIDValue,
-                        toByteOffset: MemoryLayout<Int>.size,
+                        toByteOffset: componentSize,
                         as: Int.self)
+      componentSize += MemoryLayout<Int>.size
       buffer.storeBytes(of: _computedGetter,
-                        toByteOffset: 2 * MemoryLayout<Int>.size,
+                        toByteOffset: componentSize,
                         as: UnsafeRawPointer.self)
+      componentSize += MemoryLayout<Int>.size
 
-      var addedSize = MemoryLayout<Int>.size * 2
 
-      if header.payload & Header.computedSettableFlag != 0 {
+      if header.isComputedSettable {
         buffer.storeBytes(of: _computedSetter,
                           toByteOffset: MemoryLayout<Int>.size * 3,
                           as: UnsafeRawPointer.self)
-        addedSize += MemoryLayout<Int>.size
+        componentSize += MemoryLayout<Int>.size
       }
 
-      if header.payload & Header.computedHasArgumentsFlag != 0 {
+      if header.hasComputedArguments {
+        let arguments = _computedArguments
         let argumentSize = _computedArgumentSize
         buffer.storeBytes(of: argumentSize,
-                          toByteOffset: addedSize + MemoryLayout<Int>.size,
+                          toByteOffset: componentSize,
                           as: Int.self)
+        componentSize += MemoryLayout<Int>.size
         buffer.storeBytes(of: _computedArgumentWitnesses,
-                          toByteOffset: addedSize + MemoryLayout<Int>.size * 2,
+                          toByteOffset: componentSize,
                           as: UnsafePointer<ComputedArgumentWitnesses>.self)
+        componentSize += MemoryLayout<Int>.size
+
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          // Include the extra matter for components instantiated from
+          // external property descriptors with arguments.
+          buffer.storeBytes(of: _computedArgumentWitnessSizeAdjustment,
+                            toByteOffset: componentSize,
+                            as: Int.self)
+          componentSize += MemoryLayout<Int>.size
+        }
+        let adjustedSize = argumentSize - _computedArgumentWitnessSizeAdjustment
+        let argumentDest =
+          buffer.baseAddress.unsafelyUnwrapped + componentSize
         _computedArgumentWitnesses.pointee.copy(
-          _computedArguments,
-          buffer.baseAddress.unsafelyUnwrapped + addedSize
-                                               + MemoryLayout<Int>.size * 3,
-          argumentSize)
-        addedSize += MemoryLayout<Int>.size * 2 + argumentSize
+          arguments,
+          argumentDest,
+          adjustedSize)
+        if header.isComputedInstantiatedFromExternalWithArguments {
+          // The extra information for external property descriptor arguments
+          // can always be memcpy'd.
+          _memcpy(dest: argumentDest + adjustedSize,
+                  src: arguments + adjustedSize,
+                  size: UInt(_computedArgumentWitnessSizeAdjustment))
+        }
+
+        componentSize += argumentSize
       }
 
-      componentSize += addedSize
+    case .external:
+      _sanityCheckFailure("should have been instantiated away")
     }
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
       count: buffer.count - componentSize)
   }
 
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal enum ProjectionResult<NewValue, LeafValue> {
     /// Continue projecting the key path with the given new value.
     case `continue`(NewValue)
@@ -1202,8 +1295,6 @@ internal struct RawKeyPathComponent {
     /// result of the projection.
     case `break`(LeafValue)
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var assumingContinue: NewValue {
       switch self {
       case .continue(let x):
@@ -1214,9 +1305,7 @@ internal struct RawKeyPathComponent {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func projectReadOnly<CurValue, NewValue, LeafValue>(
+  internal func _projectReadOnly<CurValue, NewValue, LeafValue>(
     _ base: CurValue,
     to: NewValue.Type,
     endingWith: LeafValue.Type
@@ -1237,7 +1326,15 @@ internal struct RawKeyPathComponent {
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
       defer { _fixLifetime(baseObj) }
-      return .continue(basePtr.advanced(by: offset)
+
+      let offsetAddress = basePtr.advanced(by: offset)
+
+      // Perform an instaneous record access on the address in order to
+      // ensure that the read will not conflict with an already in-progress
+      // 'modify' access.
+      Builtin.performInstantaneousReadAccess(offsetAddress._rawValue,
+        NewValue.self)
+      return .continue(offsetAddress
         .assumingMemoryBound(to: NewValue.self)
         .pointee)
 
@@ -1277,9 +1374,7 @@ internal struct RawKeyPathComponent {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func projectMutableAddress<CurValue, NewValue>(
+  internal func _projectMutableAddress<CurValue, NewValue>(
     _ base: UnsafeRawPointer,
     from _: CurValue.Type,
     to _: NewValue.Type,
@@ -1297,12 +1392,16 @@ internal struct RawKeyPathComponent {
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
       let object = base.assumingMemoryBound(to: AnyObject.self).pointee
-      // The base ought to be kept alive for the duration of the derived access
-      keepAlive = keepAlive == nil
-        ? object
-        : ClassHolder(previous: keepAlive, instance: object)
-      return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
+      let offsetAddress = UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
             .advanced(by: offset)
+
+      // Keep the  base alive for the duration of the derived access and also
+      // enforce exclusive access to the address.
+      keepAlive = ClassHolder._create(previous: keepAlive, instance: object,
+                                      accessingAddress: offsetAddress,
+                                      type: NewValue.self)
+
+      return offsetAddress
     
     case .mutatingGetSet(id: _, get: let rawGet, set: let rawSet,
                          argument: let argument):
@@ -1375,47 +1474,31 @@ internal struct RawKeyPathComponent {
   }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal struct KeyPathBuffer {
-  @_versioned // FIXME(sil-serialize-all)
   internal var data: UnsafeRawBufferPointer
-  @_versioned // FIXME(sil-serialize-all)
   internal var trivial: Bool
-  @_versioned // FIXME(sil-serialize-all)
   internal var hasReferencePrefix: Bool
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal var mutableData: UnsafeMutableRawBufferPointer {
     return UnsafeMutableRawBufferPointer(mutating: data)
   }
 
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal struct Header {
-    @_versioned // FIXME(sil-serialize-all)
     internal var _value: UInt32
     
-    @_versioned // FIXME(sil-serialize-all)
     internal static var sizeMask: UInt32 {
       return _SwiftKeyPathBufferHeader_SizeMask
     }
-    @_versioned // FIXME(sil-serialize-all)
     internal static var reservedMask: UInt32 {
       return _SwiftKeyPathBufferHeader_ReservedMask
     }
-    @_versioned // FIXME(sil-serialize-all)
     internal static var trivialFlag: UInt32 {
       return _SwiftKeyPathBufferHeader_TrivialFlag
     }
-    @_versioned // FIXME(sil-serialize-all)
     internal static var hasReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathBufferHeader_HasReferencePrefixFlag
     }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
       _sanityCheck(size <= Int(Header.sizeMask), "key path too big")
       _value = UInt32(size)
@@ -1423,14 +1506,8 @@ internal struct KeyPathBuffer {
         | (hasReferencePrefix ? Header.hasReferencePrefixFlag : 0)
     }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var size: Int { return Int(_value & Header.sizeMask) }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var trivial: Bool { return _value & Header.trivialFlag != 0 }
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var hasReferencePrefix: Bool {
       get {
         return _value & Header.hasReferencePrefixFlag != 0
@@ -1446,22 +1523,16 @@ internal struct KeyPathBuffer {
 
     // In a key path pattern, the "trivial" flag is used to indicate
     // "instantiable in-line"
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal var instantiableInLine: Bool {
       return trivial
     }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
     internal func validateReservedBits() {
       _precondition(_value & Header.reservedMask == 0,
                     "Reserved bits set to an unexpected bit pattern")
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal init(base: UnsafeRawPointer) {
     let header = base.load(as: Header.self)
     data = UnsafeRawBufferPointer(
@@ -1470,9 +1541,15 @@ internal struct KeyPathBuffer {
     trivial = header.trivial
     hasReferencePrefix = header.hasReferencePrefix
   }
+
+  internal init(partialData: UnsafeRawBufferPointer,
+                trivial: Bool = false,
+                hasReferencePrefix: Bool = false) {
+    self.data = partialData
+    self.trivial = trivial
+    self.hasReferencePrefix = hasReferencePrefix
+  }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal func destroy() {
     // Short-circuit if nothing in the object requires destruction.
     if trivial { return }
@@ -1485,8 +1562,6 @@ internal struct KeyPathBuffer {
     }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal mutating func next() -> (RawKeyPathComponent, Any.Type?) {
     let header = pop(RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
@@ -1501,7 +1576,7 @@ internal struct KeyPathBuffer {
     let size = component.bodySize
     component.body = UnsafeRawBufferPointer(start: component.body.baseAddress,
                                             count: size)
-    _ = popRaw(size: size, alignment: 1)
+    _ = popRaw(size: size, alignment: Int8.self)
 
     // fetch type, which is in the buffer unless it's the final component
     let nextType: Any.Type?
@@ -1513,12 +1588,10 @@ internal struct KeyPathBuffer {
     return (component, nextType)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   internal mutating func pop<T>(_ type: T.Type) -> T {
     _sanityCheck(_isPOD(T.self), "should be POD")
     let raw = popRaw(size: MemoryLayout<T>.size,
-                     alignment: MemoryLayout<T>.alignment)
+                     alignment: T.self)
     let resultBuf = UnsafeMutablePointer<T>.allocate(capacity: 1)
     _memcpy(dest: resultBuf,
             src: raw.baseAddress.unsafelyUnwrapped,
@@ -1527,29 +1600,21 @@ internal struct KeyPathBuffer {
     resultBuf.deallocate()
     return result
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal
-  mutating func popRaw(size: Int, alignment: Int) -> UnsafeRawBufferPointer {
-    var baseAddress = data.baseAddress.unsafelyUnwrapped
-    var misalignment = Int(bitPattern: baseAddress) % alignment
-    if misalignment != 0 {
-      misalignment = alignment - misalignment
-      baseAddress += misalignment
-    }
-
-    let result = UnsafeRawBufferPointer(start: baseAddress, count: size)
+  internal mutating func popRaw<Alignment>(
+    size: Int, alignment: Alignment.Type
+  ) -> UnsafeRawBufferPointer {
+    data = MemoryLayout<Alignment>._roundingUpBaseToAlignment(data)
+    let result = UnsafeRawBufferPointer(start: data.baseAddress, count: size)
     data = UnsafeRawBufferPointer(
-      start: baseAddress + size,
-      count: data.count - size - misalignment
-    )
+      start: data.baseAddress.unsafelyUnwrapped + size,
+      count: data.count - size)
     return result
   }
 }
 
 // MARK: Library intrinsics for projecting key paths.
 
-@_inlineable
+@inlinable
 public // COMPILER_INTRINSIC
 func _projectKeyPathPartial<Root>(
   root: Root,
@@ -1562,7 +1627,7 @@ func _projectKeyPathPartial<Root>(
   return _openExistential(type(of: keyPath).valueType, do: open)
 }
 
-@_inlineable
+@inlinable
 public // COMPILER_INTRINSIC
 func _projectKeyPathAny<RootValue>(
   root: RootValue,
@@ -1582,31 +1647,39 @@ func _projectKeyPathAny<RootValue>(
   return _openExistential(keyPathRoot, do: openRoot)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable
 public // COMPILER_INTRINSIC
 func _projectKeyPathReadOnly<Root, Value>(
   root: Root,
   keyPath: KeyPath<Root, Value>
 ) -> Value {
-  return keyPath.projectReadOnly(from: root)
+  return keyPath._projectReadOnly(from: root)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// The compiler can't tell which calls might begin an access.
+// That means it can't eliminate dominated checks even when it can prove
+// that the dominated scope has no internal nested conflicts.
+// We use the @_semantics("keypath.entry") annotation:
+// This doesn't solve the deinit ending a scope problem,
+// but it solves the much more important half of the problem:
+// identifying the beginning of an access scope -
+// would allow dominance based optimization:
+@_semantics("keypath.entry")
 public // COMPILER_INTRINSIC
 func _projectKeyPathWritable<Root, Value>(
   root: UnsafeMutablePointer<Root>,
   keyPath: WritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath.projectMutableAddress(from: root)
+  return keyPath._projectMutableAddress(from: root)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@_semantics("keypath.entry")
 public // COMPILER_INTRINSIC
 func _projectKeyPathReferenceWritable<Root, Value>(
   root: Root,
   keyPath: ReferenceWritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath.projectMutableAddress(from: root)
+  return keyPath._projectMutableAddress(from: root)
 }
 
 // MARK: Appending type system
@@ -1650,7 +1723,7 @@ extension _AppendKeyPath where Self == AnyKeyPath {
   /// - Returns: A key path from the root of this key path and the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending(path: AnyKeyPath) -> AnyKeyPath? {
     return _tryToAppendKeyPaths(root: self, leaf: path)
   }
@@ -1683,7 +1756,7 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
   /// - Returns: A key path from the root of this key path and the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root>(path: AnyKeyPath) -> PartialKeyPath<Root>?
   where Self == PartialKeyPath<Root> {
     return _tryToAppendKeyPaths(root: self, leaf: path)
@@ -1714,7 +1787,7 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
   /// - Returns: A key path from the root of this key path to the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, AppendedRoot, AppendedValue>(
     path: KeyPath<AppendedRoot, AppendedValue>
   ) -> KeyPath<Root, AppendedValue>?
@@ -1733,7 +1806,7 @@ extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
   /// - Returns: A key path from the root of this key path to the value type
   ///   of `path`, if `path` can be appended. If `path` can't be appended,
   ///   returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, AppendedRoot, AppendedValue>(
     path: ReferenceWritableKeyPath<AppendedRoot, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>?
@@ -1759,7 +1832,7 @@ extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
   /// - Parameter path: The key path to append.
   /// - Returns: A key path from the root of this key path to the value type of
   ///   `path`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, Value, AppendedValue>(
     path: KeyPath<Value, AppendedValue>
   ) -> KeyPath<Root, AppendedValue>
@@ -1788,7 +1861,7 @@ extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
   /// - Parameter path: The key path to append.
   /// - Returns: A key path from the root of this key path to the value type of
   ///   `path`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, Value, AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>
@@ -1808,7 +1881,7 @@ extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
   /// - Parameter path: The key path to append.
   /// - Returns: A key path from the root of this key path to the value type of
   ///   `path`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, Value, AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> WritableKeyPath<Root, AppendedValue>
@@ -1826,7 +1899,7 @@ extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
   /// - Parameter path: The key path to append.
   /// - Returns: A key path from the root of this key path to the value type of
   ///   `path`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, Value, AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>
@@ -1846,7 +1919,7 @@ extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
   /// - Parameter path: The key path to append.
   /// - Returns: A key path from the root of this key path to the value type of
   ///   `path`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public func appending<Root, Value, AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>
@@ -1855,9 +1928,8 @@ extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
   }
 }
 
-// internal-with-availability
-@_inlineable // FIXME(sil-serialize-all)
-public func _tryToAppendKeyPaths<Result: AnyKeyPath>(
+@usableFromInline
+internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
   root: AnyKeyPath,
   leaf: AnyKeyPath
 ) -> Result? {
@@ -1884,9 +1956,8 @@ public func _tryToAppendKeyPaths<Result: AnyKeyPath>(
   return _openExistential(rootRoot, do: open)
 }
 
-// internal-with-availability
-@_inlineable // FIXME(sil-serialize-all)
-public func _appendingKeyPaths<
+@usableFromInline
+internal func _appendingKeyPaths<
   Root, Value, AppendedValue,
   Result: KeyPath<Root, AppendedValue>
 >(
@@ -1898,14 +1969,24 @@ public func _appendingKeyPaths<
     var rootBuffer = $0
     return leaf.withBuffer {
       var leafBuffer = $0
+
+      // If either operand is the identity key path, then we should return
+      // the other operand back untouched.
+      if leafBuffer.data.isEmpty {
+        return unsafeDowncast(root, to: Result.self)
+      }
+      if rootBuffer.data.isEmpty {
+        return unsafeDowncast(leaf, to: Result.self)
+      }
+
       // Reserve room for the appended KVC string, if both key paths are
       // KVC-compatible.
       let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
 
       if let rootPtr = root._kvcKeyPathStringPtr,
          let leafPtr = leaf._kvcKeyPathStringPtr {
-        rootKVCLength = Int(_stdlib_strlen(rootPtr))
-        leafKVCLength = Int(_stdlib_strlen(leafPtr))
+        rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
+        leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
         appendedKVCLength = rootKVCLength + 1 + leafKVCLength
       } else {
@@ -1917,12 +1998,12 @@ public func _appendingKeyPaths<
       // Result buffer has room for both key paths' components, plus the
       // header, plus space for the middle type.
       // Align up the root so that we can put the component type after it.
-      let alignMask = MemoryLayout<Int>.alignment - 1
-      let rootSize = (rootBuffer.data.count + alignMask) & ~alignMask
+      let rootSize = MemoryLayout<Int>._roundingUpToAlignment(rootBuffer.data.count)
       let resultSize = rootSize + leafBuffer.data.count
         + 2 * MemoryLayout<Int>.size
       // Tail-allocate space for the KVC string.
-      let totalResultSize = (resultSize + appendedKVCLength + 3) & ~3
+      let totalResultSize = MemoryLayout<Int32>
+        ._roundingUpToAlignment(resultSize + appendedKVCLength)
 
       var kvcStringBuffer: UnsafeMutableRawPointer? = nil
 
@@ -2048,15 +2129,15 @@ public func _appendingKeyPaths<
 // buffer header. Includes the size of the Swift heap object header and the
 // pointer to the KVC string.
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal var keyPathObjectHeaderSize: Int {
   return MemoryLayout<HeapObject>.size + MemoryLayout<Int>.size
 }
 
 // Runtime entry point to instantiate a key path object.
-@_inlineable // FIXME(sil-serialize-all)
-@_cdecl("swift_getKeyPath")
+// Note that this has a compatibility override shim in the runtime so that
+// future compilers can backward-deploy support for instantiating new key path
+// pattern features.
+@_cdecl("swift_getKeyPathImpl")
 public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
                               arguments: UnsafeRawPointer)
     -> UnsafeRawPointer {
@@ -2092,31 +2173,50 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   if bufferHeader.instantiableInLine {
     Builtin.onceWithContext(oncePtr._rawValue, _getKeyPath_instantiateInline,
                             patternPtr._rawValue)
+
     // Return the instantiated object at +1.
-    // TODO: This will be unnecessary once we support global objects with inert
-    // refcounting.
-    let object = Unmanaged<AnyKeyPath>.fromOpaque(patternPtr)
+    let objectPtr: UnsafeRawPointer
+
+    // If in-place instantiation failed, then the first word of the pattern
+    // buffer will be null, and the second word will contain the out-of-line
+    // object that was instantiated instead.
+    let firstWord = patternPtr.load(as: UnsafeRawPointer?.self)
+    if firstWord == nil {
+      objectPtr = patternPtr.load(fromByteOffset: MemoryLayout<Int>.size,
+                                  as: UnsafeRawPointer.self)
+    } else {
+      objectPtr = UnsafeRawPointer(patternPtr)
+    }
+
+    let object = Unmanaged<AnyKeyPath>.fromOpaque(objectPtr)
+    // TODO: This retain will be unnecessary once we support global objects
+    // with inert refcounting.
     _ = object.retain()
-    return UnsafeRawPointer(patternPtr)
+    return objectPtr
   }
 
   // Otherwise, instantiate a new key path object modeled on the pattern.
-  return _getKeyPath_instantiatedOutOfLine(patternPtr, arguments)
-}
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-internal func _getKeyPath_instantiatedOutOfLine(
-  _ pattern: UnsafeRawPointer,
-  _ arguments: UnsafeRawPointer)
-    -> UnsafeRawPointer {
   // Do a pass to determine the class of the key path we'll be instantiating
   // and how much space we'll need for it.
   let (keyPathClass, rootType, size, alignmentMask)
-    = _getKeyPathClassAndInstanceSizeFromPattern(pattern, arguments)
-  _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
-               "overalignment not implemented")
+    = _getKeyPathClassAndInstanceSizeFromPattern(patternPtr, arguments)
+  return _getKeyPath_instantiateOutOfLine(
+    pattern: patternPtr,
+    arguments: arguments,
+    keyPathClass: keyPathClass,
+    rootType: rootType,
+    size: size,
+    alignmentMask: alignmentMask)
+}
 
+internal func _getKeyPath_instantiateOutOfLine(
+  pattern: UnsafeRawPointer,
+  arguments: UnsafeRawPointer,
+  keyPathClass: AnyKeyPath.Type,
+  rootType: Any.Type,
+  size: Int,
+  alignmentMask: Int)
+    -> UnsafeRawPointer {
   // Allocate the instance.
   let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
     // Instantiate the pattern into the instance.
@@ -2134,8 +2234,6 @@ internal func _getKeyPath_instantiatedOutOfLine(
   return UnsafeRawPointer(Unmanaged.passRetained(instance).toOpaque())
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal func _getKeyPath_instantiateInline(
   _ objectRawPtr: Builtin.RawPointer
 ) {
@@ -2157,26 +2255,38 @@ internal func _getKeyPath_instantiateInline(
     start: bufferPtr,
     count: instantiatedSize)
 
-  // TODO: Eventually, we'll need to handle cases where the instantiated
-  // key path has a larger size than the pattern (because it involves
-  // resilient types, for example), and fall back to out-of-place instantiation
-  // when that happens.
+  // Do the instantiation in place if the final object fits.
+  if instantiatedSize <= totalSize {
+    _instantiateKeyPathBuffer(buffer, bufferData, rootType, bufferPtr)
 
-  _sanityCheck(instantiatedSize <= totalSize,
-               "size-increasing in-place instantiation not implemented")
+    _swift_instantiateInertHeapObject(objectPtr,
+      unsafeBitCast(keyPathClass, to: OpaquePointer.self))
+  } else {
+    // Otherwise, we'll need to instantiate out-of-place.
+    let object = _getKeyPath_instantiateOutOfLine(
+      pattern: objectPtr,
+      arguments: objectPtr,
+      keyPathClass: keyPathClass,
+      rootType: rootType,
+      size: instantiatedSize,
+      alignmentMask: alignmentMask)
 
-  // Instantiate the pattern in place.
-  _instantiateKeyPathBuffer(buffer, bufferData, rootType, bufferPtr)
+    // Write a null pointer to the first word of the in-place buffer as
+    // a signal that this isn't a valid object.
+    // We rely on the heap object header size being >=2 words to get away with
+    // this.
+    assert(keyPathObjectHeaderSize >= MemoryLayout<Int>.size * 2)
+    objectPtr.storeBytes(of: nil, as: UnsafeRawPointer?.self)
 
-  _swift_instantiateInertHeapObject(objectPtr,
-    unsafeBitCast(keyPathClass, to: OpaquePointer.self))
+    // Put the pointer to the out-of-line object in the second word.
+    objectPtr.storeBytes(of: object, toByteOffset: MemoryLayout<Int>.size,
+                         as: UnsafeRawPointer.self)
+  }
 }
 
 internal typealias MetadataAccessor =
   @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal func _getKeyPathClassAndInstanceSizeFromPattern(
   _ pattern: UnsafeRawPointer,
   _ arguments: UnsafeRawPointer
@@ -2202,49 +2312,36 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   let bufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
   var buffer = KeyPathBuffer(base: bufferPtr)
   var size = buffer.data.count + MemoryLayout<Int>.size
-  var alignmentMask = MemoryLayout<Int>.alignment - 1
 
-  while true {
+  if !buffer.data.isEmpty {
+   while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
-    func popOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
-        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
-        _ = buffer.pop(UInt32.self)
-      }
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
-        _ = buffer.pop(Int.self)
-        // On 64-bit systems the pointer to the ivar offset variable is
-        // pointer-sized and -aligned, but the resulting offset ought to be
-        // 32 bits only and fit into padding between the 4-byte header and
-        // pointer-aligned type word. We don't need this space after
-        // instantiation.
-        if MemoryLayout<Int>.size == 8 {
-          size -= MemoryLayout<UnsafeRawPointer>.size
-        }
+    // Ensure that we pop an amount of data consistent with what
+    // RawKeyPathComponent.Header.patternComponentBodySize computes.
+    var bufferSizeBefore = 0
+    var expectedPop = 0
+
+    _sanityCheck({
+      bufferSizeBefore = buffer.data.count
+      expectedPop = header.patternComponentBodySize
+      return true
+    }())
+
+    func setStoredCapability(for header: RawKeyPathComponent.Header) {
+      // Mutable class properties can be the root of a reference mutation.
+      // Mutable struct properties pass through the existing capability.
+      if header.isStoredMutable {
+        if header.kind == .class { capability = .reference }
+      } else {
+        // Immutable properties can only be read.
+        capability = .readOnly
       }
     }
 
-    switch header.kind {
-    case .struct:
-      // No effect on the capability.
-      // TODO: we should dynamically prevent "let" properties from being
-      // reassigned.
-      popOffset()
-    case .class:
-      // The rest of the key path could be reference-writable.
-      // TODO: we should dynamically prevent "let" properties from being
-      // reassigned.
-      capability = .reference
-      popOffset()
-    case .computed:
-      let settable =
-        header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-      let mutating =
-        header.payload & RawKeyPathComponent.Header.computedMutatingFlag != 0
-
-      let hasArguments =
-        header.payload & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0
+    func setComputedCapability(for header: RawKeyPathComponent.Header) {
+      let settable = header.isComputedSettable
+      let mutating = header.isComputedMutating
 
       switch (settable, mutating) {
       case (false, false):
@@ -2259,16 +2356,190 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       case (false, true):
         _sanityCheckFailure("unpossible")
       }
+    }
+
+    switch header.kind {
+    case .class, .struct:
+      setStoredCapability(for: header)
+
+      // Check the final instantiated size of the offset.
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
+        || header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        _ = buffer.pop(UInt32.self)
+      }
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+        _ = buffer.pop(Int.self)
+        // On 64-bit systems the pointer to the ivar offset variable is
+        // pointer-sized and -aligned, but the resulting offset ought to be
+        // 32 bits only and fit into padding between the 4-byte header and
+        // pointer-aligned type word. We don't need this space after
+        // instantiation.
+        if MemoryLayout<Int>.size == 8 {
+          size -= MemoryLayout<UnsafeRawPointer>.size
+        }
+      }
+
+    case .external:
+      // Look at the external property descriptor to see if we should take it
+      // over the component given in the pattern.
+      let genericParamCount = Int(header.payload)
+      let descriptor = buffer.pop(UnsafeRawPointer.self)
+      let descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+      if descriptorHeader.isTrivialPropertyDescriptor {
+        // If the descriptor is trivial, then use the local candidate.
+        // Leave this external reference out of the final object size.
+        size -= (2 + genericParamCount) * MemoryLayout<Int>.size
+        // Skip the generic parameter accessors to get to the local candidate.
+        _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
+                          alignment: Int.self)
+        continue
+      }
+
+      // Drop this external reference...
+      size -= (header.patternComponentBodySize
+               + MemoryLayout<RawKeyPathComponent.Header>.size)
+      _ = buffer.popRaw(size: MemoryLayout<Int>.size * genericParamCount,
+                        alignment: Int.self)
+      // ...and the local candidate, which is the component following this
+      // one.
+      let localCandidateHeader = buffer.pop(RawKeyPathComponent.Header.self)
+      let localCandidateSize = localCandidateHeader.patternComponentBodySize
+      size -= (localCandidateSize
+               + MemoryLayout<RawKeyPathComponent.Header>.size)
+
+      // (Note that we don't pop the local candidate from the pattern buffer
+      // just yet, since we may need parts of it to instantiate the final
+      // component in some cases below. It still ought to be consumed
+      // in the computation below.)
+      _sanityCheck({
+        expectedPop += localCandidateSize
+                    +  MemoryLayout<RawKeyPathComponent.Header>.size
+        return true
+      }())
+
+      // Measure the instantiated size of the external component.
+      let newComponentSize: Int
+      switch descriptorHeader.kind {
+      case .class, .struct:
+        setStoredCapability(for: descriptorHeader)
+
+        // Discard the local candidate.
+        _ = buffer.popRaw(size: localCandidateSize,
+                          alignment: Int32.self)
+
+        // The final component will be a stored component with just an offset.
+        // If the offset requires resolution, then it'll be stored out of
+        // line after the header.
+        if descriptorHeader.storedOffsetPayload
+            > RawKeyPathComponent.Header.maximumOffsetPayload {
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + MemoryLayout<UInt32>.size
+        } else {
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+        }
+
+      case .computed:
+        // The final component will be an instantiation of the computed
+        // component.
+        setComputedCapability(for: descriptorHeader)
+
+        // If the external declaration is computed, and it takes captured
+        // arguments, then we have to build a bit of a chimera. The canonical
+        // identity and accessors come from the descriptor, but the argument
+        // handling is still as described in the local candidate.
+        if descriptorHeader.hasComputedArguments {
+          // We always start with the buffer size and witnesses.
+          var argumentBufferSize = MemoryLayout<Int>.size * 2
+
+          if localCandidateHeader.kind == .computed
+              && localCandidateHeader.hasComputedArguments {
+            // We don't need the local candidate's accessors.
+            _ /*id*/ = buffer.pop(UnsafeRawPointer.self)
+            _ /*getter*/ = buffer.pop(UnsafeRawPointer.self)
+            if localCandidateHeader.isComputedSettable {
+              _ /*setter*/ = buffer.pop(UnsafeRawPointer.self)
+            }
+
+            // Get the instantiated size of the component's own argument
+            // file.
+            let getLayoutRaw = buffer.pop(UnsafeRawPointer.self)
+            let _ /*witnesses*/ = buffer.pop(UnsafeRawPointer.self)
+            let _ /*initializer*/ = buffer.pop(UnsafeRawPointer.self)
+
+            let getLayout = unsafeBitCast(getLayoutRaw,
+              to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
+
+            let (addedSize, addedAlignmentMask) = getLayout(arguments)
+            // TODO: Handle over-aligned values
+            _sanityCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+                         "overaligned computed property element not supported")
+
+            argumentBufferSize += addedSize
+
+            // If the property descriptor also has generic arguments, we need
+            // to store the size so we can invoke the local witnesses on
+            // the arguments. We'll also store those generic arguments at
+            // pointer alignment after the local candidate's arguments.
+            if genericParamCount > 0 {
+              argumentBufferSize =
+                MemoryLayout<Int>._roundingUpToAlignment(argumentBufferSize)
+              argumentBufferSize +=
+                RawKeyPathComponent.Header.externalWithArgumentsExtraSize
+            }
+          } else {
+            // If the local candidate has no arguments, then things are a
+            // little easier. We only need to instantiate the generic arguments
+            // for the external component's accessors.
+            // Discard the local candidate.
+            _ = buffer.popRaw(size: localCandidateSize,
+                              alignment: UInt32.self)
+          }
+
+          // Add the property descriptor's generic arguments to the end, if
+          // any.
+          if genericParamCount > 0 {
+            argumentBufferSize += MemoryLayout<Int>.size * genericParamCount
+          }
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + descriptorHeader.propertyDescriptorBodySize
+                           + argumentBufferSize
+        } else {
+          // If there aren't any captured arguments expected in the external
+          // component, then we only need to adopt its accessors.
+          // Discard the local candidate.
+          _ = buffer.popRaw(size: localCandidateSize,
+                            alignment: UInt32.self)
+          // With no arguments, the instantiated size will be the
+          // same as the pattern size.
+          newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
+                           + descriptorHeader.propertyDescriptorBodySize
+        }
+
+      case .external, .optionalChain, .optionalForce, .optionalWrap:
+        _sanityCheckFailure("should not appear as property descriptor")
+      }
+
+      // Round up to pointer alignment if there are following components.
+      if !buffer.data.isEmpty {
+        size += MemoryLayout<Int>._roundingUpToAlignment(newComponentSize)
+      } else {
+        size += newComponentSize
+      }
+
+    case .computed:
+      let settable = header.isComputedSettable
+      let hasArguments = header.hasComputedArguments
+
+      setComputedCapability(for: header)
 
       _ = buffer.popRaw(size: MemoryLayout<Int>.size * (settable ? 3 : 2),
-                        alignment: MemoryLayout<Int>.alignment)
+                        alignment: Int.self)
 
       // Get the instantiated size and alignment of the argument payload
       // by asking the layout function to compute it for our given argument
       // file.
       if hasArguments {
-        let getLayoutRaw =
-          buffer.pop(UnsafeRawPointer.self)
+        let getLayoutRaw = buffer.pop(UnsafeRawPointer.self)
         let _ /*witnesses*/ = buffer.pop(UnsafeRawPointer.self)
         let _ /*initializer*/ = buffer.pop(UnsafeRawPointer.self)
 
@@ -2282,7 +2553,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
         // Argument payload replaces the space taken by the initializer
         // function pointer in the pattern.
-        size += (addedSize + alignmentMask) & ~alignmentMask
+        size += MemoryLayout<Int>._roundingUpToAlignment(addedSize)
               - MemoryLayout<Int>.size
       }
 
@@ -2297,13 +2568,33 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       break
     }
 
+    // Check that we consumed the expected amount of data from the pattern.
+    _sanityCheck(
+      {
+        // Round the amount of data we read up to alignment to include padding,
+        // skewed by the header size.
+        let popped = MemoryLayout<Int>._roundingUpToAlignment(
+           bufferSizeBefore - buffer.data.count
+           - RawKeyPathComponent.Header.pointerAlignmentSkew)
+          + RawKeyPathComponent.Header.pointerAlignmentSkew
+
+        return expectedPop == popped
+      }(),
+      """
+      component size consumed during instance size measurement does not match \
+      component size returned by patternComponentBodySize
+      """)
+
     // Break if this is the last component.
     if buffer.data.count == 0 { break }
 
     // Pop the type accessor reference.
     _ = buffer.popRaw(size: MemoryLayout<Int>.size,
-                      alignment: MemoryLayout<Int>.alignment)
+                      alignment: Int.self)
+   }
   }
+
+  _sanityCheck(buffer.data.isEmpty, "didn't read entire pattern")
 
   // Chaining always renders the whole key path read-only.
   if didChain {
@@ -2327,11 +2618,11 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   let classTy = _openExistential(root, do: openRoot)
 
   return (keyPathClass: classTy, rootType: root,
-          size: size, alignmentMask: alignmentMask)
+          size: size,
+          // FIXME: Handle overalignment
+          alignmentMask: MemoryLayout<Int>._alignmentMask)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 internal func _instantiateKeyPathBuffer(
   _ origPatternBuffer: KeyPathBuffer,
   _ origDestData: UnsafeMutableRawBufferPointer,
@@ -2377,35 +2668,55 @@ internal func _instantiateKeyPathBuffer(
   var base: Any.Type = rootType
   // Some pattern forms are pessimistically larger than what we need in the
   // instantiated key path. Keep track of this.
-  while true {
+  if !patternBuffer.data.isEmpty {
+   while true {
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
 
+    // Ensure that we pop an amount of data consistent with what
+    // RawKeyPathComponent.Header.patternComponentBodySize computes.
+    var bufferSizeBefore = 0
+    var expectedPop = 0
 
-    func tryToResolveOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
+    _sanityCheck({
+      bufferSizeBefore = patternBuffer.data.count
+      expectedPop = header.patternComponentBodySize
+      return true
+    }())
+
+    func tryToResolveOffset(header: RawKeyPathComponent.Header,
+                            getOutOfLineOffset: () -> UInt32) {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
         // Look up offset in type metadata. The value in the pattern is the
         // offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
-        let offsetOfOffset = patternBuffer.pop(UInt32.self)
-        let offset = UInt32(metadataPtr.load(fromByteOffset: Int(offsetOfOffset),
-                                       as: UInt.self))
+        let offsetOfOffset = getOutOfLineOffset()
+
+        let offset: UInt32
+        if (header.kind == .struct) {
+          offset = UInt32(metadataPtr.load(fromByteOffset: Int(offsetOfOffset),
+                                           as: UInt32.self))
+        } else {
+          offset = UInt32(metadataPtr.load(fromByteOffset: Int(offsetOfOffset),
+                                           as: UInt.self))
+        }
+
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offset)
         return
       }
 
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
         let offsetVar = patternBuffer.pop(UnsafeRawPointer.self)
         let offsetValue = UInt32(offsetVar.load(as: UInt.self))
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offsetValue)
         return
@@ -2413,39 +2724,23 @@ internal func _instantiateKeyPathBuffer(
 
       // Otherwise, just transfer the pre-resolved component.
       pushDest(header)
-      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
-        let offset = patternBuffer.pop(UInt32.self)
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        let offset = getOutOfLineOffset() //patternBuffer.pop(UInt32.self)
         pushDest(offset)
       }
     }
 
-    switch header.kind {
-    case .struct:
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
-    case .class:
-      // Crossing a class can end the reference prefix, and makes the following
-      // key path potentially reference-writable.
-      endOfReferencePrefixComponent = previousComponentAddr
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
-    case .optionalChain,
-         .optionalWrap,
-         .optionalForce:
-      // No instantiation necessary.
-      pushDest(header)
-      break
-    case .computed:
+    func tryToResolveComputedAccessors(header: RawKeyPathComponent.Header,
+                                       accessorsBuffer: inout KeyPathBuffer) {
       // A nonmutating settable property can end the reference prefix and
       // makes the following key path potentially reference-writable.
-      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0
-         && header.payload & RawKeyPathComponent.Header.computedMutatingFlag == 0 {
+      if header.isComputedSettable && !header.isComputedMutating {
         endOfReferencePrefixComponent = previousComponentAddr
       }
 
       // The ID may need resolution if the property is keyed by a selector.
       var newHeader = header
-      var id = patternBuffer.pop(Int.self)
+      var id = accessorsBuffer.pop(Int.self)
       switch header.payload
                          & RawKeyPathComponent.Header.computedIDResolutionMask {
       case RawKeyPathComponent.Header.computedIDResolved:
@@ -2463,48 +2758,276 @@ internal func _instantiateKeyPathBuffer(
       pushDest(newHeader)
       pushDest(id)
       // Carry over the accessors.
-      let getter = patternBuffer.pop(UnsafeRawPointer.self)
+      let getter = accessorsBuffer.pop(UnsafeRawPointer.self)
       pushDest(getter)
-      if header.payload & RawKeyPathComponent.Header.computedSettableFlag != 0{
-        let setter = patternBuffer.pop(UnsafeRawPointer.self)
+      if header.isComputedSettable {
+        let setter = accessorsBuffer.pop(UnsafeRawPointer.self)
         pushDest(setter)
       }
+    }
+
+    func readComputedArgumentBuffer(argsBuffer: inout KeyPathBuffer)
+        -> (getLayout: RawKeyPathComponent.ComputedArgumentLayoutFn,
+            witnesses: UnsafePointer<ComputedArgumentWitnesses>,
+            initializer: RawKeyPathComponent.ComputedArgumentInitializerFn) {
+      let getLayoutRaw = argsBuffer.pop(UnsafeRawPointer.self)
+      let getLayout = unsafeBitCast(getLayoutRaw,
+        to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
+
+      let witnesses = argsBuffer.pop(
+        UnsafePointer<ComputedArgumentWitnesses>.self)
+
+      if let _ = witnesses.pointee.destroy {
+        isTrivial = false
+      }
+
+      let initializerRaw = argsBuffer.pop(UnsafeRawPointer.self)
+      let initializer = unsafeBitCast(initializerRaw,
+        to: RawKeyPathComponent.ComputedArgumentInitializerFn.self)
+
+      return (getLayout, witnesses, initializer)
+    }
+
+    func tryToResolveComputedArguments(argsBuffer: inout KeyPathBuffer) {
+      guard header.hasComputedArguments else { return }
+
+      let (getLayout, witnesses, initializer)
+        = readComputedArgumentBuffer(argsBuffer: &argsBuffer)
+
       // Carry over the arguments.
-      if header.payload
-          & RawKeyPathComponent.Header.computedHasArgumentsFlag != 0 {
-        let getLayoutRaw = patternBuffer.pop(UnsafeRawPointer.self)
-        let getLayout = unsafeBitCast(getLayoutRaw,
-          to: RawKeyPathComponent.ComputedArgumentLayoutFn.self)
+      let (size, alignmentMask) = getLayout(arguments)
+      _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
+                   "overaligned computed arguments not implemented yet")
 
-        let witnesses = patternBuffer.pop(
-          UnsafePointer<ComputedArgumentWitnesses>.self)
+      // The real buffer stride will be rounded up to alignment.
+      let stride = (size + alignmentMask) & ~alignmentMask
+      pushDest(stride)
+      pushDest(witnesses)
 
-        if let _ = witnesses.pointee.destroy {
-          isTrivial = false
+      _sanityCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+                   "argument destination not aligned")
+      initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
+
+      destData = UnsafeMutableRawBufferPointer(
+        start: destData.baseAddress.unsafelyUnwrapped + stride,
+        count: destData.count - stride)
+    }
+
+    switch header.kind {
+    case .struct:
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
+    case .class:
+      // Accessing a mutable class property can end the reference prefix, and
+      // makes the following key path potentially reference-writable.
+      if header.isStoredMutable {
+        endOfReferencePrefixComponent = previousComponentAddr
+      }
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset(header: header,
+                         getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
+    case .optionalChain,
+         .optionalWrap,
+         .optionalForce:
+      // No instantiation necessary.
+      pushDest(header)
+      break
+    case .computed:
+      tryToResolveComputedAccessors(header: header,
+                                    accessorsBuffer: &patternBuffer)
+      tryToResolveComputedArguments(argsBuffer: &patternBuffer)
+    case .external:
+      // Look at the external property descriptor to see if we should take it
+      // over the component given in the pattern.
+      let genericParamCount = Int(header.payload)
+      let descriptor = patternBuffer.pop(UnsafeRawPointer.self)
+      var descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+
+      // Save the generic arguments to the external descriptor.
+      let descriptorGenericArgsBuf = patternBuffer.popRaw(
+        size: MemoryLayout<Int>.size * genericParamCount,
+        alignment: Int.self)
+
+      if descriptorHeader.isTrivialPropertyDescriptor {
+        // If the descriptor is trivial, then instantiate the local candidate.
+        // Continue to keep reading from the buffer as if we started with the
+        // local candidate.
+        continue
+      }
+
+      // Grab the local candidate header. We may need parts of it to complete
+      // the final component.
+      let localCandidateHeader = patternBuffer.pop(RawKeyPathComponent.Header.self)
+      let localCandidateSize = localCandidateHeader.patternComponentBodySize
+
+      // ...though we still ought to fully consume it before proceeding.
+      _sanityCheck({
+        expectedPop += localCandidateSize
+                    +  MemoryLayout<RawKeyPathComponent.Header>.size
+        return true
+      }())
+
+
+      // Instantiate the component according to the external property
+      // descriptor.
+      switch descriptorHeader.kind {
+      case .class:
+        // Accessing a mutable class property can end the reference prefix,
+        // and makes the following key path potentially reference-writable.
+        if descriptorHeader.isStoredMutable {
+          endOfReferencePrefixComponent = previousComponentAddr
         }
+        fallthrough
 
-        let initializerRaw = patternBuffer.pop(UnsafeRawPointer.self)
-        let initializer = unsafeBitCast(initializerRaw,
-          to: RawKeyPathComponent.ComputedArgumentInitializerFn.self)
+      case .struct:
+        // Drop the local candidate.
+        _ = patternBuffer.popRaw(size: localCandidateSize,
+                                 alignment: Int32.self)
 
-        let (size, alignmentMask) = getLayout(arguments)
-        _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
-                     "overaligned computed arguments not implemented yet")
+        // Instantiate the offset using the info from the descriptor.
+        tryToResolveOffset(header: descriptorHeader,
+                           getOutOfLineOffset: {
+                             descriptor.load(fromByteOffset: 4,
+                                             as: UInt32.self)
+                           })
 
-        // The real buffer stride will be rounded up to alignment.
-        let stride = (size + alignmentMask) & ~alignmentMask
-        pushDest(stride)
-        pushDest(witnesses)
+      case .computed:
+        var descriptorBuffer = KeyPathBuffer(
+          partialData: UnsafeRawBufferPointer(
+            start: descriptor + MemoryLayout<RawKeyPathComponent.Header>.size,
+            count: descriptorHeader.propertyDescriptorBodySize))
 
-        _sanityCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
-                     "argument destination not aligned")
-        initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
+        // If the external declaration is computed, and it takes captured
+        // arguments, then we have to build a bit of a chimera. The canonical
+        // identity and accessors come from the descriptor, but the argument
+        // handling is still as described in the local candidate.
+        if descriptorHeader.hasComputedArguments {
+          // Loop through instantiating all the property descriptor's
+          // generic arguments. We don't write
+          // these immediately, because the computed header and accessors
+          // come first, and if we're instantiating in-place,
+          // they will overwrite the information in the pattern.
+          let genericArgs: [UnsafeRawPointer]
+            = (0 ..< genericParamCount).map {
+              let instantiationFn = descriptorGenericArgsBuf
+                .load(fromByteOffset: MemoryLayout<Int>.size * $0,
+                      as: MetadataAccessor.self)
+              return instantiationFn(arguments)
+            }
 
-        destData = UnsafeMutableRawBufferPointer(
-          start: destData.baseAddress.unsafelyUnwrapped + stride,
-          count: destData.count - stride)
+          // If the descriptor has generic arguments, record this in the
+          // header. We'll store the size of the external generic arguments
+          // so we can invoke the local candidate's argument witnesses.
+          let localCandidateHasArguments =
+            localCandidateHeader.kind == .computed
+              && localCandidateHeader.hasComputedArguments
+          let descriptorHasArguments = genericParamCount > 0
+          if localCandidateHasArguments && descriptorHasArguments {
+            descriptorHeader.isComputedInstantiatedFromExternalWithArguments =
+              true
+          }
+
+          // Bring in the accessors from the descriptor.
+          tryToResolveComputedAccessors(header: descriptorHeader,
+                                        accessorsBuffer: &descriptorBuffer)
+          _sanityCheck(descriptorBuffer.data.isEmpty)
+
+          if localCandidateHasArguments {
+            // We don't need the local candidate's accessors.
+            _ /*id*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            _ /*getter*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            if localCandidateHeader.isComputedSettable {
+              _ /*setter*/ = patternBuffer.pop(UnsafeRawPointer.self)
+            }
+
+            // Instantiate the arguments from the local candidate.
+            let (getLayout, witnesses, initializer) =
+              readComputedArgumentBuffer(argsBuffer: &patternBuffer)
+
+            // Carry over the arguments.
+            let (baseSize, alignmentMask) = getLayout(arguments)
+            _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
+                         "overaligned computed arguments not implemented yet")
+
+            // The real buffer stride will be rounded up to alignment.
+            var totalSize = (baseSize + alignmentMask) & ~alignmentMask
+
+            // If the descriptor also has arguments, they'll be added to the
+            // end with pointer alignment.
+            if descriptorHasArguments {
+              totalSize = MemoryLayout<Int>._roundingUpToAlignment(totalSize)
+              totalSize += MemoryLayout<Int>.size * genericParamCount
+            }
+
+            pushDest(totalSize)
+            pushDest(witnesses)
+
+            // If the descriptor has arguments, store the size of its specific
+            // arguments here, so we can drop them when trying to invoke
+            // the component's witnesses.
+            if descriptorHasArguments {
+              pushDest(genericParamCount * MemoryLayout<Int>.size)
+            }
+
+            // Initialize the local candidate arguments here.
+            _sanityCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+                         "argument destination not aligned")
+            initializer(arguments, destData.baseAddress.unsafelyUnwrapped)
+
+            destData = UnsafeMutableRawBufferPointer(
+              start: destData.baseAddress.unsafelyUnwrapped + baseSize,
+              count: destData.count - baseSize)
+
+          } else {
+            // If the local candidate has no arguments, then things are a
+            // little easier. We only need to instantiate the generic arguments
+            // for the external component's accessors.
+            // Discard the local candidate.
+            _ = patternBuffer.popRaw(size: localCandidateSize,
+                                     alignment: Int32.self)
+
+            // Write out the header with the instantiated size and
+            // witnesses of the descriptor.
+            let stride = MemoryLayout<Int>.size * genericParamCount
+            pushDest(stride)
+            pushDest(__swift_keyPathGenericWitnessTable_addr())
+          }
+          // Write the descriptor's generic arguments.
+          for arg in genericArgs {
+            pushDest(arg)
+          }
+        } else {
+          // Discard the local candidate.
+          _ = patternBuffer.popRaw(size: localCandidateSize,
+                                   alignment: Int32.self)
+
+          // The final component is an instantiation of the computed
+          // component from the descriptor.
+          tryToResolveComputedAccessors(header: descriptorHeader,
+                                        accessorsBuffer: &descriptorBuffer)
+          _sanityCheck(descriptorBuffer.data.isEmpty)
+
+          // We know there are no arguments to instantiate.
+        }
+      case .external, .optionalChain, .optionalForce, .optionalWrap:
+        _sanityCheckFailure("should not appear as property descriptor")
       }
     }
+
+    // Check that we consumed the expected amount of data from the pattern.
+    _sanityCheck(
+      {
+        let popped = MemoryLayout<Int>._roundingUpToAlignment(
+           bufferSizeBefore - patternBuffer.data.count
+           - RawKeyPathComponent.Header.pointerAlignmentSkew)
+          + RawKeyPathComponent.Header.pointerAlignmentSkew
+        return expectedPop == popped
+      }(),
+      """
+      component size consumed during instantiation does not match \
+      component size returned by patternComponentBodySize
+      """)
 
     // Break if this is the last component.
     if patternBuffer.data.count == 0 { break }
@@ -2514,10 +3037,13 @@ internal func _instantiateKeyPathBuffer(
     base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
     pushDest(base)
     previousComponentAddr = componentAddr
+   }
   }
 
   // We should have traversed both buffers.
-  _sanityCheck(patternBuffer.data.isEmpty && destData.count == 0)
+  _sanityCheck(patternBuffer.data.isEmpty, "did not read the entire pattern")
+  _sanityCheck(destData.count == 0,
+               "did not write to all of the allocated space")
 
   // Write out the header.
   let destHeader = KeyPathBuffer.Header(

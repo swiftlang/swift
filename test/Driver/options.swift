@@ -1,39 +1,6 @@
-// rdar://13723332 Crash on -emit-sil with no input files
-// RUN: not %target-swift-frontend -emit-sil 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// RUN: not %target-swift-frontend -emit-sil -parse-as-library 2>&1 | %FileCheck -check-prefix=NO_FILES %s
-// NO_FILES: this mode requires at least one input file
-
-// RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// SIL_FILES: this mode requires a single input file
-
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=DUPLICATE_FILES %s
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %S/../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// DUPLICATE_FILES: duplicate input file 'SOURCE_DIR/test/Driver/options.swift'
-
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
-// INVALID_MODULE_NAME: error: module name "invalid-module-name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid.module.name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME2 %s
-// INVALID_MODULE_NAME2: error: module name "invalid.module.name" is not a valid identifier; use -module-name flag to specify an alternate name
-
-// RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name still-invalid 2>&1 | %FileCheck -check-prefix=STILL_INVALID %s
-// STILL_INVALID: error: module name "still-invalid" is not a valid identifier{{$}}
-
-// RUN: not %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
+// RUN: not %swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" 2>&1 | %FileCheck -check-prefix=STDLIB_MODULE %s
 // RUN: %target-swiftc_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
-
-// RUN: not %target-swift-frontend -typecheck -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
-// PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
-
-// RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_DEPS %s
-// DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
-
-// Should not fail with non-zero exit code.
-// RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
-// RUN: %target-swift-frontend -typecheck -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
 
 // RUN: not %swiftc_driver -crazy-option-that-does-not-exist %s 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
 // RUN: not %swift_driver -crazy-option-that-does-not-exist 2>&1 | %FileCheck -check-prefix=INVALID_OPTION %s
@@ -57,6 +24,10 @@
 
 // RUN: not %swiftc_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | %FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
 // FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
+
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with parseable module interfaces is unsupported
 
 // RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl
@@ -129,3 +100,26 @@
 // RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
 // ASSUME_SINGLE_THREADED: swift
 // ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
+
+// RUN: not %swiftc_driver -incremental -autolink-force-load %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
+// RUN: not %swiftc_driver -autolink-force-load -incremental %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
+// AUTOLINK_FORCE_LOAD: error: '-autolink-force-load' is not supported with '-incremental'
+
+// RUN: %swift_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swift_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// RUN: %swiftc_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swiftc_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// DEBUG_INFO_FORMAT_CODEVIEW: -debug-info-format=codeview
+// DEBUG_INFO_FORMAT_DWARF: -debug-info-format=dwarf
+
+// RUN: not %swift_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swift_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
+
+// RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// BAD_DEBUG_LEVEL_ERROR: error: argument '-debug-info-format=codeview' is not allowed with '{{.*}}'

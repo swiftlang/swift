@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-run %t/a.out3
-// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out4_2 && %target-codesign %t/a.out4_2 && %target-run %t/a.out4_2
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=macosx
 // REQUIRES: objc_interop
@@ -9,66 +9,50 @@ import UIKit
 import StdlibUnittest
 import StdlibUnittestFoundationExtras
 
-#if swift(>=4)
-  let UIKitTests = TestSuite("UIKit_Swift4")
+#if swift(>=4.2)
+  let UIKitTests = TestSuite("UIKit_Swift4_2")
 #else
-  let UIKitTests = TestSuite("UIKit_Swift3")
+  let UIKitTests = TestSuite("UIKit_Swift4")
 #endif
 
 #if !os(watchOS) && !os(tvOS)
 private func printDevice(_ o: UIDeviceOrientation) -> String {
-  var s = "\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), "
-  s += "\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), "
-  s += "\(o.isFlat), \(o.isValidInterfaceOrientation) "
-  s += "\(UIDeviceOrientationIsValidInterfaceOrientation(o))"
-  return s
+  return "\(o.isPortrait) \(o.isLandscape) \(o.isFlat) \(o.isValidInterfaceOrientation)"
 }
 
 private func printInterface(_ o: UIInterfaceOrientation) -> String {
-  return "\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), " +
-    "\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))"
+  return "\(o.isPortrait) \(o.isLandscape)"
 }
 
 UIKitTests.test("UIDeviceOrientation") {
-  expectEqual("false false, false false, false, false false",
-    printDevice(.unknown))
-
-  expectEqual("true true, false false, false, true true",
-    printDevice(.portrait))
-
-  expectEqual("true true, false false, false, true true",
-    printDevice(.portraitUpsideDown))
-
-  expectEqual("false false, true true, false, true true",
-    printDevice(.landscapeLeft))
-
-  expectEqual("false false, true true, false, true true",
-    printDevice(.landscapeRight))
-
-  expectEqual("false false, false false, true, false false",
-    printDevice(.faceUp))
-
-  expectEqual("false false, false false, true, false false",
-    printDevice(.faceDown))
+  expectEqual("false false false false", printDevice(.unknown))
+  expectEqual("true false false true", printDevice(.portrait))
+  expectEqual("true false false true", printDevice(.portraitUpsideDown))
+  expectEqual("false true false true", printDevice(.landscapeLeft))
+  expectEqual("false true false true", printDevice(.landscapeRight))
+  expectEqual("false false true false", printDevice(.faceUp))
+  expectEqual("false false true false", printDevice(.faceDown))
+#if !swift(>=4.2)
+  // Orientation functions should still be available
+  _ = UIDeviceOrientationIsLandscape
+  _ = UIDeviceOrientationIsPortrait
+  _ = UIDeviceOrientationIsValidInterfaceOrientation
+#endif
 }
 
 UIKitTests.test("UIInterfaceOrientation") {
-  expectEqual("false false, false false",
-    printInterface(.unknown))
-
-  expectEqual("true true, false false",
-    printInterface(.portrait))
-
-  expectEqual("true true, false false",
-    printInterface(.portraitUpsideDown))
-
-  expectEqual("false false, true true",
-    printInterface(.landscapeLeft))
-
-  expectEqual("false false, true true",
-    printInterface(.landscapeRight))
-}
+  expectEqual("false false", printInterface(.unknown))
+  expectEqual("true false", printInterface(.portrait))
+  expectEqual("true false", printInterface(.portraitUpsideDown))
+  expectEqual("false true", printInterface(.landscapeLeft))
+  expectEqual("false true", printInterface(.landscapeRight))
+#if !swift(>=4.2)
+  // Orientation functions should still be available
+  _ = UIInterfaceOrientationIsLandscape
+  _ = UIInterfaceOrientationIsPortrait
 #endif
+}
+#endif // !os(watchOS) && !os(tvOS)
 
 UIKitTests.test("UIEdgeInsets") {
   let insets = [
@@ -77,6 +61,26 @@ UIKitTests.test("UIEdgeInsets") {
     UIEdgeInsets.zero
   ]
   checkEquatable(insets, oracle: { $0 == $1 })
+  expectFalse(UIEdgeInsetsEqualToEdgeInsets(insets[0], insets[1]))
+
+  let encodedInsets = try! JSONEncoder().encode(insets[0])
+  let decodedInsets = try! JSONDecoder().decode(UIEdgeInsets.self, from: encodedInsets)
+  expectTrue(decodedInsets == insets[0])
+}
+
+UIKitTests.test("NSDirectionalEdgeInsets") {
+  guard #available(iOS 11.0, tvOS 11.0, watchOS 5.0, *) else { return }
+  let insets = [
+    NSDirectionalEdgeInsets(top: 1.0, leading: 2.0, bottom: 3.0, trailing: 4.0),
+    NSDirectionalEdgeInsets(top: 1.0, leading: 2.0, bottom: 3.1, trailing: 4.0),
+    NSDirectionalEdgeInsets.zero
+  ]
+  checkEquatable(insets, oracle: { $0 == $1 })
+  // NSDirectionalEdgeInsetsEqualToDirectionalEdgeInsets was never exposed in Swift
+
+  let encodedInsets = try! JSONEncoder().encode(insets[0])
+  let decodedInsets = try! JSONDecoder().decode(NSDirectionalEdgeInsets.self, from: encodedInsets)
+  expectTrue(decodedInsets == insets[0])
 }
 
 UIKitTests.test("UIOffset") {
@@ -86,7 +90,35 @@ UIKitTests.test("UIOffset") {
     UIOffset.zero
   ]
   checkEquatable(offsets, oracle: { $0 == $1 })
+  expectFalse(UIOffsetEqualToOffset(offsets[0], offsets[1]))
+
+  let encodedOffset = try! JSONEncoder().encode(offsets[0])
+  let decodedOffset = try! JSONDecoder().decode(UIOffset.self, from: encodedOffset)
+  expectTrue(decodedOffset == offsets[0])
 }
+
+#if os(iOS) || os(tvOS)
+UIKitTests.test("UIFloatRange") {
+  guard #available(iOS 9.0, tvOS 9.0, *) else { return }
+  #if swift(>=4.2)
+    let zero = UIFloatRange.zero
+  #else
+    let zero = UIFloatRangeZero
+  #endif
+
+  let ranges = [
+    UIFloatRange(minimum: 1.0, maximum: 2.0),
+    UIFloatRange(minimum: 1.0, maximum: 3.0),
+    zero
+  ]
+  checkEquatable(ranges, oracle: { $0 == $1 })
+  expectFalse(UIFloatRangeIsEqualToRange(ranges[0], ranges[1]))
+
+  let encodedRange = try! JSONEncoder().encode(ranges[0])
+  let decodedRange = try! JSONDecoder().decode(UIFloatRange.self, from: encodedRange)
+  expectTrue(decodedRange == ranges[0])
+}
+#endif
 
 UIKitTests.test("UIFont.Weight") {
   guard #available(iOS 8.2, *) else { return }
@@ -109,40 +141,43 @@ UIKitTests.test("UIFont.Weight") {
 
 #if !os(watchOS)
 UIKitTests.test("UILayoutPriority") {
-  #if swift(>=4) // Swift 4
-    let lowLayoutPriority: UILayoutPriority = .defaultLow
-    let highLayoutPriority: UILayoutPriority = .defaultHigh
+  let lowLayoutPriority: UILayoutPriority = .defaultLow
+  let highLayoutPriority: UILayoutPriority = .defaultHigh
 
-    expectTrue(lowLayoutPriority < highLayoutPriority)
+  expectTrue(lowLayoutPriority < highLayoutPriority)
 
-    expectTrue(lowLayoutPriority + 2.0 == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
-    expectTrue(2.0 + lowLayoutPriority == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
-    expectTrue(lowLayoutPriority - 2.0 == UILayoutPriority(lowLayoutPriority.rawValue - 2.0))
-    expectTrue(highLayoutPriority - lowLayoutPriority == highLayoutPriority.rawValue - lowLayoutPriority.rawValue)
+  expectTrue(lowLayoutPriority + 2.0 == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+  expectTrue(2.0 + lowLayoutPriority == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+  expectTrue(lowLayoutPriority - 2.0 == UILayoutPriority(lowLayoutPriority.rawValue - 2.0))
+  expectTrue(highLayoutPriority - lowLayoutPriority == highLayoutPriority.rawValue - lowLayoutPriority.rawValue)
 
-    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
+  expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
 
-    var mutablePriority = lowLayoutPriority
-    mutablePriority -= 1.0
-    mutablePriority += 2.0
-    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
+  var mutablePriority = lowLayoutPriority
+  mutablePriority -= 1.0
+  mutablePriority += 2.0
+  expectTrue(mutablePriority == lowLayoutPriority + 1.0)
 
-    let priorotyRange = lowLayoutPriority...highLayoutPriority
-    expectTrue(priorotyRange.contains(.defaultLow))
-    expectFalse(priorotyRange.contains(.required))
-  #else // Swift 3
-    let lowLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultLow
-    let highLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultHigh
+  let priorotyRange = lowLayoutPriority...highLayoutPriority
+  expectTrue(priorotyRange.contains(.defaultLow))
+  expectFalse(priorotyRange.contains(.required))
+}
+#endif
 
-    expectTrue(lowLayoutPriority < highLayoutPriority)
-
-    expectTrue(2.0 + lowLayoutPriority == lowLayoutPriority + 2.0)
-    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
-
-    var mutablePriority = lowLayoutPriority
-    mutablePriority -= 1.0
-    mutablePriority += 2.0
-    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
+#if !os(watchOS)
+UIKitTests.test("UIWindow.Level") {
+  #if swift(>=4.2) // Swift 4.2
+    let normalWindowLevel: UIWindow.Level = .normal
+    
+    expectTrue(normalWindowLevel == .normal)
+    expectTrue(normalWindowLevel < .alert)
+    expectTrue(normalWindowLevel + 1 == 1 + normalWindowLevel)
+  #else // Swift 3 and 4
+    let normalWindowLevel: UIWindowLevel = UIWindowLevelNormal
+    
+    expectTrue(normalWindowLevel == UIWindowLevelNormal)
+    expectTrue(normalWindowLevel < UIWindowLevelAlert)
+    expectTrue(normalWindowLevel + 1 == 1 + UIWindowLevelNormal)
   #endif
 }
 #endif
@@ -171,6 +206,12 @@ UIKitTests.test("NSValue bridging") {
                         nsValueInitializer: { NSValue(uiEdgeInsets: $0) },
                         nsValueGetter: { $0.uiEdgeInsetsValue },
                         equal: (==))
+  if #available(iOS 11.0, tvOS 11.0, watchOS 5.0, *) {
+    expectBridgeToNSValue(NSDirectionalEdgeInsets(top: 86, leading: 75, bottom: 30, trailing: 9),
+                          nsValueInitializer: { NSValue(directionalEdgeInsets: $0) },
+                          nsValueGetter: { $0.directionalEdgeInsetsValue },
+                          equal: (==))
+  }
   expectBridgeToNSValue(UIOffset(horizontal: 17, vertical: 38),
                         nsValueInitializer: { NSValue(uiOffset: $0) },
                         nsValueGetter: { $0.uiOffsetValue },
@@ -207,8 +248,11 @@ UIKitTests.test("UIContentSizeCategory comparison") {
 #if os(iOS) || os(watchOS) || os(tvOS)
 UIKitTests.test("UIFontMetrics scaling") {
     if #available(iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
-        let metrics = UIFontTextStyle.headline.metrics
+        let metrics = UIFont.TextStyle.headline.metrics
         expectTrue(metrics != nil)
+#if !swift(>=4.2)
+        _ = UIFontTextStyle.headline.metrics
+#endif
     }
 }
 #endif
@@ -250,6 +294,52 @@ UIKitTests.test("NSItemProviderReadingWriting support") {
   }
 }
 
+#endif
+
+#if os(iOS)
+UIKitTests.test("UIPrintError compatibility") {
+  #if swift(>=4.2)
+  _ = UIPrintError.Code.notAvailable
+  _ = UIPrintError.Code.noContent
+  _ = UIPrintError.Code.unknownImageFormat
+  _ = UIPrintError.Code.jobFailed
+  #else
+  _ = UIPrintingNotAvailableError
+  _ = UIPrintNoContentError
+  _ = UIPrintUnknownImageFormatError
+  _ = UIPrintJobFailedError
+  #endif
+}
+#endif
+
+#if !os(watchOS)
+UIKitTests.test("UIApplicationMain") {
+  #if swift(>=4.2)
+  _ = { UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv, nil, nil) }
+  #endif
+  _ = { UIApplicationMain(CommandLine.argc, UnsafeMutableRawPointer(CommandLine.unsafeArgv).bindMemory(to: UnsafeMutablePointer<Int8>.self, capacity: Int(CommandLine.argc)), nil, nil) }
+}
+#endif
+
+UIKitTests.test("UIAccessibilityTraits") {
+  #if swift(>=4.2)
+  let traits: UIAccessibilityTraits = [.link, .button]
+  expectTrue(traits.contains(.link))
+  expectFalse(traits.contains(.header))
+  #else
+  let _: UIAccessibilityTraits = UIAccessibilityTraitLink | UIAccessibilityTraitButton
+  #endif
+}
+
+#if !os(watchOS)
+UIKitTests.test("UITextDirection") {
+  #if swift(>=4.2)
+  let _: UITextDirection = .storage(.forward)
+  let _: UITextDirection = .layout(.right)
+  #else
+  let _: UITextDirection = UITextStorageDirection.backward.rawValue
+  #endif
+}
 #endif
 
 

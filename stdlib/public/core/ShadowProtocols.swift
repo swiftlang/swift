@@ -67,7 +67,7 @@ public protocol _NSArrayCore :
   func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumerating(
+  override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
@@ -94,20 +94,24 @@ public protocol _NSDictionaryCore :
   var count: Int { get }
 
   @objc(objectForKey:)
-  func objectFor(_ aKey: AnyObject) -> AnyObject?
+  func object(forKey aKey: AnyObject) -> AnyObject?
 
   func keyEnumerator() -> _NSEnumerator
 
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone?) -> AnyObject
+  override func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?)
+  @objc(getObjects:andKeys:count:)
+  func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
+  )
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumerating(
+  override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int
@@ -125,9 +129,11 @@ public protocol _NSDictionaryCore :
 public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-      andKeys keys: UnsafeMutablePointer<AnyObject>?)
-    }
+  override func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int)
+}
 
 /// A shadow for the "core operations" of NSSet.
 ///
@@ -150,10 +156,10 @@ public protocol _NSSetCore :
   // We also override the following methods for efficiency.
 
   @objc(copyWithZone:)
-  func copy(with zone: _SwiftNSZone?) -> AnyObject
+  override func copy(with zone: _SwiftNSZone?) -> AnyObject
 
   @objc(countByEnumeratingWithState:objects:count:)
-  func countByEnumerating(
+  override func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int

@@ -1,4 +1,4 @@
-add_swift_library(swiftSILGen STATIC
+add_swift_host_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp
@@ -24,7 +24,6 @@ add_swift_library(swiftSILGen STATIC
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
   SILGenLValue.cpp
-  SILGenMaterializeForSet.cpp
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenProlog.cpp

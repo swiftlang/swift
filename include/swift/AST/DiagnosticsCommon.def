@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
 #endif
 
 #ifndef ERROR
@@ -36,6 +36,11 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature) \
+  DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
@@ -49,8 +54,7 @@ ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
 NOTE(previous_decldef,none,
-     "previous %select{declaration|definition}0 of %1 is here",
-     (bool, DeclBaseName))
+     "previous definition of %0 is here", (DeclBaseName))
 
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
@@ -59,6 +63,9 @@ NOTE(brace_stmt_suggest_do,none,
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
 
+// Generic determinism-forcing override.
+REMARK(remark_max_determinism_overriding,none,
+         "SWIFTC_MAXIMUM_DETERMINISM overriding %0", (StringRef))
 
 // FIXME: This is used both as a parse error (a literal "super" outside a
 // method) and a type-checker error ("super" in a method of a non-class type).
@@ -67,10 +74,10 @@ ERROR(super_not_in_class_method,none,
 
 ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "
-      "use 'static' to declare a static method", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 method", (bool))
 ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
-      "use 'static' to declare a static property", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 property", (bool))
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
@@ -87,6 +94,43 @@ NOTE(profile_read_error,none,
 
 ERROR(generic_signature_not_minimal,none,
       "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+
+ERROR(attr_only_on_parameters, none,
+      "'%0' may only be used on parameters", (StringRef))
+
+ERROR(function_type_no_parens,none,
+      "single argument function types require parentheses", ())
+
+// FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
+// file just for a few errors.
+ERROR(sdk_node_unrecognized_key,none,
+      "unrecognized key '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_node_kind,none,
+      "unrecognized SDK node kind '%0'", (StringRef))
+ERROR(sdk_node_unrecognized_type_attr_kind,none,
+      "unrecognized type attribute '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_decl_attr_kind,none,
+      "unrecognized declaration attribute '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_decl_kind,none,
+      "unrecognized declaration kind '%0' in SDK node", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Circular reference diagnostics
+//------------------------------------------------------------------------------
+ERROR(circular_reference, none,
+      "circular reference", ())
+
+ERROR(redundant_type_alias_define, none,
+      "redundant type alias declaration", ())
+
+NOTE(circular_reference_through, none,
+     "through reference here", ())
+
+ERROR(circular_class_inheritance,none,
+      "%0 inherits from itself", (Identifier))
+
+ERROR(circular_enum_inheritance,none,
+      "%0 has a raw type that depends on itself", (Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

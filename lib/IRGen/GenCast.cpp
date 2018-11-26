@@ -19,11 +19,12 @@
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
-#include "GenMeta.h"
+#include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "TypeInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -89,15 +90,14 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  SILType fromType,
                                                  SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
-  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
-  if (isMetatype) {
-    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+  auto isMetatype = false;
+  if (auto metaType = toType.getAs<MetatypeType>()) {
+    isMetatype = true;
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
   }
   // Emit a reference to the heap metadata for the target type.
-  const bool allowConservative = true;
 
   // If we're allowed to do a conservative check, try to just use the
   // global class symbol.  If the class has been re-allocated, this
@@ -105,16 +105,16 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // test might fail; but it's a much faster check.
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
-  if (allowConservative &&
-      (targetMetadata =
-        tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
-                                       /*allowUninitialized*/ true))) {
+  if ((targetMetadata =
+           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getASTType(),
+                                          /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
-      = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
+      = emitClassHeapMetadataRef(IGF, toType.getASTType(),
                                  MetadataValueType::ObjCClass,
-                                 /*allowUninitialized*/ allowConservative);
+                                 MetadataState::Complete,
+                                 /*allowUninitialized*/ false);
   }
 
   // Handle checking a metatype object's type by directly comparing the address
@@ -158,7 +158,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
   if (destClass && destClass->hasKnownSwiftImplementation()) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -173,7 +173,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // class-bounded archetype, use the most general cast entrypoint.
   } else if (toType.is<ArchetypeType>() ||
              destClass->getForeignClassKind()==ClassDecl::ForeignKind::CFType) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -247,7 +247,8 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
     // Get the ObjC metadata for the type we're checking.
     toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
-                                          MetadataValueType::ObjCClass);
+                                          MetadataValueType::ObjCClass,
+                                          MetadataState::Complete);
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();
@@ -503,8 +504,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
                                   Explosion &ex) {
-  auto srcInstanceType = srcType.getSwiftRValueType();
-  auto destInstanceType = destType.getSwiftRValueType();
+  auto srcInstanceType = srcType.getASTType();
+  auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
            destInstanceType)) {
     destInstanceType = metatypeType.getInstanceType();
@@ -521,7 +522,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
-  bool hasSuperclassConstraint = bool(layout.superclass);
+  bool hasSuperclassConstraint = bool(layout.explicitSuperclass);
 
   for (auto protoTy : layout.getProtocols()) {
     auto *protoDecl = protoTy->getDecl();
@@ -534,7 +535,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl)) {
-      auto descriptor = emitProtocolDescriptorRef(IGF, protoDecl);
+      auto descriptor = IGF.IGM.getAddrOfProtocolDescriptor(protoDecl);
       witnessTableProtos.push_back(descriptor);
     }
 
@@ -562,7 +563,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // The source of a scalar cast is statically known to be a class or a
   // metatype, so we only have to check the class constraint in two cases:
   //
-  // 1) The destination type has an explicit superclass constraint that is
+  // 1) The destination type has a superclass constraint that is
   //    more derived than what the source type is known to be.
   //
   // 2) We are casting between metatypes, in which case the source might
@@ -580,9 +581,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Note that destInstanceType is always an existential type, so calling
   // getSuperclass() returns the superclass constraint of the existential,
   // not the superclass of some concrete class.
-  bool checkSuperclassConstraint =
-    hasSuperclassConstraint &&
-    !destInstanceType->getSuperclass()->isExactSuperclassOf(srcInstanceType);
+  bool checkSuperclassConstraint = false;
+  if (hasSuperclassConstraint) {
+    Type srcSuperclassType = srcInstanceType;
+    if (srcSuperclassType->isExistentialType())
+      srcSuperclassType = srcSuperclassType->getSuperclass();
+    if (srcSuperclassType) {
+      checkSuperclassConstraint =
+        !destInstanceType->getSuperclass()->isExactSuperclassOf(
+          srcSuperclassType);
+    }
+  }
 
   if (checkSuperclassConstraint)
     checkClassConstraint = true;
@@ -717,7 +726,9 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
   } else {
     // Get the type metadata for the instance.
-    metadataValue = emitDynamicTypeOfHeapObject(IGF, value, srcType);
+    metadataValue = emitDynamicTypeOfHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick,
+                                                srcType);
   }
 
   // Look up witness tables for the protocols that need them.
@@ -736,7 +747,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   args.push_back(metadataValue);
 
   if (checkSuperclassConstraint)
-    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.superclass)));
+    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.explicitSuperclass)));
 
   for (auto proto : witnessTableProtos)
     args.push_back(proto);
@@ -802,8 +813,35 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(sourceType.isObject());
   assert(targetType.isObject());
 
-  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
+  llvm::BasicBlock *nilCheckBB = nullptr;
+  llvm::BasicBlock *nilMergeBB = nullptr;
 
+  // Merge the nil check and return the merged result: either nil or the value.
+  auto returnNilCheckedResult = [&](IRBuilder &Builder,
+                                    Explosion &nonNilResult) {
+    if (nilCheckBB) {
+      auto notNilBB = Builder.GetInsertBlock();
+      Builder.CreateBr(nilMergeBB);
+
+      Builder.emitBlock(nilMergeBB);
+      // Insert result phi.
+      Explosion result;
+      while (!nonNilResult.empty()) {
+        auto val = nonNilResult.claimNext();
+        auto valTy = cast<llvm::PointerType>(val->getType());
+        auto nil = llvm::ConstantPointerNull::get(valTy);
+        auto phi = Builder.CreatePHI(valTy, 2);
+        phi->addIncoming(nil, nilCheckBB);
+        phi->addIncoming(val, notNilBB);
+        result.add(phi);
+      }
+      out = std::move(result);
+    } else {
+      out = std::move(nonNilResult);
+    }
+  };
+
+  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
     // for the particular case of an optional class-reference or metatype
@@ -815,6 +853,22 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     assert(value.empty());
     value = std::move(optValue);
     sourceType = sourceOptObjectType;
+
+    // We need a null-check because the runtime function can't handle null in
+    // some of the cases.
+    if (targetType.isExistentialType()) {
+      auto &Builder = IGF.Builder;
+      auto val = value.getAll()[0];
+      auto isNotNil = Builder.CreateICmpNE(
+          val, llvm::ConstantPointerNull::get(
+                   cast<llvm::PointerType>(val->getType())));
+      auto *isNotNilContBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilMergeBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilCheckBB = Builder.GetInsertBlock();
+      Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
+
+      Builder.emitBlock(isNotNilContBB);
+    }
   }
 
   // If the source value is a metatype, either do a metatype-to-metatype
@@ -879,11 +933,14 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   }
 
   if (targetType.isExistentialType()) {
+    Explosion outRes;
     emitScalarExistentialDowncast(IGF, instance, sourceType, targetType,
-                                  mode, /*not a metatype*/ None, out);
+                                  mode, /*not a metatype*/ None, outRes);
+    returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
 
+  Explosion outRes;
   llvm::Value *result = emitClassDowncast(IGF, instance, targetType, mode);
   out.add(result);
 }

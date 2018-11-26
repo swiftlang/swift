@@ -18,6 +18,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
@@ -41,7 +42,7 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(inputFilename.str());
+      ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
 
     // Return if we loaded a file
     if (FileBufOrErr)
@@ -137,7 +138,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
 
   bool done;
-  PersistentParserState persistentState;
+  PersistentParserState persistentState(Ctx);
   SkipNonTransparentFunctions delayCallbacks;
   parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
                       SkipBodies ? &delayCallbacks : nullptr);
@@ -154,6 +155,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     performTypeChecking(*importFile, persistentState.getTopLevelContext(),
                         None);
+  importMod->setHasResolvedImports();
   return importMod;
 }
 

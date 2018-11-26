@@ -3,6 +3,8 @@
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
 //
+// RUN: %target-codesign %t/a.out_Debug
+// RUN: %target-codesign %t/a.out_Release
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test

@@ -441,7 +441,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
           SILType::getPrimitiveObjectType(type).getOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
-    return Converter.convert(IGM, underlyingTy.getSwiftRValueType());
+    return Converter.convert(IGM, underlyingTy.getASTType());
   }
 
   auto swiftStructDecl = type->getDecl();
@@ -466,7 +466,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   auto args = type.getGenericArgs();
   assert(args.size() == 1 &&
          "should have a single generic argument!");
-  auto loweredArgTy = IGM.getLoweredType(args[0]).getSwiftRValueType();
+  auto loweredArgTy = IGM.getLoweredType(args[0]).getASTType();
 
   switch (kind) {
   case StructKind::Invalid:
@@ -623,10 +623,10 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
     return getClangIdType(getClangASTContext());
 
   auto superclassTy = clangCtx.ObjCBuiltinIdTy;
-  if (layout.superclass) {
+  if (auto layoutSuperclassTy = layout.getSuperclass()) {
     superclassTy = clangCtx.getCanonicalType(
       cast<clang::ObjCObjectPointerType>(
-        Converter.convert(IGM, CanType(layout.superclass)))
+        Converter.convert(IGM, CanType(layoutSuperclassTy)))
         ->getPointeeType());
   }
 
@@ -756,7 +756,7 @@ clang::CanQualType IRGenModule::getClangType(CanType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {
-  return getClangType(type.getSwiftRValueType());
+  return getClangType(type.getASTType());
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {

@@ -46,18 +46,27 @@ protected:
   /// If disabled, it is an error to try to mangle such an entity.
   bool AllowNamelessEntities = false;
 
-  /// If nonnull, provides a callback to encode symbolic references to
-  /// type contexts.
-  std::function<bool (const DeclContext *Context)>
-    CanSymbolicReference;
-  
-  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+  /// If enabled, some entities will be emitted as symbolic reference
+  /// placeholders. The offsets of these references will be stored in the
+  /// `SymbolicReferences` vector, and it is up to the consumer of the mangling
+  /// to fill these in.
+  bool AllowSymbolicReferences = false;
+
+public:
+  using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
+                                              const ProtocolConformance *>;
+protected:
+
+  /// If set, the mangler calls this function to determine whether to symbolic
+  /// reference a given entity. Defaults to always returning true.
+  std::function<bool (SymbolicReferent)> CanSymbolicReference;
+
+  std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
   
 public:
   enum class SymbolKind {
     Default,
     DynamicThunk,
-    SwiftDispatchThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
     DirectMethodReferenceThunk,
@@ -197,6 +206,15 @@ protected:
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
+  /// Append the bound generics arguments for the given declaration context
+  /// based on a complete substitution map.
+  ///
+  /// \returns the number of generic parameters that were emitted
+  /// thus far.
+  unsigned appendBoundGenericArgs(DeclContext *dc,
+                                  SubstitutionMap subs,
+                                  bool &isFirstArgList);
+
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
 
@@ -208,7 +226,8 @@ protected:
 
   void appendModule(const ModuleDecl *module);
 
-  void appendProtocolName(const ProtocolDecl *protocol);
+  void appendProtocolName(const ProtocolDecl *protocol,
+                          bool allowStandardSubstitution = true);
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
@@ -283,7 +302,7 @@ protected:
 
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
-  void appendSymbolicReference(const DeclContext *context);
+  void appendSymbolicReference(SymbolicReferent referent);
   
   std::string mangleTypeWithoutPrefix(Type type) {
     appendType(type);

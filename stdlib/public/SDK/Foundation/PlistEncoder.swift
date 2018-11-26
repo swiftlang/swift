@@ -68,7 +68,8 @@ open class PropertyListEncoder {
       do {
           return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
       } catch {
-          throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
+          throw EncodingError.invalidValue(value, 
+                                           EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
       }
     }
 
@@ -204,12 +205,12 @@ fileprivate struct _PlistEncodingStorage {
         return array
     }
 
-    fileprivate mutating func push(container: NSObject) {
+    fileprivate mutating func push(container: __owned NSObject) {
         self.containers.append(container)
     }
 
     fileprivate mutating func popContainer() -> NSObject {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.popLast()!
     }
 }
@@ -746,16 +747,16 @@ fileprivate struct _PlistDecodingStorage {
     }
 
     fileprivate var topContainer: Any {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.last!
     }
 
-    fileprivate mutating func push(container: Any) {
+    fileprivate mutating func push(container: __owned Any) {
         self.containers.append(container)
     }
 
     fileprivate mutating func popContainer() {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         self.containers.removeLast()
     }
 }
@@ -1066,7 +1067,7 @@ fileprivate struct _PlistKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCo
         return _PlistUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
     }
 
-    private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
+    private func _superDecoder(forKey key: __owned CodingKey) throws -> Decoder {
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 

@@ -19,8 +19,8 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTContext;
@@ -43,7 +43,7 @@ class VersionRange {
   // a single version tuple value representing the lower end point x.y.z of a
   // range [x.y.z, +Inf).
   union {
-    clang::VersionTuple LowerEndpoint;
+    llvm::VersionTuple LowerEndpoint;
     ExtremalRange ExtremalValue;
   };
   
@@ -65,7 +65,7 @@ public:
   bool hasLowerEndpoint() const { return HasLowerEndpoint; }
 
   /// Returns the range's lower endpoint.
-  const clang::VersionTuple &getLowerEndpoint() const {
+  const llvm::VersionTuple &getLowerEndpoint() const {
     assert(HasLowerEndpoint);
     return LowerEndpoint;
   }
@@ -110,7 +110,7 @@ public:
     }
 
     // The g.l.b of [v1, +Inf), [v2, +Inf) is [max(v1,v2), +Inf)
-    const clang::VersionTuple maxVersion =
+    const llvm::VersionTuple maxVersion =
         std::max(this->getLowerEndpoint(), Other.getLowerEndpoint());
 
     setLowerEndpoint(maxVersion);
@@ -131,7 +131,7 @@ public:
     }
 
     // The l.u.b of [v1, +Inf), [v2, +Inf) is [min(v1,v2), +Inf)
-    const clang::VersionTuple minVersion =
+    const llvm::VersionTuple minVersion =
         std::min(this->getLowerEndpoint(), Other.getLowerEndpoint());
 
     setLowerEndpoint(minVersion);
@@ -156,12 +156,12 @@ public:
 
   /// Returns a version range representing all versions greater than or equal
   /// to the passed-in version.
-  static VersionRange allGTE(const clang::VersionTuple &EndPoint) {
+  static VersionRange allGTE(const llvm::VersionTuple &EndPoint) {
     return VersionRange(EndPoint);
   }
 
 private:
-  VersionRange(const clang::VersionTuple &LowerEndpoint) {
+  VersionRange(const llvm::VersionTuple &LowerEndpoint) {
     setLowerEndpoint(LowerEndpoint);
   }
 
@@ -174,7 +174,7 @@ private:
     ExtremalValue = Version;
   }
 
-  void setLowerEndpoint(const clang::VersionTuple &Version) {
+  void setLowerEndpoint(const llvm::VersionTuple &Version) {
     HasLowerEndpoint = 1;
     LowerEndpoint = Version;
   }

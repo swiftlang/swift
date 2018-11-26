@@ -29,7 +29,7 @@ extension CGAffineTransform: Equatable {
 //===----------------------------------------------------------------------===//
 
 extension CGColor {
-  @available(OSX 10.3, iOS 2.0, *)
+  @available(macOS 10.3, iOS 2.0, *)
   public var components: [CGFloat]? {
     guard let pointer = self.__unsafeComponents else { return nil }
     let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
@@ -49,14 +49,44 @@ extension CGColor {
 }
 
 public protocol _CGColorInitTrampoline {
+#if os(macOS)
   init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+#else
+  init?(colorSpace space: CGColorSpace, components: UnsafePointer<CGFloat>)
+#endif
 }
 
 extension _CGColorInitTrampoline {
   public init(_colorLiteralRed red: Float, green: Float, blue: Float,
               alpha: Float) {
-    self.init(red: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue),
-              alpha: CGFloat(alpha))
+    let red = CGFloat(red)
+    let green = CGFloat(green)
+    let blue = CGFloat(blue)
+    let alpha = CGFloat(alpha)
+    // This initializer used to call the CGColorCreateGenericRGB, which is
+    // known to Swift as CGColor(red:green:blue:alpha:). Unfortunately this API
+    // is not available on platforms other than macOS. It would be possible to
+    // replicate the exact functionality of that API using
+    // kGColorSpaceGenericRGB, but it is marked as unavailable for Swift. The
+    // next best option is to use an sRGB color space, which is available but
+    // was introduced a little later than the (now legacy) generic RGB color
+    // space.
+    // Should be OK, since this code only affects the playgrounds, where
+    // you can't really pick the OS version other than "what's currently
+    // shipping".
+#if os(macOS)
+    self.init(red: red, green: green, blue: blue, alpha: alpha)
+#else
+    if #available(iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+      guard let space = CGColorSpace(name: CGColorSpace.sRGB) else {
+        fatalError("Unable to create an sRGB color space")
+      }
+      self.init(colorSpace: space, components: [red, green, blue, alpha])!
+    }
+    else {
+      fatalError("Cannot create a CGColor on this version of OS")
+    }
+#endif
   }
 }
 
@@ -69,7 +99,8 @@ extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 extension CGColorSpace {
   public var colorTable: [UInt8]? {
     guard self.model == .indexed else { return nil }
-    var table = [UInt8](repeating: 0, count: self.__colorTableCount)
+    let components = self.baseColorSpace?.numberOfComponents ?? 1
+    var table = [UInt8](repeating: 0, count: self.__colorTableCount * components)
     self.__unsafeGetColorTable(&table)
     return table
   }
@@ -227,11 +258,13 @@ public extension CGPoint {
   }
 }
 
-extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGPoint : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
+}
 
+extension CGPoint : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGPoint.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .point(Double(x), Double(y))
@@ -292,14 +325,16 @@ public extension CGSize {
   }
 }
 
-extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGSize : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
       children: ["width": width, "height": height],
       displayStyle: .`struct`)
   }
+}
 
+extension CGSize : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGSize.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .size(Double(width), Double(height))
@@ -424,20 +459,22 @@ public extension CGRect {
   }
 
   @available(*, unavailable, renamed: "minX")
-  public var x: CGFloat { return minX }
+  var x: CGFloat { return minX }
 
   @available(*, unavailable, renamed: "minY")
-  public var y: CGFloat { return minY }
+  var y: CGFloat { return minY }
 }
 
-extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGRect : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
       children: ["origin": origin, "size": size],
       displayStyle: .`struct`)
   }
+}
 
+extension CGRect : _CustomPlaygroundQuickLookable {
   @available(*, deprecated, message: "CGRect.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .rectangle(
@@ -510,7 +547,7 @@ extension CGAffineTransform : Codable {
 
 extension CGImage {
   public func copy(maskingColorComponents components: [CGFloat]) -> CGImage? {
-    return self.__copy(maskingColorComponents: UnsafePointer(components))
+    return self.__copy(maskingColorComponents: components)
   }
 }
 

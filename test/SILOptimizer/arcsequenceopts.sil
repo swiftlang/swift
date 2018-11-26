@@ -1553,7 +1553,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return %2 : $()
 }
 
-sil [_semantics "arc.programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
 
 // CHECK-LABEL: sil @ignore_fatalErrorMsgBB : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK-NOT: strong_retain
@@ -2177,6 +2177,7 @@ bb0(%0 : $@callee_guaranteed () -> ()):
 // CHECK: apply [[MAYRELEASE]]
 // CHECK-NOT: strong_retain
 // CHECK: return
+// CHECK: } // end sil function 'testReleaseNoneAttribute'
 sil [releasenone] @releaseNone : $@convention(thin) () -> ()
 sil @mayRelease : $@convention(thin) () -> ()
 
@@ -2190,4 +2191,25 @@ bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
   %10 = tuple()
   return %10 : $()
+}
+
+// Make sure that we elimiante the inner retain/release pair on the
+// partial_apply by treating it as an entrance.
+// CHECK-LABEL: sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+// CHECK: partial_apply
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function 'test_strong_entrance_partial_apply'
+sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  strong_retain %1 : $@callee_guaranteed () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }

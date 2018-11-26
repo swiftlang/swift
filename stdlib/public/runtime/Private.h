@@ -28,6 +28,7 @@
 #endif
 
 namespace swift {
+class ParsedTypeIdentity;
 
 class TypeReferenceOwnership {
   enum : uint8_t {
@@ -43,15 +44,10 @@ class TypeReferenceOwnership {
 public:
   constexpr TypeReferenceOwnership() : Data(0) {}
 
-  bool isWeak() const { return Data & Weak; }
-  bool isUnowned() const { return Data & Unowned; }
-  bool isUnmanaged() const { return Data & Unmanaged; }
-
-  void setWeak() { Data |= Weak; }
-
-  void setUnowned() { Data |= Unowned; }
-
-  void setUnmanaged() { Data |= Unmanaged; }
+#define REF_STORAGE(Name, ...) \
+  void set##Name() { Data |= Name; } \
+  bool is##Name() const { return Data & Name; }
+#include "swift/AST/ReferenceStorage.def"
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -60,7 +56,7 @@ public:
 /// itself related info has to be bundled with it.
 class TypeInfo {
   const Metadata *Type;
-  const TypeReferenceOwnership ReferenceOwnership;
+  TypeReferenceOwnership ReferenceOwnership;
 
 public:
   TypeInfo() : Type(nullptr), ReferenceOwnership() {}
@@ -73,6 +69,10 @@ public:
   bool isWeak() const { return ReferenceOwnership.isWeak(); }
   bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
   bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 #if SWIFT_HAS_ISA_MASKING
@@ -82,10 +82,10 @@ public:
 
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
-                                    const ProtocolDescriptor *theProtocol);
+                                    ProtocolDescriptorRef protocol);
   
   bool classConformsToObjCProtocol(const void *theClass,
-                                    const ProtocolDescriptor *theProtocol);
+                                   ProtocolDescriptorRef protocol);
 #endif
 
   /// Is the given value a valid alignment mask?
@@ -120,7 +120,8 @@ public:
 #if SWIFT_HAS_OPAQUE_ISAS
     // The ISA is opaque so masking it will not return a pointer.  We instead
     // need to call the objc runtime to get the class.
-    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+    id idObject = reinterpret_cast<id>(const_cast<void *>(object));
+    return reinterpret_cast<const ClassMetadata*>(object_getClass(idObject));
 #else
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
@@ -196,12 +197,17 @@ public:
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
+  /// All information is taken from the passed-in layout rather than the VWT.
+  /// This is so that we can delay "publishing" the flags in the actual
+  /// value witness table until all required changes have been made.
+  ///
   /// For instance, if the value witness table represents a POD type, this will
   /// insert POD value witnesses into the table. The vwtable's flags must have
   /// been initialized before calling this function.
   ///
   /// Returns true if common value witnesses were used, false otherwise.
-  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+  void installCommonValueWitnesses(const TypeLayout &layout,
+                                   ValueWitnessTable *vwtable);
 
   const Metadata *
   _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,
@@ -229,12 +235,90 @@ public:
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the generic arguments from
+  /// the given metadata.
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
+    const Metadata *base;
+
+    /// An element in the descriptor path.
+    struct PathElement {
+      /// The context described by this path element.
+      const ContextDescriptor *context;
+
+      /// The number of key parameters in the parent.
+      unsigned numKeyGenericParamsInParent;
+
+      /// The number of key parameters locally introduced here.
+      unsigned numKeyGenericParamsHere;
+
+      /// Whether this context has any non-key generic parameters.
+      bool hasNonKeyGenericParams;
+    };
+
+    /// Information about the generic context descriptors that make up \c
+    /// descriptor, from the outermost to the innermost.
+    mutable std::vector<PathElement> descriptorPath;
+
+    /// Builds the descriptor path.
+    ///
+    /// \returns a pair containing the number of key generic parameters in
+    /// the path up to this point.
+    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    // Set up the state we need to compute substitutions.
+    void setup() const;
+
+  public:
+    /// Produce substitutions entirely from the given metadata.
+    explicit SubstGenericParametersFromMetadata(const Metadata *base)
+      : base(base) { }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
   /// given a particular generic parameter specified by depth/index.
   TypeInfo _getTypeByMangledName(StringRef typeName,
                                  SubstGenericParameterFn substGenericParam);
+
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the complete set of generic
+  /// arguments "as written".
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
+    /// The complete set of generic arguments.
+    const std::vector<const Metadata *> &allGenericArgs;
+
+    /// The counts of generic parameters at each level.
+    const std::vector<unsigned> &genericParamCounts;
+
+  public:
+    /// Initialize a new function object to handle substitutions. Both
+    /// parameters are references to vectors that must live longer than
+    /// this function object.
+    ///
+    /// \param allGenericArgs The complete set of generic arguments, as written.
+    /// This could come directly from "source" (where all generic arguments are
+    /// encoded) or from metadata via gatherWrittenGenericArgs().
+    ///
+    /// \param genericParamCounts The count of generic parameters at each
+    /// generic level, typically gathered by _gatherGenericParameterCounts.
+    explicit SubstGenericParametersFromWrittenArgs(
+        const std::vector<const Metadata *> &allGenericArgs,
+        const std::vector<unsigned> &genericParamCounts)
+      : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
+    }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
 
   /// Gather generic parameter counts from a context descriptor.
   ///
@@ -291,10 +375,25 @@ public:
 
   void *allocateMetadata(size_t size, size_t align);
 
+  /// Gather the set of generic arguments that would be written in the
+  /// source, as a f
+  ///
+  /// This function computes generic arguments even when they are not
+  /// directly represented in the metadata, e.g., generic parameters that
+  /// are canonicalized away by same-type constraints and are therefore not
+  /// "key" parameters.
+  ///
+  /// \code
+  ///   extension Array where Element == String { }
+  ///   extension Dictionary where Key == Value { }
+  /// \endcode
+  void gatherWrittenGenericArgs(const Metadata *metadata,
+                                const TypeContextDescriptor *description,
+                                std::vector<const Metadata *> &allGenericArgs);
+
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
-                             bool concretizedGenerics,
                              Demangle::Demangler &Dem);
   
   /// Symbolic reference resolver that produces the demangling tree for the
@@ -305,13 +404,41 @@ public:
     explicit ResolveToDemanglingForContext(Demangle::Demangler &Dem)
       : Dem(Dem) {}
     
-    Demangle::NodePointer operator()(int32_t offset, const void *base) {
-      auto descriptor =
-        (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
-      
-      return _buildDemanglingForContext(descriptor, {}, false, Dem);
-    }
+    Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
+                                     Demangle::Directness isIndirect,
+                                     int32_t offset,
+                                     const void *base);
   };
+
+  /// Symbolic reference resolver that resolves the absolute addresses of
+  /// symbolic references but leaves them as references.
+  class ResolveAsSymbolicReference {
+    Demangle::Demangler &Dem;
+  public:
+    explicit ResolveAsSymbolicReference(Demangle::Demangler &Dem)
+      : Dem(Dem) {}
+    
+    Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
+                                     Demangle::Directness isIndirect,
+                                     int32_t offset,
+                                     const void *base);
+  };
+  
+  /// Demangler resolver that turns resolved symbolic references into their
+  /// demangling trees.
+  class ExpandResolvedSymbolicReferences {
+    Demangle::Demangler &Dem;
+  public:
+    explicit ExpandResolvedSymbolicReferences(Demangle::Demangler &Dem)
+      : Dem(Dem) {}
+    
+    Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
+                                     const void *resolvedReference);
+  };
+
+  /// Is the given type imported from a C tag type?
+  bool _isCImportedTagType(const TypeContextDescriptor *type,
+                           const ParsedTypeIdentity &identity);
 
   /// Check whether a type conforms to a protocol.
   ///
@@ -322,8 +449,14 @@ public:
   ///   table will be placed here
   bool _conformsToProtocol(const OpaqueValue *value,
                            const Metadata *type,
-                           const ProtocolDescriptor *protocol,
+                           ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
+
+  /// Given a type that we know conforms to the given protocol, find the
+  /// superclass that introduced the conformance.
+  const Metadata *findConformingSuperclass(const Metadata *type,
+                                           const ProtocolDescriptor *protocol);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

@@ -19,6 +19,7 @@ namespace swift {
 class AbstractStorageDecl;
 class ValueDecl;
 class ExtensionDecl;
+class ModuleEntity;
 enum class AccessorKind;
 class Type;
 
@@ -35,6 +36,10 @@ bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 /// Prints out the USR for the given Decl.
 /// \returns true if it failed, false on success.
 bool printDeclUSR(const ValueDecl *D, raw_ostream &OS);
+
+/// Prints out the USR for the given ModuleEntity.
+/// \returns true if it failed, false on success.
+bool printModuleUSR(ModuleEntity Mod, raw_ostream &OS);
 
 /// Prints out the accessor USR for the given storage Decl.
 /// \returns true if it failed, false on success.

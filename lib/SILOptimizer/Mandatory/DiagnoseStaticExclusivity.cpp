@@ -33,6 +33,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -53,118 +54,6 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 }
 
 namespace {
-
-enum class AccessedStorageKind : unsigned {
-  /// The access is to a location represented by a SIL value
-  /// (for example, an 'alloc_box' instruction for a local variable).
-  /// Two accesses accessing the exact same SILValue are considered to be
-  /// accessing the same storage location.
-  Value,
-
-  /// The access is to a global variable.
-  GlobalVar,
-
-  /// The access is to a stored class property.
-  ClassProperty
-};
-
-/// Represents the identity of a stored class property as a combination
-/// of a base and a single projection. Eventually the goal is to make this
-/// more precise and consider, casts, etc.
-class ObjectProjection {
-public:
-  ObjectProjection(SILValue Object, const Projection &Proj)
-      : Object(Object), Proj(Proj) {
-    assert(Object->getType().isObject());
-  }
-
-  SILValue getObject() const { return Object; }
-  const Projection &getProjection() const { return Proj; }
-
-  bool operator==(const ObjectProjection &Other) const {
-    return Object == Other.Object && Proj == Other.Proj;
-  }
-
-  bool operator!=(const ObjectProjection &Other) const {
-    return Object != Other.Object || Proj != Other.Proj;
-  }
-
-private:
-  SILValue Object;
-  Projection Proj;
-};
-
-/// Represents the identity of a storage location being accessed.
-/// This is used to determine when two 'begin_access' instructions
-/// definitely access the same underlying location.
-///
-/// The key invariant that this class must maintain is that if it says
-/// two storage locations are the same then they must be the same at run time.
-/// It is allowed to err on the other side: it may imprecisely fail to
-/// recognize that two storage locations that represent the same run-time
-/// location are in fact the same.
-class AccessedStorage {
-
-private:
-  AccessedStorageKind Kind;
-
-  union {
-    SILValue Value;
-    SILGlobalVariable *Global;
-    ObjectProjection ObjProj;
-  };
-
-public:
-  AccessedStorage(SILValue V)
-      : Kind(AccessedStorageKind::Value), Value(V) { }
-
-  AccessedStorage(SILGlobalVariable *Global)
-      : Kind(AccessedStorageKind::GlobalVar), Global(Global) {}
-
-  AccessedStorage(AccessedStorageKind Kind,
-                  const ObjectProjection &ObjProj)
-      : Kind(Kind), ObjProj(ObjProj) {}
-
-  AccessedStorageKind getKind() const { return Kind; }
-
-  SILValue getValue() const {
-    assert(Kind == AccessedStorageKind::Value);
-    return Value;
-  }
-
-  SILGlobalVariable *getGlobal() const {
-    assert(Kind == AccessedStorageKind::GlobalVar);
-    return Global;
-  }
-
-  const ObjectProjection &getObjectProjection() const {
-    assert(Kind == AccessedStorageKind::ClassProperty);
-    return ObjProj;
-  }
-
-  /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagnostic purposes.
-  const ValueDecl *getStorageDecl() const {
-    switch(Kind) {
-    case AccessedStorageKind::GlobalVar:
-      return getGlobal()->getDecl();
-    case AccessedStorageKind::Value:
-      if (auto *Box = dyn_cast<AllocBoxInst>(getValue())) {
-        return Box->getLoc().getAsASTNode<VarDecl>();
-      }
-      if (auto *Arg = dyn_cast<SILFunctionArgument>(getValue())) {
-        return Arg->getDecl();
-      }
-      break;
-    case AccessedStorageKind::ClassProperty: {
-      const ObjectProjection &OP = getObjectProjection();
-      const Projection &P = OP.getProjection();
-      return P.getVarDecl(OP.getObject()->getType());
-    }
-    }
-    return nullptr;
-  }
-};
 
 enum class RecordedAccessKind {
   /// The access was for a 'begin_access' instruction in the current function
@@ -219,6 +108,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessKind;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   SILLocation getAccessLoc() const {
@@ -228,6 +118,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessLoc;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   const IndexTrieNode *getSubPath() const {
@@ -410,13 +301,6 @@ using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
 /// Represents two accesses that conflict and their underlying storage.
 struct ConflictingAccess {
-private:
-
-  /// If true, always diagnose this conflict as a warning. This is useful for
-  /// staging in fixes for false negatives without affecting source
-  /// compatibility.
-  bool AlwaysDiagnoseAsWarning = false;
-public:
   /// Create a conflict for two begin_access instructions in the same function.
   ConflictingAccess(const AccessedStorage &Storage, const RecordedAccess &First,
                     const RecordedAccess &Second)
@@ -425,59 +309,9 @@ public:
   const AccessedStorage Storage;
   const RecordedAccess FirstAccess;
   const RecordedAccess SecondAccess;
-
-  bool getAlwaysDiagnoseAsWarning() const { return AlwaysDiagnoseAsWarning; }
-  void setAlwaysDiagnoseAsWarning(bool AlwaysDiagnoseAsWarning) {
-    this->AlwaysDiagnoseAsWarning = AlwaysDiagnoseAsWarning;
-  }
 };
 
 } // end anonymous namespace
-
-namespace llvm {
-/// Enable using AccessedStorage as a key in DenseMap.
-template <> struct DenseMapInfo<AccessedStorage> {
-  static AccessedStorage getEmptyKey() {
-    return AccessedStorage(swift::SILValue::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getEmptyKey()));
-  }
-
-  static AccessedStorage getTombstoneKey() {
-    return AccessedStorage(swift::SILValue::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getTombstoneKey()));
-  }
-
-  static unsigned getHashValue(AccessedStorage Storage) {
-    switch (Storage.getKind()) {
-    case AccessedStorageKind::Value:
-      return DenseMapInfo<swift::SILValue>::getHashValue(Storage.getValue());
-    case AccessedStorageKind::GlobalVar:
-      return DenseMapInfo<void *>::getHashValue(Storage.getGlobal());
-    case AccessedStorageKind::ClassProperty: {
-      const ObjectProjection &P = Storage.getObjectProjection();
-      return llvm::hash_combine(P.getObject(), P.getProjection());
-    }
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
-  }
-
-  static bool isEqual(AccessedStorage LHS, AccessedStorage RHS) {
-    if (LHS.getKind() != RHS.getKind())
-      return false;
-
-    switch (LHS.getKind()) {
-    case AccessedStorageKind::Value:
-      return LHS.getValue() == RHS.getValue();
-    case AccessedStorageKind::GlobalVar:
-      return LHS.getGlobal() == RHS.getGlobal();
-    case AccessedStorageKind::ClassProperty:
-        return LHS.getObjectProjection() == RHS.getObjectProjection();
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
-  }
-};
-
-} // end namespace llvm
 
 /// Returns whether an access of the given kind requires exclusive or shared
 /// access to its storage.
@@ -599,13 +433,13 @@ canReplaceWithCallToCollectionSwapAt(const BeginAccessInst *Access1,
   // a witness for a subscript on MutableCollection?
   bool IsSubscriptOnMutableCollection = false;
   ProtocolDecl *ProtocolForDecl =
-      Decl1->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      Decl1->getDeclContext()->getSelfProtocolDecl();
   if (ProtocolForDecl) {
     IsSubscriptOnMutableCollection = (ProtocolForDecl == MutableCollectionDecl);
   } else {
     for (ValueDecl *Req : Decl1->getSatisfiedProtocolRequirements()) {
       DeclContext *ReqDC = Req->getDeclContext();
-      ProtocolDecl *ReqProto = ReqDC->getAsProtocolOrProtocolExtensionContext();
+      ProtocolDecl *ReqProto = ReqDC->getSelfProtocolDecl();
       assert(ReqProto && "Protocol requirement not in a protocol?");
 
       if (ReqProto == MutableCollectionDecl) {
@@ -686,11 +520,11 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   const AccessedStorage &Storage = Violation.Storage;
   const RecordedAccess &FirstAccess = Violation.FirstAccess;
   const RecordedAccess &SecondAccess = Violation.SecondAccess;
+  SILFunction *F = FirstAccess.getInstruction()->getFunction();
 
-  DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
-                     << "\n  vs " << *SecondAccess.getInstruction()
-                     << "\n  in function "
-                     << *FirstAccess.getInstruction()->getFunction());
+  LLVM_DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
+                          << "\n  vs " << *SecondAccess.getInstruction()
+                          << "\n  in function " << *F);
 
   // Can't have a conflict if both accesses are reads.
   assert(!(FirstAccess.getAccessKind() == SILAccessKind::Read &&
@@ -708,16 +542,8 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
-  // For now, all exclusivity violations are warning in Swift 3 mode.
-  // Also treat some violations as warnings to allow them to be staged in.
-  bool DiagnoseAsWarning = Violation.getAlwaysDiagnoseAsWarning() ||
-      Ctx.LangOpts.isSwiftVersion3();
-
-  if (const ValueDecl *VD = Storage.getStorageDecl()) {
+  if (const ValueDecl *VD = Storage.getDecl(F)) {
     // We have a declaration, so mention the identifier in the diagnostic.
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_warn :
-                         diag::exclusivity_access_required);
     SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
     SILModule &M = FirstAccess.getInstruction()->getModule();
     std::string PathDescription = getPathDescription(
@@ -737,18 +563,16 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
     }
 
     auto D =
-        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required,
                  PathDescription, AccessKindForMain, SuggestSwapAt);
     D.highlight(RangeForMain);
     if (SuggestSwapAt)
       addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
                      Ctx.SourceMgr);
   } else {
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_unknown_decl_warn :
-                         diag::exclusivity_access_required_unknown_decl);
-    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
-             AccessKindForMain)
+    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+             diag::exclusivity_access_required_unknown_decl, AccessKindForMain)
         .highlight(RangeForMain);
   }
   diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
@@ -756,48 +580,14 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
       .highlight(NoteAccess.getAccessLoc().getSourceRange());
 }
 
-/// Make a best effort to find the underlying object for the purpose
-/// of identifying the base of a 'ref_element_addr'.
-static SILValue findUnderlyingObject(SILValue Value) {
-  assert(Value->getType().isObject());
-  SILValue Iter = Value;
-
-  while (true) {
-    // For now just look through begin_borrow instructions; we can likely
-    // make this more precise in the future.
-    if (auto *BBI = dyn_cast<BeginBorrowInst>(Iter)) {
-      Iter = BBI->getOperand();
-      continue;
-    }
-    break;
-  }
-
-  assert(Iter->getType().isObject());
-  return Iter;
-}
-
 /// Look through a value to find the underlying storage accessed.
-static AccessedStorage findAccessedStorage(SILValue Source) {
-  SILValue BaseAddress = findAccessedAddressBase(Source);
-  if (!BaseAddress) {
+static AccessedStorage findValidAccessedStorage(SILValue Source) {
+  const AccessedStorage &Storage = findAccessedStorage(Source);
+  if (!Storage) {
     llvm::dbgs() << "Bad memory access source: " << Source;
     llvm_unreachable("Unexpected access source.");
   }
-  // Base case for globals: make sure ultimate source is recognized.
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(BaseAddress)) {
-    return AccessedStorage(GAI->getReferencedGlobal());
-  }
-  // Base case for class objects.
-  if (auto *REA = dyn_cast<RefElementAddrInst>(BaseAddress)) {
-    // Do a best-effort to find the identity of the object being projected
-    // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
-    // actually refer the same address) because these will be dynamically
-    // checked.
-    SILValue Object = findUnderlyingObject(REA->getOperand());
-    const ObjectProjection &OP = ObjectProjection(Object, Projection(REA));
-    return AccessedStorage(AccessedStorageKind::ClassProperty, OP);
-  }
-  return AccessedStorage(BaseAddress);
+  return Storage;
 }
 
 /// Returns true when the apply calls the Standard Library swap().
@@ -879,25 +669,51 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
                            *BestArgAccess);
 }
 
-/// Use the summary analysis to check whether a call to the given
-/// function would conflict with any in progress accesses. The starting
-/// index indicates what index into the the callee's parameters the
-/// arguments array starts at -- this is useful for partial_apply functions,
-/// which pass only a suffix of the callee's arguments at the apply site.
-static void checkForViolationWithCall(
-    const StorageMap &Accesses, SILFunction *Callee, unsigned StartingAtIndex,
-    OperandValueArrayRef Arguments, AccessSummaryAnalysis *ASA,
-    bool DiagnoseAsWarning,
-    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
-  const AccessSummaryAnalysis::FunctionSummary &FS =
-      ASA->getOrCreateSummary(Callee);
+// =============================================================================
+// The data flow algorithm that drives diagnostics.
 
-  // For each argument in the suffix of the callee arguments being passed
-  // at this call site, determine whether the arguments will be accessed
-  // in a way that conflicts with any currently in progress accesses.
-  // If so, diagnose.
-  for (unsigned ArgumentIndex : indices(Arguments)) {
-    unsigned CalleeIndex = StartingAtIndex + ArgumentIndex;
+// Forward declare verification entry points.
+#ifndef NDEBUG
+static void checkNoEscapePartialApply(PartialApplyInst *PAI);
+#endif
+static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses);
+
+namespace {
+/// Track the current state of formal accesses, including exclusivity
+/// violations, and function summaries at a particular point in the program.
+struct AccessState {
+  AccessSummaryAnalysis *ASA;
+
+  // Stores the accesses that have been found to conflict. Used to defer
+  // emitting diagnostics until we can determine whether they should
+  // be suppressed.
+  llvm::SmallVector<ConflictingAccess, 4> ConflictingAccesses;
+
+  // Collects calls the Standard Library swap() for Fix-Its.
+  llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
+
+  StorageMap *Accesses = nullptr;
+
+  AccessState(AccessSummaryAnalysis *ASA) : ASA(ASA) {}
+};
+} // namespace
+
+/// For each argument in the range of the callee arguments being applied at the
+/// given apply site, use the summary analysis to determine whether the
+/// arguments will be accessed in a way that conflicts with any currently in
+/// progress accesses. If so, diagnose.
+static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
+  SILFunction *Callee = Apply.getCalleeFunction();
+  if (!Callee || Callee->empty())
+    return;
+
+  const AccessSummaryAnalysis::FunctionSummary &FS =
+      State.ASA->getOrCreateSummary(Callee);
+
+  for (unsigned ArgumentIndex : range(Apply.getNumArguments())) {
+
+    unsigned CalleeIndex =
+        Apply.getCalleeArgIndexOfFirstAppliedArg() + ArgumentIndex;
 
     const AccessSummaryAnalysis::ArgumentSummary &AS =
         FS.getAccessForArgument(CalleeIndex);
@@ -908,21 +724,21 @@ static void checkForViolationWithCall(
     if (SubAccesses.empty())
       continue;
 
-    SILValue Argument = Arguments[ArgumentIndex];
+    SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
-    const AccessedStorage &Storage = findAccessedStorage(Argument);
-    auto AccessIt = Accesses.find(Storage);
+    // A valid AccessedStorage should alway sbe found because Unsafe accesses
+    // are not tracked by AccessSummaryAnalysis.
+    const AccessedStorage &Storage = findValidAccessedStorage(Argument);
+    auto AccessIt = State.Accesses->find(Storage);
 
     // Are there any accesses in progress at the time of the call?
-    if (AccessIt == Accesses.end())
+    if (AccessIt == State.Accesses->end())
       continue;
 
     const AccessInfo &Info = AccessIt->getSecond();
-    if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info)) {
-      Conflict->setAlwaysDiagnoseAsWarning(DiagnoseAsWarning);
-      ConflictingAccesses.push_back(*Conflict);
-    }
+    if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info))
+      State.ConflictingAccesses.push_back(*Conflict);
   }
 }
 
@@ -937,233 +753,133 @@ static CanSILFunctionType getSILFunctionTypeForValue(SILValue arg) {
   return argTy.getAs<SILFunctionType>();
 }
 
-/// Checks whether any of the arguments to the apply are closures and diagnoses
-/// if any of the @inout_aliasable captures passed to those closures have
-/// in-progress accesses that would conflict with any access the summary
-/// says the closure would perform.
-static void checkForViolationsInNoEscapeClosureArguments(
-    const StorageMap &Accesses, ApplySite AS, AccessSummaryAnalysis *ASA,
-    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses,
-    bool DiagnoseAsWarning) {
+/// Recursively check for conflicts with in-progress accesses at the given
+/// apply.
+///
+/// Any captured variable accessed by a noescape closure is considered to be
+/// accessed at the point that the closure is fully applied. This includes
+/// variables captured by address by the noescape closure being applied or by
+/// any other noescape closure that is itself passed as an argument to that
+/// closure.
+///
+/// (1) Use AccessSummaryAnalysis to check each argument for statically
+/// enforced accesses nested within the callee.
+///
+/// (2) If an applied argument is itself a function type, recursively check for
+/// violations on the closure being passed as an argument.
+///
+/// (3) Walk up the chain of partial applies to recursively visit all arguments.
+///
+/// Note: This handles closures that are called immediately:
+///  var i = 7
+///  ({ (p: inout Int) in i = 8})(&i) // Overlapping access to 'i'
+///
+/// Note: This handles chains of partial applies:
+///   pa1 = partial_apply f(c) : $(a, b, c)
+///   pa2 = partial_apply pa1(b) : $(a, b)
+///   apply pa2(a)
+static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
+  // First, check access to variables immediately captured at this apply site.
+  checkCaptureAccess(Apply, State);
 
-  // Check for violation with closures passed as arguments
-  for (SILValue Argument : AS.getArguments()) {
-    auto fnType = getSILFunctionTypeForValue(Argument);
-    if (!fnType || !fnType->isNoEscape())
+  // Next, recursively check any noescape closures passed as arguments at this
+  // apply site.
+  TinyPtrVector<PartialApplyInst *> partialApplies;
+  for (SILValue Argument : Apply.getArguments()) {
+    auto FnType = getSILFunctionTypeForValue(Argument);
+    if (!FnType || !FnType->isNoEscape())
       continue;
 
-    FindClosureResult result = findClosureForAppliedArg(Argument);
-    if (!result.PAI)
-      continue;
-
-    SILFunction *Callee = result.PAI->getCalleeFunction();
-    if (!Callee || Callee->empty())
-      continue;
-
-    // For source compatibility reasons, treat conflicts found by
-    // looking through reabstraction thunks as warnings. A future compiler
-    // will upgrade these to errors;
-    DiagnoseAsWarning |= result.isReabstructionThunk;
-
-    // For source compatibility reasons, treat conflicts found by
-    // looking through noescape blocks as warnings. A future compiler
-    // will upgrade these to errors.
-    DiagnoseAsWarning |=
-        (getSILFunctionTypeForValue(Argument)->getRepresentation()
-         == SILFunctionTypeRepresentation::Block);
-
-    // Check the closure's captures, which are a suffix of the closure's
-    // parameters.
-    unsigned StartIndex =
-        Callee->getArguments().size() - result.PAI->getNumArguments();
-    checkForViolationWithCall(Accesses, Callee, StartIndex,
-                              result.PAI->getArguments(), ASA,
-                              DiagnoseAsWarning, ConflictingAccesses);
+    findClosuresForFunctionValue(Argument, partialApplies);
   }
+  // Continue recursively walking up the chain of applies if necessary.
+  findClosuresForFunctionValue(Apply.getCallee(), partialApplies);
+
+  for (auto *PAI : partialApplies)
+    checkForViolationAtApply(ApplySite(PAI), State);
 }
 
-/// Given a full apply site, diagnose if the apply either calls a closure
-/// directly that conflicts with an in-progress access or takes a noescape
-/// argument that, when called, would conflict with an in-progress access.
-static void checkForViolationsInNoEscapeClosures(
-    const StorageMap &Accesses, FullApplySite FAS, AccessSummaryAnalysis *ASA,
-    llvm::SmallVectorImpl<ConflictingAccess> &ConflictingAccesses) {
-  // Check to make sure that calling a closure immediately will not result in
-  // a conflict. This diagnoses in cases where there is a conflict between an
-  // argument passed inout to the closure and an access inside the closure to a
-  // captured variable:
-  //
-  //  var i = 7
-  //  ({ (p: inout Int) in i = 8})(&i) // Overlapping access to 'i'
-  //
-  SILFunction *Callee = FAS.getCalleeFunction();
-  if (Callee && !Callee->empty()) {
-    // Check for violation with directly called closure
-    checkForViolationWithCall(Accesses, Callee, 0, FAS.getArguments(), ASA,
-                              /*DiagnoseAsWarning=*/false, ConflictingAccesses);
-  }
-
-  // Check to make sure that any arguments to the apply are not themselves
-  // noescape closures that -- when called -- might conflict with an in-progress
-  // access. For example, this will diagnose on the following:
-  //
-  // var i = 7
-  // takesInoutAndClosure(&i) { i = 8 } // Overlapping access to 'i'
-  //
-  checkForViolationsInNoEscapeClosureArguments(Accesses, FAS, ASA,
-                                               ConflictingAccesses,
-                                               /*DiagnoseAsWarning=*/false);
-}
-
-#ifndef NDEBUG
-// If a partial apply has @inout_aliasable arguments, it may only be used as
-// a @noescape function type in a way that is recognized by
-// DiagnoseStaticExclusivity.
-static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
-  SmallVector<Operand *, 8> uses(PAI->getUses());
-  while (!uses.empty()) {
-    Operand *oper = uses.pop_back_val();
-    SILInstruction *user = oper->getUser();
-
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
-      continue;
-
-    if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
-      uses.append(copy->getUses().begin(), copy->getUses().end());
-      continue;
-    }
-    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
-       uses.append(cvt->getUses().begin(), cvt->getUses().end());
-      continue;
-    }
-    // @noescape block storage can be passed as an Optional (Nullable).
-    if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
-      uses.append(EI->getUses().begin(), EI->getUses().end());
-      continue;
-    }
-    if (isa<ApplySite>(user)) {
-      SILValue arg = oper->get();
-      auto ArgumentFnType = getSILFunctionTypeForValue(arg);
-      if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
-        // Verify that the inverse operation, finding a partial_apply from a
-        // @noescape argument, is consistent.
-        assert(findClosureForAppliedArg(arg).PAI &&
-               "cannot find partial_apply from @noescape function argument");
-        continue;
-      }
-      llvm::dbgs() << "Argument must be @noescape function type: " << *arg;
-      llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                       "used as a @noescape function type argument.");
-    }
-    auto *store = dyn_cast<StoreInst>(user);
-    if (store && oper->getOperandNumber() == StoreInst::Src) {
-      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(store->getDest())) {
-        SILValue storageAddr = PBSI->getOperand();
-        // The closure is stored to block storage. Recursively visit all
-        // uses of any initialized block storage values derived from this
-        // storage address..
-        for (Operand *oper : storageAddr->getUses()) {
-          if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
-            uses.append(IBS->getUses().begin(), IBS->getUses().end());
-        }
-        continue;
-      }
-    }
-    llvm::dbgs() << "Unexpected partial_apply use: " << *user;
-    llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                     "used as a @noescape function type argument.");
-  }
-}
-#endif
-
-// Check if the given memory instruction obviously initializes the memory
-// object at `root`. Initialization does not require exclusivity enforcement
-// because uninitialized variables can't be captured.
-static bool isSafeInitialization(SILInstruction *memInst, SILValue root) {
-  // Local variable initialization is already filtered out by the check for
-  // temporary buffer access. Handle globals.
-  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(root)) {
-    // There doesn't seem to be a better way to check for initialization than
-    // scanning for the preceding alloc_global.
-    SILGlobalVariable *var = globalAddr->getReferencedGlobal();
-    auto I = globalAddr->getIterator();
-    auto beginI = globalAddr->getParent()->begin();
-    while (I != beginI) {
-      --I;
-      if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(I)) {
-        if (allocGlobal->getReferencedGlobal() == var)
-          return true;
-      }
-      if (I->mayReadOrWriteMemory())
-        break;
-    }
-  }
-  return false;
-}
-
-// Check that the given address-type operand is guarded by begin/end access
-// markers.
-static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
-  SILValue address = memOper->get();
-  SILInstruction *memInst = memOper->getUser();
-
-  auto error = [address, memInst]() {
-    llvm::dbgs() << "Memory access not protected by begin_access:\n";
-    memInst->printInContext(llvm::dbgs());
-    llvm::dbgs() << "Accessing: " << address;
-    llvm::dbgs() << "In function:\n";
-    memInst->getFunction()->print(llvm::dbgs());
-    abort();
-  };
-
-  if (auto apply = ApplySite::isa(memInst)) {
-    SILArgumentConvention conv =
-        apply.getArgumentConvention(apply.getCalleeArgIndex(*memOper));
-    // Captured addresses currently use the @inout_aliasable convention. They
-    // are considered an access at any call site that uses the closure. However,
-    // those accesses are never explictly protected by access markers. Instead,
-    // exclusivity uses AccessSummaryAnalysis to check for conflicts. Here, we
-    // can simply ignore any @inout_aliasable arguments.
-    if (conv == SILArgumentConvention::Indirect_InoutAliasable)
+// Apply transfer function to the AccessState. Beginning an access
+// increments the read or write count for the storage location;
+// Ending one decrements the count.
+static void checkForViolationsAtInstruction(SILInstruction &I,
+                                            AccessState &State) {
+  if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
 
-    assert(!isa<PartialApplyInst>(memInst)
-           && "partial apply can only capture an address as inout_aliasable");
-    // TODO: We currently assume @in/@in_guaranteed are only used for
-    // pass-by-value arguments. i.e. the address points a local copy of the
-    // argument, which is only passed by address for abstraction
-    // reasons. However, in the future, @in_guaranteed may be used for
-    // borrowed values, which should be recognized as a formal read.
-    if (conv != SILArgumentConvention::Indirect_Inout)
+    SILAccessKind Kind = BAI->getAccessKind();
+    const AccessedStorage &Storage =
+      findValidAccessedStorage(BAI->getSource());
+    // Storage may be associated with a nested access where the outer access is
+    // "unsafe". That's ok because the outer access can itself be treated like a
+    // valid source, as long as we don't ask for its source.
+    AccessInfo &Info = (*State.Accesses)[Storage];
+    const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
+    if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
+      State.ConflictingAccesses.emplace_back(Storage, *Conflict,
+                                             RecordedAccess(BAI, SubPath));
+    }
+
+    Info.beginAccess(BAI, SubPath);
+    return;
+  }
+
+  if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
+    if (EAI->getBeginAccess()->getEnforcement() == SILAccessEnforcement::Unsafe)
       return;
-  }
 
-  // Strip off address projections, but not ref_element_addr.
-  SILValue base = findAccessedAddressBase(address);
-  // `base` is null for address producers that are only used for local
-  // initialization.
-  if (!base || !isPossibleFormalAccessBase(base))
-    return;
+    auto It =
+      State.Accesses->find(findValidAccessedStorage(EAI->getSource()));
+    AccessInfo &Info = It->getSecond();
 
-  // Skip local non-lvalue accesses. There are many local initialization
-  // patterns that don't require access markers.
-  if (!isa<ApplySite>(memInst)
-      && (isa<AllocStackInst>(base) || isa<AllocBoxInst>(base))) {
-    return;
-  }
+    BeginAccessInst *BAI = EAI->getBeginAccess();
+    const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
+    Info.endAccess(EAI, SubPath);
 
-  if (isSafeInitialization(memInst, base))
-    return;
-
-  // Otherwise, the address base should be an in-scope begin_access.
-  if (auto *BAI = dyn_cast<BeginAccessInst>(base)) {
-    const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
-    AccessInfo &Info = Accesses[Storage];
+    // If the storage location has no more in-progress accesses, remove
+    // it to keep the StorageMap lean.
     if (!Info.hasAccessesInProgress())
-      error();
+      State.Accesses->erase(It);
     return;
   }
-  error();
+
+  if (I.getModule().getOptions().VerifyExclusivity && I.mayReadOrWriteMemory()) {
+    visitAccessedAddress(&I, [&State](Operand *memOper) {
+        checkAccessedAddress(memOper, *State.Accesses);
+      });
+  }
+
+  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+    // Record calls to swap() for potential Fix-Its.
+    if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext()))
+      State.CallsToSwap.push_back(AI);
+    else
+      checkForViolationAtApply(AI, State);
+    return;
+  }
+
+  if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
+    checkForViolationAtApply(TAI, State);
+    return;
+  }
+#ifndef NDEBUG
+  // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
+  // closure types, move this PartialApply verification into the
+  // SILVerifier to better pinpoint the offending pass.
+  if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
+    ApplySite apply(PAI);
+    if (llvm::any_of(apply.getArgumentOperands(), [apply](Operand &oper) {
+          return apply.getArgumentConvention(oper)
+                 == SILArgumentConvention::Indirect_InoutAliasable;
+        })) {
+      checkNoEscapePartialApply(PAI);
+    }
+  }
+#endif
+  // Sanity check to make sure entries are properly removed.
+  assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
+         && "Entries were not properly removed?!");
 }
 
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
@@ -1186,15 +902,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
   if (Fn.empty())
     return;
 
-  bool VerifyMemOps = Fn.getModule().getOptions().VerifyExclusivity;
-
-  // Collects calls the Standard Library swap() for Fix-Its.
-  llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
-
-  // Stores the accesses that have been found to conflict. Used to defer
-  // emitting diagnostics until we can determine whether they should
-  // be suppressed.
-  llvm::SmallVector<ConflictingAccess, 4> ConflictingAccesses;
+  AccessState State(ASA);
 
   // For each basic block, track the stack of current accesses on
   // exit from that block.
@@ -1225,89 +933,263 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
     // The in-progress accesses for the current program point, represented
     // as map from storage locations to the accesses in progress for the
     // location.
-    StorageMap &Accesses = *BBState;
-
-    for (auto &I : *BB) {
-      // Apply transfer functions. Beginning an access
-      // increments the read or write count for the storage location;
-      // Ending onr decrements the count.
-      if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
-        SILAccessKind Kind = BAI->getAccessKind();
-        const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
-        AccessInfo &Info = Accesses[Storage];
-        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
-        if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
-          ConflictingAccesses.emplace_back(Storage, *Conflict,
-                                           RecordedAccess(BAI, SubPath));
-        }
-
-        Info.beginAccess(BAI, SubPath);
-        continue;
-      }
-
-      if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
-        auto It = Accesses.find(findAccessedStorage(EAI->getSource()));
-        AccessInfo &Info = It->getSecond();
-
-        BeginAccessInst *BAI = EAI->getBeginAccess();
-        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
-        Info.endAccess(EAI, SubPath);
-
-        // If the storage location has no more in-progress accesses, remove
-        // it to keep the StorageMap lean.
-        if (!Info.hasAccessesInProgress())
-          Accesses.erase(It);
-        continue;
-      }
-
-      if (VerifyMemOps && I.mayReadOrWriteMemory()) {
-        visitAccessedAddress(&I, [&Accesses](Operand *memOper) {
-          checkAccessedAddress(memOper, Accesses);
-        });
-      }
-
-      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-        // Record calls to swap() for potential Fix-Its.
-        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
-          CallsToSwap.push_back(AI);
-        else
-          checkForViolationsInNoEscapeClosures(Accesses, AI, ASA,
-                                               ConflictingAccesses);
-        continue;
-      }
-
-      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
-        checkForViolationsInNoEscapeClosures(Accesses, TAI, ASA,
-                                             ConflictingAccesses);
-        continue;
-      }
-#ifndef NDEBUG
-      // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
-      // closure types, move this PartialApply verification into the
-      // SILVerifier to better pinpoint the offending pass.
-      if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
-        ApplySite apply(PAI);
-        if (llvm::any_of(range(apply.getNumArguments()),
-                         [apply](unsigned argIdx) {
-                           return apply.getArgumentConvention(argIdx)
-                             == SILArgumentConvention::Indirect_InoutAliasable;
-                         })) {
-          checkNoEscapePartialApply(PAI);
-        }
-      }
-#endif
-      // Sanity check to make sure entries are properly removed.
-      assert((!isa<ReturnInst>(&I) || Accesses.empty()) &&
-             "Entries were not properly removed?!");
-    }
+    State.Accesses = BBState.getPointer();
+    for (auto &I : *BB)
+      checkForViolationsAtInstruction(I, State);
   }
 
   // Now that we've collected violations and suppressed calls, emit
   // diagnostics.
-  for (auto &Violation : ConflictingAccesses) {
-    diagnoseExclusivityViolation(Violation, CallsToSwap, Fn.getASTContext());
+  for (auto &Violation : State.ConflictingAccesses) {
+    diagnoseExclusivityViolation(Violation, State.CallsToSwap,
+                                 Fn.getASTContext());
   }
 }
+
+// =============================================================================
+// Verification
+
+#ifndef NDEBUG
+// This must handle exactly the same SIL patterns as
+// swift::funcClosureForAppliedArg but in forward order.
+template <typename FollowUse>
+static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
+  SILInstruction *user = oper->getUser();
+
+  // Ignore uses that are totally uninteresting.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+    return;
+
+  // Before checking conversions in general below (getSingleValueCopyOrCast),
+  // check for convert_function to [without_actually_escaping]. Assume such
+  // conversion are not actually escaping without following their uses.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
+    if (CFI->withoutActuallyEscaping())
+      return;
+  }
+
+  // Look through copies, borrows, and conversions.
+  //
+  // Note: This handles ConversionInst, which already includes everything in
+  // swift::stripConvertFunctions.
+  if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
+    // Only follow the copied operand. Other operands are incidental,
+    // as in the second operand of mark_dependence.
+    if (oper->getOperandNumber() == 0)
+      followUses(copy);
+
+    return;
+  }
+
+  switch (user->getKind()) {
+  default:
+    break;
+
+  // Look through Optionals.
+  case SILInstructionKind::EnumInst:
+    // @noescape block storage can be passed as an Optional (Nullable).
+    followUses(cast<EnumInst>(user));
+    return;
+
+  // Look through Phis.
+  case SILInstructionKind::BranchInst: {
+    const SILPhiArgument *arg = cast<BranchInst>(user)->getArgForOperand(oper);
+    followUses(arg);
+    return;
+  }
+  case SILInstructionKind::CondBranchInst: {
+    const SILPhiArgument *arg =
+        cast<CondBranchInst>(user)->getArgForOperand(oper);
+    if (arg) // If the use isn't the branch condition, follow it.
+      followUses(arg);
+    return;
+  }
+  // Look through ObjC closures.
+  case SILInstructionKind::StoreInst:
+    if (oper->getOperandNumber() == StoreInst::Src) {
+      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(
+            cast<StoreInst>(user)->getDest())) {
+        SILValue storageAddr = PBSI->getOperand();
+        // The closure is stored to block storage. Recursively visit all
+        // uses of any initialized block storage values derived from this
+        // storage address..
+        for (Operand *oper : storageAddr->getUses()) {
+          if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
+            followUses(IBS);
+        }
+        return;
+      }
+    }
+    break;
+
+  case SILInstructionKind::IsEscapingClosureInst:
+    // May be generated by withoutActuallyEscaping.
+    return;
+
+  case SILInstructionKind::PartialApplyInst: {
+    // Recurse through partial_apply to handle special cases before handling
+    // ApplySites in general below.
+    PartialApplyInst *PAI = cast<PartialApplyInst>(user);
+    // Use the same logic as checkForViolationAtApply applied to a def-use
+    // traversal.
+    //
+    // checkForViolationAtApply recurses through partial_apply chains.
+    if (oper->get() == PAI->getCallee()) {
+      followUses(PAI);
+      return;
+    }
+    // checkForViolationAtApply also uses findClosuresForAppliedArg which in
+    // turn checks isPartialApplyOfReabstractionThunk.
+    //
+    // A closure with @inout_aliasable arguments may be applied to a
+    // thunk as "escaping", but as long as the thunk is only used as a
+    // '@noescape" type then it is safe.
+    if (isPartialApplyOfReabstractionThunk(PAI)) {
+      // Don't follow thunks that were generated by withoutActuallyEscaping.
+      SILFunction *thunkDef = PAI->getReferencedFunction();
+      if (!thunkDef->isWithoutActuallyEscapingThunk())
+        followUses(PAI);
+      return;
+    }
+    // Handle this use like a normal applied argument.
+    break;
+  }
+  };
+
+  // Handle ApplySites in general after checking PartialApply above.
+  if (isa<ApplySite>(user)) {
+    SILValue arg = oper->get();
+    auto argumentFnType = getSILFunctionTypeForValue(arg);
+    if (argumentFnType && argumentFnType->isNoEscape()) {
+      // Verify that the inverse operation, finding a partial_apply from a
+      // @noescape argument, is consistent.
+      TinyPtrVector<PartialApplyInst *> partialApplies;
+      findClosuresForFunctionValue(arg, partialApplies);
+      assert(!partialApplies.empty()
+             && "cannot find partial_apply from @noescape function argument");
+      return;
+    }
+    llvm::dbgs() << "Applied argument must be @noescape function type: " << *arg;
+  }
+  else
+    llvm::dbgs() << "Unexpected partial_apply use: " << *user;
+
+  llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                   "used as a @noescape function type argument.");
+}
+
+// If a partial apply has @inout_aliasable arguments, it may only be used as
+// a @noescape function type in a way that is recognized by
+// DiagnoseStaticExclusivity.
+static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
+  SmallVector<Operand *, 8> uses;
+  // Avoid exponential path exploration.
+  llvm::SmallDenseSet<Operand *, 8> visited;
+  auto uselistInsert = [&](Operand *operand) {
+    if (visited.insert(operand).second)
+      uses.push_back(operand);
+  };
+
+  for (Operand *use : PAI->getUses())
+    uselistInsert(use);
+
+  while (!uses.empty()) {
+    Operand *oper = uses.pop_back_val();
+    checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+      for (Operand *use : V->getUses())
+        uselistInsert(use);
+    });
+  }
+}
+#endif
+
+// Check that the given address-type operand is guarded by begin/end access
+// markers.
+static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
+  SILValue address = memOper->get();
+  SILInstruction *memInst = memOper->getUser();
+
+  auto error = [address, memInst]() {
+    llvm::dbgs() << "Memory access not protected by begin_access:\n";
+    memInst->printInContext(llvm::dbgs());
+    llvm::dbgs() << "Accessing: " << address;
+    llvm::dbgs() << "In function:\n";
+    memInst->getFunction()->print(llvm::dbgs());
+    abort();
+  };
+
+  // If the memory instruction is only used for initialization, it doesn't need
+  // an access marker.
+  if (memInstMustInitialize(memOper))
+    return;
+
+  if (auto apply = ApplySite::isa(memInst)) {
+    SILArgumentConvention conv = apply.getArgumentConvention(*memOper);
+    // Captured addresses currently use the @inout_aliasable convention. They
+    // are considered an access at any call site that uses the closure. However,
+    // those accesses are never explictly protected by access markers. Instead,
+    // exclusivity uses AccessSummaryAnalysis to check for conflicts. Here, we
+    // can simply ignore any @inout_aliasable arguments.
+    if (conv == SILArgumentConvention::Indirect_InoutAliasable)
+      return;
+
+    assert(!isa<PartialApplyInst>(memInst)
+           && "partial apply can only capture an address as inout_aliasable");
+    // TODO: We currently assume @in/@in_guaranteed are only used for
+    // pass-by-value arguments. i.e. the address points a local copy of the
+    // argument, which is only passed by address for abstraction
+    // reasons. However, in the future, @in_guaranteed may be used for
+    // borrowed values, which should be recognized as a formal read.
+    if (conv != SILArgumentConvention::Indirect_Inout)
+      return;
+  }
+
+  // Strip off address projections, but not ref_element_addr.
+  const AccessedStorage &storage = findAccessedStorage(address);
+  // findAccessedStorage may return an invalid storage object if the address
+  // producer is not recognized by its whitelist. For the purpose of
+  // verification, we assume that this can only happen for local
+  // initialization, not a formal memory access. The strength of
+  // verification rests on the completeness of the opcode list inside
+  // findAccessedStorage.
+  //
+  // For the purpose of verification, an unidentified access is
+  // unenforced. These occur in cases like global addressors and local buffers
+  // that make use of RawPointers.
+  if (!storage || storage.getKind() == AccessedStorage::Unidentified)
+    return;
+
+  // Some identifiable addresses can also be recognized as local initialization
+  // or other patterns that don't qualify as formal access.
+  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
+    return;
+
+  // A box or stack variable may represent lvalues, but they can only conflict
+  // with call sites in the same scope. Some initialization patters (stores to
+  // the local value) aren't protected by markers, so we need this check.
+  if (!isa<ApplySite>(memInst)
+      && (storage.getKind() == AccessedStorage::Box
+          || storage.getKind() == AccessedStorage::Stack)) {
+    return;
+  }
+
+  // Otherwise, the address base should be an in-scope begin_access.
+  if (storage.getKind() == AccessedStorage::Nested) {
+    auto *BAI = cast<BeginAccessInst>(storage.getValue());
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
+    const AccessedStorage &Storage = findValidAccessedStorage(BAI->getSource());
+    AccessInfo &Info = Accesses[Storage];
+    if (!Info.hasAccessesInProgress())
+      error();
+    return;
+  }
+  error();
+}
+
+// =============================================================================
+// Function Pass Driver
 
 namespace {
 

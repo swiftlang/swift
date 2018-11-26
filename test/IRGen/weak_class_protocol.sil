@@ -6,7 +6,7 @@ import Swift
 
 protocol Foo: class { }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @store_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @store_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64) {{.*}} {
 // CHECK:       entry:
 // CHECK-objc:    [[INSTANCE:%.*]] = inttoptr i64 %1 to %objc_object*
 // CHECK-native:  [[INSTANCE:%.*]] = inttoptr i64 %1 to %swift.refcounted*
@@ -14,7 +14,7 @@ protocol Foo: class { }
 // CHECK:         [[WTABLE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
 // CHECK:         store i8** [[WTABLE]], i8*** [[WTABLE_SLOT]], align 8
 // CHECK:         [[INSTANCE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0
-// CHECK-objc:    call %swift.weak* @swift_unknownWeakAssign(%swift.weak* returned [[INSTANCE_SLOT]], %objc_object* [[INSTANCE]]) {{#[0-9]+}}
+// CHECK-objc:    call %swift.weak* @swift_unknownObjectWeakAssign(%swift.weak* returned [[INSTANCE_SLOT]], %objc_object* [[INSTANCE]]) {{#[0-9]+}}
 // CHECK-native:  call %swift.weak* @swift_weakAssign(%swift.weak* returned [[INSTANCE_SLOT]], %swift.refcounted* [[INSTANCE]]) {{#[0-9]+}}
 // CHECK:         ret void
 // CHECK:       }

@@ -12,15 +12,17 @@
 
 #include "swift/Driver/ParseableOutput.h"
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/Types.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift::driver::parseable_output;
 using namespace swift::driver;
+using namespace swift::sys;
 using namespace swift;
 
 namespace {
@@ -30,7 +32,7 @@ namespace {
     CommandInput(StringRef Path) : Path(Path) {}
   };
 
-  typedef std::pair<types::ID, std::string> OutputPair;
+  using OutputPair = std::pair<file_types::ID, std::string>;
 } // end anonymous namespace
 
 namespace swift {
@@ -43,19 +45,18 @@ namespace json {
     static bool mustQuote(StringRef) { return true; }
   };
 
-  template<>
-  struct ScalarEnumerationTraits<types::ID> {
-    static void enumeration(Output &out, types::ID &value) {
-      types::forAllTypes([&](types::ID ty) {
-        std::string typeName = types::getTypeName(ty);
+  template <> struct ScalarEnumerationTraits<file_types::ID> {
+    static void enumeration(Output &out, file_types::ID &value) {
+      file_types::forAllTypes([&](file_types::ID ty) {
+        std::string typeName = file_types::getTypeName(ty);
         out.enumCase(value, typeName.c_str(), ty);
       });
     }
   };
 
-  template<>
-  struct ObjectTraits<std::pair<types::ID, std::string>> {
-    static void mapping(Output &out, std::pair<types::ID, std::string> &value) {
+  template <> struct ObjectTraits<std::pair<file_types::ID, std::string>> {
+    static void mapping(Output &out,
+                        std::pair<file_types::ID, std::string> &value) {
       out.mapRequired("type", value.first);
       out.mapRequired("path", value.second);
     }
@@ -131,17 +132,17 @@ public:
     }
 
     // TODO: set up Outputs appropriately.
-    types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
-    if (PrimaryOutputType != types::TY_Nothing) {
+    file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
+    if (PrimaryOutputType != file_types::TY_Nothing) {
       for (const std::string &OutputFileName : Cmd.getOutput().
                                                  getPrimaryOutputFilenames()) {
         Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
       }
     }
-    types::forAllTypes([&](types::ID Ty) {
-        for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
-          Outputs.push_back(OutputPair(Ty, Output));
-        }
+    file_types::forAllTypes([&](file_types::ID Ty) {
+      for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
+        Outputs.push_back(OutputPair(Ty, Output));
+      }
     });
   }
 
@@ -156,9 +157,9 @@ public:
 };
 
 class TaskBasedMessage : public CommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
 public:
-  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
+  TaskBasedMessage(StringRef Kind, const Job &Cmd, int64_t Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
   void provideMapping(swift::json::Output &out) override {
@@ -168,37 +169,44 @@ public:
 };
 
 class BeganMessage : public DetailedCommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
+  TaskProcessInformation ProcInfo;
+
 public:
-  BeganMessage(const Job &Cmd, ProcessId Pid) :
-      DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
+  BeganMessage(const Job &Cmd, int64_t Pid, TaskProcessInformation ProcInfo)
+      : DetailedCommandBasedMessage("began", Cmd), Pid(Pid),
+        ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
     DetailedCommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
+    out.mapRequired("process", ProcInfo);
   }
 };
 
 class TaskOutputMessage : public TaskBasedMessage {
   std::string Output;
+  TaskProcessInformation ProcInfo;
+
 public:
-  TaskOutputMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
-                    StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
-                                        Output(Output) {}
+  TaskOutputMessage(StringRef Kind, const Job &Cmd, int64_t Pid,
+                    StringRef Output, TaskProcessInformation ProcInfo)
+      : TaskBasedMessage(Kind, Cmd, Pid), Output(Output), ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskBasedMessage::provideMapping(out);
     out.mapOptional("output", Output, std::string());
+    out.mapRequired("process", ProcInfo);
   }
 };
 
 class FinishedMessage : public TaskOutputMessage {
   int ExitStatus;
 public:
-  FinishedMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                  int ExitStatus) : TaskOutputMessage("finished", Cmd, Pid,
-                                                      Output),
-                                    ExitStatus(ExitStatus) {}
+  FinishedMessage(const Job &Cmd, int64_t Pid, StringRef Output,
+                  TaskProcessInformation ProcInfo, int ExitStatus)
+      : TaskOutputMessage("finished", Cmd, Pid, Output, ProcInfo),
+        ExitStatus(ExitStatus) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -210,10 +218,11 @@ class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
   Optional<int> Signal;
 public:
-  SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg, Optional<int> Signal) :
-      TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
-      Signal(Signal) {}
+  SignalledMessage(const Job &Cmd, int64_t Pid, StringRef Output,
+                   StringRef ErrorMsg, Optional<int> Signal,
+                   TaskProcessInformation ProcInfo)
+      : TaskOutputMessage("signalled", Cmd, Pid, Output, ProcInfo),
+        ErrorMsg(ErrorMsg), Signal(Signal) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -253,25 +262,27 @@ static void emitMessage(raw_ostream &os, Message &msg) {
   os << JSONString << '\n';
 }
 
-void parseable_output::emitBeganMessage(raw_ostream &os,
-                                        const Job &Cmd, ProcessId Pid) {
-  BeganMessage msg(Cmd, Pid);
+void parseable_output::emitBeganMessage(raw_ostream &os, const Job &Cmd,
+                                        int64_t Pid,
+                                        TaskProcessInformation ProcInfo) {
+  BeganMessage msg(Cmd, Pid, ProcInfo);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitFinishedMessage(raw_ostream &os,
-                                           const Job &Cmd, ProcessId Pid,
-                                           int ExitStatus, StringRef Output) {
-  FinishedMessage msg(Cmd, Pid, Output, ExitStatus);
+void parseable_output::emitFinishedMessage(raw_ostream &os, const Job &Cmd,
+                                           int64_t Pid, int ExitStatus,
+                                           StringRef Output,
+                                           TaskProcessInformation ProcInfo) {
+  FinishedMessage msg(Cmd, Pid, Output, ProcInfo, ExitStatus);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitSignalledMessage(raw_ostream &os,
-                                            const Job &Cmd, ProcessId Pid,
-                                            StringRef ErrorMsg,
+void parseable_output::emitSignalledMessage(raw_ostream &os, const Job &Cmd,
+                                            int64_t Pid, StringRef ErrorMsg,
                                             StringRef Output,
-                                            Optional<int> Signal) {
-  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
+                                            Optional<int> Signal,
+                                            TaskProcessInformation ProcInfo) {
+  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal, ProcInfo);
   emitMessage(os, msg);
 }
 

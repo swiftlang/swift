@@ -16,7 +16,7 @@ import Foundation
 public let IterateData = BenchmarkInfo(
   name: "IterateData",
   runFunction: run_IterateData,
-  tags: [.validation, .api])
+  tags: [.validation, .api, .Data])
 
 @inline(never)
 func generateData() -> Data {

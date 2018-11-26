@@ -237,3 +237,7 @@ public func run_DropFirstArrayLazy(_ N: Int) {
     CheckResults(result == sumCount)
   }
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

@@ -41,6 +41,11 @@ func funcdecl5(_ a: Int, y: Int) {
 
   1 = x        // expected-error {{cannot assign to a literal value}}
   (1) = x      // expected-error {{cannot assign to a literal value}}
+  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
+  1.0 = x               // expected-error {{cannot assign to a literal value}}
+  nil = 1               // expected-error {{cannot assign to a literal value}}
+
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
@@ -202,8 +207,15 @@ func IfStmt1() {
 
 func IfStmt2() {
   if 1 > 0 {
-  } else // expected-error {{expected '{' after 'else'}}
+  } else // expected-error {{expected '{' or 'if' after 'else'}}
   _ = 42
+}
+func IfStmt3() {
+  if 1 > 0 {
+  } else 1 < 0 { // expected-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}}
+    _ = 42
+  } else {
+  }
 }
 
 //===--- While statement.
@@ -337,7 +349,9 @@ func test_defer(_ a : Int) {
 
   // Not ok.
   while false { defer { break } }   // expected-error {{'break' cannot transfer control out of a defer statement}}
+  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{17-22=do}}
   defer { return }  // expected-error {{'return' cannot transfer control out of a defer statement}}
+  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
 }
 
 class SomeTestClass {
@@ -345,6 +359,7 @@ class SomeTestClass {
   
   func method() {
     defer { x = 97 }  // self. not required here!
+    // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
   }
 }
 
@@ -378,6 +393,13 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
 
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
+
+  // SR-7567
+  guard let outer = y else {
+    guard true else {
+      print(outer) // expected-error {{variable declared in 'guard' condition is not usable in its body}}
+    }
+  }
 }
 
 func test_is_as_patterns() {

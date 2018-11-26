@@ -156,7 +156,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             }
         }
         
-        mutating func append(contentsOf other: [Int]) {
+        mutating func append(contentsOf other: __owned [Int]) {
             switch self {
             case .empty:
                 switch other.count {
@@ -265,7 +265,6 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     default:
                         fatalError("Range \(range) is out of bounds of count 1")
                     }
-                    return self
                 case .pair(let first, let second):
                     
                     switch (range.lowerBound, range.upperBound) {
@@ -502,19 +501,19 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         
         var debugDescription: String { return description }
         
-        static func +(_ lhs: Storage, _ rhs: Storage) -> Storage {
+        static func +(lhs: Storage, rhs: Storage) -> Storage {
             var res = lhs
             res.append(contentsOf: rhs)
             return res
         }
         
-        static func +(_ lhs: Storage, _ rhs: [Int]) -> Storage {
+        static func +(lhs: Storage, rhs: [Int]) -> Storage {
             var res = lhs
             res.append(contentsOf: rhs)
             return res
         }
         
-        static func ==(_ lhs: Storage, _ rhs: Storage) -> Bool {
+        static func ==(lhs: Storage, rhs: Storage) -> Bool {
             switch (lhs, rhs) {
             case (.empty, .empty):
                 return true
@@ -684,7 +683,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     
     // MARK: - Bridging Helpers
     
-    fileprivate init(nsIndexPath: ReferenceType) {
+    fileprivate init(nsIndexPath: __shared ReferenceType) {
         let count = nsIndexPath.length
         if count == 0 {
             _indexes = []
@@ -780,6 +779,7 @@ extension IndexPath : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSIndexPath?) -> IndexPath {
         guard let src = source else { return IndexPath() }
         return IndexPath(nsIndexPath: src)

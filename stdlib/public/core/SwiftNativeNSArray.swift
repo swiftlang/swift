@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  _ContiguousArrayStorageBase supplies the implementation of the
+//  __ContiguousArrayStorageBase supplies the implementation of the
 //  _NSArrayCore API (and thus, NSArray the API) for our
 //  _ContiguousArrayStorage<T>.  We can't put this implementation
 //  directly on _ContiguousArrayStorage because generic classes can't
@@ -23,40 +23,36 @@ import SwiftShims
 
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-@_transparent
+@usableFromInline @_transparent
 internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned
-@_transparent
+@usableFromInline @_transparent
 internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
 
 /// An `NSArray` with Swift-native reference counting and contiguous
 /// storage.
+///
+/// NOTE: older runtimes called this
+/// _SwiftNativeNSArrayWithContiguousStorage. The two must coexist, so
+/// it was renamed. The old name must not be used in the new runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
-@_versioned
-internal class _SwiftNativeNSArrayWithContiguousStorage
-  : _SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
+@usableFromInline
+internal class __SwiftNativeNSArrayWithContiguousStorage
+  : __SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @nonobjc internal override init() {}
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
   // Operate on our contiguous storage
-  @_inlineable
-  @_versioned
   internal func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -66,7 +62,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
+extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
@@ -141,69 +137,55 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 /// Ideally instances of this class would be allocated in-line in the
 /// buffers used for Array storage.
 @_fixed_layout // FIXME(sil-serialize-all)
-@_versioned
-@objc internal final class _SwiftDeferredNSArray
-  : _SwiftNativeNSArrayWithContiguousStorage {
+@usableFromInline
+@objc internal final class __SwiftDeferredNSArray
+  : __SwiftNativeNSArrayWithContiguousStorage {
 
   // This stored property should be stored at offset zero.  We perform atomic
   // operations on it.
   //
   // Do not access this property directly.
-  @_versioned
   @nonobjc
   internal var _heapBufferBridged_DoNotUse: AnyObject?
 
   // When this class is allocated inline, this property can become a
   // computed one.
-  @_versioned
+  @usableFromInline
   @nonobjc
-  internal let _nativeStorage: _ContiguousArrayStorageBase
+  internal let _nativeStorage: __ContiguousArrayStorageBase
 
-  @_inlineable
-  @_versioned
   @nonobjc
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
-  internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
-
-  @_inlineable
-  @_versioned
-  internal var _heapBufferBridged: HeapBufferStorage? {
+  internal var _heapBufferBridged: _BridgingBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, to: HeapBufferStorage.self)
+      return unsafeBitCast(ref, to: _BridgingBufferStorage.self)
     }
     return nil
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal init(_nativeStorage: _ContiguousArrayStorageBase) {
+  internal init(_nativeStorage: __ContiguousArrayStorageBase) {
     self._nativeStorage = _nativeStorage
   }
 
-  @_inlineable
-  @_versioned
-  internal func _destroyBridgedStorage(_ hb: HeapBufferStorage?) {
+  internal func _destroyBridgedStorage(_ hb: _BridgingBufferStorage?) {
     if let bridgedStorage = hb {
-      let heapBuffer = _HeapBuffer(bridgedStorage)
-      let count = heapBuffer.value
-      heapBuffer.baseAddress.deinitialize(count: count)
+      let buffer = _BridgingBuffer(bridgedStorage)
+      let count = buffer.count
+      buffer.baseAddress.deinitialize(count: count)
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
   deinit {
     _destroyBridgedStorage(_heapBufferBridged)
   }
 
-  @_inlineable
-  @_versioned
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -212,9 +194,9 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
-        let heapBuffer = _HeapBuffer(bridgedStorage)
+        let bridgingBuffer = _BridgingBuffer(bridgedStorage)
         buffer = UnsafeBufferPointer(
-            start: heapBuffer.baseAddress, count: heapBuffer.value)
+            start: bridgingBuffer.baseAddress, count: bridgingBuffer.count)
       }
 
       // If elements are bridged verbatim, the native buffer is all we
@@ -226,7 +208,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       }
       else {
         // Create buffer of bridged objects.
-        let objects = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
+        let objects = _nativeStorage._getNonVerbatimBridgingBuffer()
         
         // Atomically store a reference to that buffer in self.
         if !_stdlib_atomicInitializeARCRef(
@@ -234,7 +216,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
           // Another thread won the race.  Throw out our buffer.
           _destroyBridgedStorage(
-            unsafeDowncast(objects.storage!, to: HeapBufferStorage.self))
+            unsafeDowncast(objects.storage!, to: _BridgingBufferStorage.self))
         }
         continue // Try again
       }
@@ -251,7 +233,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc
   internal override var count: Int {
     if let bridgedStorage = _heapBufferBridged {
-      return _HeapBuffer(bridgedStorage).value
+      return _BridgingBuffer(bridgedStorage).count
     }
 
     // Check if elements are bridged verbatim.
@@ -261,38 +243,37 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 }
 #else
 // Empty shim version for non-objc platforms.
-@_versioned
+@usableFromInline
 @_fixed_layout
-internal class _SwiftNativeNSArrayWithContiguousStorage {
-  @_inlineable
-  @_versioned
+internal class __SwiftNativeNSArrayWithContiguousStorage {
+  @inlinable
   internal init() {}
 
-  @_inlineable
-  @_versioned
+  @inlinable
   deinit {}
 }
 #endif
 
 /// Base class of the heap buffer backing arrays.  
-@_versioned
+///
+/// NOTE: older runtimes called this _ContiguousArrayStorageBase. The
+/// two must coexist, so it was renamed. The old name must not be used
+/// in the new runtime.
+@usableFromInline
 @_fixed_layout
-internal class _ContiguousArrayStorageBase
-  : _SwiftNativeNSArrayWithContiguousStorage {
+internal class __ContiguousArrayStorageBase
+  : __SwiftNativeNSArrayWithContiguousStorage {
 
-  @_versioned
+  @usableFromInline
   final var countAndCapacity: _ArrayBody
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init(_doNotCallMeBase: ()) {
-    _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
+    _sanityCheckFailure("creating instance of __ContiguousArrayStorageBase")
   }
   
 #if _runtime(_ObjC)
-  @_inlineable
-  @_versioned
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -306,8 +287,6 @@ internal class _ContiguousArrayStorageBase
   /// If the stored type is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
@@ -315,40 +294,32 @@ internal class _ContiguousArrayStorageBase
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
   @nonobjc
   internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal func _getNonVerbatimBridgedHeapBuffer() ->
-    _HeapBuffer<Int, AnyObject> {
+  internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     _sanityCheckFailure(
-      "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")
+      "Concrete subclasses must implement _getNonVerbatimBridgingBuffer")
   }
 #endif
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _sanityCheckFailure(
       "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var staticElementType: Any.Type {
     _sanityCheckFailure(
       "Concrete subclasses must implement staticElementType")
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   deinit {
     _sanityCheck(
       self !== _emptyArrayStorage, "Deallocating empty array storage?!")

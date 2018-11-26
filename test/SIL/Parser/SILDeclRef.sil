@@ -48,8 +48,8 @@ public func testBase(b: Base) -> Int32
 // P.boo() -> Int32
 sil @_TFE10SILDeclRefPS_1P3boofT_Vs5Int32 : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> Int32
 
-// Int32.init(_builtinIntegerLiteral : Builtin.Int2048) -> Int32
-sil public_external [transparent] [serialized] @_TFVs5Int32CfT22_builtinIntegerLiteralBi2048__S_ : $@convention(method) (Builtin.Int2048, @thin Int32.Type) -> Int32
+// Int32.init(_builtinIntegerLiteral : Builtin.IntLiteral) -> Int32
+sil public_external [transparent] [serialized] @_TFVs5Int32CfT22_builtinIntegerLiteralBI__S_ : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 // Base.foo() -> Int32
 sil @_TFC10SILDeclRef4Base3foofT_Vs5Int32 : $@convention(method) (@guaranteed Base) -> Int32
@@ -122,7 +122,7 @@ sil_vtable Derived1 {
   #Base.foo!1: (Base) -> (Int32) -> () : @_TFC10SILDeclRef8Derived13foofT1nVs5Int32_T_	// Derived1.foo(n : Int32) -> ()
   #Base.foo!1: (Base) -> (Float) -> Int32 : @_TFC10SILDeclRef8Derived13foofT1fSf_Vs5Int32	// Derived1.foo(f : Float) -> Int32
   #Base.init!initializer.1: (Base.Type) -> () -> Base : @_TFC10SILDeclRef8Derived1cfT_S0_	// Derived1.init() -> Derived1
-  #Derived1.deinit!deallocator: (Derived1) -> () -> () : @_TFC10SILDeclRef8Derived1D	// Derived1.__deallocating_deinit
+  #Derived1.deinit!deallocator.1: (Derived1) -> () -> () : @_TFC10SILDeclRef8Derived1D	// Derived1.__deallocating_deinit
 }
 
 sil_vtable Derived2 {
@@ -130,7 +130,7 @@ sil_vtable Derived2 {
   #Base.foo!1: (Base) -> (Int32) -> () : @_TFC10SILDeclRef8Derived23foofT1nVs5Int32_T_	// Derived2.foo(n : Int32) -> ()
   #Base.foo!1: (Base) -> (Float) -> Int32 : @_TFC10SILDeclRef8Derived23foofT1fSf_Vs5Int32	// Derived2.foo(f : Float) -> Int32
   #Base.init!initializer.1: (Base.Type) -> () -> Base : @_TFC10SILDeclRef8Derived2cfT_S0_	// Derived2.init() -> Derived2
-  #Derived2.deinit!deallocator: (Derived2) -> () -> () : @_TFC10SILDeclRef8Derived2D	// Derived2.__deallocating_deinit
+  #Derived2.deinit!deallocator.1: (Derived2) -> () -> () : @_TFC10SILDeclRef8Derived2D	// Derived2.__deallocating_deinit
 }
 
 sil_witness_table [serialized] Base: P module SILDeclRef {

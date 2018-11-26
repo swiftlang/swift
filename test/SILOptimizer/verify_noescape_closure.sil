@@ -11,19 +11,19 @@
 import Builtin
 import Swift
 
-// CHECK: Argument must be @noescape function type: %{{.*}} = partial_apply
+// CHECK: Applied argument must be @noescape function type: %{{.*}} = partial_apply
 // CHECK: A partial_apply with @inout_aliasable may only be used as a @noescape function type argument.
 
 sil @takesEscapingClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
 sil hidden @closureWithArgument : $@convention(thin) (@inout_aliasable Int) -> () {
-bb0(%1 : $*Int):
+bb0(%1 : @trivial $*Int):
   %3 = tuple ()
   return %3 : $()
 }
 
 sil @missingNoescape : $@convention(thin) (Int) ->() {
-bb0(%0 : $Int):
+bb0(%0 : @trivial $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int

@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT
 import objc_enum_multi_file_helper
 #endif
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$S4main6useFoo{{.*}}F"(i32) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @"$s4main6useFoo{{.*}}F"(i32) {{.*}} {
 func useFoo(_ x: Foo) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 1, label %[[CASE_B:.+]]
@@ -34,7 +34,7 @@ func useFoo(_ x: Foo) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
@@ -42,7 +42,7 @@ func useFoo(_ x: Foo) -> Int32 {
   // CHECK: ret i32 %[[RETVAL]]
 }
 
-// CHECK-LABEL: define hidden swiftcc i32 @"$S4main6useBar{{.*}}F"(i32) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc i32 @"$s4main6useBar{{.*}}F"(i32) {{.*}} {
 func useBar(_ x: Bar) -> Int32 {
   // CHECK: switch i32 %0, label %[[DEFAULT:.+]] [
   // CHECK-DAG: i32 6, label %[[CASE_B:.+]]
@@ -68,7 +68,7 @@ func useBar(_ x: Bar) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$s{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]

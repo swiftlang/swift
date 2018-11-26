@@ -7,7 +7,7 @@ class HasFunc {
     return HasFunc()
   }
   func SomethingElse(_: SomethingElse) { // expected-error {{use of undeclared type 'SomethingElse'}}
-    return nil
+    return nil // expected-error {{unexpected non-void return value in void function}}
   }
   func SomethingElse() -> SomethingElse? { // expected-error {{use of undeclared type 'SomethingElse'}}
     return nil
@@ -15,10 +15,10 @@ class HasFunc {
 }
 
 class HasGenericFunc {
-  func HasGenericFunc<HasGenericFunc : HasGenericFunc>(x: HasGenericFunc) -> HasGenericFunc { // expected-error {{inheritance from non-protocol, non-class type 'HasGenericFunc'}}
+  func HasGenericFunc<HasGenericFunc : HasGenericFunc>(x: HasGenericFunc) -> HasGenericFunc { // expected-error {{type 'HasGenericFunc' constrained to non-protocol, non-class type 'HasGenericFunc'}}
     return x
   }
-  func SomethingElse<SomethingElse : SomethingElse>(_: SomethingElse) -> SomethingElse? { // expected-error {{inheritance from non-protocol, non-class type 'SomethingElse'}}
+  func SomethingElse<SomethingElse : SomethingElse>(_: SomethingElse) -> SomethingElse? { // expected-error {{type 'SomethingElse' constrained to non-protocol, non-class type 'SomethingElse'}}
     return nil
   }
 }
@@ -38,15 +38,16 @@ protocol ReferenceSomeProtocol {
 }
 
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{use of undeclared type 'TopLevelFunc'}}'
-func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{inheritance from non-protocol, non-class type 'TopLevelGenericFunc'}}
+func TopLevelGenericFunc<TopLevelGenericFunc : TopLevelGenericFunc>(x: TopLevelGenericFunc) -> TopLevelGenericFunc { return x } // expected-error {{type 'TopLevelGenericFunc' constrained to non-protocol, non-class type 'TopLevelGenericFunc'}}
 func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // expected-error {{use of undeclared type 'TopLevelGenericFunc2'}}
 var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
 
 
-// FIXME: The first error is redundant, isn't correct in what it states, and
-// also should be emitted on the inheritance clause.
-protocol AProtocol { // expected-error {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
-  associatedtype e : e // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+// FIXME: The first error is redundant and isn't correct in what it states.
+protocol AProtocol {
+  associatedtype e : e
+  // expected-error@-1 {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
+  // expected-error@-2 {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 
@@ -65,7 +66,8 @@ class X {
 
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
-  typealias A = A // expected-error {{type alias 'A' references itself}}
+  typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
+  typealias B = B // expected-error {{type alias 'B' references itself}}
   // expected-note@-1 {{type declared here}}
 }
 

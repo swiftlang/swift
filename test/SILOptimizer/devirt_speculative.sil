@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt  | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -module-name devirt_speculative -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt  | %FileCheck %s
 
 sil_stage canonical
 
@@ -154,3 +154,64 @@ bb0(%0 : $Base):
   unreachable
 } 
 
+class Throw {
+  func mayThrow() throws
+}
+
+class S1 : Throw {
+  override func mayThrow()
+}
+
+class S2 : Throw {
+  override func mayThrow() throws
+}
+
+sil hidden [thunk] @$S4main4ThrowC8mayThrowyyKF : $@convention(method) (@guaranteed Throw) -> @error Error {
+bb0(%0 : $Throw):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden @$S4main2S1C8mayThrowyyF : $@convention(method) (@guaranteed S1) -> () {
+bb0(%0 : $S1):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error Error {
+bb0(%0 : $S2):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil{{.*}} @test_devirt_of_throw_without_error
+// CHECK-NOT: checked_cast_br [exact] %0 : $Throw to $S1
+// CHECK: return
+
+sil hidden [noinline] @test_devirt_of_throw_without_error : $@convention(thin) (@owned Throw) -> () {
+bb0(%0 : $Throw):
+  %80 = class_method %0 : $Throw, #Throw.mayThrow!1 : (Throw) -> () throws -> (), $@convention(method) (@guaranteed Throw) -> @error Error // user: %81
+  try_apply %80(%0) : $@convention(method) (@guaranteed Throw) -> @error Error, normal bb7, error bb6
+
+bb6(%82 : $Error):
+  br bb1
+
+bb7(%84 : $()):
+  br bb1
+
+bb1:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil_vtable Throw {
+  #Throw.mayThrow!1: (Throw) -> () throws -> () : @$S4main4ThrowC8mayThrowyyKF
+}
+
+sil_vtable S1 {
+  #Throw.mayThrow!1: (Throw) -> () throws -> () : @$S4main2S1C8mayThrowyyF [override]
+}
+
+sil_vtable S2 {
+  #Throw.mayThrow!1: (Throw) -> () throws -> () : @$S4main2S2C8mayThrowyyKF [override]
+}

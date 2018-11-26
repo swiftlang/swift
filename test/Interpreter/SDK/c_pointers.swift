@@ -1,12 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
-#if os(OSX)
+#if os(macOS)
 import AppKit
 typealias XXColor = NSColor
 #endif
@@ -28,7 +29,7 @@ let cgRed = CGColor(colorSpace: rgb, components: [1.0, 0.0, 0.0, 1.0])!
 let nsRed = XXColor(cgColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
-#if os(OSX)
+#if os(macOS)
 nsRed!.getRed(&r, green: &g, blue: &b, alpha: &a)
 #else
 nsRed.getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -86,7 +87,7 @@ autoreleasepool {
   do {
     let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
                          encoding: String.Encoding.utf8.rawValue)
-    _preconditionFailure("file should not actually exist")
+    preconditionFailure("file should not actually exist")
   } catch {
     print(error._code) // CHECK-NEXT: 260
     hangCanary(error as NSError)
@@ -95,7 +96,7 @@ autoreleasepool {
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 class DumbString: NSString {
-  override func character(at x: Int) -> unichar { _preconditionFailure("nope") }
+  override func character(at x: Int) -> unichar { preconditionFailure("nope") }
   override var length: Int { return 0 }
 
   convenience init(contentsOfFile s: String, encoding: String.Encoding) throws {

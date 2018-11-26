@@ -25,7 +25,7 @@
 /// The policy about the sourcekitd API is to keep it source and ABI compatible,
 /// thus SOURCEKITD_VERSION_MAJOR is expected to remain stable.
 #define SOURCEKITD_VERSION_MAJOR 0
-#define SOURCEKITD_VERSION_MINOR 3
+#define SOURCEKITD_VERSION_MINOR 4
 
 #define SOURCEKITD_VERSION_ENCODE(major, minor) ( \
       ((major) * 10000)                           \
@@ -309,7 +309,10 @@ typedef enum {
   SOURCEKITD_VARIANT_TYPE_INT64 = 3,
   SOURCEKITD_VARIANT_TYPE_STRING = 4,
   SOURCEKITD_VARIANT_TYPE_UID = 5,
-  SOURCEKITD_VARIANT_TYPE_BOOL = 6
+  SOURCEKITD_VARIANT_TYPE_BOOL = 6,
+  // Reserved for future addition
+  // SOURCEKITD_VARIANT_TYPE_DOUBLE = 7,
+  SOURCEKITD_VARIANT_TYPE_DATA = 8,
 } sourcekitd_variant_type_t;
 
 typedef enum {
@@ -351,7 +354,7 @@ SOURCEKITD_PUBLIC SOURCEKITD_NONNULL1 SOURCEKITD_WARN_RESULT
 sourcekitd_variant_t
 sourcekitd_response_get_value(sourcekitd_response_t resp);
 
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 sourcekitd_variant_type_t
 sourcekitd_variant_get_type(sourcekitd_variant_t obj);
 
@@ -516,6 +519,14 @@ sourcekitd_variant_string_get_length(sourcekitd_variant_t obj);
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 const char *
 sourcekitd_variant_string_get_ptr(sourcekitd_variant_t obj);
+
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
+size_t
+sourcekitd_variant_data_get_size(sourcekitd_variant_t obj);
+
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
+const void *
+sourcekitd_variant_data_get_ptr(sourcekitd_variant_t obj);
 
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 sourcekitd_uid_t

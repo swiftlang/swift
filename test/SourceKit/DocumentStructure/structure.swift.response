@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 1970,
+  key.length: 2065,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -223,6 +223,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "OuterCls",
       key.offset: 377,
       key.length: 45,
@@ -557,6 +558,7 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "Foo",
       key.offset: 999,
       key.length: 58,
@@ -1206,6 +1208,84 @@
           key.typename: "Int",
           key.nameoffset: 1959,
           key.namelength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MyEnum",
+      key.offset: 1990,
+      key.length: 36,
+      key.nameoffset: 1995,
+      key.namelength: 6,
+      key.bodyoffset: 2003,
+      key.bodylength: 22,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 2006,
+          key.length: 18,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "Bar(arg:)",
+              key.offset: 2011,
+              key.length: 13,
+              key.nameoffset: 2011,
+              key.namelength: 13
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "arg",
+          key.offset: 2015,
+          key.length: 8,
+          key.typename: "Int",
+          key.nameoffset: 2015,
+          key.namelength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MySecondEnum",
+      key.offset: 2028,
+      key.length: 36,
+      key.nameoffset: 2033,
+      key.namelength: 12,
+      key.bodyoffset: 2047,
+      key.bodylength: 16,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 2050,
+          key.length: 12,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "One",
+              key.offset: 2055,
+              key.length: 7,
+              key.nameoffset: 2055,
+              key.namelength: 3,
+              key.elements: [
+                {
+                  key.kind: source.lang.swift.structure.elem.init_expr,
+                  key.offset: 2061,
+                  key.length: 1
+                }
+              ]
+            }
+          ]
         }
       ]
     }

@@ -160,7 +160,7 @@ class TypeRefBuilder {
 public:
   using BuiltType = const TypeRef *;
   using BuiltNominalTypeDecl = Optional<std::string>;
-  using BuiltProtocolDecl = Optional<std::string>;
+  using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder();
 
@@ -177,6 +177,11 @@ private:
   /// Cache for associated type lookups.
   std::unordered_map<TypeRefID, const TypeRef *,
                      TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
+
+  /// Cache for field info lookups.
+  std::unordered_map<std::string,
+                     std::pair<const FieldDescriptor *, const ReflectionInfo *>>
+                     FieldTypeInfoCache;
 
   TypeConverter TC;
   MetadataSourceBuilder MSB;
@@ -209,9 +214,14 @@ public:
     return Demangle::mangleNode(node);
   }
 
-  Optional<std::string>
+  BuiltProtocolDecl
   createProtocolDecl(const Demangle::NodePointer &node) {
-    return Demangle::mangleNode(node);
+    return std::make_pair(Demangle::mangleNode(node), false);
+  }
+
+  BuiltProtocolDecl
+  createObjCProtocolDecl(std::string &&name) {
+    return std::make_pair(name, true);
   }
 
   Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
@@ -260,9 +270,15 @@ public:
   createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass,
                                 bool isClassBound) {
-    std::vector<const NominalTypeRef *> protocolRefs;
+    std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
-      protocolRefs.push_back(createNominalType(protocol));
+      if (!protocol)
+        continue;
+
+      if (protocol->second)
+        protocolRefs.push_back(createObjCProtocolType(protocol->first));
+      else
+        protocolRefs.push_back(createNominalType(protocol->first));
     }
 
     return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
@@ -287,34 +303,36 @@ public:
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
                             const TypeRef *base,
-                            Optional<std::string> protocol) {
-    return DependentMemberTypeRef::create(*this, member, base, *protocol);
+                            BuiltProtocolDecl protocol) {
+    // Objective-C protocols don't have dependent types.
+    if (protocol->second)
+      return nullptr;
+    return DependentMemberTypeRef::create(*this, member, base,
+                                          protocol->first);
   }
 
-  const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
-    return UnownedStorageTypeRef::create(*this, base);
+#define REF_STORAGE(Name, ...) \
+  const Name##StorageTypeRef *create##Name##StorageType(const TypeRef *base) { \
+    return Name##StorageTypeRef::create(*this, base); \
   }
-
-  const UnmanagedStorageTypeRef *
-  createUnmanagedStorageType(const TypeRef *base) {
-    return UnmanagedStorageTypeRef::create(*this, base);
-  }
-
-  const WeakStorageTypeRef *createWeakStorageType(const TypeRef *base) {
-    return WeakStorageTypeRef::create(*this, base);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
     return SILBoxTypeRef::create(*this, base);
   }
 
-  const ObjCClassTypeRef *
-  createObjCClassType(const std::string &mangledName) {
-    return ObjCClassTypeRef::create(*this, mangledName);
-  }
-
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return createObjCClassType("");
+  }
+
+  const ObjCClassTypeRef *
+  createObjCClassType(const std::string &name) {
+    return ObjCClassTypeRef::create(*this, name);
+  }
+
+  const ObjCProtocolTypeRef *
+  createObjCProtocolType(const std::string &name) {
+    return ObjCProtocolTypeRef::create(*this, name);
   }
 
   const ForeignClassTypeRef *
@@ -356,15 +374,30 @@ public:
     // demangling out of the referenced context descriptors in the target
     // process.
     Dem.setSymbolicReferenceResolver(
-      [this, &reader](int32_t offset, const void *base) -> Demangle::NodePointer {
-        // Resolve the reference to a remote address.
-        auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
-        if (remoteAddress == 0)
+    [this, &reader](SymbolicReferenceKind kind,
+                    Directness directness,
+                    int32_t offset, const void *base) -> Demangle::NodePointer {
+      // Resolve the reference to a remote address.
+      auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
+      if (remoteAddress == 0)
+        return nullptr;
+      
+      auto address = remoteAddress + offset;
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = reader.readPointerValue(address)) {
+          address = *indirectAddress;
+        } else {
           return nullptr;
-        
-        return reader.readDemanglingForContextDescriptor(remoteAddress + offset,
-                                                         Dem);
-      });
+        }
+      }
+      
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context:
+        return reader.readDemanglingForContextDescriptor(address, Dem);
+      }
+      
+      return nullptr;
+    });
   }
 
   TypeConverter &getTypeConverter() { return TC; }

@@ -1,0 +1,23 @@
+// RUN: %scale-test --begin 3 --end 20  --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+protocol P {}
+class C : P {}
+class D : P {}
+
+class Test {
+  let c: C! = C()
+  let d: D! = D()
+  var a: [P]! = []
+
+  func test() {
+    a = [
+      c,
+%for i in range(0, N):
+      c,
+%end
+      d
+    ]
+  }
+}

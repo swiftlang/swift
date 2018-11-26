@@ -474,10 +474,10 @@ class OptimizerStatsAnalysis : public SILAnalysis {
 
 public:
   OptimizerStatsAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
+      : SILAnalysis(SILAnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::OptimizerStats;
+    return S->getKind() == SILAnalysisKind::OptimizerStats;
   }
 
   /// Invalidate all information in this analysis.
@@ -492,13 +492,13 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     AddedFuncs.push_back(F);
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     DeletedFuncs.push_back(F);
   };
 
@@ -546,8 +546,8 @@ public:
 /// The output stream to be used for writing the collected statistics.
 /// Use the unique_ptr to ensure that the file is properly closed upon
 /// exit.
-std::unique_ptr<llvm::raw_ostream, std::function<void(llvm::raw_ostream *)>>
-    stats_output_stream;
+std::unique_ptr<llvm::raw_ostream, void(*)(llvm::raw_ostream *)>
+    stats_output_stream = {nullptr, nullptr};
 
 /// Return the output streamm to be used for logging the collected statistics.
 llvm::raw_ostream &stats_os() {
@@ -557,16 +557,15 @@ llvm::raw_ostream &stats_os() {
     if (!SILStatsOutputFile.empty()) {
       // Try to open the file.
       std::error_code EC;
-      llvm::raw_fd_ostream *fd_stream = new llvm::raw_fd_ostream(
+      auto fd_stream = llvm::make_unique<llvm::raw_fd_ostream>(
           SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::F_Text);
       if (!fd_stream->has_error() && !EC) {
-        stats_output_stream = {fd_stream,
+        stats_output_stream = {fd_stream.release(),
                                [](llvm::raw_ostream *d) { delete d; }};
         return *stats_output_stream.get();
       }
       fd_stream->clear_error();
       llvm::errs() << SILStatsOutputFile << " : " << EC.message() << "\n";
-      delete fd_stream;
     }
     // Otherwise use llvm::errs() as output. No need to destroy it at the end.
     stats_output_stream = {&llvm::errs(), [](llvm::raw_ostream *d) {}};

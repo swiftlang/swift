@@ -46,6 +46,15 @@ namespace irgen {
                                                 llvm::Value *table,
                                                 WitnessIndex index);
 
+  /// Given a witness table (protocol or value), load one of the
+  /// witnesses.
+  ///
+  /// The load is marked invariant. This should not be used in contexts where
+  /// the referenced witness table is still undergoing initialization.
+  llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                llvm::Value *table,
+                                                llvm::Value *index);
+
   /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
   llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
                                                         llvm::Value *metadata,
@@ -54,18 +63,6 @@ namespace irgen {
 
   /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
   llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
-                                                        SILType T,
-                                                        Address destBuffer,
-                                                        Address srcBuffer);
-
-  /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
-  llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
-                                                        llvm::Value *metadata,
-                                                        Address destBuffer,
-                                                        Address srcBuffer);
-
-  /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
-  llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
                                                         SILType T,
                                                         Address destBuffer,
                                                         Address srcBuffer);
@@ -206,7 +203,7 @@ namespace irgen {
   /// The type must be dynamically known to have enum witnesses.
   void emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
                                         SILType T,
-                                        unsigned tag,
+                                        llvm::Value *tag,
                                         Address srcObject);
 
   /// Emit a load of the 'size' value witness.

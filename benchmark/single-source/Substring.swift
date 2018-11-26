@@ -42,7 +42,7 @@ public func run_SubstringFromLongString(_ N: Int) {
 
 func create<T : RangeReplaceableCollection, U : Collection>(
   _: T.Type, from source: U
-) where T.Iterator.Element == U.Iterator.Element {
+) where T.Element == U.Element {
   blackHole(T(source))
 }
 

@@ -1,0 +1,941 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/FloatingPointPrinting.swift
+// RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-build-swift %t/FloatingPointPrinting.swift -o %t/main.out
+// RUN: %target-codesign %t/main.out
+// RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out
+// RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
+// REQUIRES: executable_test
+
+import StdlibUnittest
+#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+  import Glibc
+#else
+  import Darwin
+#endif
+
+// It takes about an hour to run the Float formatter over all 2 billion
+// positive values to verify that it's correct.  Of course, we don't want
+// to do that for the Swift standard library.
+//
+// Instead, I ran the same test against a version of the Float formatter that
+// used only 45 bits precision (instead of 59) and collected all the values that
+// failed with that reduced precision.  This should catch any future mistakes
+// that inadvertently damage the accuracy of the formatter's internal
+// calculations.
+fileprivate let generatedCases_Float: [(Float, String)] = [
+  (0x1.ab510cp-126, "1.9621416e-38"),
+  (0x1.b2171p-126 , "1.993244e-38"),
+  (0x1.b2171p-125 , "3.986488e-38"),
+  (0x1.b2171p-124 , "7.972976e-38"),
+  (0x1.1c01b4p-122, "2.0865513e-37"),
+  (0x1.e41e3p-122 , "3.5567368e-37"),
+  (0x1.070866p-120, "7.7298394e-37"),
+  (0x1.0a4cap-120 , "7.825834e-37"),
+  (0x1.2e92dep-118, "3.5567368e-36"),
+  (0x1.225e0ap-117, "6.826503e-36"),
+  (0x1.288e84p-117, "6.9720146e-36"),
+  (0x1.732b26p-117, "8.726131e-36"),
+  (0x1.ab8e9cp-117, "1.0051818e-35"),
+  (0x1.ea228ap-117, "1.15230165e-35"),
+  (0x1.fc5bb8p-117, "1.1951446e-35"),
+  (0x1.9cfcbcp-113, "1.5534853e-34"),
+  (0x1.e11c02p-112, "3.619465e-34"),
+  (0x1.56f96cp-110, "1.0321008e-33"),
+  (0x1.9d393ep-110, "1.2434995e-33"),
+  (0x1.e11c02p-109, "2.895572e-33"),
+  (0x1.0186b2p-107, "6.199717e-33"),
+  (0x1.e11c02p-107, "1.1582288e-32"),
+  (0x1.87454cp-106, "1.8838998e-32"),
+  (0x1.a337f6p-105, "4.0369282e-32"),
+  (0x1.71515ap-105, "3.556401e-32"),
+  (0x1.5d594ep-101, "5.382571e-31"),
+  (0x1.0d7e9ep-100, "8.304443e-31"),
+  (0x1.5d594ep-100, "1.0765142e-30"),
+  (0x1.fd0eacp-99 , "3.137308e-30"),
+  (0x1.356bf6p-98 , "3.813917e-30"),
+  (0x1.356bf6p-97 , "7.627834e-30"),
+  (0x1.6256f8p-97 , "8.7351485e-30"),
+  (0x1.6c524ep-97 , "8.9812184e-30"),
+  (0x1.993d5p-97  , "1.0088533e-29"),
+  (0x1.c62854p-97 , "1.11958476e-29"),
+  (0x1.fd0eacp-97 , "1.2549232e-29"),
+  (0x1.e41a56p-96 , "2.3868115e-29"),
+  (0x1.266f8p-94  , "5.806717e-29"),
+  (0x1.765118p-94 , "7.382097e-29"),
+  (0x1.cb25fep-94 , "9.055106e-29"),
+  (0x1.778decp-93 , "1.4813009e-28"),
+  (0x1.23f5d8p-92 , "2.303161e-28"),
+  (0x1.23f5d8p-90 , "9.212644e-28"),
+  (0x1.a1f86p-90  , "1.3188814e-27"),
+  (0x1.3db25cp-87 , "8.019793e-27"),
+  (0x1.bbb4e2p-87 , "1.1200729e-26"),
+  (0x1.83be04p-84 , "7.8303923e-26"),
+  (0x1.5c87fap-84 , "7.038531e-26"),
+  (0x1.b35478p-84 , "8.7914184e-26"),
+  (0x1.54279p-83  , "1.3738732e-25"),
+  (0x1.210beap-82 , "2.3348993e-25"),
+  (0x1.98040cp-82 , "3.2959255e-25"),
+  (0x1.d3801cp-81 , "7.552877e-25"),
+  (0x1.296c54p-80 , "9.610261e-25"),
+  (0x1.7ee2ccp-80 , "1.2371711e-24"),
+  (0x1.d3801cp-80 , "1.5105754e-24"),
+  (0x1.e8c296p-78 , "6.3170763e-24"),
+  (0x1.09a3c4p-77 , "6.8666256e-24"),
+  (0x1.7e7638p-77 , "9.886406e-24"),
+  (0x1.d3ecbp-77  , "1.2095566e-23"),
+  (0x1.5eada8p-76 , "1.8129645e-23"),
+  (0x1.21517ap-74 , "5.9829616e-23"),
+  (0x1.ab6668p-74 , "8.8384254e-23"),
+  (0x1.91172cp-74 , "8.2943575e-23"),
+  (0x1.be075ap-74 , "9.223658e-23"),
+  (0x1.aeaacap-70 , "1.424958e-21"),
+  (0x1.35db3cp-69 , "2.0504575e-21"),
+  (0x1.74df2p-67  , "9.869829e-21"),
+  (0x1.f5fa7ap-66 , "2.6574517e-20"),
+  (0x1.aa969ep-64 , "9.0333597e-20"),
+  (0x1.c77c72p-64 , "9.6452936e-20"),
+  (0x1.7f3dep-64  , "8.1154587e-20"),
+  (0x1.036eeap-57 , "7.0319526e-18"),
+  (0x1.46b2fap-57 , "8.855198e-18"),
+  (0x1.796e1ep-57 , "1.0230265e-17"),
+  (0x1.ce5b7ap-57 , "1.25322205e-17"),
+  (0x1.dee466p-57 , "1.2980399e-17"),
+  (0x1.5b3fep-55  , "3.7648867e-17"),
+  (0x1.3d11a2p-54 , "6.875335e-17"),
+  (0x1.796e1ep-54 , "8.184212e-17"),
+  (0x1.bbe57cp-54 , "9.625469e-17"),
+  (0x1.d624acp-54 , "1.01946067e-16"),
+  (0x1.f841f8p-54 , "1.0934346e-16"),
+  (0x1.3d11a2p-53 , "1.375067e-16"),
+  (0x1.b20fd8p-52 , "3.7648867e-16"),
+  (0x1.928636p-47 , "1.1172293e-14"),
+  (0x1.ba8a18p-47 , "1.2282937e-14"),
+  (0x1.e28dfap-47 , "1.3393581e-14"),
+  (0x1.374dcap-44 , "6.912334e-14"),
+  (0x1.a0efd4p-44 , "9.257857e-14"),
+  (0x1.7c8658p-44 , "8.4493474e-14"),
+  (0x1.e62862p-44 , "1.07948705e-13"),
+  (0x1.89537ap-40 , "1.397375e-12"),
+  (0x1.981532p-39 , "2.8996026e-12"),
+  (0x1.3e8744p-38 , "4.5265606e-12"),
+  (0x1.431bf6p-37 , "9.183316e-12"),
+  (0x1.525f7ep-37 , "9.6171395e-12"),
+  (0x1.7a0ff2p-37 , "1.07451764e-11"),
+  (0x1.cf8bp-37   , "1.3174684e-11"),
+  (0x1.f637d2p-37 , "1.4273895e-11"),
+  (0x1.4cc72ap-34 , "7.566495e-11"),
+  (0x1.86e8aep-34 , "8.8882395e-11"),
+  (0x1.9093e2p-34 , "9.1080816e-11"),
+  (0x1.eef76ap-34 , "1.12542343e-10"),
+  (0x1.f637d2p-34 , "1.1419116e-10"),
+  (0x1.2cc742p+59 , "6.772926e+17"),
+  (0x1.426638p+59 , "7.259787e+17"),
+  (0x1.ac1062p+60 , "1.9278289e+18"),
+  (0x1.3fb25ap+61 , "2.8795718e+18"),
+  (0x1.28aacp+68  , "3.4203376e+20"),
+  (0x1.21de92p+69 , "6.683934e+20"),
+  (0x1.077b62p+69 , "6.0754804e+20"),
+  (0x1.6dd68ep+69 , "8.435652e+20"),
+  (0x1.5b7194p+69 , "8.0115055e+20"),
+  (0x1.72d57p+71  , "3.4203376e+21"),
+  (0x1.3f1b66p+74 , "2.3545942e+22"),
+  (0x1.cf8accp+74 , "3.4203376e+22"),
+  (0x1.15204ep+76 , "8.179321e+22"),
+  (0x1.69167ep+76 , "1.0657433e+23"),
+  (0x1.a3dfccp+77 , "2.4784999e+23"),
+  (0x1.25ee82p+79 , "6.940265e+23"),
+  (0x1.6d4a0cp+79 , "8.6251485e+23"),
+  (0x1.9b811cp+79 , "9.716371e+23"),
+  (0x1.45ee1ep+84 , "2.4626585e+25"),
+  (0x1.84615ep+84 , "2.934519e+25"),
+  (0x1.1b492p+87  , "1.7123566e+26"),
+  (0x1.61594ap+87 , "2.1358624e+26"),
+  (0x1.1c0b3ep+89 , "6.8677604e+26"),
+  (0x1.3e5134p+89 , "7.696438e+26"),
+  (0x1.cd7a02p+89 , "1.1157819e+27"),
+  (0x1.621b68p+90 , "1.7123566e+27"),
+  (0x1.baa242p+93 , "1.7123566e+28"),
+  (0x1.d40dfp+94  , "3.6213959e+28"),
+  (0x1.10287cp+96 , "8.422887e+28"),
+  (0x1.8da532p+99 , "9.845221e+29"),
+  (0x1.f58b6cp+100, "2.4835287e+30"),
+  (0x1.e11158p+102, "9.5285285e+30"),
+  (0x1.b61814p+103, "1.7354693e+31"),
+  (0x1.0502cp+104 , "2.0679402e+31"),
+  (0x1.772604p+106, "1.188893e+32"),
+  (0x1.fe44a2p+106, "1.6171041e+32"),
+  (0x1.9c7f7ap+108, "5.229033e+32"),
+  (0x1.2c7314p+109, "7.6173e+32"),
+  (0x1.19c658p+109, "7.143839e+32"),
+  (0x1.89d2cp+109 , "9.984605e+32"),
+  (0x1.af2c36p+109, "1.0931527e+33"),
+  (0x1.c1d8f2p+109, "1.1404988e+33"),
+  (0x1.89d2cp+110 , "1.996921e+33"),
+  (0x1.97d44cp+110, "2.0679402e+33"),
+  (0x1.89d2cp+111 , "3.993842e+33"),
+  (0x1.2c7314p+112, "6.09384e+33"),
+  (0x1.368a68p+112, "6.2985127e+33"),
+  (0x1.89d2cp+112 , "7.987684e+33"),
+  (0x1.5b22eap+112, "7.040762e+33"),
+  (0x1.b88294p+112, "8.934606e+33"),
+  (0x1.e7326ap+112, "9.881528e+33"),
+  (0x1.672f5ap+114, "2.9140547e+34"),
+  (0x1.103662p+115, "4.4168992e+34"),
+  (0x1.4fd77p+116 , "1.0898681e+35"),
+  (0x1.cf198ap+116, "1.5028446e+35"),
+  (0x1.347374p+118, "4.0039227e+35"),
+  (0x1.7ced98p+118, "4.9447295e+35"),
+  (0x1.aa03cp+119 , "1.1059973e+36"),
+  (0x1.3b315cp+122, "6.5462986e+36"),
+  (0x1.3e2542p+122, "6.607624e+36"),
+  (0x1.c4fb6p+122 , "9.408067e+36"),
+  (0x1.f062b6p+122, "1.03095254e+37"),
+  (0x1.2db58cp+123, "1.2532508e+37"),
+  (0x1.a345d8p+126, "1.393273e+38"),
+  (0x1.a345d8p+127, "2.786546e+38")
+]
+
+// Of course, exhaustive testing of Double (or Float80!) is not
+// practical, so I used another approach to generate test cases
+// for those:
+
+// The Errol paper details a method for enumerating cases where the optimal
+// base-10 form might be extremely close to the midpoint between two binary
+// Doubles, and therefore at risk of being handled incorrectly by Grisu-style
+// formatters that use fixed-precision arithmetic. These are the extreme cases
+// for our algorithm, so if we get these right, we have pretty high confidence
+// that we get everything right.
+
+// I took that list and ran it through a reduced-precision version of the Double
+// formatter to identify these worst-case values:
+fileprivate let generatedCases_Double: [(Double, String)] = [
+  (0x1.379f099a86228p-317, "4.559093100884257e-96"),
+  (0x1.7c3fba45c1271p-307, "5.696647848853893e-93"),
+  (0x1.4f14348a4c5dcp-299, "1.285104507361864e-90"),
+  (0x1.4f14348a4c5dcp-298, "2.570209014723728e-90"),
+  (0x1.a8c931c19b77ap-298, "3.258302752792233e-90"),
+  (0x1.4f14348a4c5dcp-297, "5.140418029447456e-90"),
+  (0x1.a8c931c19b77ap-297, "6.516605505584466e-90"),
+  (0x1.97a2a205f591fp-294, "5.002799281833755e-89"),
+  (0x1.387cf9cb4ad4fp-261, "3.294312317590731e-79"),
+  (0x1.ddc7e975c5045p-247, "8.252392874408775e-75"),
+  (0x1.ddc7e975c5045p-246, "1.650478574881755e-74"),
+  (0x1.ddc7e975c5045p-245, "3.30095714976351e-74"),
+  (0x1.ddc7e975c5045p-244, "6.60191429952702e-74"),
+  (0x1.ddc7e975c5045p-243, "1.320382859905404e-73"),
+  (0x1.ddc7e975c5045p-242, "2.640765719810808e-73"),
+  (0x1.ddc7e975c5045p-241, "5.281531439621616e-73"),
+  (0x1.9190e30e46c1ep-235, "2.840978519032327e-71"),
+  (0x1.0ed9bd6bfd003p-234, "3.832399419240467e-71"),
+  (0x1.9190e30e46c1ep-234, "5.681957038064654e-71"),
+  (0x1.3b28b27523ea6p-229, "1.426989259361117e-69"),
+  (0x1.3b28b27523ea6p-228, "2.853978518722234e-69"),
+  (0x1.aedaa0fc32ac8p-222, "2.497072464210591e-67"),
+  (0x1.aedaa0fc32ac8p-221, "4.994144928421182e-67"),
+  (0x1.48050091c3c25p-219, "1.520865118855779e-66"),
+  (0x1.48050091c3c25p-218, "3.041730237711558e-66"),
+  (0x1.f5a18504dfaadp-215, "3.721305106071689e-65"),
+  (0x1.f5a18504dfaadp-214, "7.442610212143378e-65"),
+  (0x1.eef5e1f90ac34p-196, "1.925091640472375e-59"),
+  (0x1.eef5e1f90ac34p-195, "3.85018328094475e-59"),
+  (0x1.eef5e1f90ac34p-194, "7.7003665618895e-59"),
+  (0x1.b20c2f4f8d49fp-138, "4.865841847892019e-42"),
+  (0x1.25d342b1e33e6p-128, "3.372948296445563e-39"),
+  (0x1.4faba79ea92edp-122, "2.466117547186101e-37"),
+  (0x1.4faba79ea92edp-121, "4.932235094372202e-37"),
+  (0x1.78cfcab31064dp-89 , "2.378016066134295e-27"),
+  (0x1.78cfcab31064dp-88 , "4.75603213226859e-27"),
+  (0x1.78cfcab31064dp-87 , "9.51206426453718e-27"),
+  (0x1.78cfcab31064dp-86 , "1.902412852907436e-26"),
+  (0x1.78cfcab31064dp-85 , "3.804825705814872e-26"),
+  (0x1.56d589dc3d0e3p-78 , "4.431027338341785e-24"),
+  (0x1.cd230a7ff47c4p+145, "8.034137530808823e+43"),
+  (0x1.30d9a1c3890bp+151 , "3.399192475886301e+45"),
+  (0x1.fc1562f08f125p+151, "5.665320793143835e+45"),
+  (0x1.a32ac316fb3acp+186, "1.605929046641989e+56"),
+  (0x1.a32ac316fb3acp+187, "3.211858093283978e+56"),
+  (0x1.8862481ccada3p+188, "6.013265967485603e+56"),
+  (0x1.a32ac316fb3acp+188, "6.423716186567956e+56"),
+  (0x1.5564fb098c956p+201, "4.285935458457607e+60"),
+  (0x1.f20b1a0d7f626p+207, "4.001624164855121e+62"),
+  (0x1.f20b1a0d7f626p+208, "8.003248329710242e+62"),
+  (0x1.a53bb31b369a2p+219, "1.386282306169174e+66"),
+  (0x1.a53bb31b369a2p+220, "2.772564612338348e+66"),
+  (0x1.a53bb31b369a2p+221, "5.545129224676696e+66"),
+  (0x1.66a00a69c6c34p+224, "3.776763733298609e+67"),
+  (0x1.e2785c3a2a20ap+227, "4.064803033949531e+68"),
+  (0x1.e2785c3a2a20ap+228, "8.129606067899062e+68"),
+  (0x1.454b1aef62c8dp+231, "4.384946084578497e+69"),
+  (0x1.0fde34c996086p+233, "1.465909318208761e+70"),
+  (0x1.0fde34c996086p+234, "2.931818636417522e+70"),
+  (0x1.9a2c2a34ac2fap+234, "4.423291694721855e+70"),
+  (0x1.9a2c2a34ac2fap+235, "8.84658338944371e+70"),
+  (0x1.9a2c2a34ac2fap+236, "1.769316677888742e+71"),
+  (0x1.9a2c2a34ac2fap+237, "3.538633355777484e+71"),
+  (0x1.9a2c2a34ac2fap+238, "7.077266711554968e+71"),
+  (0x1.ca9bade45b94ap+260, "3.318949537676913e+78"),
+  (0x1.ca9bade45b94ap+261, "6.637899075353826e+78"),
+  (0x1.b3a29c72cab91p+269, "1.614179517443508e+81"),
+  (0x1.b3a29c72cab91p+270, "3.228359034887016e+81"),
+  (0x1.b3a29c72cab91p+271, "6.456718069774032e+81"),
+  (0x1.c84c524ab5ebp+277 , "4.328301679886463e+83"),
+  (0x1.71760b3c0bc14p+287, "3.588703015985849e+86"),
+  (0x1.11926d079e00ap+304, "3.482974734743573e+91"),
+  (0x1.9d8f9fc2808d3p+321, "6.901257826767179e+96"),
+  (0x1.63ed4a60c9c91p+324, "4.751595491707413e+97")
+]
+
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+// Float80 found via Errol technique.
+//
+// As with Double, except for Float80.  The original list in this
+// case had 23 million test cases.  I filtered that against
+// a Float80 formatter with 129 bits precision.
+fileprivate let generatedCases_Float80: [(Float80, String)] = [
+  (0xf.8f06b25f79a0ad9p-329, "1.4226714622425547106e-98"),
+  (0xb.a14796a877c6939p-303, "7.136593768505787697e-91"),
+  (0xf.8e473d72ad52a71p-296, "1.2218360180048428346e-88"),
+  (0xb.c6f5bb0c6811badp-289, "1.1840575897174935119e-86"),
+  (0xc.c2111d383f1adfp-236 , "1.1553302055733876345e-70"),
+  (0xc.c2111d383f1adfp-233 , "9.242641644587101076e-70"),
+  (0xf.be3d87da323be87p-156, "1.7235014706998294962e-46"),
+  (0xb.d809f3772d38a59p-150, "8.298420730548195494e-45"),
+  (0xb.61d88e478a80191p-136, "1.3066137006059396529e-40"),
+  (0x8.7e6e301b42330f6p-115, "2.044824541427335683e-34"),
+  (0xe.280cfad818ffc45p-115, "3.408040902378892805e-34"),
+  (0x8.7e6e301b42330f6p-114, "4.089649082854671366e-34"),
+  (0xe.280cfad818ffc45p-114, "6.81608180475778561e-34"),
+  (0x8.7e6e301b42330f6p-113, "8.179298165709342732e-34"),
+  (0xe.280cfad818ffc45p-113, "1.363216360951557122e-33"),
+  (0xe.280cfad818ffc45p-112, "2.726432721903114244e-33"),
+  (0xe.280cfad818ffc45p-111, "5.452865443806228488e-33"),
+  (0xe.280cfad818ffc45p-110, "1.0905730887612456976e-32"),
+  (0xc.09de12b2b8b462p+169 , "9.008308715099773956e+51"),
+  (0xc.eb461a5ceb157bep+196, "1.2975058974374774429e+60"),
+  (0xd.f29472fdfc52a5ep+202, "8.965157263531703087e+61"),
+  (0x9.63a86496b5f39b5p+206, "9.656322849684964617e+62"),
+  (0xf.aab4e43915de71bp+239, "1.3840439837858165139e+73"),
+  (0xf.135bf3c301b911ap+239, "1.3318159089259743813e+73"),
+  (0xe.7c03034ced93b19p+239, "1.2795878340661322487e+73"),
+  (0xd.e4aa12d6d96e518p+239, "1.2273597592062901161e+73"),
+  (0xd.4d512260c548f17p+239, "1.1751316843464479835e+73"),
+  (0xc.b5f831eab123916p+239, "1.1229036094866058509e+73"),
+  (0xc.1e9f41749cfe315p+239, "1.0706755346267637183e+73"),
+  (0xa.efed608874b3713p+239, "9.662193849070794531e+72"),
+  (0xa.58947012608e112p+239, "9.139913100472373205e+72"),
+  (0x9.c13b7f9c4c68b11p+239, "8.617632351873951879e+72"),
+  (0x9.29e28f26384351p+239 , "8.095351603275530553e+72"),
+  (0x8.92899eb0241df0fp+239, "7.573070854677109227e+72"),
+  (0xa.58947012608e112p+240, "1.827982620094474641e+73"),
+  (0xa.58947012608e112p+241, "3.655965240188949282e+73"),
+  (0xa.58947012608e112p+242, "7.311930480377898564e+73"),
+  (0xd.4d512260c548f17p+242, "9.401053474771583868e+73"),
+  (0xc.9240ee0f9d5e4d6p+252, "9.097859174935622588e+76"),
+]
+#endif
+
+let PrintTests = TestSuite("FloatingPointPrinting")
+
+% for FloatType in ['Float', 'Double', 'Float80']:
+% if FloatType == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+% end
+
+// Verify that a particular value provides a specific description string.
+// Also check that the generated strings actually satisfy our
+// accuracy requirements.
+fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  expectEqual(expected, object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectAccurateDescription(object,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
+// Verify our key requirements:
+//
+// * Accurate.  A formatted float should parse back to exactly the original
+//   value.
+//
+// * Short. The formatted value should use the minimum number of digits needed
+//   to be accurate.
+//
+// * Close. If there is more than one accurate and short value, we want the one
+//   that is closest (as an infinitely-precise real number) to the original
+//   binary float (interpreted as an infinitely-precise real number).
+fileprivate func expectAccurateDescription(_ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  if !object.isFinite {
+    return
+  }
+
+  // Following checks all return early on failure, since it makes no sense to
+  // check shortness if the result is inaccurate, etc.
+
+  // Verify round-trip accuracy:
+  let text = object.debugDescription
+  if let roundTrip = ${FloatType}(text) {
+    if object != roundTrip {
+      expectationFailure("Round-trip inaccuracy: \(object) != \(roundTrip)",
+        trace: message(),
+        stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+      return
+    }
+  } else {
+    expectationFailure("Failed to parse \(text)",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    return
+  }
+
+  // TODO: Verify shortness by trimming the last digit and checking
+  // that the result does NOT round-trip.
+
+  // TODO: Verify closeness by fuzzing the last digit and checking
+  // that the result is not closer.  Note this requires higher-precision
+  // arithmetic.
+}
+% if FloatType == 'Float80':
+#endif
+% end
+% end
+
+// Special helper for NaN values
+fileprivate func expectNaN<T>(_ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
+  // Regular description always returns "nan"
+  expectEqual("nan", object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+
+  // debugDescription prints full details about NaNs, which is tricky to test
+  // because NaNs often get truncated: various implementations force all NaNs
+  // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
+  // NaN into a function (via an FP register) is enough to mangle the value.
+
+#if arch(x86_64)
+  // Verify the exact debugDescription value only on x86_64, where we
+  // know the exact expected String:
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+#endif
+
+  // On all platforms, we verify that the generated debugDescription text
+  // follows the expected format, even when we can't verify the exact value.
+  var actual = object.debugDescription
+
+  // Optional leading "-"
+  if actual.hasPrefix("-") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Optional leading "s"
+  if actual.hasPrefix("s") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Fixed text "nan"
+  if actual.prefix(3) != "nan" {
+    expectationFailure("Badly formatted NaN debug description (expected 'nan'): \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    return
+  }
+  actual = String(actual.dropFirst(3))
+
+  // Optional parenthesized payload after "nan"
+  if actual.hasPrefix("(0x") {
+    actual = String(actual.dropFirst(3))
+    while !actual.isEmpty {
+      if actual.hasPrefix(")") {
+        if actual != ")" {
+          expectationFailure("Malformed NaN: extra text after payload: \(object.debugDescription)", trace:
+            message(),
+            stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        }
+        return
+      } else {
+        // TODO: verify hex digit
+      }
+      actual = String(actual.dropFirst())
+    }
+    expectationFailure("Malformed NaN: no closing parenthesis after payload: \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !actual.isEmpty {
+    expectationFailure("Badly formatted NaN debug description has invalid text after 'nan'.  Expected '(0x': \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+// Foundation's String(format:) isn't available here, so
+// build up "1e-234" manually:
+fileprivate func exponentialPowerOfTen(_ power: Int) -> String {
+  let digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+  var s = "1e"
+  var p = power
+  if p < 0 {
+    s += "-"
+    p = -p
+  } else {
+    s += "+"
+  }
+  if (p > 999) {
+    s += digits[ (p / 1000) % 10]
+  }
+  if (p > 99) {
+    s += digits[ (p / 100) % 10]
+  }
+  s += digits[ (p / 10) % 10]
+  s += digits[ p % 10]
+  return s
+}
+
+// An earlier version of Swift's floating-point `.description` logic
+// used potentially locale-sensitive C library functions, hence
+// this logic to help verify that the output does not depend on
+// the C locale.
+PrintTests.setUp {
+  if let localeArgIndex = CommandLine.arguments.firstIndex(of: "--locale") {
+    let locale = CommandLine.arguments[localeArgIndex + 1]
+    expectEqual("ru_RU.UTF-8", locale)
+    setlocale(LC_ALL, locale)
+  } else {
+    setlocale(LC_ALL, "")
+  }
+}
+
+// Check that all floating point types
+// are CustomStringConvertible
+PrintTests.test("CustomStringConvertible") {
+  func hasDescription(_ any: Any) {
+    expectTrue(any is CustomStringConvertible)
+  }
+
+  hasDescription(Float(1.0))
+  hasDescription(Double(1.0))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  hasDescription(Float80(1.0))
+#endif
+  hasDescription(CFloat(1.0))
+  hasDescription(CDouble(1.0))
+}
+
+// Check that all floating point types
+// are CustomDebugStringConvertible
+PrintTests.test("CustomDebugStringConvertible") {
+  func hasDebugDescription(_ any: Any) {
+    expectTrue(any is CustomDebugStringConvertible)
+  }
+
+  hasDebugDescription(Float(1.0))
+  hasDebugDescription(Double(1.0))
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  hasDebugDescription(Float80(1.0))
+#endif
+  hasDebugDescription(CFloat(1.0))
+  hasDebugDescription(CDouble(1.0))
+}
+
+PrintTests.test("Printable_CFloat") {
+  // Basic check for CFloat: Since it's a synonym for Float, we don't
+  // need more detailed verification, just basic sanity.
+  expectDescription("1.0", CFloat(1.0))
+  expectDescription("1.1", CFloat(1.1))
+  expectDescription("-1.0", CFloat(-1.0))
+}
+
+PrintTests.test("Printable_CDouble") {
+  // Likewise for CDouble
+  expectDescription("1.0", CDouble(1.0))
+  expectDescription("1.1", CDouble(1.1))
+  expectDescription("-1.0", CDouble(-1.0))
+}
+
+PrintTests.test("Printable_Float") {
+  func asFloat32(_ f: Float32) -> Float32 { return f }
+
+  // Basic sanity checks:
+  let f = 100.125 as Float
+  expectEqual("f = 100.125", "f = \(f)")
+
+  expectDescription("0.0", asFloat32(0.0))
+  expectDescription("-0.0", -asFloat32(0.0))
+  expectDescription("0.1", asFloat32(0.1))
+  expectDescription("-0.1", asFloat32(-0.1))
+  expectDescription("1.0", asFloat32(1.0))
+  expectDescription("-1.0", asFloat32(-1.0))
+  expectDescription("1.1", asFloat32(1.1))
+  expectDescription("100.125", asFloat32(100.125))
+  expectDescription("-100.125", asFloat32(-100.125))
+
+  // Standard special numbers:
+  expectDescription("inf", Float.infinity)
+  expectDescription("-inf", -Float.infinity)
+  expectDescription("3.1415925", Float.pi)
+  expectDescription("3.4028235e+38", Float.greatestFiniteMagnitude)
+#if !arch(arm)
+  expectDescription("1e-45", Float.leastNonzeroMagnitude)
+#endif
+  expectDescription("1.1754944e-38", Float.leastNormalMagnitude)
+
+  // Special cases for the underlying algorithms:
+  // Smallest Float that requires 9 digits to print accurately
+  expectDescription("1.00000075e-36", 1.00000075e-36 as Float)
+  // Worst case for shortness:
+  // Float for which the shortest accurate decimal form is
+  // closest to the midpoint between two binary floats
+  expectDescription("7.0385313e-26", 7.0385313e-26 as Float)
+  // Second-worst case for shortness:
+  expectDescription("7.038531e-26", Float("7.038531e-26")!)
+  // Note: The above test computes the reference value from a
+  // string because `7.038531e-26 as Float` is broken:
+  // See https://bugs.swift.org/browse/SR-7124
+
+  // NaNs require special care in testing:
+  // NaN is printed with additional detail to debugDescription, but not description
+  expectNaN("nan", Float.nan)
+  expectNaN("nan(0xffff)", Float(nan: 65535, signaling: false))
+  expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fff_ffff))
+  expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fdf_ffff))
+  expectNaN("-nan", -Float.nan)
+  expectNaN("-nan(0xffff)", -Float(nan: 65535, signaling: false))
+  expectNaN("snan", Float.signalingNaN)
+  expectNaN("-snan", -Float.signalingNaN)
+  expectNaN("snan(0xffff)", Float(nan: 65535, signaling: true))
+  expectNaN("-snan(0xffff)", -Float(nan: 65535, signaling: true))
+  expectNaN("snan(0x1fffff)", Float(bitPattern: 0x7fbf_ffff))
+
+  // Every power of 10 should print with only a single digit '1'
+#if arch(arm)
+  let lowerBound = -37
+#else
+  let lowerBound = -45
+#endif
+  for power in lowerBound ... 38 {
+    let s: String
+    if power < -4 || power > 7 { // Exponential form
+      s = exponentialPowerOfTen(power)
+    } else if power < 0 { // Fractional decimal form
+      s = "0." + String(repeating: "0", count: -power - 1) + "1"
+    } else { // Decimal form
+      s = "1" + String(repeating: "0", count: power) + ".0"
+    }
+    let f = Float(s)!
+    expectDescription(s, f)
+  }
+
+  // Test the 170 "worst cases" listed above.
+  for (f,s) in generatedCases_Float {
+    expectAccurateDescription(f.nextDown)
+    expectDescription(s, f)
+    expectAccurateDescription(f.nextUp)
+  }
+
+  // Float can represent all integers -(2^24)...(2^24)
+  let maxDecimalForm = Float(1 << 24)
+  expectDescription("16777216.0", maxDecimalForm)
+  expectDescription("-16777216.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.6777218e+07", maxDecimalForm.nextUp)
+  expectDescription("-1.6777218e+07", -maxDecimalForm.nextUp)
+
+  expectDescription("1.00001", asFloat32(1.00001))
+  expectDescription("1.25e+17", asFloat32(125000000000000000.0))
+  expectDescription("1.25e+16", asFloat32(12500000000000000.0))
+  expectDescription("1.25e+15", asFloat32(1250000000000000.0))
+  expectDescription("1.25e+14", asFloat32(125000000000000.0))
+  expectDescription("1.25e+13", asFloat32(12500000000000.0))
+  expectDescription("1.25e+12", asFloat32(1250000000000.0))
+  expectDescription("1.25e+11", asFloat32(125000000000.0))
+  expectDescription("1.25e+10", asFloat32(12500000000.0))
+  expectDescription("1.25e+09", asFloat32(1250000000.0))
+  expectDescription("1.25e+08", asFloat32(125000000.0))
+  expectDescription("12500000.0", asFloat32(12500000.0))
+  expectDescription("1250000.0", asFloat32(1250000.0))
+  expectDescription("125000.0", asFloat32(125000.0))
+  expectDescription("12500.0",  asFloat32(12500.0))
+  expectDescription("1250.0",   asFloat32(1250.0))
+  expectDescription("125.0",    asFloat32(125.0))
+  expectDescription("12.5",     asFloat32(12.5))
+  expectDescription("1.25",     asFloat32(1.25))
+  expectDescription("0.125",    asFloat32(0.125))
+  expectDescription("0.0125",   asFloat32(0.0125))
+  expectDescription("0.00125",  asFloat32(0.00125))
+  expectDescription("0.000125", asFloat32(0.000125))
+  expectDescription("1.25e-05", asFloat32(0.0000125))
+  expectDescription("1.25e-06", asFloat32(0.00000125))
+  expectDescription("1.25e-07", asFloat32(0.000000125))
+  expectDescription("1.25e-08", asFloat32(0.0000000125))
+  expectDescription("1.25e-09", asFloat32(0.00000000125))
+  expectDescription("1.25e-10", asFloat32(0.000000000125))
+  expectDescription("1.25e-11", asFloat32(0.0000000000125))
+  expectDescription("1.25e-12", asFloat32(0.00000000000125))
+  expectDescription("1.25e-13", asFloat32(0.000000000000125))
+  expectDescription("1.25e-14", asFloat32(0.0000000000000125))
+  expectDescription("1.25e-15", asFloat32(0.00000000000000125))
+  expectDescription("1.25e-16", asFloat32(0.000000000000000125))
+  expectDescription("1.25e-17", asFloat32(0.0000000000000000125))
+}
+
+PrintTests.test("Printable_Double") {
+  func asFloat64(_ f: Float64) -> Float64 { return f }
+
+  // Sanity check
+  let f = 100.125 as Double
+  expectEqual("f = 100.125", "f = \(f)")
+
+  expectDescription("0.0", asFloat64(0.0))
+  expectDescription("-0.0", asFloat64(-0.0))
+  expectDescription("0.1", asFloat64(0.1))
+  expectDescription("-0.1", asFloat64(-0.1))
+  expectDescription("1.0", asFloat64(1.0))
+  expectDescription("-1.0", asFloat64(-1.0))
+  expectDescription("1.1", asFloat64(1.1))
+  expectDescription("100.125", asFloat64(100.125))
+  expectDescription("-100.125", asFloat64(-100.125))
+
+  // Special values
+  expectDescription("3.141592653589793", Double.pi)
+  expectDescription("1.7976931348623157e+308", Double.greatestFiniteMagnitude)
+#if !arch(arm)
+  expectDescription("5e-324", Double.leastNonzeroMagnitude)
+#endif
+  expectDescription("2.2250738585072014e-308", Double.leastNormalMagnitude)
+  expectDescription("inf", Double.infinity)
+  expectDescription("-inf", -Double.infinity)
+  // Worst case for Double shortness:
+  expectDescription("2.311989689387339e-82", 2.311989689387339e-82)
+
+  // Verify NaNs
+  expectNaN("nan", Double.nan)
+  expectNaN("-nan", -Double.nan)
+  expectNaN("nan(0xffff)", Double(nan: 65535, signaling: false))
+  expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
+  expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
+  expectNaN("-nan(0xffff)", -Double(nan: 65535, signaling: false))
+  expectNaN("snan", Double.signalingNaN)
+  expectNaN("-snan", -Double.signalingNaN)
+  expectNaN("snan(0xffff)", Double(nan: 65535, signaling: true))
+  expectNaN("-snan(0xffff)", -Double(nan: 65535, signaling: true))
+  expectNaN("snan(0x3ffffffffffff)", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
+
+  // We know how every power of 10 should print
+#if arch(arm)
+  let lowerBound = -307
+#else
+  let lowerBound = -323
+#endif
+  for power in lowerBound ... 308 {
+    let s: String
+    if power < -4 || power > 15 { // Exponential form
+      s = exponentialPowerOfTen(power)
+    } else if power < 0 { // Fractional decimal form
+      s = "0." + String(repeating: "0", count: -power - 1) + "1"
+    } else { // Decimal form
+      s = "1" + String(repeating: "0", count: power) + ".0"
+    }
+    let f = Double(s)!
+    expectDescription(s, f)
+  }
+
+  // Verify 74 extreme values generated using a technique from the Errol paper,
+  // plus many nearby values.
+  for (d, s) in generatedCases_Double {
+    expectDescription(s, d)
+
+    // Also check nearby values.
+    var upCase = d
+    var downCase = d
+    for _ in 0..<10 {
+      upCase = upCase.nextUp
+      expectAccurateDescription(upCase)
+      downCase = downCase.nextDown
+      expectAccurateDescription(downCase)
+    }
+  }
+
+  // Double can represent all integers -(2^53)...(2^53)
+  let maxDecimalForm = Double((1 as Int64) << 53)
+  expectDescription("9007199254740992.0", maxDecimalForm)
+  expectDescription("-9007199254740992.0", -maxDecimalForm)
+  // Outside of that range, we use exponential form:
+  expectDescription("9.007199254740994e+15", maxDecimalForm.nextUp)
+  expectDescription("-9.007199254740994e+15", -maxDecimalForm.nextUp)
+
+  expectDescription("1.00000000000001", asFloat64(1.00000000000001))
+  expectDescription("1.25e+17", asFloat64(125000000000000000.0))
+  expectDescription("1.25e+16", asFloat64(12500000000000000.0))
+  expectDescription("1250000000000000.0", asFloat64(1250000000000000.0))
+  expectDescription("125000000000000.0", asFloat64(125000000000000.0))
+  expectDescription("12500000000000.0", asFloat64(12500000000000.0))
+  expectDescription("1250000000000.0", asFloat64(1250000000000.0))
+  expectDescription("125000000000.0", asFloat64(125000000000.0))
+  expectDescription("12500000000.0", asFloat64(12500000000.0))
+  expectDescription("1250000000.0", asFloat64(1250000000.0))
+  expectDescription("125000000.0", asFloat64(125000000.0))
+  expectDescription("12500000.0", asFloat64(12500000.0))
+  expectDescription("1250000.0", asFloat64(1250000.0))
+  expectDescription("125000.0", asFloat64(125000.0))
+  expectDescription("12500.0", asFloat64(12500.0))
+  expectDescription("1250.0", asFloat64(1250.0))
+  expectDescription("125.0", asFloat64(125.0))
+  expectDescription("12.5", asFloat64(12.5))
+  expectDescription("1.25", asFloat64(1.25))
+  expectDescription("0.125", asFloat64(0.125))
+  expectDescription("0.0125", asFloat64(0.0125))
+  expectDescription("0.00125", asFloat64(0.00125))
+  expectDescription("0.000125", asFloat64(0.000125))
+  expectDescription("1.25e-05", asFloat64(0.0000125))
+  expectDescription("1.25e-06", asFloat64(0.00000125))
+  expectDescription("1.25e-07", asFloat64(0.000000125))
+  expectDescription("1.25e-08", asFloat64(0.0000000125))
+  expectDescription("1.25e-09", asFloat64(0.00000000125))
+  expectDescription("1.25e-10", asFloat64(0.000000000125))
+  expectDescription("1.25e-11", asFloat64(0.0000000000125))
+  expectDescription("1.25e-12", asFloat64(0.00000000000125))
+  expectDescription("1.25e-13", asFloat64(0.000000000000125))
+  expectDescription("1.25e-14", asFloat64(0.0000000000000125))
+  expectDescription("1.25e-15", asFloat64(0.00000000000000125))
+  expectDescription("1.25e-16", asFloat64(0.000000000000000125))
+  expectDescription("1.25e-17", asFloat64(0.0000000000000000125))
+}
+
+PrintTests.test("Printable_Float80") {
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  func asFloat80(_ f: Swift.Float80) -> Swift.Float80 { return f }
+
+  // Sanity
+  let f = 100.125 as Float80
+  expectEqual("f = 100.125", "f = \(f)")
+
+  expectDescription("0.0", asFloat80(0.0))
+  expectDescription("-0.0", -asFloat80(0.0))
+  expectDescription("0.1", asFloat80(0.1))
+  expectDescription("-0.1", asFloat80(-0.1))
+  expectDescription("1.0", asFloat80(1.0))
+  expectDescription("-1.0", asFloat80(-1.0))
+  expectDescription("1.1", asFloat80(1.1))
+  expectDescription("100.125", asFloat80(100.125))
+  expectDescription("-100.125", asFloat80(-100.125))
+
+  // Special values
+  expectDescription("3.1415926535897932385", Float80.pi)
+  expectDescription("1.189731495357231765e+4932", Float80.greatestFiniteMagnitude)
+  expectDescription("4e-4951", Float80.leastNonzeroMagnitude)
+  expectDescription("3.3621031431120935063e-4932", Float80.leastNormalMagnitude)
+  expectDescription("inf", Float80.infinity)
+  expectDescription("-inf", -Float80.infinity)
+
+  // NaNs
+  expectNaN("nan", Float80.nan)
+  expectNaN("nan(0xffff)", Float80(nan: 65535, signaling: false))
+  expectNaN("nan(0x1fffffffffffffff)", Float80(sign: .plus, exponentBitPattern: 0x7fff, significandBitPattern: 0xffff_ffff_ffff_ffff))
+  expectNaN("nan(0x1fffffffffffffff)", Float80(sign: .plus, exponentBitPattern: 0x7fff, significandBitPattern: 0xdfff_ffff_ffff_ffff))
+  expectNaN("-nan", -Float80.nan)
+  expectNaN("-nan(0xffff)", -Float80(nan: 65535, signaling: false))
+  expectNaN("snan", Float80.signalingNaN)
+  expectNaN("-snan", -Float80.signalingNaN)
+  expectNaN("snan(0xffff)", Float80(nan: 65535, signaling: true))
+  expectNaN("-snan(0xffff)", -Float80(nan: 65535, signaling: true))
+  expectNaN("snan(0x1fffffffffffffff)", Float80(sign: .plus, exponentBitPattern: 0x7fff, significandBitPattern: 0xbfff_ffff_ffff_ffff))
+
+  // We know how every power of 10 should print
+  for power in -4950 ... 4932 {
+    let s: String
+    if power < -4 || power > 19 { // Exponential form
+      s = exponentialPowerOfTen(power)
+    } else if power < 0 { // Fractional decimal form
+      s = "0." + String(repeating: "0", count: -power - 1) + "1"
+    } else { // Decimal form
+      s = "1" + String(repeating: "0", count: power) + ".0"
+    }
+    let f = Float80(s)!
+    expectDescription(s, f)
+  }
+
+  // Verify the extreme cases generated via the Errol technique.
+  for (d, s) in generatedCases_Float80 {
+    expectDescription(s, d)
+
+    var upCase = d
+    var downCase = d
+    for _ in 0..<10 {
+      upCase = upCase.nextUp
+      expectAccurateDescription(upCase)
+      downCase = downCase.nextDown
+      expectAccurateDescription(downCase)
+    }
+  }
+
+  // Float80 can represent all integers -(2^64)...(2^64):
+  let maxDecimalForm = Float80(UInt64.max) + 1.0
+  expectDescription("18446744073709551616.0", maxDecimalForm)
+  expectDescription("-18446744073709551616.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.8446744073709551618e+19", maxDecimalForm.nextUp)
+  expectDescription("-1.8446744073709551618e+19", -maxDecimalForm.nextUp)
+
+  expectDescription("1.00000000000000001", asFloat80(1.00000000000000001))
+  expectDescription("1.25e+21", asFloat80(1250000000000000000000.0))
+  expectDescription("1.25e+20", asFloat80(125000000000000000000.0))
+  expectDescription("12500000000000000000.0", asFloat80(12500000000000000000.0))
+  expectDescription("1250000000000000000.0", asFloat80(1250000000000000000.0))
+  expectDescription("125000000000000000.0", asFloat80(125000000000000000.0))
+  expectDescription("12500000000000000.0", asFloat80(12500000000000000.0))
+  expectDescription("1250000000000000.0", asFloat80(1250000000000000.0))
+  expectDescription("125000000000000.0", asFloat80(125000000000000.0))
+  expectDescription("12500000000000.0", asFloat80(12500000000000.0))
+  expectDescription("1250000000000.0", asFloat80(1250000000000.0))
+  expectDescription("125000000000.0", asFloat80(125000000000.0))
+  expectDescription("12500000000.0", asFloat80(12500000000.0))
+  expectDescription("1250000000.0", asFloat80(1250000000.0))
+  expectDescription("125000000.0", asFloat80(125000000.0))
+  expectDescription("12500000.0", asFloat80(12500000.0))
+  expectDescription("1250000.0", asFloat80(1250000.0))
+  expectDescription("125000.0", asFloat80(125000.0))
+  expectDescription("12500.0", asFloat80(12500.0))
+  expectDescription("1250.0", asFloat80(1250.0))
+  expectDescription("125.0", asFloat80(125.0))
+  expectDescription("12.5", asFloat80(12.5))
+  expectDescription("1.25", asFloat80(1.25))
+  expectDescription("0.125", asFloat80(0.125))
+  expectDescription("0.0125", asFloat80(0.0125))
+  expectDescription("0.00125", asFloat80(0.00125))
+  expectDescription("0.000125", asFloat80(0.000125))
+  expectDescription("1.25e-05", asFloat80(0.0000125))
+  expectDescription("1.25e-06", asFloat80(0.00000125))
+  expectDescription("1.25e-07", asFloat80(0.000000125))
+  expectDescription("1.25e-08", asFloat80(0.0000000125))
+  expectDescription("1.25e-09", asFloat80(0.00000000125))
+  expectDescription("1.25e-10", asFloat80(0.000000000125))
+  expectDescription("1.25e-11", asFloat80(0.0000000000125))
+  expectDescription("1.25e-12", asFloat80(0.00000000000125))
+  expectDescription("1.25e-13", asFloat80(0.000000000000125))
+  expectDescription("1.25e-14", asFloat80(0.0000000000000125))
+  expectDescription("1.25e-15", asFloat80(0.00000000000000125))
+  expectDescription("1.25e-16", asFloat80(0.000000000000000125))
+  expectDescription("1.25e-17", asFloat80(0.0000000000000000125))
+#endif
+}
+
+runAllTests()

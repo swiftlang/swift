@@ -13,15 +13,14 @@
 /// A collection of indices for an arbitrary collection
 @_fixed_layout
 public struct DefaultIndices<Elements: Collection> {
-  @_versioned
+  @usableFromInline
   internal var _elements: Elements
-  @_versioned
+  @usableFromInline
   internal var _startIndex: Elements.Index
-  @_versioned
+  @usableFromInline
   internal var _endIndex: Elements.Index
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal init(
     _elements: Elements,
     startIndex: Elements.Index,
@@ -41,23 +40,23 @@ extension DefaultIndices: Collection {
   public typealias SubSequence = DefaultIndices<Elements>
   public typealias Iterator = IndexingIterator<DefaultIndices<Elements>>
 
-  @_inlineable
+  @inlinable
   public var startIndex: Index {
     return _startIndex
   }
 
-  @_inlineable
+  @inlinable
   public var endIndex: Index {
     return _endIndex
   }
 
-  @_inlineable
+  @inlinable
   public subscript(i: Index) -> Elements.Index {
     // FIXME: swift-3-indexing-model: range check.
     return i
   }
 
-  @_inlineable
+  @inlinable
   public subscript(bounds: Range<Index>) -> DefaultIndices<Elements> {
     // FIXME: swift-3-indexing-model: range check.
     return DefaultIndices(
@@ -66,19 +65,19 @@ extension DefaultIndices: Collection {
       endIndex: bounds.upperBound)
   }
 
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(after: i)
   }
 
-  @_inlineable
+  @inlinable
   public func formIndex(after i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formIndex(after: &i)
   }
 
-  @_inlineable
+  @inlinable
   public var indices: Indices {
     return self
   }
@@ -86,13 +85,13 @@ extension DefaultIndices: Collection {
 
 extension DefaultIndices: BidirectionalCollection
 where Elements: BidirectionalCollection {
-  @_inlineable
+  @inlinable
   public func index(before i: Index) -> Index {
     // FIXME: swift-3-indexing-model: range check.
     return _elements.index(before: i)
   }
 
-  @_inlineable
+  @inlinable
   public func formIndex(before i: inout Index) {
     // FIXME: swift-3-indexing-model: range check.
     _elements.formIndex(before: &i)
@@ -120,7 +119,7 @@ extension Collection where Indices == DefaultIndices<Self> {
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public var indices: DefaultIndices<Self> {
     return DefaultIndices(
       _elements: self,
@@ -128,8 +127,3 @@ extension Collection where Indices == DefaultIndices<Self> {
       endIndex: self.endIndex)
   }
 }
-
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection

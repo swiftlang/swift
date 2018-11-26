@@ -72,7 +72,7 @@ findAllNonFailureExitBBs(SILFunction *F,
       continue;
 
     // A return inst is always a non-failure exit bb.
-    if (isa<ReturnInst>(TI) || isa<ThrowInst>(TI)) {
+    if (TI->isFunctionExiting()) {
       BBs.push_back(&BB);
       continue;
     }

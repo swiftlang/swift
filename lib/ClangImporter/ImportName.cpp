@@ -552,7 +552,7 @@ namespace {
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
 struct VersionedSwiftNameInfo {
   const clang::SwiftNameAttr *Attr;
-  clang::VersionTuple Version;
+  llvm::VersionTuple Version;
   bool IsReplacedByActive;
 };
 
@@ -573,10 +573,12 @@ enum class VersionedSwiftNameAction {
 
 static VersionedSwiftNameAction
 checkVersionedSwiftName(VersionedSwiftNameInfo info,
-                        clang::VersionTuple bestSoFar,
+                        llvm::VersionTuple bestSoFar,
                         ImportNameVersion requestedVersion) {
   if (!bestSoFar.empty() && bestSoFar <= info.Version)
     return VersionedSwiftNameAction::Ignore;
+
+  auto requestedClangVersion = requestedVersion.asClangVersionTuple();
 
   if (info.IsReplacedByActive) {
     // We know that there are no versioned names between the active version and
@@ -586,7 +588,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     // new value that is now active. (Special case: replacement = 0 means that
     // a header annotation was replaced by an unversioned API notes annotation.)
     if (info.Version.empty() ||
-        info.Version.getMajor() >= requestedVersion.majorVersionNumber()) {
+        info.Version >= requestedClangVersion) {
       return VersionedSwiftNameAction::ResetToActive;
     }
     if (bestSoFar.empty())
@@ -594,7 +596,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     return VersionedSwiftNameAction::Ignore;
   }
 
-  if (info.Version.getMajor() < requestedVersion.majorVersionNumber())
+  if (info.Version < requestedClangVersion)
     return VersionedSwiftNameAction::Ignore;
   return VersionedSwiftNameAction::Use;
 }
@@ -614,9 +616,15 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
   if (version > ImportNameVersion::swift2()) {
+    // FIXME: Until Apple gets a chance to update UIKit's API notes, always use
+    // the new name for certain properties.
+    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl))
+      if (importer::isSpecialUIKitStructZeroProperty(namedDecl))
+        version = ImportNameVersion::swift4_2();
+
     const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
     const clang::SwiftNameAttr *result = activeAttr;
-    clang::VersionTuple bestSoFar;
+    llvm::VersionTuple bestSoFar;
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
 
@@ -674,9 +682,9 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
   if (!attr) return nullptr;
 
-  // API notes produce implicit attributes; ignore them because they weren't
-  // used for naming in Swift 2.
-  if (attr->isImplicit()) return nullptr;
+  // API notes produce attributes with no source location; ignore them because
+  // they weren't used for naming in Swift 2.
+  if (attr->getLocation().isInvalid()) return nullptr;
 
   // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
@@ -789,7 +797,7 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
 static bool omitNeedlessWordsInFunctionName(
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
-    const clang::DeclContext *dc, const llvm::SmallBitVector &nonNullArgs,
+    const clang::DeclContext *dc, const SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
     NameImporter &nameImporter) {
   clang::ASTContext &clangCtx = nameImporter.getClangContext();
@@ -887,7 +895,8 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
   if (isa<clang::EnumConstantDecl>(decl)) {
     auto enumDecl = cast<clang::EnumDecl>(dc);
     switch (getEnumKind(enumDecl)) {
-    case EnumKind::Enum:
+    case EnumKind::NonFrozenEnum:
+    case EnumKind::FrozenEnum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
       if (version != ImportNameVersion::raw()) {
@@ -1005,7 +1014,8 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
     auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
     switch (nameImporter.getEnumKind(ED)) {
-    case EnumKind::Enum:
+    case EnumKind::NonFrozenEnum:
+    case EnumKind::FrozenEnum:
     case EnumKind::Options:
       if (version != ImportNameVersion::raw())
         break;
@@ -1712,7 +1722,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
+  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
+                                 isInitializer);
   return result;
 }
 
@@ -1772,6 +1783,40 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   if (!givenName)
     importNameCache[key] = res;
   return res;
+}
+
+bool NameImporter::forEachDistinctImportName(
+    const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+    llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
+  using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
+  SmallVector<ImportNameKey, 8> seenNames;
+
+  ImportedName newName = importName(decl, activeVersion);
+  if (!newName)
+    return true;
+  ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+  if (action(newName, activeVersion))
+    seenNames.push_back(key);
+
+  activeVersion.forEachOtherImportNameVersion(
+      [&](ImportNameVersion nameVersion) {
+        // Check to see if the name is different.
+        ImportedName newName = importName(decl, nameVersion);
+        if (!newName)
+          return;
+        ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+
+        bool seen = llvm::any_of(
+            seenNames, [&key](const ImportNameKey &existing) -> bool {
+              return key.first == existing.first &&
+                     key.second.equalsWithoutResolving(existing.second);
+            });
+        if (seen)
+          return;
+        if (action(newName, nameVersion))
+          seenNames.push_back(key);
+      });
+  return false;
 }
 
 const InheritedNameSet *NameImporter::getAllPropertyNames(
@@ -1841,4 +1886,3 @@ const InheritedNameSet *NameImporter::getAllPropertyNames(
 
   return known->second.get();
 }
-

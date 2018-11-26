@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module %s | %FileCheck -check-prefix CHECK-VTABLE %s
+// RUN: %target-swift-frontend -emit-sil -o - -emit-module-path %t/Lib.swiftmodule -module-name Lib -I %S/Inputs/custom-modules -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck -check-prefix CHECK-VTABLE %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
@@ -13,27 +13,29 @@
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
 // RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -DTEST %s | %FileCheck -check-prefix CHECK-IR %s
 
+// RUN: %target-swift-frontend -typecheck -I %t -I %S/Inputs/custom-modules -Xcc -DBAD %S/Inputs/typedefs-helper.swift -verify
+
 #if TEST
 
 import Typedefs
 import Lib
 
-// CHECK-SIL-LABEL: sil hidden @$S8typedefs11testSymbolsyyF
+// CHECK-SIL-LABEL: sil hidden @$s8typedefs11testSymbolsyyF
 func testSymbols() {
   // Check that the symbols are not using 'Bool'.
-  // CHECK-SIL: function_ref @$S3Lib1xs5Int32Vvau
+  // CHECK-SIL: function_ref @$s3Lib1xs5Int32Vvau
   _ = Lib.x
-  // CHECK-SIL: function_ref @$S3Lib9usesAssocs5Int32VSgvau
+  // CHECK-SIL: function_ref @$s3Lib9usesAssocs5Int32VSgvau
   _ = Lib.usesAssoc
-} // CHECK-SIL: end sil function '$S8typedefs11testSymbolsyyF'
+} // CHECK-SIL: end sil function '$s8typedefs11testSymbolsyyF'
 
-// CHECK-IR-LABEL: define{{.*}} void @"$S8typedefs18testVTableBuilding4usery3Lib4UserC_tF
+// CHECK-IR-LABEL: define{{.*}} void @"$s8typedefs18testVTableBuilding4usery3Lib4UserC_tF
 public func testVTableBuilding(user: User) {
   // The important thing in this CHECK line is the "i64 30", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 30|i32 33}}
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 26|i32 29}}
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
@@ -50,10 +52,10 @@ let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
-_ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
+_ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
 let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
-let _: UnwrappedAlias = nil // expected-error {{nil cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
+let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
 
 let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
 let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
@@ -168,25 +170,21 @@ open class User {
 // (10 words of normal class metadata on 64-bit platforms, 13 on 32-bit)
 // 10 CHECK-VTABLE-NEXT: #User.unwrappedProp!getter.1:
 // 11 CHECK-VTABLE-NEXT: #User.unwrappedProp!setter.1:
-// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!materializeForSet.1:
+// 12 CHECK-VTABLE-NEXT: #User.unwrappedProp!modify.1:
 // 13 CHECK-VTABLE-NEXT: #User.wrappedProp!getter.1:
 // 14 CHECK-VTABLE-NEXT: #User.wrappedProp!setter.1:
-// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!materializeForSet.1:
+// 15 CHECK-VTABLE-NEXT: #User.wrappedProp!modify.1:
 // 16 CHECK-VTABLE-NEXT: #User.returnsUnwrappedMethod!1:
 // 17 CHECK-VTABLE-NEXT: #User.returnsWrappedMethod!1:
 // 18 CHECK-VTABLE-NEXT: #User.constrainedUnwrapped!1:
 // 19 CHECK-VTABLE-NEXT: #User.constrainedWrapped!1:
 // 20 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
 // 21 CHECK-VTABLE-NEXT: #User.subscript!getter.1:
-// 22 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 23 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 24 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 25 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 26 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 27 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 28 CHECK-VTABLE-NEXT: #User.init!initializer.1:
-// 29 CHECK-VTABLE-NEXT: #User.init!allocator.1:
-// 30 CHECK-VTABLE-NEXT: #User.lastMethod!1:
+// 22 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 23 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 24 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 25 CHECK-VTABLE-NEXT: #User.init!allocator.1:
+// 26 CHECK-VTABLE-NEXT: #User.lastMethod!1:
 // CHECK-VTABLE: }
 
 

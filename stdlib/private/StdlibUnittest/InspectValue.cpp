@@ -16,12 +16,16 @@
 using namespace swift;
 
 SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY extern "C"
-uint32_t getMetadataKindOf(
+const char *getMetadataKindOf(
     OpaqueValue *value,
     const Metadata *type
 ) {
-  auto result = uint32_t(type->getKind());
-  SWIFT_CC_PLUSONE_GUARD(type->vw_destroy(value));
-  return result;
+  switch (type->getKind()) {
+#define METADATAKIND(NAME, VALUE) \
+  case MetadataKind::NAME: return #NAME;
+#include "swift/ABI/MetadataKind.def"
+
+  default: return "none of your business";
+  }
 }
 

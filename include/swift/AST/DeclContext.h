@@ -48,6 +48,7 @@ namespace swift {
   class GenericParamList;
   class LazyResolver;
   class LazyMemberLoader;
+  class LazyMemberParser;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -213,7 +214,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
 
   /// If this DeclContext is a GenericType declaration or an
   /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+  GenericTypeDecl *getSelfTypeDecl() const;
 
   static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind) {
     switch (Kind) {
@@ -237,12 +238,13 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   }
 
 public:
-  Decl *getAsDeclOrDeclExtensionContext() {
+  LLVM_READONLY
+  Decl *getAsDecl() {
     return ParentAndKind.getInt() == ASTHierarchy::Decl ?
       reinterpret_cast<Decl*>(this + 1) : nullptr;
   }
-  const Decl *getAsDeclOrDeclExtensionContext() const {
-    return const_cast<DeclContext*>(this)->getAsDeclOrDeclExtensionContext();
+  const Decl *getAsDecl() const {
+    return const_cast<DeclContext*>(this)->getAsDecl();
   }
 
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
@@ -262,46 +264,56 @@ public:
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.
+  LLVM_READONLY
   bool isModuleContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a context with module-wide scope, e.g. a module
   /// or a source file.
+  LLVM_READONLY
   bool isModuleScopeContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
+  LLVM_READONLY
   bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
+  LLVM_READONLY
   bool isExtensionContext() const; // see swift/AST/Decl.h
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
-  NominalTypeDecl *getAsNominalTypeOrNominalTypeExtensionContext() const;
+  LLVM_READONLY
+  NominalTypeDecl *getSelfNominalTypeDecl() const;
 
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
-  ClassDecl *getAsClassOrClassExtensionContext() const;
+  LLVM_READONLY
+  ClassDecl *getSelfClassDecl() const;
 
   /// If this DeclContext is an enum, or an extension on an enum, return the
   /// EnumDecl, otherwise return null.
-  EnumDecl *getAsEnumOrEnumExtensionContext() const;
+  LLVM_READONLY
+  EnumDecl *getSelfEnumDecl() const;
 
   /// If this DeclContext is a struct, or an extension on a struct, return the
   /// StructDecl, otherwise return null.
-  StructDecl *getAsStructOrStructExtensionContext() const;
+  LLVM_READONLY
+  StructDecl *getSelfStructDecl() const;
 
   /// If this DeclContext is a protocol, or an extension on a
   /// protocol, return the ProtocolDecl, otherwise return null.
-  ProtocolDecl *getAsProtocolOrProtocolExtensionContext() const;
+  LLVM_READONLY
+  ProtocolDecl *getSelfProtocolDecl() const;
 
   /// If this DeclContext is a protocol extension, return the extended protocol.
-  ProtocolDecl *getAsProtocolExtensionContext() const;
+  LLVM_READONLY
+  ProtocolDecl *getExtendedProtocolDecl() const;
 
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///
-  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
+  /// Only valid if \c getSelfProtocolDecl().
   GenericTypeParamType *getProtocolSelfType() const;
 
   /// Gets the type being declared by this context.
@@ -351,6 +363,7 @@ public:
 
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
+  LLVM_READONLY
   DeclContext *getLocalContext();
   const DeclContext *getLocalContext() const {
     return const_cast<DeclContext*>(this)->getLocalContext();
@@ -363,6 +376,7 @@ public:
   /// destructors).
   ///
   /// \returns the innermost method, or null if there is no such method.
+  LLVM_READONLY
   AbstractFunctionDecl *getInnermostMethodContext();
   const AbstractFunctionDecl *getInnermostMethodContext() const {
     return const_cast<DeclContext*>(this)->getInnermostMethodContext();
@@ -373,6 +387,7 @@ public:
   /// This routine looks through closure, initializer, and local function
   /// contexts to find the innermost type context -- nominal type or
   /// extension.
+  LLVM_READONLY
   DeclContext *getInnermostTypeContext();
   const DeclContext *getInnermostTypeContext() const {
     return const_cast<DeclContext *>(this)->getInnermostTypeContext();
@@ -382,6 +397,7 @@ public:
   ///
   /// This routine looks through contexts to find the innermost
   /// declaration context that is itself a declaration.
+  LLVM_READONLY
   Decl *getInnermostDeclarationDeclContext();
   const Decl *getInnermostDeclarationDeclContext() const {
     return
@@ -408,20 +424,19 @@ public:
     return false;
   }
 
-  /// Compute a context C such that C is a parent context of A and B.
-  /// If no such context exists, return \c nullptr.
-  static DeclContext *getCommonParentContext(DeclContext *A, DeclContext *B);
-
   /// Returns the module context that contains this context.
+  LLVM_READONLY
   ModuleDecl *getParentModule() const;
 
   /// Returns the module scope context that contains this context.
   ///
   /// This is either a \c Module or a \c FileUnit.
+  LLVM_READONLY
   DeclContext *getModuleScopeContext() const;
 
   /// Returns the source file that contains this context, or null if this
   /// is not within a source file.
+  LLVM_READONLY
   SourceFile *getParentSourceFile() const;
 
   /// Determine whether this declaration context is generic, meaning that it or
@@ -472,6 +487,32 @@ public:
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
+  /// Look for the set of declarations with the given name within the
+  /// given set of nominal type declarations.
+  ///
+  /// \param types The type declarations to look into.
+  ///
+  /// \param member The member to search for.
+  ///
+  /// \param options Options that control name lookup, based on the
+  /// \c NL_* constants in \c NameLookupOptions.
+  ///
+  /// \param[out] decls Will be populated with the declarations found by name
+  /// lookup.
+  ///
+  /// \returns true if anything was found.
+  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+                       NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
+  /// Perform qualified lookup for the given member in the given module.
+  bool lookupQualified(ModuleDecl *module, DeclName member, NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
+  /// Perform \c AnyObject lookup for the given member.
+  bool lookupAnyObject(DeclName member, NLOptions options,
+                       SmallVectorImpl<ValueDecl *> &decls) const;
+
   /// Look up all Objective-C methods with the given selector visible
   /// in the enclosing module.
   void lookupAllObjCMethods(
@@ -480,6 +521,7 @@ public:
 
   /// Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
+  LLVM_READONLY
   ASTContext &getASTContext() const;
 
   /// Retrieve the set of protocols whose conformances will be

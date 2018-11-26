@@ -175,7 +175,6 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_count", ArrayCallKind::kGetCount)
             .Case("array.get_capacity", ArrayCallKind::kGetCapacity)
             .Case("array.get_element", ArrayCallKind::kGetElement)
-            .Case("array.owner", ArrayCallKind::kGetArrayOwner)
             .Case("array.make_mutable", ArrayCallKind::kMakeMutable)
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
@@ -717,7 +716,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
     SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
-    const SmallVectorImpl<SILValue> &Vals, ArrayRef<Substitution> Subs) {
+    const SmallVectorImpl<SILValue> &Vals, SubstitutionMap Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");

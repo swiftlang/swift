@@ -1052,28 +1052,6 @@ bb0(%0 : $*U, %1 : $*T, %2 : $@thick U.Type):
   return %5 : $()
 }
 
-// CHECK-LABEL: CG of test_pin
-// CHECK-NEXT:    Arg %0 Esc: A, Succ:
-// CHECK-NEXT:    Ret  Esc: R, Succ: %0
-// CHECK-NEXT:  End
-sil @test_pin : $@convention(thin) (Builtin.NativeObject) -> Optional<Builtin.NativeObject> {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = strong_pin %0 : $Builtin.NativeObject
-  return %1 : $Optional<Builtin.NativeObject>
-}
-
-// CHECK-LABEL: CG of test_unpin
-// CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
-// CHECK-NEXT:    Con %0.1 Esc: A, Succ: (%0.2)
-// CHECK-NEXT:    Con %0.2 Esc: G, Succ:
-// CHECK-NEXT:  End
-sil @test_unpin : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
-bb0(%0 : $Optional<Builtin.NativeObject>):
-  strong_unpin %0 : $Optional<Builtin.NativeObject>
-  %2 = tuple ()
-  return %2 : $()
-}
-
 sil_global @global_y : $SomeData
 
 // CHECK-LABEL: CG of test_node_merge_during_struct_inst
@@ -1442,10 +1420,10 @@ bb0(%0 : $@convention(thin) () -> ()):
 }
 
 // X.deinit
-// CHECK-LABEL: CG of $S4main1XCfD
+// CHECK-LABEL: CG of $s4main1XCfD
 // CHECK:        Arg %0 Esc: A, Succ:
 // CHECKL:      End
-sil @$S4main1XCfD: $@convention(method) (@owned X) -> () {
+sil @$s4main1XCfD: $@convention(method) (@owned X) -> () {
 bb0(%0 : $X):
   fix_lifetime %0 : $X
   %1 = tuple ()
@@ -1453,14 +1431,14 @@ bb0(%0 : $X):
 }
 
 // Z.deinit
-// CHECK-LABEL: CG of $S4main1ZCfD
+// CHECK-LABEL: CG of $s4main1ZCfD
 // CHECK:        Arg %0 Esc: A, Succ: (%0.1)
 // CHECK:        Con %0.1 Esc: A, Succ: (%0.2)
 // CHECK:        Con %0.2 Esc: G, Succ:
 // CHECK:        Val %3 Esc: G, Succ: (%3.1)
 // CHECK:        Con %3.1 Esc: G, Succ: %0.2
 // CHECKL:      End
-sil @$S4main1ZCfD: $@convention(method) (@owned Z) -> () {
+sil @$s4main1ZCfD: $@convention(method) (@owned Z) -> () {
 bb0(%0 : $Z):
   %1 = ref_element_addr %0 : $Z, #Z.x
   %2 = load %1 : $*X
@@ -1471,11 +1449,11 @@ bb0(%0 : $Z):
 }
 
 sil_vtable X {
-  #X.deinit!deallocator: @$S4main1XCfD
+  #X.deinit!deallocator.1: @$s4main1XCfD
 }
 
 sil_vtable Z {
-  #Z.deinit!deallocator: @$S4main1ZCfD
+  #Z.deinit!deallocator.1: @$s4main1ZCfD
 }
 
 

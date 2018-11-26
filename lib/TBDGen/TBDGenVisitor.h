@@ -29,62 +29,68 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
 
+#include "tapi/InterfaceFile.h"
+
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
 
 namespace swift {
+
+struct TBDGenOptions;
+
 namespace tbdgen {
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
-  StringSet &Symbols;
-  const llvm::Triple &Triple;
+  tapi::internal::InterfaceFile &Symbols;
+  tapi::internal::ArchitectureSet Archs;
+  StringSet *StringSymbols;
+
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
-  StringRef InstallName;
+  const TBDGenOptions &Opts;
 
 private:
-  bool FileHasEntryPoint = false;
-
-  void addSymbol(StringRef name) {
-    auto isNewValue = Symbols.insert(name).second;
-    (void)isNewValue;
-    assert(isNewValue && "already inserted");
-  }
+  void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
+                                     tapi::internal::SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
-  void addSymbol(LinkEntity entity) {
-    auto linkage =
-        LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
-
-    auto externallyVisible =
-        llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
-        linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
-
-    if (externallyVisible)
-      addSymbol(linkage.getName());
-  }
+  void addSymbol(LinkEntity entity);
 
   void addConformances(DeclContext *DC);
 
   void addDispatchThunk(SILDeclRef declRef);
 
+  void addMethodDescriptor(SILDeclRef declRef);
+
+  void addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto);
+  void addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType);
+  void addAssociatedConformanceDescriptor(AssociatedConformance conformance);
+
 public:
-  TBDGenVisitor(StringSet &symbols, const llvm::Triple &triple,
+  TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
+                tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
-                ModuleDecl *swiftModule, StringRef installName)
-      : Symbols(symbols), Triple(triple), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), InstallName(installName) {}
+                ModuleDecl *swiftModule, const TBDGenOptions &opts)
+      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
+        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
+        Opts(opts) {}
 
-  void setFileHasEntryPoint(bool hasEntryPoint) {
-    FileHasEntryPoint = hasEntryPoint;
-
-    if (hasEntryPoint)
+  void addMainIfNecessary(FileUnit *file) {
+    // HACK: 'main' is a special symbol that's always emitted in SILGen if
+    //       the file has an entry point. Since it doesn't show up in the
+    //       module until SILGen, we need to explicitly add it here.
+    if (file->hasEntryPoint())
       addSymbol("main");
   }
 
+  /// \brief Adds the global symbols associated with the first file.
+  void addFirstFileSymbols();
+
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
+
+  void visitAccessorDecl(AccessorDecl *AD);
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
@@ -92,11 +98,17 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD);
 
+  void visitDestructorDecl(DestructorDecl *DD);
+
   void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD);
 
+  void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
+
   void visitVarDecl(VarDecl *VD);
+
+  void visitEnumDecl(EnumDecl *ED);
 
   void visitDecl(Decl *D) {}
 };

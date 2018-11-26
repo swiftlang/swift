@@ -1,5 +1,6 @@
-add_swift_library(swiftIRGen STATIC
+add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
+  ClassLayout.cpp
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
@@ -20,6 +21,7 @@ add_swift_library(swiftIRGen STATIC
   GenFunc.cpp
   GenHeap.cpp
   GenInit.cpp
+  GenIntegerLiteral.cpp
   GenKeyPath.cpp
   GenMeta.cpp
   GenObjC.cpp
@@ -42,8 +44,11 @@ add_swift_library(swiftIRGen STATIC
   LoadableByAddress.cpp
   LocalTypeData.cpp
   MetadataLayout.cpp
+  MetadataRequest.cpp
+  Outlining.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
+  TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
   LINK_LIBRARIES
     swiftAST

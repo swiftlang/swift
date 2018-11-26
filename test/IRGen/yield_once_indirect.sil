@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 import Swift
@@ -19,7 +19,7 @@ struct Indirect<T: AnyObject> {
 
 sil @make_indirect : $<T: SomeClass> () -> (@out Indirect<T>)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %T19yield_once_indirect8IndirectV* } @test_simple
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T19yield_once_indirect8IndirectV* } @test_simple
 // CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]), %swift.type* %C)
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]), %swift.type* %C)
 sil @test_simple : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
@@ -30,10 +30,10 @@ entry:
   // CHECK-64-SAME: , align 8
 
   //   Coroutine setup.
-  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$S19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
-  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$S19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$s19yield_once_indirect9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
   // CHECK-NEXT:    [[BEGIN:%.*]] = call i8* @llvm.coro.begin(token [[ID]], i8* null)
-
+  // CHECK-NEXT:    store %swift.type*
   // CHECK-NEXT:    call swiftcc void @marker(i32 1000)
   %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
   %1000 = integer_literal $Builtin.Int32, 1000
@@ -83,18 +83,19 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( protected)?}} swiftcc void @"$S19yield_once_indirect9SomeClassCRbzlIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$s19yield_once_indirect9SomeClassCRbzlIet_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_simple_call(i1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
 sil @test_simple_call : $(Builtin.Int1) -> () {
-entry(%flag : $Builtin.Int1):
+entry(%flag : @trivial $Builtin.Int1):
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], {{\[}}[[BUFFER_SIZE]] x i8]* [[T0]], i32 0, i32 0
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
 
-  // CHECK-NEXT:    [[SUBCLASS:%.*]] = call %swift.type* @"$S19yield_once_indirect12SomeSubclassCMa"()
+  // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s19yield_once_indirect12SomeSubclassCMa"([[INT]] 0)
+  // CHECK-NEXT:    [[SUBCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 
   //   Prepare the continuation function pointer to block analysis.
   // CHECK-NEXT:    [[T0:%.*]] = call i8* @llvm.coro.prepare.retcon(i8* bitcast ([[ORIG_CORO_T:.*]] @test_simple to i8*))
@@ -108,7 +109,7 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[VALUE:%.*]] = bitcast %T19yield_once_indirect8IndirectV* [[ORIG_VALUE]] to [[INDIRECT_SUB:%T19yield_once_indirect8IndirectVyAA12SomeSubclassCG]]*
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
 
-  // CHECK-NEXT:    call [[INDIRECT_SUB]]* @"$S19yield_once_indirect8IndirectVyAA12SomeSubclassCGWh0_"([[INDIRECT_SUB]]* [[VALUE]])
+  // CHECK-NEXT:    call [[INDIRECT_SUB]]* @"$s19yield_once_indirect8IndirectVyAA12SomeSubclassCGWOh"([[INDIRECT_SUB]]* [[VALUE]])
   destroy_addr %value : $*Indirect<SomeSubclass>
 
   //   Branch.

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
 
 // Declare this SIL to be canonical because some tests break raw SIL
@@ -1381,7 +1381,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil @jumpthread_switch_enum3
-// CHECK: switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb3
+// CHECK: switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
 // CHECK: bb1:
 // CHECK-NEXT: switch_enum
 // CHECK: bb2:
@@ -1683,6 +1683,32 @@ exit:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @dont_crash_jump_threading_single_case_switch_enums
+// CHECK-NOT: switch_enum
+// CHECK: } // end sil function
+sil @dont_crash_jump_threading_single_case_switch_enums : $@convention(thin) () -> () {
+bb0:
+  br bb1(undef : $OneCase)
+
+bb1(%19 : $OneCase):
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb2
+
+bb2:
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb3
+
+bb3:
+  %48 = enum $OneCase, #OneCase.First!enumelt.1
+  cond_br undef, bb6, bb7
+
+bb6:
+  %72 = tuple ()
+  return %72 : $()
+
+bb7:
+  br bb1(%48 : $OneCase)
+}
+
 
 enum IntEnum : Int32 {
   case E0
@@ -3046,4 +3072,78 @@ bb2(%e : $Error):
 bb3(%res : $Builtin.Int32):
   release_value %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32)
   return  %res : $Builtin.Int32
+}
+
+struct TestStr {
+  let a: Int32
+  let c: Int32
+}
+
+enum TestEnm {
+  case X
+  case Y(TestStr)
+}
+
+// CHECK-LABEL: sil @dont_crash
+// CHECK:      bb0(%0 : $TestEnm, %1 : $Int32):
+// CHECK-NEXT:   %2 = tuple ()
+// CHECK-NEXT:   return %2 : $()
+sil @dont_crash : $@convention(method) (TestEnm, Int32) -> () {
+bb0(%2 : $TestEnm, %3 : $Int32):
+  %98 = integer_literal $Builtin.Int1, -1
+  cond_br %98, bb2, bb3
+
+bb2:
+  %18 = tuple()
+  return %18 : $()
+
+bb3:
+  br bb8(%2 : $TestEnm)
+
+bb8(%47 : $TestEnm):
+  %49 = unchecked_enum_data %47 : $TestEnm, #TestEnm.Y!enumelt.1
+  %57 = struct_extract %49 : $TestStr, #TestStr.c
+  cond_br undef, bb9, bb11
+
+bb9:
+  br bb10
+
+bb10:
+  %64 = struct $TestStr (%3 : $Int32, %57 : $Int32)
+  %65 = enum $TestEnm, #TestEnm.Y!enumelt.1, %64 : $TestStr
+  cond_br undef, bb2, bb16
+
+bb11:
+  br bb10
+
+
+bb16:
+  br bb8(%65 : $TestEnm)
+}
+
+sil @print : $@convention(thin) (@guaranteed String) -> ()
+sil @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+
+sil @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed String) -> () {
+bb0(%condition : $Builtin.Int1, %arg : $String):
+  %print = function_ref @print : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %condition, bb1, bb2
+bb1:
+  apply %print(%arg) : $@convention(thin) (@guaranteed String) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  cond_br %condition, bb4, bb5
+bb4:
+  apply %print(%yield) : $@convention(thin) (@guaranteed String) -> ()
+  br bb6
+bb5:
+  br bb6
+bb6:
+  end_apply %token
+  %rv = tuple ()
+  return %rv : $()
 }

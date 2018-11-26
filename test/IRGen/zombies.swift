@@ -8,5 +8,5 @@ class C {
   init(i: Int) { self.i = i }
 }
 
-// CHECK: @"$S7zombies1CC1i33_{{.*}}vg" = hidden alias void (), void ()* @_swift_dead_method_stub
+// CHECK: @"$s7zombies1CC1i33_{{.*}}vg" = hidden {{(dllexport )?}}alias void (), void ()* @_swift_dead_method_stub
 // CHECK: define internal void @_swift_dead_method_stub()

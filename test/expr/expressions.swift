@@ -256,9 +256,9 @@ func test_lambda() {
 
 func test_lambda2() {
   { () -> protocol<Int> in
-    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
+    // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-    // expected-warning @-3 {{result of call is unused}}
+    // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
     return 1
   }()
 }
@@ -505,6 +505,9 @@ func testSingleQuoteStringLiterals() {
   _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
 
   _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
+  _ = 'ab\("c")' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}}
+  _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
+                 // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
 
   _ = "abc' // expected-error{{unterminated string literal}}
   _ = 'abc" // expected-error{{unterminated string literal}}
@@ -533,10 +536,8 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
-  var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
-  var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
+  var y = &x //expected-error {{use of extraneous '&'}}
+  var z = &arg //expected-error {{use of extraneous '&'}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -552,8 +553,8 @@ struct SpecialPi {} // Type with no implicit construction.
 
 var pi_s: SpecialPi
 
-func getPi() -> Float {} // expected-note 3 {{found this candidate}}
-func getPi() -> Double {} // expected-note 3 {{found this candidate}}
+func getPi() -> Float {}
+func getPi() -> Double {}
 func getPi() -> SpecialPi {}
 
 enum Empty { }
@@ -575,17 +576,17 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_d1 = Double(pi_d)
   var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
-  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
-  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
-  var e = Empty(f)
+  var e = Empty(f) // expected-error {{variable 'e' cannot have enum type 'Empty' with no cases}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
-  var e3 = Empty(Float(d))
+  var e3 = Empty(Float(d)) // expected-error {{variable 'e3' cannot have enum type 'Empty' with no cases}}
 }
 
 struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
@@ -616,7 +617,7 @@ func unaryOps(_ i8: inout Int8, i64: inout Int64) {
   i64 += 1
   i8 -= 1
 
-  Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
+  Int64(5) += 1 // expected-error{{left side of mutating operator has immutable type 'Int64'}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
@@ -671,7 +672,7 @@ func lvalue_processing() {
 
   var n = 42
   fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
-  fn(&n, 12) // expected-warning {{result of call is unused, but produces 'Int'}}
+  fn(&n, 12) // expected-warning {{result of call to function returning 'Int' is unused}}
 
   n +-+= 12
 
@@ -688,11 +689,9 @@ func test() {
   var x = Foo()
   let y = Foo()
 
-  // FIXME: Bad diagnostics
-
   // rdar://15708430
-  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
-  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
+  (&x).method()  // expected-error {{use of extraneous '&'}}
+  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
 }
 
 
@@ -739,18 +738,17 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
-    
-// FIXME: The issue here is a type compatibility problem, there is no ambiguity.
-[4].joined(separator: [1]) // expected-error {{type of expression is ambiguous without more context}}
-[4].joined(separator: [[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
+
+[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -818,19 +816,20 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
-  // expected-warning @-1 {{expression of type 'inout Int' is unused}}
-  let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  (true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  let a = (true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
-  inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
-  &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
+  &_ // expected-error {{use of extraneous '&'}}
 
-  inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
+  inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
+
+  inoutTests((&x)) // expected-error {{use of extraneous '&'}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -845,7 +844,7 @@ func inoutTests(_ arr: inout Int) {
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(_ z: inout Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
+func r20802757(_ z: inout Int = &g20802757) { // expected-error {{use of extraneous '&'}}
   print(z)
 }
 
@@ -888,7 +887,7 @@ var y = 1
 let _ = (x, x + 1).0
 let _ = (x, 3).1
 (x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
+(x,4) = (1,2) // expected-error {{expression is not assignable: literals are not mutable}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 
@@ -913,3 +912,20 @@ Sr3439: do {
   let obj = C();
   _ = obj[#column] // Ok.
 }
+
+// rdar://problem/23672697 - No way to express literal integers larger than Int without using type ascription
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF
+let _: Int64 = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF as Int64
+let _ = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
+
+// rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
+let _ = "foo \(42 /* ) " ) */)"
+let _ = "foo \(foo // )  " // expected-error {{unterminated string literal}}
+let _ = "foo \(42 /*
+                   * multiline comment
+                   */)end"
+// expected-error @-3 {{unterminated string literal}}
+// expected-error @-2 {{expected expression}}
+// expected-error @-3 {{unterminated string literal}}

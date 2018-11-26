@@ -84,6 +84,10 @@ WARNING(implicit_bridging_header_imported_from_module,none,
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
+WARNING(clang_vfs_overlay_is_ignored,none,
+        "ignoring '-ivfsoverlay' options provided to '-Xcc' in favor of "
+        "'-vfsoverlay'", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

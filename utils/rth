@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import glob
 import os
 import pipes
 import shlex
@@ -80,6 +81,7 @@ class ResilienceTest(object):
             compiler_flags = ['-emit-library', '-emit-module',
                               '-swift-version', '4',
                               '-Xfrontend', '-enable-resilience',
+                              '-Xfrontend', '-enable-class-resilience',
                               '-D', config,
                               self.lib_src,
                               '-o', output_dylib]
@@ -103,8 +105,10 @@ class ResilienceTest(object):
     def compile_main(self):
         for config in self.config_dir_map:
             output_obj = os.path.join(self.config_dir_map[config], 'main.o')
-            compiler_flags = ['-D', config, '-c', self.test_src, '-I',
-                              self.config_dir_map[config], '-o', output_obj]
+            compiler_flags = ['-D', config, '-c', self.test_src,
+                              '-Xfrontend', '-enable-class-resilience',
+                              '-I', self.config_dir_map[config],
+                              '-o', output_obj]
             command = self.target_build_swift + compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)
@@ -150,13 +154,20 @@ class ResilienceTest(object):
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
 
+            codesign_cmd = self.target_codesign + [output_obj]
+            verbose_print_command(codesign_cmd)
+            returncode = subprocess.call(codesign_cmd)
+            assert returncode == 0, str(codesign_cmd)
+
     def execute(self):
         for config1, config2 in self.configs():
             config1_lower = config1.lower()
             config2_lower = config2.lower()
             output_obj = os.path.join(self.tmp_dir,
                                       config1_lower + '_' + config2_lower)
-            command = self.target_run + [output_obj, self.tmp_dir]
+            tmp_dir_contents = glob.glob(
+                os.path.join(self.tmp_dir, self.config_dir_map[config1], '*'))
+            command = self.target_run + [output_obj] + tmp_dir_contents
             verbose_print_command(command)
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)

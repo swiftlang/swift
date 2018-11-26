@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,8 +33,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
     switch (elt.getKind()) {
-    case Archetype:
-      id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
+    case GenericParameter:
+      id.AddPointer(elt.getGenericParameter());
       break;
 
     case Requirement:
@@ -45,10 +45,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getWitness());
       break;
 
-    case AssociatedType:
-      id.AddPointer(elt.getAssociatedType());
-      break;
-
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -57,19 +53,16 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ClosureResult:
     case ParentType:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
-    case ScalarToTuple:
-    case Load:
+    case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -80,6 +73,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -115,17 +109,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case ArrayElementType:
-      out << "array element";
-      break;
-
-    case Archetype:
-      out << "archetype '" << elt.getArchetype()->getString() << "'";
-      break;
-
-    case AssociatedType:
-      out << "associated type '"
-          << elt.getAssociatedType()->getNameStr() << "'";
+    case GenericParameter:
+      out << "generic parameter '" << elt.getGenericParameter()->getString() << "'";
       break;
 
     case ApplyArgument:
@@ -173,8 +158,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "instance type";
       break;
 
-    case Load:
-      out << "load";
+    case AutoclosureResult:
+      out << "@autoclosure result";
       break;
 
     case Member:
@@ -197,28 +182,20 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "parent type";
       break;
 
-    case RvalueAdjustment:
-      out << "rvalue adjustment";
+    case LValueConversion:
+      out << "@lvalue-to-inout conversion";
       break;
 
-    case ScalarToTuple:
-      out << "scalar to tuple";
+    case RValueAdjustment:
+      out << "rvalue adjustment";
       break;
 
     case SequenceIteratorProtocol:
       out << "sequence iterator type";
       break;
 
-    case SubscriptIndex:
-      out << "subscript index";
-      break;
-
     case SubscriptMember:
       out << "subscript member";
-      break;
-
-    case SubscriptResult:
-      out << "subscript result";
       break;
 
     case TupleElement:
@@ -247,16 +224,37 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
       break;
 
-    case TypeParameterRequirement:
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+    case TypeParameterRequirement: {
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
+          << " (";
+      switch (static_cast<RequirementKind>(elt.getValue2())) {
+      case RequirementKind::Conformance:
+        out << "conformance";
+        break;
+      case RequirementKind::Superclass:
+        out << "superclass";
+        break;
+      case RequirementKind::SameType:
+        out << "same-type";
+        break;
+      case RequirementKind::Layout:
+        out << "layout";
+        break;
+      }
+      out << ")";
       break;
+    }
 
     case ImplicitlyUnwrappedDisjunctionChoice:
-      out << "implictly unwrapped disjunction choice";
+      out << "implicitly unwrapped disjunction choice";
       break;
 
     case DynamicLookupResult:
       out << "dynamic lookup result";
+      break;
+
+    case ContextualType:
+      out << "contextual type";
       break;
     }
   }

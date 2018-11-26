@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -enable-key-path-resilience -import-objc-header %S/Inputs/keypaths_objc.h %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -18,14 +18,14 @@ class Foo: NSObject {
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
 
-  dynamic var dyn: String { fatalError() }
+  @objc dynamic var dyn: String { fatalError() }
 }
 
 class Bar: NSObject {
   @objc var foo: Foo { fatalError() }
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B8KeypathsyyF
+// CHECK-LABEL: sil hidden @$s13keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
   _ = \NonObjC.x
@@ -47,7 +47,7 @@ func objcKeypaths() {
   _ = \Foo.differentName
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B18KeypathIdentifiersyyF
+// CHECK-LABEL: sil hidden @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
   // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
   _ = \ObjCFoo.objcProp
@@ -87,4 +87,12 @@ func objcProtocolRequirement<T: ObjCProto>(_: T) {
   _ = \T.objcRequirement
   // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
   _ = \ObjCProto.objcRequirement
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}externalObjCProperty
+func externalObjCProperty() {
+  // Pure ObjC-dispatched properties do not have external descriptors.
+  // CHECK: keypath $KeyPath<NSObject, String>, 
+  // CHECK-NOT: external #NSObject.description
+  _ = \NSObject.description
 }

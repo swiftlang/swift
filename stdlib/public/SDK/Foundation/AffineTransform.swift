@@ -33,7 +33,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
         self.tY = tY
     }
     
-    fileprivate init(reference: NSAffineTransform) {
+    fileprivate init(reference: __shared NSAffineTransform) {
         m11 = reference.transformStruct.m11
         m12 = reference.transformStruct.m12
         m21 = reference.transformStruct.m21
@@ -239,7 +239,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
     
     public func inverted() -> AffineTransform? {
         let determinant = (m11 * m22) - (m12 * m21)
-        if fabs(determinant) <= ε {
+        if abs(determinant) <= ε {
             return nil
         }
         var inverse = AffineTransform()
@@ -317,6 +317,7 @@ extension AffineTransform : _ObjectiveCBridgeable {
         return true // Can't fail
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ x: NSAffineTransform?) -> AffineTransform {
         guard let src = x else { return AffineTransform.identity }
         return AffineTransform(reference: src)

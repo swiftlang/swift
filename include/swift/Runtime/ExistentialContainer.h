@@ -20,9 +20,8 @@ namespace swift {
 /// The basic layout of an opaque (non-class-bounded) existential type.
 template <typename Runtime>
 struct TargetOpaqueExistentialContainer {
-  ValueBuffer Buffer;
-  const TargetMetadata<Runtime> *Type;
-  // const void *WitnessTables[];
+  TargetValueBuffer<Runtime> Buffer;
+  ConstTargetMetadataPointer<Runtime, TargetMetadata> Type;
 
   const TargetWitnessTable<Runtime> **getWitnessTables() {
     return reinterpret_cast<const TargetWitnessTable<Runtime> **>(this + 1);

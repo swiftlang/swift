@@ -86,21 +86,37 @@ Using the Benchmark Driver
 * `--num-samples`
     * Control the number of samples to take for each test
 * `--list`
-    * Print a list of available tests
+    * Print a list of available tests matching specified criteria
+* `--tags`
+    * Run tests that are labeled with specified [tags](https://github.com/apple/swift/blob/master/benchmark/utils/TestsUtils.swift#L19)
+     (comma separated list); multiple tags are interpreted as logical AND, i.e.
+     run only test that are labeled with all the supplied tags
+* `--skip-tags`
+    * Don't run tests that are labeled with any of the specified tags (comma
+      separated list); default value: `skip,unstable`; to get complete list of
+      tests, specify empty `--skip-tags=`
+
 
 ### Examples
 
 * `$ ./Benchmark_O --num-iters=1 --num-samples=1`
 * `$ ./Benchmark_Onone --list`
 * `$ ./Benchmark_Osize Ackermann`
+* `$ ./Benchmark_O --tags=Dictionary`
+* `$ ./Benchmark_O --skip-tags=unstable,skip,validation`
 
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
-The regular `--list` option does not provide these, but you can run:
-* `$ ./Benchmark_O --list --run-all | tail -n +2 | nl`
-You can use ordinal numbers instead of test names like this:
+These are printed out together with benchmark names and tags using the
+`--list` parameter. For a complete list of all available performance tests run
+* `$ ./Benchmark_O --list --skip-tags=`
+
+You can use test numbers instead of test names like this:
 * `$ ./Benchmark_O 1 42`
 * `$ ./Benchmark_Driver run 1 42`
+
+Test numbers are not stable in the long run, adding and removing tests from the
+benchmark suite will reorder them, but they are stable for a given build.
 
 Using the Harness Generator
 ---------------------------
@@ -138,7 +154,7 @@ To add a new multiple file test:
     instance of BenchmarkInfo (specified in the template below).
 
 2.  In `CMakeLists.txt` add the new directory name to
-    `SWIFT_MULTISOURCE_SWIFT3_BENCHES`, and set `YourTestName_sources` to the
+    `SWIFT_MULTISOURCE_SWIFT_BENCHES`, and set `YourTestName_sources` to the
     list of source file paths.
 
 3.  Edit `main.swift`. Import and register your new Swift module.
@@ -186,3 +202,21 @@ public func run_YourTestName(N: Int) {
 
 The current set of tags are defined by the `BenchmarkCategory` enum in
 `TestsUtils.swift` .
+
+Testing the Benchmark Drivers
+-----------------------------
+When working on tests, after the initial build
+````
+swift-source$ ./swift/utils/build-script -R -B
+````
+you can rebuild just the benchmarks:
+````
+swift-source$ export SWIFT_BUILD_DIR=`pwd`/build/Ninja-ReleaseAssert/swift-macosx-x86_64
+swift-source$ ninja -C ${SWIFT_BUILD_DIR} swift-benchmark-macosx-x86_64
+````
+
+When modifying the testing infrastructure, you should verify that your changes
+pass all the tests:
+````
+swift-source$ ./llvm/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-x86_64/benchmark
+````

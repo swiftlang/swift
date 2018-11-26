@@ -62,4 +62,28 @@ _ = (x: 1) ? true : false // expected-error {{'(x: Int)' is not convertible to '
 let ib: Bool! = false
 let eb: Bool? = .some(false)
 let conditional = ib ? "Broken" : "Heart" // should infer Bool!
-let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional type 'Bool?' not unwrapped; did you mean to use '!' or '?'?}}
+let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional type 'Bool?' must be unwrapped}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+// expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+// <rdar://problem/39586166> - crash when IfExpr has UnresolvedType in condition
+struct Delegate {
+  var shellTasks: [ShellTask]
+}
+
+extension Array {
+  subscript(safe safe: Int) -> Element? { // expected-note {{found this candidate}}
+    get { }
+    set { }
+  }
+}
+
+struct ShellTask {
+  var commandLine: [String]
+}
+
+let delegate = Delegate(shellTasks: [])
+_ = delegate.shellTasks[safe: 0]?.commandLine.compactMap({ $0.asString.hasPrefix("") ? $0 : nil }).count ?? 0
+// expected-error@-1 {{ambiguous reference to member 'subscript'}}
+
+// FIXME: Horrible diagnostic, but at least we no longer crash

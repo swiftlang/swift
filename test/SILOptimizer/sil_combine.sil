@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -360,6 +360,53 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
 }
 
+// CHECK-LABEL: sil @optimize_load_first_char_from_string_literal
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 97
+// CHECK-NEXT:   return %0
+sil @optimize_load_first_char_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = string_literal utf8 "abc123a"
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %2 = struct_element_addr %1 : $*UInt8, #UInt8._value
+  %3 = load %2 : $*Builtin.Int8
+  return %3 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil @optimize_load_from_string_literal
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 49
+// CHECK-NEXT:   return %0
+sil @optimize_load_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = string_literal utf8 "abc123a"
+  %1 = integer_literal $Builtin.Word, 3
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %3 = index_addr %2 : $*UInt8, %1 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*UInt8, #UInt8._value
+  %5 = load %4 : $*Builtin.Int8
+  return %5 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil @optimize_nested_index_addr
+// CHECK:      bb0(%0 : $Builtin.RawPointer):
+// CHECK-NEXT:   %1 = pointer_to_address %0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
+// CHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
+// CHECK-NEXT:   %4 = address_to_pointer %3
+// CHECK-NEXT:   return %4
+sil @optimize_nested_index_addr : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = integer_literal $Builtin.Word, 3
+  %2 = integer_literal $Builtin.Word, 7
+  %3 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %4 = index_addr %3 : $*UInt8, %1 : $Builtin.Word
+  %5 = index_addr %4 : $*UInt8, %2 : $Builtin.Word
+  %6 = address_to_pointer %5 : $*UInt8 to $Builtin.RawPointer
+  return %6 : $Builtin.RawPointer
+}
+
+
 // CHECK-LABEL: sil @release_value_test
 // CHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : $Builtin.NativeObject):
 // CHECK-NEXT: strong_release [[RELEASE_TARGET]] : $Builtin.NativeObject
@@ -404,8 +451,8 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil @a2p_p2a_reinterpret_cast_word_raw_pointer
 // CHECK: bb0
+// CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
-// CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: return
 sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
@@ -1133,9 +1180,9 @@ bb0:
 
 // CHECK-LABEL: sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
-// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
-// CHECK-NEXT: return
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
 sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
@@ -1146,9 +1193,10 @@ bb0(%0 : $*Builtin.NativeObject):
 
 // CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
-// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
-// CHECK-NEXT: return
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: debug_value [[ADDR_CAST]]
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
 sil @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
@@ -1216,7 +1264,7 @@ bb0(%0 : $AnyObject):
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: return
-sil @unchecked_ref_cast_upcast_combine : $@convention(thin) E -> Builtin.NativeObject {
+sil @unchecked_ref_cast_upcast_combine : $@convention(thin) (E) -> Builtin.NativeObject {
 bb0(%0 : $E):
   %1 = upcast %0 : $E to $B
   %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
@@ -2430,6 +2478,20 @@ sil @alloc_ref_dynamic_with_metatype : $() -> () {
   return %4 : $()
 }
 
+// CHECK: sil @alloc_ref_dynamic_with_metatype_genneric
+// CHECK: metatype
+// CHECK: upcast
+// CHECK: alloc_ref_dynamic
+// CHECK: return
+sil @alloc_ref_dynamic_with_metatype_genneric : $<T where T : B>() -> () {
+  %1 = metatype $@thick T.Type
+  %2 = upcast %1 : $@thick T.Type to $@thick B.Type
+  %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
+  strong_release %3 : $B
+  %4 = tuple()
+  return %4 : $()
+}
+
 // CHECK-LABEL: sil @alloc_ref_dynamic_with_upcast_metatype
 // CHECK: bb0
 // CHECK-NOT: alloc_ref_dynamic
@@ -3401,7 +3463,7 @@ protocol Prot0 : class {
 
 
 protocol Prot1 : Prot0 {
-  static func newWithConfig() throws -> Builtin.Int32
+  @_nonoverride static func newWithConfig() throws -> Builtin.Int32
 }
 
 protocol Prot2 : Prot1 {
@@ -3484,11 +3546,11 @@ bb0(%0 : $_ContiguousArrayStorage<B>):
 // CHECK: bb0(%0
 // CHECK-NEXT: %1 = upcast %0
 // CHECK-NEXT: return %1
-sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> _ContiguousArrayStorageBase {
+sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> __ContiguousArrayStorageBase {
 bb0(%0 : $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
-  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
-  return %2 : $_ContiguousArrayStorageBase
+  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  return %2 : $__ContiguousArrayStorageBase
 }
 
 sil @returnInt : $@convention(thin) () -> Builtin.Int32
@@ -3504,3 +3566,86 @@ bb0:
   %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
   return %4 : $Builtin.Int32
 }
+
+// CHECK-LABEL: sil @optimize_arc_with_value_to_bridge_object
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT: struct $UInt64
+// CHECK-NEXT: value_to_bridge_object
+// CHECK-NEXT: return
+sil @optimize_arc_with_value_to_bridge_object : $@convention(thin) (Builtin.Int64) -> Builtin.BridgeObject {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  strong_retain %2 : $Builtin.BridgeObject
+  return %2 : $Builtin.BridgeObject
+}
+
+// CHECK-LABEL: sil @optimize_stringObject_bit_operations
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 4611686018427387904
+// CHECK-NEXT:   return %0
+sil @optimize_stringObject_bit_operations : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %2 = string_literal utf8 "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 13835058055282163712
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 6917529027641081856
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_optimize_stringObject_bit_operations1
+// CHECK:   builtin "stringObjectOr_Int64"
+// CHECK:   builtin "and_Int64"
+sil @dont_optimize_stringObject_bit_operations1 : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%2 : $Builtin.RawPointer):
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, -9223372036854775808
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 4611686018427387904
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_optimize_stringObject_bit_operations2
+// CHECK:   builtin "stringObjectOr_Int64"
+// CHECK:   builtin "and_Int64"
+sil @dont_optimize_stringObject_bit_operations2 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %2 = string_literal utf8 "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 13835058055282163712
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 1152921504606846975
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @conversion_to_and_from_bridge_object
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:   return %0
+sil @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  %3 = bridge_object_to_word %2 : $Builtin.BridgeObject to $Builtin.Word
+  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+

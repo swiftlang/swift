@@ -28,6 +28,7 @@
 #include "LocalTypeDataKind.h"
 #include "DominancePoint.h"
 #include "MetadataPath.h"
+#include "MetadataRequest.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/STLExtras.h"
 #include <utility>
@@ -36,9 +37,10 @@ namespace swift {
   class TypeBase;
 
 namespace irgen {
+  class DynamicMetadataRequest;
+  class MetadataResponse;
   class FulfillmentMap;
   enum IsExact_t : bool;
-
 
 /// A cache of local type data.
 ///
@@ -53,10 +55,8 @@ namespace irgen {
 ///     ask whether each is acceptable.
 class LocalTypeDataCache {
 public:
-  using Key = LocalTypeDataKey;
-
-  static Key getKey(CanType type, LocalTypeDataKind index) {
-    return { type, index };
+  static LocalTypeDataKey getKey(CanType type, LocalTypeDataKind index) {
+    return LocalTypeDataKey{ type, index };
   }
 
 private:
@@ -81,6 +81,16 @@ private:
     /// Return the abstract cost of evaluating this cache entry.
     OperationCost cost() const;
 
+    /// Return the abstract cost of evaluating this cache entry.
+    OperationCost costForRequest(LocalTypeDataKey key,
+                                 DynamicMetadataRequest request) const;
+
+    /// Return whether following the metadata path immediately produces
+    /// a value that's statically known to satisfy the given request, or
+    /// whether a separate dynamic check is required.
+    bool immediatelySatisfies(LocalTypeDataKey key,
+                              DynamicMetadataRequest request) const;
+
     /// Destruct and deallocate this cache entry.
     void erase() const;
 
@@ -99,13 +109,22 @@ private:
 
   /// A concrete entry in the cache, which directly stores the desired value.
   struct ConcreteCacheEntry : CacheEntry {
-    llvm::Value *Value;
+    MetadataResponse Value;
 
     ConcreteCacheEntry(DominancePoint point, bool isConditional,
-                       llvm::Value *value)
+                       MetadataResponse value)
       : CacheEntry(Kind::Concrete, point, isConditional), Value(value) {}
 
     OperationCost cost() const { return OperationCost::Free; }
+    OperationCost costForRequest(LocalTypeDataKey key,
+                                 DynamicMetadataRequest request) const;
+
+    bool immediatelySatisfies(LocalTypeDataKey key,
+                              DynamicMetadataRequest request) const;
+
+    static bool classof(const CacheEntry *entry) {
+      return entry->getKind() == Kind::Concrete;
+    }
   };
 
   /// A source of concrete data from which abstract cache entries can be
@@ -119,15 +138,16 @@ private:
   private:
     CanType Type;
     void *Conformance;
-    llvm::Value *Value;
+    MetadataResponse Value;
 
   public:
     explicit AbstractSource(CanType type, ProtocolConformanceRef conformance,
                             llvm::Value *value)
-      : Type(type), Conformance(conformance.getOpaqueValue()), Value(value) {
+      : Type(type), Conformance(conformance.getOpaqueValue()),
+        Value(MetadataResponse::forComplete(value)) {
       assert(Conformance != nullptr);
     }
-    explicit AbstractSource(CanType type, llvm::Value *value)
+    explicit AbstractSource(CanType type, MetadataResponse value)
       : Type(type), Conformance(nullptr), Value(value) {}
 
     Kind getKind() const {
@@ -141,7 +161,7 @@ private:
       assert(Conformance && "not a protocol conformance");
       return ProtocolConformanceRef::getFromOpaqueValue(Conformance);
     }
-    llvm::Value *getValue() const {
+    MetadataResponse getValue() const {
       return Value;
     }
   };
@@ -150,16 +170,41 @@ private:
   /// non-trivial evaluation to derive the desired value.
   struct AbstractCacheEntry : CacheEntry {
     unsigned SourceIndex;
+    unsigned State;
     MetadataPath Path;
 
     AbstractCacheEntry(DominancePoint point, bool isConditional,
-                       unsigned sourceIndex, MetadataPath &&path)
+                       unsigned sourceIndex, MetadataPath &&path,
+                       MetadataState state)
       : CacheEntry(Kind::Abstract, point, isConditional),
-        SourceIndex(sourceIndex), Path(std::move(path)) {}
+        SourceIndex(sourceIndex), State(unsigned(state)),
+        Path(std::move(path)) {}
 
-    llvm::Value *follow(IRGenFunction &IGF, AbstractSource &source) const;
+    MetadataResponse follow(IRGenFunction &IGF, AbstractSource &source,
+                            DynamicMetadataRequest request) const;
+
+    /// Return the natural state of the metadata that would be produced
+    /// by just following the path.  If the path ends in calling a type
+    /// metadata accessor, it's okay to use MetadataState::Complete here
+    /// because it's just as cheap to produce that as anything else.
+    /// But if the path ends in just loading type metadata from somewhere,
+    /// this should be the presumed state of that type metadata so that
+    /// the costing accurately includes the cost of dynamically checking
+    /// the state of that metadata.
+    MetadataState getState() const {
+      return MetadataState(State);
+    }
 
     OperationCost cost() const { return Path.cost(); }
+    OperationCost costForRequest(LocalTypeDataKey key,
+                                 DynamicMetadataRequest request) const;
+
+    bool immediatelySatisfies(LocalTypeDataKey key,
+                              DynamicMetadataRequest request) const;
+
+    static bool classof(const CacheEntry *entry) {
+      return entry->getKind() == Kind::Abstract;
+    }
   };
 
   /// The linked list of cache entries corresponding to a particular key.
@@ -207,7 +252,7 @@ private:
     }
   };
 
-  llvm::DenseMap<Key, CacheEntryChain> Map;
+  llvm::DenseMap<LocalTypeDataKey, CacheEntryChain> Map;
 
   std::vector<AbstractSource> AbstractSources;
 
@@ -223,25 +268,24 @@ public:
 
   /// Load the value from cache if possible.  This may require emitting
   /// code if the value is cached abstractly.
-  llvm::Value *tryGet(IRGenFunction &IGF, Key key, bool allowAbstract = true);
-
-  /// Load the value from cache, asserting its presence.
-  llvm::Value *get(IRGenFunction &IGF, Key key) {
-    auto result = tryGet(IGF, key);
-    assert(result && "get() on unmapped entry?");
-    return result;
-  }
+  MetadataResponse tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
+                          bool allowAbstract, DynamicMetadataRequest request);
 
   /// Add a new concrete entry to the cache at the given definition point.
   void addConcrete(DominancePoint point, bool isConditional,
-                   Key key, llvm::Value *value) {
+                   LocalTypeDataKey key, MetadataResponse value) {
+    key = key.getCachingKey();
+
+    assert((key.Kind.isAnyTypeMetadata() ||
+            value.isStaticallyKnownComplete()) &&
+           "only type metadata can be added in a non-complete state");
     auto newEntry = new ConcreteCacheEntry(point, isConditional, value);
     Map[key].push_front(newEntry);
   }
 
   /// Add entries based on what can be fulfilled from the given type metadata.
   void addAbstractForTypeMetadata(IRGenFunction &IGF, CanType type,
-                                  IsExact_t isExact, llvm::Value *metadata);
+                                  IsExact_t isExact, MetadataResponse value);
 
   void dump() const;
 

@@ -41,12 +41,14 @@ namespace swift {
   class SILDebugScope;
   class SILType;
   class SourceLoc;
+  enum class MetadataState : size_t;
 
 namespace Lowering {
   class TypeConverter;
 }
   
 namespace irgen {
+  class DynamicMetadataRequest;
   class Explosion;
   class FunctionRef;
   class HeapLayout;
@@ -54,10 +56,10 @@ namespace irgen {
   class IRGenModule;
   class LinkEntity;
   class LocalTypeDataCache;
+  class MetadataResponse;
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  enum class ReferenceCounting : unsigned char;
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
@@ -225,9 +227,10 @@ public:
   llvm::Value *emitAllocEmptyBoxCall();
 
   // Emit a call to the given generic type metadata access function.
-  llvm::CallInst *emitGenericTypeMetadataAccessFunctionCall(
+  MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
                                           llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args);
+                                          ArrayRef<llvm::Value *> args,
+                                          DynamicMetadataRequest request);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -236,12 +239,14 @@ public:
   // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
 
-  // Emit a reference to a type layout record for the given type. The referenced
-  // data is enough to lay out an aggregate containing a value of the type, but
-  // can't uniquely represent the type or perform value witness operations on
-  // it.
-  llvm::Value *emitTypeLayoutRef(SILType type);
-  
+  /// Emit a reference to the canonical type metadata record for the given
+  /// formal type.  The metadata is only required to be abstract; that is,
+  /// you cannot use the result for layout.
+  llvm::Value *emitAbstractTypeMetadataRef(CanType type);
+
+  MetadataResponse emitTypeMetadataRef(CanType type,
+                                       DynamicMetadataRequest request);
+
   // Emit a reference to a metadata object that can be used for layout, but
   // cannot be used to identify a type. This will produce a layout appropriate
   // to the abstraction level of the given type. It may be able to avoid runtime
@@ -252,9 +257,13 @@ public:
   // here, since for some types it's easier to get a shared reference to one
   // than a metadata reference, and it would be more type-safe.
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
+  llvm::Value *emitTypeMetadataRefForLayout(SILType type,
+                                            DynamicMetadataRequest request);
   
-  llvm::Value *emitValueWitnessTableRef(CanType type);
   llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        llvm::Value **metadataSlot = nullptr);
+  llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        DynamicMetadataRequest request,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
@@ -304,53 +313,90 @@ public:
                          Atomicity atomicity);
   llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
 
-  //   - unowned references
-  void emitUnownedRetain(llvm::Value *value, ReferenceCounting style,
-                         Atomicity atomicity);
-  void emitUnownedRelease(llvm::Value *value, ReferenceCounting style,
-                          Atomicity atomicity);
-  void emitStrongRetainUnowned(llvm::Value *value, ReferenceCounting style,
-                               Atomicity atomicity);
-  void emitStrongRetainAndUnownedRelease(llvm::Value *value,
-                                         ReferenceCounting style,
-                                         Atomicity atomicity);
-  void emitUnownedInit(llvm::Value *val, Address dest, ReferenceCounting style);
-  void emitUnownedAssign(llvm::Value *value, Address dest,
-                         ReferenceCounting style);
-  void emitUnownedCopyInit(Address destAddr, Address srcAddr,
-                           ReferenceCounting style);
-  void emitUnownedTakeInit(Address destAddr, Address srcAddr,
-                           ReferenceCounting style);
-  void emitUnownedCopyAssign(Address destAddr, Address srcAddr,
-                             ReferenceCounting style);
-  void emitUnownedTakeAssign(Address destAddr, Address srcAddr,
-                             ReferenceCounting style);
-  llvm::Value *emitUnownedLoadStrong(Address src, llvm::Type *resultType,
-                                     ReferenceCounting style);
-  llvm::Value *emitUnownedTakeStrong(Address src, llvm::Type *resultType,
-                                     ReferenceCounting style);
-  void emitUnownedDestroy(Address addr, ReferenceCounting style);
-  llvm::Value *getUnownedExtraInhabitantIndex(Address src,
-                                              ReferenceCounting style);
-  void storeUnownedExtraInhabitant(llvm::Value *index, Address dest,
-                                   ReferenceCounting style);
+  llvm::Value *getReferenceStorageExtraInhabitantIndex(Address src,
+                                                   ReferenceOwnership ownership,
+                                                   ReferenceCounting style);
+  void storeReferenceStorageExtraInhabitant(llvm::Value *index,
+                                            Address dest,
+                                            ReferenceOwnership ownership,
+                                            ReferenceCounting style);
 
-  //   - weak references
-  void emitWeakInit(llvm::Value *ref, Address dest, ReferenceCounting style);
-  void emitWeakAssign(llvm::Value *ref, Address dest, ReferenceCounting style);
-  void emitWeakCopyInit(Address destAddr, Address srcAddr,
-                        ReferenceCounting style);
-  void emitWeakTakeInit(Address destAddr, Address srcAddr,
-                        ReferenceCounting style);
-  void emitWeakCopyAssign(Address destAddr, Address srcAddr,
-                          ReferenceCounting style);
-  void emitWeakTakeAssign(Address destAddr, Address srcAddr,
-                          ReferenceCounting style);
-  llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *resultType,
-                                  ReferenceCounting style);
-  llvm::Value *emitWeakTakeStrong(Address src, llvm::Type *resultType,
-                                  ReferenceCounting style);
-  void emitWeakDestroy(Address addr, ReferenceCounting style);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Kind) \
+  void emit##Kind##Name##Init(llvm::Value *val, Address dest); \
+  void emit##Kind##Name##Assign(llvm::Value *value, Address dest); \
+  void emit##Kind##Name##CopyInit(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##TakeInit(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##CopyAssign(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##TakeAssign(Address destAddr, Address srcAddr); \
+  llvm::Value *emit##Kind##Name##LoadStrong(Address src, \
+                                            llvm::Type *resultType); \
+  llvm::Value *emit##Kind##Name##TakeStrong(Address src, \
+                                            llvm::Type *resultType); \
+  void emit##Kind##Name##Destroy(Address addr);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Kind) \
+  void emit##Kind##Name##Retain(llvm::Value *value, Atomicity atomicity); \
+  void emit##Kind##Name##Release(llvm::Value *value, Atomicity atomicity); \
+  void emit##Kind##StrongRetain##Name(llvm::Value *value, Atomicity atomicity);\
+  void emit##Kind##StrongRetainAnd##Name##Release(llvm::Value *value, \
+                                                  Atomicity atomicity);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown) \
+  void emit##Name##Init(llvm::Value *val, Address dest, ReferenceCounting style); \
+  void emit##Name##Assign(llvm::Value *value, Address dest, \
+                          ReferenceCounting style); \
+  void emit##Name##CopyInit(Address destAddr, Address srcAddr, \
+                            ReferenceCounting style); \
+  void emit##Name##TakeInit(Address destAddr, Address srcAddr, \
+                            ReferenceCounting style); \
+  void emit##Name##CopyAssign(Address destAddr, Address srcAddr, \
+                              ReferenceCounting style); \
+  void emit##Name##TakeAssign(Address destAddr, Address srcAddr, \
+                              ReferenceCounting style); \
+  llvm::Value *emit##Name##LoadStrong(Address src, llvm::Type *resultType, \
+                                      ReferenceCounting style); \
+  llvm::Value *emit##Name##TakeStrong(Address src, llvm::Type *resultType, \
+                                      ReferenceCounting style); \
+  void emit##Name##Destroy(Address addr, ReferenceCounting style);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown) \
+  void emit##Name##Retain(llvm::Value *value, ReferenceCounting style, \
+                         Atomicity atomicity); \
+  void emit##Name##Release(llvm::Value *value, ReferenceCounting style, \
+                          Atomicity atomicity); \
+  void emitStrongRetain##Name(llvm::Value *value, ReferenceCounting style, \
+                              Atomicity atomicity); \
+  void emitStrongRetainAnd##Name##Release(llvm::Value *value, \
+                                          ReferenceCounting style, \
+                                          Atomicity atomicity);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  void emit##Name##Retain(llvm::Value *value, ReferenceCounting style, \
+                         Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNative##Name##Retain(value, atomicity); \
+  } \
+  void emit##Name##Release(llvm::Value *value, ReferenceCounting style, \
+                          Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNative##Name##Release(value, atomicity); \
+  } \
+  void emitStrongRetain##Name(llvm::Value *value, ReferenceCounting style, \
+                              Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNativeStrongRetain##Name(value, atomicity); \
+  } \
+  void emitStrongRetainAnd##Name##Release(llvm::Value *value, \
+                                          ReferenceCounting style, \
+                                          Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNativeStrongRetainAnd##Name##Release(value, atomicity); \
+  }
+#include "swift/AST/ReferenceStorage.def"
+#undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
   // Routines for the Swift native reference-counting style.
   //   - strong references
@@ -359,35 +405,6 @@ public:
   void emitNativeStrongRetain(llvm::Value *value, Atomicity atomicity);
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
-  //   - unowned references
-  void emitNativeUnownedRetain(llvm::Value *value, Atomicity atomicity);
-  void emitNativeUnownedRelease(llvm::Value *value, Atomicity atomicity);
-  void emitNativeStrongRetainUnowned(llvm::Value *value, Atomicity atomicity);
-  void emitNativeStrongRetainAndUnownedRelease(llvm::Value *value,
-                                               Atomicity atomicity);
-  void emitNativeUnownedInit(llvm::Value *val, Address dest);
-  void emitNativeUnownedAssign(llvm::Value *value, Address dest);
-  void emitNativeUnownedCopyInit(Address destAddr, Address srcAddr);
-  void emitNativeUnownedTakeInit(Address destAddr, Address srcAddr);
-  void emitNativeUnownedCopyAssign(Address destAddr, Address srcAddr);
-  void emitNativeUnownedTakeAssign(Address destAddr, Address srcAddr);
-  llvm::Value *emitNativeUnownedLoadStrong(Address src, llvm::Type *resultType);
-  llvm::Value *emitNativeUnownedTakeStrong(Address src, llvm::Type *resultType);
-  void emitNativeUnownedDestroy(Address addr);
-
-  //   - weak references
-  void emitNativeWeakInit(llvm::Value *value, Address dest);
-  void emitNativeWeakAssign(llvm::Value *value, Address dest);
-  llvm::Value *emitNativeWeakLoadStrong(Address src, llvm::Type *type);
-  llvm::Value *emitNativeWeakTakeStrong(Address src, llvm::Type *type);
-  void emitNativeWeakDestroy(Address addr);
-  void emitNativeWeakCopyInit(Address destAddr, Address srcAddr);
-  void emitNativeWeakTakeInit(Address destAddr, Address srcAddr);
-  void emitNativeWeakCopyAssign(Address destAddr, Address srcAddr);
-  void emitNativeWeakTakeAssign(Address destAddr, Address srcAddr);
-  //   - other operations
-  llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
-  void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
 
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
@@ -403,26 +420,6 @@ public:
   //   - strong references
   void emitUnknownStrongRetain(llvm::Value *value, Atomicity atomicity);
   void emitUnknownStrongRelease(llvm::Value *value, Atomicity atomicity);
-  //   - unowned references
-  void emitUnknownUnownedInit(llvm::Value *val, Address dest);
-  void emitUnknownUnownedAssign(llvm::Value *value, Address dest);
-  void emitUnknownUnownedCopyInit(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedTakeInit(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedCopyAssign(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedTakeAssign(Address destAddr, Address srcAddr);
-  llvm::Value *emitUnknownUnownedLoadStrong(Address src, llvm::Type *resultTy);
-  llvm::Value *emitUnknownUnownedTakeStrong(Address src, llvm::Type *resultTy);
-  void emitUnknownUnownedDestroy(Address addr);
-  //   - weak references
-  void emitUnknownWeakDestroy(Address addr);
-  void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
-  void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);
-  void emitUnknownWeakCopyAssign(Address destAddr, Address srcAddr);
-  void emitUnknownWeakTakeAssign(Address destAddr, Address srcAddr);
-  void emitUnknownWeakInit(llvm::Value *value, Address dest);
-  void emitUnknownWeakAssign(llvm::Value *value, Address dest);
-  llvm::Value *emitUnknownWeakLoadStrong(Address src, llvm::Type *type);
-  llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
 
   // Routines for the Builtin.NativeObject reference-counting style.
   void emitBridgeStrongRetain(llvm::Value *value, Atomicity atomicity);
@@ -433,11 +430,13 @@ public:
   void emitErrorStrongRelease(llvm::Value *value);
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull, bool checkPinned);
+                                bool isNonNull);
 
-  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc);
+  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
+                                         unsigned verificationType);
 
-//--- Expression emission ------------------------------------------------------
+  //--- Expression emission
+  //------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
 
@@ -446,63 +445,100 @@ public:
 
   void bindArchetype(ArchetypeType *type,
                      llvm::Value *metadata,
+                     MetadataState metadataState,
                      ArrayRef<llvm::Value*> wtables);
 
 //--- Type emission ------------------------------------------------------------
 public:
-  /// Look up a local type data reference, returning null if no entry was
-  /// found.  This will emit code to materialize the reference if an
-  /// "abstract" entry is present.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind) {
-    return tryGetLocalTypeData(LocalTypeDataKey{type, kind});
-  }
-  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+  /// Look up a local type metadata reference, returning a null response
+  /// if no entry was found which can satisfy the request.  This may need
+  /// emit code to materialize the reference.
+  ///
+  /// This does a look up for a formal ("AST") type.  If you are looking for
+  /// type metadata that will work for working with a representation
+  /// ("lowered", "SIL") type, use getGetLocalTypeMetadataForLayout.
+  MetadataResponse tryGetLocalTypeMetadata(CanType type,
+                                           DynamicMetadataRequest request);
 
   /// Look up a local type data reference, returning null if no entry was
-  /// found or if the only viable entries are abstract.  This will never
-  /// emit code.
-  llvm::Value *tryGetConcreteLocalTypeData(LocalTypeDataKey key);
+  /// found.  This may need to emit code to materialize the reference.
+  ///
+  /// The data kind cannot be for type metadata; use tryGetLocalTypeMetadata
+  /// for that.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind);
 
-  /// Retrieve a local type data reference which is known to exist.
-  llvm::Value *getLocalTypeData(CanType type, LocalTypeDataKind kind);
-
-  /// Add a local type-metadata reference at a point which definitely
-  /// dominates all of its uses.
-  void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                                llvm::Value *data) {
-    setUnscopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
-  }
-  void setUnscopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-  
-  /// Add a local type-metadata reference, valid at the current insertion
-  /// point.
-  void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                              llvm::Value *data) {
-    setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
-  }
-  void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-
-  /// The same as tryGetLocalTypeData, just for the Layout metadata.
+  /// The same as tryGetLocalTypeMetadata, but for representation-compatible
+  /// "layout" metadata.  The returned metadata may not be for a type that
+  /// has anything to do with the formal type that was lowered to the given
+  /// type; however, it is guaranteed to have equivalent characteristics
+  /// in terms of layout, spare bits, POD-ness, and so on.
   ///
   /// We use a separate function name for this to clarify that you should
-  /// only ever be looking type metadata for a lowered SILType for the
-  /// purposes of local layout (e.g. of a tuple).
-  llvm::Value *tryGetLocalTypeDataForLayout(SILType type,
-                                            LocalTypeDataKind kind) {
-    return tryGetLocalTypeData(type.getSwiftRValueType(), kind);
-  }
+  /// only ever be looking for type metadata for a lowered SILType for the
+  /// purposes of local manipulation, such as the layout of a type or
+  /// emitting a value-copy.
+  MetadataResponse tryGetLocalTypeMetadataForLayout(SILType type,
+                                           DynamicMetadataRequest request);
 
-  /// Add a local type-metadata reference, which is valid for the containing
-  /// block.
+  /// The same as tryGetForLocalTypeData, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// tryGetLocalTypeMetadataForLayout for that.
+  llvm::Value *tryGetLocalTypeDataForLayout(SILType type,
+                                            LocalTypeDataKind kind);
+
+  /// Add a local type metadata reference at a point which definitely
+  /// dominates all of its uses.
+  void setUnscopedLocalTypeMetadata(CanType type,
+                                    MetadataResponse response);
+
+  /// Add a local type data reference at a point which definitely
+  /// dominates all of its uses.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// setUnscopedLocalTypeMetadata for that.
+  void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                                llvm::Value *data);
+
+  /// Add a local type metadata reference that is valid at the current
+  /// insertion point.
+  void setScopedLocalTypeMetadata(CanType type, MetadataResponse value);
+
+  /// Add a local type data reference that is valid at the current
+  /// insertion point.
+  ///
+  /// The data kind cannot be for type metadata; use setScopedLocalTypeMetadata
+  /// for that.
+  void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                              llvm::Value *data);
+
+  /// The same as setScopedLocalTypeMetadata, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  void setScopedLocalTypeMetadataForLayout(SILType type, MetadataResponse value);
+
+  /// The same as setScopedLocalTypeData, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// setScopedLocalTypeMetadataForLayout for that.
   void setScopedLocalTypeDataForLayout(SILType type, LocalTypeDataKind kind,
-                                       llvm::Value *data) {
-    setScopedLocalTypeData(type.getSwiftRValueType(), kind, data);
-  }
+                                       llvm::Value *data);
+
+  // These are for the private use of the LocalTypeData subsystem.
+  MetadataResponse tryGetLocalTypeMetadata(LocalTypeDataKey key,
+                                           DynamicMetadataRequest request);
+  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+  MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
+                                               DynamicMetadataRequest request);
+  void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.
   void bindLocalTypeDataFromTypeMetadata(CanType type, IsExact_t isExact,
-                                         llvm::Value *metadata);
+                                         llvm::Value *metadata,
+                                         MetadataState metadataState);
 
   /// Given the witness table parameter, bind local type data for
   /// the witness table itself and any conditional requirements.

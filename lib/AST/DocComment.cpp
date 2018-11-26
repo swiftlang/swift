@@ -370,8 +370,7 @@ getAnyBaseClassDocComment(swift::markup::MarkupContext &MC,
 
         auto *Text = swift::markup::Text::create(MC, MC.allocateCopy(OS.str()));
 
-        auto BaseClass =
-          BaseDecl->getDeclContext()->getAsClassOrClassExtensionContext();
+        auto BaseClass = BaseDecl->getDeclContext()->getSelfClassDecl();
 
         auto *BaseClassMonospace =
           swift::markup::Code::create(MC,
@@ -410,9 +409,10 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
                                                 const ValueDecl *VD)
     -> const ValueDecl * {
       SmallVector<ValueDecl *, 2> Members;
-      P->lookupQualified(P->getDeclaredType(), VD->getFullName(),
+      P->lookupQualified(const_cast<ProtocolDecl *>(P),
+                         VD->getFullName(),
                          NLOptions::NL_ProtocolMembers,
-                         /*typeResolver=*/nullptr, Members);
+                         Members);
     SmallVector<const ValueDecl *, 1> ProtocolRequirements;
     for (auto Member : Members)
       if (isa<ProtocolDecl>(Member->getDeclContext()) &&
@@ -447,11 +447,11 @@ swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
 
   // If this refers to a class member, check to see if any
   // base classes have a doc comment and cascade it to here.
-  if (const auto *CD = D->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (const auto *CD = D->getDeclContext()->getSelfClassDecl())
     if (auto BaseClassDoc = getAnyBaseClassDocComment(MC, CD, D))
       return BaseClassDoc;
 
-  if (const auto *PE = D->getDeclContext()->getAsProtocolExtensionContext())
+  if (const auto *PE = D->getDeclContext()->getExtendedProtocolDecl())
     if (auto ReqDoc = getProtocolRequirementDocComment(MC, PE, D))
       return ReqDoc;
 

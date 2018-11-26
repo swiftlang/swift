@@ -5,8 +5,8 @@ import Swift
 
 // Specialize to a function with removed dead argument.
 
-// CHECK-LABEL: sil [thunk] [always_inline] @one_arg_dead
-// CHECK: [[F:%[0-9]+]] = function_ref @$S12one_arg_deadTf4nnd_n
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @one_arg_dead
+// CHECK: [[F:%[0-9]+]] = function_ref @$s12one_arg_deadTf4nnd_n
 // CHECK: [[A:%[0-9]+]] = apply [[F]](%0, %1)
 // CHECK: return [[A]]
 sil @one_arg_dead : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
@@ -18,8 +18,8 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
   return %8 : $Bool
 }
 
-// CHECK-LABEL: sil [thunk] [always_inline] @always_inline_one_arg_dead
-// CHECK: [[F:%[0-9]+]] = function_ref @$S26always_inline_one_arg_deadTf4nnd_n
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @always_inline_one_arg_dead
+// CHECK: [[F:%[0-9]+]] = function_ref @$s26always_inline_one_arg_deadTf4nnd_n
 // CHECK: [[A:%[0-9]+]] = apply [[F]](%0, %1)
 // CHECK: return [[A]]
 sil [always_inline] @always_inline_one_arg_dead : $@convention(witness_method: Comparable) (Int32, Int32, @thin Int32.Type) -> Bool {
@@ -33,8 +33,8 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
 
 // Still delete only one dead arg as only one arg is partially applied.
 
-// CHECK-LABEL: sil [thunk] [always_inline] @two_args_dead
-// CHECK: [[F:%[0-9]+]] = function_ref @$S13two_args_deadTf4nnd_n
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @two_args_dead
+// CHECK: [[F:%[0-9]+]] = function_ref @$s13two_args_deadTf4nnd_n
 // CHECK: [[A:%[0-9]+]] = apply [[F]](%0, %1)
 // CHECK: return [[A]]
 sil @two_args_dead : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
@@ -83,10 +83,10 @@ bb0:
   return %2 : $@callee_owned (Int32, Int32) -> Bool
 }
 
-// CHECK-LABEL: sil shared @$S12one_arg_deadTf4nnd_n
+// CHECK-LABEL: sil shared @$s12one_arg_deadTf4nnd_n
 // CHECK: builtin
 // CHECK: return
 
-// CHECK-LABEL: sil shared @$S13two_args_deadTf4nnd_n
+// CHECK-LABEL: sil shared @$s13two_args_deadTf4nnd_n
 // CHECK: builtin
 // CHECK: return

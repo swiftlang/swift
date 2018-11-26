@@ -25,3 +25,23 @@ struct Z<U> {
   let bad3: X<U> // expected-error{{'X' requires that 'U' be a class type}}
 }
 
+// SR-7168: layout constraints weren't getting merged.
+protocol P1 {
+  associatedtype A
+  var a: A { get }
+}
+
+protocol P2 {
+  associatedtype B: P1
+  var b: B { get }
+}
+
+func requiresAnyObject<T: AnyObject>(_: T) { }
+
+func anyObjectConstraint<T: P2, U: P2>(_ t: T, _ u: U)
+where T.B.A: AnyObject, U.B: AnyObject, T.B == T.B.A, U.B.A == U.B {
+  requiresAnyObject(t.b)
+  requiresAnyObject(u.b)
+  requiresAnyObject(t.b.a)
+  requiresAnyObject(u.b.a)
+}

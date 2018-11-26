@@ -1,0 +1,338 @@
+// RUN: %target-sil-opt -wmo -access-enforcement-wmo -assume-parsing-unqualified-ownership-sil %s -enable-sil-verify-all | %FileCheck %s
+//
+// Test the AccessEnforcementWMO pass in isolation. This ensures that
+// no upstream passes have removed SIL-level access markers that are
+// required to ensure the pass is not overly optimistic. It also
+// checks generated getters and setters are handled as expected.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+var internalGlobal: Int64
+
+public var publicGlobal: Int64
+
+public class C {
+  @sil_stored var setterProp: Int64 { get set }
+  @sil_stored final var finalProp: Int64 { get set }
+  @sil_stored var inlinedProp: Int64 { get set }
+  @sil_stored var internalProp: Int64 { get set }
+  @sil_stored var keyPathProp: Int64 { get set }
+  @sil_stored final var finalKeyPathProp: Int64 { get set }
+  @sil_stored public var publicProp: Int64 { get set }
+  init()
+  deinit
+}
+
+// internalGlobal
+sil_global hidden @$s10access_wmo14internalGlobalSivp : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+
+// publicGlobal
+sil_global @$s10access_wmo12publicGlobalSivp : $Int64 = {
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %initval = struct $Int64 (%0 : $Builtin.Int64)
+}
+
+// readGlobal()
+// CHECK-LABEL: sil @$s10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int64 {
+//
+// The internal global is promoted to static.
+// CHECK: [[G1:%.]] = global_addr @$s10access_wmo14internalGlobalSivp : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[G1]] : $*Int64
+//
+// The public global remains dynamic.
+// CHECK: [[G2:%.*]] = global_addr @$s10access_wmo12publicGlobalSivp : $*Int
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[G2]] : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo10readGlobalSiyF'
+sil @$s10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = global_addr @$s10access_wmo14internalGlobalSivp : $*Int64
+  %1 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*Int64
+  %2 = struct_element_addr %1 : $*Int64, #Int64._value
+  %3 = load %2 : $*Builtin.Int64
+  end_access %1 : $*Int64
+  %5 = global_addr @$s10access_wmo12publicGlobalSivp : $*Int64
+  %6 = begin_access [read] [dynamic] [no_nested_conflict] %5 : $*Int64
+  %7 = struct_element_addr %6 : $*Int64, #Int64._value
+  %8 = load %7 : $*Builtin.Int64
+  end_access %6 : $*Int64
+  %10 = integer_literal $Builtin.Int1, -1
+  %11 = builtin "sadd_with_overflow_Int64"(%3 : $Builtin.Int64, %8 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  %13 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %13 : $Builtin.Int1
+  %15 = struct $Int64 (%12 : $Builtin.Int64)
+  return %15 : $Int64
+} // end sil function '$s10access_wmo10readGlobalSiyF'
+
+// setInt(_:_:)
+sil [noinline] @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int64, Int64) -> ()
+
+// testAccessGlobal(v:)
+// CHECK-LABEL: sil @$s10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int64) -> () {
+// CHECK: [[G1:%.*]] = global_addr @$s10access_wmo14internalGlobalSivp : $*Int64
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[G1]] : $*Int64
+// CHECK: [[G2:%.*]] = global_addr @$s10access_wmo12publicGlobalSivp : $*Int64
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[G2]] : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo16testAccessGlobal1vySi_tF'
+sil @$s10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int64) -> () {
+// %0                                             // users: %9, %5, %1
+bb0(%0 : $Int64):
+  %1 = global_addr @$s10access_wmo14internalGlobalSivp : $*Int64
+  %2 = begin_access [modify] [dynamic] [no_nested_conflict] %1 : $*Int64
+  // function_ref setInt(_:_:)
+  %3 = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int64, Int64) -> ()
+  %4 = apply %3(%2, %0) : $@convention(thin) (@inout Int64, Int64) -> ()
+  end_access %2 : $*Int64
+  %6 = global_addr @$s10access_wmo12publicGlobalSivp : $*Int64
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %6 : $*Int64
+  %8 = apply %3(%7, %0) : $@convention(thin) (@inout Int64, Int64) -> ()
+  end_access %7 : $*Int64
+  %10 = tuple ()
+  return %10 : $()
+} // end sil function '$s10access_wmo16testAccessGlobal1vySi_tF'
+
+// setKeyPath(_:_:_:)
+sil [noinline] @$s10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
+
+// readProp(c:)
+//
+// See the explanation in access_wmo.swift for why some non-public
+// properties cannot currently be promoted to static enforcement.
+//
+// CHECK-LABEL: sil @$s10access_wmo8readProp1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: [[E1:%.*]] = ref_element_addr %0 : $C, #C.setterProp
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[E1]] : $*Int64
+// CHECK: [[E2:%.*]] = ref_element_addr %0 : $C, #C.finalProp
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[E2]] : $*Int64
+// CHECK: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[E3]] : $*Int64
+// CHECK: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[E4]] : $*Int64
+// CHECK: [[E5:%.*]] = ref_element_addr %0 : $C, #C.keyPathProp
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[E5]] : $*Int64
+// CHECK: [[E5:%.*]] = ref_element_addr %0 : $C, #C.finalKeyPathProp
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[E5]] : $*Int64
+// CHECK: [[E6:%.*]] = ref_element_addr %0 : $C, #C.publicProp
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[E6]] : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo8readProp1cyAA1CC_tF'
+sil @$s10access_wmo8readProp1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// %0
+bb0(%0 : $C):
+  %1 = ref_element_addr %0 : $C, #C.setterProp
+  %2 = begin_access [read] [dynamic] [no_nested_conflict] %1 : $*Int64
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load %3 : $*Builtin.Int64
+  end_access %2 : $*Int64
+  %6 = ref_element_addr %0 : $C, #C.finalProp
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %6 : $*Int64
+  %8 = struct_element_addr %7 : $*Int64, #Int64._value
+  %9 = load %8 : $*Builtin.Int64
+  end_access %7 : $*Int64
+  %11 = ref_element_addr %0 : $C, #C.inlinedProp
+  %12 = begin_access [read] [dynamic] [no_nested_conflict] %11 : $*Int64
+  %13 = struct_element_addr %12 : $*Int64, #Int64._value
+  %14 = load %13 : $*Builtin.Int64
+  end_access %12 : $*Int64
+  %16 = ref_element_addr %0 : $C, #C.internalProp
+  %17 = begin_access [read] [dynamic] [no_nested_conflict] %16 : $*Int64
+  %18 = struct_element_addr %17 : $*Int64, #Int64._value
+  %19 = load %18 : $*Builtin.Int64
+  end_access %17 : $*Int64
+  %21 = ref_element_addr %0 : $C, #C.keyPathProp
+  %22 = begin_access [read] [dynamic] [no_nested_conflict] %21 : $*Int64
+  %23 = struct_element_addr %22 : $*Int64, #Int64._value
+  %24 = load %23 : $*Builtin.Int64
+  end_access %22 : $*Int64
+  %26 = ref_element_addr %0 : $C, #C.finalKeyPathProp
+  %27 = begin_access [read] [dynamic] [no_nested_conflict] %26 : $*Int64
+  %28 = struct_element_addr %27 : $*Int64, #Int64._value
+  %29 = load %28 : $*Builtin.Int64
+  end_access %27 : $*Int64
+  %31 = ref_element_addr %0 : $C, #C.publicProp
+  %32 = begin_access [read] [dynamic] [no_nested_conflict] %31 : $*Int64
+  %33 = struct_element_addr %32 : $*Int64, #Int64._value
+  %34 = load %33 : $*Builtin.Int64
+  end_access %32 : $*Int64
+  %36 = tuple ()
+  return %36 : $()
+} // end sil function '$s10access_wmo8readProp1cyAA1CC_tF'
+
+// testAccessProp(c:v:)
+// CHECK-LABEL: sil @$s10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int64) -> () {
+// CHECK: bb0(%0 : $C, %1 : $Int64):
+// CHECK: [[E1:%.*]] = ref_element_addr %0 : $C, #C.setterProp
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[E1]] : $*Int64
+// CHECK: [[E2:%.*]] = ref_element_addr %0 : $C, #C.finalProp
+// CHECK: begin_access [modify] [static] [no_nested_conflict] [[E2]] : $*Int64
+// CHECK: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
+// CHECK: begin_unpaired_access [modify] [dynamic] [[E3]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
+// CHECK: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
+// CHECK: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
+// CHECK: keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter.1 : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> ())
+// CHECK: keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; stored_property #C.finalKeyPathProp : $Int64)
+// CHECK: [[E5:%.*]] = ref_element_addr %0 : $C, #C.publicProp
+// CHECK: begin_unpaired_access [modify] [dynamic] [[E5]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
+// CHECK-LABEL: } // end sil function '$s10access_wmo14testAccessProp1c1vyAA1CC_SitF'
+sil @$s10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int64) -> () {
+bb0(%0 : $C, %1 : $Int64):
+  %2 = ref_element_addr %0 : $C, #C.setterProp
+  %3 = begin_access [modify] [dynamic] [no_nested_conflict] %2 : $*Int64
+  store %1 to %3 : $*Int64
+  end_access %3 : $*Int64
+  %6 = ref_element_addr %0 : $C, #C.finalProp
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %6 : $*Int64
+  // function_ref setInt(_:_:)
+  %8 = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int64, Int64) -> ()
+  %9 = apply %8(%7, %1) : $@convention(thin) (@inout Int64, Int64) -> ()
+  end_access %7 : $*Int64
+  %11 = alloc_stack $Builtin.UnsafeValueBuffer
+  %12 = ref_element_addr %0 : $C, #C.inlinedProp
+  begin_unpaired_access [modify] [dynamic] %12 : $*Int64, %11 : $*Builtin.UnsafeValueBuffer
+  %14 = mark_dependence %12 : $*Int64 on %0 : $C
+  store %1 to %14 : $*Int64
+  end_unpaired_access [dynamic] %11 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %11 : $*Builtin.UnsafeValueBuffer
+  %18 = alloc_stack $Builtin.UnsafeValueBuffer
+  %19 = ref_element_addr %0 : $C, #C.internalProp
+  begin_unpaired_access [modify] [dynamic] %19 : $*Int64, %18 : $*Builtin.UnsafeValueBuffer
+  %21 = mark_dependence %19 : $*Int64 on %0 : $C
+  %22 = apply %8(%21, %1) : $@convention(thin) (@inout Int64, Int64) -> ()
+  end_unpaired_access [dynamic] %18 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %18 : $*Builtin.UnsafeValueBuffer
+  %25 = keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter.1 : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> ())
+  // function_ref setKeyPath(_:_:_:)
+  %26 = function_ref @$s10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
+  %27 = apply %26(%0, %25, %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
+  strong_release %25 : $ReferenceWritableKeyPath<C, Int64>
+  %29 = keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; stored_property #C.finalKeyPathProp : $Int64)
+  %30 = apply %26(%0, %29, %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
+  strong_release %29 : $ReferenceWritableKeyPath<C, Int64>
+  %32 = alloc_stack $Builtin.UnsafeValueBuffer
+  %33 = ref_element_addr %0 : $C, #C.publicProp
+  begin_unpaired_access [modify] [dynamic] %33 : $*Int64, %32 : $*Builtin.UnsafeValueBuffer
+  %35 = mark_dependence %33 : $*Int64 on %0 : $C
+  %36 = apply %8(%35, %1) : $@convention(thin) (@inout Int64, Int64) -> ()
+  end_unpaired_access [dynamic] %32 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %32 : $*Builtin.UnsafeValueBuffer
+  %39 = tuple ()
+  return %39 : $()
+} // end sil function '$s10access_wmo14testAccessProp1c1vyAA1CC_SitF'
+
+// key path getter for C.keyPathProp : C
+//
+// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64 {
+// CHECK: begin_access [read] [static] [no_nested_conflict] %{{.*}} : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC11keyPathPropSivpACTK'
+sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64 {
+bb0(%0 : $*Int64, %1 : $*C):
+  %2 = load %1 : $*C                              // user: %3
+  %3 = ref_element_addr %2 : $C, #C.keyPathProp   // user: %4
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %3 : $*Int64 // users: %6, %5
+  %5 = load %4 : $*Int64                          // user: %7
+  end_access %4 : $*Int64                         // id: %6
+  store %5 to %0 : $*Int64                        // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+} // end sil function '$s10access_wmo1CC11keyPathPropSivpACTK'
+
+// key path setter for C.keyPathProp : C
+//
+// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> () {
+// CHECK: begin_access [modify] [static] [no_nested_conflict] %{{.*}} : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC11keyPathPropSivpACTk'
+sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> () {
+bb0(%0 : $*Int64, %1 : $*C):
+  %2 = load %0 : $*Int64                          // user: %6
+  %3 = load %1 : $*C                              // user: %4
+  %4 = ref_element_addr %3 : $C, #C.keyPathProp   // user: %5
+  %5 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int64 // users: %7, %6
+  store %2 to %5 : $*Int64                        // id: %6
+  end_access %5 : $*Int64                         // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+} // end sil function '$s10access_wmo1CC11keyPathPropSivpACTk'
+
+// C.keyPathProp.getter
+// CHECK-LABEL: sil hidden [transparent] @$s10access_wmo1CC11keyPathPropSivg : $@convention(method) (@guaranteed C) -> Int64 {
+// CHECK: begin_access [read] [static] [no_nested_conflict] %{{.*}} : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC11keyPathPropSivg'
+sil hidden [transparent] @$s10access_wmo1CC11keyPathPropSivg : $@convention(method) (@guaranteed C) -> Int64 {
+// %0
+bb0(%0 : $C):
+  %1 = ref_element_addr %0 : $C, #C.keyPathProp   // user: %2
+  %2 = begin_access [read] [dynamic] [no_nested_conflict] %1 : $*Int64 // users: %4, %3
+  %3 = load %2 : $*Int64                          // user: %5
+  end_access %2 : $*Int64                         // id: %4
+  return %3 : $Int64                              // id: %5
+} // end sil function '$s10access_wmo1CC11keyPathPropSivg'
+
+// variable initialization expression of C.publicProp
+sil [transparent] @$s10access_wmo1CC10publicPropSivpfi : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  return %1 : $Int64
+} // end sil function '$s10access_wmo1CC10publicPropSivpfi'
+
+// C.publicProp.getter
+//
+// CHECK-LABEL: sil [transparent] @$s10access_wmo1CC10publicPropSivg : $@convention(method) (@guaranteed C) -> Int64 {
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict] %{{.*}} : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC10publicPropSivg'
+sil [transparent] @$s10access_wmo1CC10publicPropSivg : $@convention(method) (@guaranteed C) -> Int64 {
+// %0
+bb0(%0 : $C):
+  %1 = ref_element_addr %0 : $C, #C.publicProp    // user: %2
+  %2 = begin_access [read] [dynamic] [no_nested_conflict] %1 : $*Int64 // users: %4, %3
+  %3 = load %2 : $*Int64                          // user: %5
+  end_access %2 : $*Int64                         // id: %4
+  return %3 : $Int64                              // id: %5
+} // end sil function '$s10access_wmo1CC10publicPropSivg'
+
+// C.publicProp.setter
+// CHECK-LABEL: sil [transparent] @$s10access_wmo1CC10publicPropSivs : $@convention(method) (Int64, @guaranteed C) -> () {
+// CHECK: bb0(%0 : $Int64, %1 : $C):
+// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] %{{.*}} : $*Int64
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC10publicPropSivs'
+sil [transparent] @$s10access_wmo1CC10publicPropSivs : $@convention(method) (Int64, @guaranteed C) -> () {
+bb0(%0 : $Int64, %1 : $C):
+  %2 = ref_element_addr %1 : $C, #C.publicProp    // user: %3
+  %3 = begin_access [modify] [dynamic] [no_nested_conflict] %2 : $*Int64 // users: %5, %4
+  store %0 to %3 : $*Int64                        // id: %4
+  end_access %3 : $*Int64                         // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function '$s10access_wmo1CC10publicPropSivs'
+
+// closure #1 in C.publicProp.materializeForSet
+sil shared [transparent] @$s10access_wmo1CC10publicPropSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*C, %3 : $@thick C.Type):
+  end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+  %5 = tuple ()
+  return %5 : $()
+} // end sil function '$s10access_wmo1CC10publicPropSivmytfU_'
+
+// C.publicProp.materializeForSet
+// CHECK-LABEL: sil [transparent] @$s10access_wmo1CC10publicPropSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed C) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: begin_unpaired_access [modify] [dynamic] %{{.*}} : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
+// CHECK-LABEL: } // end sil function '$s10access_wmo1CC10publicPropSivm'
+sil [transparent] @$s10access_wmo1CC10publicPropSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed C) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $C):
+  %3 = ref_element_addr %2 : $C, #C.publicProp
+  begin_unpaired_access [modify] [dynamic] %3 : $*Int64, %1 : $*Builtin.UnsafeValueBuffer
+  %5 = address_to_pointer %3 : $*Int64 to $Builtin.RawPointer
+  // function_ref closure #1 in C.publicProp.materializeForSet
+  %6 = function_ref @$s10access_wmo1CC10publicPropSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> ()
+  %7 = thin_function_to_pointer %6 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed C, @thick C.Type) -> () to $Builtin.RawPointer
+  %8 = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, %7 : $Builtin.RawPointer
+  %9 = tuple (%5 : $Builtin.RawPointer, %8 : $Optional<Builtin.RawPointer>)
+  return %9 : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+} // end sil function '$s10access_wmo1CC10publicPropSivm'

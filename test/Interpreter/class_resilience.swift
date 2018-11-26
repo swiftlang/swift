@@ -1,24 +1,26 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
 
-// RUN: %target-build-swift-dylib(%t/libresilient_class.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/libresilient_class.%target-dylib-extension) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/libresilient_class.%target-dylib-extension
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -o %t/main -Xfrontend -enable-class-resilience -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_class.%target-dylib-extension
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
 // RUN: %target-codesign %t/libresilient_struct_wmo.%target-dylib-extension
 
-// RUN: %target-build-swift-dylib(%t/libresilient_class_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/libresilient_class_wmo.%target-dylib-extension) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
 // RUN: %target-codesign %t/libresilient_class_wmo.%target-dylib-extension
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_class_wmo -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_class_wmo -Xfrontend -enable-class-resilience -o %t/main2 -Xlinker -rpath -Xlinker %t -module-name main
+// RUN: %target-codesign %t/main2
 
-// RUN: %target-run %t/main %t/libresilient_struct_wmo.%target-dylib-extension %t/libresilient_class_wmo.%target-dylib-extension
+// RUN: %target-run %t/main2 %t/libresilient_struct_wmo.%target-dylib-extension %t/libresilient_class_wmo.%target-dylib-extension
 
 // REQUIRES: executable_test
 

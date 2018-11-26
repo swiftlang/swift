@@ -479,7 +479,61 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     
     expectEqual(expected, resultString)
   }
-  
+
+  func testEncodingDictionaryStringKeyConversionUntouched() {
+    let expected = "{\"leaveMeAlone\":\"test\"}"
+    let toEncode: [String: String] = ["leaveMeAlone": "test"]
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let resultData = try! encoder.encode(toEncode)
+    let resultString = String(bytes: resultData, encoding: .utf8)
+
+    expectEqual(expected, resultString)
+  }
+
+  private struct EncodeFailure : Encodable {
+    var someValue: Double
+  }
+
+  private struct EncodeFailureNested : Encodable {
+    var nestedValue: EncodeFailure
+  }
+
+  func testEncodingDictionaryFailureKeyPath() {
+    let toEncode: [String: EncodeFailure] = ["key": EncodeFailure(someValue: Double.nan)]
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    do {
+      _ = try encoder.encode(toEncode)
+    } catch EncodingError.invalidValue(let (_, context)) {
+      expectEqual(2, context.codingPath.count)
+      expectEqual("key", context.codingPath[0].stringValue)
+      expectEqual("someValue", context.codingPath[1].stringValue)
+    } catch {
+      expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+  }
+
+  func testEncodingDictionaryFailureKeyPathNested() {
+    let toEncode: [String: [String: EncodeFailureNested]] = ["key": ["sub_key": EncodeFailureNested(nestedValue: EncodeFailure(someValue: Double.nan))]]
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    do {
+      _ = try encoder.encode(toEncode)
+    } catch EncodingError.invalidValue(let (_, context)) {
+      expectEqual(4, context.codingPath.count)
+      expectEqual("key", context.codingPath[0].stringValue)
+      expectEqual("sub_key", context.codingPath[1].stringValue)
+      expectEqual("nestedValue", context.codingPath[2].stringValue)
+      expectEqual("someValue", context.codingPath[3].stringValue)
+    } catch {
+      expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+  }
+
   private struct EncodeNested : Encodable {
     let nestedValue: EncodeMe
   }
@@ -598,13 +652,61 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       // This converter removes the first 4 characters from the start of all string keys, if it has more than 4 characters
       let string = path.last!.stringValue
       guard string.count > 4 else { return path.last! }
-      let newString = string.substring(from: string.index(string.startIndex, offsetBy: 4, limitedBy: string.endIndex)!)
+      let newString = String(string.dropFirst(4))
       return _TestKey(stringValue: newString)!
     }
     decoder.keyDecodingStrategy = .custom(customKeyConversion)
     let result = try! decoder.decode(DecodeMe2.self, from: input)
     
     expectEqual("test", result.hello)
+  }
+
+  func testDecodingDictionaryStringKeyConversionUntouched() {
+    let input = "{\"leave_me_alone\":\"test\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let result = try! decoder.decode([String: String].self, from: input)
+
+    expectEqual(["leave_me_alone": "test"], result)
+  }
+
+  func testDecodingDictionaryFailureKeyPath() {
+    let input = "{\"leave_me_alone\":\"test\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    do {
+      _ = try decoder.decode([String: Int].self, from: input)
+    } catch DecodingError.typeMismatch(let (_, context)) {
+      expectEqual(1, context.codingPath.count)
+      expectEqual("leave_me_alone", context.codingPath[0].stringValue)
+    } catch {
+      expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
+  }
+
+  private struct DecodeFailure : Decodable {
+    var intValue: Int
+  }
+
+  private struct DecodeFailureNested : Decodable {
+    var nestedValue: DecodeFailure
+  }
+
+  func testDecodingDictionaryFailureKeyPathNested() {
+    let input = "{\"top_level\": {\"sub_level\": {\"nested_value\": {\"int_value\": \"not_an_int\"}}}}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    do {
+      _ = try decoder.decode([String: [String : DecodeFailureNested]].self, from: input)
+    } catch DecodingError.typeMismatch(let (_, context)) {
+      expectEqual(4, context.codingPath.count)
+      expectEqual("top_level", context.codingPath[0].stringValue)
+      expectEqual("sub_level", context.codingPath[1].stringValue)
+      expectEqual("nestedValue", context.codingPath[2].stringValue)
+      expectEqual("intValue", context.codingPath[3].stringValue)
+    } catch {
+      expectUnreachable("Unexpected error: \(String(describing: error))")
+    }
   }
   
   private struct DecodeMe3 : Codable {
@@ -1132,27 +1234,6 @@ fileprivate class Person : Codable, Equatable {
     self.website = website
   }
 
-  private enum CodingKeys : String, CodingKey {
-    case name
-    case email
-    case website
-  }
-
-  // FIXME: Remove when subclasses (Employee) are able to override synthesized conformance.
-  required init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    name = try container.decode(String.self, forKey: .name)
-    email = try container.decode(String.self, forKey: .email)
-    website = try container.decodeIfPresent(URL.self, forKey: .website)
-  }
-
-  func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(name, forKey: .name)
-    try container.encode(email, forKey: .email)
-    try container.encodeIfPresent(website, forKey: .website)
-  }
-
   func isEqual(_ other: Person) -> Bool {
     return self.name == other.name &&
            self.email == other.email &&
@@ -1553,9 +1634,11 @@ JSONEncoderTests.test("testEncodingNonConformingFloats") { TestJSONEncoder().tes
 JSONEncoderTests.test("testEncodingNonConformingFloatStrings") { TestJSONEncoder().testEncodingNonConformingFloatStrings() }
 JSONEncoderTests.test("testEncodingKeyStrategySnake") { TestJSONEncoder().testEncodingKeyStrategySnake() }
 JSONEncoderTests.test("testEncodingKeyStrategyCustom") { TestJSONEncoder().testEncodingKeyStrategyCustom() }
+JSONEncoderTests.test("testEncodingDictionaryStringKeyConversionUntouched") { TestJSONEncoder().testEncodingDictionaryStringKeyConversionUntouched() }
 JSONEncoderTests.test("testEncodingKeyStrategyPath") { TestJSONEncoder().testEncodingKeyStrategyPath() }
 JSONEncoderTests.test("testDecodingKeyStrategyCamel") { TestJSONEncoder().testDecodingKeyStrategyCamel() }
 JSONEncoderTests.test("testDecodingKeyStrategyCustom") { TestJSONEncoder().testDecodingKeyStrategyCustom() }
+JSONEncoderTests.test("testDecodingDictionaryStringKeyConversionUntouched") { TestJSONEncoder().testDecodingDictionaryStringKeyConversionUntouched() }
 JSONEncoderTests.test("testEncodingKeyStrategySnakeGenerated") { TestJSONEncoder().testEncodingKeyStrategySnakeGenerated() }
 JSONEncoderTests.test("testDecodingKeyStrategyCamelGenerated") { TestJSONEncoder().testDecodingKeyStrategyCamelGenerated() }
 JSONEncoderTests.test("testKeyStrategySnakeGeneratedAndCustom") { TestJSONEncoder().testKeyStrategySnakeGeneratedAndCustom() }
@@ -1572,5 +1655,9 @@ JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomData") { TestJSONEncod
 JSONEncoderTests.test("testDecoderStateThrowOnDecode") { TestJSONEncoder().testDecoderStateThrowOnDecode() }
 JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomDate") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomDate() }
 JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomData") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomData() }
+JSONEncoderTests.test("testEncodingDictionaryFailureKeyPath") { TestJSONEncoder().testEncodingDictionaryFailureKeyPath() }
+JSONEncoderTests.test("testEncodingDictionaryFailureKeyPathNested") { TestJSONEncoder().testEncodingDictionaryFailureKeyPathNested() }
+JSONEncoderTests.test("testDecodingDictionaryFailureKeyPath") { TestJSONEncoder().testDecodingDictionaryFailureKeyPath() }
+JSONEncoderTests.test("testDecodingDictionaryFailureKeyPathNested") { TestJSONEncoder().testDecodingDictionaryFailureKeyPathNested() }
 runAllTests()
 #endif

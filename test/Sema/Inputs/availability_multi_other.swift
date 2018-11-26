@@ -66,8 +66,7 @@ class SubOtherIntroduced10_51 : OtherIntroduced10_51 {
 class OtherIntroduced10_52 : OtherIntroduced10_51 {
 }
 
-extension OtherIntroduced10_51 { // expected-error {{'OtherIntroduced10_51' is only available on OS X 10.51 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing extension}}
+extension OtherIntroduced10_51 {
 }
 
 extension OtherIntroduced10_9 {

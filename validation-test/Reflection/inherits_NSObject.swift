@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/inherits_NSObject
+// RUN: %target-codesign %t/inherits_NSObject
+
 // RUN: %target-run %target-swift-reflection-test %t/inherits_NSObject | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: objc_interop

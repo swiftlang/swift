@@ -51,7 +51,7 @@ bb0:
 // CHECK: G global_var
 sil_global [serialized] @global_var : $Builtin.Int32
 
-// CHECK: W $S4main23ConformingGenericStructVyxGAA17ResilientProtocolAAWP
+// CHECK: W $s4main23ConformingGenericStructVyxGAA17ResilientProtocolAAWP
 // DEMANGLE: W protocol witness table for main.ConformingGenericStruct<A> : main.ResilientProtocol in main
 sil_witness_table [serialized] <T> ConformingGenericStruct<T> : ResilientProtocol module protocol_resilience {
   method #ResilientProtocol.defaultA!1: @defaultA
@@ -60,7 +60,7 @@ sil_witness_table [serialized] <T> ConformingGenericStruct<T> : ResilientProtoco
 // vtables cannot be serialized from SIL.
 // SIL-NM: V C
 sil_vtable [serialized] C {
-  #C.deinit!deallocator: @c_deinit
+  #C.deinit!deallocator.1: @c_deinit
 }
 
 

@@ -43,7 +43,7 @@ extension Sequence {
   /// list consisting of indices of names with five or fewer letters.
   ///
   ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
-  ///     var shorterIndices: [SetIndex<String>] = []
+  ///     var shorterIndices: [Set<String>.Index] = []
   ///     for (i, name) in zip(names.indices, names) {
   ///         if name.count <= 5 {
   ///             shorterIndices.append(i)
@@ -61,7 +61,9 @@ extension Sequence {
   ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
-  @_inlineable
+  ///
+  /// - Complexity: O(1)
+  @inlinable // protocol-only
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -102,7 +104,9 @@ extension Sequence {
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func min(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -144,7 +148,9 @@ extension Sequence {
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func max(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -170,7 +176,9 @@ extension Sequence where Element: Comparable {
   ///
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   @warn_unqualified_access
   public func min() -> Element? {
     return self.min(by: <)
@@ -187,7 +195,9 @@ extension Sequence where Element: Comparable {
   ///
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   @warn_unqualified_access
   public func max() -> Element? {
     return self.max(by: <)
@@ -219,7 +229,10 @@ extension Sequence  {
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `possiblePrefix`.
+  @inlinable
   public func starts<PossiblePrefix: Sequence>(
     with possiblePrefix: PossiblePrefix,
     by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
@@ -262,7 +275,10 @@ extension Sequence where Element: Equatable {
   /// - Returns: `true` if the initial elements of the sequence are the same as
   ///   the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `possiblePrefix`.
+  @inlinable
   public func starts<PossiblePrefix: Sequence>(
     with possiblePrefix: PossiblePrefix
   ) -> Bool where PossiblePrefix.Element == Element {
@@ -296,7 +312,10 @@ extension Sequence {
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
   ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `other`.
+  @inlinable
   public func elementsEqual<OtherSequence: Sequence>(
     _ other: OtherSequence,
     by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
@@ -336,7 +355,10 @@ extension Sequence where Element : Equatable {
   /// - Parameter other: A sequence to compare to this sequence.
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `other`.
+  @inlinable
   public func elementsEqual<OtherSequence: Sequence>(
     _ other: OtherSequence
   ) -> Bool where OtherSequence.Element == Element {
@@ -378,7 +400,10 @@ extension Sequence {
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that perform
   ///   localized comparison instead.
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `other`.
+  @inlinable
   public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -429,7 +454,10 @@ extension Sequence where Element : Comparable {
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-  @_inlineable
+  ///
+  /// - Complexity: O(*m*), where *m* is the lesser of the length of the
+  ///   sequence and the length of `other`.
+  @inlinable
   public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence
   ) -> Bool where OtherSequence.Element == Element {
@@ -477,7 +505,9 @@ extension Sequence {
   ///   the passed element represents a match.
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   public func contains(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
@@ -487,6 +517,30 @@ extension Sequence {
       }
     }
     return false
+  }
+
+  /// Returns a Boolean value indicating whether every element of a sequence
+  /// satisfies a given predicate.
+  ///
+  /// The following code uses this method to test whether all the names in an
+  /// array have at least five characters:
+  ///
+  ///     let names = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
+  ///     let allHaveAtLeastFive = names.allSatisfy({ $0.count >= 5 })
+  ///     // allHaveAtLeastFive == true
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
   }
 }
 
@@ -506,13 +560,59 @@ extension Sequence where Element : Equatable {
   /// - Parameter element: The element to find in the sequence.
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   public func contains(_ element: Element) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     } else {
       return self.contains { $0 == element }
     }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// count(where:)
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns the number of elements in the sequence that satisfy the given
+  /// predicate.
+  ///
+  /// You can use this method to count the number of elements that pass a test.
+  /// For example, this code finds the number of names that are fewer than
+  /// five characters long:
+  ///
+  ///     let names = ["Jacqueline", "Ian", "Amy", "Juan", "Soroush", "Tiffany"]
+  ///     let shortNameCount = names.count(where: { $0.count < 5 })
+  ///     // shortNameCount == 3
+  ///
+  /// To find the number of times a specific element appears in the sequence,
+  /// use the equal-to operator (`==`) in the closure to test for a match.
+  ///
+  ///     let birds = ["duck", "duck", "duck", "duck", "goose"]
+  ///     let duckCount = birds.count(where: { $0 == "duck" })
+  ///     // duckCount == 4
+  ///
+  /// The sequence must be finite.
+  ///
+  /// - Parameter predicate: A closure that takes each element of the sequence
+  ///   as its argument and returns a Boolean value indicating whether
+  ///   the element should be included in the count.
+  /// - Returns: The number of elements in the sequence that satisfy the given
+  ///   predicate.
+  @inlinable
+  public func count(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Int {
+    var count = 0
+    for e in self {
+      if try predicate(e) {
+        count += 1
+      }
+    }
+    return count
   }
 }
 
@@ -562,7 +662,9 @@ extension Sequence {
   ///     the caller.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
@@ -617,7 +719,9 @@ extension Sequence {
   ///     value with an element of the sequence.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
-  @_inlineable
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
   public func reduce<Result>(
     into initialResult: Result,
     _ updateAccumulatingResult:
@@ -641,12 +745,12 @@ extension Sequence {
   ///
   /// The sequence must be finite.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
-  @_inlineable
-  public func reversed() -> [Element] {
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  @inlinable
+  public __consuming func reversed() -> [Element] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
@@ -675,10 +779,10 @@ extension Sequence {
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///
-  ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
+  ///     let mapped = numbers.map { Array(repeating: $0, count: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
   ///
-  ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
+  ///     let flatMapped = numbers.flatMap { Array(repeating: $0, count: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to
@@ -688,9 +792,9 @@ extension Sequence {
   ///   sequence as its argument and returns a sequence or collection.
   /// - Returns: The resulting flattened array.
   ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @_inlineable
+  /// - Complexity: O(*m* + *n*), where *n* is the length of this sequence
+  ///   and *m* is the length of the result.
+  @inlinable
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Element) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.Element] {
@@ -706,7 +810,7 @@ extension Sequence {
   /// Returns an array containing the non-`nil` results of calling the given
   /// transformation with each element of this sequence.
   ///
-  /// Use this method to receive an array of nonoptional values when your
+  /// Use this method to receive an array of non-optional values when your
   /// transformation produces an optional value.
   ///
   /// In this example, note the difference in the result of using `map` and
@@ -725,43 +829,10 @@ extension Sequence {
   /// - Returns: An array of the non-`nil` results of calling `transform`
   ///   with each element of the sequence.
   ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @_inlineable
+  /// - Complexity: O(*m* + *n*), where *n* is the length of this sequence
+  ///   and *m* is the length of the result.
+  @inlinable // protocol-only
   public func compactMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) rethrows -> [ElementOfResult] {
-    return try _compactMap(transform)
-  }
-
-  /// Returns an array containing the non-`nil` results of calling the given
-  /// transformation with each element of this sequence.
-  ///
-  /// Use this method to receive an array of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an optional `Int` value.
-  ///
-  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  ///
-  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
-  ///     // [1, 2, nil, nil, 5]
-  ///
-  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
-  ///     // [1, 2, 5]
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   sequence as its argument and returns an optional value.
-  /// - Returns: An array of the non-`nil` results of calling `transform`
-  ///   with each element of the sequence.
-  ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @inline(__always)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     return try _compactMap(transform)
@@ -770,7 +841,7 @@ extension Sequence {
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func _compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

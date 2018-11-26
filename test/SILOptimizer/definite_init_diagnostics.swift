@@ -83,11 +83,6 @@ func test2() {
   }
   b4 = 7
   
-  let b5: Any
-  b5 = "x"   
-  { takes_inout_any(&b5) }()   // expected-error {{immutable value 'b5' must not be passed inout}}
-  ({ takes_inout_any(&b5) })()   // expected-error {{immutable value 'b5' must not be passed inout}}
-
   // Structs
   var s1 : SomeStruct
   s1 = SomeStruct()   // ok
@@ -111,16 +106,22 @@ func test2() {
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
   _ = w2                // ok
   
   
-  // Unowned.  This is immediately crashing code (it causes a retain of a
-  // released object) so it should be diagnosed with a warning someday.
+  // Unowned. This is immediately crashing code (it causes a retain of a
+  // released object).
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'u2' is 'unowned'}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
 }
@@ -431,18 +432,18 @@ class DelegatingCtorClass {
   }
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
-    _ = ivar       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
-    ivar = x       // expected-error {{'self' used in property access 'ivar' before 'self.init' call}}
+    _ = ivar       // expected-error {{'self' used before 'self.init' call}}
+    ivar = x       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
   convenience init(x: EmptyStruct, y: EmptyStruct, z: EmptyStruct) {
     self.init()
-    self.init()    // expected-error {{'self.init' called multiple times in initializer}}
+    self.init()
   }
 
   convenience init(x: (EmptyStruct, EmptyStruct)) {
-    method()       // expected-error {{'self' used in method call 'method' before 'self.init' call}}
+    method()       // expected-error {{'self' used before 'self.init' call}}
     self.init()
   }
 
@@ -560,10 +561,10 @@ func testNoReturn3(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion().start()
+    PerpetualMotion().start() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 func testNoReturn4(_ b : Bool) -> Any {
@@ -571,10 +572,10 @@ func testNoReturn4(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion.stop()
+    PerpetualMotion.stop() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 
@@ -592,10 +593,10 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
   }
 }
 
-// <rdar://problem/16660680> QoI: _preconditionFailure() in init method complains about super.init being called multiple times
+// <rdar://problem/16660680> QoI: preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
   init() {  
-    _preconditionFailure("leave me alone dude");
+    preconditionFailure("leave me alone dude");
   }
 }
 
@@ -756,12 +757,23 @@ extension Int {
   func inspect() {}
 }
 
+extension Array {
+  subscript(replacing index: Int, with newValue: Element) -> Element {
+    mutating get {
+      let oldValue = self[index]
+      self[index] = newValue
+      return oldValue
+    }
+  }
+}
+
+func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  // expected-note @+1 5 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  // expected-note @+1 7 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
@@ -769,6 +781,9 @@ struct LetProperties {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
+
+  func methodTakesInOut(_ x: inout Int) {}
+  func throwingMethodTakesInOut(_ x: inout Int) throws {}
 
   // Let properties can be initialized naturally exactly once along any given
   // path through an initializer.
@@ -809,19 +824,24 @@ struct LetProperties {
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
-  init() {
+  init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
     swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    
+    try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+
     u.inspect()  // ok, non mutating.
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
     arr = []
     arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
     arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
-    arr[12] = 17   // expected-error {{mutating subscript 'subscript' may not be used on immutable value 'self.arr'}}
+    arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
+    let _ = arr[replacing: 12, with: 17] // expected-error {{mutating accessor for subscript may not be used on immutable value 'self.arr'}}
+
+    methodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+    try throwingMethodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
   }
 }
 
@@ -834,7 +854,7 @@ protocol TestMutabilityProtocol {
  
 class C<T : TestMutabilityProtocol> {
   let x : T
-  let y : T
+  let y : T // expected-note {{change 'let' to 'var' to make it mutable}}
   
   init(a : T) {
     x = a; y = a
@@ -876,7 +896,7 @@ func testLocalProperties(_ b : Int) -> Int {
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T
+  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
@@ -928,8 +948,8 @@ struct StructMutatingMethodTest {
 
  // <rdar://problem/19268443> DI should reject this call to transparent function
  class TransparentFunction {
-  let x : Int
-  let y : Int
+  let x : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
   init() {
     x = 42
     x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
@@ -1072,7 +1092,7 @@ extension ProtocolInitTest {
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
 func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
-  let x: Int
+  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 1
   bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
 }
@@ -1227,8 +1247,8 @@ class SuperConvenienceSub : SuperConvenienceBase {
     super.init(i)
   }
   public init(_ i1: Int, _ i2: Int, _ i3: Int) {
-    self.init(i1, i1)
-  }
+    self.init(i1, i1) // expected-error{{'self' used before 'super.init' call}}
+  } // expected-error{{'super.init' isn't called}}
 }
 
 // While testing some changes I found this regression that wasn't
@@ -1309,3 +1329,225 @@ class ProtocolCastTestChild : ProtocolCastTestParent, ProtocolCastTestProtocol {
   }
 }
 
+// Make sure we don't diagnose immediate deallocation of instances if we first
+// assign them through strong variables.
+func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
+  weak var c1: SomeClass?
+  do {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  unowned let c2: SomeClass
+  do {
+    let tmp = SomeClass()
+    c2 = tmp
+  }
+
+  weak var c3: SomeClass?
+  let c3Tmp = SomeClass()
+  c3 = c3Tmp
+
+  unowned let c4: SomeClass
+  let c4Tmp = SomeClass()
+  c4 = c4Tmp
+
+  _ = c1; _ = c2; _ = c3; _ = c4
+}
+
+class ClassWithUnownedProperties {
+
+  weak var c1: SomeClass?
+  unowned var c2: SomeClass
+
+  init(c2: SomeClass) {
+    self.c2 = c2
+  }
+
+  func assignToC1() {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  func assignToC2() {
+    let tmp = SomeClass()
+    c2 = tmp
+  }
+}
+
+// Tests for DI when optionals are defined using unchecked_take_enum_data_addr
+// <rdar://38624845>
+
+func testOptionalDoubleWrite() -> String? {
+  let sConst: String? // expected-note {{change 'let' to 'var' to make it mutable}}
+  sConst = ""
+  sConst? = "v2" // expected-error {{immutable value 'sConst' may only be initialized once}}
+  return sConst
+}
+
+func testOptionalDoubleWrite2() -> Int? {
+  let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = 0
+  x? = 0 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+protocol DIOptionalTestProtocol {
+  var f: Int { get set }
+}
+
+func testOptionalDoubleWrite3(p1: DIOptionalTestProtocol) -> DIOptionalTestProtocol? {
+  let x: DIOptionalTestProtocol? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p1
+  x? = p1 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalWrite() {
+  let x: Int? // expected-note {{constant defined here}}
+              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
+  x? = 0 // expected-error {{constant 'x' used before being initialized}}
+}
+
+func testOptionalWriteGenerics<T>(p: T) -> T? {
+  let x: T? // expected-note {{constant defined here}}
+            // expected-note@-1 {{change 'let' to 'var' to make it mutable}}
+  x? = p  // expected-error {{constant 'x' used before being initialized}}
+  x = p   // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalWriteGenerics2<T>(p: T) -> T? {
+  let x: T? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p
+  x? = p  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+enum TestOptionalEnum {
+  case Cons(Int)
+  case Nil
+}
+
+func testOptionalWithEnum(p: TestOptionalEnum) -> TestOptionalEnum? {
+  let x: TestOptionalEnum? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p
+  x? = p  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+// Tests for optional chaining
+
+class DIOptionalTestClass {
+  var r: DIOptionalTestClass? = nil
+  var f: Int = 0;
+  let g: Int = 0;
+}
+
+func testOptionalChaining(p: DIOptionalTestClass?) {
+  p?.f = 2
+}
+
+func testOptionalChaining2(p: DIOptionalTestClass?) -> DIOptionalTestClass? {
+  let x: DIOptionalTestClass?
+  x = p
+  x?.f = 1
+  p?.r?.f = 2
+  return x
+}
+
+struct DIOptionalTestStruct {
+  var f: Int
+}
+
+func testOptionalChaining3() -> DIOptionalTestStruct? {
+  let x: DIOptionalTestStruct?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStruct(f: 0)
+  x?.f = 2  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+extension DIOptionalTestStruct {
+  public init?() {
+    self.f = 0
+  }
+}
+
+func testOptionalChaining4() -> DIOptionalTestStruct? {
+  let x: DIOptionalTestStruct?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStruct()
+  x?.f = 2  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+struct DIOptionalTestStructPair {
+  var pair: (Int, Int)
+}
+
+func test6() -> DIOptionalTestStructPair? {
+  let x: DIOptionalTestStructPair?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStructPair(pair: (0, 0))
+  x?.pair.0 = 1 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
+  let x: T? // expected-note {{constant defined here}}
+            // expected-note@-1 {{constant defined here}}
+            // expected-note@-2 {{constant defined here}}
+
+  // note that here assignment to 'f' is a call to the setter.
+  x?.f = 0  // expected-error {{constant 'x' used before being initialized}}
+            // expected-error@-1 {{constant 'x' passed by reference before being initialized}}
+  return x  // expected-error {{constant 'x' used before being initialized}}
+}
+
+// Test optional tuples
+
+func testOptionalTupleUse(x: Bool) -> Int? {
+  let optTuple: (Int, Int)? // expected-note {{constant defined here}}
+                            // expected-note@-1 {{constant defined here}}
+  return optTuple?.1 // expected-error {{constant 'optTuple' used before being initialized}}
+                     // expected-error@-1 {{constant 'optTuple' used before being initialized}}
+}
+
+func testOptionalTupleOverwrite(x: Bool) -> (Int, Int)? {
+  let tupleVar: (Int, Int)? // expected-note {{change 'let' to 'var' to make it mutable}}
+  tupleVar = (0, 0)
+  tupleVar?.1 = 1           // expected-error {{immutable value 'tupleVar' may only be initialized once}}
+  return tupleVar
+}
+
+func testOptionalTupleNoError(x: Bool) -> Int? {
+  let optTuple: (Int, Int)?
+  optTuple = (0, 0)
+  return optTuple?.1
+}
+
+func testOptionalTupleNoError2(x: Bool) -> (Int, Int)? {
+  var tupleVar: (Int, Int)?
+  tupleVar = (0, 0)
+  tupleVar?.1 = 1
+  return tupleVar
+}
+
+// Test forced unwrapping of optionals
+
+func testOptionalUseByUnwrap() {
+  let x: Int? // expected-note {{constant defined here}}
+              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
+  x! = 0      // expected-error {{constant 'x' used before being initialized}}
+}
+
+func testOptionalWriteByUnwrap() -> Int? {
+  let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = 0
+  x! = 0      // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalUnwrapNoError() -> Int? {
+  let x: Int?
+  x = 0
+  return x!
+}

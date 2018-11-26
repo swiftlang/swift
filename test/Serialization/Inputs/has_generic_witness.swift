@@ -48,14 +48,14 @@ public struct BasStruct : Bassable {
 }
 
 
-prefix operator ~~~ {}
+prefix operator ~~~
 
 public protocol _CyclicAssociated {
   associatedtype Assoc = CyclicImpl
 }
 
 public protocol CyclicAssociated : _CyclicAssociated {
-  prefix func ~~~(_: Self.Type)
+  static prefix func ~~~(_: Self.Type)
 }
 
 prefix public func ~~~ <T: _CyclicAssociated>(_: T.Type) {}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 
@@ -22,15 +22,15 @@ sil_vtable C {}
 
 // -- The runtime doesn't track spare bits, so fixed instances of the dynamic
 //    type can't use them.
-// CHECK-64-LABEL: define{{( protected)?}} swiftcc { i64, i8 } @fixed_instances_dont_use_spare_bits(i64, i8)
-// CHECK-32-LABEL: define{{( protected)?}} swiftcc { i32, i8 } @fixed_instances_dont_use_spare_bits(i32, i8)
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i8 } @fixed_instances_dont_use_spare_bits(i64, i8)
+// CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i8 } @fixed_instances_dont_use_spare_bits(i32, i8)
 sil @fixed_instances_dont_use_spare_bits : $@convention(thin) (@owned Either<C, C>) -> @owned Either<C, C> {
 entry(%e : $Either<C, C>):
   return %e : $Either<C, C>
 }
 
 // -- Handle case where all of the payloads become empty.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @empty_instance(i8) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @empty_instance(i8) {{.*}} {
 sil @empty_instance : $@convention(thin) (Either<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $Either<(), ()>):
@@ -80,7 +80,7 @@ next(%z : $Builtin.Int8):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @empty_instance2(i8) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @empty_instance2(i8) {{.*}} {
 sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $EitherOr<(), ()>):
@@ -154,7 +154,7 @@ next(%z : $Builtin.Int8):
 
 sil hidden_external @consume_case_test_result : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1, Builtin.Int1) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @static_multi_payload_case_test
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @static_multi_payload_case_test
 // CHECK:         call swiftcc void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
 sil @static_multi_payload_case_test : $@convention(thin) () -> () {
 entry:
@@ -191,7 +191,7 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @static_multi_payload_case_test_empty
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @static_multi_payload_case_test_empty
 // CHECK:         call swiftcc void @consume_case_test_result(i1 true, i1 true, i1 true, i1 true)
 sil @static_multi_payload_case_test_empty : $@convention(thin) () -> () {
 entry:
@@ -227,7 +227,7 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_multi_payload_case_test
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_multi_payload_case_test
 sil @dynamic_multi_payload_case_test : $@convention(thin) <T, U> () -> () {
 entry:
   %t = integer_literal $Builtin.Int1, 1
@@ -263,7 +263,7 @@ entry:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_inject
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_inject
 // CHECK:         ([[EITHER_OR:%T26enum_dynamic_multi_payload8EitherOrO.*]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_inject : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -279,7 +279,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_project
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_project
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_project : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -291,7 +291,7 @@ entry(%e : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_switch
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_switch
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, %swift.type* %T)
 sil @dynamic_switch : $@convention(thin) <T> () -> @out EitherOr<T, Builtin.Int64> {
 entry(%e : $*EitherOr<T, Builtin.Int64>):
@@ -332,7 +332,7 @@ next(%x : $Builtin.Int8):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_value_semantics
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_value_semantics
 // CHECK:         ([[EITHER_OR]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
 sil @dynamic_value_semantics : $@convention(thin) <T> (@in EitherOr<T, Builtin.Int64>) -> @out EitherOr<T, Builtin.Int64> {
 entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
@@ -366,7 +366,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dynamic_value_semantics2
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_value_semantics2
 // CHECK:         ([[EITHER_OR:%T26enum_dynamic_multi_payload8EitherOrO.*]]* noalias nocapture sret, [[EITHER_OR]]* noalias nocapture, %swift.type* %T)
 sil @dynamic_value_semantics2 : $@convention(thin) <T> (@in EitherOr<T, C>) -> @out EitherOr<T, C> {
 entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
@@ -417,25 +417,35 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   return undef : $()
 }
 
-// CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 
-// CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMr"
+// CHECK: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s26enum_dynamic_multi_payload8EitherOrOMr"
 // CHECK-SAME: (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 
 // CHECK:      [[BUF:%.*]] = alloca [2 x i8**]
 // CHECK:      [[BUF0:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 0
-// CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:      [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %T)
+// CHECK-NEXT: [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[T_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[T_OK:%.*]] = icmp ule [[INT]] [[T_STATUS]], 63
+// CHECK-NEXT: br i1 [[T_OK]],
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF0]]
 
 // CHECK:      [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
-// CHECK:      [[T0:%.*]] = bitcast %swift.type* %U to i8***
+// CHECK:      [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %U)
+// CHECK-NEXT: [[U_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[U_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[U_OK:%.*]] = icmp ule [[INT]] [[U_STATUS]], 63
+// CHECK-NEXT: br i1 [[U_OK]],
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* [[U_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(%swift.type* [[METADATA]], {{i(32|64)}} 0, {{i(32|64)}} 2, i8*** [[BUF0]])

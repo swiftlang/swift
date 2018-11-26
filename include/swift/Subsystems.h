@@ -46,6 +46,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class Evaluator;
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
@@ -60,10 +61,12 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
   struct TypeLoc;
   class UnifiedStatsReporter;
+  enum class SourceFileKind;
 
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
@@ -140,6 +143,11 @@ namespace swift {
   ///                  source file.
   void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
 
+  /// Once type-checking is complete, this instruments code with calls to an
+  /// intrinsic that record the expected values of local variables so they can
+  /// be compared against the results from the debugger.
+  void performDebuggerTestingTransform(SourceFile &SF);
+
   /// Once parsing and name-binding are complete, this optionally transforms the
   /// ASTs to add calls to external logging functions.
   ///
@@ -184,7 +192,8 @@ namespace swift {
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
                            unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0);
+                           unsigned ExpressionTimeoutThreshold = 0,
+                           unsigned SwitchCheckingInvocationThreshold = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -228,21 +237,14 @@ namespace swift {
 
   /// Turn the given module into SIL IR.
   ///
-  /// The module must contain source files.
-  ///
-  /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
-  /// of all files in the module is present in the SILModule.
+  /// The module must contain source files. The optimizer will assume that the
+  /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options,
-                       bool wholeModuleCompilation = false);
+  performSILGeneration(ModuleDecl *M, SILOptions &options);
 
   /// Turn a source file into SIL IR.
-  ///
-  /// If \p StartElem is provided, the module is assumed to be only part of the
-  /// SourceFile, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None);
+  performSILGeneration(FileUnit &SF, SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -274,7 +276,6 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
-                      unsigned StartElem = 0,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
@@ -312,6 +313,11 @@ namespace swift {
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats=nullptr);
 
+  /// Dump YAML describing all fixed-size types imported from the given module.
+  bool performDumpTypeInfo(IRGenOptions &Opts,
+                           SILModule &SILMod,
+                           llvm::LLVMContext &LLVMContext);
+
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
   createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
@@ -319,10 +325,11 @@ namespace swift {
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:
-    ParserUnit(SourceManager &SM, unsigned BufferID,
-               const LangOptions &LangOpts, StringRef ModuleName);
-    ParserUnit(SourceManager &SM, unsigned BufferID);
-    ParserUnit(SourceManager &SM, unsigned BufferID,
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
+               const LangOptions &LangOpts, StringRef ModuleName,
+               SyntaxParsingCache *SyntaxCache = nullptr);
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();
@@ -336,6 +343,24 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerAccessRequestFunctions(Evaluator &evaluator);
+
+  /// Register AST-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerNameLookupRequestFunctions(Evaluator &evaluator);
+
+  /// Register Sema-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any semantic queries
+  /// using Sema-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

@@ -39,21 +39,28 @@ for self_ty in all_integer_types(word_bits):
 
 extension ${Type[0]} : CustomReflectable {
   /// A mirror that reflects the `${Type[0]}` instance.
-  @_inlineable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
   }
 }
 
-extension ${Type[0]} : CustomPlaygroundQuickLookable {
+extension ${Type[0]} : _CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for the `${Type[0]}` instance.
-  @_inlineable // FIXME(sil-serialize-all)
   @available(*, deprecated, message: "${Type[0]}.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return ${Type[1]}(${Type[2]})
   }
 }
 % end
+
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+extension Float80 : CustomReflectable {
+  /// A mirror that reflects the Float80 instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
+#endif
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

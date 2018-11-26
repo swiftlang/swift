@@ -12,8 +12,7 @@ import Foundation
 // CHECK_NONE: define{{( protected)?}} {{.*}}void {{.*}}none
 public func none(_ a: inout Int64) {
   // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
-  // CHECK_NONE: store{{.*}}, !dbg
-  // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
+  // CHECK_NONE: store i64{{.*}}, !dbg ![[NONE_INIT:.*]]
   a -= 2
   // CHECK_NONE: ret {{.*}}, !dbg ![[NONE_RET:.*]]
   // CHECK_NONE: ![[NONE_INIT]] = !DILocation(line: [[@LINE-2]], column:
@@ -178,3 +177,17 @@ public func cleanup_simple_complex(_ a: NSString) -> Int64 {
 }
 
 // ---------------------------------------------------------------------
+
+// RUN: %FileCheck %s --check-prefix=CHECK_INIT < %t.ll
+// CHECK_INIT: define {{.*}}$s4main6Class1CACSgycfc
+public class Class1 {
+  public required init?() {
+    print("hello")
+    // CHECK_INIT: call {{.*}}@"$ss5print_9separator10terminatoryypd_S2StF"{{.*}}, !dbg [[printLoc:![0-9]+]]
+    // CHECK_INIT: br label {{.*}}, !dbg [[retnLoc:![0-9]+]]
+
+    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-4]]
+    // CHECK_INIT: [[retnLoc]] = !DILocation(line: [[@LINE+1]]
+    return nil
+  }
+}

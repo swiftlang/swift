@@ -1,5 +1,6 @@
+
 // RUN: %empty-directory(%t)
-// RUN: %utils/chex.py < %s > %t/keypaths_objc.sil
+// RUN: %{python} %utils/chex.py < %s > %t/keypaths_objc.sil
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %t/keypaths_objc.sil | %FileCheck %t/keypaths_objc.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 
@@ -7,40 +8,40 @@ import Swift
 import Foundation
 
 class C: NSObject {
-  dynamic var x: NSString { get }
+  @objc dynamic var x: NSString { get }
   @sil_stored final var stored: Int
   override init()
 }
 
 sil_vtable C {}
 
-sil @x_get : $@convention(thin) (@in C) -> @out NSString
+sil @x_get : $@convention(thin) (@in_guaranteed C) -> @out NSString
 
 // CHECK: [[KEYPATH_A:@keypath.*]] = private global
-// --             0x0100_0002: computed, get-only, indirect identifier
-// CHECK-SAME: <i32 0x0100_0002>,
+// --             computed, get-only, indirect identifier
+// CHECK-SAME: <i32 0x0200_0002>,
 // CHECK-SAME: i8** @"\01L_selector(x)"
 
 // CHECK: [[KEYPATH_B:@keypath.*]] = private global
-// --             0x02fffffd: class stored property with indirect offset
-// CHECK-SAME: <i32 0x02fffffd>,
-// CHECK-SAME: @"$S13keypaths_objc1CC6storedSivpWvd"
+// --             class mutable stored property with indirect offset
+// CHECK-SAME: <i32 0x03fffffd>,
+// CHECK-SAME: @"$s13keypaths_objc1CC6storedSivpWvd"
 
 // CHECK-LABEL: define swiftcc void @objc_only_property()
 sil @objc_only_property : $@convention(thin) () -> () {
 entry:
   // CHECK: call %swift.refcounted* @swift_getKeyPath({{.*}} [[KEYPATH_A]]
-  %a = keypath $KeyPath<C, NSString>, (objc "x"; root $C; gettable_property $NSString, id #C.x!getter.1.foreign, getter @x_get : $@convention(thin) (@in C) -> @out NSString)
+  %a = keypath $KeyPath<C, NSString>, (objc "x"; root $C; gettable_property $NSString, id #C.x!getter.1.foreign, getter @x_get : $@convention(thin) (@in_guaranteed C) -> @out NSString)
   unreachable
 }
 
-sil hidden @$S13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
-entry(%0 : $C):
+sil hidden @$s13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
+entry(%0 : @guaranteed $C):
   unreachable
 }
 
-sil hidden @$S13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
-entry(%0 : $@objc_metatype C.Type):
+sil hidden @$s13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
+entry(%0 : @trivial $@objc_metatype C.Type):
   unreachable
 }
 

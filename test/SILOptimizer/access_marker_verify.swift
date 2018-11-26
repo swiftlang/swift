@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
+
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -49,7 +50,7 @@ struct StructOfInt {
   }
 }
 // The verifier ignores the load of the self box.
-// CHECK-LABEL: sil hidden @$S20access_marker_verify11StructOfIntVACycfC : $@convention(method) (@thin StructOfInt.Type) -> StructOfInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify11StructOfIntVACycfC : $@convention(method) (@thin StructOfInt.Type) -> StructOfInt {
 // CHECK: bb0(%0 : @trivial $@thin StructOfInt.Type):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var StructOfInt }, var, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] [[BOX]] : ${ var StructOfInt }
@@ -62,7 +63,7 @@ struct StructOfInt {
 // CHECK:   [[VAL:%.*]] = load [trivial] [[PROJ]] : $*StructOfInt
 // CHECK:   destroy_value [[UNINIT]] : ${ var StructOfInt }
 // CHECK:   return [[VAL]] : $StructOfInt
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify11StructOfIntVACycfC'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify11StructOfIntVACycfC'
 
 // --- class initialization.
 class SuperHasInt {
@@ -86,7 +87,7 @@ class SubHasInt : SuperHasInt {
     super.init()
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt {
 // CHECK:   bb0(%0 : @owned $SuperHasInt):
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [rootself] %0 : $SuperHasInt
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[UNINIT]] : $SuperHasInt
@@ -94,14 +95,14 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %{{.*}} to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[UNINIT]] : $SuperHasInt, $SuperHasInt
+// CHECK:   end_borrow [[BORROW]] : $SuperHasInt
 // CHECK-NOT: begin_access
 // CHECK:   [[VAL:%.*]] = copy_value [[UNINIT]] : $SuperHasInt
 // CHECK:   destroy_value [[UNINIT]] : $SuperHasInt
 // CHECK:   return [[VAL]] : $SuperHasInt
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify11SuperHasIntCACycfc'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify11SuperHasIntCACycfc'
 
-// CHECK-LABEL: sil hidden @$S20access_marker_verify9SubHasIntCACycfc : $@convention(method) (@owned SubHasInt) -> @owned SubHasInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify9SubHasIntCACycfc : $@convention(method) (@owned SubHasInt) -> @owned SubHasInt {
 // CHECK: bb0(%0 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
@@ -114,11 +115,11 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %{{.*}} to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[PROJ]] : $SubHasInt, $*SubHasInt
+// CHECK:   end_borrow [[BORROW]] : $SubHasInt
 // CHECK-NOT: begin_access
 // CHECK:   load [take] [[PROJ]] : $*SubHasInt
 // CHECK:   upcast %{{.*}} : $SubHasInt to $SuperHasInt
-// CHECK:   function_ref @$S20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt
+// CHECK:   function_ref @$s20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt
 // CHECK:   apply
 // CHECK:   unchecked_ref_cast %{{.*}} : $SuperHasInt to $SubHasInt
 // CHECK-NOT: begin_access
@@ -126,9 +127,9 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[VAL:%.*]] = load [copy] [[PROJ]] : $*SubHasInt
 // CHECK:   destroy_value [[UNINIT]] : ${ var SubHasInt }
 // CHECK:   return [[VAL]] : $SubHasInt
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify9SubHasIntCACycfc'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify9SubHasIntCACycfc'
 
-// CHECK-LABEL: sil hidden @$S20access_marker_verify9SubHasIntC1xACSi_tcfc : $@convention(method) (Int, @owned SubHasInt) -> @owned SubHasInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify9SubHasIntC1xACSi_tcfc : $@convention(method) (Int, @owned SubHasInt) -> @owned SubHasInt {
 // CHECK: bb0(%0 : @trivial $Int, %1 : @owned $SubHasInt):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var SubHasInt }, let, name "self"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [derivedself] [[BOX]] : ${ var SubHasInt }
@@ -141,11 +142,11 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADR]] : $*Int
 // CHECK:   assign %0 to [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROW]] from [[PROJ]] : $SubHasInt, $*SubHasInt
+// CHECK:   end_borrow [[BORROW]] : $SubHasInt
 // CHECK-NOT: begin_access
 // CHECK:   load [take] [[PROJ]] : $*SubHasInt
 // CHECK:   upcast %{{.*}} : $SubHasInt to $SuperHasInt
-// CHECK:   function_ref @$S20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt
+// CHECK:   function_ref @$s20access_marker_verify11SuperHasIntCACycfc : $@convention(method) (@owned SuperHasInt) -> @owned SuperHasInt
 // CHECK:   apply
 // CHECK:   unchecked_ref_cast %{{.*}} : $SuperHasInt to $SubHasInt
 // CHECK-NOT: begin_access
@@ -153,7 +154,7 @@ class SubHasInt : SuperHasInt {
 // CHECK:   [[VAL:%.*]] = load [copy] [[PROJ]] : $*SubHasInt
 // CHECK:   destroy_value [[UNINIT]] : ${ var SubHasInt }
 // CHECK:   return [[VAL]] : $SubHasInt
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify9SubHasIntC1xACSi_tcfc'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify9SubHasIntC1xACSi_tcfc'
 
 // --- access `let` property.
 class LetClass {
@@ -162,17 +163,12 @@ class LetClass {
 
 // FIXME: should be a [unknown] access.
 //
-// CHECK-LABEL: sil hidden @$S20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF : $@convention(thin) (@owned LetClass) -> Int {
-// CHECK: bb0(%0 : @owned $LetClass):
-// CHECK:   begin_borrow %0 : $LetClass
+// CHECK-LABEL: sil hidden @$s20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF : $@convention(thin) (@guaranteed LetClass) -> Int {
+// CHECK: bb0(%0 : @guaranteed $LetClass):
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [read] [dynamic]
 // CHECK:   load [trivial]
-// CHECK:   end_access
-// CHECK:   end_borrow
-// CHECK:   destroy_value %0 : $LetClass
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify10testGetLet1cSiAA0F5ClassC_tF'
 func testGetLet(c: LetClass) -> Int {
   return c.x
 }
@@ -190,7 +186,7 @@ final class SubWrapper : BaseClass {
     super.init()
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify10SubWrapperCyAcA03IntE0Vcfc : $@convention(method) (IntWrapper, @owned SubWrapper) -> @owned SubWrapper {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify10SubWrapperCyAcA03IntE0Vcfc : $@convention(method) (IntWrapper, @owned SubWrapper) -> @owned SubWrapper {
 // CHECK: bb0(%0 : @trivial $IntWrapper, %1 : @owned $SubWrapper):
 // CHECK:   alloc_box ${ var SubWrapper }, let, name "self"
 // CHECK:   mark_uninitialized [derivedself]
@@ -200,9 +196,7 @@ final class SubWrapper : BaseClass {
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow
 // CHECK:   ref_element_addr
-// CHECK:   begin_access [modify] [dynamic]
 // CHECK:   assign %0 to
-// CHECK:   end_access
 // CHECK:   end_borrow
 // CHECK-NOT: begin_access
 // CHECK:   load [take]
@@ -211,7 +205,7 @@ final class SubWrapper : BaseClass {
 // CHECK:   [[VAL:%.*]] = load [copy]
 // CHECK:   destroy_value %{{.*}} : ${ var SubWrapper }
 // CHECK:   return [[VAL]] : $SubWrapper
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify10SubWrapperCyAcA03IntE0Vcfc'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify10SubWrapperCyAcA03IntE0Vcfc'
 
 // --- captured local.
 func testCaptureLocal() -> ()->() {
@@ -220,7 +214,7 @@ func testCaptureLocal() -> ()->() {
   _ = x
   return f
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify16testCaptureLocalyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
 // CHECK: bb0:
 // CHECK:   alloc_box ${ var Int }, var, name "x"
 // CHECK:   [[PROJ:%.*]] = project_box
@@ -237,7 +231,7 @@ func testCaptureLocal() -> ()->() {
 // CHECK-NOT: begin_access
 // CHECK:   assign [[VAL]] to [[UNINIT]] : $*Int
 // CHECK:   return {{.*}} : $@callee_guaranteed () -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16testCaptureLocalyycyF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify16testCaptureLocalyycyF'
 
 // --- mutating struct.
 func testModifyS(_ arg: StructOfInt) -> StructOfInt {
@@ -246,7 +240,7 @@ func testModifyS(_ arg: StructOfInt) -> StructOfInt {
   lhs.changeMe()
   return lhs
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify11testModifySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify11testModifySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
 // CHECK: bb0(%0 : @trivial $StructOfInt):
 // CHECK:   alloc_box ${ var StructOfInt }, var, name "lhs"
 // CHECK:   mark_uninitialized [var]
@@ -255,13 +249,13 @@ func testModifyS(_ arg: StructOfInt) -> StructOfInt {
 // CHECK:   assign
 // CHECK:   end_access
 // CHECK:   begin_access [modify] [unknown]
-// CHECK:   function_ref @$S20access_marker_verify11StructOfIntV8changeMeyyF : $@convention(method) (@inout StructOfInt) -> ()
+// CHECK:   function_ref @$s20access_marker_verify11StructOfIntV8changeMeyyF : $@convention(method) (@inout StructOfInt) -> ()
 // CHECK:   apply
 // CHECK:   end_access
 // CHECK:   begin_access [read] [unknown]
 // CHECK:   load [trivial]
 // CHECK:   end_access
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify11testModifySyAA11StructOfIntVADF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify11testModifySyAA11StructOfIntVADF'
 
 // --- initialize LValue.
 protocol HasIntGetter {
@@ -271,7 +265,7 @@ func testInitLValue(p: HasIntGetter) -> Int {
   var x = p.x
   return x
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF : $@convention(thin) (@in HasIntGetter) -> Int {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF : $@convention(thin) (@in_guaranteed HasIntGetter) -> Int {
 // CHECK: bb0(%0 : @trivial $*HasIntGetter):
 // CHECK:   alloc_box ${ var Int }, var, name "x"
 // CHECK:   [[PROJ:%.*]] = project_box
@@ -289,7 +283,7 @@ func testInitLValue(p: HasIntGetter) -> Int {
 // CHECK:   begin_access [read] [unknown] [[PROJ]]
 // CHECK:   load [trivial]
 // CHECK:   end_access
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF'
 
 // --- initialize let.
 func testCopyS(_ arg: StructOfInt) -> StructOfInt {
@@ -297,7 +291,7 @@ func testCopyS(_ arg: StructOfInt) -> StructOfInt {
   lhs = arg
   return lhs
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify9testCopySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify9testCopySyAA11StructOfIntVADF : $@convention(thin) (StructOfInt) -> StructOfInt {
 // CHECK: bb0(%0 : @trivial $StructOfInt):
 // CHECK:   alloc_stack $StructOfInt, let, name "lhs"
 // CHECK:   [[UNINIT:%.*]] = mark_uninitialized [var]
@@ -305,21 +299,21 @@ func testCopyS(_ arg: StructOfInt) -> StructOfInt {
 // CHECK:   assign %0 to [[UNINIT]] : $*StructOfInt
 // CHECK-NOT: begin_access
 // CHECK:   %5 = load [trivial] [[UNINIT]] : $*StructOfInt
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify9testCopySyAA11StructOfIntVADF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify9testCopySyAA11StructOfIntVADF'
 
 // --- local var init (single buffer).
 func testLocalVarInit(_ arg: StructOfInt) -> Int {
   var lhs = arg
   return lhs.i
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16testLocalVarInitySiAA11StructOfIntVF : $@convention(thin) (StructOfInt) -> Int {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify16testLocalVarInitySiAA11StructOfIntVF : $@convention(thin) (StructOfInt) -> Int {
 // CHECK: bb0(%0 : @trivial $StructOfInt):
 // CHECK:   alloc_box ${ var StructOfInt }, var, name "lhs"
 // CHECK:   [[BOX:%.*]] = project_box
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[BOX]]
 // CHECK:   store %0 to [trivial] [[ACCESS]]
 // CHECK:   end_access
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16testLocalVarInitySiAA11StructOfIntVF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify16testLocalVarInitySiAA11StructOfIntVF'
 
 // --- init generic enum
 enum GenericEnum<T> {
@@ -333,7 +327,7 @@ case V(T)
 func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
   return GenericEnum(t: t)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify11GenericEnumO1tACyxGSgx_tcfC : $@convention(method) <T> (@in T, @thin GenericEnum<T>.Type) -> @out Optional<GenericEnum<T>> {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify11GenericEnumO1tACyxGSgx_tcfC : $@convention(method) <T> (@in T, @thin GenericEnum<T>.Type) -> @out Optional<GenericEnum<T>> {
 // CHECK: bb0(%0 : @trivial $*Optional<GenericEnum<T>>, %1 : @trivial $*T, %2 : @trivial $@thin GenericEnum<T>.Type):
 // CHECK:   alloc_box $<τ_0_0> { var GenericEnum<τ_0_0> } <T>, var, name "self"
 // CHECK:   mark_uninitialized [delegatingself] %3 : $<τ_0_0> { var GenericEnum<τ_0_0> } <T>
@@ -350,7 +344,7 @@ func testInitGenericEnum<T>(t: T) -> GenericEnum<T>? {
 // CHECK-NOT: begin_access
 // CHECK:   copy_addr %{{.*}} to [initialization] [[ADR2]] : $*GenericEnum<T>
 // CHECK:   inject_enum_addr %0 : $*Optional<GenericEnum<T>>, #Optional.some!enumelt.1
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify11GenericEnumO1tACyxGSgx_tcfC'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify11GenericEnumO1tACyxGSgx_tcfC'
 
 // -- initialize indirect enum.
 enum IndirectEnum {
@@ -360,7 +354,7 @@ enum IndirectEnum {
 func testIndirectEnum() -> IndirectEnum {
   return IndirectEnum.V(3)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16testIndirectEnumAA0eF0OyF : $@convention(thin) () -> @owned IndirectEnum {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify16testIndirectEnumAA0eF0OyF : $@convention(thin) () -> @owned IndirectEnum {
 // CHECK: bb0:
 // CHECK:   alloc_box ${ var Int }
 // CHECK:   [[PROJ:%.*]] = project_box
@@ -370,7 +364,7 @@ func testIndirectEnum() -> IndirectEnum {
 // CHECK:   end_access
 // CHECK:   enum $IndirectEnum, #IndirectEnum.V!enumelt.1
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16testIndirectEnumAA0eF0OyF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify16testIndirectEnumAA0eF0OyF'
 
 // -- indirect enum with getter.
 enum IntEnum {
@@ -382,14 +376,14 @@ enum IntEnum {
     }
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify7IntEnumO8getValueSivg : $@convention(method) (@guaranteed IntEnum) -> Int {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify7IntEnumO8getValueSivg : $@convention(method) (@guaranteed IntEnum) -> Int {
 // CHECK: bb0(%0 : @guaranteed $IntEnum):
 // CHECK:   switch_enum %{{.*}} : $IntEnum, case #IntEnum.int!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var Int }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var Int }):
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[PROJ]] : $*Int
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify7IntEnumO8getValueSivg'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify7IntEnumO8getValueSivg'
 
 // -- indirect enum reference.
 enum RefEnum {
@@ -401,14 +395,14 @@ enum RefEnum {
     }
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg : $@convention(method) (@guaranteed RefEnum) -> @owned BaseClass {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg : $@convention(method) (@guaranteed RefEnum) -> @owned BaseClass {
 // CHECK: bb0(%0 : @guaranteed $RefEnum):
 // CHECK:   switch_enum %{{.*}} : $RefEnum, case #RefEnum.ref!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var BaseClass }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var BaseClass }):
 // CHECK:   [[PROJ:%.*]] = project_box %{{.*}} : ${ var BaseClass }, 0
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow [[PROJ]] : $*BaseClass
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg'
 
 // --- indirect enum pattern.
 func testEnumPattern(ie: IndirectEnum) -> Bool {
@@ -418,14 +412,14 @@ func testEnumPattern(ie: IndirectEnum) -> Bool {
   _ = kind
   return true
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify15testEnumPattern2ieSbAA08IndirectE0O_tF : $@convention(thin) (@owned IndirectEnum) -> Bool {
-// CHECK: bb0(%0 : @owned $IndirectEnum):
+// CHECK-LABEL: sil hidden @$s20access_marker_verify15testEnumPattern2ieSbAA08IndirectE0O_tF : $@convention(thin) (@guaranteed IndirectEnum) -> Bool {
+// CHECK: bb0(%0 : @guaranteed $IndirectEnum):
 // CHECK:   switch_enum %{{.*}} : $IndirectEnum, case #IndirectEnum.V!enumelt.1: [[BBV:bb.*]], default bb
 // CHECK: [[BBV]](%{{.*}} : @owned ${ var Int }):
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[PROJ]] : $*Int
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify15testEnumPattern2ieSbAA08IndirectE0O_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify15testEnumPattern2ieSbAA08IndirectE0O_tF'
 
 // --- enum LValue.
 struct StructOfEnum {
@@ -434,82 +428,92 @@ struct StructOfEnum {
 }
 func enumLValueHelper(_: inout E, _: inout E) {}
 
-// CHECK-LABEL: sil hidden @$S20access_marker_verify14testEnumLValue1syAA08StructOfE0Vz_tF : $@convention(thin) (@inout StructOfEnum) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify14testEnumLValue1syAA08StructOfE0Vz_tF : $@convention(thin) (@inout StructOfEnum) -> () {
 // CHECK: bb0(%0 : @trivial $*StructOfEnum):
 // CHECK:   begin_access [modify] [unknown] %0 : $*StructOfEnum
 // CHECK:   struct_element_addr %2 : $*StructOfEnum, #StructOfEnum.e
 // CHECK:   begin_access [modify] [unknown] %0 : $*StructOfEnum
 // CHECK:   struct_element_addr %4 : $*StructOfEnum, #StructOfEnum.f
-// CHECK:   function_ref @$S20access_marker_verify16enumLValueHelperyyAA1EOz_ADztF : $@convention(thin) (@inout E, @inout E) -> ()
+// CHECK:   function_ref @$s20access_marker_verify16enumLValueHelperyyAA1EOz_ADztF : $@convention(thin) (@inout E, @inout E) -> ()
 // CHECK:   apply %6(%3, %5) : $@convention(thin) (@inout E, @inout E) -> ()
 // CHECK:   end_access %4 : $*StructOfEnum
 // CHECK:   end_access %2 : $*StructOfEnum
 // CHECK:   %10 = tuple ()
 // CHECK:   return %10 : $()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify14testEnumLValue1syAA08StructOfE0Vz_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify14testEnumLValue1syAA08StructOfE0Vz_tF'
 func testEnumLValue(s: inout StructOfEnum) {
   enumLValueHelper(&s.e, &s.f)
 }
 
+struct MyDict<K: Hashable, V> {
+  let s = "" // make this non-trivial
+  subscript(key: K) -> V? {
+    get { return nil }
+    set {}
+  }
+}
+
 // --- Optional access.
-func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
+func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
   var dict = dict
   dict[1]?.append(2)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF : $@convention(thin) (@owned Dictionary<Int, Array<Int>>) -> () {
-// CHECK: bb0(%0 : @owned $Dictionary<Int, Array<Int>>):
-// CHECK:   alloc_box ${ var Dictionary<Int, Array<Int>> }, var, name "dict"
+// CHECK-LABEL: sil hidden @$s20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF : $@convention(thin) (@guaranteed MyDict<Int, Array<Int>>) -> () {
+// CHECK: bb0(%0 : @guaranteed $MyDict<Int, Array<Int>>):
+// CHECK:   alloc_box ${ var MyDict<Int, Array<Int>> }, var, name "dict"
 // CHECK:   [[PROJ:%.*]] = project_box
 // ----- initialize the box.
 // CHECK:   [[INITACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]]
 // CHECK:   store %{{.*}} to [init] [[INITACCESS]]
 // CHECK:   end_access [[INITACCESS]]
-// ----- begin formal access for Dictionary.subscript.setter
+// ----- begin formal access for MyDict.subscript.setter
 // CHECK:   [[BOXACCESS:%.*]] = begin_access [modify] [unknown] [[PROJ]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK:   load_borrow [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
+// CHECK:   load_borrow [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
 // ----- Initialize some trivial temporaries.
 // CHECK:   alloc_stack $Int
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [trivial]
-// ----- Call Dictionary.subscript.getter.
+// ----- Call MyDict.subscript.getter.
 // CHECK-NOT: begin_access
 // CHECK:   apply %{{.*}}<Int, [Int]>
 // ----- access the temporary array result of the getter
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]]
-// CHECK:   select_enum_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, case #Optional.some!enumelt.1
-// CHECK:   cond_br %{{.*}}, bb2, bb1
+// CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[TEMPACCESS]]
+// CHECK:   cond_br [[HAS_VALUE]], [[TRUEBB:bb[0-9]+]], [[FALSEBB:bb[0-9]+]]
 //
-// CHECK: bb1:
-// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
-// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK-NOT: begin_access
-// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
-// CHECK:   alloc_stack $Int
-// CHECK-NOT: begin_access
-// CHECK:   store %{{.*}} to [trivial] %31 : $*Int
-// Call Dictionary.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
-// CHECK:   end_access [[BOXACCESS]] : $*Dictionary<Int, Array<Int>>
-// CHECK:   br
-//
-// CHECK: bb2:
+// CHECK: [[TRUEBB]]:
 // CHECK-NOT: begin_access
 // CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt.1
 // ----- call Array.append
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
-// CHECK:   function_ref @$SSa6appendyyxF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+// CHECK:   function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
 // CHECK:   apply %{{.*}}<Int>(%{{.*}}, [[TEMPARRAYADR]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
 // CHECK:   [[TEMPARRAYVAL:%.*]] = load [take] [[TEMPACCESS]] : $*Optional<Array<Int>>
 // CHECK:   [[ARRAYCOPY:%.*]] = alloc_stack $Optional<Array<Int>>
 // CHECK:   store [[TEMPARRAYVAL]] to [init] [[ARRAYCOPY]] : $*Optional<Array<Int>>
 // CHECK:   alloc_stack $Int
 // CHECK:   store %{{.*}} to [trivial]
-// ----- call Dictionary.subscript.setter
-// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF'
+// ----- call MyDict.subscript.setter
+// CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   br [[RETBB:bb[0-9]+]]
+//
+// CHECK: [[FALSEBB]]:
+// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
+// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
+// CHECK-NOT: begin_access
+// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
+// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
+// CHECK-NOT: begin_access
+// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
+// Call MyDict.subscript.setter
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
+// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
+// CHECK:   br [[RETBB]]
+//
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF'
 
 // --- Optional map.
 enum OptionalWithMap<Wrapped> {
@@ -530,8 +534,8 @@ enum OptionalWithMap<Wrapped> {
     }
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed (@in Wrapped) -> (@out U, @error Error), @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error Error) {
-// CHECK: bb0(%0 : @trivial $*Optional<U>, %1 : @trivial $@noescape @callee_guaranteed (@in Wrapped) -> (@out U, @error Error), %2 : @trivial $*OptionalWithMap<Wrapped>):
+// CHECK-LABEL: sil hidden @$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF : $@convention(method) <Wrapped><U> (@noescape @callee_guaranteed (@in_guaranteed Wrapped) -> (@out U, @error Error), @in_guaranteed OptionalWithMap<Wrapped>) -> (@out Optional<U>, @error Error) {
+// CHECK: bb0(%0 : @trivial $*Optional<U>, %1 : @trivial $@noescape @callee_guaranteed (@in_guaranteed Wrapped) -> (@out U, @error Error), %2 : @trivial $*OptionalWithMap<Wrapped>):
 // CHECK: [[STK:%.]] = alloc_stack $OptionalWithMap<Wrapped>
 // CHECK-NOT: begin_access
 // CHECK: copy_addr %2 to [initialization] [[STK]] : $*OptionalWithMap<Wrapped>
@@ -543,12 +547,9 @@ enum OptionalWithMap<Wrapped> {
 // CHECK: alloc_stack $Wrapped, let, name "y"
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[ADR]] to [initialization]
-// CHECK: alloc_stack $Wrapped
-// CHECK-NOT: begin_access
-// CHECK: copy_addr %{{.*}} to [initialization]
 // ----- call transform.
 // CHECK: try_apply
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify15OptionalWithMapO3mapyqd__Sgqd__xKXEKlF'
 
 // --- delegating initializer.
 struct DelegatingInit {
@@ -560,7 +561,7 @@ struct DelegatingInit {
     self.init(i: 4)
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify14DelegatingInitV1iACSi_tcfC : $@convention(method) (Int, @thin DelegatingInit.Type) -> DelegatingInit {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify14DelegatingInitV1iACSi_tcfC : $@convention(method) (Int, @thin DelegatingInit.Type) -> DelegatingInit {
 // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $@thin DelegatingInit.Type):
 // CHECK:   alloc_box ${ var DelegatingInit }, var, name "self"
 // CHECK:   mark_uninitialized [rootself] %2 : ${ var DelegatingInit }
@@ -573,39 +574,39 @@ struct DelegatingInit {
 // CHECK:   load [trivial] [[BOX]] : $*DelegatingInit
 // CHECK:   destroy_value
 // CHECK:   return %10 : $DelegatingInit
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify14DelegatingInitV1iACSi_tcfC'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify14DelegatingInitV1iACSi_tcfC'
 
 // --- addressor.
 func testAddressor(p: UnsafePointer<Int>) -> Int {
   return p.pointee
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify13testAddressor1pSiSPySiG_tF : $@convention(thin) (UnsafePointer<Int>) -> Int {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify13testAddressor1pSiSPySiG_tF : $@convention(thin) (UnsafePointer<Int>) -> Int {
 // CHECK: bb0(%0 : @trivial $UnsafePointer<Int>):
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[ADR]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify13testAddressor1pSiSPySiG_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify13testAddressor1pSiSPySiG_tF'
 
 // --- shims.
 func testShims() -> UInt32 {
   return _SwiftKeyPathBufferHeader_SizeMask
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify9testShimss6UInt32VyF : $@convention(thin) () -> UInt32 {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify9testShimss6UInt32VyF : $@convention(thin) () -> UInt32 {
 // CHECK: bb0:
 // CHECK:   [[GA:%.*]] = global_addr @_SwiftKeyPathBufferHeader_SizeMask : $*UInt32
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[GA]] : $*UInt32
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify9testShimss6UInt32VyF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify9testShimss6UInt32VyF'
 
 // --- global variable initialization.
 var globalString1 = "⓪" // start non-empty
 // CHECK-LABEL: sil private @globalinit_33_{{.*}}_func0 : $@convention(c) () -> () {
-// CHECK: alloc_global @$S20access_marker_verify13globalString1SSvp
-// CHECK: [[GA:%.*]] = global_addr @$S20access_marker_verify13globalString1SSvp : $*String
+// CHECK: alloc_global @$s20access_marker_verify13globalString1SSvp
+// CHECK: [[GA:%.*]] = global_addr @$s20access_marker_verify13globalString1SSvp : $*String
 // CHECK: apply
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
 // CHECK: store %{{.*}} to [init] [[ACCESS]] : $*String
@@ -614,13 +615,14 @@ var globalString1 = "⓪" // start non-empty
 
 var globalString2 = globalString1
 // CHECK-LABEL: sil private @globalinit_33_180BF7B9126DB0C8C6C26F15ACD01908_func1 : $@convention(c) () -> () {
-// CHECK: alloc_global @$S20access_marker_verify13globalString2SSvp
-// CHECK: [[GA:%.*]] = global_addr @$S20access_marker_verify13globalString2SSvp : $*String
+// CHECK: alloc_global @$s20access_marker_verify13globalString2SSvp
+// CHECK: [[GA:%.*]] = global_addr @$s20access_marker_verify13globalString2SSvp : $*String
 // CHECK: apply
 // CHECK: [[PTR:%.*]] = pointer_to_address
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*String
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[GA]] : $*String
+// CHECK: [[INIT:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
+// CHECK: copy_addr [[ACCESS]] to [initialization] [[INIT]] : $*String
+// CHECK: end_access [[INIT]] : $*String
 // CHECK: end_access [[ACCESS]] : $*String
 // CHECK-NOT: end_access
 // CHECK-LABEL: } // end sil function 'globalinit_33_180BF7B9126DB0C8C6C26F15ACD01908_func1'
@@ -640,13 +642,13 @@ struct GenericStructWithGetter<T> {
     get { return Value(val) }
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify23GenericStructWithGetterV5valueAC5ValueVyx_Gvg : $@convention(method) <T> (@in_guaranteed GenericStructWithGetter<T>) -> GenericStructWithGetter<T>.Value {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify23GenericStructWithGetterV5valueAC5ValueVyx_Gvg : $@convention(method) <T> (@in_guaranteed GenericStructWithGetter<T>) -> GenericStructWithGetter<T>.Value {
 // CHECK: bb0(%0 : @trivial $*GenericStructWithGetter<T>):
 // CHECK:   [[ADR:%.*]] = struct_element_addr %0 : $*GenericStructWithGetter<T>, #GenericStructWithGetter.val
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[ADR]] : $*Int
 // CHECK:   apply
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify23GenericStructWithGetterV5valueAC5ValueVyx_Gvg'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify23GenericStructWithGetterV5valueAC5ValueVyx_Gvg'
 
 // --- setter.
 struct StructWithSetter {
@@ -665,25 +667,25 @@ struct StructWithSetter {
     val += incVal
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16StructWithSetterV3inc0G3ValySi_tF : $@convention(method) (Int, @inout StructWithSetter) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify16StructWithSetterV3inc0G3ValySi_tF : $@convention(method) (Int, @inout StructWithSetter) -> () {
 // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*StructWithSetter):
 // CHECK: [[FORMALACCESS:%.*]] = begin_access [modify] [unknown] %1
 // CHECK: alloc_stack $Int
 // CHECK: load [trivial] [[FORMALACCESS]] : $*StructWithSetter
-// CHECK: [[GETTER:%.*]] = function_ref @$S20access_marker_verify16StructWithSetterV3valSivg
+// CHECK: [[GETTER:%.*]] = function_ref @$s20access_marker_verify16StructWithSetterV3valSivg
 // CHECK: apply [[GETTER]]
 // CHECK: begin_access [modify] [unsafe]
 // CHECK: store %{{.*}} to [trivial]
 // CHECK: end_access
 // CHECK: begin_access [modify] [unsafe]
-// CHECK: [[INC:%.*]] = function_ref @$SSi2peoiyySiz_SitFZ
+// CHECK: [[INC:%.*]] = function_ref @$sSi2peoiyySiz_SitFZ
 // CHECK: apply [[INC]]
 // CHECK: load [trivial] %13 : $*Int
-// CHECK: [[SETTER:%.*]] = function_ref @$S20access_marker_verify16StructWithSetterV3valSivs
+// CHECK: [[SETTER:%.*]] = function_ref @$s20access_marker_verify16StructWithSetterV3valSivs
 // CHECK: apply [[SETTER]]
 // CHECK: end_access
 // CHECK: end_access [[FORMALACCESS]]
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16StructWithSetterV3inc0G3ValySi_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify16StructWithSetterV3inc0G3ValySi_tF'
 
 // --- lazy inout.
 func increment(_ x: inout Int) { x += 1 }
@@ -695,25 +697,25 @@ final class LazyFinalClassProperty {
 func inoutWriteOfLazyFinalClassProperty(l: inout LazyFinalClassProperty) {
   increment(&l.cat)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify34inoutWriteOfLazyFinalClassProperty1lyAA0ghiJ0Cz_tF : $@convention(thin) (@inout LazyFinalClassProperty) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify34inoutWriteOfLazyFinalClassProperty1lyAA0ghiJ0Cz_tF : $@convention(thin) (@inout LazyFinalClassProperty) -> () {
 // CHECK: bb0(%0 : @trivial $*LazyFinalClassProperty):
 // CHECK:   [[FORMALACCESS:%.*]] = begin_access [read] [unknown] %0 : $*LazyFinalClassProperty
 // CHECK:   load [copy] [[FORMALACCESS]] : $*LazyFinalClassProperty
 // CHECK:   end_access [[FORMALACCESS]] : $*LazyFinalClassProperty
 // CHECK:   // function_ref LazyFinalClassProperty.cat.getter
-// CHECK:   [[GETTER:%.*]] = function_ref @$S20access_marker_verify22LazyFinalClassPropertyC3catSivg
+// CHECK:   [[GETTER:%.*]] = function_ref @$s20access_marker_verify22LazyFinalClassPropertyC3catSivg
 // CHECK:   apply [[GETTER]]
 // CHECK:   begin_access [modify] [unsafe]
 // CHECK:   store %{{.*}} to [trivial]
 // CHECK:   end_access
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] %5 : $*Int
-// CHECK:   [[INC:%.*]] = function_ref @$S20access_marker_verify9incrementyySizF : $@convention(thin) (@inout Int) -> ()
+// CHECK:   [[INC:%.*]] = function_ref @$s20access_marker_verify9incrementyySizF : $@convention(thin) (@inout Int) -> ()
 // CHECK:   apply [[INC]]([[TEMPACCESS]]) : $@convention(thin) (@inout Int) -> ()
 // CHECK:   load [trivial] [[TEMPACCESS]] : $*Int
-// CHECK:   [[SETTER:%.*]] = function_ref @$S20access_marker_verify22LazyFinalClassPropertyC3catSivs
+// CHECK:   [[SETTER:%.*]] = function_ref @$s20access_marker_verify22LazyFinalClassPropertyC3catSivs
 // CHECK:   apply [[SETTER]]
 // CHECK:   end_access [[TEMPACCESS]] : $*Int
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify34inoutWriteOfLazyFinalClassProperty1lyAA0ghiJ0Cz_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify34inoutWriteOfLazyFinalClassProperty1lyAA0ghiJ0Cz_tF'
 
 // --- lazy getter.
 func inoutAccessOfLazyFinalClassProperty(
@@ -721,14 +723,14 @@ func inoutAccessOfLazyFinalClassProperty(
 ) -> Int {
   return l.cat
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify35inoutAccessOfLazyFinalClassProperty1lSiAA0ghiJ0Cz_tF : $@convention(thin) (@inout LazyFinalClassProperty) -> Int {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify35inoutAccessOfLazyFinalClassProperty1lSiAA0ghiJ0Cz_tF : $@convention(thin) (@inout LazyFinalClassProperty) -> Int {
 // CHECK: bb0(%0 : @trivial $*LazyFinalClassProperty):
 // CHECK:   begin_access [read] [unknown] %0
 // CHECK:   load [copy]
 // CHECK:   end_access
-// CHECK:   [[GETTER:%.*]] = function_ref @$S20access_marker_verify22LazyFinalClassPropertyC3catSivg : $@convention(method) (@guaranteed LazyFinalClassProperty) -> Int
+// CHECK:   [[GETTER:%.*]] = function_ref @$s20access_marker_verify22LazyFinalClassPropertyC3catSivg : $@convention(method) (@guaranteed LazyFinalClassProperty) -> Int
 // CHECK:   apply [[GETTER]]
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify35inoutAccessOfLazyFinalClassProperty1lSiAA0ghiJ0Cz_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify35inoutAccessOfLazyFinalClassProperty1lSiAA0ghiJ0Cz_tF'
 
 // --- polymorphic getter
 protocol Abstractable {
@@ -739,26 +741,41 @@ protocol Abstractable {
 class C : Abstractable {
   var storedFunction: () -> Int = { 0 }
 }
-// CHECK-LABEL: sil private [transparent] [thunk] @$S20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvmTW : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout C) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $*C):
-// CHECK:   [[ADR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_guaranteed () -> @out Int
-// CHECK:   [[TEMP:%.*]] = alloc_stack $@callee_guaranteed () -> Int
-// CHECK:   [[GETTER:%.*]] = apply
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]] : $*@callee_guaranteed () -> Int
-// CHECK:   store %{{.*}} to [init] [[ACCESS]] : $*@callee_guaranteed () -> Int
-// CHECK:   end_access [[ACCESS]] : $*@callee_guaranteed () -> Int
-// CHECK-NOT: begin_access
-// CHECK:   load [copy] [[TEMP]] : $*@callee_guaranteed () -> Int
-// CHECK:   [[PA:%.*]] = partial_apply
-// CHECK:   destroy_addr [[TEMP]] : $*@callee_guaranteed () -> Int
-// CHECK-NOT: begin_access
-// CHECK:   store [[PA]] to [init] [[ADR]] : $*@callee_guaranteed () -> @out Int
-// CHECK:   [[PTR:%.*]] = address_to_pointer [[ADR]] : $*@callee_guaranteed () -> @out Int to $Builtin.RawPointer
-// CHECK:   [[FPTR:%.*]] = thin_function_to_pointer %{{.*}} : $@convention(witness_method: Abstractable) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout C, @thick C.Type) -> () to $Builtin.RawPointer
-// CHECK:   [[ENUM:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[FPTR]] : $Builtin.RawPointer
-// CHECK:   [[R:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[ENUM]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[R]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvmTW'
+// CHECK-LABEL: sil private [transparent] [thunk] @$s20access_marker_verify1CCAA12AbstractableA2aDP14storedFunction6ResultQzycvMTW : $@yield_once @convention(witness_method: Abstractable) (@inout C) -> @yields @inout @callee_guaranteed () -> @out Int
+// CHECK:      bb0(%0 : @trivial $*C):
+// CHECK-NEXT:   [[SELF:%.*]] = load_borrow %0 : $*C
+// CHECK-NEXT:   [[MODIFY:%.*]] = class_method [[SELF]] : $C, #C.storedFunction!modify.1
+// CHECK-NEXT:   ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[SELF]])
+// CHECK-NEXT:   [[TEMP:%.*]] = alloc_stack $@callee_guaranteed () -> @out Int
+// CHECK-NEXT:   [[OLD_FN:%.*]] = load [take] [[ADDR]]
+// CHECK-NEXT:   // function_ref thunk
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegd_SiIegr_TR
+// CHECK-NEXT:   [[THUNKED_OLD_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[OLD_FN]])
+// CHECK-NEXT:   store [[THUNKED_OLD_FN]] to [init] [[TEMP]] :
+// CHECK-NEXT:   yield [[TEMP]] : $*@callee_guaranteed () -> @out Int, resume bb1, unwind bb2
+
+// CHECK:      bb1:
+// CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   // function_ref thunk
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegr_SiIegd_TR
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
+// CHECK-NEXT:   dealloc_stack [[TEMP]]
+// CHECK-NEXT:   end_apply [[TOKEN]]
+// CHECK-NEXT:   [[TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:   end_borrow [[SELF]] : $C
+// CHECK-NEXT:   return [[TUPLE]]
+
+// CHECK:      bb2:
+// CHECK-NEXT:   [[NEW_FN:%.*]] = load [take] [[TEMP]]
+// CHECK-NEXT:   // function_ref thunk
+// CHECK-NEXT:   [[THUNK:%.*]] = function_ref @$sSiIegr_SiIegd_TR
+// CHECK-NEXT:   [[THUNKED_NEW_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[NEW_FN]])
+// CHECK-NEXT:   store [[THUNKED_NEW_FN]] to [init] [[ADDR]] :
+// CHECK-NEXT:   dealloc_stack [[TEMP]]
+// CHECK-NEXT:   abort_apply [[TOKEN]]
+// CHECK-NEXT:   end_borrow [[SELF]] : $C
+// CHECK-NEXT:   unwind
 
 // --- writeback address-only.
 var addressOnly: P {
@@ -773,7 +790,7 @@ func takesInoutP(x: inout P) {}
 func testWriteback() {
   takesInoutP(x: &addressOnly)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify13testWritebackyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify13testWritebackyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   %0 = alloc_stack $P
 // CHECK: [[GETTER:%.*]] = apply
@@ -783,7 +800,7 @@ func testWriteback() {
 // Call addressOnly.setter
 // CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in P) -> ()
 // CHECK: end_access [[ACCESS]] : $*P
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify13testWritebackyyF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify13testWritebackyyF'
 
 // --- writeback temp.
 struct MutableStorage {
@@ -801,23 +818,15 @@ class Container {
     self.storage.push()
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify9ContainerC17testWritebackTempyyF : $@convention(method) (@guaranteed Container) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify9ContainerC17testWritebackTempyyF : $@convention(method) (@guaranteed Container) -> () {
 // CHECK: bb0(%0 : @guaranteed $Container):
 // call storage.materializeForSet
-// CHECK: [[MATSET:%.*]] = class_method %0 : $Container, #Container.storage!materializeForSet.1
-// CHECK: apply [[MATSET]]
+// CHECK: [[MODIFY:%.*]] = class_method %0 : $Container, #Container.storage!modify.1
+// CHECK: begin_apply [[MODIFY]]
 // call MutableStorage.push()
 // CHECK: apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableStorage) -> ()
-// CHECK: switch_enum %{{.*}} : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[BBSOME:bb.*]], case #Optional.none!enumelt: bb
-// CHECK: [[BBSOME]]([[WB:%.*]] : @trivial $Builtin.RawPointer):
-// CHECK: [[WBF:%.*]] = pointer_to_thin_function [[WB]]
-// CHECK: [[TEMP:%.*]] = alloc_stack $Container
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]] : $*Container
-// CHECK: store_borrow %0 to [[ACCESS]] : $*Container
-// writeback
-// CHECK: apply [[WBF]]
-// CHECK: end_access [[ACCESS]] : $*Container
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify9ContainerC17testWritebackTempyyF'
+// CHECK: end_apply
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify9ContainerC17testWritebackTempyyF'
 
 // --- return mixed tuple
 protocol HasClassGetter {
@@ -826,7 +835,7 @@ protocol HasClassGetter {
 func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
   return (p.c, p.c)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in HasClassGetter) -> (@owned BaseClass, @out Any) {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in_guaranteed HasClassGetter) -> (@owned BaseClass, @out Any) {
 // CHECK: bb0(%0 : @trivial $*Any, %1 : @trivial $*HasClassGetter):
 // CHECK: [[P1:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
 // CHECK: [[TEMP1:%.*]] = alloc_stack $@opened
@@ -834,16 +843,16 @@ func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
 // CHECK: copy_addr [[P1]] to [initialization] [[TEMP1]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: [[OUTC:%.*]] = apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
-// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*HasClassGetter to $*@opened
 // CHECK: [[TEMP2:%.*]] = alloc_stack $@opened
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [[P2]] to [initialization] [[TEMP2]] : $*@opened
 // CHECK-NOT: begin_access
 // CHECK: apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
+// CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: store %{{.*}} to [init] [[OUTANY]] : $*BaseClass
 // CHECK: return [[OUTC]] : $BaseClass
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF'
 
 // --- existential cast.
 internal protocol CanCast {
@@ -857,7 +866,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
     return (self as CanCast as? CanCastStruct<T>)?.base
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
 // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*CanCastStruct<Base>):
 // CHECK: [[OUT_ENUM:%.*3]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[TEMP_SUB:%.*]] = alloc_stack $Optional<CanCastStruct<T>>
@@ -878,7 +887,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK: end_access [[ACCESS]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF'
 
 // --- open existential
 protocol Q : PBar {}
@@ -889,7 +898,7 @@ func testOpenExistential(p: PBar) {
     q.bar()
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF : $@convention(thin) (@in PBar) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF : $@convention(thin) (@in_guaranteed PBar) -> () {
 // CHECK: bb0(%0 : @trivial $*PBar):
 // CHECK: [[Q0:%.*]] = alloc_stack $Optional<Q>, let, name "q0"
 // CHECK: [[PBAR:%.*]] = alloc_stack $PBar
@@ -901,11 +910,8 @@ func testOpenExistential(p: PBar) {
 // CHECK: checked_cast_addr_br take_always PBar in [[PBAR]] : $*PBar to Q in [[Q0_DATA]] : $*Q, bb1, bb2
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr [[Q0]] : $*Optional<Q>, #Optional.some!enumelt.1
-// CHECK: [[TMP_Q:%.*]] = alloc_stack $Optional<Q>
 // CHECK-NOT: begin_access
-// CHECK: copy_addr [[Q0]] to [initialization] [[TMP_Q]] : $*Optional<Q>
-// CHECK-NOT: begin_access
-// CHECK: apply %{{.*}}<Q>([[TMP_Q]], {{.*}}) : $@convention(method) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
+// CHECK: apply %{{.*}}<Q>([[Q0]], {{.*}}) : $@convention(method) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, _OptionalNilComparisonType, @thin Optional<τ_0_0>.Type) -> Bool
 // CHECK: [[Q:%.*]] = alloc_stack $Q, let, name "q"
 // CHECK: [[OPT_Q:%.*]] = alloc_stack $Optional<Q>
 // CHECK-NOT: begin_access
@@ -920,7 +926,7 @@ func testOpenExistential(p: PBar) {
 // CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*Q to $*@opened("{{.*}}") Q
 // CHECK: witness_method $@opened("{{.*}}") Q, #PBar.bar!1
 // CHECK: apply %{{.*}}<@opened("{{.*}}") Q>([[Q_ADR]])
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF'
 
 // --- local existential
 func getP() -> P {
@@ -933,7 +939,7 @@ func testLocalExistential() {
   takesClosure { p = getP() }
   _ = p
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify20testLocalExistentialyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify20testLocalExistentialyyF : $@convention(thin) () -> () {
 // CHECK: alloc_box ${ var P }, var, name "p"
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var P }, 0
 // CHECK-NOT: begin_access
@@ -951,7 +957,7 @@ func testLocalExistential() {
 // CHECK: end_access
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[COPY]] to [[UNINIT]] : $*P
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify20testLocalExistentialyyF'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify20testLocalExistentialyyF'
 
 // --- address-only argument.
 protocol UsesSelf {
@@ -963,48 +969,93 @@ extension UsesSelf {
     a.bar(b)
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify8UsesSelfPAAE04testE01a1byx_xtFZ : $@convention(method) <Self where Self : UsesSelf> (@in Self, @in Self, @thick Self.Type) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify8UsesSelfPAAE04testE01a1byx_xtFZ : $@convention(method) <Self where Self : UsesSelf> (@in_guaranteed Self, @in_guaranteed Self, @thick Self.Type) -> () {
 // CHECK: bb0(%0 : @trivial $*Self, %1 : @trivial $*Self, %2 : @trivial $@thick Self.Type):
-// CHECK: [[COPY:%.*]] = alloc_stack $Self
-// CHECK: copy_addr %1 to [initialization] [[COPY]] : $*Self
-// CHECK: apply %{{.*}}<Self>([[COPY]], %0) : $@convention(witness_method: UsesSelf) <τ_0_0 where τ_0_0 : UsesSelf> (@in τ_0_0, @in_guaranteed τ_0_0) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify8UsesSelfPAAE04testE01a1byx_xtFZ'
+// CHECK: apply %{{.*}}<Self>(%1, %0) : $@convention(witness_method: UsesSelf) <τ_0_0 where τ_0_0 : UsesSelf> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify8UsesSelfPAAE04testE01a1byx_xtFZ'
 
 // --- autoclosure
 struct StructWithLayout {
   internal init() {
-    _sanityCheck(MemoryLayout.size(ofValue: self) >= 0)
+    assert(MemoryLayout.size(ofValue: self) >= 0)
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify16StructWithLayoutVACycfC : $@convention(method) (@thin StructWithLayout.Type) -> StructWithLayout {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify16StructWithLayoutVACycfC : $@convention(method) (@thin StructWithLayout.Type) -> StructWithLayout {
 // CHECK: bb0(%0 : @trivial $@thin StructWithLayout.Type):
 // CHECK: alloc_box ${ var StructWithLayout }, var, name "self"
 // CHECK: mark_uninitialized [rootself] %{{.*}} : ${ var StructWithLayout }
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var StructWithLayout }, 0
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
-// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
-// call default argument
-// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
+// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
 // call StaticString.init
 // CHECK: apply
 // call UInt.init(_builtinIntegerLiteral:)
 // CHECK: apply
+// call default argument
 // call _sanityCheck(_:_:file:line:)
 // CHECK: apply %{{.*}}([[CLOSURE]], {{.*}})
 // CHECK: load [trivial] [[PROJ]] : $*StructWithLayout
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify16StructWithLayoutVACycfC'
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify16StructWithLayoutVACycfC'
 
 // --- pointer_to_address
 // Verification should ignore this case.
 func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
   y.pointee = x
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> () {
+// CHECK-LABEL: sil hidden @$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> () {
 // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $UnsafeMutablePointer<Int>):
 // call addressor
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK-NOT: begin_access
-// CHECK: assign %0 to [[ADR]] : $*Int
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: assign %0 to [[ACCESS]] : $*Int
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
+
+// Verification should ignore the address operand of init_existential_addr.
+class testInitExistentialGlobal {
+  static var testProperty: P = StructP()
+}
+// CHECK-LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
+// CHECK:   alloc_global @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
+// CHECK:   [[GADR:%.*]] = global_addr @$s20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
+// CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
+// CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
+// CHECK-LABEL: } // end sil function 'globalinit
+
+public enum SomeError: Swift.Error {
+    case error
+}
+
+// Verification should ignore addresses produced by project_existential_box.
+public func testInitBox() throws {
+    throw SomeError.error
+}
+// CHECK-LABEL: sil @$s20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
+// CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
+// CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK: store [[BOXALLOC]] to [init] [[BOXBUF:%.*]] :
+// CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
+// CHECK: [[BOXALLOC2:%.*]] = load [take] [[BOXBUF]]
+// CHECK: throw [[BOXALLOC2]] : $Error
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify11testInitBoxyyKF'
+
+public final class HasStaticProp {
+  public static let empty: HasStaticProp = HasStaticProp()
+}
+
+// A global addressor produces an unenforced RawPointer. This looke
+// like an Unidentified access with no access marker. Ensure that
+// verification doesn't assert.
+public func getStaticProp() -> HasStaticProp {
+  return .empty
+}
+
+// CHECK-LABEL: sil @$s20access_marker_verify13getStaticPropAA03HaseF0CyF : $@convention(thin) () -> @owned HasStaticProp {
+// function_ref HasStaticProp.empty.unsafeMutableAddressor
+// CHECK: [[F:%.*]] = function_ref @$s20access_marker_verify13HasStaticPropC5emptyACvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[RP:%.*]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
+// CHECK: load [copy] [[ADR]] : $*HasStaticProp
+// CHECK-LABEL: } // end sil function '$s20access_marker_verify13getStaticPropAA03HaseF0CyF'

@@ -31,17 +31,21 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
@@ -68,6 +72,11 @@ class CompilerInvocation {
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
+  TBDGenOptions TBDGenOpts;
+  ParseableInterfaceOptions ParseableInterfaceOpts;
+  /// The \c SyntaxParsingCache to use when parsing the main file of this
+  /// invocation
+  SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
@@ -86,11 +95,19 @@ public:
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
   ///
+  /// Any configuration files loaded as a result of parsing arguments will be
+  /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
+  /// buffers should \e not be interpreted by the caller; they are only present
+  /// in order to make it possible to reproduce how these arguments were parsed
+  /// if the compiler ends up crashing or exhibiting other bad behavior.
+  ///
   /// If non-empty, relative search paths are resolved relative to
   /// \p workingDirectory.
   ///
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags,
+                 SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+                     *ConfigurationFileBuffers = nullptr,
                  StringRef workingDirectory = {});
 
   /// Sets specific options based on the given serialized Swift binary data.
@@ -109,12 +126,13 @@ public:
   serialization::Status loadFromSerializedAST(StringRef data);
 
   /// Serialize the command line arguments for emitting them
-  /// to DWARF and inject SDKPath if necessary.
-  static void buildDWARFDebugFlags(std::string &Output,
-                                   const ArrayRef<const char*> &Args,
-                                   StringRef SDKPath,
-                                   StringRef ResourceDir);
+  /// to DWARF or CodeView and inject SDKPath if necessary.
+  static void buildDebugFlags(std::string &Output,
+                              const ArrayRef<const char*> &Args,
+                              StringRef SDKPath,
+                              StringRef ResourceDir);
 
+  void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
@@ -184,6 +202,12 @@ public:
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
 
+  TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
+  const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
+  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
+  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
+
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
     return ClangImporterOpts;
@@ -208,6 +232,14 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  void setMainFileSyntaxParsingCache(SyntaxParsingCache *Cache) {
+    MainFileSyntaxParsingCache = Cache;
+  }
+
+  SyntaxParsingCache *getMainFileSyntaxParsingCache() const {
+    return MainFileSyntaxParsingCache;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
@@ -272,7 +304,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -289,7 +321,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -311,6 +343,15 @@ public:
   /// so return the TBDPath when in that mode and fail an assert
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
+
+  /// ParseableInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ParseableInterfaceOutputPath when in that mode and
+  /// fail an assert if not in that mode.
+  std::string getParseableInterfaceOutputPathForWholeModule() const;
+
+  SerializationOptions
+  computeSerializationOptions(const SupplementaryOutputPaths &outs,
+                              bool moduleIsPublic);
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -328,7 +369,8 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
-  DependencyTracker *DepTracker = nullptr;
+  /// Null if no tracker.
+  std::unique_ptr<DependencyTracker> DepTracker;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -388,6 +430,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -400,13 +444,11 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void setDependencyTracker(DependencyTracker *DT) {
+  void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = DT;
+    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
-  DependencyTracker *getDependencyTracker() {
-    return DepTracker;
-  }
+  DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
   /// Set the SIL module for this compilation instance.
   ///
@@ -417,9 +459,7 @@ public:
     return TheSILModule.get();
   }
 
-  std::unique_ptr<SILModule> takeSILModule() {
-    return std::move(TheSILModule);
-  }
+  std::unique_ptr<SILModule> takeSILModule();
 
   bool hasSILModule() {
     return static_cast<bool>(TheSILModule);
@@ -476,14 +516,19 @@ public:
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  /// Set up the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns true. Else it
+  /// returns false if setup succeeded.
+  bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();
@@ -520,9 +565,14 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
+  void performParseOnly(bool EvaluateConditionals = false,
+                        bool ParseDelayedBodyOnEnd = false);
+
+  /// Parses and performs name binding on all input files.
   ///
-  ///
-  void performParseOnly(bool EvaluateConditionals = false);
+  /// Like a parse-only invocation, a single file is required. Unlike a
+  /// parse-only invocation, module imports will be processed.
+  void performParseAndResolveImportsOnly();
 
 private:
   SourceFile *
@@ -562,7 +612,9 @@ private:
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
-  void parseAndCheckTypes(const ImplicitImports &implicitImports);
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
+  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
+                              SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
@@ -581,9 +633,10 @@ private:
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
-  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
-                                 DelayedParsingCallbacks *DelayedParseCB,
-                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
+                                     PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB,
+                                     OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 

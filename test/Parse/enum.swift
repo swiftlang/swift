@@ -110,7 +110,7 @@ enum Recovery2 {
   case UE1: // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery3 {
-  case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case UE2(Void): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
   case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
@@ -143,12 +143,12 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
   case E
 }
 
-enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
+enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
-enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{circular enum raw types 'RawTypeCircularityA' -> 'RawTypeCircularityB' -> 'RawTypeCircularityA'}} FIXME: expected-error{{RawRepresentable}}
+enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{'RawTypeCircularityA' has a raw type that depends on itself}}
   case Morrison, Belmont, Madison, Hawthorne
 
   init(integerLiteral value: Int) {
@@ -324,40 +324,40 @@ enum RawTypeMismatch : Int { // expected-error {{'RawTypeMismatch' declares raw 
 }
 
 enum DuplicateMembers1 {
-  case Foo // expected-note {{previous definition of 'Foo' is here}}
-  case Foo // expected-error {{duplicate definition of enum element}}
+  case Foo // expected-note {{'Foo' previously declared here}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers2 {
-  case Foo, Bar // expected-note {{previous definition of 'Foo' is here}} expected-note {{previous definition of 'Bar' is here}}
-  case Foo // expected-error {{duplicate definition of enum element}}
-  case Bar // expected-error {{duplicate definition of enum element}}
+  case Foo, Bar // expected-note {{'Foo' previously declared here}} expected-note {{'Bar' previously declared here}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
+  case Bar // expected-error {{invalid redeclaration of 'Bar'}}
 }
 
 enum DuplicateMembers3 {
-  case Foo // expected-note {{previous definition of 'Foo' is here}}
-  case Foo(Int) // expected-error {{duplicate definition of enum element}}
+  case Foo // expected-note {{'Foo' previously declared here}}
+  case Foo(Int) // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case Foo = 1 // expected-note {{previous definition of 'Foo' is here}}
-  case Foo = 2 // expected-error {{duplicate definition of enum element}}
+  case Foo = 1 // expected-note {{'Foo' previously declared here}}
+  case Foo = 2 // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers5 : Int { // expected-error {{'DuplicateMembers5' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case Foo = 1 // expected-note {{previous definition of 'Foo' is here}}
-  case Foo = 1 + 1 // expected-error {{duplicate definition of enum element}} expected-error {{raw value for enum case must be a literal}}
+  case Foo = 1 // expected-note {{'Foo' previously declared here}}
+  case Foo = 1 + 1 // expected-error {{invalid redeclaration of 'Foo'}} expected-error {{raw value for enum case must be a literal}}
 }
 
 enum DuplicateMembers6 {
-  case Foo // expected-note 2{{previous definition of 'Foo' is here}}
-  case Foo // expected-error {{duplicate definition of enum element}}
-  case Foo // expected-error {{duplicate definition of enum element}}
+  case Foo // expected-note 2{{'Foo' previously declared here}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
+  case Foo // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers7 : String { // expected-error {{'DuplicateMembers7' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case Foo // expected-note {{previous definition of 'Foo' is here}}
-  case Foo = "Bar" // expected-error {{duplicate definition of enum element}}
+  case Foo // expected-note {{'Foo' previously declared here}}
+  case Foo = "Bar" // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 // Refs to duplicated enum cases shouldn't crash the compiler.
@@ -437,7 +437,7 @@ enum RawValueBTest: Double, RawValueB {
 }
 
 enum foo : String { // expected-error {{'foo' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
+  case bar = nil // expected-error {{cannot convert 'nil' to raw type 'String'}}
 }
 
 // Static member lookup from instance methods
@@ -468,8 +468,8 @@ enum SE0036 {
   }
 
   func staticReferenceInInstanceMethod() {
-    _ = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{9-9=SE0036.}}
-    _ = self.A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{none}}
+    _ = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
+    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{none}}
     _ = SE0036.A
   }
 
@@ -483,9 +483,9 @@ enum SE0036 {
 
   func staticReferenceInSwitchInInstanceMethod() {
     switch self {
-    case A: break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
-    case B(_): break // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{10-10=.}}
-    case C(let x): _ = x; break // expected-error {{enum element 'C' cannot be referenced as an instance member}} {{10-10=.}}
+    case A: break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
+    case B(_): break // expected-error {{enum case 'B' cannot be used as an instance member}} {{10-10=.}}
+    case C(let x): _ = x; break // expected-error {{enum case 'C' cannot be used as an instance member}} {{10-10=.}}
     }
   }
 
@@ -515,10 +515,10 @@ enum SE0036 {
 
   init() {
     self = .A
-    self = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{12-12=.}}
+    self = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{12-12=.}}
     self = SE0036.A
     self = .B(SE0036_Auxiliary())
-    self = B(SE0036_Auxiliary()) // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{12-12=.}}
+    self = B(SE0036_Auxiliary()) // expected-error {{enum case 'B' cannot be used as an instance member}} {{12-12=.}}
     self = SE0036.B(SE0036_Auxiliary())
   }
 }
@@ -528,7 +528,7 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
+    case A(_): break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
     }
 
     switch self {
@@ -542,3 +542,9 @@ enum SE0036_Generic<T> {
 }
 
 enum switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-12=`switch`}}
+
+enum SE0155 {
+  case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
+  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
+  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+}

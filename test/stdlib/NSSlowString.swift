@@ -1,6 +1,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
 // RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -56,7 +57,10 @@ tests.test("Iterator") {
   expectEqualSequence(opaque.utf8.reversed(), native.utf8.reversed())
 }
 
-tests.test("Unicode 9 grapheme breaking") {
+tests.test("Unicode 9 grapheme breaking")
+    .xfail(.osxMinor(10, 9, reason: "Mac OS X 10.9 has an old version of ICU"))
+    .xfail(.iOSMajor(7, reason: "iOS 7 has an old version of ICU"))
+    .code {
 
 	// Test string lengths that correspond to smaller than our fixed size code
 	// unit buffer, larger than it, and exactly it.
@@ -68,7 +72,11 @@ tests.test("Unicode 9 grapheme breaking") {
 	check(strJustRight as String, expectedCount: 5, expectedCodeUnitCount: 16)
 }
 
-tests.test("Zalgo") {
+tests.test("Zalgo")
+    .xfail(.osxMinor(10, 9, reason: "Mac OS X 10.9 has an old version of ICU"))
+    .xfail(.iOSMajor(7, reason: "iOS 7 has an old version of ICU"))
+    .code {
+
 	// Check that we handle absurdly long graphemes
 	var zalgo = "a👩‍👩‍👧‍👦c"
 	for combo in 0x300...0x36f {

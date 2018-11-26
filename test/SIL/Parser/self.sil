@@ -15,7 +15,7 @@ class SelfTest {}
 sil_vtable SelfTest {}
 
 sil @test_stuff : $@convention(method) (@owned SelfTest) -> () {
-bb0(%0 : $SelfTest):
+bb0(%0 : @owned $SelfTest):
   // CHECK: metatype $@thick @dynamic_self SelfTest
   %2 = metatype $@thick @dynamic_self SelfTest.Type
   // CHECK: metatype $@thick Optional<@dynamic_self SelfTest>.Type

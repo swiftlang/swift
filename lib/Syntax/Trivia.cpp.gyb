@@ -44,6 +44,20 @@ void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
+bool TriviaPiece::isComment() const {
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if trivia.is_comment:
+    return true;
+% else:
+    return false;
+% end
+% end
+  }
+  llvm_unreachable("unknown kind");
+}
+
 void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   switch (Kind) {
 % for trivia in TRIVIAS:
@@ -73,6 +87,7 @@ bool TriviaPiece::trySquash(const TriviaPiece &Next) {
 % end
 % end
   }
+  llvm_unreachable("unknown kind");
 }
 
 void TriviaPiece::print(llvm::raw_ostream &OS) const {

@@ -5,10 +5,18 @@
 sil_stage canonical
 
 import Swift
+protocol P {}
+
+// NonBitwiseTakableBit = 0x00100000. This struct is bitwise takable because
+// 0x70007 = 458759
+// CHECK: @"$s12existentials14BitwiseTakableVWV" = internal constant [14 x i8*] {{.*}} i8* inttoptr (i64 458759 to i8*)
+struct BitwiseTakable {
+  var p: P
+}
 
 protocol CP: class {}
 
-// CHECK-DAG: define{{( protected)?}} swiftcc { %swift.refcounted*, i8** } @class_existential_unowned(%swift.refcounted*, i8**) {{.*}} {
+// CHECK-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc { %swift.refcounted*, i8** } @class_existential_unowned(%swift.refcounted*, i8**) {{.*}} {
 sil @class_existential_unowned : $@convention(thin) (@owned CP) -> @owned CP {
 entry(%s : $CP):
   %u = ref_to_unowned %s : $CP to $@sil_unowned CP
@@ -33,7 +41,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
+// CHECK-DAG: define{{( dllexport)?}}{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }
@@ -67,19 +75,19 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[DEST_WITNESS:%.*]] = load i8**, i8*** [[SRC_WITNESS_ADDR]]
   %c = load_weak        %w : $*@sil_weak CP?
 
-  // CHECK: call { %swift.weak, i8** }* @"$S12existentials2CP_pSgXwWb0_"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
+  // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOb"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: call { %swift.weak, i8** }* @"$S12existentials2CP_pSgXwWd0_"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
+  // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOd"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr [take] %w to                  %v : $*@sil_weak CP?
 
-  // CHECK: call { %swift.weak, i8** }* @"$S12existentials2CP_pSgXwWc0_"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
+  // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOc"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to [initialization] %v : $*@sil_weak CP?
 
-  // CHECK: call { %swift.weak, i8** }* @"$S12existentials2CP_pSgXwWf0_"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
+  // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOf"({ %swift.weak, i8** }* %0, { %swift.weak, i8** }* [[V]])
   copy_addr        %w to                  %v : $*@sil_weak CP?
 
-  // CHECK: call { %swift.weak, i8** }* @"$S12existentials2CP_pSgXwWh0_"({ %swift.weak, i8** }* [[V]])
+  // CHECK: call { %swift.weak, i8** }* @"$s12existentials2CP_pSgXwWOh"({ %swift.weak, i8** }* [[V]])
   destroy_addr %v : $*@sil_weak CP?
 
   dealloc_stack %v : $*@sil_weak CP?

@@ -1,0 +1,368 @@
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -enable-sil-ownership -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+// This is a test that verifies ownership behavior around arguments that should
+// be flagged as failures.
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: Function: 'no_end_borrow_error'
+// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
+//
+// TODO: Better error message here.
+sil @no_end_borrow_error : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @guaranteed $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'leak_along_path'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT:     Value: %2 = argument of bb1 : $Builtin.NativeObject
+// CHECK-NEXT:     Post Dominating Failure Blocks:
+// CHECK-NEXT:         bb3
+sil @leak_along_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb3
+
+bb2:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we only flag the subargument leak and not the parent argument.
+//
+// CHECK-LABEL: Function: 'leak_along_subarg_path'
+// CHECK-NEXT: Error! Found a leak due to a consuming post-dominance failure!
+// CHECK-NEXT:     Value: %5 = argument of bb3 : $Builtin.NativeObject
+// CHECK-NEXT:     Post Dominating Failure Blocks:
+// CHECK-NEXT:         bb5
+
+sil @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb2, bb5
+
+bb2:
+  br bb3(%1 : $Builtin.NativeObject)
+
+bb3(%2 : @guaranteed $Builtin.NativeObject):
+  cond_br undef, bb4, bb5
+
+bb4:
+  end_borrow %2 : $Builtin.NativeObject
+  br bb5
+
+bb5:
+  end_borrow %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-NOT: Function: 'good_order'
+sil @good_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb1:
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : @guaranteed $Builtin.NativeObject):
+  end_borrow %2 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb4
+
+bb4:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb5:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb4
+}
+
+// Make sure that we only flag the end_borrow "use after free" in bb2.
+//
+// CHECK-LABEL: Function: 'bad_order'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject           // id: %6
+// CHECK-NEXT: Block: bb2
+// CHECK-LABEL: Function: 'bad_order'
+// CHECK-NEXT: Found use after free due to unvisited non lifetime ending uses?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT:     Remaining Users:
+// CHECK-NEXT: User:  end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+// CHECK-NOT: Block: bb1
+sil @bad_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb5
+
+bb1:
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%2 : @guaranteed $Builtin.NativeObject):
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb4
+
+bb4:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb5:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb4
+}
+
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+
+// CHECK-LABEL: Function: 'bad_order_add_a_level'
+// CHECK-NEXT: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK-NEXT: Value: %9 = argument of bb4 : $Builtin.NativeObject
+
+// NOTE: We use the expected numbered value in the output to make it easier to
+// match the filecheck patterns with the input.
+sil @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb7
+
+bb1:
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%4 : @guaranteed $Builtin.NativeObject):
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  cond_br undef, bb3, bb5
+
+bb3:
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb4(%9 : @guaranteed $Builtin.NativeObject):
+  br bb6
+
+bb5:
+  end_borrow %4 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  br bb6
+
+bb6:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb7:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb6
+}
+
+// Check that we only add an argument to the use set of its parent argument.
+// This ensures that when checking we do not waste a bunch of compile time by
+// propagating up end_borrows through many arguments. Also make sure that we do
+// properly visit terminators so that we do not erroneously flag them as
+// improper uses.
+//
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb4
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb5
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %1 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+//
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found use after free?!
+// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: Consuming User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Non Consuming User:   end_borrow %9 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb4
+
+// CHECK-LABEL: Function: 'bad_order_add_a_level_2'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %4 = argument of bb2 : $Builtin.NativeObject
+// CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
+// CHECK-NEXT: Block: bb2
+// CHECK-NOT: Block
+sil @bad_order_add_a_level_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb7
+
+bb1:
+  br bb2(%1 : $Builtin.NativeObject)
+
+bb2(%4 : @guaranteed $Builtin.NativeObject):
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  cond_br undef, bb3, bb5
+
+bb3:
+  br bb4(%4 : $Builtin.NativeObject)
+
+bb4(%9 : @guaranteed $Builtin.NativeObject):
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  end_borrow %9 : $Builtin.NativeObject
+  br bb6
+
+bb5:
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
+  br bb6
+
+bb6:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+
+bb7:
+  end_borrow %1 : $Builtin.NativeObject
+  br bb6
+}
+
+// CHECK-LABEL: Function: 'owned_argument_overuse_br1'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: Block: bb0
+
+// CHECK-LABEL: Function: 'owned_argument_overuse_br1'
+// CHECK-NEXT: Error! Found a leaked owned value that was never consumed.
+// CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
+// CHECK-NOT: Block
+// CHECK-NOT: Function: 'owned_argument_overuse_br1'
+sil @owned_argument_overuse_br1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'owned_argument_overuse_br2'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   br bb1(%0 : $Builtin.NativeObject)
+// CHECK-NEXT: Block: bb0
+// CHECK-NOT: Block
+// CHECK-NOT: Function: 'owned_argument_overuse_br2'
+sil @owned_argument_overuse_br2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  br bb1(%0 : $Builtin.NativeObject)
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+// CHECK-NEXT: Block: bb0
+// CHECK-LABEL: Function: 'owned_argument_overuse_condbr1'
+// CHECK-NEXT: Error! Found a leaked owned value that was never consumed.
+// CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
+// CHECK-NOT: Function: 'owned_argument_overuse_condbr1'
+sil @owned_argument_overuse_condbr1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'owned_argument_overuse_condbr2'
+// CHECK-NEXT: Found over consume?!
+// CHECK-NEXT: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK-NEXT: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+// CHECK-NEXT: Block: bb0
+// CHECK-NOT: Block
+// CHECK-NOT: Function: 'owned_argument_overuse_condbr2'
+sil @owned_argument_overuse_condbr2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  destroy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}

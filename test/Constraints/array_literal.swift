@@ -44,7 +44,7 @@ func useDict<K,V>(_ d: Dict<K,V>) {}
 
 useIntList([1,2,3])
 useIntList([1.0,2,3]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
-useIntList([nil])  // expected-error {{nil is not compatible with expected element type 'Int'}}
+useIntList([nil])  // expected-error {{'nil' is not compatible with expected element type 'Int'}}
 
 useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
@@ -129,7 +129,7 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _: Int = a2  // expected-error{{value of type 'Array<Any>'}}
+  let _: Int = a2  // expected-error{{value of type '[Any]'}}
   
   let a3 = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
@@ -137,7 +137,7 @@ func defaultToAny(i: Int, s: String) {
   
   let a4: Array = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _: Int = a4 // expected-error{{value of type 'Array<Any?>'}}
+  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
 
   let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}
@@ -339,4 +339,20 @@ extension Int: P { }
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
   let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
+}
+
+
+// SR-8385
+enum SR8385: ExpressibleByStringLiteral {
+  case text(String)
+  init(stringLiteral value: String) {
+    self = .text(value)
+  }
+}
+
+func testSR8385() {
+  let _: [SR8385] = [SR8385("hello")]
+  let _: [SR8385] = [.text("hello")]
+  let _: [SR8385] = ["hello", SR8385.text("world")]
+  let _: [SR8385] = ["hello", .text("world")]
 }

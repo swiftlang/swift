@@ -33,34 +33,34 @@ func testConstantFoldFloatLiterals() {
 #endif
 }
 
-// i386: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// i386: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
-// i386: call swiftcc void @"$S15FloatingPointIR13acceptFloat80yys0E0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
+// i386: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// i386: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// i386: call swiftcc void @"$s15FloatingPointIR13acceptFloat80yys0E0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
 
-// x86_64: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// x86_64: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
-// x86_64: call swiftcc void @"$S15FloatingPointIR13acceptFloat80yys0E0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
+// x86_64: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// x86_64: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// x86_64: call swiftcc void @"$s15FloatingPointIR13acceptFloat80yys0E0VF{{.*}}"(x86_fp80 0xK3FFF8000000000000000)
 
-// armv7: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// armv7: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// armv7: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// armv7: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// armv7s: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// armv7s: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// armv7s: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// armv7s: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// armv7k: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// armv7k: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// armv7k: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// armv7k: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// arm64: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// arm64: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// arm64: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// arm64: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// aarch64: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// aarch64: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// aarch64: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// aarch64: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// powerpc64: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// powerpc64: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// powerpc64: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// powerpc64: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// powerpc64le: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// powerpc64le: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// powerpc64le: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// powerpc64le: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
 
-// s390x: call swiftcc void @"$S15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
-// s390x: call swiftcc void @"$S15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)
+// s390x: call swiftcc void @"$s15FloatingPointIR13acceptFloat32yySfF{{.*}}"(float 1.000000e+00)
+// s390x: call swiftcc void @"$s15FloatingPointIR13acceptFloat64yySdF{{.*}}"(double 1.000000e+00)

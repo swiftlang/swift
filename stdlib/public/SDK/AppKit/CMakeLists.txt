@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   AppKit.swift
   AppKit_FoundationExtensions.swift
   NSError.swift
+  NSEvent.swift
   NSGraphics.swift
   NSOpenGL.swift
 

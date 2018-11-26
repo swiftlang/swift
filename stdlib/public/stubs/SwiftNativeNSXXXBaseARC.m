@@ -31,22 +31,32 @@
 // decomposedStringWithCanonicalMapping implementation. Instead, we use a local
 // autorelease pool to prevent leaking of the temporary object into the callers
 // autorelease pool.
-#if defined(__i386__)
+//
+//
+// FIXME: Right now we force an autoreleasepool here on x86_64 where we really
+// do not want to do so. The reason why is that without the autoreleasepool (or
+// really something like a defer), we tail call
+// objc_retainAutoreleasedReturnValue which blocks the hand shake. Evidently
+// this is something that we do not want to do. See:
+// b79ff50f1bca97ecfd053372f5f6dc9d017398bc. Until that is resolved, just create
+// an autoreleasepool here on x86_64. On arm/arm64 we do not have such an issue
+// since we use an assembly marker instead.
+#if defined(__i386__) || defined(__x86_64__)
 #define AUTORELEASEPOOL @autoreleasepool
 #else
 // On other platforms we rely on the remove from autorelease pool optimization.
 #define AUTORELEASEPOOL
 #endif
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift_stdlib_NSStringHashValue(NSString *SWIFT_NS_RELEASES_ARGUMENT str,
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+size_t swift_stdlib_NSStringHashValue(NSString *str,
                                       bool isASCII) {
   AUTORELEASEPOOL {
     return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 size_t
 swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   NSString __unsafe_unretained *str =
@@ -56,20 +66,24 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringLowercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
+swift_stdlib_NSStringLowercaseString(NSString *str) {
   AUTORELEASEPOOL {
     return str.lowercaseString;
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringUppercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
+swift_stdlib_NSStringUppercaseString(NSString *str) {
   AUTORELEASEPOOL {
     return str.uppercaseString;
   }
 }
+
+#else
+
+extern char ignore_pedantic_warning;
 
 #endif

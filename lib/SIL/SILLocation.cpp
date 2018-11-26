@@ -20,6 +20,9 @@
 
 using namespace swift;
 
+// 64-bit is 24 bytes, 32-bit is 20 bytes.
+static_assert(sizeof(SILLocation) == sizeof(void *) + 4*sizeof(unsigned),
+              "SILLocation must stay small");
 
 SourceLoc SILLocation::getSourceLoc() const {
   if (isSILFile())
@@ -125,14 +128,7 @@ DeclContext *SILLocation::getAsDeclContext() const {
   if (!isASTNode())
     return nullptr;
   if (auto *D = getAsASTNode<Decl>())
-    switch (D->getKind()) {
-    // These four dual-inherit from DeclContext.
-    case DeclKind::Func:        return cast<FuncDecl>(D);
-    case DeclKind::Constructor: return cast<ConstructorDecl>(D);
-    case DeclKind::Extension:   return cast<ExtensionDecl>(D);
-    case DeclKind::Destructor:  return cast<DestructorDecl>(D);
-    default:                    return D->getDeclContext();
-    }
+    return D->getInnermostDeclContext();
   if (auto *E = getAsASTNode<Expr>())
     if (auto *DC = dyn_cast<AbstractClosureExpr>(E))
       return DC;
@@ -143,7 +139,7 @@ SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
                                           const SourceManager &SM) {
   DebugLoc DL;
   if (Loc.isValid()) {
-    DL.Filename = SM.getBufferIdentifierForLoc(Loc);
+    DL.Filename = SM.getDisplayNameForLoc(Loc);
     std::tie(DL.Line, DL.Column) = SM.getLineAndColumn(Loc);
   }
   return DL;

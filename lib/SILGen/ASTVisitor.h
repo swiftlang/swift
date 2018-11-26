@@ -56,12 +56,21 @@ public:
     llvm_unreachable("expression kind should not survive to SILGen");
   }
 
+  ExprRetTy visitVarargExpansionExpr(VarargExpansionExpr *E, Args... AA) {
+    llvm_unreachable("vararg expansion should not appear in this position");
+  }
+
   ExprRetTy visitIdentityExpr(IdentityExpr *E, Args...AA) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }
 
   ExprRetTy visitTryExpr(TryExpr *E, Args...AA) {
+    return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
+                                                std::forward<Args>(AA)...);
+  }
+
+  ExprRetTy visitLazyInitializerExpr(LazyInitializerExpr *E, Args...AA) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }

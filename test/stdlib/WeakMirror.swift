@@ -18,6 +18,7 @@
 // RUN: else \
 // RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 
@@ -96,6 +97,24 @@ mirrors.test("struct/StructHasNativeWeakReference") {
   expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
   expectEqual(child.x, extractedChild.x)
   print(extractedChild)
+}
+
+// SR-8878: Using Mirror to access a weak reference results in object
+// being retained indefinitely
+mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
+  weak var verifier: AnyObject?
+  do {
+    let parent = NativeSwiftClassHasWeak(x: 1010)
+    let child = NativeSwiftClass(x: 2020)
+    verifier = child
+    parent.weakProperty = child
+    let mirror = Mirror(reflecting: parent)
+    let children = Array(mirror.children)
+    let extractedChild = children[0].1 as! NativeSwiftClass
+    expectNotNil(extractedChild)
+    expectNotNil(verifier)
+  }
+  expectNil(verifier)
 }
 
 #if _runtime(_ObjC)

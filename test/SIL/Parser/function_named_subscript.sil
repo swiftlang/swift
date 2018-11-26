@@ -12,12 +12,12 @@ class SubscriptAsFunction {
   func `subscript`()
 }
 
-sil hidden @$S4test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
-bb0(%0 : $SubscriptAsFunction):
+sil hidden @$s4test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
+bb0(%0 : @guaranteed $SubscriptAsFunction):
   return undef : $()
 }
 
 sil_vtable SubscriptAsFunction {
-  // CHECK: #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$S4test19SubscriptAsFunctionC9subscriptyyF
-  #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$S4test19SubscriptAsFunctionC9subscriptyyF
+  // CHECK: #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
+  #SubscriptAsFunction.`subscript`!1: (SubscriptAsFunction) -> () -> () : @$s4test19SubscriptAsFunctionC9subscriptyyF
 }

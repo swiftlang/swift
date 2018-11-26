@@ -748,7 +748,7 @@ OptionSetTests.test("UpdateWith.SingleOption") {
   expectNil(member1)
   
   let member2 = s.update(with: .tuesday)
-  expectOptionalEqual(.tuesday, member2)
+  expectEqual(.tuesday, member2)
 }
 
 OptionSetTests.test("UpdateWith.MultipleOptions") {
@@ -764,7 +764,7 @@ OptionSetTests.test("UpdateWith.MultipleOptions") {
   expectNil(member1)
   
   let member2 = s.update(with: .friday)
-  expectOptionalEqual(.friday, member2)
+  expectEqual(.friday, member2)
 }
 
 OptionSetTests.test("UpdateWith.EmptySet") {
@@ -778,7 +778,7 @@ OptionSetTests.test("UpdateWith.EmptySet") {
   expectNil(member1)
   
   let member2 = s.update(with: .monday)
-  expectOptionalEqual(.monday, member2)
+  expectEqual(.monday, member2)
 }
 
 runAllTests()

@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
@@ -130,6 +131,7 @@ static bool isNominalImportKind(ImportKind kind) {
   case ImportKind::Func:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static const char *getImportKindString(ImportKind kind) {
@@ -286,7 +288,8 @@ void NameBinder::addImport(
         emittedDiag.emplace(diagnose(ID,
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
-            typealias->getDeclaredInterfaceType(),
+            NameAliasType::get(typealias, Type(), SubstitutionMap(),
+                                typealias->getUnderlyingTypeLoc().getType()),
             getImportKindString(ID->getImportKind())));
       } else {
         emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,
@@ -345,9 +348,10 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
-/// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
-/// nodes for unresolved value names, and we may have unresolved type names as
-/// well.  This handles import directives and forward references.
+/// At this point parsing has been performed, but we still have
+/// UnresolvedDeclRefExpr nodes for unresolved value names, and we may have
+/// unresolved type names as well. This handles import directives and forward
+/// references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   SharedTimer timer("Name binding");
   // Make sure we skip adding the standard library imports if the

@@ -4,13 +4,13 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -module-to-print my_system_overlay -source-filename %s -I %t -Xcc -I -Xcc %S/Inputs/my_system_overlay > %t.out
 // RUN: %FileCheck %s -input-file=%t.out
 
+// CHECK: function/Swift | some_func() | [[SOMEFUNC_USR:.*]] | Def | rel: 0
+// CHECK: class/Swift | BaseCls | [[BASECLS_USR:.*]] | Def | rel: 0
+// CHECK: instance-method/Swift | theMeth() | [[BASECLSMETH_USR:.*]] | Def,Dyn,RelChild | rel: 1
+// CHECK-NEXT: RelChild | class/Swift | BaseCls | [[BASECLS_USR]]
 // CHECK: class/Swift | SubCls | [[SUBCLS_USR:.*]] | Def | rel: 0
-// CHECK: class/Swift | BaseCls | [[BASECLS_USR:.*]] | Ref,RelBase | rel: 1
+// CHECK: class/Swift | BaseCls | [[BASECLS_USR]] | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | SubCls | [[SUBCLS_USR]]
 // CHECK: instance-method/Swift | theMeth() | [[SUBCLSMETH_USR:.*]] | Def,Dyn,RelChild,RelOver | rel: 2
-// CHECK-NEXT: RelOver | instance-method/Swift | theMeth() | [[BASECLSMETH_USR:.*]]
+// CHECK-NEXT: RelOver | instance-method/Swift | theMeth() | [[BASECLSMETH_USR]]
 // CHECK-NEXT: RelChild | class/Swift | SubCls | [[SUBCLS_USR]]
-// CHECK: class/Swift | BaseCls | [[BASECLS_USR]] | Def | rel: 0
-// CHECK: instance-method/Swift | theMeth() | [[BASECLSMETH_USR]] | Def,Dyn,RelChild | rel: 1
-// CHECK-NEXT: RelChild | class/Swift | BaseCls | [[BASECLS_USR]]
-// CHECK: function/Swift | some_func() | [[SOMEFUNC_USR:.*]] | Def | rel: 0

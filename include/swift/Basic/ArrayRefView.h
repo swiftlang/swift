@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_ARRAYREFVIEW_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Casting.h"
 
 namespace swift {
 
@@ -37,11 +38,11 @@ public:
     const Orig *Ptr;
     iterator(const Orig *ptr) : Ptr(ptr) {}
   public:
-    typedef Projected value_type;
-    typedef Projected reference;
-    typedef void pointer;
-    typedef ptrdiff_t difference_type;
-    typedef std::random_access_iterator_tag iterator_category;
+    using value_type = Projected;
+    using reference = Projected;
+    using pointer = void;
+    using difference_type = ptrdiff_t;
+    using iterator_category = std::random_access_iterator_tag;
 
     Projected operator*() const { return Project(*Ptr); }
     Projected operator->() const { return operator*(); }
@@ -151,6 +152,20 @@ public:
     return !(lhs == rhs);
   }
 };
+
+/// Helper for \c CastArrayRefView that casts the original type to the
+/// projected type.
+template<typename Projected, typename Orig>
+inline Projected *arrayRefViewCastHelper(const Orig &value) {
+  using llvm::cast_or_null;
+  return cast_or_null<Projected>(value);
+}
+
+/// An ArrayRefView that performs a cast_or_null on each element in the
+/// underlying ArrayRef.
+template<typename Orig, typename Projected>
+using CastArrayRefView =
+  ArrayRefView<Orig, Projected *, arrayRefViewCastHelper<Projected, Orig>>;
 
 } // end namespace swift
 

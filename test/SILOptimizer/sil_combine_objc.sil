@@ -1,9 +1,6 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 // REQUIRES: objc_interop
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 // See https://bugs.swift.org/browse/SR-5065, rdar://32511494
 // XFAIL: *
 
@@ -78,7 +75,7 @@ bb0(%0 : $ZZZ):
   store %0 to %6 : $*ZZZ
   %8 = struct_extract %4 : $Array<ZZZ>, #Array._buffer
   %9 = struct_extract %8 : $_ArrayBuffer<ZZZ>, #_ArrayBuffer._storage
-  %10 = struct_extract %9 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %10 = struct_extract %9 : $_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_release %10 : $Builtin.BridgeObject
   %12 = tuple ()
   return %12 : $()
@@ -129,7 +126,7 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
   %14 = apply %10(%12) : $@convention(thin) (@owned @callee_owned () -> Bool) -> ()
   %15 = struct_extract %4 : $Array<_HeapBuffer<C, Int>>, #Array._buffer // user: %16
   %16 = struct_extract %15 : $_ArrayBuffer<_HeapBuffer<C, Int>>, #_ArrayBuffer._storage // user: %17
-  %17 = struct_extract %16 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue // user: %18
+  %17 = struct_extract %16 : $_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue // user: %18
   strong_release %17 : $Builtin.BridgeObject      // id: %18
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20

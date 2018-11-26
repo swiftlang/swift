@@ -15,6 +15,7 @@
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -204,6 +205,10 @@ void ResponseBuilder::Dictionary::set(UIdent Key, llvm::StringRef Str) {
   xpc_dictionary_set_string(Impl, Key.c_str(), Buf.c_str());
 }
 
+void ResponseBuilder::Dictionary::set(UIdent Key, const std::string &Str) {
+  xpc_dictionary_set_string(Impl, Key.c_str(), Str.c_str());
+}
+
 void ResponseBuilder::Dictionary::set(UIdent Key, int64_t val) {
   xpc_dictionary_set_int64(Impl, Key.c_str(), val);
 }
@@ -215,6 +220,16 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   for (auto Str : Strs) {
     Buf = Str;
     xpc_array_set_string(arr, XPC_ARRAY_APPEND, Buf.c_str());
+  }
+  xpc_dictionary_set_value(Impl, Key.c_str(), arr);
+  xpc_release(arr);
+}
+
+void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
+                                      ArrayRef<std::string> Strs) {
+  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  for (auto Str : Strs) {
+    xpc_array_set_string(arr, XPC_ARRAY_APPEND, Str.c_str());
   }
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
   xpc_release(arr);
@@ -244,10 +259,10 @@ void ResponseBuilder::Dictionary::setCustomBuffer(
       SourceKit::UIdent Key,
       CustomBufferKind Kind, std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
 
-  std::unique_ptr<llvm::MemoryBuffer> CustomBuf;
+  std::unique_ptr<llvm::WritableMemoryBuffer> CustomBuf;
   CustomBuf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
       sizeof(uint64_t) + MemBuf->getBufferSize());
-  char *BufPtr = (char*)CustomBuf->getBufferStart();
+  char *BufPtr = CustomBuf->getBufferStart();
   *reinterpret_cast<uint64_t*>(BufPtr) = (uint64_t)Kind;
   BufPtr += sizeof(uint64_t);
   memcpy(BufPtr, MemBuf->getBufferStart(), MemBuf->getBufferSize());
@@ -569,9 +584,10 @@ sourcekitd_response_get_value(sourcekitd_response_t resp) {
 #define XPC_OBJ(var) ((xpc_object_t)(var).data[1])
 
 #define CUSTOM_BUF_KIND(xobj) \
-  ((CustomBufferKind)*(uint64_t*)xpc_data_get_bytes_ptr(xobj))
+  ((CustomBufferKind)*(const uint64_t*)xpc_data_get_bytes_ptr(xobj))
 #define CUSTOM_BUF_START(xobj) \
-  ((void*)(((uint64_t*)xpc_data_get_bytes_ptr(xobj))+1))
+  ((const void*)(((const uint64_t*)xpc_data_get_bytes_ptr(xobj))+1))
+#define CUSTOM_BUF_SIZE(xobj) (xpc_data_get_length(xobj) - sizeof(uint64_t))
 
 static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
   xpc_object_t obj = XPC_OBJ(var);
@@ -606,6 +622,8 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case CustomBufferKind::DocStructureElementArray:
     case CustomBufferKind::AttributesArray:
       return SOURCEKITD_VARIANT_TYPE_ARRAY;
+    case CustomBufferKind::RawData:
+      return SOURCEKITD_VARIANT_TYPE_DATA;
     }
   }
 
@@ -695,6 +713,14 @@ static const char *XPCVar_string_get_ptr(sourcekitd_variant_t obj) {
   return xpc_string_get_string_ptr(XPC_OBJ(obj));
 }
 
+static size_t XPCVar_data_get_size(sourcekitd_variant_t obj) {
+  return xpc_data_get_length(XPC_OBJ(obj));
+}
+
+static const void *XPCVar_data_get_ptr(sourcekitd_variant_t obj) {
+  return xpc_data_get_bytes_ptr(XPC_OBJ(obj));
+}
+
 static int64_t XPCVar_int64_get_value(sourcekitd_variant_t obj) {
   return xpc_int64_get_value(XPC_OBJ(obj));
 }
@@ -723,7 +749,9 @@ static VariantFunctions XPCVariantFuncs = {
   XPCVar_string_get_length,
   XPCVar_string_get_ptr,
   XPCVar_int64_get_value,
-  XPCVar_uid_get_value
+  XPCVar_uid_get_value,
+  XPCVar_data_get_size,
+  XPCVar_data_get_ptr,
 };
 
 static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
@@ -753,6 +781,10 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
     case CustomBufferKind::AttributesArray:
       return {{ (uintptr_t)getVariantFunctionsForAttributesArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case sourcekitd::CustomBufferKind::RawData:
+      return {{ (uintptr_t)getVariantFunctionsForRawData(),
+                (uintptr_t)CUSTOM_BUF_START(obj),
+                (uintptr_t)CUSTOM_BUF_SIZE(obj) }};
     }
   }
 

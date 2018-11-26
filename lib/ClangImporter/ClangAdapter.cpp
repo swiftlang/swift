@@ -31,10 +31,10 @@ using namespace importer;
 
 /// Get a bit vector indicating which arguments are non-null for a
 /// given function or method.
-llvm::SmallBitVector
+SmallBitVector
 importer::getNonNullArgs(const clang::Decl *decl,
                          ArrayRef<const clang::ParmVarDecl *> params) {
-  llvm::SmallBitVector result;
+  SmallBitVector result;
   if (!decl)
     return result;
 
@@ -53,7 +53,8 @@ importer::getNonNullArgs(const clang::Decl *decl,
     if (result.empty())
       result.resize(params.size(), false);
 
-    for (unsigned idx : nonnull->args()) {
+    for (auto paramIdx : nonnull->args()) {
+      unsigned idx = paramIdx.getASTIndex();
       if (idx < result.size())
         result.set(idx);
     }
@@ -298,6 +299,9 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Double:
       return "Double";
 
+    case clang::BuiltinType::Char8:
+      return "UInt8";
+
     case clang::BuiltinType::Char16:
       return "UInt16";
 
@@ -335,6 +339,30 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       return OmissionTypeName();
 
     // FIXME: Types that can be mapped, but aren't yet.
+    case clang::BuiltinType::ShortAccum:
+    case clang::BuiltinType::Accum:
+    case clang::BuiltinType::LongAccum:
+    case clang::BuiltinType::UShortAccum:
+    case clang::BuiltinType::UAccum:
+    case clang::BuiltinType::ULongAccum:
+    case clang::BuiltinType::ShortFract:
+    case clang::BuiltinType::Fract:
+    case clang::BuiltinType::LongFract:
+    case clang::BuiltinType::UShortFract:
+    case clang::BuiltinType::UFract:
+    case clang::BuiltinType::ULongFract:
+    case clang::BuiltinType::SatShortAccum:
+    case clang::BuiltinType::SatAccum:
+    case clang::BuiltinType::SatLongAccum:
+    case clang::BuiltinType::SatUShortAccum:
+    case clang::BuiltinType::SatUAccum:
+    case clang::BuiltinType::SatULongAccum:
+    case clang::BuiltinType::SatShortFract:
+    case clang::BuiltinType::SatFract:
+    case clang::BuiltinType::SatLongFract:
+    case clang::BuiltinType::SatUShortFract:
+    case clang::BuiltinType::SatUFract:
+    case clang::BuiltinType::SatULongFract:
     case clang::BuiltinType::Half:
     case clang::BuiltinType::LongDouble:
     case clang::BuiltinType::Float16:
@@ -684,7 +712,7 @@ bool importer::isUnavailableInSwift(
     }
 
     if (platformAvailability.deprecatedAsUnavailableFilter) {
-      clang::VersionTuple version = attr->getDeprecated();
+      llvm::VersionTuple version = attr->getDeprecated();
       if (version.empty())
         continue;
       if (platformAvailability.deprecatedAsUnavailableFilter(
@@ -713,11 +741,10 @@ OptionalTypeKind importer::getParamOptionality(version::Version swiftVersion,
     return OTK_None;
 
   // Check for the 'static' annotation on C arrays.
-  if (!swiftVersion.isVersion3())
-    if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
-      if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
-        if (AT->getSizeModifier() == clang::ArrayType::Static)
-          return OTK_None;
+  if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
+    if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
+      if (AT->getSizeModifier() == clang::ArrayType::Static)
+        return OTK_None;
 
   // Default to implicitly unwrapped optionals.
   return OTK_ImplicitlyUnwrappedOptional;

@@ -1,0 +1,132 @@
+{
+  "id": 39,
+  "kind": "SourceFile",
+  "layout": [
+    {
+      "id": 38,
+      "kind": "CodeBlockItemList",
+      "layout": [
+        {
+          "id": 13,
+          "omitted": true
+        },
+        {
+          "id": 35,
+          "kind": "CodeBlockItem",
+          "layout": [
+            {
+              "id": 34,
+              "kind": "SequenceExpr",
+              "layout": [
+                {
+                  "id": 33,
+                  "kind": "ExprList",
+                  "layout": [
+                    {
+                      "id": 28,
+                      "kind": "DiscardAssignmentExpr",
+                      "layout": [
+                        {
+                          "id": 27,
+                          "tokenKind": {
+                            "kind": "kw__"
+                          },
+                          "leadingTrivia": [
+                            {
+                              "kind": "Newline",
+                              "value": 1
+                            },
+                            {
+                              "kind": "LineComment",
+                              "value": "\/\/ ATTENTION: This file is testing the EOF token. "
+                            },
+                            {
+                              "kind": "Newline",
+                              "value": 1
+                            },
+                            {
+                              "kind": "LineComment",
+                              "value": "\/\/ DO NOT PUT ANYTHING AFTER THE CHANGE, NOT EVEN A NEWLINE"
+                            },
+                            {
+                              "kind": "Newline",
+                              "value": 1
+                            }
+                          ],
+                          "trailingTrivia": [
+                            {
+                              "kind": "Space",
+                              "value": 1
+                            }
+                          ],
+                          "presence": "Present"
+                        }
+                      ],
+                      "presence": "Present"
+                    },
+                    {
+                      "id": 30,
+                      "kind": "AssignmentExpr",
+                      "layout": [
+                        {
+                          "id": 29,
+                          "tokenKind": {
+                            "kind": "equal"
+                          },
+                          "leadingTrivia": [],
+                          "trailingTrivia": [
+                            {
+                              "kind": "Space",
+                              "value": 1
+                            }
+                          ],
+                          "presence": "Present"
+                        }
+                      ],
+                      "presence": "Present"
+                    },
+                    {
+                      "id": 32,
+                      "kind": "IdentifierExpr",
+                      "layout": [
+                        {
+                          "id": 31,
+                          "tokenKind": {
+                            "kind": "identifier",
+                            "text": "xx"
+                          },
+                          "leadingTrivia": [],
+                          "trailingTrivia": [],
+                          "presence": "Present"
+                        },
+                        null
+                      ],
+                      "presence": "Present"
+                    }
+                  ],
+                  "presence": "Present"
+                }
+              ],
+              "presence": "Present"
+            },
+            null,
+            null
+          ],
+          "presence": "Present"
+        }
+      ],
+      "presence": "Present"
+    },
+    {
+      "id": 37,
+      "tokenKind": {
+        "kind": "eof",
+        "text": ""
+      },
+      "leadingTrivia": [],
+      "trailingTrivia": [],
+      "presence": "Present"
+    }
+  ],
+  "presence": "Present"
+}

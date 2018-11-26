@@ -108,6 +108,9 @@ def _apply_default_arguments(args):
     if args.llbuild_assertions is None:
         args.llbuild_assertions = args.assertions
 
+    if args.lldb_assertions is None:
+        args.lldb_assertions = args.assertions
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
@@ -162,6 +165,16 @@ def _apply_default_arguments(args):
 
     if not args.android or not args.build_android:
         args.build_android = False
+
+    # --test-paths implies --test and/or --validation-test
+    # depending on what directories/files have been specified.
+    if args.test_paths:
+        for path in args.test_paths:
+            if path.startswith('test'):
+                args.test = True
+            elif path.startswith('validation-test'):
+                args.test = True
+                args.validation_test = True
 
     # --validation-test implies --test.
     if args.validation_test:
@@ -355,6 +368,9 @@ def create_argument_parser():
            help='enable Thread Sanitizer on the swift runtime')
     option('--enable-lsan', toggle_true,
            help='enable Leak Sanitizer for swift tools')
+    option('--enable-sanitize-coverage', toggle_true,
+           help='enable sanitizer coverage for swift tools. Necessary for '
+                'fuzzing swiftc')
 
     option('--compiler-vendor', store,
            choices=['none', 'apple'],
@@ -442,8 +458,11 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
-    option('--enable-guaranteed-normal-arguments', store_true,
-           help='Enable guaranteed normal arguments')
+    option('--disable-guaranteed-normal-arguments', store_true,
+           help='Disable guaranteed normal arguments')
+
+    option('--enable-stdlibcore-exclusivity-checking', store_true,
+           help='Enable exclusivity checking in stdlibCore')
 
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
@@ -495,6 +514,9 @@ def create_argument_parser():
 
     option(['-p', '--swiftpm'], store_true('build_swiftpm'),
            help='build swiftpm')
+
+    option(['--swiftsyntax'], store_true('build_swiftsyntax'),
+           help='build swiftSyntax')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -699,6 +721,9 @@ def create_argument_parser():
 
     option('--long-test', toggle_true,
            help='run the long test suite')
+
+    option('--stress-test', toggle_true,
+           help='run the stress test suite')
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')
@@ -959,6 +984,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /lldb                       (optional)
                      /llbuild                    (optional)
                      /swiftpm                    (optional, requires llbuild)
+                     /swift-syntax               (optional, requires swiftpm)
                      /compiler-rt                (optional)
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)

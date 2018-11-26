@@ -372,13 +372,8 @@ public:
 
     PrintOptions PO;
     PO.SkipAttributes = true;
-    std::string TypeName;
-    if (IsIUO) {
-      assert(Ty->getOptionalObjectType());
-      TypeName = Ty->getOptionalObjectType()->getStringAsComponent(PO) + "!";
-    } else {
-      TypeName = Ty->getString(PO);
-    }
+    PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+    std::string TypeName = Ty->getString(PO);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      TypeName);
 
@@ -426,8 +421,7 @@ public:
 
   void addOptionalMethodCallTail() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "!");
-    getLastChunk().setIsAnnotation();
+        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "?");
   }
 
   void addTypeAnnotation(StringRef Type) {

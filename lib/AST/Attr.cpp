@@ -28,11 +28,32 @@
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
+#define DECL_ATTR(_, Id, ...) \
+  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
+                "Attrs are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/Attr.def"
+static_assert(IsTriviallyDestructible<DeclAttributes>::value,
+              "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
+static_assert(IsTriviallyDestructible<TypeAttributes>::value,
+              "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
+
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
                                   unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+StringRef swift::getAccessLevelSpelling(AccessLevel value) {
+  switch (value) {
+  case AccessLevel::Private: return "private";
+  case AccessLevel::FilePrivate: return "fileprivate";
+  case AccessLevel::Internal: return "internal";
+  case AccessLevel::Public: return "public";
+  case AccessLevel::Open: return "open";
+  }
+
+  llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
@@ -78,7 +99,7 @@ bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
 }
 
 bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
-  unsigned Options = getOptions(DAK);
+  auto Options = getOptions(DAK);
   switch (DK) {
 #define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
@@ -89,7 +110,7 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
 bool
 DeclAttributes::isUnavailableInSwiftVersion(
   const version::Version &effectiveVersion) const {
-  clang::VersionTuple vers = effectiveVersion;
+  llvm::VersionTuple vers = effectiveVersion;
   for (auto attr : *this) {
     if (auto available = dyn_cast<AvailableAttr>(attr)) {
       if (available->isInvalid())
@@ -158,11 +179,11 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      Optional<clang::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      clang::VersionTuple MinVersion =
+      llvm::VersionTuple MinVersion =
         AvAttr->isLanguageVersionSpecific() ?
         ctx.LangOpts.EffectiveLanguageVersion :
         ctx.LangOpts.getMinPlatformVersion();
@@ -191,6 +212,7 @@ void DeclAttributes::dump(const Decl *D) const {
 /// attribute (e.g., as @available(iOS 8.0, *). The presentation requires an
 /// introduction version and does not support deprecation, obsoletion, or
 /// messages.
+LLVM_READONLY
 static bool isShortAvailable(const DeclAttribute *DA) {
   auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
   if (!AvailAttr)
@@ -211,9 +233,15 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None &&
-      !AvailAttr->isLanguageVersionSpecific())
+  switch (AvailAttr->PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
     return false;
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    return true;
+  }
 
   return true;
 }
@@ -231,7 +259,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   assert(!Attrs.empty());
 
   Printer << "@available(";
-  auto FirstAvail = dyn_cast<AvailableAttr>(Attrs[0]);
+  auto FirstAvail = cast<AvailableAttr>(Attrs.front());
   if (Attrs.size() == 1 &&
       FirstAvail->isLanguageVersionSpecific()) {
     assert(FirstAvail->Introduced.hasValue());
@@ -261,6 +289,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   // Process attributes in passes.
   AttributeVector shortAvailableAttributes;
+  const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -274,6 +303,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.excludeAttrKind(DA->getKind()))
       continue;
 
+    // Be careful not to coalesce `@available(swift 5)` with other short
+    // `available' attributes.
+    if (auto *availableAttr = dyn_cast<AvailableAttr>(DA)) {
+      if (availableAttr->isLanguageVersionSpecific() &&
+          isShortAvailable(availableAttr)) {
+        swiftVersionAvailableAttribute = availableAttr;
+        continue;
+      }
+    }
+
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
@@ -281,9 +320,10 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     which.push_back(DA);
   }
 
-  if (!shortAvailableAttributes.empty()) {
+  if (swiftVersionAvailableAttribute)
+    printShortFormAvailable(swiftVersionAvailableAttribute, Printer, Options);
+  if (!shortAvailableAttributes.empty())
     printShortFormAvailable(shortAvailableAttributes, Printer, Options);
-  }
 
   for (auto DA : longAttributes)
     DA->print(Printer, Options, D);
@@ -370,7 +410,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_Alignment:
     Printer.printAttrName("@_alignment");
-    Printer << "(" << cast<AlignmentAttr>(this)->Value << ")";
+    Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
     break;
 
   case DAK_SILGenName:
@@ -538,7 +578,7 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
   print(P, PrintOptions(), D);
 }
 
-unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
+uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");
@@ -598,44 +638,24 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
-        return "effects(readnone)";
+        return "_effects(readnone)";
       case EffectsKind::ReadOnly:
-        return "effects(readonly)";
+        return "_effects(readonly)";
       case EffectsKind::ReleaseNone:
-        return "effects(releasenone)";
+        return "_effects(releasenone)";
       case EffectsKind::ReadWrite:
-        return "effects(readwrite)";
+        return "_effects(readwrite)";
       case EffectsKind::Unspecified:
-        return "effects(unspecified)";
+        return "_effects(unspecified)";
     }
   case DAK_AccessControl:
-  case DAK_SetterAccess:
-    switch (cast<AbstractAccessControlAttr>(this)->getAccess()) {
-    case AccessLevel::Private:
-      return "private";
-    case AccessLevel::FilePrivate:
-      return "fileprivate";
-    case AccessLevel::Internal:
-      return "internal";
-    case AccessLevel::Public:
-      return "public";
-    case AccessLevel::Open:
-      return "open";
-    }
-    llvm_unreachable("bad access level");
+  case DAK_SetterAccess: {
+    AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
+    return getAccessLevelSpelling(access);
+  }
 
   case DAK_ReferenceOwnership:
-    switch (cast<ReferenceOwnershipAttr>(this)->get()) {
-    case ReferenceOwnership::Strong:
-      llvm_unreachable("Never present in the attribute");
-    case ReferenceOwnership::Weak:
-      return "weak";
-    case ReferenceOwnership::Unowned:
-      return "unowned";
-    case ReferenceOwnership::Unmanaged:
-      return "unowned(unsafe)";
-    }
-    llvm_unreachable("bad ownership kind");
+    return keywordOf(cast<ReferenceOwnershipAttr>(this)->get());
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:
@@ -664,17 +684,17 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
     NameData = name->getOpaqueValue();
 
     // Store location information.
-    ObjCAttrBits.HasTrailingLocationInfo = true;
+    Bits.ObjCAttr.HasTrailingLocationInfo = true;
     getTrailingLocations()[0] = parenRange.Start;
     getTrailingLocations()[1] = parenRange.End;
     std::memcpy(getTrailingLocations().slice(2).data(), nameLocs.data(),
                 nameLocs.size() * sizeof(SourceLoc));
   } else {
-    ObjCAttrBits.HasTrailingLocationInfo = false;
+    Bits.ObjCAttr.HasTrailingLocationInfo = false;
   }
 
-  ObjCAttrBits.ImplicitName = false;
-  ObjCAttrBits.Swift3Inferred = false;
+  Bits.ObjCAttr.ImplicitName = false;
+  Bits.ObjCAttr.Swift3Inferred = false;
 }
 
 ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
@@ -761,9 +781,9 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
                                    PlatformAgnosticAvailabilityKind Kind,
-                                   clang::VersionTuple Obsoleted) {
+                                   llvm::VersionTuple Obsoleted) {
   assert(Kind != PlatformAgnosticAvailabilityKind::None);
-  clang::VersionTuple NoVersion;
+  llvm::VersionTuple NoVersion;
   if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
     assert(!Obsoleted.empty());
   }
@@ -829,7 +849,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   if (isUnconditionallyUnavailable())
     return AvailableVersionComparison::Unavailable;
 
-  clang::VersionTuple queryVersion =
+  llvm::VersionTuple queryVersion =
     isLanguageVersionSpecific() ?
     ctx.LangOpts.EffectiveLanguageVersion :
     ctx.LangOpts.getMinPlatformVersion();
@@ -865,17 +885,20 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                bool exported,
                                SpecializationKind kind)
     : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      numRequirements(0), trailingWhereClause(clause),
-      kind(kind), exported(exported) {
+      trailingWhereClause(clause) {
+  Bits.SpecializeAttr.exported = exported;
+  Bits.SpecializeAttr.kind = unsigned(kind);
+  Bits.SpecializeAttr.numRequirements = 0;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                ArrayRef<Requirement> requirements,
                                bool exported,
                                SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      numRequirements(0), kind(kind), exported(exported) {
-  numRequirements = requirements.size();
+    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false) {
+  Bits.SpecializeAttr.exported = exported;
+  Bits.SpecializeAttr.kind = unsigned(kind);
+  Bits.SpecializeAttr.numRequirements = requirements.size();
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
@@ -886,7 +909,7 @@ void SpecializeAttr::setRequirements(ASTContext &Ctx,
   assert(requirements.size() <= numClauseRequirements);
   if (!numClauseRequirements)
     return;
-  numRequirements = requirements.size();
+  Bits.SpecializeAttr.numRequirements = requirements.size();
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 

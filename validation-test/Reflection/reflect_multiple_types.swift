@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_multiple_types
-// RUN: %target-run %target-swift-reflection-test %t/reflect_multiple_types 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-codesign %t/reflect_multiple_types
+
+// RUN: %target-run %target-swift-reflection-test %t/reflect_multiple_types | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
@@ -129,7 +132,7 @@ reflect(object: obj)
 // CHECK-64-NEXT:           (field name=large offset=0
 // CHECK-64-NEXT:             (reference kind=strong refcounting=native))))))
 // CHECK-64-NEXT:   (field name=t03 offset=40
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t04 offset=48
 // CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
@@ -168,7 +171,7 @@ reflect(object: obj)
 // CHECK-64-NEXT:   (field name=t14 offset=120
 // CHECK-64-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-64-NEXT:   (field name=t15 offset=128
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t16 offset=136
 // CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=1
@@ -217,7 +220,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:           (field name=large offset=0
 // CHECK-32-NEXT:             (reference kind=strong refcounting=native))))))
 // CHECK-32-NEXT:   (field name=t03 offset=24
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t04 offset=32
 // CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
@@ -256,7 +259,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:   (field name=t14 offset=80
 // CHECK-32-NEXT:     (reference kind=strong refcounting=unknown))
 // CHECK-32-NEXT:   (field name=t15 offset=84
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t16 offset=88
 // CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=4092

@@ -1,0 +1,33 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-interop -emit-ir -primary-file %s | %FileCheck %s -DWORD=i%target-ptrsize
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C { }
+sil_vtable C { }
+
+struct S {
+  @sil_stored unowned(unsafe) var uu: @sil_unmanaged C? { get set }
+}
+
+func example(_ os: S?)
+
+// CHECK-LABEL: define hidden swiftcc void @"$s35reference_storage_extra_inhabitants7exampleyyAA1SVSgF"
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = icmp eq [[WORD]] %0, 1
+sil hidden @$s35reference_storage_extra_inhabitants7exampleyyAA1SVSgF : $@convention(thin) (Optional<S>) -> () {
+bb0(%0 : $Optional<S>):
+  switch_enum %0 : $Optional<S>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1 // id: %2
+
+bb1:                                              // Preds: bb0
+  br bb4                                          // id: %3
+
+bb2(%4 : $S):                                     // Preds: bb0
+  br bb4                                          // id: %9
+
+bb4:                                              // Preds: bb3 bb1
+  %10 = tuple ()                                  // user: %11
+  return %10 : $()                                // id: %11
+}

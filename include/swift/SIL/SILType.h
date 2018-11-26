@@ -138,7 +138,7 @@ public:
 
   /// Returns the \p Category variant of this type.
   SILType getCategoryType(SILValueCategory Category) const {
-    return SILType(getSwiftRValueType(), Category);
+    return SILType(getASTType(), Category);
   }
 
   /// Returns the variant of this type that matches \p Ty.getCategory()
@@ -149,20 +149,26 @@ public:
   /// Returns the address variant of this type.  Instructions which
   /// manipulate memory will generally work with object addresses.
   SILType getAddressType() const {
-    return SILType(getSwiftRValueType(), SILValueCategory::Address);
+    return SILType(getASTType(), SILValueCategory::Address);
   }
 
   /// Returns the object variant of this type.  Note that address-only
   /// types are not legal to manipulate directly as objects in SIL.
   SILType getObjectType() const {
-    return SILType(getSwiftRValueType(), SILValueCategory::Object);
+    return SILType(getASTType(), SILValueCategory::Object);
   }
 
-  /// Returns the Swift type referenced by this SIL type.
-  CanType getSwiftRValueType() const {
+  /// Returns the canonical AST type referenced by this SIL type.
+  CanType getASTType() const {
     return CanType(value.getPointer());
   }
   
+  // FIXME -- Temporary until LLDB adopts getASTType()
+  LLVM_ATTRIBUTE_DEPRECATED(CanType getSwiftRValueType() const,
+                            "Please use getASTType()") {
+    return getASTType();
+  }
+
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
   SILFunctionTypeRepresentation getFunctionRepresentation() const {
@@ -173,18 +179,18 @@ public:
   /// cast fails.
   template<typename TYPE>
   typename CanTypeWrapperTraits<TYPE>::type
-  getAs() const { return dyn_cast<TYPE>(getSwiftRValueType()); }
+  getAs() const { return dyn_cast<TYPE>(getASTType()); }
 
   /// Cast the Swift type referenced by this SIL type, which must be of the
   /// specified subtype.
   template<typename TYPE>
   typename CanTypeWrapperTraits<TYPE>::type
-  castTo() const { return cast<TYPE>(getSwiftRValueType()); }
+  castTo() const { return cast<TYPE>(getASTType()); }
 
   /// Returns true if the Swift type referenced by this SIL type is of the
   /// specified subtype.
   template<typename TYPE>
-  bool is() const { return isa<TYPE>(getSwiftRValueType()); }
+  bool is() const { return isa<TYPE>(getASTType()); }
 
   bool isVoid() const {
     return value.getPointer()->isVoid();
@@ -193,22 +199,22 @@ public:
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
-    return getSwiftRValueType().getClassOrBoundGenericClass();
+    return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
   StructDecl *getStructOrBoundGenericStruct() const {
-    return getSwiftRValueType().getStructOrBoundGenericStruct();
+    return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
   EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getSwiftRValueType().getEnumOrBoundGenericEnum();
+    return getASTType().getEnumOrBoundGenericEnum();
   }
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getSwiftRValueType().getNominalOrBoundGenericNominal();
+    return getASTType().getNominalOrBoundGenericNominal();
   }
   
   /// True if the type is an address type.
@@ -251,6 +257,10 @@ public:
   bool isLoadable(SILModule &M) const {
     return !isAddressOnly(M);
   }
+  /// True if either:
+  /// 1) The type, or the referenced type of an address type, is loadable.
+  /// 2) The SIL Module conventions uses lowered addresses
+  bool isLoadableOrOpaque(SILModule &M) const;
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
@@ -270,43 +280,43 @@ public:
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
-    return getSwiftRValueType().hasReferenceSemantics();
+    return getASTType().hasReferenceSemantics();
   }
 
   /// Returns true if the referenced type is any sort of class-reference type,
   /// meaning anything with reference semantics that is not a function type.
   bool isAnyClassReferenceType() const {
-    return getSwiftRValueType().isAnyClassReferenceType();
+    return getASTType().isAnyClassReferenceType();
   }
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
   bool hasRetainablePointerRepresentation() const {
-    return getSwiftRValueType()->hasRetainablePointerRepresentation();
+    return getASTType()->hasRetainablePointerRepresentation();
   }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {
-    return getSwiftRValueType().isExistentialType();
+    return getASTType().isExistentialType();
   }
   /// Returns true if the referenced type is any kind of existential type.
   bool isAnyExistentialType() const {
-    return getSwiftRValueType().isAnyExistentialType();
+    return getASTType().isAnyExistentialType();
   }
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
-    return getSwiftRValueType()->isClassExistentialType();
+    return getASTType()->isClassExistentialType();
   }
 
   /// Returns true if the referenced type is an opened existential type
   /// (which is actually a kind of archetype).
   bool isOpenedExistential() const {
-    return getSwiftRValueType()->isOpenedExistential();
+    return getASTType()->isOpenedExistential();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
   /// or more opened existential types.
   bool hasOpenedExistential() const {
-    return getSwiftRValueType()->hasOpenedExistential();
+    return getASTType()->hasOpenedExistential();
   }
   
   /// Returns the representation used by an existential type. If the concrete
@@ -328,12 +338,12 @@ public:
   
   /// True if the type contains a type parameter.
   bool hasTypeParameter() const {
-    return getSwiftRValueType()->hasTypeParameter();
+    return getASTType()->hasTypeParameter();
   }
   
   /// True if the type is bridgeable to an ObjC object pointer type.
   bool isBridgeableObjectType() const {
-    return getSwiftRValueType()->isBridgeableObjectType();
+    return getASTType()->isBridgeableObjectType();
   }
 
   static bool isClassOrClassMetatype(Type t) {
@@ -346,33 +356,22 @@ public:
 
   /// True if the type is a class type or class metatype type.
   bool isClassOrClassMetatype() {
-    return isObject() && isClassOrClassMetatype(getSwiftRValueType());
+    return isObject() && isClassOrClassMetatype(getASTType());
   }
 
   /// True if the type involves any archetypes.
   bool hasArchetype() const {
-    return getSwiftRValueType()->hasArchetype();
+    return getASTType()->hasArchetype();
   }
   
   /// Returns the ASTContext for the referenced Swift type.
-  const ASTContext &getASTContext() const {
-    return getSwiftRValueType()->getASTContext();
+  ASTContext &getASTContext() const {
+    return getASTType()->getASTContext();
   }
 
   /// True if the given type has at least the size and alignment of a native
   /// pointer.
   bool isPointerSizeAndAligned();
-
-  /// Return true if the layout of `toType` is an ABI compatible prefix of
-  /// `fromType` ignoring reference types. `fromType` may be larger than
-  /// `toType` and still be unsafe castable. `fromType` may contain references
-  /// in positions where `toType` does not contain references and still be
-  /// unsafe castable. This is used solely to determine whether an address cast
-  /// can be promoted to a cast between aggregates of scalar values without
-  /// confusing IRGen.
-  static bool canPerformABICompatibleUnsafeCastValue(SILType fromType,
-                                                     SILType toType,
-                                                     SILModule &M);
 
   /// True if `operTy` can be cast by single-reference value into `resultTy`.
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
@@ -413,28 +412,26 @@ public:
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
   SILType getSuperclass() const {
-    auto superclass = getSwiftRValueType()->getSuperclass();
+    auto superclass = getASTType()->getSuperclass();
     if (!superclass) return SILType();
     return SILType::getPrimitiveObjectType(superclass->getCanonicalType());
   }
 
   /// Return true if Ty is a subtype of this exact SILType, or false otherwise.
   bool isExactSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isExactSuperclassOf(Ty.getSwiftRValueType());
+    return getASTType()->isExactSuperclassOf(Ty.getASTType());
   }
 
   /// Return true if Ty is a subtype of this SILType, or if this SILType
   /// contains archetypes that can be found to form a supertype of Ty, or false
   /// otherwise.
   bool isBindableToSuperclassOf(SILType Ty) const {
-    return getSwiftRValueType()->isBindableToSuperclassOf(
-                                                        Ty.getSwiftRValueType());
+    return getASTType()->isBindableToSuperclassOf(Ty.getASTType());
   }
 
   /// Look through reference-storage types on this type.
   SILType getReferenceStorageReferentType() const {
-    return SILType(getSwiftRValueType().getReferenceStorageReferent(),
-                   getCategory());
+    return SILType(getASTType().getReferenceStorageReferent(), getCategory());
   }
 
   /// Transform the function type SILType by replacing all of its interface
@@ -442,14 +439,7 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                           SubstitutionList Subs) const;
-
-  /// Transform the function type SILType by replacing all of its interface
-  /// generic args with the appropriate item from the substitution.
-  ///
-  /// Only call this with function types!
-  SILType substGenericArgs(SILModule &M,
-                           const SubstitutionMap &SubMap) const;
+                           SubstitutionMap SubMap) const;
 
   /// If the original type is generic, pass the signature as genericSig.
   ///
@@ -460,7 +450,7 @@ public:
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig=CanGenericSignature()) const;
 
-  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, SubstitutionMap subs) const;
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -486,21 +476,17 @@ public:
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
-  SILType unwrapAnyOptionalType() const;
-
-  /// Wraps one level of optional type.
-  ///
-  /// Returns the lowered Optional<T> if the given type is T.
-  ///
-  /// \arg F The SILFunction where the SILType is used.
-  SILType wrapAnyOptionalType(SILFunction &F) const;
+  SILType unwrapOptionalType() const;
 
   /// Returns true if this is the AnyObject SILType;
-  bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
+  bool isAnyObject() const { return getASTType()->isAnyObject(); }
 
   /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
   /// Type.
   SILType getReferentType(SILModule &M) const;
+  
+  /// Returns a SILType with any archetypes mapped out of context.
+  SILType mapTypeOutOfContext() const;
 
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.
@@ -530,6 +516,8 @@ public:
   static SILType getRawPointerType(const ASTContext &C);
   /// Get a builtin integer type as a SILType.
   static SILType getBuiltinIntegerType(unsigned bitWidth, const ASTContext &C);
+  /// Get the IntegerLiteral type as a SILType.
+  static SILType getBuiltinIntegerLiteralType(const ASTContext &C);
   /// Get a builtin floating-point type as a SILType.
   static SILType getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
                                      const ASTContext &C);
@@ -580,7 +568,10 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(
     SILModule &M, Lowering::AbstractionPattern origType,
-    CanAnyFunctionType substType, Optional<SILDeclRef> constant = None,
+    CanAnyFunctionType substType,
+    Optional<SILDeclRef> origConstant = None,
+    Optional<SILDeclRef> constant = None,
+    Optional<SubstitutionMap> reqtSubs = None,
     Optional<ProtocolConformanceRef> witnessMethodConformance = None);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {

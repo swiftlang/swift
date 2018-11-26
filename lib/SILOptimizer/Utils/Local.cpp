@@ -169,12 +169,19 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 }
 
 namespace {
-  using CallbackTy = std::function<void(SILInstruction *)>;
+  using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
 void swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
                                            bool Force, CallbackTy Callback) {
+  SILBasicBlock::iterator instIter;
+  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
+}
+
+void swift::recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
+    bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -217,8 +224,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      
-      eraseFromParentWithDebugInsts(I);
+      eraseFromParentWithDebugInsts(I, InstIter);
     }
 
     NextInsts.swap(DeadInsts);
@@ -232,12 +238,13 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force,
-                                                       CallbackTy Callback) {
-
+SILBasicBlock::iterator
+swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
+                                                  CallbackTy Callback) {
+  SILBasicBlock::iterator nextI = std::next(I->getIterator());
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
+  return nextI;
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -313,22 +320,6 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILValue V) {
   return FullApplySite();
 }
 
-// Replace a dead apply with a new instruction that computes the same
-// value, and delete the old apply.
-void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
-  auto *OldApply = Old.getInstruction();
-  if (!isa<TryApplyInst>(OldApply))
-    cast<SingleValueInstruction>(OldApply)->replaceAllUsesWith(New);
-  recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
-}
-
-bool swift::hasArchetypes(SubstitutionList Subs) {
-  // Check whether any of the substitutions are dependent.
-  return llvm::any_of(Subs, [](const Substitution &S) {
-    return S.getReplacement()->hasArchetype();
-  });
-}
-
 bool swift::mayBindDynamicSelf(SILFunction *F) {
   if (!F->hasSelfMetadataParam())
     return false;
@@ -342,6 +333,43 @@ bool swift::mayBindDynamicSelf(SILFunction *F) {
         return true;
     }
   }
+  return false;
+}
+
+static SILValue skipAddrProjections(SILValue V) {
+  for (;;) {
+    switch (V->getKind()) {
+      case ValueKind::IndexAddrInst:
+      case ValueKind::IndexRawPointerInst:
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+        V = cast<SingleValueInstruction>(V)->getOperand(0);
+        break;
+      default:
+        return V;
+    }
+  }
+  llvm_unreachable("there is no escape from an infinite loop");
+}
+
+/// Check whether the \p addr is an address of a tail-allocated array element.
+bool swift::isAddressOfArrayElement(SILValue addr) {
+  addr = stripAddressProjections(addr);
+  if (auto *MD = dyn_cast<MarkDependenceInst>(addr))
+    addr = stripAddressProjections(MD->getValue());
+
+  // High-level SIL: check for an get_element_address array semantics call.
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(addr))
+    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
+      ArraySemanticsCall Call(SEI->getOperand());
+      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
+        return true;
+    }
+
+  // Check for an tail-address (of an array buffer object).
+  if (isa<RefTailAddrInst>(skipAddrProjections(addr)))
+    return true;
+
   return false;
 }
 
@@ -521,7 +549,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -552,7 +580,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getSwiftRValueType())
+    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getASTType())
       ->getCanonicalType();
     auto LoweredOptionalSrcType = SILType::getPrimitiveObjectType(
       OptionalSrcCanTy);
@@ -592,7 +620,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                  "Swift thick functions that differ in escapeness are not ABI "
                  "compatible");
       // Insert convert_function.
-      return B->createConvertFunction(Loc, Value, DestTy);
+      return B->createConvertFunction(Loc, Value, DestTy,
+                                      /*WithoutActuallyEscaping=*/false);
     }
   }
 
@@ -854,7 +883,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionList(), Arguments,
+                             SubstitutionMap(), Arguments,
                              false);
 }
 
@@ -1052,6 +1081,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
+    Builder.setCurrentDebugScope(FinalRelease->getDebugScope());
     for (unsigned i : indices(Args)) {
       SILValue Arg = Args[i];
       SILParameterInfo Param = Params[i];
@@ -1306,6 +1336,26 @@ void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << '\n';
 }
 
+// FIXME: Remove this. SILCloner should not create critical edges.
+bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *DT,
+                                          SILLoopInfo *LI) {
+  bool changed = false;
+  // Remove any critical edges that the EdgeThreadingCloner may have
+  // accidentally created.
+  for (unsigned succIdx = 0, succEnd = origBB->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    if (nullptr != splitCriticalEdge(origBB->getTerminator(), succIdx, DT, LI))
+      changed |= true;
+  }
+  for (unsigned succIdx = 0, succEnd = getNewBB()->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    auto *newBB =
+      splitCriticalEdge(getNewBB()->getTerminator(), succIdx, DT, LI);
+    changed |= (newBB != nullptr);
+  }
+  return changed;
+}
+
 bool swift::simplifyUsers(SingleValueInstruction *I) {
   bool Changed = false;
 
@@ -1320,8 +1370,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
     if (!S)
       continue;
 
-    SVI->replaceAllUsesWith(S);
-    SVI->eraseFromParent();
+    replaceAllSimplifiedUsesAndErase(SVI, S);
     Changed = true;
   }
 
@@ -1331,11 +1380,11 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
 /// True if a type can be expanded
 /// without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (EnableExpandAll) {
-    return true;
-  }
   if (Ty.isAddressOnly(Module)) {
     return false;
+  }
+  if (EnableExpandAll) {
+    return true;
   }
   unsigned numFields = Module.Types.countNumberOfFields(Ty);
   if (numFields > 6) {
@@ -1362,65 +1411,94 @@ bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
   return true;
 }
 
-/// Check if the value of V is computed by means of a simple initialization.
-/// Store the actual SILValue into Val and the reversed list of instructions
-/// initializing it in Insns.
-/// The check is performed by recursively walking the computation of the
-/// SIL value being analyzed.
-/// TODO: Move into utils.
-bool
-swift::analyzeStaticInitializer(SILValue V,
-                                SmallVectorImpl<SILInstruction *> &Insns) {
-  // Save every instruction we see.
-  // TODO: MultiValueInstruction?
-  if (auto I = dyn_cast<SingleValueInstruction>(V))
-    Insns.push_back(I);
+// Encapsulate the state used for recursive analysis of a static
+// initializer. Discover all the instruction in a use-def graph and return them
+// in topological order.
+//
+// TODO: We should have a DFS utility for this sort of thing so it isn't
+// recursive.
+class StaticInitializerAnalysis {
+  SmallVectorImpl<SILInstruction *> &postOrderInstructions;
+  llvm::SmallDenseSet<SILValue, 8> visited;
+  int recursionLevel = 0;
 
-  if (auto *SI = dyn_cast<StructInst>(V)) {
-    // If it is not a struct which is a simple type, bail.
-    if (!isSimpleType(SI->getType(), SI->getModule()))
+public:
+  StaticInitializerAnalysis(
+      SmallVectorImpl<SILInstruction *> &postOrderInstructions)
+      : postOrderInstructions(postOrderInstructions) {}
+
+  // Perform a recursive DFS on on the use-def graph rooted at `V`. Insert
+  // values in the `visited` set in preorder. Insert values in
+  // `postOrderInstructions` in postorder so that the instructions are
+  // topologically def-use ordered (in execution order).
+  bool analyze(SILValue RootValue) {
+    return recursivelyAnalyzeOperand(RootValue);
+  }
+
+protected:
+  bool recursivelyAnalyzeOperand(SILValue V) {
+    if (!visited.insert(V).second)
+      return true;
+
+    if (++recursionLevel > 50)
       return false;
-    for (auto &Op: SI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
-        return false;
-    }
+
+    // TODO: For multi-result instructions, we could simply insert all result
+    // values in the visited set here.
+    auto *I = dyn_cast<SingleValueInstruction>(V);
+    if (!I)
+      return false;
+
+    if (!recursivelyAnalyzeInstruction(I))
+      return false;
+
+    postOrderInstructions.push_back(I);
+    --recursionLevel;
     return true;
   }
 
-  if (auto *TI = dyn_cast<TupleInst>(V)) {
-    // If it is not a tuple which is a simple type, bail.
-    if (!isSimpleType(TI->getType(), TI->getModule()))
-      return false;
-    for (auto &Op: TI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
+  bool recursivelyAnalyzeInstruction(SILInstruction *I) {
+    if (auto *SI = dyn_cast<StructInst>(I)) {
+      // If it is not a struct which is a simple type, bail.
+      if (!isSimpleType(SI->getType(), SI->getModule()))
         return false;
-    }
-    return true;
-  }
 
-  if (auto *bi = dyn_cast<BuiltinInst>(V)) {
-    switch (bi->getBuiltinInfo().ID) {
-    case BuiltinValueKind::FPTrunc:
-      if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
-        return analyzeStaticInitializer(LI, Insns);
+      return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
+        return recursivelyAnalyzeOperand(Op.get());
+      });
+    }
+    if (auto *TI = dyn_cast<TupleInst>(I)) {
+      // If it is not a tuple which is a simple type, bail.
+      if (!isSimpleType(TI->getType(), TI->getModule()))
+        return false;
+
+      return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
+        return recursivelyAnalyzeOperand(Op.get());
+      });
+    }
+    if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+      switch (bi->getBuiltinInfo().ID) {
+      case BuiltinValueKind::FPTrunc:
+        if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
+          return recursivelyAnalyzeOperand(LI);
+        }
+        return false;
+      default:
+        return false;
       }
-      return false;
-    default:
-      return false;
     }
+    return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)
+           || isa<StringLiteralInst>(I);
   }
+};
 
-  if (isa<IntegerLiteralInst>(V)
-      || isa<FloatLiteralInst>(V)
-      || isa<StringLiteralInst>(V)) {
-    return true;
-  }
-
-  return false;
+/// Check if the value of V is computed by means of a simple initialization.
+/// Populate `forwardInstructions` with references to all the instructions
+/// that participate in the use-def graph required to compute `V`. The
+/// instructions will be in def-use topological order.
+bool swift::analyzeStaticInitializer(
+    SILValue V, SmallVectorImpl<SILInstruction *> &forwardInstructions) {
+  return StaticInitializerAnalysis(forwardInstructions).analyze(V);
 }
 
 /// Replace load sequence which may contain
@@ -1428,6 +1506,10 @@ swift::analyzeStaticInitializer(SILValue V,
 /// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 /// Move into utils.
+///
+/// FIXME: this utility does not make sense as an API. How can the caller
+/// guarantee that the only uses of `I` are struct_element_addr and
+/// tuple_element_addr?
 void swift::replaceLoadSequence(SILInstruction *I,
                                 SILValue Value,
                                 SILBuilder &B) {
@@ -1452,6 +1534,18 @@ void swift::replaceLoadSequence(SILInstruction *I,
     }
     return;
   }
+
+  if (auto *BA = dyn_cast<BeginAccessInst>(I)) {
+    for (auto Use : BA->getUses()) {
+      replaceLoadSequence(Use->getUser(), Value, B);
+    }
+    return;
+  }
+
+  // Incidental uses of an addres are meaningless with regard to the loaded
+  // value.
+  if (isIncidentalUse(I) || isa<BeginUnpairedAccessInst>(I))
+    return;
 
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
@@ -1488,8 +1582,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
-      auto *ND = AFD->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = AFD->getDeclContext()->getSelfNominalTypeDecl();
       if (ND->getEffectiveAccess() == AccessLevel::Open)
         return false;
     }
@@ -1502,56 +1595,6 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   }
 
   llvm_unreachable("Unhandled access level in switch.");
-}
-
-void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                                    DominanceInfo *DomTree) {
-  SILValue V = Op.get();
-  SILInstruction *Prev = nullptr;
-  auto *InsertPt = InsertBefore;
-  while (true) {
-    SILValue Incoming = stripSinglePredecessorArgs(V);
-    
-    // Forward the incoming arg from a single predecessor.
-    if (V != Incoming) {
-      if (V == Op.get()) {
-        // If we are the operand itself set the operand to the incoming
-        // argument.
-        Op.set(Incoming);
-        V = Incoming;
-      } else {
-        // Otherwise, set the previous projections operand to the incoming
-        // argument.
-        assert(Prev && "Must have seen a projection");
-        Prev->setOperand(0, Incoming);
-        V = Incoming;
-      }
-    }
-    
-    switch (V->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst: {
-        auto *Inst = cast<SingleValueInstruction>(V);
-        // We are done once the current projection dominates the insert point.
-        if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
-          return;
-        
-        // Move the current projection and memorize it for the next iteration.
-        Prev = Inst;
-        Inst->moveBefore(InsertPt);
-        InsertPt = Inst;
-        V = Inst->getOperand(0);
-        continue;
-      }
-      default:
-        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
-               "The projected value must dominate the insertion point");
-        return;
-    }
-  }
 }
 
 void StaticInitCloner::add(SILInstruction *InitVal) {
@@ -1593,9 +1636,76 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
       }
     }
   }
-  assert(ValueMap.count(InitVal) != 0 &&
-         "Could not schedule all instructions for cloning");
-  return cast<SingleValueInstruction>(ValueMap[InitVal]);
+  return cast<SingleValueInstruction>(getMappedValue(InitVal));
 }
 
+Optional<FindLocalApplySitesResult>
+swift::findLocalApplySites(FunctionRefInst *FRI) {
+  SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
+  Optional<FindLocalApplySitesResult> f;
+  f.emplace();
+
+  // Optimistically state that we have no escapes before our def-use dataflow.
+  f->escapes = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+    auto *user = op->getUser();
+
+    // If we have a full apply site as our user.
+    if (auto apply = FullApplySite::isa(user)) {
+      if (apply.getCallee() == op->get()) {
+        f->fullApplySites.push_back(apply);
+        continue;
+      }
+    }
+
+    // If we have a partial apply as a user, start tracking it, but also look at
+    // its users.
+    if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
+      if (pai->getCallee() == op->get()) {
+        // Track the partial apply that we saw so we can potentially eliminate
+        // dead closure arguments.
+        f->partialApplySites.push_back(pai);
+        // Look to see if we can find a full application of this partial apply
+        // as well.
+        copy(pai->getUses(), std::back_inserter(worklist));
+        continue;
+      }
+    }
+
+    // Otherwise, see if we have any function casts to look through...
+    switch (user->getKind()) {
+    case SILInstructionKind::ThinToThickFunctionInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+      copy(cast<SingleValueInstruction>(user)->getUses(),
+           std::back_inserter(worklist));
+      continue;
+
+    // Look through any reference count instructions since these are not
+    // escapes:
+    case SILInstructionKind::CopyValueInst:
+      copy(cast<CopyValueInst>(user)->getUses(), std::back_inserter(worklist));
+      continue;
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
+      continue;
+    default:
+      break;
+    }
+
+    // But everything else is considered an escape.
+    f->escapes = true;
+  }
+
+  // If we did escape and didn't find any apply sites, then we have no
+  // information for our users that is interesting.
+  if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
+    return None;
+  return f;
+}

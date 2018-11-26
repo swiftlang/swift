@@ -14,7 +14,7 @@
 import _SwiftCoreFoundationOverlayShims
 
 /// DateInterval represents a closed date interval in the form of [startDate, endDate].  It is possible for the start and end dates to be the same with a duration of 0.  DateInterval does not support reverse intervals i.e. intervals where the duration is less than 0 and the end date occurs earlier in time than the start date.
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public struct DateInterval : ReferenceConvertible, Comparable, Hashable, Codable {
     public typealias ReferenceType = NSDateInterval
     
@@ -164,18 +164,18 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable, Codable
         }
     }
     
-    @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     public static func ==(lhs: DateInterval, rhs: DateInterval) -> Bool {
         return lhs.start == rhs.start && lhs.duration == rhs.duration
     }
 
-    @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     public static func <(lhs: DateInterval, rhs: DateInterval) -> Bool {
         return lhs.compare(rhs) == .orderedAscending
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension DateInterval : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var description: String {
         return "\(start) to \(end)"
@@ -194,7 +194,7 @@ extension DateInterval : CustomStringConvertible, CustomDebugStringConvertible, 
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension DateInterval : _ObjectiveCBridgeable {
     public static func _getObjectiveCType() -> Any.Type {
         return NSDateInterval.self
@@ -216,6 +216,7 @@ extension DateInterval : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateInterval?) -> DateInterval {
         var result: DateInterval?
         _forceBridgeFromObjectiveC(source!, result: &result)
@@ -223,7 +224,7 @@ extension DateInterval : _ObjectiveCBridgeable {
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension NSDateInterval : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
     @nonobjc

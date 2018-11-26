@@ -100,7 +100,7 @@ private:
 
   /// The entry point to the transformation.
   void run() override {
-    DEBUG(llvm::dbgs() << "** StackPromotion **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** StackPromotion **\n");
 
     bool Changed = false;
 
@@ -160,7 +160,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (ArgUser == SEI)
       continue;
 
-    if (isDebugInst(ArgUser))
+    if (ArgUser->isDebugInstruction())
       continue;
 
     if (ArgUser->getParent()->getSinglePredecessorBlock() == SEI->getParent()) {
@@ -227,7 +227,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   while (!Arg->use_empty()) {
     Operand *ArgUse = *Arg->use_begin();
     SILInstruction *ArgUser = ArgUse->getUser();
-    if (isDebugInst(ArgUser)) {
+    if (ArgUser->isDebugInstruction()) {
       // Don't care about debug instructions. Just remove them.
       ArgUser->eraseFromParent();
       continue;
@@ -241,7 +241,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       SILArgument *NewArg = nullptr;
       if (NeedEnumArg.insert(UseBlock).second) {
         // The first Enum use in this UseBlock.
-        NewArg = UseBlock->createPHIArgument(Arg->getType(),
+        NewArg = UseBlock->createPhiArgument(Arg->getType(),
                                              ValueOwnershipKind::Owned);
       } else {
         // We already inserted the Enum argument for this UseBlock.

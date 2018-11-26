@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 2 --end 6 --step 1 --select NumLeafScopes %s -Xfrontend=-verify -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+weak var tuple = (UInt8(0)   // expected-error {{'weak' may only be applied to}}
+%for i in range(0, N):
+  , UInt8(0)
+%end
+)

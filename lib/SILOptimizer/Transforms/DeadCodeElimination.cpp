@@ -121,8 +121,8 @@ class DCE : public SILFunctionTransform {
     if (!PDT->getRootNode())
       return;
 
-    DEBUG(F->dump());
-    DEBUG(PDT->print(llvm::dbgs()));
+    LLVM_DEBUG(F->dump());
+    LLVM_DEBUG(PDT->print(llvm::dbgs()));
 
     assert(Worklist.empty() && LiveValues.empty() && LiveBlocks.empty() &&
            ControllingInfoMap.empty() && ReverseDependencies.empty() &&
@@ -187,8 +187,8 @@ void DCE::markValueLive(SILNode *V) {
   if (LiveValues.count(V) || isa<SILUndef>(V))
     return;
 
-  DEBUG(llvm::dbgs() << "Marking as live:\n");
-  DEBUG(V->dump());
+  LLVM_DEBUG(llvm::dbgs() << "Marking as live:\n");
+  LLVM_DEBUG(V->dump());
 
   LiveValues.insert(V);
 
@@ -419,10 +419,12 @@ void DCE::propagateLiveness(SILInstruction *I) {
 SILBasicBlock *DCE::nearestUsefulPostDominator(SILBasicBlock *Block) {
   // Find the nearest post-dominator that has useful instructions.
   auto *PostDomNode = PDT->getNode(Block)->getIDom();
-  while (!LiveBlocks.count(PostDomNode->getBlock()))
+  while (PostDomNode && !LiveBlocks.count(PostDomNode->getBlock()))
     PostDomNode = PostDomNode->getIDom();
 
-  return PostDomNode->getBlock();
+  if (PostDomNode)
+    return PostDomNode->getBlock();
+  return nullptr;
 }
 
 // Replace the given conditional branching instruction with a plain
@@ -453,8 +455,8 @@ void DCE::replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block) {
   } else {
     Branch = SILBuilderWithScope(Inst).createBranch(Inst->getLoc(), Block);
   }
-  DEBUG(llvm::dbgs() << "Inserted unconditional branch:\n");
-  DEBUG(Branch->dump());
+  LLVM_DEBUG(llvm::dbgs() << "Inserted unconditional branch:\n");
+  LLVM_DEBUG(Branch->dump());
   (void)Branch;
 }
 
@@ -468,8 +470,8 @@ bool DCE::removeDead(SILFunction &F) {
       if (LiveValues.count(Inst))
         continue;
 
-      DEBUG(llvm::dbgs() << "Removing dead argument:\n");
-      DEBUG(Inst->dump());
+      LLVM_DEBUG(llvm::dbgs() << "Removing dead argument:\n");
+      LLVM_DEBUG(Inst->dump());
 
       Inst->replaceAllUsesWithUndef();
 
@@ -485,8 +487,11 @@ bool DCE::removeDead(SILFunction &F) {
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
       if (isa<TermInst>(Inst)) {
-        replaceBranchWithJump(Inst,
-                              nearestUsefulPostDominator(Inst->getParent()));
+        SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
+        if (!postDom)
+          continue;
+  
+        replaceBranchWithJump(Inst, postDom);
         Inst->eraseFromParent();
         BranchesChanged = true;
         Changed = true;
@@ -495,8 +500,8 @@ bool DCE::removeDead(SILFunction &F) {
 
       ++NumDeletedInsts;
 
-      DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
-      DEBUG(Inst->dump());
+      LLVM_DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
+      LLVM_DEBUG(Inst->dump());
 
       Inst->replaceAllUsesOfAllResultsWithUndef();
 

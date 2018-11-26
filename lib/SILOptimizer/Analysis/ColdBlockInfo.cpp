@@ -44,7 +44,7 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
 
   if (auto *Arg = dyn_cast<SILArgument>(Cond)) {
     llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> InValues;
-    if (!Arg->getIncomingValues(InValues))
+    if (!Arg->getIncomingPhiValues(InValues))
       return BranchHint::None;
 
     if (recursionDepth > RecursionDepthLimit)

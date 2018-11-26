@@ -187,7 +187,7 @@ extension String {
   /// - Parameters:
   ///   - bytes: A sequence of bytes to interpret using `encoding`.
   ///   - encoding: The ecoding to use to interpret `bytes`.
-  public init? <S: Sequence>(bytes: S, encoding: Encoding)
+  public init? <S: Sequence>(bytes: __shared S, encoding: Encoding)
     where S.Iterator.Element == UInt8 {
     let byteArray = Array(bytes)
     if let ns = NSString(
@@ -267,7 +267,7 @@ extension String {
   /// Produces a string created by reading data from the file at a
   /// given path interpreted using a given encoding.
   public init(
-    contentsOfFile path: String,
+    contentsOfFile path: __shared String,
     encoding enc: Encoding
   ) throws {
     let ns = try NSString(contentsOfFile: path, encoding: enc.rawValue)
@@ -283,7 +283,7 @@ extension String {
   /// a given path and returns by reference the encoding used to
   /// interpret the file.
   public init(
-    contentsOfFile path: String,
+    contentsOfFile path: __shared String,
     usedEncoding: inout Encoding
   ) throws {
     var enc: UInt = 0
@@ -293,7 +293,7 @@ extension String {
   }
 
   public init(
-    contentsOfFile path: String
+    contentsOfFile path: __shared String
   ) throws {
     let ns = try NSString(contentsOfFile: path, usedEncoding: nil)
     self = String._unconditionallyBridgeFromObjectiveC(ns)
@@ -308,7 +308,7 @@ extension String {
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
   public init(
-    contentsOf url: URL,
+    contentsOf url: __shared URL,
     encoding enc: Encoding
   ) throws {
     let ns = try NSString(contentsOf: url, encoding: enc.rawValue)
@@ -324,7 +324,7 @@ extension String {
   /// and returns by reference the encoding used to interpret the
   /// data.  Errors are written into the inout `error` argument.
   public init(
-    contentsOf url: URL,
+    contentsOf url: __shared URL,
     usedEncoding: inout Encoding
   ) throws {
     var enc: UInt = 0
@@ -334,7 +334,7 @@ extension String {
   }
 
   public init(
-    contentsOf url: URL
+    contentsOf url: __shared URL
   ) throws {
     let ns = try NSString(contentsOf: url, usedEncoding: nil)
     self = String._unconditionallyBridgeFromObjectiveC(ns)
@@ -365,7 +365,7 @@ extension String {
 
   /// Returns a `String` initialized by converting given `data` into
   /// Unicode characters using a given `encoding`.
-  public init?(data: Data, encoding: Encoding) {
+  public init?(data: __shared Data, encoding: Encoding) {
     guard let s = NSString(data: data, encoding: encoding.rawValue) else { return nil }
     self = String._unconditionallyBridgeFromObjectiveC(s)
   }
@@ -375,7 +375,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted.
-  public init(format: String, _ arguments: CVarArg...) {
+  public init(format: __shared String, _ arguments: CVarArg...) {
     self = String(format: format, arguments: arguments)
   }
 
@@ -386,7 +386,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user's default locale.
-  public init(format: String, arguments: [CVarArg]) {
+  public init(format: __shared String, arguments: __shared [CVarArg]) {
     self = String(format: format, locale: nil, arguments: arguments)
   }
 
@@ -395,7 +395,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: Locale?, _ args: CVarArg...) {
+  public init(format: __shared String, locale: __shared Locale?, _ args: CVarArg...) {
     self = String(format: format, locale: locale, arguments: args)
   }
 
@@ -407,7 +407,7 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  public init(format: String, locale: Locale?, arguments: [CVarArg]) {
+  public init(format: __shared String, locale: __shared Locale?, arguments: __shared [CVarArg]) {
 #if DEPLOYMENT_RUNTIME_SWIFT
     self = withVaList(arguments) {
       String._unconditionallyBridgeFromObjectiveC(
@@ -435,8 +435,7 @@ extension StringProtocol where Index == String.Index {
 
   // self can be a Substring so we need to subtract/add this offset when
   // passing _ns to the Foundation APIs. Will be 0 if self is String.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _substringOffset: Int {
     return self.startIndex.encodedOffset
   }
@@ -447,8 +446,7 @@ extension StringProtocol where Index == String.Index {
     return Index(encodedOffset: utf16Index + _substringOffset)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _toRelativeNSRange(_ r: Range<String.Index>) -> NSRange {
     return NSRange(
       location: r.lowerBound.encodedOffset - _substringOffset,
@@ -542,7 +540,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A capitalized representation of the string that is produced
   /// using the current locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedCapitalized: String {
     return _ns.localizedCapitalized
   }
@@ -888,7 +886,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A lowercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedLowercase: String {
     return _ns.localizedLowercase
   }
@@ -953,7 +951,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardContains<
     T : StringProtocol
   >(_ string: T) -> Bool {
@@ -1128,7 +1126,7 @@ extension StringProtocol where Index == String.Index {
 
   /// An uppercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedUppercase: String {
     return _ns.localizedUppercase as String
   }
@@ -1185,7 +1183,7 @@ extension StringProtocol where Index == String.Index {
 
 #if !DEPLOYMENT_RUNTIME_SWIFT
   /// Perform string transliteration.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func applyingTransform(
     _ transform: StringTransform, reverse: Bool
   ) -> String? {
@@ -1219,12 +1217,12 @@ extension StringProtocol where Index == String.Index {
     let range = range.relative(to: self)
     _ns.enumerateLinguisticTags(
       in: _toRelativeNSRange(range),
-      scheme: tagScheme._ephemeralString,
+      scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
       options: opts,
       orthography: orthography != nil ? orthography! : nil
     ) {
       var stop_ = false
-      body($0, self._range($1), self._range($2), &stop_)
+      body($0!.rawValue, self._range($1), self._range($2), &stop_)
       if stop_ {
         $3.pointee = true
       }
@@ -1465,7 +1463,7 @@ extension StringProtocol where Index == String.Index {
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
         in: _toRelativeNSRange(range.relative(to: self)),
-        scheme: tagScheme._ephemeralString,
+        scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
         options: opts,
         orthography: orthography,
         tokenRanges: $0) as NSArray
@@ -1604,7 +1602,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardRange<
     T : StringProtocol
   >(of string: T) -> Range<Index>? {
@@ -1638,8 +1636,8 @@ extension StringProtocol where Index == String.Index {
   /// Equivalent to `self.rangeOfString(other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {
     let r = self.range(of: other) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
-      _sanityCheck(r == _ns.contains(other._ephemeralString))
+    if #available(macOS 10.10, iOS 8.0, *) {
+      assert(r == _ns.contains(other._ephemeralString))
     }
     return r
   }
@@ -1661,8 +1659,8 @@ extension StringProtocol where Index == String.Index {
     let r = self.range(
       of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
-      _sanityCheck(r ==
+    if #available(macOS 10.10, iOS 8.0, *) {
+      assert(r ==
         _ns.localizedCaseInsensitiveContains(other._ephemeralString))
     }
     return r

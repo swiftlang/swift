@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-codemotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -315,6 +316,13 @@ void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
   if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
+    // We can't do this optimization on non-exhaustive enums.
+    const SILFunction *Fn = CondBr->getFunction();
+    bool IsExhaustive =
+        E->isEffectivelyExhaustive(Fn->getModule().getSwiftModule(),
+                                   Fn->getResilienceExpansion());
+    if (!IsExhaustive)
+      return;
     // Look for a single other element on this enum.
     EnumElementDecl *OtherElt = nullptr;
     for (EnumElementDecl *Elt : E->getAllElements()) {
@@ -344,7 +352,7 @@ bool BBEnumTagDataflowState::initWithFirstPred(SILBasicBlock *FirstPredBB) {
 
   // If we fail, we found an unreachable block, bail.
   if (FirstPredState == nullptr) {
-    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
     return false;
   }
 
@@ -388,13 +396,13 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
 
   // If we have no predecessors, there is nothing to do so return early...
   if (getBB()->pred_empty()) {
-    DEBUG(llvm::dbgs() << "            No Preds.\n");
+    LLVM_DEBUG(llvm::dbgs() << "            No Preds.\n");
     return;
   }
 
   auto PI = getBB()->pred_begin(), PE = getBB()->pred_end();
   if (*PI == getBB()) {
-    DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
     return;
   }
 
@@ -419,7 +427,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
     return;
   }
 
-  DEBUG(llvm::dbgs() << "            Merging in rest of predecessors...\n");
+  LLVM_DEBUG(llvm::dbgs() <<"            Merging in rest of predecessors...\n");
 
   // Enum values that while merging we found conflicting values for. We blot
   // them after the loop in order to ensure that we can still find the ends of
@@ -435,7 +443,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
   do {
     // If we loop on ourselves, bail...
     if (*PI == getBB()) {
-      DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
       return;
     }
 
@@ -444,7 +452,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
 
     BBEnumTagDataflowState *PredBBState = getContext().getBBState(PredBB);
     if (PredBBState == nullptr) {
-      DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
+      LLVM_DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
       return;
     }
 
@@ -469,7 +477,7 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
           !(*PredIter).hasValue()) {
         // Otherwise, we are conservative and do not forward the EnumTag that we
         // are tracking. Blot it!
-        DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+        LLVM_DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
         CurBBValuesToBlot.push_back(P->first);
         PredBBValuesToBlot.push_back(P->first);
         continue;
@@ -485,8 +493,8 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
       // clear all the state since we cannot hoist safely.
       if (!PredBB->getSingleSuccessorBlock()) {
         EnumToEnumBBCaseListMap.clear();
-        DEBUG(llvm::dbgs() << "                Predecessor has other "
-                              "successors. Clearing BB cast list map.\n");
+        LLVM_DEBUG(llvm::dbgs() << "                Predecessor has other "
+                                   "successors. Clearing BB cast list map.\n");
       } else {
         // Otherwise, add this case to our predecessor case list. We will unique
         // this after we have finished processing all predecessors.
@@ -500,23 +508,23 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
       // are tracking. Blot it!
-      DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+      LLVM_DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
       CurBBValuesToBlot.push_back(P->first);
     }
   } while (PI != PE);
 
   for (unsigned ID : CurBBValuesToBlot) {
-    ValueToCaseMap.blot(ID);
+    ValueToCaseMap.erase(ID);
   }
   for (unsigned ID : PredBBValuesToBlot) {
-    EnumToEnumBBCaseListMap.blot(ID);
+    EnumToEnumBBCaseListMap.erase(ID);
   }
 }
 
 bool BBEnumTagDataflowState::visitEnumInst(EnumInst *EI) {
   unsigned ID = getIDForValue(SILValue(EI));
-  DEBUG(llvm::dbgs() << "    Storing enum into map. ID: " << ID
-                     << ". Value: " << *EI);
+  LLVM_DEBUG(llvm::dbgs() << "    Storing enum into map. ID: " << ID
+                          << ". Value: " << *EI);
   ValueToCaseMap[ID] = EI->getElement();
   return false;
 }
@@ -524,8 +532,8 @@ bool BBEnumTagDataflowState::visitEnumInst(EnumInst *EI) {
 bool BBEnumTagDataflowState::visitUncheckedEnumDataInst(
     UncheckedEnumDataInst *UEDI) {
   unsigned ID = getIDForValue(UEDI->getOperand());
-  DEBUG(llvm::dbgs() << "    Storing unchecked enum data into map. ID: " << ID
-                     << ". Value: " << *UEDI);
+  LLVM_DEBUG(llvm::dbgs() << "    Storing unchecked enum data into map. ID: "
+                          << ID << ". Value: " << *UEDI);
   ValueToCaseMap[ID] = UEDI->getElement();
   return false;
 }
@@ -541,9 +549,9 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
     return true;
   }
 
-  DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
-                     << (*FindResult)->first);
+  LLVM_DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
+  LLVM_DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
+                          << (*FindResult)->first);
 
   SILBuilderWithScope Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
@@ -562,9 +570,9 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
     return true;
   }
 
-  DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
-                     << (*FindResult)->first);
+  LLVM_DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
+  LLVM_DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
+                          << (*FindResult)->first);
 
   SILBuilderWithScope Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
@@ -598,7 +606,7 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
     if (!RVI)
       continue;
 
-    DEBUG(llvm::dbgs() << "        Visiting release: " << *RVI);
+    LLVM_DEBUG(llvm::dbgs() << "        Visiting release: " << *RVI);
 
     // Grab the operand of the release value inst.
     SILValue Op = RVI->getOperand();
@@ -608,8 +616,8 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
     auto R = EnumToEnumBBCaseListMap.find(ID);
     // If we don't have one, skip this release value inst.
     if (R == EnumToEnumBBCaseListMap.end()) {
-      DEBUG(llvm::dbgs() << "            Could not find [(BB, EnumTag)] "
-                            "list for release_value's operand. Bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "            Could not find [(BB, EnumTag)] "
+                                "list for release_value's operand. Bailing!\n");
       continue;
     }
 
@@ -617,12 +625,11 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
     // If we don't have an enum tag for each predecessor of this BB, bail since
     // we do not know how to handle that BB.
     if (EnumBBCaseList.size() != NumPreds) {
-      DEBUG(llvm::dbgs() << "            Found [(BB, EnumTag)] list for "
-                            "release_value's operand, but we do not have an "
-                            "enum tag for each predecessor. Bailing!\n");
-      DEBUG(llvm::dbgs() << "            List:\n");
-      DEBUG(for (auto P
-                 : EnumBBCaseList) {
+      LLVM_DEBUG(llvm::dbgs() << "            Found [(BB, EnumTag)] list for "
+                                 "release_value's operand, but we do not have "
+                                "an enum tag for each predecessor. Bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "            List:\n");
+      LLVM_DEBUG(for (auto P : EnumBBCaseList) {
         llvm::dbgs() << "                ";
         P.second->dump(llvm::dbgs());
       });
@@ -639,13 +646,13 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
     // if we are going to use it.
     if (valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
                                           SILBasicBlock::iterator(RVI), AA)) {
-      DEBUG(llvm::dbgs() << "            Release value has use that stops "
-                            "hoisting! Bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "            Release value has use that stops "
+                                 "hoisting! Bailing!\n");
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "            Its safe to perform the "
-                          "transformation!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Its safe to perform the "
+                               "transformation!\n");
 
     // Otherwise perform the transformation.
     for (auto P : EnumBBCaseList) {
@@ -883,7 +890,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
   // Make sure we can get all the incoming values.
   llvm::SmallVector<SILValue, 4> PredValues;
-  if (!SA->getIncomingValues(PredValues))
+  if (!SA->getIncomingPhiValues(PredValues))
     return false;
 
   // Ok, we can get all the incoming values and create releases for them.
@@ -1025,7 +1032,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     // then return it.
     if (canSinkInstruction(&*InstToSink) &&
         Iden->isIdenticalTo(&*InstToSink, operandCompare)) {
-      DEBUG(llvm::dbgs() << "Found an identical instruction.");
+      LLVM_DEBUG(llvm::dbgs() << "Found an identical instruction.");
       return &*InstToSink;
     }
 
@@ -1039,7 +1046,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 
     SkipBudget--;
     InstToSink = std::prev(InstToSink);
-    DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
+    LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
   }
 
   return nullptr;
@@ -1056,11 +1063,11 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   // This will further enable to sink strong_retain_unowned instructions,
   // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
-  auto *UTORI1 = dyn_cast<UnownedToRefInst>(First);
-  auto *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
-  if (UTORI1 && UTORI2) {
-    return 0;
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  if (isa<Name##ToRefInst>(First) && isa<Name##ToRefInst>(Second)) { \
+    return 0; \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   // TODO: Add more cases than Struct
   auto *FirstStruct = dyn_cast<StructInst>(First);
@@ -1238,7 +1245,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
     BB->getArgument(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
-    BB->replacePHIArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
+    BB->replacePhiArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
 
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.
@@ -1362,7 +1369,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
   if (FirstPred->getTerminator() == &*FirstPred->begin())
     return Changed;
 
-  DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
+  LLVM_DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
 
   // Map values in predecessor blocks to argument indices of the successor
   // block. For example:
@@ -1389,7 +1396,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
   auto InstToSink = FirstPred->getTerminator()->getIterator();
 
   while (SkipBudget) {
-    DEBUG(llvm::dbgs() << "Processing: " << *InstToSink);
+    LLVM_DEBUG(llvm::dbgs() << "Processing: " << *InstToSink);
 
     // Save the duplicated instructions in case we need to remove them.
     SmallVector<SILInstruction *, 4> Dups;
@@ -1408,7 +1415,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
                 P, &*InstToSink, valueToArgIdxMap, opRelation)) {
           Dups.push_back(DupInst);
         } else {
-          DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
+          LLVM_DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
           Dups.clear();
           break;
         }
@@ -1417,7 +1424,7 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
       // If we found duplicated instructions, sink one of the copies and delete
       // the rest.
       if (Dups.size()) {
-        DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
+        LLVM_DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
         InstToSink->moveBefore(&*BB->begin());
 
         if (opRelation == EqualAfterMove) {
@@ -1443,26 +1450,27 @@ static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
 
         // Restart the scan.
         InstToSink = FirstPred->getTerminator()->getIterator();
-        DEBUG(llvm::dbgs() << "Restarting scan. Next inst: " << *InstToSink);
+        LLVM_DEBUG(llvm::dbgs() << "Restarting scan. Next inst: "
+                                << *InstToSink);
         continue;
       }
     }
 
     // If this instruction was a barrier then we can't sink anything else.
     if (isSinkBarrier(&*InstToSink)) {
-      DEBUG(llvm::dbgs() << "Aborting on barrier: " << *InstToSink);
+      LLVM_DEBUG(llvm::dbgs() << "Aborting on barrier: " << *InstToSink);
       return Changed;
     }
 
     // This is the first instruction, we are done.
     if (InstToSink == FirstPred->begin()) {
-      DEBUG(llvm::dbgs() << "Reached the first instruction.");
+      LLVM_DEBUG(llvm::dbgs() << "Reached the first instruction.");
       return Changed;
     }
 
     SkipBudget--;
     InstToSink = std::prev(InstToSink);
-    DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
+    LLVM_DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
   }
 
   return Changed;
@@ -1701,28 +1709,28 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
   for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
        ++RPOIdx) {
 
-    DEBUG(llvm::dbgs() << "Visiting BB RPO#" << RPOIdx << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting BB RPO#" << RPOIdx << "\n");
 
     BBEnumTagDataflowState &State = BBToStateMap.getRPOState(RPOIdx);
 
-    DEBUG(llvm::dbgs() << "    Predecessors (empty if no predecessors):\n");
-    DEBUG(for (SILBasicBlock *Pred
+    LLVM_DEBUG(llvm::dbgs() <<"    Predecessors (empty if no predecessors):\n");
+    LLVM_DEBUG(for (SILBasicBlock *Pred
                : State.getBB()->getPredecessorBlocks()) {
       llvm::dbgs() << "        BB#" << RPOIdx << "; Ptr: " << Pred << "\n";
     });
-    DEBUG(llvm::dbgs() << "    State Addr: " << &State << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    State Addr: " << &State << "\n");
 
     // Merge in our predecessor states. We relook up our the states for our
     // predecessors to avoid memory invalidation issues due to copying in the
     // dense map.
-    DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
     State.mergePredecessorStates();
 
     // If our predecessors cover any of our enum values, attempt to hoist
     // releases up the CFG onto enum payloads or sink retains out of switch
     // regions.
-    DEBUG(llvm::dbgs() << "    Attempting to move releases into "
-          "predecessors!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Attempting to move releases into "
+                               "predecessors!\n");
 
     // Perform a relatively local forms of retain sinking and release hoisting
     // regarding switch regions and SILargument. This are not handled by retain
@@ -1748,7 +1756,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= hoistSILArgumentReleaseInst(State.getBB());
 
     // Then perform the dataflow.
-    DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
     Changed |= State.process();
   }
 
@@ -1770,8 +1778,8 @@ public:
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
-    DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
-          " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName()
+                            << " *****\n");
 
     if (processFunction(F, AA, PO, RCIA, HoistReleases))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

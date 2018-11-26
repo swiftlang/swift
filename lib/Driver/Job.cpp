@@ -16,6 +16,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -24,8 +25,8 @@ using namespace swift;
 using namespace swift::driver;
 
 StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
-                                                  types::ID Type) const {
-  if (Type == types::TY_Nothing)
+                                                  file_types::ID Type) const {
+  if (Type == file_types::TY_Nothing)
     return StringRef();
   auto const *M = DerivedOutputMap.getOutputMapForInput(PrimaryInputFile);
   if (!M)
@@ -52,12 +53,12 @@ struct CommandOutputInvariantChecker {
 };
 
 void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
-                                types::ID Type,
+                                file_types::ID Type,
                                 StringRef OutputFile,
                                 bool Overwrite) {
   assert(!PrimaryInputFile.empty());
   assert(!OutputFile.empty());
-  assert(Type != types::TY_Nothing);
+  assert(Type != file_types::TY_Nothing);
   auto &M = DerivedOutputMap.getOrCreateOutputMapForInput(PrimaryInputFile);
   if (Overwrite) {
     M[Type] = OutputFile;
@@ -73,7 +74,7 @@ void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
 }
 
 void CommandOutput::checkInvariants() const {
-  types::forAllTypes([&](types::ID Type) {
+  file_types::forAllTypes([&](file_types::ID Type) {
       size_t numOutputsOfType = 0;
       for (auto const &I : Inputs) {
         // FIXME: At the moment, empty primary input names correspond to
@@ -84,7 +85,7 @@ void CommandOutput::checkInvariants() const {
         // are presently (arbitrarily and wrongly) stored in entries
         // associated with the first primary input of the CommandOutput
         // that they were derived from.
-        assert(PrimaryOutputType == types::TY_Nothing || !I.Primary.empty());
+        assert(PrimaryOutputType == file_types::TY_Nothing || !I.Primary.empty());
         auto const *M = DerivedOutputMap.getOutputMapForInput(I.Primary);
         if (!M)
           continue;
@@ -104,7 +105,7 @@ void CommandOutput::checkInvariants() const {
 bool CommandOutput::hasSameAdditionalOutputTypes(
     CommandOutput const &other) const {
   bool sameAdditionalOutputTypes = true;
-  types::forAllTypes([&](types::ID Type) {
+  file_types::forAllTypes([&](file_types::ID Type) {
       bool a = AdditionalOutputTypes.count(Type) == 0;
       bool b = other.AdditionalOutputTypes.count(Type) == 0;
       if (a != b)
@@ -128,13 +129,13 @@ void CommandOutput::addOutputs(CommandOutput const &other) {
   }
 }
 
-CommandOutput::CommandOutput(types::ID PrimaryOutputType,
+CommandOutput::CommandOutput(file_types::ID PrimaryOutputType,
                              OutputFileMap &Derived)
     : PrimaryOutputType(PrimaryOutputType), DerivedOutputMap(Derived) {
   CommandOutputInvariantChecker Check(*this);
 }
 
-types::ID CommandOutput::getPrimaryOutputType() const {
+file_types::ID CommandOutput::getPrimaryOutputType() const {
   return PrimaryOutputType;
 }
 
@@ -142,7 +143,7 @@ void CommandOutput::addPrimaryOutput(CommandInputPair Input,
                                      StringRef PrimaryOutputFile) {
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
     "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
-  if (PrimaryOutputType == types::TY_Nothing) {
+  if (PrimaryOutputType == file_types::TY_Nothing) {
     // For TY_Nothing, we accumulate the inputs but do not add any outputs.
     // The invariant holds on either side of this action because all primary
     // outputs for this command will be absent (so the length == 0 case in the
@@ -176,20 +177,20 @@ SmallVector<StringRef, 16> CommandOutput::getPrimaryOutputFilenames() const {
     V.push_back(Out);
     if (!Out.empty())
       ++NonEmpty;
-    assert(!Out.empty() || PrimaryOutputType == types::TY_Nothing);
+    assert(!Out.empty() || PrimaryOutputType == file_types::TY_Nothing);
   }
   assert(NonEmpty == 0 || NonEmpty == Inputs.size());
   return V;
 }
 
-void CommandOutput::setAdditionalOutputForType(types::ID Type,
+void CommandOutput::setAdditionalOutputForType(file_types::ID Type,
                                                StringRef OutputFilename) {
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
       "additional", this, Inputs[0].Primary, Type, OutputFilename);
   CommandOutputInvariantChecker Check(*this);
   assert(Inputs.size() >= 1);
   assert(!OutputFilename.empty());
-  assert(Type != types::TY_Nothing);
+  assert(Type != file_types::TY_Nothing);
 
   // If we're given an "additional" output with the same type as the primary,
   // and we've not yet had such an additional type added, we treat it as a
@@ -204,7 +205,7 @@ void CommandOutput::setAdditionalOutputForType(types::ID Type,
   ensureEntry(Inputs[0].Primary, Type, OutputFilename, Overwrite);
 }
 
-StringRef CommandOutput::getAdditionalOutputForType(types::ID Type) const {
+StringRef CommandOutput::getAdditionalOutputForType(file_types::ID Type) const {
   if (AdditionalOutputTypes.count(Type) == 0)
     return StringRef();
   assert(Inputs.size() >= 1);
@@ -216,7 +217,7 @@ StringRef CommandOutput::getAdditionalOutputForType(types::ID Type) const {
 }
 
 SmallVector<StringRef, 16>
-CommandOutput::getAdditionalOutputsForType(types::ID Type) const {
+CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
   SmallVector<StringRef, 16> V;
   if (AdditionalOutputTypes.count(Type) != 0) {
     for (auto const &I : Inputs) {
@@ -234,10 +235,14 @@ CommandOutput::getAdditionalOutputsForType(types::ID Type) const {
   return V;
 }
 
-StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
+StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {
   if (PrimaryOutputType == Type)
     return getPrimaryOutputFilename();
   return getAdditionalOutputForType(Type);
+}
+
+const OutputFileMap &CommandOutput::getDerivedOutputMap() const {
+  return DerivedOutputMap;
 }
 
 StringRef CommandOutput::getBaseInput(size_t Index) const {
@@ -284,7 +289,7 @@ void
 CommandOutput::print(raw_ostream &out) const {
   out
     << "{\n"
-    << "    PrimaryOutputType = " << types::getTypeName(PrimaryOutputType)
+    << "    PrimaryOutputType = " << file_types::getTypeName(PrimaryOutputType)
     << ";\n"
     << "    Inputs = [\n";
   interleave(Inputs,
@@ -310,6 +315,16 @@ CommandOutput::dump() const {
   llvm::errs() << '\n';
 }
 
+void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
+  SmallVector<StringRef, 4> inputs;
+  for (const CommandInputPair IP : Inputs) {
+    assert(IP.Base == IP.Primary && !IP.Base.empty() &&
+           "output file maps won't work if these differ");
+    inputs.push_back(IP.Primary);
+  }
+  getDerivedOutputMap().write(out, inputs);
+}
+
 Job::~Job() = default;
 
 void Job::printArguments(raw_ostream &os,
@@ -321,6 +336,15 @@ void Job::printArguments(raw_ostream &os,
 
 void Job::dump() const {
   printCommandLineAndEnvironment(llvm::errs());
+}
+
+ArrayRef<const char *> Job::getArgumentsForTaskExecution() const {
+  if (hasResponseFile()) {
+    writeArgsToResponseFile();
+    return getResponseFileArg();
+  } else {
+    return getArguments();
+  }
 }
 
 void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
@@ -338,7 +362,12 @@ void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
 void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
+  if (hasResponseFile()) {
+    printArguments(os, {ResponseFileArg});
+    os << " # ";
+  }
   printArguments(os, Arguments);
+
   os << Terminator;
 }
 
@@ -389,13 +418,33 @@ void Job::printSummary(raw_ostream &os) const {
   os << "}";
 }
 
+bool Job::writeArgsToResponseFile() const {
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(ResponseFilePath, EC, llvm::sys::fs::F_None);
+  if (EC) {
+    return true;
+  }
+  for (const char *arg : Arguments) {
+    escapeAndPrintString(OS, arg);
+    OS << " ";
+  }
+  OS.flush();
+  return false;
+}
+
 BatchJob::BatchJob(const JobAction &Source,
                    SmallVectorImpl<const Job *> &&Inputs,
                    std::unique_ptr<CommandOutput> Output,
                    const char *Executable, llvm::opt::ArgStringList Arguments,
                    EnvironmentVector ExtraEnvironment,
                    std::vector<FilelistInfo> Infos,
-                   ArrayRef<const Job *> Combined)
+                   ArrayRef<const Job *> Combined, int64_t &NextQuasiPID)
     : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
           ExtraEnvironment, Infos),
-      CombinedJobs(Combined.begin(), Combined.end()) {}
+      CombinedJobs(Combined.begin(), Combined.end()),
+      QuasiPIDBase(NextQuasiPID) {
+
+  assert(QuasiPIDBase < 0);
+  NextQuasiPID -= CombinedJobs.size();
+  assert(NextQuasiPID < 0);
+}

@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -55,9 +56,10 @@ struct StoredDiagnosticInfo {
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
 
-  StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken, bool fatal)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
+                                 bool fatal)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
-  StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
                              opts == DiagnosticOptions::Fatal) {}
@@ -73,7 +75,7 @@ enum LocalDiagID : uint32_t {
 } // end anonymous namespace
 
 // TODO: categorization
-static StoredDiagnosticInfo storedDiagnosticInfos[] = {
+static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define ERROR(ID, Options, Text, Signature)                                    \
   StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
 #define WARNING(ID, Options, Text, Signature)                                  \
@@ -88,7 +90,7 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
                   LocalDiagID::NumDiags,
               "array size mismatch");
 
-static const char *diagnosticStrings[] = {
+static constexpr const char * const diagnosticStrings[] = {
 #define ERROR(ID, Options, Text, Signature) Text,
 #define WARNING(ID, Options, Text, Signature) Text,
 #define NOTE(ID, Options, Text, Signature) Text,
@@ -327,27 +329,33 @@ static void formatSelectionArgument(StringRef ModifierArguments,
 }
 
 static bool isInterestingTypealias(Type type) {
-  auto aliasTy = dyn_cast<NameAliasType>(type.getPointer());
-  if (!aliasTy)
-    return false;
-  if (aliasTy->getDecl() == type->getASTContext().getVoidDecl())
-    return false;
-  if (type->is<BuiltinType>())
+  // Dig out the typealias declaration, if there is one.
+  TypeAliasDecl *aliasDecl = nullptr;
+  if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer()))
+    aliasDecl = aliasTy->getDecl();
+  else
     return false;
 
-  auto aliasDecl = aliasTy->getDecl();
+  if (aliasDecl == type->getASTContext().getVoidDecl())
+    return false;
 
   // The 'Swift.AnyObject' typealias is not 'interesting'.
   if (aliasDecl->getName() ==
-      aliasDecl->getASTContext().getIdentifier("AnyObject") &&
-      aliasDecl->getParentModule()->isStdlibModule()) {
+        aliasDecl->getASTContext().getIdentifier("AnyObject") &&
+      (aliasDecl->getParentModule()->isStdlibModule() ||
+       aliasDecl->getParentModule()->isBuiltinModule())) {
     return false;
   }
 
-  auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
-
-  if (aliasDecl->isCompatibilityAlias())
+  // Compatibility aliases are only interesting insofar as their underlying
+  // types are interesting.
+  if (aliasDecl->isCompatibilityAlias()) {
+    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
     return isInterestingTypealias(underlyingTy);
+  }
+
+  // Builtin types are never interesting typealiases.
+  if (type->is<BuiltinType>()) return false;
 
   return true;
 }
@@ -466,6 +474,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
     break;
+
+  case DiagnosticArgumentKind::ReferenceOwnership:
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              unsigned(Arg.getAsReferenceOwnership()),
+                              FormatOpts, Out);
+    } else {
+      assert(Modifier.empty() &&
+             "Improper modifier for ReferenceOwnership argument");
+      Out << Arg.getAsReferenceOwnership();
+    }
+    break;
+
   case DiagnosticArgumentKind::StaticSpellingKind:
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
@@ -803,9 +824,22 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   Info.FixIts = diagnostic.getFixIts();
   for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
-                               diagnosticStrings[(unsigned)Info.ID],
-                               diagnostic.getArgs(),
-                               Info);
+                               diagnosticStringFor(Info.ID),
+                               diagnostic.getArgs(), Info);
   }
 }
 
+const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
+  return diagnosticStrings[(unsigned)id];
+}
+
+DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
+  : diags(diags)
+{
+  consumers = diags.takeConsumers();
+}
+
+DiagnosticSuppression::~DiagnosticSuppression() {
+  for (auto consumer : consumers)
+    diags.addConsumer(*consumer);
+}

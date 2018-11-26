@@ -17,6 +17,7 @@
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -272,23 +273,23 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
-Version::operator clang::VersionTuple() const
+Version::operator llvm::VersionTuple() const
 {
   switch (Components.size()) {
  case 0:
-   return clang::VersionTuple();
+   return llvm::VersionTuple();
  case 1:
-   return clang::VersionTuple((unsigned)Components[0]);
+   return llvm::VersionTuple((unsigned)Components[0]);
  case 2:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1]);
  case 3:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2]);
  case 4:
  case 5:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2],
                               (unsigned)Components[3]);
@@ -303,6 +304,12 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
     return None;
   case 1:
     break;
+  case 2:
+    // The only valid explicit language version with a minor
+    // component is 4.2.
+    if (Components[0] == 4 && Components[1] == 2)
+      break;
+    return None;
   default:
     // We do not want to permit users requesting more precise effective language
     // versions since accepting such an argument promises more than we're able
@@ -326,6 +333,9 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   case 4:
     static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
+    // Version '4' on its own implies '4.1.50'.
+    if (size() == 1)
+      return Version{4, 1, 50};
     return Version::getCurrentLanguageVersion();
   case 5:
     return Version{5, 0};
@@ -340,6 +350,16 @@ Version Version::asMajorVersion() const {
   Version res;
   res.Components.push_back(Components[0]);
   return res;
+}
+
+std::string Version::asAPINotesVersionString() const {
+  // Other than for "4.2.x", map the Swift major version into
+  // the API notes version for Swift. This has the effect of allowing
+  // API notes to effect changes only on Swift major versions,
+  // not minor versions.
+  if (size() >= 2 && Components[0] == 4 && Components[1] == 2)
+    return "4.2";
+  return llvm::itostr(Components[0]);
 }
 
 bool operator>=(const class Version &lhs,
@@ -362,6 +382,11 @@ bool operator>=(const class Version &lhs,
   }
   // Equality
   return true;
+}
+
+bool operator<(const class Version &lhs, const class Version &rhs) {
+
+  return !(lhs >= rhs);
 }
 
 bool operator==(const class Version &lhs,
@@ -426,4 +451,3 @@ std::string getSwiftRevision() {
 
 } // end namespace version
 } // end namespace swift
-

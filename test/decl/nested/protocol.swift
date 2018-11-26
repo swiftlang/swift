@@ -52,12 +52,10 @@ protocol Racoon {
 }
 
 enum SillyRawEnum : SillyProtocol.InnerClass {}
-// expected-error@-1 {{reference to generic type 'SillyProtocol.InnerClass' requires arguments in <...>}}
-// expected-error@-2 {{type 'SillyRawEnum' does not conform to protocol 'RawRepresentable'}}
+// expected-error@-1 {{type 'SillyRawEnum' does not conform to protocol 'RawRepresentable'}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
-  // expected-note@-1 {{generic type 'InnerClass' declared here}}
 }
 
 enum OuterEnum {
@@ -68,12 +66,46 @@ enum OuterEnum {
 
 class OuterClass {
   protocol InnerProtocol : OuterClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OuterClass'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
 
 class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OtherGenericClass<T>'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+}
+
+protocol SelfDotTest {
+  func f(_: Self.Class)
+  class Class {}
+  // expected-error@-1{{type 'Class' cannot be nested in protocol 'SelfDotTest'}}
+}
+
+struct Outer {
+  typealias E = NestedValidation.T
+  protocol NestedValidation { // expected-error {{protocol 'NestedValidation' cannot be nested inside another declaration}}
+    typealias T = A.B
+    class A { // expected-error {{type 'A' cannot be nested in protocol 'NestedValidation'}}
+      typealias B = Int
+    }
+  }
+}
+
+struct OuterForUFI {
+  @usableFromInline
+  protocol Inner { // expected-error {{protocol 'Inner' cannot be nested inside another declaration}}
+    func req()
+  }
+}
+
+extension OuterForUFI.Inner {
+  public func extMethod() {} // The 'public' puts this in a special path.
+}
+
+func testLookup(_ x: OuterForUFI.Inner) {
+  x.req()
+  x.extMethod()
+}
+func testLookup<T: OuterForUFI.Inner>(_ x: T) {
+  x.req()
+  x.extMethod()
 }

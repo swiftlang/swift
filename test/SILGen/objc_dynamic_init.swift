@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/objc_dynamic_init.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/objc_dynamic_init.h -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -35,11 +35,11 @@ final class Bobamathing: Thingamabob {
     }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$S{{.*}}GadgetC{{.*}}CTW
-// CHECK:         class_method {{%.*}} : $@thick Gadget.Type, #Gadget.init!allocator.1 :
+// CHECK-LABEL: sil private [transparent] [thunk] @$s{{.*}}GadgetC{{.*}}CTW
+// CHECK:         function_ref @{{.*}}Gadget{{.*}}fC :
 
 // CHECK-LABEL: sil_vtable Gadget {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : @$S{{.*}}GadgetC{{.*}}C //
+// CHECK-NOT:     #Gadget.init!allocator.1
 
 // CHECK-LABEL: sil_vtable Gizmo {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : @$S{{.*}}GizmoC{{.*}}C [override] //
+// CHECK-NOT:     #Gadget.init!allocator.1

@@ -12,13 +12,13 @@ public protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
-// CHECK-SAME:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
+// CHECK-SAME:           [[RUNCIBLE:@"\$s33protocol_conformance_records_objc8RuncibleMp"]]
 // -- nominal type descriptor
-// CHECK-SAME:           @"$SSo6NSRectVMn"
+// CHECK-SAME:           @"$sSo6NSRectVMn"
 // -- witness table
-// CHECK-SAME:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
+// CHECK-SAME:           @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
 // -- flags
 // CHECK-SAME:           i32 0
 // CHECK-SAME:         },
@@ -26,13 +26,13 @@ extension NSRect: Runcible {
   public func runce() {}
 }
 
-// CHECK-LABEL:         @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL:         @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- class object reference
-// CHECK-SAME:           @"got.OBJC_CLASS_$_Gizmo"
+// CHECK-SAME:           @"\01l_OBJC_CLASS_REF_$_Gizmo"
 // -- witness table
-// CHECK-SAME:           @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
+// CHECK-SAME:           @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
 // -- flags
 // CHECK-SAME:           i32 24
 // CHECK-SAME:         }
@@ -41,5 +41,5 @@ extension Gizmo: Runcible {
 }
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
-// CHECK-SAME: @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc"
-// CHECK-SAME: @"$SSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc"
+// CHECK-SAME: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc"
+// CHECK-SAME: @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc"

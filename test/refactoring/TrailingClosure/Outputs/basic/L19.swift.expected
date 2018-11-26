@@ -1,0 +1,25 @@
+struct Foo {
+  static func foo(a: () -> Int) {}
+  func qux(x: Int, y: () -> Int ) {}
+}
+
+func testTrailingClosure() -> String {
+  Foo.foo(a: { 1 })
+  Foo.bar(a: { print(3); return 1 })
+  Foo().qux(x: 1, y: { 1 })
+  let _ = Foo().quux(x: 1, y: { 1 })
+
+  [1,2,3]
+    .filter({ $0 % 2 == 0 })
+    .map({ $0 + 1 })
+}
+
+func foobar(first: String? = nil, closure: () -> Void) { fatalError() }
+func blah() {
+  _ = foobar { print("foo") }
+}
+
+
+
+
+

@@ -652,14 +652,14 @@
 // CHECK: TypesToReflect.ClassBoundP
 // CHECK: --------------------------
 
-// CHECK: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: TypesToReflect.(FileprivateProtocol in _{{[0-9a-fA-F]+}})
 // CHECK: -------------------------------------------------------------------------
 
 // CHECK: TypesToReflect.HasFileprivateProtocol
 // CHECK: -------------------------------------
-// CHECK: x: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: x: TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})
 // CHECK: (protocol_composition
-// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})))
+// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})))
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
@@ -708,8 +708,7 @@
 // CHECK: CAPTURE DESCRIPTORS:
 // CHECK: ====================
 // CHECK: - Capture types:
-// CHECK: (sil_box
-// CHECK:   (generic_type_parameter depth=0 index=0))
+// CHECK: (builtin Builtin.NativeObject)
 // CHECK: - Metadata sources:
 // CHECK: (generic_type_parameter depth=0 index=0)
 // CHECK: (closure_binding index=0)

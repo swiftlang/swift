@@ -70,6 +70,7 @@ class XRefTracePath {
       case Kind::Unknown:
         return Identifier();
       }
+      llvm_unreachable("unhandled kind");
     }
 
     void print(raw_ostream &os) const {
@@ -110,19 +111,16 @@ class XRefTracePath {
         break;
       case Kind::Accessor:
         switch (getDataAs<uintptr_t>()) {
-        case Getter:
+        case Get:
           os << "(getter)";
           break;
-        case Setter:
+        case Set:
           os << "(setter)";
           break;
-        case MaterializeForSet:
-          os << "(materializeForSet)";
-          break;
-        case Addressor:
+        case Address:
           os << "(addressor)";
           break;
-        case MutableAddressor:
+        case MutableAddress:
           os << "(mutableAddressor)";
           break;
         case WillSet:
@@ -130,6 +128,12 @@ class XRefTracePath {
           break;
         case DidSet:
           os << "(didSet)";
+          break;
+        case Read:
+          os << "(read)";
+          break;
+        case Modify:
+          os << "(modify)";
           break;
         default:
           os << "(unknown accessor kind)";
@@ -224,8 +228,7 @@ public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
     NeedsVTableEntry = 1 << 1,
-    NeedsAllocatingVTableEntry = 1 << 2,
-    NeedsFieldOffsetVectorEntry = 1 << 3,
+    NeedsFieldOffsetVectorEntry = 1 << 2,
   };
   using Flags = OptionSet<Flag>;
 
@@ -243,9 +246,6 @@ public:
   }
   bool needsVTableEntry() const {
     return flags.contains(Flag::NeedsVTableEntry);
-  }
-  bool needsAllocatingVTableEntry() const {
-    return flags.contains(Flag::NeedsAllocatingVTableEntry);
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
@@ -354,6 +354,41 @@ public:
     return llvm::inconvertibleErrorCode();
   }
 };
+
+class SILEntityError : public llvm::ErrorInfo<SILEntityError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+  StringRef name;
+public:
+  SILEntityError(StringRef name, std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)), name(name) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize SIL entity '" << name << "'";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+LLVM_NODISCARD
+static inline std::unique_ptr<llvm::ErrorInfoBase>
+takeErrorInfo(llvm::Error error) {
+  std::unique_ptr<llvm::ErrorInfoBase> result;
+  llvm::handleAllErrors(std::move(error),
+                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
+    result = std::move(info);
+  });
+  return result;
+}
 
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;

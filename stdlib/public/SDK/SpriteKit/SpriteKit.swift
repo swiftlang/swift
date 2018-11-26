@@ -24,13 +24,17 @@ public typealias SKColor = UIColor
 // this class only exists to allow AnyObject lookup of _copyImageData
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
-@objc class _SpriteKitMethodProvider : NSObject {
-  override init() { _sanityCheckFailure("don't touch me") }
+//
+// NOTE: older runtimes called this _SpriteKitMethodProvider. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
+@objc class __SpriteKitMethodProvider : NSObject {
+  override init() { preconditionFailure("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
 
 @available(iOS, introduced: 10.0)
-@available(OSX, introduced: 10.12)
+@available(macOS, introduced: 10.12)
 @available(tvOS, introduced: 10.0)
 @available(watchOS, introduced: 3.0)
 extension SKWarpGeometryGrid {
@@ -64,13 +68,13 @@ extension SKWarpGeometryGrid {
     case (0, 0):
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: nil)
     case (let dests, 0):
-        _precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: nil, destPositions: destinationPositions)
     case (0, let sources):
-        _precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: nil)
     case (let dests, let sources):
-        _precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
+        precondition(dests == requiredElementsCount && sources == requiredElementsCount, "Mismatch found between rows/columns and positions.")
         self.init(__columns: columns, rows: rows, sourcePositions: sourcePositions, destPositions: destinationPositions)
     }
   }

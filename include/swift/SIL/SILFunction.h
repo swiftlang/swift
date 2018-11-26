@@ -17,13 +17,13 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "swift/SIL/SILProfiler.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -35,11 +35,18 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+class SILFunctionBuilder;
+class SILProfiler;
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+enum IsThunk_t {
+  IsNotThunk,
+  IsThunk,
+  IsReabstractionThunk,
+  IsSignatureOptimizedThunk
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
@@ -97,12 +104,13 @@ private:
 class SILFunction
   : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
 public:
-  typedef llvm::iplist<SILBasicBlock> BlockListType;
+  using BlockListType = llvm::iplist<SILBasicBlock>;
 
 private:
   friend class SILBasicBlock;
   friend class SILModule;
-    
+  friend class SILFunctionBuilder;
+
   /// Module - The SIL module that the function belongs to.
   SILModule &Module;
 
@@ -120,8 +128,8 @@ private:
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The forwarding substitutions, lazily computed.
-  Optional<SubstitutionList> ForwardingSubs;
+  /// The forwarding substitution map, lazily computed.
+  SubstitutionMap ForwardingSubMap;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
@@ -223,6 +231,41 @@ private:
   /// serialization.
   bool WasDeserializedCanonical = false;
 
+  /// True if this is a reabstraction thunk of escaping function type whose
+  /// single argument is a potentially non-escaping closure. This is an escape
+  /// hatch to allow non-escaping functions to be stored or passed as an
+  /// argument with escaping function type. The thunk argument's function type
+  /// is not necessarily @noescape. The only relevant aspect of the argument is
+  /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
+  bool IsWithoutActuallyEscapingThunk = false;
+
+  static void
+  validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
+                        const GenericSpecializationInformation *genericInfo) {
+#ifndef NDEBUG
+    // The _original_ function for a method can turn into a thunk through
+    // signature optimization, meaning it needs to retain its subclassScope, but
+    // other thunks and specializations are implementation details and so
+    // shouldn't be connected to their parent class.
+    bool thunkCanHaveSubclassScope;
+    switch (isThunk) {
+    case IsNotThunk:
+    case IsSignatureOptimizedThunk:
+      thunkCanHaveSubclassScope = true;
+      break;
+    case IsThunk:
+    case IsReabstractionThunk:
+      thunkCanHaveSubclassScope = false;
+      break;
+    }
+    auto allowsInterestingScopes = thunkCanHaveSubclassScope && !genericInfo;
+    assert(
+        allowsInterestingScopes ||
+        scope == SubclassScope::NotApplicable &&
+            "SubclassScope on specialization or non-signature-optimized thunk");
+#endif
+  }
+
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
@@ -266,10 +309,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root) {
-    assert(!Profiler && "Function already has a profiler");
-    Profiler = SILProfiler::create(Module, Root);
-  }
+  void createProfiler(ASTNode Root, ForDefinition_t forDefinition);
 
   void discardProfiler() { Profiler = nullptr; }
 
@@ -351,6 +391,18 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  /// Returns true if this is a reabstraction thunk of escaping function type
+  /// whose single argument is a potentially non-escaping closure. i.e. the
+  /// thunks' function argument may itself have @inout_aliasable parameters.
+  bool isWithoutActuallyEscapingThunk() const {
+    return IsWithoutActuallyEscapingThunk;
+  }
+
+  void setWithoutActuallyEscapingThunk(bool val = true) {
+    assert(!val || isThunk() == IsReabstractionThunk);
+    IsWithoutActuallyEscapingThunk = val;
   }
 
   /// Returns the calling convention used by this entry point.
@@ -575,13 +627,20 @@ public:
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
-  void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
+  void setThunk(IsThunk_t isThunk) {
+    validateSubclassScope(getClassSubclassScope(), isThunk, SpecializationInfo);
+    Thunk = isThunk;
+  }
 
   /// Get the class visibility (relevant for class methods).
   SubclassScope getClassSubclassScope() const {
     return SubclassScope(ClassSubclassScope);
   }
-    
+  void setClassSubclassScope(SubclassScope scope) {
+    validateSubclassScope(scope, isThunk(), SpecializationInfo);
+    ClassSubclassScope = static_cast<unsigned>(scope);
+  }
+
   /// Get this function's noinline attribute.
   Inline_t getInlineStrategy() const { return Inline_t(InlineStrategy); }
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
@@ -589,7 +648,7 @@ public:
   /// \return the function side effects information.
   EffectsKind getEffectsKind() const { return EffectsKindAttr; }
 
-  /// \return True if the function is annotated with the @effects attribute.
+  /// \return True if the function is annotated with the @_effects attribute.
   bool hasEffectsKind() const {
     return EffectsKindAttr != EffectsKind::Unspecified;
   }
@@ -657,6 +716,7 @@ public:
 
   void setSpecializationInfo(const GenericSpecializationInformation *Info) {
     assert(!isSpecialization());
+    validateSubclassScope(getClassSubclassScope(), isThunk(), Info);
     SpecializationInfo = Info;
   }
 
@@ -685,7 +745,7 @@ public:
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
-  SubstitutionList getForwardingSubstitutions();
+  SubstitutionMap getForwardingSubstitutionMap();
 
   //===--------------------------------------------------------------------===//
   // Block List Access
@@ -694,9 +754,9 @@ public:
   BlockListType &getBlocks() { return BlockList; }
   const BlockListType &getBlocks() const { return BlockList; }
 
-  typedef BlockListType::iterator iterator;
-  typedef BlockListType::reverse_iterator reverse_iterator;
-  typedef BlockListType::const_iterator const_iterator;
+  using iterator = BlockListType::iterator;
+  using reverse_iterator = BlockListType::reverse_iterator;
+  using const_iterator = BlockListType::const_iterator;
 
   bool empty() const { return BlockList.empty(); }
   iterator begin() { return BlockList.begin(); }
@@ -714,7 +774,8 @@ public:
   const SILBasicBlock *getEntryBlock() const { return &front(); }
 
   SILBasicBlock *createBasicBlock();
-  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {
@@ -822,6 +883,11 @@ public:
   /// invariants.
   void verify(bool SingleFunction = true) const;
 
+  /// Verify that all non-cond-br critical edges have been split.
+  ///
+  /// This is a fast subset of the checks performed in the SILVerifier.
+  void verifyCriticalEdges() const;
+
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
@@ -862,6 +928,9 @@ public:
   /// block inside.  This depends on there being a 'dot' and 'gv' program in
   /// your path.
   void viewCFG() const;
+  /// Like ViewCFG, but the graph does not show the contents of basic blocks.
+  void viewCFGOnly() const;
+
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -880,8 +949,8 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILFunction> :
-public ilist_default_traits<::swift::SILFunction> {
-  typedef ::swift::SILFunction SILFunction;
+public ilist_node_traits<::swift::SILFunction> {
+  using SILFunction = ::swift::SILFunction;
 
 public:
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }

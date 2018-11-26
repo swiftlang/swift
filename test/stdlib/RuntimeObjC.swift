@@ -2,6 +2,7 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -292,13 +293,13 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectTrue(_isBridgedToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
+  expectTrue(_isBridgedToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -468,96 +469,6 @@ var nsStringCanaryCount = 0
   @objc override func character(at index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValue/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: true)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValueNonASCII/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringHashValue(a, isASCII: false)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointer/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: true)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHashValuePointerNonASCII/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    _stdlib_NSStringHashValuePointer(ptrA, isASCII: false)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFDPointer/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
-    _stdlib_NSStringHasPrefixNFDPointer(ptrA, ptrB)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFDPointer/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    let ptrA = unsafeBitCast(a, to: OpaquePointer.self)
-    let ptrB = unsafeBitCast(b, to: OpaquePointer.self)
-    _stdlib_NSStringHasSuffixNFDPointer(ptrA, ptrB)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    _stdlib_NSStringHasPrefixNFD(a, b)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    let b = NSStringCanary()
-    expectEqual(2, nsStringCanaryCount)
-    _stdlib_NSStringHasSuffixNFD(a, b)
-  }
-  expectEqual(0, nsStringCanaryCount)
 }
 
 RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
@@ -790,7 +701,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-class TestArtificialSubclass: NSObject {
+@objc @objcMembers class TestArtificialSubclass: NSObject {
   dynamic var foo = "foo"
 }
 
@@ -849,6 +760,30 @@ ObjCConformsToProtocolTestSuite.test("cast/instance") {
 ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeClass.self is SomeObjCProto.Type)
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
+}
+
+// SR-7357
+
+extension Optional where Wrapped == NSData {
+    private class Inner {
+    }
+
+    var asInner: Inner {
+        return Inner()
+    }
+}
+
+var RuntimeClassNamesTestSuite = TestSuite("runtime class names")
+
+RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained extension") {
+  let base: NSData? = nil
+  let util = base.asInner
+
+  let clas = unsafeBitCast(type(of: util), to: NSObject.self)
+  // Name should look like _TtC1aP.*Inner
+  let desc = clas.description
+  expectEqual("_TtGC1a", desc.prefix(7))
+  expectEqual("Data_", desc.suffix(5))
 }
 
 runAllTests()

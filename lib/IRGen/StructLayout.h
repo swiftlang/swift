@@ -60,7 +60,7 @@ enum class LayoutKind {
 class NonFixedOffsetsImpl;
 
 /// The type to pass around for non-fixed offsets.
-typedef Optional<NonFixedOffsetsImpl*> NonFixedOffsets;
+using NonFixedOffsets = Optional<NonFixedOffsetsImpl *>;
 
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
@@ -100,7 +100,7 @@ public:
 private:
   enum : unsigned { IncompleteKind  = 4 };
 
-  /// The swift type information for this element.
+  /// The swift type information for this element's layout.
   const TypeInfo *Type;
 
   /// The offset in bytes from the start of the struct.
@@ -310,7 +310,7 @@ private:
 /// Apply layout attributes such as @_alignment to the layout properties of a
 /// type, diagnosing any problems with them.
 void applyLayoutAttributes(IRGenModule &IGM,
-                           CanType ty,
+                           NominalTypeDecl *decl,
                            bool isFixedLayout,
                            /*inout*/ Alignment &alignment);
 
@@ -333,7 +333,6 @@ class StructLayout {
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
-  CanType ASTTy;
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -346,14 +345,14 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, CanType astTy,
+  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
                LayoutKind kind, LayoutStrategy strategy,
                ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
   StructLayout(const StructLayoutBuilder &builder,
-               CanType astTy,
+               NominalTypeDecl *decl,
                llvm::Type *type,
                ArrayRef<ElementLayout> elements)
     : MinimumAlign(builder.getAlignment()),
@@ -363,7 +362,6 @@ public:
       IsKnownPOD(builder.isPOD()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
-      ASTTy(astTy),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
@@ -393,41 +391,6 @@ public:
   /// Bitcast the given pointer to this type.
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,
                      const llvm::Twine &name = "") const;
-};
-
-/// Different policies for accessing a physical field.
-enum class FieldAccess : uint8_t {
-  /// Instance variable offsets are constant.
-  ConstantDirect,
-  
-  /// Instance variable offsets must be loaded from "direct offset"
-  /// global variables.
-  NonConstantDirect,
-  
-  /// Instance variable offsets are kept in fields in metadata, but
-  /// the offsets of those fields within the metadata are constant.
-  ConstantIndirect
-};
-
-struct ClassLayout {
-  /// Lazily-initialized array of all fragile stored properties in the class
-  /// (including superclass stored properties).
-  ArrayRef<VarDecl*> AllStoredProperties;
-  /// Lazily-initialized array of all fragile stored properties inherited from
-  /// superclasses.
-  ArrayRef<VarDecl*> InheritedStoredProperties;
-  /// Lazily-initialized array of all field access methods.
-  ArrayRef<FieldAccess> AllFieldAccesses;
-  /// Does the class metadata require dynamic initialization.
-  bool MetadataRequiresDynamicInitialization;
-
-  unsigned getFieldIndex(VarDecl *field) const {
-    // FIXME: This is algorithmically terrible.
-    auto found = std::find(AllStoredProperties.begin(),
-                           AllStoredProperties.end(), field);
-    assert(found != AllStoredProperties.end() && "didn't find field in type?!");
-    return found - AllStoredProperties.begin();
-  }
 };
 
 } // end namespace irgen

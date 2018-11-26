@@ -42,11 +42,11 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         case republicOfChina
         
         /// A simple tabular Islamic calendar using the astronomical/Thursday epoch of CE 622 July 15
-        @available(OSX 10.10, iOS 8.0, *)
+        @available(macOS 10.10, iOS 8.0, *)
         case islamicTabular
         
         /// The Islamic Umm al-Qura calendar used in Saudi Arabia. This is based on astronomical calculation, instead of tabular behavior.
-        @available(OSX 10.10, iOS 8.0, *)
+        @available(macOS 10.10, iOS 8.0, *)
         case islamicUmmAlQura
         
     }
@@ -97,7 +97,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// Returns a new Calendar.
     ///
     /// - parameter identifier: The kind of calendar to use.
-    public init(identifier: Identifier) {
+    public init(identifier: __shared Identifier) {
         let result = __NSCalendarCreate(Calendar._toNSCalendarIdentifier(identifier))
         _handle = _MutableHandle(adoptingReference: result as! NSCalendar)
         _autoupdating = false
@@ -106,7 +106,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     // MARK: -
     // MARK: Bridging
     
-    fileprivate init(reference : NSCalendar) {
+    fileprivate init(reference : __shared NSCalendar) {
         _handle = _MutableHandle(reference: reference)
         if __NSCalendarIsAutoupdating(reference) {
             _autoupdating = true
@@ -357,7 +357,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A component to calculate a range for.
     /// - returns: The range, or nil if it could not be calculated.
     public func minimumRange(of component: Component) -> Range<Int>? {
-        return _handle.map { $0.minimumRange(of: Calendar._toCalendarUnit([component])).toRange() }
+        return _handle.map { Range($0.minimumRange(of: Calendar._toCalendarUnit([component]))) }
     }
     
     /// The maximum range limits of the values that a given component can take on in the receive
@@ -366,7 +366,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A component to calculate a range for.
     /// - returns: The range, or nil if it could not be calculated.
     public func maximumRange(of component: Component) -> Range<Int>? {
-        return _handle.map { $0.maximumRange(of: Calendar._toCalendarUnit([component])).toRange() }
+        return _handle.map { Range($0.maximumRange(of: Calendar._toCalendarUnit([component]))) }
     }
     
     
@@ -383,7 +383,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The absolute time for which the calculation is performed.
     /// - returns: The range of absolute time values smaller can take on in larger at the time specified by date. Returns `nil` if larger is not logically bigger than smaller in the calendar, or the given combination of components does not make sense (or is a computation which is undefined).
     public func range(of smaller: Component, in larger: Component, for date: Date) -> Range<Int>? {
-        return _handle.map { $0.range(of: Calendar._toCalendarUnit([smaller]), in: Calendar._toCalendarUnit([larger]), for: date).toRange() }
+        return _handle.map { Range($0.range(of: Calendar._toCalendarUnit([smaller]), in: Calendar._toCalendarUnit([larger]), for: date)) }
     }
     
     @available(*, unavailable, message: "use range(of:in:for:) instead")
@@ -417,7 +417,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter component: A calendar component.
     /// - parameter date: The specified date.
     /// - returns: A new `DateInterval` if the starting time and duration of a component could be calculated, otherwise `nil`.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateInterval(of component: Component, for date: Date) -> DateInterval? {
         var start : Date = Date(timeIntervalSinceReferenceDate: 0)
         var interval : TimeInterval = 0
@@ -694,7 +694,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     ///
     /// - parameter date: The date contained in the weekend.
     /// - returns: A `DateInterval`, or nil if the date is not in a weekend.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateIntervalOfWeekend(containing date: Date) -> DateInterval? {
         var nsDate : NSDate?
         var ti : TimeInterval = 0
@@ -739,7 +739,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The date at which to begin the search.
     /// - parameter direction: Which direction in time to search. The default value is `.forward`.
     /// - returns: A `DateInterval`, or nil if weekends do not exist in the specific calendar or locale.
-    @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func nextWeekend(startingAfter date: Date, direction: SearchDirection = .forward) -> DateInterval? {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
         var nsDate : NSDate?
@@ -917,25 +917,25 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         
         switch matchingPolicy {
         case .nextTime:
-            let _ = result.insert(.matchNextTime)
+            result.insert(.matchNextTime)
         case .nextTimePreservingSmallerComponents:
-            let _ = result.insert(.matchNextTimePreservingSmallerUnits)
+            result.insert(.matchNextTimePreservingSmallerUnits)
         case .previousTimePreservingSmallerComponents:
-            let _ = result.insert(.matchPreviousTimePreservingSmallerUnits)
+            result.insert(.matchPreviousTimePreservingSmallerUnits)
         case .strict:
-            let _ = result.insert(.matchStrictly)
+            result.insert(.matchStrictly)
         }
         
         switch repeatedTimePolicy {
         case .first:
-            let _ = result.insert(.matchFirst)
+            result.insert(.matchFirst)
         case .last:
-            let _ = result.insert(.matchLast)
+            result.insert(.matchLast)
         }
         
         switch direction {
         case .backward:
-            let _ = result.insert(.searchBackwards)
+            result.insert(.searchBackwards)
         case .forward:
             break
         }
@@ -964,13 +964,13 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         
         var result = NSCalendar.Unit()
         for u in units {
-            let _ = result.insert(unitMap[u]!)
+            result.insert(unitMap[u]!)
         }
         return result
     }
     
     internal static func _toNSCalendarIdentifier(_ identifier : Identifier) -> NSCalendar.Identifier {
-        if #available(OSX 10.10, iOS 8.0, *) {
+        if #available(macOS 10.10, iOS 8.0, *) {
             let identifierMap : [Identifier : NSCalendar.Identifier] =
                 [.gregorian : .gregorian,
                  .buddhist : .buddhist,
@@ -1010,7 +1010,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     }
     
     internal static func _fromNSCalendarIdentifier(_ identifier : NSCalendar.Identifier) -> Identifier {
-        if #available(OSX 10.10, iOS 8.0, *) {
+        if #available(macOS 10.10, iOS 8.0, *) {
             let identifierMap : [NSCalendar.Identifier : Identifier] =
                 [.gregorian : .gregorian,
                  .buddhist : .buddhist,
@@ -1113,6 +1113,7 @@ extension Calendar : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCalendar?) -> Calendar {
         var result: Calendar?
         _forceBridgeFromObjectiveC(source!, result: &result)

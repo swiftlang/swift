@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name borrow -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
 import Swift
 
@@ -12,7 +13,7 @@ final class C {
 
 func useD(_ d: D) {}
 
-// CHECK-LABEL: sil hidden @$S6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
@@ -22,12 +23,12 @@ func useD(_ d: D) {}
 // CHECK:   [[OFFSET:%.*]] = ref_element_addr [[BORROWED_CLASS]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[OFFSET]] : $*D
 // CHECK:   [[LOADED_VALUE:%.*]] = load [copy] [[ACCESS]]
-// CHECK:   end_borrow [[BORROWED_CLASS]] from [[CLASS]]
+// CHECK:   end_borrow [[BORROWED_CLASS]]
 // CHECK:   destroy_value [[CLASS]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$S6borrow4useD{{.*}} : $@convention(thin) (@owned D) -> ()
+// CHECK:   [[FUNC:%.*]] = function_ref @$s6borrow4useD{{.*}} : $@convention(thin) (@guaranteed D) -> ()
 // CHECK:   apply [[FUNC]]([[LOADED_VALUE]])
 // CHECK:   destroy_value [[BOX]]
-// CHECK: } // end sil function '$S6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
+// CHECK: } // end sil function '$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}}'
 func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {
   var c = C()
   useD(c.d)

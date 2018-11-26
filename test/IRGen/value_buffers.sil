@@ -18,7 +18,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @alloc_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %TSi*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %TSi, %TSi* [[T0]], i32 0, i32 0
@@ -32,7 +32,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @project_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %TSi*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %TSi, %TSi* [[T0]], i32 0, i32 0
@@ -45,7 +45,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dealloc_small([24 x i8]* nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dealloc_small([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret void
 
@@ -56,7 +56,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_big([24 x i8]* nocapture dereferenceable({{.*}}), %T13value_buffers9BigStructV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @alloc_big([24 x i8]* nocapture dereferenceable({{.*}}), %T13value_buffers9BigStructV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = call noalias i8* @swift_slowAlloc(i64 48, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [24 x i8]* %0 to i8**
@@ -64,7 +64,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
 // CHECK-NEXT: [[ADDR:%.*]] = bitcast i8* [[T0]] to %T13value_buffers9BigStructV*
 // CHECK-NEXT: [[PARAM1:%.*]] = bitcast %T13value_buffers9BigStructV* [[ADDR]] to i8*
 // CHECK-NEXT: [[PARAM2:%.*]] = bitcast %T13value_buffers9BigStructV* %1 to i8*
-// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[PARAM1]], i8* [[PARAM2]], i64 48, i32 8, i1 false)
+// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[PARAM1]], i8* align 8 [[PARAM2]], i64 48, i1 false)
 // CHECK-NEXT: ret void
 
 sil @project_big : $(@inout Builtin.UnsafeValueBuffer, BigStruct) -> () {
@@ -74,13 +74,13 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_big([24 x i8]* nocapture dereferenceable({{.*}}), %T13value_buffers9BigStructV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @project_big([24 x i8]* nocapture dereferenceable({{.*}}), %T13value_buffers9BigStructV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %T13value_buffers9BigStructV**
 // CHECK-NEXT: [[ADDR:%.*]] = load %T13value_buffers9BigStructV*, %T13value_buffers9BigStructV** [[T0]], align 8
 // CHECK-NEXT: [[PARAM1:%.*]] = bitcast %T13value_buffers9BigStructV* [[ADDR]] to i8*
 // CHECK-NEXT: [[PARAM2:%.*]] = bitcast %T13value_buffers9BigStructV* %1 to i8*
-// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[PARAM1]], i8* [[PARAM2]], i64 48, i32 8, i1 false)
+// CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[PARAM1]], i8* align 8 [[PARAM2]], i64 48, i1 false)
 // CHECK-NEXT: ret void
 
 sil @dealloc_big : $(@inout Builtin.UnsafeValueBuffer) -> () {
@@ -89,7 +89,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dealloc_big([24 x i8]* nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dealloc_big([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: [[ADDR:%.*]] = load i8*, i8** [[T0]], align 8

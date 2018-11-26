@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-unknown-linux-gnu -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -Xcc --sysroot=/var/empty -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-ELF
+// RUN: %target-swift-frontend -parse-stdlib -enable-objc-interop -disable-objc-attr-requires-foundation-module -I %S/Inputs/usr/include -Xcc --sysroot=/var/empty -emit-ir %s -o - | %FileCheck %s -check-prefix CHECK-ELF
 
 // REQUIRES: OS=linux-gnu
 
@@ -18,10 +18,10 @@ extension C : P {
 class D {
 }
 
-// CHECK-ELF-NOT: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
+// CHECK-ELF-NOT: @"$s4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-ELF: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section "objc_protolist"
 // CHECK-ELF: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section "objc_protorefs", align 8
-// CHECK-ELF: @"OBJC_CLASS_REF_$_I" = {{.*}}, section "objc_classrefs", align 8
+// CHECK-ELF: @"\01l_OBJC_CLASS_REF_$_I" = {{.*}}, section "objc_classrefs", align 8
 // CHECK-ELF: @"\01L_selector(init)" = {{.*}}, section "objc_selrefs"
 // CHECK-ELF: @objc_classes = {{.*}}, section "objc_classlist"
 // CHECK-ELF: @objc_categories = {{.*}}, section "objc_catlist"

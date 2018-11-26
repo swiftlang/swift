@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck %s -verify
 
 import ObjectiveC
 

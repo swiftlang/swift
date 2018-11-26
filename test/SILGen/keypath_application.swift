@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class A {}
 class B {}
@@ -12,11 +13,9 @@ func loadable(readonly: A, writable: inout A,
               wkp: WritableKeyPath<A, B>,
               rkp: ReferenceWritableKeyPath<A, B>) {
   // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
-  // CHECK: [[ROOT_BORROW:%.*]] = begin_borrow %0
-  // CHECK: [[ROOT_COPY:%.*]] = copy_value [[ROOT_BORROW]]
+  // CHECK: [[ROOT_COPY:%.*]] = copy_value %0
   // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
-  // CHECK: [[KP_BORROW:%.*]] = begin_borrow %3
-  // CHECK: [[KP_COPY:%.*]] = copy_value [[KP_BORROW]]
+  // CHECK: [[KP_COPY:%.*]] = copy_value %3
   // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
   // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
   // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
@@ -122,3 +121,40 @@ func partial<A>(valueA: A,
   _ = valueB[keyPath: pkpB]
 }
 
+extension Int {
+  var b: Int { get { return 0 } set { } }
+  var u: Int { get { return 0 } set { } }
+  var tt: Int { get { return 0 } set { } }
+}
+
+// CHECK-LABEL: sil hidden @{{.*}}writebackNesting
+func writebackNesting(x: inout Int,
+                      y: WritableKeyPath<Int, Int>,
+                      z: WritableKeyPath<Int, Int>,
+                      w: Int) -> Int {
+  // -- get 'b'
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivg
+  // -- apply keypath y
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
+  // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
+  // CHECK: ({{%.*}}, [[OWNER_Y:%.*]]) = destructure_tuple [[PROJECT_RET]]
+  // -- get 'u'
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivg
+  // -- apply keypath z
+  // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
+  // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
+  // CHECK: ({{%.*}}, [[OWNER_Z:%.*]]) = destructure_tuple [[PROJECT_RET]]
+
+  // -- set 'tt'
+  // CHECK: function_ref @$sSi19keypath_applicationE2ttSivs
+  // -- destroy owner for keypath projection z
+  // CHECK: destroy_value [[OWNER_Z]]
+  // -- set 'u'
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivs
+  // -- destroy owner for keypath projection y
+  // CHECK: destroy_value [[OWNER_Y]]
+  // -- set 'b'
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivs
+
+  x.b[keyPath: y].u[keyPath: z].tt = w
+}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -19,9 +19,10 @@ bb0(%0 : $@thick Outer.Inner.Type):
   %1 = metatype $@thick Outer.Type
   return %1 : $@thick Outer.Type
 }
-// CHECK-LABEL: define{{ | protected }}swiftcc %swift.type* @test0(%swift.type*)
-// CHECK:      [[T0:%.*]] = call %swift.type* @"$S12nested_types5OuterCMa"()
-// CHECK-NEXT: ret %swift.type* [[T0]]
+// CHECK-LABEL: define{{ | dllexport | protected }}swiftcc %swift.type* @test0(%swift.type*)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s12nested_types5OuterCMa"([[INT]] 0)
+// CHECK-NEXT: [[T1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: ret %swift.type* [[T1]]
 
-// CHECK-LABEL: define hidden %swift.type* @"$S12nested_types5OuterC5InnerVMa"()
-// CHECK:      ret %swift.type* bitcast {{.*}} @"$S12nested_types5OuterC5InnerVMf"
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s12nested_types5OuterC5InnerVMa"(
+// CHECK:      ret %swift.metadata_response { %swift.type* bitcast {{.*}}@"$s12nested_types5OuterC5InnerVMf"{{.*}}, [[INT]] 0 }

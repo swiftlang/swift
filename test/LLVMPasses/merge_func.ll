@@ -200,6 +200,100 @@ define i32 @func4_merged_with2(i32 %x) {
 }
 
 
+; The same example as above, but we cannot merge func2 with func4, because
+; func4 calls func1 (which is merged with func2 in the first iteration).
+
+declare i32 @get_int(i32 %x)
+
+; CHECK-LABEL: define i32 @Function1_merged_with_3(i32 %x)
+; CHECK: %1 = tail call i32 @Function1_merged_with_3Tm(i32 %x, i32* @g1)
+; CHECK: ret i32 %1
+define i32 @Function1_merged_with_3(i32 %x) {
+  %l1 = load i32, i32* @g1, align 4
+  %sum = add i32 %x, %l1
+  %l2 = load i32, i32* @g2, align 4
+  %sum2 = add i32 %sum, %l2
+  %l3 = load i32, i32* @g3, align 4
+  %sum3 = add i32 %sum2, %l2
+  %l4 = load i32, i32* @g4, align 4
+  %sum4 = add i32 %sum3, %l2
+  %l5 = load i32, i32* @g5, align 4
+  %sum5 = add i32 %sum4, %l2
+  %c = call fastcc i32 @get_int(i32 %sum5)
+  ret i32 %c
+}
+
+; CHECK-LABEL: define i32 @Function2_not_merged(i32 %x)
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: %c = call fastcc i32 @get_int
+; CHECK: ret i32 %c
+define i32 @Function2_not_merged(i32 %x) {
+  %l1 = load i32, i32* @g2, align 4
+  %sum = add i32 %x, %l1
+  %l2 = load i32, i32* @g3, align 4
+  %sum2 = add i32 %sum, %l2
+  %l3 = load i32, i32* @g4, align 4
+  %sum3 = add i32 %sum2, %l2
+  %l4 = load i32, i32* @g5, align 4
+  %sum4 = add i32 %sum3, %l2
+  %l5 = load i32, i32* @g1, align 4
+  %sum5 = add i32 %sum4, %l2
+  %c = call fastcc i32 @get_int(i32 %sum5)
+  ret i32 %c
+}
+
+; CHECK-LABEL: define i32 @Function3_merged_with_1(i32 %x)
+; CHECK: %1 = tail call i32 @Function1_merged_with_3Tm(i32 %x, i32* @g2)
+; CHECK: ret i32 %1
+define i32 @Function3_merged_with_1(i32 %x) {
+  %l1 = load i32, i32* @g2, align 4
+  %sum = add i32 %x, %l1
+  %l2 = load i32, i32* @g2, align 4
+  %sum2 = add i32 %sum, %l2
+  %l3 = load i32, i32* @g3, align 4
+  %sum3 = add i32 %sum2, %l2
+  %l4 = load i32, i32* @g4, align 4
+  %sum4 = add i32 %sum3, %l2
+  %l5 = load i32, i32* @g5, align 4
+  %sum5 = add i32 %sum4, %l2
+  %c = call fastcc i32 @get_int(i32 %sum5)
+  ret i32 %c
+}
+
+; CHECK-LABEL: define internal i32 @Function1_merged_with_3Tm(i32, i32*)
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: %c = call fastcc i32 @get_int
+; CHECK: ret i32 %c
+
+; CHECK-LABEL: define i32 @Function4_not_merged(i32 %x) {
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: load
+; CHECK: %1 = call fastcc i32 @Function1_merged_with_3Tm(i32 %sum5, i32* @g1)
+; CHECK: ret i32 %1
+define i32 @Function4_not_merged(i32 %x) {
+  %l1 = load i32, i32* @g1, align 4
+  %sum = add i32 %x, %l1
+  %l2 = load i32, i32* @g3, align 4
+  %sum2 = add i32 %sum, %l2
+  %l3 = load i32, i32* @g4, align 4
+  %sum3 = add i32 %sum2, %l2
+  %l4 = load i32, i32* @g5, align 4
+  %sum4 = add i32 %sum3, %l2
+  %l5 = load i32, i32* @g1, align 4
+  %sum5 = add i32 %sum4, %l2
+  %c = call fastcc i32 @Function1_merged_with_3(i32 %sum5)
+  ret i32 %c
+}
+
+
 ; Test a call chain: caller -> callee1 -> callee2.
 ; Functions should be merged in bottom-up order: callee2, callee1, caller.
 ; Also check that the calling convention is preserved.

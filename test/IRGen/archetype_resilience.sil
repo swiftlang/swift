@@ -17,10 +17,10 @@ public enum EnumWithClassArchetypeAndDynamicSize<T : AnyObject> {
 }
 
 // CHECK-LABEL: define swiftcc void @copyDynamicMultiEnum(%swift.type* %"EnumWithClassArchetypeAndDynamicSize<T>", %swift.type* %U, %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* noalias nocapture swiftself)
-// CHECK: call %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* @"$S20archetype_resilienceytWc2_"(%T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* %0, %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* {{.*}}, %swift.type* %T, %swift.type* %"EnumWithClassArchetypeAndDynamicSize<T>")
+// CHECK: call %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* @"$s20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeOyxGRlzCr0_lWOc"(%T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* %0, %T20archetype_resilience36EnumWithClassArchetypeAndDynamicSizeO* {{.*}}, %swift.type* %"EnumWithClassArchetypeAndDynamicSize<T>")
 // CHECK: ret void
 sil @copyDynamicMultiEnum : $@convention(method) <T, U where T: AnyObject> (@in_guaranteed EnumWithClassArchetypeAndDynamicSize<T>) -> () {
-bb0(%0 : $*EnumWithClassArchetypeAndDynamicSize<T>):
+bb0(%0 : @trivial $*EnumWithClassArchetypeAndDynamicSize<T>):
   %1 = alloc_stack $EnumWithClassArchetypeAndDynamicSize<T> 
   copy_addr %0 to [initialization] %1 : $*EnumWithClassArchetypeAndDynamicSize<T>
   dealloc_stack %1 : $*EnumWithClassArchetypeAndDynamicSize<T>

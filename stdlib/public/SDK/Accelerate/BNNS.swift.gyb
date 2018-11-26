@@ -16,11 +16,11 @@ import Swift
 
 %{
 bnns2016 = [
-  ('OSX','10.12'), ('iOS','10.0'), ('tvOS','10.0'), ('watchOS','3.0')
+  ('macOS','10.12'), ('iOS','10.0'), ('tvOS','10.0'), ('watchOS','3.0')
 ]
 
 bnns2017 = [
-  ('OSX','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
+  ('macOS','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
 ]
 
 def relString(releases):
@@ -99,7 +99,7 @@ extension BNNSImageStackDescriptor {
               image_stride: Int,
               data_type: BNNSDataType) {
 
-    _precondition(data_type != .indexed8,
+    precondition(data_type != .indexed8,
                   "Image stacks cannot use the indexed8 data type.")
 
     self.init(width: width,
@@ -119,7 +119,7 @@ extension BNNSVectorDescriptor {
   public init(size: Int,
               data_type: BNNSDataType) {
 
-    _precondition(data_type != .indexed8,
+    precondition(data_type != .indexed8,
                   "Vectors cannot use the indexed8 data type.")
 
     self.init(size: size,
@@ -137,7 +137,7 @@ extension BNNSLayerData {
               data_scale: Float = 1,
               data_bias: Float = 0) {
 
-    _precondition(data_type != .indexed8,
+    precondition(data_type != .indexed8,
                   "This initializer cannot be used with the indexed8 data type; use BNNSLayerData.indexed8 instead.")
 
     self.init(data: data,
@@ -172,10 +172,10 @@ extension BNNSActivation {
   public init(function: BNNSActivationFunction,
               alpha: Float = .nan,
               beta: Float = .nan) {
-    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
-      _precondition(function != .integerLinearSaturate,
+    if #available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+      precondition(function != .integerLinearSaturate,
                     "This initializer cannot be used with the integerLinearSaturate activation function; use BNNSActivation.integerLinearSaturate(scale:Int32, offset:Int32, shift:Int32) instead.")
-      _precondition(function != .integerLinearSaturatePerChannel,
+      precondition(function != .integerLinearSaturatePerChannel,
                     "This initializer cannot be used with the integerLinearSaturatePerChannel activation function; use BNNSActivation.integerLinearSaturatePerChannel(scale:UnsafePointer<Int32>, offset:UnsafePointer<Int32>, shift:UnsafePointer<Int32>) instead.")
     }
     self.init(function: function,

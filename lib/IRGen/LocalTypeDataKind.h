@@ -25,7 +25,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 
 namespace swift {
-  class NormalProtocolConformance;
   class ProtocolDecl;
 
 namespace irgen {
@@ -47,7 +46,8 @@ private:
   /// to distinguish different kinds of pointer; we just assume that e.g. a
   /// ProtocolConformance will never have the same address as a Decl.
   enum : RawType {
-    TypeMetadata,
+    FormalTypeMetadata,
+    RepresentationTypeMetadata,
     ValueWitnessTable,
     // <- add more special cases here
 
@@ -65,17 +65,24 @@ public:
   
   // The magic values are all odd and so do not collide with pointer values.
   
-  /// A reference to the type metadata.
-  static LocalTypeDataKind forTypeMetadata() {
-    return LocalTypeDataKind(TypeMetadata);
+  /// A reference to the formal type metadata.
+  static LocalTypeDataKind forFormalTypeMetadata() {
+    return LocalTypeDataKind(FormalTypeMetadata);
   }
 
-  /// A reference to the value witness table.
+  /// A reference to type metadata for a representation-compatible type.
+  static LocalTypeDataKind forRepresentationTypeMetadata() {
+    return LocalTypeDataKind(RepresentationTypeMetadata);
+  }
+
+  /// A reference to the value witness table for a representation-compatible
+  /// type.
   static LocalTypeDataKind forValueWitnessTable() {
     return LocalTypeDataKind(ValueWitnessTable);
   }
 
-  /// A reference to a specific value witness.
+  /// A reference to a specific value witness for a representation-compatible
+  /// type.
   static LocalTypeDataKind forValueWitness(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessBase + (unsigned)witness);
   }
@@ -108,6 +115,11 @@ public:
   }
 
   LocalTypeDataKind getCachingKind() const;
+
+  bool isAnyTypeMetadata() const {
+    return Value == FormalTypeMetadata ||
+           Value == RepresentationTypeMetadata;
+  }
 
   bool isSingletonKind() const {
     return (Value < FirstPayloadValue);
@@ -162,6 +174,9 @@ public:
   CanType Type;
   LocalTypeDataKind Kind;
 
+  LocalTypeDataKey(CanType type, LocalTypeDataKind kind)
+    : Type(type), Kind(kind) {}
+
   LocalTypeDataKey getCachingKey() const;
 
   bool operator==(const LocalTypeDataKey &other) const {
@@ -175,16 +190,17 @@ public:
 }
 }
 
-template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
   static inline LocalTypeDataKey getEmptyKey() {
     return { CanTypeInfo::getEmptyKey(),
-             swift::irgen::LocalTypeDataKind::forTypeMetadata() };
+             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
   }
   static inline LocalTypeDataKey getTombstoneKey() {
     return { CanTypeInfo::getTombstoneKey(),
-             swift::irgen::LocalTypeDataKind::forTypeMetadata() };
+             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
   }
   static unsigned getHashValue(const LocalTypeDataKey &key) {
     return combineHashValue(CanTypeInfo::getHashValue(key.Type),
@@ -194,5 +210,6 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
     return a == b;
   }
 };
+}
 
 #endif

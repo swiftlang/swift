@@ -130,7 +130,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
   std::string LineStr;
 
   if (Loc.isValid()) {
-    BufferID = getBufferIdentifierForLoc(Loc);
+    BufferID = getDisplayNameForLoc(Loc);
     auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
 
     // Scan backward to find the start of the line.

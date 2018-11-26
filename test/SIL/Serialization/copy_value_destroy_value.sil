@@ -10,24 +10,24 @@ import Builtin
 
 
 // CHECK-LABEL: sil [serialized] @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[T0:%[0-9]+]] : $@sil_unowned Builtin.NativeObject):
+// CHECK: bb0([[T0:%[0-9]+]] : @owned $@sil_unowned Builtin.NativeObject):
 // CHECK-NEXT: [[COPY_RESULT:%.*]] = copy_unowned_value [[T0]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: destroy_value [[T0]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: return [[COPY_RESULT]] : $Builtin.NativeObject
 sil [serialized] @test_copy_unowned_value : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-bb0(%0 : $@sil_unowned Builtin.NativeObject):
+bb0(%0 : @owned $@sil_unowned Builtin.NativeObject):
   %1 = copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
   destroy_value %0 : $@sil_unowned Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil [serialized] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[ARG1:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: bb0([[ARG1:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK: [[COPY_VALUE_RESULT:%[0-9]+]] = copy_value [[ARG1]] : $Builtin.NativeObject
 // CHECK: destroy_value [[ARG1]]
 // CHECK: return [[COPY_VALUE_RESULT]]
 sil [serialized] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = copy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject

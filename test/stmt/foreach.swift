@@ -17,7 +17,7 @@ func bad_containers_2(bc: BadContainer2) {
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
-  func makeIterator() { } // expected-note{{inferred type '()' (by matching requirement 'makeIterator()') is invalid: does not conform to 'IteratorProtocol'}}
+  func makeIterator() { } // expected-note{{candidate can not infer 'Iterator' = '()' because '()' is not a nominal type and so can't conform to 'IteratorProtocol'}}
 }
 
 func bad_containers_3(bc: BadContainer3) {
@@ -168,13 +168,15 @@ func testMatchingPatterns() {
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
   let array : [Int]?
-  for x in array {  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+  for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
+    // expected-note@-1{{coalesce}}
+    // expected-note@-2{{force-unwrap}}
   }
 }
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{using 'Sequence' as a concrete type conforming to protocol 'Sequence' is not supported}}
+  for x in s { // expected-error {{protocol type 'Sequence' cannot conform to 'Sequence' because only concrete types can conform to protocols}}
     _ = x
   }
 }

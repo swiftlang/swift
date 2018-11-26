@@ -12,7 +12,6 @@
 
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -20,58 +19,48 @@
 
 using namespace swift;
 
-namespace {
-/// A helper class to collect all nominal type declarations.
-class NominalTypeWalker: public ASTWalker {
-  ClassHierarchyAnalysis::ProtocolImplementations &ProtocolImplementationsCache;
-public:
-  NominalTypeWalker(ClassHierarchyAnalysis::ProtocolImplementations
-                        &ProtocolImplementationsCache)
-    :ProtocolImplementationsCache(ProtocolImplementationsCache) {
-  }
-
-  bool walkToDeclPre(Decl *D) override {
-    auto *NTD = dyn_cast<NominalTypeDecl>(D);
-    if (!NTD || !NTD->hasInterfaceType())
-      return true;
-    auto Protocols = NTD->getAllProtocols();
-    // We are only interested in types implementing protocols.
-    if (!Protocols.empty()) {
-      for (auto &Protocol : Protocols) {
-        auto &K = ProtocolImplementationsCache[Protocol];
-        K.push_back(NTD);
-      }
-    }
-    return true;
-  }
-};
-} // end anonymous namespace
-
 void ClassHierarchyAnalysis::init() {
-  // Process all types implementing protocols.
-  SmallVector<Decl *, 32> Decls;
-  // TODO: It would be better if we could get all declarations
-  // from a given module, not only the top-level ones.
-  M->getSwiftModule()->getTopLevelDecls(Decls);
-
-  NominalTypeWalker Walker(ProtocolImplementationsCache);
-  for (auto *D: Decls) {
-    D->walk(Walker);
-  }
+  auto module = M->getSwiftModule();
 
   // For each class declaration in our V-table list:
   for (auto &VT : M->getVTableList()) {
     ClassDecl *C = VT.getClass();
-    // Ignore classes that are at the top of the class hierarchy:
-    if (!C->hasSuperclass())
-      continue;
 
-    // Add the superclass to the list of inherited classes.
-    ClassDecl *Super = C->getSuperclass()->getClassOrBoundGenericClass();
-    auto &K = DirectSubclassesCache[Super];
-    assert(std::find(K.begin(), K.end(), C) == K.end() &&
-           "Class vector must be unique");
-    K.push_back(C);
+    while (true) {
+      // Ignore classes that are at the top of the class hierarchy:
+      if (!C->hasSuperclass())
+        break;
+
+      ClassDecl *super = C->getSuperclassDecl();
+      auto superModule = super->getModuleContext();
+
+      // Don't bother collecting subclasses for classes from a different module.
+      // TODO: cross-module WMO
+      if (superModule != module)
+        break;
+
+      // Find the superclass's list of direct subclasses.  If it's non-empty,
+      // we've previously walked up to the class, so there's no reason to keep
+      // walking from this point.
+      auto &list = DirectSubclassesCache[super];
+      bool shouldVisitSuper = list.empty();
+
+      // Check whether C is already in the list, which can happen
+      // if we had a v-table that was a subclass of C.
+      // We expect a linear scan to be cheap enough for this.
+      if (std::find(list.begin(), list.end(), C) != list.end())
+        break;
+
+      list.push_back(C);
+
+      // Keep walking if this is the first time we reached this superclass.
+      // We have to do this because the SILModule might not have v-tables for
+      // every class in the module.
+      if (!shouldVisitSuper)
+        break;
+
+      C = super;
+    }
   }
 }
 

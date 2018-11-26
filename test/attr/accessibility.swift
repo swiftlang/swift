@@ -208,35 +208,24 @@ extension GenericStruct where Param: InternalProto {
 }
 
 
-public protocol ProtoWithReqs {
-  associatedtype Assoc
-  func foo()
+public class OuterClass {
+  class InnerClass {}
 }
 
-public struct Adopter<T> : ProtoWithReqs {}
-extension Adopter {
-  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
+public protocol PublicProto2 {
+  associatedtype T
+  associatedtype U
 }
 
-public class AnotherAdopterBase {
-  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
-}
-public class AnotherAdopterSub : AnotherAdopterBase, ProtoWithReqs {}
+// FIXME: With the current design, the below should not diagnose.
+//
+// However, it does, because we look at the bound decl in the
+// TypeRepr first, and it happens to already be set.
+//
+// FIXME: Once we no longer do that, come up with another strategy
+// to make the above diagnose.
 
-public protocol ReqProvider {}
-extension ReqProvider {
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
-}
-public struct AdoptViaProtocol : ProtoWithReqs, ReqProvider {
-  public typealias Assoc = Int
-}
-
-public protocol ReqProvider2 {}
-extension ProtoWithReqs where Self : ReqProvider2 {
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
-}
-public struct AdoptViaCombinedProtocol : ProtoWithReqs, ReqProvider2 {
-  public typealias Assoc = Int
+extension PublicProto2 where Self.T : OuterClass, Self.U == Self.T.InnerClass {
+  public func cannotBePublic() {}
+  // expected-error@-1 {{cannot declare a public instance method in an extension with internal requirements}}
 }

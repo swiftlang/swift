@@ -67,7 +67,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     private func _getter(_ x : Int) -> Int? { return x == NSDateComponentUndefined ? nil : x }
     
     /// Translate from the proper Swift optional value into an NSDateComponentUndefined
-    private func _setter(_ x : Int?) -> Int { if let xx = x { return xx } else { return NSDateComponentUndefined } }
+    private static func _setter(_ x : Int?) -> Int { if let xx = x { return xx } else { return NSDateComponentUndefined } }
 
     /// The `Calendar` used to interpret the other values in this structure.
     ///
@@ -88,63 +88,63 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var era: Int? {
         get { return _handle.map { _getter($0.era) } }
-        set { _applyMutation { $0.era = _setter(newValue) } }
+        set { _applyMutation { $0.era = DateComponents._setter(newValue) } }
     }
     
     /// A year or count of years.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var year: Int? {
         get { return _handle.map { _getter($0.year) } }
-        set { _applyMutation { $0.year = _setter(newValue) } }
+        set { _applyMutation { $0.year = DateComponents._setter(newValue) } }
     }
     
     /// A month or count of months.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var month: Int? {
         get { return _handle.map { _getter($0.month) } }
-        set { _applyMutation { $0.month = _setter(newValue) } }
+        set { _applyMutation { $0.month = DateComponents._setter(newValue) } }
     }
     
     /// A day or count of days.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var day: Int? {
         get { return _handle.map { _getter($0.day) } }
-        set { _applyMutation { $0.day = _setter(newValue) } }
+        set { _applyMutation { $0.day = DateComponents._setter(newValue) } }
     }
     
     /// An hour or count of hours.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var hour: Int? {
         get { return _handle.map { _getter($0.hour) } }
-        set { _applyMutation { $0.hour = _setter(newValue) } }
+        set { _applyMutation { $0.hour = DateComponents._setter(newValue) } }
     }
     
     /// A minute or count of minutes.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var minute: Int? {
         get { return _handle.map { _getter($0.minute) } }
-        set { _applyMutation { $0.minute = _setter(newValue) } }
+        set { _applyMutation { $0.minute = DateComponents._setter(newValue) } }
     }
     
     /// A second or count of seconds.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var second: Int? {
         get { return _handle.map { _getter($0.second) } }
-        set { _applyMutation { $0.second = _setter(newValue) } }
+        set { _applyMutation { $0.second = DateComponents._setter(newValue) } }
     }
     
     /// A nanosecond or count of nanoseconds.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var nanosecond: Int? {
         get { return _handle.map { _getter($0.nanosecond) } }
-        set { _applyMutation { $0.nanosecond = _setter(newValue) } }
+        set { _applyMutation { $0.nanosecond = DateComponents._setter(newValue) } }
     }
     
     /// A weekday or count of weekdays.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekday: Int? {
         get { return _handle.map { _getter($0.weekday) } }
-        set { _applyMutation { $0.weekday = _setter(newValue) } }
+        set { _applyMutation { $0.weekday = DateComponents._setter(newValue) } }
     }
     
     /// A weekday ordinal or count of weekday ordinals.
@@ -152,28 +152,28 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekdayOrdinal: Int? {
         get { return _handle.map { _getter($0.weekdayOrdinal) } }
-        set { _applyMutation { $0.weekdayOrdinal = _setter(newValue) } }
+        set { _applyMutation { $0.weekdayOrdinal = DateComponents._setter(newValue) } }
     }
     
     /// A quarter or count of quarters.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var quarter: Int? {
         get { return _handle.map { _getter($0.quarter) } }
-        set { _applyMutation { $0.quarter = _setter(newValue) } }
+        set { _applyMutation { $0.quarter = DateComponents._setter(newValue) } }
     }
     
     /// A week of the month or a count of weeks of the month.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekOfMonth: Int? {
         get { return _handle.map { _getter($0.weekOfMonth) } }
-        set { _applyMutation { $0.weekOfMonth = _setter(newValue) } }
+        set { _applyMutation { $0.weekOfMonth = DateComponents._setter(newValue) } }
     }
     
     /// A week of the year or count of the weeks of the year.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var weekOfYear: Int? {
         get { return _handle.map { _getter($0.weekOfYear) } }
-        set { _applyMutation { $0.weekOfYear = _setter(newValue) } }
+        set { _applyMutation { $0.weekOfYear = DateComponents._setter(newValue) } }
     }
     
     /// The ISO 8601 week-numbering year of the receiver.
@@ -184,7 +184,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     public var yearForWeekOfYear: Int? {
         get { return _handle.map { _getter($0.yearForWeekOfYear) } }
-        set { _applyMutation { $0.yearForWeekOfYear = _setter(newValue) } }
+        set { _applyMutation { $0.yearForWeekOfYear = DateComponents._setter(newValue) } }
     }
     
     /// Set to true if these components represent a leap month.
@@ -216,17 +216,17 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// Set the value of one of the properties, using an enumeration value instead of a property name.
     ///
     /// The calendar and timeZone and isLeapMonth properties cannot be set by this method.
-    @available(OSX 10.9, iOS 8.0, *)
+    @available(macOS 10.9, iOS 8.0, *)
     public mutating func setValue(_ value: Int?, for component: Calendar.Component) {
         _applyMutation {
-            $0.setValue(_setter(value), forComponent: Calendar._toCalendarUnit([component]))
+            $0.setValue(DateComponents._setter(value), forComponent: Calendar._toCalendarUnit([component]))
         }
     }
     
     /// Returns the value of one of the properties, using an enumeration value instead of a property name.
     ///
     /// The calendar and timeZone and isLeapMonth property values cannot be retrieved by this method.
-    @available(OSX 10.9, iOS 8.0, *)
+    @available(macOS 10.9, iOS 8.0, *)
     public func value(for component: Calendar.Component) -> Int? {
         return _handle.map {
             $0.value(forComponent: Calendar._toCalendarUnit([component]))
@@ -244,7 +244,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// If the time zone property is set in the `DateComponents`, it is used.
     ///
     /// The calendar property must be set, or the result is always `false`.
-    @available(OSX 10.9, iOS 8.0, *)
+    @available(macOS 10.9, iOS 8.0, *)
     public var isValidDate: Bool {
         return _handle.map { $0.isValidDate }
     }
@@ -256,7 +256,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     /// Except for some trivial cases (e.g., 'seconds' should be 0 - 59 in any calendar), this method is not necessarily cheap.
     ///
     /// If the time zone property is set in the `DateComponents`, it is used.
-    @available(OSX 10.9, iOS 8.0, *)
+    @available(macOS 10.9, iOS 8.0, *)
     public func isValidDate(in calendar: Calendar) -> Bool {
         return _handle.map { $0.isValidDate(in: calendar) }
     }
@@ -269,7 +269,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     // MARK: - Bridging Helpers
     
-    fileprivate init(reference: NSDateComponents) {
+    fileprivate init(reference: __shared NSDateComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
@@ -338,6 +338,7 @@ extension DateComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateComponents?) -> DateComponents {
         guard let src = source else { return DateComponents() }
         return DateComponents(reference: src)

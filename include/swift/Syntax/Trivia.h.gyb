@@ -10,7 +10,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -89,8 +89,10 @@
 
 #include "swift/Basic/OwnedString.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/ByteTreeSerialization.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include <vector>
 
@@ -129,6 +131,7 @@ class TriviaPiece {
       : Kind(Kind), Count(Count), Text() {}
 
   friend struct json::ObjectTraits<TriviaPiece>;
+  friend struct llvm::yaml::MappingTraits<TriviaPiece>;
 
 public:
 
@@ -168,7 +171,10 @@ public:
 %   end
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
+
+  bool isComment() const;
 
   void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
   
@@ -369,6 +375,52 @@ private:
 };
 } // namespace syntax
 
+namespace byteTree {
+
+template <>
+struct WrapperTypeTraits<syntax::TriviaKind> {
+  static uint8_t numericValue(const syntax::TriviaKind &Kind) {
+    switch (Kind) {
+% for trivia in TRIVIAS:
+  case syntax::TriviaKind::${trivia.name}: return ${trivia.serialization_code};
+% end
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::TriviaKind &Kind,
+                    unsigned Index) {
+    Writer.write(numericValue(Kind), Index);
+  }
+};
+
+template <>
+struct ObjectTraits<syntax::TriviaPiece> {
+  static unsigned numFields(const syntax::TriviaPiece &Trivia,
+                            UserInfoMap &UserInfo) {
+    return 2;
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::TriviaPiece &Trivia,
+                    UserInfoMap &UserInfo) {
+    Writer.write(Trivia.getKind(), /*Index=*/0);
+    // Write the trivia's text or count depending on its kind
+    switch (Trivia.getKind()) {
+% for trivia in TRIVIAS:
+    case syntax::TriviaKind::${trivia.name}:
+% if trivia.is_collection():
+      Writer.write(static_cast<uint32_t>(Trivia.getCount()), /*Index=*/1);
+% else:
+      Writer.write(Trivia.getText(), /*Index=*/1);
+% end
+      break;
+% end
+    }
+  }
+};
+
+} // end namespace byteTree
+
 namespace json {
 /// Serialization traits for TriviaPiece.
 /// - All trivia pieces will have a "kind" key that contains the serialized
@@ -401,13 +453,77 @@ struct ObjectTraits<syntax::TriviaPiece> {
 
 /// Serialization traits for TriviaKind.
 template <>
-struct ScalarEnumerationTraits<syntax::TriviaKind> {
-  static void enumeration(Output &out, syntax::TriviaKind &value) {
+struct ScalarReferenceTraits<syntax::TriviaKind> {
+  static StringRef stringRef(const syntax::TriviaKind &value) {
+    switch (value) {
 % for trivia in TRIVIAS:
-    out.enumCase(value, "${trivia.name}", syntax::TriviaKind::${trivia.name});
+    case syntax::TriviaKind::${trivia.name}:
+      return "\"${trivia.name}\"";
 % end
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 } // namespace json
 } // namespace swift
+
+namespace llvm {
+namespace yaml {
+
+/// Deserialization traits for TriviaPiece.
+/// - All trivia pieces will have a "kind" key that contains the serialized
+///   name of the trivia kind.
+/// - Comment trivia will have the associated text of the comment under the
+///   "value" key.
+/// - All other trivia will have the associated integer count of their
+///   occurrences under the "value" key.
+template<>
+struct MappingTraits<swift::syntax::TriviaPiece> {
+  static swift::syntax::TriviaPiece mapping(IO &in) {
+    swift::syntax::TriviaKind kind;
+    in.mapRequired("kind", kind);
+    switch (kind) {
+% for trivia in TRIVIAS:
+    case swift::syntax::TriviaKind::${trivia.name}: {
+% if trivia.is_collection():
+
+/// FIXME: This is a workaround for existing bug from llvm yaml parser
+/// which would raise error when deserializing number with trailing character
+/// like "1\n". See https://bugs.llvm.org/show_bug.cgi?id=15505
+      StringRef str;
+      in.mapRequired("value", str);
+      unsigned count = std::atoi(str.data());
+      return swift::syntax::TriviaPiece(kind, count);
+% else:
+      StringRef text;
+      in.mapRequired("value", text);
+      return swift::syntax::TriviaPiece(
+          kind, swift::OwnedString::makeRefCounted(text));
+% end
+      break;
+    }
+% end
+    }
+  }
+};
+
+/// Deserialization traits for TriviaKind.
+template <>
+struct ScalarEnumerationTraits<swift::syntax::TriviaKind> {
+  static void enumeration(IO &in, swift::syntax::TriviaKind &value) {
+% for trivia in TRIVIAS:
+    in.enumCase(value, "${trivia.name}", swift::syntax::TriviaKind::${trivia.name});
+% end
+  }
+};
+
+
+} // namespace yaml
+} // namespace llvm
 #endif // SWIFT_SYNTAX_TRIVIA_H

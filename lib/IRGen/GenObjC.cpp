@@ -41,13 +41,13 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
-#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -278,7 +278,8 @@ namespace {
       return APInt(bits, 0);
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       src = IGF.Builder.CreateBitCast(src, IGF.IGM.SizeTy->getPointerTo());
       auto val = IGF.Builder.CreateLoad(src);
       auto isNonzero = IGF.Builder.CreateICmpNE(val,
@@ -288,7 +289,8 @@ namespace {
       return IGF.Builder.CreateSExt(isNonzero, IGF.IGM.Int32Ty);
     }
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       // There's only one extra inhabitant, 0.
       dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.SizeTy->getPointerTo());
       IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
@@ -307,11 +309,12 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
   return Types.getObjCClassPtrTypeInfo();
 }
 
-const LoadableTypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
   // ObjC class pointers look like unmanaged (untagged) object references.
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
   ObjCClassPtrTI =
-    createUnmanagedStorageType(IGM.ObjCClassPtrTy);
+    createUnmanagedStorageType(IGM.ObjCClassPtrTy, ReferenceCounting::ObjC,
+                               /*isOptional*/false);
   ObjCClassPtrTI->NextConverted = FirstType;
   FirstType = ObjCClassPtrTI;
   return *ObjCClassPtrTI;
@@ -581,13 +584,15 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
   if (isInstanceMethod) {
     searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                            MetadataValueType::ObjCClass,
+                                           MetadataState::Complete,
                                            /*allow uninitialized*/ true);
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
     ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
-    if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, searchClassDecl)) {
+    if (doesClassMetadataRequireUpdate(IGF.IGM, searchClassDecl)) {
       searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
+                                             MetadataState::Complete,
                                              /*allow uninitialized*/ true);
       searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
       searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
@@ -656,6 +661,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuperStret2Fn();
       }
+      llvm_unreachable("unhandled kind");
     } else {
       switch (kind) {
       case ObjCMessageKind::Normal:
@@ -667,6 +673,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuper2Fn();
       }
+      llvm_unreachable("unhandled kind");
     }
   }();
 
@@ -685,7 +692,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   if (auto searchType = methodInfo.getSearchType()) {
     receiverValue =
       emitSuperArgument(IGF, isInstanceMethod, selfValue,
-                        searchType.getSwiftRValueType());
+                        searchType.getASTType());
   } else {
     receiverValue = selfValue;
   }
@@ -1062,7 +1069,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
-      methodTy->getFormalCSemanticResult().getSwiftRValueType());
+      methodTy->getFormalCSemanticResult().getASTType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1094,7 +1101,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 
   // Return type.
   {
-    auto clangType = IGM.getClangType(resultType.getSwiftRValueType());
+    auto clangType = IGM.getClangType(resultType.getASTType());
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,
@@ -1156,7 +1163,9 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding.
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   atEncoding = getObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
   
@@ -1346,9 +1355,13 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   Selector selector(declRef);
   auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding, which is always "@?"
-  /// for a function type.
-  auto atEncoding = IGM.getAddrOfGlobalString("@?");
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
+  auto ptrSize = IGM.getPointerSize().getValue();
+  llvm::SmallString<8> signature;
+  signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
+  auto atEncoding = IGM.getAddrOfGlobalString(signature);
 
   /// The third element is the method implementation pointer.
   auto impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);

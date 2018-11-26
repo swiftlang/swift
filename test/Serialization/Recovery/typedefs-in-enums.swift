@@ -34,7 +34,7 @@ public enum BadEnum {
   case problematic(Any, WrappedInt)
   case alsoOkay(Any, Any, Any)
 
-  static public func ==(a: BadEnum, b: BadEnum) -> Bool {
+  public static func ==(a: BadEnum, b: BadEnum) -> Bool {
     return false
   }
 }
@@ -45,7 +45,7 @@ public enum GenericBadEnum<T: HasAssoc> where T.Assoc == WrappedInt {
   case noPayload
   case perfectlyOkayPayload(Int)
 
-  static public func ==(a: GenericBadEnum<T>, b: GenericBadEnum<T>) -> Bool {
+  public static func ==(a: GenericBadEnum<T>, b: GenericBadEnum<T>) -> Bool {
     return false
   }
 }
@@ -57,7 +57,7 @@ public enum OkayEnum {
   case plainOldAlias(Any, UnwrappedInt)
   case other(Int)
 
-  static public func ==(a: OkayEnum, b: OkayEnum) -> Bool {
+  public static func ==(a: OkayEnum, b: OkayEnum) -> Bool {
     return false
   }
 }

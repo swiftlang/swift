@@ -1,7 +1,7 @@
 @inline(__always)
 func internalFunction() {}
 
-@_versioned
+@usableFromInline
 func versionedFunction() {}
 
 public protocol Shape {

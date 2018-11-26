@@ -151,18 +151,6 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     _ = s.underestimatedCount
   }
 
-  Log.map.expectIncrement(Base.self) {
-    _ = s.map { $0 }
-  }
-
-  Log.filter.expectIncrement(Base.self) {
-    _ = s.filter { (_) in true }
-  }
-
-  Log.forEach.expectIncrement(Base.self) {
-    _ = s.forEach { (_) in }
-  }
-
   Log.dropFirst.expectIncrement(Base.self) {
     _ = s.dropFirst(0)
   }
@@ -331,23 +319,6 @@ tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
     _blackHole(x)
   }
 %   end
-
-  Log.first.expectIncrement(Base.self) {
-    Log.startIndex.expectUnchanged(Base.self) {
-      Log.makeIterator.expectUnchanged(Base.self) {
-        _ = c.first
-      }
-    }
-  }
-
-%   if Traversal in ['Bidirectional', 'RandomAccess']:
-  BidirectionalCollectionLog.last.expectIncrement(Base.self) {
-    Log.endIndex.expectUnchanged(Base.self) {
-      _ = c.last
-    }
-  }
-%   end
-
 }
 %   end
 % end
@@ -358,7 +329,7 @@ tests.test("ForwardCollection") {
   let a1 = ContiguousArray(fc0)
   expectEqual(a0, a1)
   for e in a0 {
-    let i = fc0.index(of: e)
+    let i = fc0.firstIndex(of: e)
     expectNotNil(i)
     expectEqual(e, fc0[i!])
   }
@@ -386,7 +357,7 @@ tests.test("BidirectionalCollection") {
   let a1 = ContiguousArray(bc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = bc0.index(of: e)
+    let i = bc0.firstIndex(of: e)
     expectNotNil(i)
     expectEqual(e, bc0[i!])
   }
@@ -396,7 +367,7 @@ tests.test("BidirectionalCollection") {
   }
 
   // Can't upgrade a non-random-access collection to random access
-  let s0 = "Hello, Woyld".characters
+  let s0 = "Hello, Woyld"
   let bc1 = AnyBidirectionalCollection(s0)
   let fc3 = AnyCollection(bc1)
   expectTrue(storesSameUnderlyingCollection(fc3, bc1))
@@ -421,7 +392,7 @@ tests.test("RandomAccessCollection") {
   let a1 = ContiguousArray(rc0.lazy.reversed())
   expectEqual(a0, a1)
   for e in a0 {
-    let i = rc0.index(of: e)
+    let i = rc0.firstIndex(of: e)
     expectNotNil(i)
     expectEqual(e, rc0[i!])
   }

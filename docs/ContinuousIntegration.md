@@ -11,17 +11,18 @@
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Specific Preset Testing](#specific-preset-testing)
+    - [Build Swift Toolchain](#build-swift-toolchain)
     - [Testing Compiler Performance](#testing-compiler-performance)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
 
 ## Introduction
 
-FIXME: FILL ME IN!
+This page is designed to assist in the understanding of proper practices for testing for the Swift project. 
 
 ## Pull Request Testing
 
-In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
+In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
 
 ### @swift-ci
 
@@ -102,7 +103,7 @@ With that being said, a validation test on macOS does the following:
 1. Removes the workspace.
 2. Builds the compiler.
 3. Builds the standard library for macOS and the simulators for all platforms.
-4. lldb is /not/ build/tested [[2]](#footnote-2)
+4. lldb is /not/ built/tested [[2]](#footnote-2)
 5. The tests, validation-tests are run for all simulators and macOS both with
    and without optimizations enabled.
 
@@ -134,22 +135,31 @@ Python       | @swift-ci Please Python lint | Lints Python sources | `./utils/py
 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
-macOS platform | @swift-ci Please Test Source Compatibility | Swift Source Compatibility Suite on macOS Platform
+macOS platform | @swift-ci Please Test Source Compatibility | Swift Source Compatibility Suite on macOS Platform (Release and Debug)
+macOS platform | @swift-ci Please Test Source Compatibility Release | Swift Source Compatibility Suite on macOS Platform (Release)
+macOS platform | @swift-ci Please Test Source Compatibility Debug | Swift Source Compatibility Suite on macOS Platform (Debug)
 
 ### Specific Preset Testing
 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
-macOS platform | preset=<preset> <br> @swift-ci Please test macOS with preset | Swift Test macOS Platform with preset
+macOS platform | preset=<preset> <br> @swift-ci Please test with preset macOS Platform | Swift Test macOS Platform with preset
+Linux platform | preset=<preset> <br> @swift-ci Please test with preset Linux Platform | Swift Test Linux Platform with preset
 
 
 For example:
 
 ```
 preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
-@swift-ci Please test macOS with preset
+@swift-ci Please test with preset macOS
 
 ```
+### Build Swift Toolchain
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | @swift-ci Please Build Toolchain macOS Platform| Swift Build Toolchain macOS Platform
+Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Linux Platform
 
 ### Testing Compiler Performance
 

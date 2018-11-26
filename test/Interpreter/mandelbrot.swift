@@ -1,9 +1,12 @@
-// RUN: %target-jit-run -I %S -enable-source-import %s | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -emit-library -o %t/libcomplex.%target-dylib-extension -emit-module %S/complex.swift -module-link-name complex
+// RUN: %target-jit-run %s -I %t -L %t | %FileCheck %s
+
+// RUN: grep -v import %s > %t/main.swift
+// RUN: %target-jit-run %t/main.swift %S/complex.swift | %FileCheck %s
+
 // REQUIRES: executable_test
 // REQUIRES: swift_interpreter
-
-// FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors
-// FIXME: This test uses IRGen with -enable-source-import; it may fail with -g.
 
 import complex
 

@@ -30,9 +30,13 @@
 
 #if SWIFT_OBJC_INTEROP
 
+#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 // Source code: "SwiftObject"
 // Real class name: mangled "Swift._SwiftObject"
 #define SwiftObject _TtCs12_SwiftObject
+#else
+// Pre-stable ABI uses un-mangled name for SwiftObject
+#endif
 
 #if __has_attribute(objc_root_class)
 __attribute__((__objc_root_class__))

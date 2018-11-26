@@ -1,34 +1,34 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class Foo {
-  // CHECK-LABEL: sil hidden @$S10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F
   func zim() {}
 }
 
 extension Foo {
-  // CHECK-LABEL: sil hidden @$S10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
   func zang() {}
 
-  // CHECK-LABEL: sil hidden @$S10extensions3FooC7zippitySivg
+  // CHECK-LABEL: sil hidden @$s10extensions3FooC7zippitySivg
   var zippity: Int { return 0 }
 }
 
 struct Bar {
-  // CHECK-LABEL: sil hidden @$S10extensions3BarV4zung{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s10extensions3BarV4zung{{[_0-9a-zA-Z]*}}F
   func zung() {}
 }
 
 extension Bar {
-  // CHECK-LABEL: sil hidden @$S10extensions3BarV4zoom{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s10extensions3BarV4zoom{{[_0-9a-zA-Z]*}}F
   func zoom() {}
 }
 
-// CHECK-LABEL: sil hidden @$S10extensions19extensionReferencesyyAA3FooCF
+// CHECK-LABEL: sil hidden @$s10extensions19extensionReferencesyyAA3FooCF
 func extensionReferences(_ x: Foo) {
   // Non-objc extension methods are statically dispatched.
-  // CHECK: function_ref @$S10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
   x.zang()
-  // CHECK: function_ref @$S10extensions3FooC7zippitySivg
+  // CHECK: function_ref @$s10extensions3FooC7zippitySivg
   _ = x.zippity
 
 }
@@ -37,16 +37,15 @@ func extensionMethodCurrying(_ x: Foo) {
   _ = x.zang
 }
 
-// CHECK-LABEL: sil shared [thunk] @$S10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
-// CHECK:         function_ref @$S10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil shared [thunk] @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
+// CHECK:         function_ref @$s10extensions3FooC4zang{{[_0-9a-zA-Z]*}}F
 
 // Extensions of generic types with stored property initializers
 
-// CHECK-LABEL: sil hidden [transparent] @$S10extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
+// CHECK-LABEL: sil hidden [transparent] @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
 // CHECK:      bb0(%0 : @trivial $*Optional<T>):
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
-// CHECK:      [[FN:%.*]] = function_ref @$SSq10nilLiteralxSgyt_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
-// CHECK-NEXT: apply [[FN]]<T>(%0, [[METATYPE]]) : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+// CHECK:      inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 
@@ -54,11 +53,11 @@ struct Box<T> {
   let t: T? = nil
 }
 
-// CHECK-LABEL: sil hidden @$S10extensions3BoxV1tACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
+// CHECK-LABEL: sil hidden @$s10extensions3BoxV1tACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T>
 // CHECK:      [[SELF_BOX:%.*]] = alloc_box $<τ_0_0> { var Box<τ_0_0> } <T>
 // CHECK-NEXT: [[UNINIT_SELF_BOX:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
 // CHECK-NEXT: [[SELF_ADDR:%.*]] = project_box [[UNINIT_SELF_BOX]] : $<τ_0_0> { var Box<τ_0_0> } <T>
-// CHECK:      [[INIT:%.*]] = function_ref @$S10extensions3BoxV1txSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+// CHECK:      [[INIT:%.*]] = function_ref @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<T>
 // CHECK-NEXT: apply [[INIT]]<T>([[RESULT]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
 // CHECK-NEXT: [[T_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*Box<T>, #Box.t

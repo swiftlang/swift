@@ -38,18 +38,20 @@ constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
-/// The Mach-O section name for the section containing type field references.
-/// This lives within SEG_TEXT.
-constexpr const char TypeFieldRecordSection[] = "__swift5_fieldmd";
+
+#if __POINTER_WIDTH__ == 64
+using mach_header_platform = mach_header_64;
+#else
+using mach_header_platform = mach_header;
+#endif
+
+extern "C" void *_NSGetMachExecuteHeader();
 
 template<const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
 #if __POINTER_WIDTH__ == 64
-  using mach_header_platform = mach_header_64;
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
-#else
-  using mach_header_platform = mach_header;
 #endif
   
   // Look for a __swift5_proto section.
@@ -85,12 +87,6 @@ void swift::initializeTypeMetadataRecordLookup() {
   
 }
 
-void swift::initializeTypeFieldLookup() {
-  _dyld_register_func_for_add_image(
-      addImageCallback<TypeFieldRecordSection,
-                       addImageTypeFieldDescriptorBlockCallback>);
-}
-
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   Dl_info dlinfo;
   if (dladdr(address, &dlinfo) == 0) {
@@ -102,6 +98,15 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dlinfo.dli_sname;
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
+}
+
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  unsigned long size;
+  auto *executableHeader = static_cast<mach_header_platform *>(_NSGetMachExecuteHeader());
+  uint8_t *data = getsectiondata(executableHeader, segment, section, &size);
+  if (outSize != nullptr && data != nullptr)
+    *outSize = size;
+  return static_cast<void *>(data);
 }
 
 #endif // defined(__APPLE__) && defined(__MACH__)

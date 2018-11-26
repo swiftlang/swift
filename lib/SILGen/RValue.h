@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -172,6 +172,9 @@ public:
   static RValue forInContext() {
     return RValue(InContext);
   }
+
+  static unsigned getRValueSize(CanType substType);
+  static unsigned getRValueSize(AbstractionPattern origType, CanType substType);
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
@@ -204,11 +207,6 @@ public:
 
   /// True if this rvalue was emitted into context.
   bool isInContext() const & { return elementsToBeAdded == InContext; }
-  
-  /// True if this represents an lvalue.
-  bool isLValue() const & {
-    return isa<InOutType>(type);
-  }
   
   /// Add an element to the rvalue. The rvalue must not yet be complete.
   void addElement(RValue &&element) &;
@@ -320,10 +318,12 @@ public:
       // Allow function types to disagree about 'noescape'.
       if (auto lf = dyn_cast<FunctionType>(l)) {
         if (auto rf = dyn_cast<FunctionType>(r)) {
-          return lf.getInput() == rf.getInput()
-              && lf.getResult() == rf.getResult()
-              && lf->getExtInfo().withNoEscape(false) ==
-                 lf->getExtInfo().withNoEscape(false);
+          auto lParams = lf.getParams();
+          auto rParams = rf.getParams();
+          return AnyFunctionType::equalParams(lParams, rParams) &&
+                 lf.getResult() == rf.getResult() &&
+                 lf->getExtInfo().withNoEscape(false) ==
+                     lf->getExtInfo().withNoEscape(false);
         }
       }
       return false;
@@ -354,6 +354,8 @@ public:
 
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
+
+  RValue copyForDiagnostics() const;
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;

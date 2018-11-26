@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil | %FileCheck %s
 sil_stage raw
 
 import Builtin
@@ -13,7 +13,9 @@ class C {
   @objc func fn() { }
 }
 
-class D : C, P, ClassP { }
+class D : C, P, ClassP {
+  override func fn() { }
+}
 
 struct S {
   let x : ()
@@ -21,7 +23,7 @@ struct S {
 
 enum E {
   case Case
-  case DataCase(())
+  case DataCase(Void)
 }
 
 sil @general_test : $() -> () {
@@ -94,10 +96,11 @@ bb0:
   mark_dependence undef : $C on undef : $C
   // CHECK: is_unique undef : $C
   is_unique undef : $C
-  // CHECK: is_unique_or_pinned undef : $C
-  is_unique_or_pinned undef : $C
   // CHECK: copy_block undef : $@convention(block) () -> ()
   copy_block undef : $@convention(block) () -> ()
+
+  // CHECK: copy_block_without_escaping undef : $@convention(block) () -> () withoutEscaping undef : $@noescape () -> ()
+  copy_block_without_escaping undef : $@convention(block) () -> () withoutEscaping undef : $@noescape () -> ()
 
   // Dynamic dispatch
 
@@ -312,17 +315,25 @@ bb0:
 
 sil @switch_enum_test : $() -> () {
 bb0:
-  // CHECK: switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb1
-  switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb1
+  // CHECK: switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb2
+  switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb2
 bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
   return undef : $()
 }
 
 sil @switch_enum_addr_test : $() -> () {
 bb0:
-  // CHECK: switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb1
-  switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb1
+  // CHECK: switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb2
+  switch_enum_addr undef : $*E, case #E.Case!enumelt: bb1, default bb2
 bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
   return undef : $()
 }
 
@@ -331,8 +342,10 @@ bb0:
   // CHECK: dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
   dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
 bb1(%x : $@convention(objc_method) (P) -> ()):
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   return undef: $()
 }
 
@@ -341,8 +354,10 @@ bb0:
   // CHECK: checked_cast_br undef : $C to $C, bb1, bb2
   checked_cast_br undef : $C to $C, bb1, bb2
 bb1(%x : $C):
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   return undef : $()
 }
 
@@ -351,8 +366,10 @@ bb0:
   // CHECK: checked_cast_addr_br take_always C in undef : $*C to C in undef : $*C, bb1, bb2
   checked_cast_addr_br take_always C in undef : $*C to C in undef : $*C, bb1, bb2
 bb1:
-  br bb2
+  br bb3
 bb2:
+  br bb3
+bb3:
   return undef : $()
 }
 

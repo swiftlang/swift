@@ -12,14 +12,6 @@
 
 /// A collection that supports efficient random-access index traversal.
 ///
-/// In most cases, it's best to ignore this protocol and use the
-/// `RandomAccessCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RandomAccessIndexable = RandomAccessCollection
-
-/// A collection that supports efficient random-access index traversal.
-///
 /// Random-access collections can move indices any distance and 
 /// measure the distance between indices in O(1) time. Therefore, the
 /// fundamental difference between random-access and bidirectional collections
@@ -41,17 +33,11 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 public protocol RandomAccessCollection: BidirectionalCollection
 where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices
+  // FIXME: Associated type inference requires these.
+  override associatedtype Element
+  override associatedtype Index
+  override associatedtype SubSequence
+  override associatedtype Indices
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -70,7 +56,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
+  override var indices: Indices { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -87,26 +73,138 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  ///
+  /// - Complexity: O(1)
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(position: Index) -> Element { get }
+  // FIXME: Associated type inference requires these.
+  override subscript(position: Index) -> Element { get }
+  override var startIndex: Index { get }
+  override var endIndex: Index { get }
 
-  // FIXME(ABI): Associated type inference requires this.
-  var startIndex: Index { get }
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index value immediately before `i`.
+  override func index(before i: Index) -> Index
 
-  // FIXME(ABI): Associated type inference requires this.
-  var endIndex: Index { get }
+  /// Replaces the given index with its predecessor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  override func formIndex(before i: inout Index)
+
+  /// Returns the position immediately after the given index.
+  ///
+  /// The successor of an index must be well defined. For an index `i` into a
+  /// collection `c`, calling `c.index(after: i)` returns the same index every
+  /// time.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
+  override func index(after i: Index) -> Index
+
+  /// Replaces the given index with its successor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  override func formIndex(after i: inout Index)
+
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  ///
+  ///     let s = "Swift"
+  ///     let i = s.index(s.startIndex, offsetBy: 4)
+  ///     print(s[i])
+  ///     // Prints "t"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  ///
+  /// - Complexity: O(1)
+  @_nonoverride func index(_ i: Index, offsetBy distance: Int) -> Index
+
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let s = "Swift"
+  ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
+  ///         print(s[i])
+  ///     }
+  ///     // Prints "t"
+  ///
+  /// The next example attempts to retrieve an index six positions from
+  /// `s.startIndex` but fails, because that distance is beyond the index
+  /// passed as `limit`.
+  ///
+  ///     let j = s.index(s.startIndex, offsetBy: 6, limitedBy: s.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1)
+  @_nonoverride func index(
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
+  ) -> Index?
+
+  /// Returns the distance between two indices.
+  ///
+  /// Unless the collection conforms to the `BidirectionalCollection` protocol,
+  /// `start` must be less than or equal to `end`.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`. The result can be
+  ///   negative only if the collection conforms to the
+  ///   `BidirectionalCollection` protocol.
+  ///
+  /// - Complexity: O(1)
+  @_nonoverride func distance(from start: Index, to end: Index) -> Int
 }
-
-// TODO: swift-3-indexing-model - Make sure RandomAccessCollection has
-// documented complexity guarantees, e.g. for index(_:offsetBy:).
 
 // TODO: swift-3-indexing-model - (By creating an ambiguity?), try to
 // make sure RandomAccessCollection models implement
@@ -138,31 +236,32 @@ extension RandomAccessCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` should be greater than `i` to have any effect. Likewise, if
-  ///     `n < 0`, `limit` should be less than `i` to have any effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` should be greater than `i` to have any
+  ///     effect. Likewise, if `distance < 0`, `limit` should be less than `i`
+  ///     to have any effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
-    let l = distance(from: i, to: limit)
-    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+    let l = self.distance(from: i, to: limit)
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
-    return index(i, offsetBy: n)
+    return index(i, offsetBy: distance)
   }
 }
 
@@ -180,7 +279,7 @@ where Index : Strideable,
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
-  @_inlineable
+  @inlinable
   public var indices: Range<Index> {
     return startIndex..<endIndex
   }
@@ -190,7 +289,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
     _failEarlyRangeCheck(
@@ -203,7 +302,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.
@@ -222,21 +321,22 @@ where Index : Strideable,
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
-  public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
-    let result = i.advanced(by: n)
+  @inlinable
+  public func index(_ i: Index, offsetBy distance: Index.Stride) -> Index {
+    let result = i.advanced(by: distance)
     // This range check is not precise, tighter bounds exist based on `n`.
     // Unfortunately, we would need to perform index manipulation to
     // compute those bounds, which is probably too slow in the general
@@ -256,7 +356,7 @@ where Index : Strideable,
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
     _failEarlyRangeCheck(

@@ -2,10 +2,6 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}
-
 public let NSUTF8StringEncoding: UInt = 8
 
 extension AnyHashable : _ObjectiveCBridgeable {
@@ -230,7 +226,7 @@ extension NSError : Error {
   public var _code: Int { return code }
 }
 
-public enum _GenericObjCError : Error {
+internal enum _GenericObjCError : Error {
   case nilError
 }
 
@@ -244,6 +240,38 @@ public func _convertNSErrorToError(_ error: NSError?) -> Error {
 public func _convertErrorToNSError(_ x: Error) -> NSError {
   return x as NSError
 }
+
+extension _SwiftNewtypeWrapper where Self.RawValue == Error {
+  @inlinable // FIXME(sil-serialize-all)
+  public func _bridgeToObjectiveC() -> NSError {
+    return rawValue as NSError
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _forceBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) {
+    result = Self(rawValue: source)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) -> Bool {
+    result = Self(rawValue: source)
+    return result != nil
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSError?
+  ) -> Self {
+    return Self(rawValue: _convertNSErrorToError(source))!
+  }
+}
+
 
 
 extension NSArray {
@@ -284,7 +312,7 @@ public protocol _ErrorCodeProtocol {
 }
 
 public extension _BridgedStoredNSError {
-  public init?(_bridgedNSError error: NSError) {
+  init?(_bridgedNSError error: NSError) {
     self.init(_nsError: error)
   }
 }
@@ -293,13 +321,13 @@ public extension _BridgedStoredNSError {
 public extension _BridgedStoredNSError
     where Code: RawRepresentable, Code.RawValue: SignedInteger {
   // FIXME: Generalize to Integer.
-  public var code: Code {
+  var code: Code {
     return Code(rawValue: numericCast(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
-  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+  init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
   }
 
@@ -312,20 +340,20 @@ public extension _BridgedStoredNSError
 public extension _BridgedStoredNSError
     where Code: RawRepresentable, Code.RawValue: UnsignedInteger {
   // FIXME: Generalize to Integer.
-  public var code: Code {
+  var code: Code {
     return Code(rawValue: numericCast(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
-  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+  init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
   }
 }
 
 extension NSDictionary {
   @objc public subscript(_: Any) -> Any? {
-    @objc(_swift_objectForKeyedSubscript:)
+    @objc(__swift_objectForKeyedSubscript:)
     get { fatalError() }
   }
 
@@ -334,7 +362,7 @@ extension NSDictionary {
 extension NSMutableDictionary {
   public override subscript(_: Any) -> Any? {
     get { fatalError() }
-    @objc(_swift_setObject:forKeyedSubscript:)
+    @objc(__swift_setObject:forKeyedSubscript:)
     set { }
   }
 }

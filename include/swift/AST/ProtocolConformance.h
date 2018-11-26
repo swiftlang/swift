@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
@@ -114,6 +113,11 @@ public:
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const;
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const;
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const;
 
   /// Determine whether this conformance is complete.
   bool isComplete() const {
@@ -254,10 +258,6 @@ public:
   /// Get the substitutions associated with this conformance.
   SubstitutionMap getSubstitutions(ModuleDecl *M) const;
 
-  /// Determine whether the witness table access function for this conformance
-  /// needs to be passed information when called, or if it stands alone.
-  bool witnessTableAccessorRequiresArguments() const;
-
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
@@ -302,13 +302,20 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const;
 
   /// Get any additional requirements that are required for this conformance to
+  /// be satisfied, if it is possible for them to be computed.
+  Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
+
+  /// Get any additional requirements that are required for this conformance to
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(Type substType,
-                             TypeSubstitutionFn subs,
+  ProtocolConformance *subst(SubstitutionMap subMap) const;
+
+  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// applies to the substituted type.
+  ProtocolConformance *subst(TypeSubstitutionFn subs,
                              LookupConformanceFn conformances) const;
 
   void dump() const;
@@ -349,6 +356,20 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// Also stores the "invalid" bit.
   llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
 
+  /// \brief The reason that this conformance exists.
+  ///
+  /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
+  /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
+  /// or Implied (e.g. 'Foo : Protocol' in 'protocol Other: Protocol {} struct
+  /// Foo: Other {}'). In only the latter case, the conformance is non-null and
+  /// points to the conformance that implies this one.
+  ///
+  /// This should never be Inherited: that is handled by
+  /// InheritedProtocolConformance.
+  llvm::PointerIntPair<NormalProtocolConformance *, 2, ConformanceEntryKind>
+      SourceKindAndImplyingConformance = {nullptr,
+                                          ConformanceEntryKind::Explicit};
+
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
@@ -362,7 +383,16 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   /// Any additional requirements that are required for this conformance to
   /// apply, e.g. 'Something: Baz' in 'extension Foo: Bar where Something: Baz'.
-  ArrayRef<Requirement> ConditionalRequirements;
+  mutable ArrayRef<Requirement> ConditionalRequirements;
+  enum class ConditionalRequirementsState {
+    Uncomputed,
+    Computing,
+    Complete,
+  };
+  /// The state of the ConditionalRequirements field: whether it has been
+  /// computed or not.
+  mutable ConditionalRequirementsState CRState =
+      ConditionalRequirementsState::Uncomputed;
 
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
@@ -381,7 +411,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   NormalProtocolConformance(Type conformingType,
@@ -394,12 +423,11 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   void resolveLazyInfo() const;
 
-  void differenceAndStoreConditionalRequirements();
+  void differenceAndStoreConditionalRequirements() const;
 
 public:
   /// Get the protocol being conformed to.
@@ -420,10 +448,37 @@ public:
   }
 
   /// Get any additional requirements that are required for this conformance to
+  /// be satisfied if they can be computed.
+  ///
+  /// If \c computeIfPossible is false, this will not do the lazy computation of
+  /// the conditional requirements and will just query the current state. This
+  /// should almost certainly only be used for debugging purposes, prefer \c
+  /// getConditionalRequirementsIfAvailable (these are separate because
+  /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
+  /// parameter gets in the way of that).
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
+    if (computeIfPossible)
+      differenceAndStoreConditionalRequirements();
+
+    if (CRState == ConditionalRequirementsState::Complete)
+      return ConditionalRequirements;
+
+    return None;
+  }
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied if they can be computed.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return getConditionalRequirementsIfAvailableOrCached(
+        /*computeIfPossible=*/true);
+  }
+
+  /// Get any additional requirements that are required for this conformance to
   /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
   /// to be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return ConditionalRequirements;
+    return *getConditionalRequirementsIfAvailable();
   }
 
   /// Retrieve the state of this conformance.
@@ -445,6 +500,28 @@ public:
   void setInvalid() {
     ContextAndInvalid.setInt(true);
     SignatureConformances = {};
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return SourceKindAndImplyingConformance.getInt();
+  }
+
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    assert(getSourceKind() == ConformanceEntryKind::Implied);
+    return SourceKindAndImplyingConformance.getPointer();
+  }
+
+  void setSourceKindAndImplyingConformance(
+      ConformanceEntryKind sourceKind,
+      NormalProtocolConformance *implyingConformance) {
+    assert(sourceKind != ConformanceEntryKind::Inherited &&
+           "a normal conformance cannot be inherited");
+    assert((sourceKind == ConformanceEntryKind::Implied) ==
+               (bool)implyingConformance &&
+           "an implied conformance needs something that implies it");
+    SourceKindAndImplyingConformance = {implyingConformance, sourceKind};
   }
 
   /// Determine whether this conformance is lazily loaded.
@@ -610,7 +687,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  SubstitutionList GenericSubstitutions;
+  SubstitutionMap GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -620,13 +697,15 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// Any conditional requirements, in substituted form. (E.g. given Foo<T>: Bar
   /// where T: Bar, Foo<Baz<U>> will include Baz<U>: Bar.)
-  ArrayRef<Requirement> ConditionalRequirements;
+  mutable Optional<ArrayRef<Requirement>> ConditionalRequirements;
 
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 SubstitutionList substitutions);
+                                 SubstitutionMap substitutions);
+
+  void computeConditionalRequirements() const;
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -635,19 +714,33 @@ public:
     return GenericConformance;
   }
 
-  /// Get the substitutions used to produce this specialized conformance from
-  /// the generic conformance.
-  SubstitutionList getGenericSubstitutions() const {
-    return GenericSubstitutions;
-  }
-
   /// Get the substitution map representing the substitutions used to produce
   /// this specialized conformance.
-  SubstitutionMap getSubstitutionMap() const;
+  SubstitutionMap getSubstitutionMap() const { return GenericSubstitutions; }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ///
+  /// If \c computeIfPossible is false, this will not do the lazy computation of
+  /// the conditional requirements and will just query the current state. This
+  /// should almost certainly only be used for debugging purposes, prefer \c
+  /// getConditionalRequirementsIfAvailable (these are separate because
+  /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
+  /// parameter gets in the way of that).
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
+    if (computeIfPossible)
+      computeConditionalRequirements();
+    return ConditionalRequirements;
+  }
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return getConditionalRequirementsIfAvailableOrCached(
+        /*computeIfPossible=*/true);
+  }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return ConditionalRequirements;
+    return *getConditionalRequirementsIfAvailable();
   }
 
   /// Get the protocol being conformed to.
@@ -664,6 +757,15 @@ public:
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
     return GenericConformance->getState();
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return GenericConformance->getSourceKind();
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    return GenericConformance->getImplyingConformance();
   }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
@@ -694,16 +796,15 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getGenericConformance(),
-            getGenericSubstitutions());
+    Profile(ID, getType(), getGenericConformance(), getSubstitutionMap());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
                       ProtocolConformance *genericConformance,
-                      SubstitutionList subs) {
+                      SubstitutionMap subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
-    profileSubstitutionList(ID, subs);
+    subs.profile(ID);
   }
 
   static bool classof(const ProtocolConformance *conformance) {
@@ -749,6 +850,12 @@ public:
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return InheritedConformance->getConditionalRequirementsIfAvailable();
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
     return InheritedConformance->getConditionalRequirements();
   }
@@ -767,6 +874,13 @@ public:
   ProtocolConformanceState getState() const {
     return InheritedConformance->getState();
   }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Inherited;
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const { return nullptr; }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const {

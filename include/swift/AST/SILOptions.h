@@ -42,20 +42,6 @@ public:
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
-  enum LinkingMode {
-    /// Skip SIL linking.
-    LinkNone,
-
-    /// Perform normal SIL linking.
-    LinkNormal,
-
-    /// Link all functions during SIL linking.
-    LinkAll
-  };
-
-  /// Controls how to perform SIL linking.
-  LinkingMode LinkMode = LinkNormal;
-
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
   /// above but the interactions between all the flags are tricky.
@@ -63,6 +49,9 @@ public:
 
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
+
+  /// Enable existential specializer optimization.
+  bool ExistentialSpecializer = false;
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
@@ -112,9 +101,6 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
-
-  /// Emit normal function arguments using the +0 guaranteed convention.
-  bool EnableGuaranteedNormalArguments = false;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;

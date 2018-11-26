@@ -22,17 +22,17 @@ protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
-  
+
   var _base: Base { get }
 }
 
 extension _SequenceWrapper  {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
@@ -41,14 +41,14 @@ extension _SequenceWrapper  {
 }
 
 extension _SequenceWrapper where Iterator == Base.Iterator {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func makeIterator() -> Iterator {
+  @inlinable // generic-performance
+  public __consuming func makeIterator() -> Iterator {
     return self._base.makeIterator()
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+
+  @inlinable // generic-performance
   @discardableResult
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     return _base._copyContents(initializing: buf)
@@ -56,73 +56,54 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 }
 
 extension _SequenceWrapper {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func map<T>(
-    _ transform: (Element) throws -> T
-) rethrows -> [T] {
-    return try _base.map(transform)
-  }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func forEach(_ body: (Element) throws -> Void) rethrows {
-    return try _base.forEach(body)
-  }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  public func _copyToContiguousArray()
+  @inlinable // generic-performance
+  public __consuming func _copyToContiguousArray()
     -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
 }
 
 extension _SequenceWrapper where SubSequence == Base.SubSequence {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func dropFirst(_ n: Int) -> SubSequence {
+  @inlinable // generic-performance
+  public __consuming func dropFirst(_ n: Int) -> SubSequence {
     return _base.dropFirst(n)
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  public func dropLast(_ n: Int) -> SubSequence {
+  @inlinable // generic-performance
+  public __consuming func dropLast(_ n: Int) -> SubSequence {
     return _base.dropLast(n)
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  public func prefix(_ maxLength: Int) -> SubSequence {
+  @inlinable // generic-performance
+  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
     return _base.prefix(maxLength)
   }
-  @_inlineable // FIXME(sil-serialize-all)
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  @inlinable // generic-performance
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     return _base.suffix(maxLength)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func drop(
+  @inlinable // generic-performance
+  public __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.drop(while: predicate)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func prefix(
+  @inlinable // generic-performance
+  public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     return try _base.prefix(while: predicate)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  public func split(
+  @inlinable // generic-performance
+  public __consuming func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence] {

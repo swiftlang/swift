@@ -61,6 +61,18 @@ struct FixitFilter {
         Info.ID == diag::invalid_ibinspectable.ID ||
         Info.ID == diag::invalid_ibaction_decl.ID)
       return false;
+
+    // The Migrator only applies changes from the APIDiffMigratorPass in the
+    // primary file, so if a nominal type was renamed, for example, any members
+    // users have added in an extension in a separate file may not be visible,
+    // due to the extension rename not having been applied. The below diag(s)
+    // can provide undesireable fixits that rename references of these
+    // no-longer-visible members to similar still-visible ones.
+    // Note: missing_argument_lables and extra_argument_labels are filtered out
+    // elsewhere
+    if (Info.ID == diag::wrong_argument_labels.ID)
+      return false;
+
     // Adding type(of:) interacts poorly with the swift migrator by
     // invalidating some inits with type errors.
     if (Info.ID == diag::init_not_instance_member.ID)
@@ -130,6 +142,7 @@ struct FixitFilter {
         Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
         Info.ID == diag::missing_several_cases.ID ||
         Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::missing_unknown_case.ID ||
         Info.ID == diag::paren_void_probably_void.ID ||
         Info.ID == diag::make_decl_objc.ID ||
         Info.ID == diag::optional_req_nonobjc_near_match_add_objc.ID)

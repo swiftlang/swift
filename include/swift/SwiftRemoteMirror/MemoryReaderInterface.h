@@ -32,66 +32,70 @@ extern "C" {
 // in the system library, so we use 'swift_addr_t'.
 typedef uint64_t swift_addr_t;
 
+/// The following callbacks provide "reader_context", which is an opaque context
+/// provided in swift_reflection_createReflectionContext.
+
+/// Free memory returned from readBytes. May be NULL if memory never needs to be freed.
 typedef void (*FreeBytesFunction)(void *reader_context, const void *bytes, void *context);
 
+/// Get the size in bytes of the target's pointer type.
 typedef uint8_t (*PointerSizeFunction)(void *reader_context);
+
+/// Get the size in bytes of the target's size type.
 typedef uint8_t (*SizeSizeFunction)(void *reader_context);
+
+/// Read a sequence of bytes at an address in the target.
+///
+/// \param address the address in the target address space
+/// \param size the number of bytes to read
+/// \param outFreeContext on return, an arbitrary context pointer that the caller will
+///                       pass to the free function
+/// \returns A pointer to the requested memory, or NULL if the memory could not be read.
+///          The caller must invoke the free function on the returned pointer once it's
+///          done using the memory.
 typedef const void *(*ReadBytesFunction)(void *reader_context, swift_addr_t address,
                                          uint64_t size,
                                          void **outFreeContext);
+
+/// Get the string length at the given address.
+///
+/// This scan always occurs in a read-only data section. If the scan
+/// would go beyond the section boundary, a length of 0 should be
+/// returned.
+///
+/// \param address the address in the target address space
+/// \returns The length of the string or 0 if the scan was unsuccessful.
 typedef uint64_t (*GetStringLengthFunction)(void *reader_context,
                                             swift_addr_t address);
+
+/// Get the address of a symbol in the target address space.
+///
+/// \returns true if the lookup was successful.
 typedef swift_addr_t (*GetSymbolAddressFunction)(void *reader_context,
                                                  const char *name,
                                                  uint64_t name_length);
 
-typedef struct MemoryReaderImpl {
-  /// An opaque context that the implementor can specify to
-  /// be passed to each of the APIs below.
-  void *reader_context;
+typedef enum {
+  /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
+  /// should be populated with the size of an ordinary pointer in the remote
+  /// process, in bytes.
+  DLQ_GetPointerSize,
 
-  /// Get the size in bytes of the target's pointer type.
-  PointerSizeFunction getPointerSize;
+  /// The query should ignore inBuffer, and treat outBuffer as uint8_t* which
+  /// should be populated with the size of size_t in the remote process, in
+  /// bytes.
+  DLQ_GetSizeSize,
+} DataLayoutQueryType;
 
-  /// Get the size in bytes of the target's size type.
-  SizeSizeFunction getSizeSize;
-
-  /// Free memory returned from readBytes. May be NULL if memory never needs to be freed.
-  FreeBytesFunction free;
-
-  // FIXME: -Wdocumentation complains about \param and \returns on function pointers.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdocumentation"
-
-  /// Read a sequence of bytes at an address in the target.
-  ///
-  /// \param address the address in the target address space
-  /// \param size the number of bytes to read
-  /// \param outFreeContext on return, an arbitrary context pointer that the caller will
-  ///                       pass to the free function
-  /// \returns A pointer to the requested memory, or NULL if the memory could not be read.
-  ///          The caller must invoke the free function on the returned pointer once it's
-  ///          done using the memory.
-  ReadBytesFunction readBytes;
-
-  /// Get the string length at the given address.
-  ///
-  /// This scan always occurs in a read-only data section. If the scan
-  /// would go beyond the section boundary, a length of 0 should be
-  /// returned.
-  ///
-  /// \param address the address in the target address space
-  /// \returns The length of the string or 0 if the scan was unsuccessful.
-  GetStringLengthFunction getStringLength;
-
-  /// Get the address of a symbol in the target address space.
-  ///
-  /// \returns true if the lookup was successful.
-  GetSymbolAddressFunction getSymbolAddress;
-
-#pragma clang diagnostic pop
-
-} MemoryReaderImpl;
+/// Data layout query function, which returns answers based on query types (from
+/// the DataLayoutQueryType enum). The meaning of the input and output buffer
+/// is defined by the type of the query. Unknown requests should be handled by
+/// returning 0.
+///
+/// \returns 0 on error, non-zero on success.
+typedef int (*QueryDataLayoutFunction)(void *reader_context,
+                                       DataLayoutQueryType type, void *inBuffer,
+                                       void *outBuffer);
 
 #ifdef __cplusplus
 } // extern "C"

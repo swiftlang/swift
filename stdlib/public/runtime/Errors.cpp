@@ -140,8 +140,11 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
   }
 
   // If lookupSymbol succeeded then fileName is non-null. Thus, we find the
-  // library name here.
-  StringRef libraryName = StringRef(syminfo.fileName).rsplit('/').second;
+  // library name here. Avoid using StringRef::rsplit because its definition
+  // is not provided in the header so that it requires linking with
+  // libSupport.a.
+  StringRef libraryName = StringRef(syminfo.fileName);
+  libraryName = libraryName.substr(libraryName.rfind('/')).substr(1);
 
   // Next we get the symbol name that we are going to use in our backtrace.
   std::string symbolName;
@@ -171,7 +174,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }
@@ -292,6 +295,12 @@ void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
   _swift_runtime_on_report(flags, message, details);
 }
 
+bool swift::_swift_reportFatalErrorsToDebugger = true;
+
+bool swift::_swift_shouldReportFatalErrorsToDebugger() {
+  return _swift_reportFatalErrorsToDebugger;
+}
+
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,
@@ -343,20 +352,27 @@ swift::fatalError(uint32_t flags, const char *format, ...)
 
 // Report a warning to system console and stderr.
 void
-swift::warning(uint32_t flags, const char *format, ...)
+swift::warningv(uint32_t flags, const char *format, va_list args)
 {
-  va_list args;
-  va_start(args, format);
-
   char *log;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
 #pragma GCC diagnostic pop
-
+  
   reportNow(flags, log);
-
+  
   free(log);
+}
+
+// Report a warning to system console and stderr.
+void
+swift::warning(uint32_t flags, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  warningv(flags, format, args);
 }
 
 // Crash when a deleted method is called by accident.

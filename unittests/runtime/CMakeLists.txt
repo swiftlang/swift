@@ -3,7 +3,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   set(swift_runtime_test_extra_libraries)
   if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-    list(APPEND swift_runtime_test_extra_libraries swiftImageInspectionShared)
+    list(APPEND swift_runtime_test_extra_libraries 
+      $<TARGET_FILE:swiftImageInspectionShared-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}>)
   endif()
 
   add_subdirectory(LongTests)
@@ -33,7 +34,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
-    Exclusivity.cpp
+    CompatibilityOverride.cpp
+    Concurrent.cpp
     Metadata.cpp
     Mutex.cpp
     Enum.cpp

@@ -202,6 +202,7 @@ sil @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
 // CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: return
 // CHECK: bb6(
+// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: throw
 // CHECK: } // end sil function 'sil_combine_dead_partial_apply_try_apply'

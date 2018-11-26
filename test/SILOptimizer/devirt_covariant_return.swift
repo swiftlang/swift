@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances with covariant return types correctly. The verifier
@@ -7,10 +8,9 @@
 // TODO: this is not working right now: rdar://problem/33461095
 // As a side-test it also checks if all allocs can be promoted to the stack.
 
-// CHECK-LABEL: sil hidden @$S23devirt_covariant_return6driveryyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s23devirt_covariant_return6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK: alloc_ref
-// CHECK: alloc_ref
+// CHECK-NOT: alloc_ref
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
@@ -109,9 +109,9 @@ public class Bear {
 
   // Check that devirtualizer can handle convenience initializers, which have covariant optional
   // return types.
-  // CHECK-LABEL: sil @$S23devirt_covariant_return4BearC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
-  // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
+  // CHECK-LABEL: sil @$s23devirt_covariant_return4BearC{{[_0-9a-zA-Z]*}}fC
+  // CHECK: checked_cast_br [exact] %{{.*}} : $@thick Bear.Type to $@thick GummyBear.Type
+  // CHECK: upcast %{{.*}} : $Optional<GummyBear> to $Optional<Bear>
   // CHECK: }
   public convenience init?(delegateFailure: Bool, failAfter: Bool) {
     self.init(fail: delegateFailure)
@@ -119,7 +119,7 @@ public class Bear {
   }
 }
 
-final class PolarBear: Bear {
+final class GummyBear: Bear {
 
   override init?(fail: Bool) {
     super.init(fail: fail)
@@ -176,7 +176,7 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil shared [noinline] @$S23devirt_covariant_return7driver1ys5Int32VAA2C1CFTf4d_n
+// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
@@ -190,7 +190,7 @@ func driver1(_ c: C1) -> Int32 {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil shared [noinline] @$S23devirt_covariant_return7driver3ys5Int32VAA1CCFTf4g_n
+// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver3ys5Int32VAA1CCF
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
 // CHECK-NOT: bb{{.*}}:
 // check that for C2, we convert the non-optional result into an optional and then cast.
@@ -231,7 +231,7 @@ public class D2: D1 {
 
 // Check that the boo call gets properly devirtualized and that
 // that D2.foo() is inlined thanks to this.
-// CHECK-LABEL: sil shared [noinline] @$S23devirt_covariant_return7driver2ys5Int32VAA2D2CFTf4g_n
+// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver2ys5Int32VAA2D2CF
 // CHECK-NOT: class_method
 // CHECK: checked_cast_br [exact] %{{.*}} : $D1 to $D2
 // CHECK: bb2
@@ -276,7 +276,7 @@ class EEE : CCC {
 
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
-// CHECK-LABEL: sil shared [noinline] @$S23devirt_covariant_return37testDevirtOfMethodReturningTupleTypes_1bAA2AAC_AEtAA3CCCC_AA2BBCtFTf4gg_n
+// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return37testDevirtOfMethodReturningTupleTypes_1bAA2AAC_AEtAA3CCCC_AA2BBCtF
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
@@ -316,7 +316,7 @@ class DDDD : CCCC {
 
 // Check devirtualization of methods with optional results, where
 // optional results need to be casted.
-// CHECK-LABEL: sil shared [noinline] @{{.*}}testOverridingMethodWithOptionalResult
+// CHECK-LABEL: sil [noinline] @{{.*}}testOverridingMethodWithOptionalResult
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $F
 // CHECK: checked_cast_br [exact] %{{.*}} : $F to $G
 // CHECK: switch_enum

@@ -114,15 +114,13 @@ class AnnotatingPrinter : public StreamPrinter {
     const auto *ED = dyn_cast<ExtensionDecl>(D);
     if (!ED)
       return;
-    if (ED->getExtendedType()) {
-      if (auto NTD = ED->getExtendedType()->getAnyNominal()) {
-        if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
-          auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
-          DefaultMapToUse = &Pair.first->getSecond();
-          if (Pair.second) {
-            swift::collectDefaultImplementationForProtocolMembers(PD,
-                                                      Pair.first->getSecond());
-          }
+    if (auto NTD = ED->getExtendedNominal()) {
+      if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
+        auto Pair = AllDefaultMaps.insert({PD, DefaultImplementMap()});
+        DefaultMapToUse = &Pair.first->getSecond();
+        if (Pair.second) {
+          swift::collectDefaultImplementationForProtocolMembers(PD,
+                                                    Pair.first->getSecond());
         }
       }
     }
@@ -209,6 +207,7 @@ public:
     initDefaultMapToUse(D);
     // If D is declared in the extension, then the synthesized target is valid.
     TypeOrExtensionDecl SynthesizedTarget;
+    assert(D->getDeclContext()->isModuleScopeContext() == EntitiesStack.empty());
     if (D->getDeclContext() == SynthesizedExtensionInfo.first)
       SynthesizedTarget = SynthesizedExtensionInfo.second;
     EntitiesStack.emplace_back(D, SynthesizedTarget,
@@ -278,7 +277,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
 
   ProtocolDecl *proto = nullptr;
   if (auto *typeDC = DC->getInnermostTypeContext())
-    proto = typeDC->getAsProtocolOrProtocolExtensionContext();
+    proto = typeDC->getSelfProtocolDecl();
 
   for (auto &Req : GenericSig->getRequirements()) {
     // Skip protocol Self requirement.
@@ -373,8 +372,8 @@ static bool initDocEntityInfo(const Decl *D,
         assert(DocRef.find(Open) != StringRef::npos);
         auto FirstPart = DocRef.substr(0, DocRef.find(Open) + (Open).size());
         auto SecondPart = DocRef.substr(FirstPart.size());
-        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedType()->
-          getAnyNominal()->getName().str();
+        auto ExtendedName = ((const ExtensionDecl*)D)->getExtendedNominal()
+            ->getName().str();
         assert(SecondPart.startswith(ExtendedName));
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
@@ -417,21 +416,9 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::FileUnit: {
       if (auto *CD = D->getClangDecl()) {
         if (auto *M = CD->getImportedOwningModule()) {
-          const clang::Module *Root = M->getTopLevelModule();
-
-          // If Root differs from the owning module, then the owning module is
-          // a sub-module.
-          if (M != Root) {
+          if (M->isSubModule()) {
             llvm::raw_svector_ostream OS(Info.SubModuleName);
-            llvm::SmallVector<StringRef, 4> Names;
-
-            // Climb up and collect sub-module names.
-            for (auto Current = M; Current != Root; Current = Current->Parent) {
-              Names.insert(Names.begin(), Current->Name);
-            }
-            OS << Root->Name;
-            std::for_each(Names.begin(), Names.end(),
-                          [&](StringRef N) { OS << "." << N; });
+            ModuleDecl::ReverseFullNameIterator(M).printForward(OS);
           }
         }
       }
@@ -455,8 +442,8 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 }
 
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
-  if (auto Alias = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return Alias->getDecl();
+  if (auto alias = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return alias->getDecl();
   return Ty->getAnyNominal();
 }
 
@@ -777,7 +764,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
                           CompilerInvocation Invocation) {
   Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.setModuleName("main");
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
 
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
@@ -838,19 +825,13 @@ static void addParameters(const AbstractFunctionDecl *FD,
                           TextEntity &Ent,
                           SourceManager &SM,
                           unsigned BufferID) {
-  auto params = FD->getParameterLists();
-  // Ignore 'self'.
-  if (FD->getDeclContext()->isTypeContext())
-    params = params.slice(1);
-
   ArrayRef<Identifier> ArgNames;
   DeclName Name = FD->getFullName();
   if (Name) {
     ArgNames = Name.getArgumentNames();
   }
-  for (auto paramList : params) {
-    addParameters(ArgNames, paramList, Ent, SM, BufferID);
-  }
+  auto paramList = FD->getParameters();
+  addParameters(ArgNames, paramList, Ent, SM, BufferID);
 }
 
 static void addParameters(const SubscriptDecl *D,
@@ -979,8 +960,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1108,7 +1088,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.performSema();
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1354,7 +1334,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager().processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(
@@ -1362,13 +1342,13 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     CompilerInstance &ParseCI, std::string &Error) {
   CompilerInvocation Invocation;
 
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, ParseCI.getDiags(), Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
     return nullptr;
   }
-  Invocation.setInputKind(InputFileKind::IFK_Swift);
+  Invocation.setInputKind(InputFileKind::Swift);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
 
@@ -1417,7 +1397,7 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
   CompilerInvocation Invocation;
   std::string Error;
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
 
   if (Failed) {
@@ -1453,7 +1433,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   CI.addDiagnosticConsumer(&PrintDiags);
   std::vector<StringRef> Groups;
   std::string Error;
-  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
     Receiver(Groups, Error);
     return;
@@ -1466,7 +1446,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   ASTContext &Ctx = CI.getASTContext();
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
+
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {

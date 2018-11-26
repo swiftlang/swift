@@ -1,6 +1,4 @@
-// REQUIRES: objc_interop
-
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs/custom-modules %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -I %S/../Inputs/custom-modules %s -emit-ir | %FileCheck %s
 
 sil_stage raw
 
@@ -11,7 +9,7 @@ import ObjCRuntimeVisible
 
 // CHECK: [[CLASS_NAME:@.*]] = private unnamed_addr constant [22 x i8] c"MyRuntimeVisibleClass\00"
 
-// CHECK: define swiftcc %objc_class* @getClassA() #0 {
+// CHECK: define {{(dllexport )?}}{{(protected )?}}swiftcc %objc_class* @getClassA() #0 {
 sil @getClassA : $@convention(thin) () -> @objc_metatype A.Type {
 bb0:
   // CHECK: call %objc_class* @objc_lookUpClass(i8* getelementptr inbounds ([22 x i8], [22 x i8]* [[CLASS_NAME]],
@@ -19,18 +17,4 @@ bb0:
 
   // CHECK-NEXT:  ret %objc_class*
   return %0 : $@objc_metatype A.Type
-}
-
-// CHECK: define swiftcc void @deallocA(%TSo1AC*) #0 {
-sil @deallocA : $@convention(thin) (@owned A) -> () {
-bb0(%0 : $A):
-  %1 = metatype $@thick A.Type
-
-  // CHECK: call %objc_object* @object_dispose
-  dealloc_partial_ref %0 : $A, %1 : $@thick A.Type
-
-  %2 = tuple ()
-
-  // CHECK-NEXT: ret
-  return %2 : $()
 }

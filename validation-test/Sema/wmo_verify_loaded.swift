@@ -20,7 +20,7 @@ extension Notification.Name {}
 
 // NSPasteboardType.init(rawValue:)
 // - just make sure it has a body.
-// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo16NSPasteboardTypea8rawValueABSS_tcfC : $@convention(method) (@owned String, @thin NSPasteboard.PasteboardType.Type) -> @owned NSPasteboard.PasteboardType {
-// CHECK: bb0(%0 : $String, %1 : $@thin NSPasteboard.PasteboardType.Type):
+// CHECK-LABEL: sil shared [transparent] [serializable] @$sSo16NSPasteboardTypea8rawValueABSS_tcfC : $@convention(method) (@owned String, @thin NSPasteboard.PasteboardType.Type) -> @owned NSPasteboard.PasteboardType {
+// CHECK: bb0(%0 : @owned $String, %1 : @trivial $@thin NSPasteboard.PasteboardType.Type):
 // CHECK: return %{{.*}} : $NSPasteboard.PasteboardType
-// CHECK-LABEL: } // end sil function '$SSo16NSPasteboardTypea8rawValueABSS_tcfC'
+// CHECK-LABEL: } // end sil function '$sSo16NSPasteboardTypea8rawValueABSS_tcfC'

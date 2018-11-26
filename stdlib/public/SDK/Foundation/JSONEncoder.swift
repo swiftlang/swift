@@ -10,6 +10,42 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A marker protocol used to determine whether a value is a `String`-keyed `Dictionary`
+/// containing `Encodable` values (in which case it should be exempt from key conversion strategies).
+///
+/// NOTE: The architecture and environment check is due to a bug in the current (2018-08-08) Swift 4.2
+/// runtime when running on i386 simulator. The issue is tracked in https://bugs.swift.org/browse/SR-8276
+/// Making the protocol `internal` instead of `fileprivate` works around this issue.
+/// Once SR-8276 is fixed, this check can be removed and the protocol always be made fileprivate.
+#if arch(i386) || arch(arm)
+internal protocol _JSONStringDictionaryEncodableMarker { }
+#else
+fileprivate protocol _JSONStringDictionaryEncodableMarker { }
+#endif
+
+extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String, Value: Encodable { }
+
+/// A marker protocol used to determine whether a value is a `String`-keyed `Dictionary`
+/// containing `Decodable` values (in which case it should be exempt from key conversion strategies).
+///
+/// The marker protocol also provides access to the type of the `Decodable` values,
+/// which is needed for the implementation of the key conversion strategy exemption.
+///
+/// NOTE: Please see comment above regarding SR-8276
+#if arch(i386) || arch(arm)
+internal protocol _JSONStringDictionaryDecodableMarker {
+    static var elementType: Decodable.Type { get }
+}
+#else
+fileprivate protocol _JSONStringDictionaryDecodableMarker {
+    static var elementType: Decodable.Type { get }
+}
+#endif
+
+extension Dictionary : _JSONStringDictionaryDecodableMarker where Key == String, Value: Decodable {
+    static var elementType: Decodable.Type { return Value.self }
+}
+
 //===----------------------------------------------------------------------===//
 // JSON Encoder
 //===----------------------------------------------------------------------===//
@@ -32,7 +68,7 @@ open class JSONEncoder {
         public static let prettyPrinted = OutputFormatting(rawValue: 1 << 0)
 
         /// Produce JSON with dictionary keys sorted in lexicographic order.
-        @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+        @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
         public static let sortedKeys    = OutputFormatting(rawValue: 1 << 1)
     }
 
@@ -48,7 +84,7 @@ open class JSONEncoder {
         case millisecondsSince1970
 
         /// Encode the `Date` as an ISO-8601-formatted string (in RFC 3339 format).
-        @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+        @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
         case iso8601
 
         /// Encode the `Date` as a string formatted by the given formatter.
@@ -110,7 +146,7 @@ open class JSONEncoder {
         case custom((_ codingPath: [CodingKey]) -> CodingKey)
         
         fileprivate static func _convertToSnakeCase(_ stringKey: String) -> String {
-            guard stringKey.count > 0 else { return stringKey }
+            guard !stringKey.isEmpty else { return stringKey }
         
             var words : [Range<String.Index>] = []
             // The general idea of this algorithm is to split words on transition from lower to upper case, then on transition of >1 upper case characters to lowercase
@@ -212,22 +248,27 @@ open class JSONEncoder {
         let encoder = _JSONEncoder(options: self.options)
 
         guard let topLevel = try encoder.box_(value) else {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
         }
 
         if topLevel is NSNull {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
         } else if topLevel is NSNumber {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as number JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as number JSON fragment."))
         } else if topLevel is NSString {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
         }
 
         let writingOptions = JSONSerialization.WritingOptions(rawValue: self.outputFormatting.rawValue)
         do {
            return try JSONSerialization.data(withJSONObject: topLevel, options: writingOptions)
         } catch {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
         }
     }
 }
@@ -346,12 +387,12 @@ fileprivate struct _JSONEncodingStorage {
         return array
     }
 
-    fileprivate mutating func push(container: NSObject) {
+    fileprivate mutating func push(container: __owned NSObject) {
         self.containers.append(container)
     }
 
     fileprivate mutating func popContainer() -> NSObject {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.popLast()!
     }
 }
@@ -733,7 +774,7 @@ extension _JSONEncoder {
             return NSNumber(value: 1000.0 * date.timeIntervalSince1970)
 
         case .iso8601:
-            if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+            if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
                 return NSString(string: _iso8601Formatter.string(from: date))
             } else {
                 fatalError("ISO8601DateFormatter is unavailable on this platform.")
@@ -810,24 +851,55 @@ extension _JSONEncoder {
         }
     }
 
-    fileprivate func box<T : Encodable>(_ value: T) throws -> NSObject {
+    fileprivate func box(_ dict: [String : Encodable]) throws -> NSObject? {
+        let depth = self.storage.count
+        let result = self.storage.pushKeyedContainer()
+        do {
+            for (key, value) in dict {
+                self.codingPath.append(_JSONKey(stringValue: key, intValue: nil))
+                defer { self.codingPath.removeLast() }
+                result[key] = try box(value)
+            }
+        } catch {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
+
+        // The top container should be a new container.
+        guard self.storage.count > depth else {
+            return nil
+        }
+
+        return self.storage.popContainer()
+    }
+
+    fileprivate func box(_ value: Encodable) throws -> NSObject {
         return try self.box_(value) ?? NSDictionary()
     }
 
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
-    fileprivate func box_<T : Encodable>(_ value: T) throws -> NSObject? {
-        if T.self == Date.self || T.self == NSDate.self {
+    fileprivate func box_(_ value: Encodable) throws -> NSObject? {
+        // Disambiguation between variable and function is required due to
+        // issue tracked at: https://bugs.swift.org/browse/SR-1846
+        let type = Swift.type(of: value)
+        if type == Date.self || type == NSDate.self {
             // Respect Date encoding strategy
             return try self.box((value as! Date))
-        } else if T.self == Data.self || T.self == NSData.self {
+        } else if type == Data.self || type == NSData.self {
             // Respect Data encoding strategy
             return try self.box((value as! Data))
-        } else if T.self == URL.self || T.self == NSURL.self {
+        } else if type == URL.self || type == NSURL.self {
             // Encode URLs as single strings.
             return self.box((value as! URL).absoluteString)
-        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
+        } else if type == Decimal.self || type == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
             return (value as! NSDecimalNumber)
+        } else if value is _JSONStringDictionaryEncodableMarker {
+            return try self.box(value as! [String : Encodable])
         }
 
         // The value should request a container from the _JSONEncoder.
@@ -889,7 +961,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
     fileprivate init(referencing encoder: _JSONEncoder,
-                     key: CodingKey, convertedKey: CodingKey, wrapping dictionary: NSMutableDictionary) {
+                     key: CodingKey, convertedKey: __shared CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, convertedKey.stringValue)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -947,7 +1019,7 @@ open class JSONDecoder {
         case millisecondsSince1970
 
         /// Decode the `Date` as an ISO-8601-formatted string (in RFC 3339 format).
-        @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+        @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
         case iso8601
 
         /// Decode the `Date` as a string parsed by the given formatter.
@@ -1005,7 +1077,7 @@ open class JSONDecoder {
             guard !stringKey.isEmpty else { return stringKey }
         
             // Find the first non-underscore character
-            guard let firstNonUnderscore = stringKey.index(where: { $0 != "_" }) else {
+            guard let firstNonUnderscore = stringKey.firstIndex(where: { $0 != "_" }) else {
                 // Reached the end without finding an _
                 return stringKey
             }
@@ -1013,7 +1085,7 @@ open class JSONDecoder {
             // Find the last non-underscore character
             var lastNonUnderscore = stringKey.index(before: stringKey.endIndex)
             while lastNonUnderscore > firstNonUnderscore && stringKey[lastNonUnderscore] == "_" {
-                stringKey.formIndex(before: &lastNonUnderscore);
+                stringKey.formIndex(before: &lastNonUnderscore)
             }
         
             let keyRange = firstNonUnderscore...lastNonUnderscore
@@ -1197,16 +1269,16 @@ fileprivate struct _JSONDecodingStorage {
     }
 
     fileprivate var topContainer: Any {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         return self.containers.last!
     }
 
-    fileprivate mutating func push(container: Any) {
+    fileprivate mutating func push(container: __owned Any) {
         self.containers.append(container)
     }
 
     fileprivate mutating func popContainer() {
-        precondition(self.containers.count > 0, "Empty container stack.")
+        precondition(!self.containers.isEmpty, "Empty container stack.")
         self.containers.removeLast()
     }
 }
@@ -1544,7 +1616,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
         return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
     }
 
-    private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
+    private func _superDecoder(forKey key: __owned CodingKey) throws -> Decoder {
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 
@@ -2289,7 +2361,7 @@ extension _JSONDecoder {
             return Date(timeIntervalSince1970: double / 1000.0)
 
         case .iso8601:
-            if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+            if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
                 let string = try self.unbox(value, as: String.self)!
                 guard let date = _iso8601Formatter.date(from: string) else {
                     throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath, debugDescription: "Expected date string to be ISO8601-formatted."))
@@ -2354,11 +2426,34 @@ extension _JSONDecoder {
         }
     }
 
+    fileprivate func unbox<T>(_ value: Any, as type: _JSONStringDictionaryDecodableMarker.Type) throws -> T? {
+        guard !(value is NSNull) else { return nil }
+
+        var result = [String : Any]()
+        guard let dict = value as? NSDictionary else {
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        }
+        let elementType = type.elementType
+        for (key, value) in dict {
+            let key = key as! String
+            self.codingPath.append(_JSONKey(stringValue: key, intValue: nil))
+            defer { self.codingPath.removeLast() }
+
+            result[key] = try unbox_(value, as: elementType)
+        }
+
+        return result as? T
+    }
+
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
+        return try unbox_(value, as: type) as? T
+    }
+
+    fileprivate func unbox_(_ value: Any, as type: Decodable.Type) throws -> Any? {
         if type == Date.self || type == NSDate.self {
-            return try self.unbox(value, as: Date.self) as? T
+            return try self.unbox(value, as: Date.self)
         } else if type == Data.self || type == NSData.self {
-            return try self.unbox(value, as: Data.self) as? T
+            return try self.unbox(value, as: Data.self)
         } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
@@ -2368,10 +2463,11 @@ extension _JSONDecoder {
                 throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
                                                                         debugDescription: "Invalid URL string."))
             }
-
-            return url as! T
+            return url
         } else if type == Decimal.self || type == NSDecimalNumber.self {
-            return try self.unbox(value, as: Decimal.self) as? T
+            return try self.unbox(value, as: Decimal.self)
+        } else if let stringKeyedDictType = type as? _JSONStringDictionaryDecodableMarker.Type {
+            return try self.unbox(value, as: stringKeyedDictType)
         } else {
             self.storage.push(container: value)
             defer { self.storage.popContainer() }
@@ -2416,7 +2512,7 @@ fileprivate struct _JSONKey : CodingKey {
 //===----------------------------------------------------------------------===//
 
 // NOTE: This value is implicitly lazy and _must_ be lazy. We're compiled against the latest SDK (w/ ISO8601DateFormatter), but linked against whichever Foundation the user has. ISO8601DateFormatter might not exist, so we better not hit this code path on an older OS.
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 fileprivate var _iso8601Formatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = .withInternetDateTime
@@ -2427,7 +2523,7 @@ fileprivate var _iso8601Formatter: ISO8601DateFormatter = {
 // Error Utilities
 //===----------------------------------------------------------------------===//
 
-fileprivate extension EncodingError {
+extension EncodingError {
     /// Returns a `.invalidValue` error describing the given invalid floating-point value.
     ///
     ///

@@ -154,11 +154,12 @@ class HostSpecificConfiguration(object):
                     test = False
 
             if build:
-                # Validation and long tests require building the full standard
-                # library, whereas the other targets can build a slightly
-                # smaller subset which is faster to build.
+                # Validation, long, and stress tests require building the full
+                # standard library, whereas the other targets can build a
+                # slightly smaller subset which is faster to build.
                 if args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test:
+                        args.validation_test or args.long_test or \
+                        args.stress_test:
                     self.swift_stdlib_build_targets.append(
                         "swift-stdlib-" + name)
                 else:
@@ -167,29 +168,32 @@ class HostSpecificConfiguration(object):
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
-                # FIXME: This probably should respect `args.benchmark`, but
-                # a typo in build-script-impl meant we always would do this.
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-" + name)
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-" + name)
 
             if build_external_benchmarks:
                 # Add support for the external benchmarks.
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-{}-external".format(name))
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-{}-external".format(name))
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
                     suffix = "-non-executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
-                if args.validation_test and args.long_test:
+                if args.validation_test and args.long_test and \
+                        args.stress_test:
                     subset_suffix = "-all"
                 elif args.validation_test:
                     subset_suffix = "-validation"
                 elif args.long_test:
                     subset_suffix = "-only_long"
+                elif args.stress_test:
+                    subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
                 self.swift_test_run_targets.append("check-swift{}{}-{}".format(
@@ -285,16 +289,6 @@ class BuildScriptInvocation(object):
         if args.build_subdir is None:
             args.build_subdir = \
                 workspace.compute_build_subdir(args)
-
-        # --test-paths implies --test and/or --validation-test
-        # depending on what directories/files have been specified.
-        if args.test_paths:
-            for path in args.test_paths:
-                if path.startswith('test'):
-                    args.test = True
-                elif path.startswith('validation-test'):
-                    args.test = True
-                    args.validation_test = True
 
         # Add optional stdlib-deployment-targets
         if args.android:
@@ -411,13 +405,10 @@ class BuildScriptInvocation(object):
         # Set an appropriate default umask.
         os.umask(0o022)
 
-        if 'SDKROOT' in os.environ:
-            print('NOTE: Environment variable SDKROOT is set to "{}"'
-                  .format(os.environ['SDKROOT']))
-
         # Unset environment variables that might affect how tools behave.
         for v in [
                 'MAKEFLAGS',
+                'SDKROOT',
                 'MACOSX_DEPLOYMENT_TARGET',
                 'IPHONEOS_DEPLOYMENT_TARGET',
                 'TVOS_DEPLOYMENT_TARGET',
@@ -482,6 +473,7 @@ class BuildScriptInvocation(object):
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
+            "--swiftsyntax-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -490,6 +482,8 @@ class BuildScriptInvocation(object):
                 args.swift_analyze_code_coverage).lower(),
             "--llbuild-enable-assertions", str(
                 args.llbuild_assertions).lower(),
+            "--lldb-assertions", str(
+                args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
             "--build-jobs", str(args.build_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -597,6 +591,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libicu"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
+        if not args.build_swiftsyntax:
+            impl_args += ["--skip-build-swiftsyntax"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -633,13 +629,14 @@ class BuildScriptInvocation(object):
         if not args.build_android:
             impl_args += ["--skip-build-android"]
 
-        if not args.test and not args.long_test:
+        if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += ["--skip-test-cmark",
                           "--skip-test-lldb",
                           "--skip-test-llbuild",
                           "--skip-test-swiftpm",
+                          "--skip-test-swiftsyntax",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
@@ -675,6 +672,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--validation-test"]
         if args.long_test:
             impl_args += ["--long-test"]
+        if args.stress_test:
+            impl_args += ["--stress-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:

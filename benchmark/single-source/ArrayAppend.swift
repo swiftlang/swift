@@ -18,9 +18,11 @@ public let ArrayAppend = [
   BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendAsciiSubstring", runFunction: run_ArrayAppendAsciiSubstring, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendFromGeneric", runFunction: run_ArrayAppendFromGeneric, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendLatin1Substring", runFunction: run_ArrayAppendLatin1Substring, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: [.validation, .api, .Array]),
@@ -30,6 +32,7 @@ public let ArrayAppend = [
   BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppendUTF16Substring", runFunction: run_ArrayAppendUTF16Substring, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: [.validation, .api, .Array]),
   BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: [.validation, .api, .Array]),
@@ -199,7 +202,7 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
 @inline(never)
 public func appendFromGeneric<
   S: Sequence
->(array: inout [S.Iterator.Element], sequence: S) {
+>(array: inout [S.Element], sequence: S) {
   array.append(contentsOf: sequence)
 }
 
@@ -221,7 +224,7 @@ public func run_ArrayAppendFromGeneric(_ N: Int) {
 @inline(never)
 public func appendToGeneric<
   R: RangeReplaceableCollection
->(collection: inout R, array: [R.Iterator.Element]) {
+>(collection: inout R, array: [R.Element]) {
   collection.append(contentsOf: array)
 }
 
@@ -245,7 +248,7 @@ public func run_ArrayAppendToGeneric(_ N: Int) {
 public func appendToFromGeneric<
   R: RangeReplaceableCollection, S: Sequence
 >(collection: inout R, sequence: S) 
-where R.Iterator.Element == S.Iterator.Element {
+where R.Element == S.Element {
   collection.append(contentsOf: sequence)
 }
 
@@ -310,7 +313,7 @@ public func run_ArrayAppendAscii(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums += getString(s).utf8
        }
     }
   }
@@ -324,7 +327,7 @@ public func run_ArrayAppendLatin1(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums += getString(s).utf8
        }
     }
   }
@@ -338,7 +341,49 @@ public func run_ArrayAppendUTF16(_ N: Int) {
     for _ in 0..<10 {
        var nums = [UInt8]()
        for _ in 0..<10_000 {
-         nums += s.utf8
+         nums += getString(s).utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendAsciiSubstring(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog!"[...]
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += getSubstring(s).utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendLatin1Substring(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog\u{00A1}"[...]
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += getSubstring(s).utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendUTF16Substring(_ N: Int) {
+  let s = "the quick brown 🦊 jumps over the lazy dog"[...]
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += getSubstring(s).utf8
        }
     }
   }

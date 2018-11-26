@@ -6,6 +6,6 @@
 
 import AppKit
 
-let image = NSImage(named: NSImageNameTrashEmpty)
+let image = NSImage(named: NSImage.Name.trashEmpty)
 // CHECK: TrashEmpty
 print(image!.name()!)

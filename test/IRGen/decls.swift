@@ -20,6 +20,6 @@ func test1() {
 }
 
 // Check that we emit nominal type descriptors for all types.
-// CHECK-DAG: @"$S5decls5test1yyF1aL_CMn" = hidden constant
-// CHECK-DAG: @"$S5decls5test1yyF1bL_CMn" = hidden constant
+// CHECK-DAG: @"$s5decls5test1yyF1aL_CMn" = internal constant
+// CHECK-DAG: @"$s5decls5test1yyF1bL_CMn" = internal constant
 

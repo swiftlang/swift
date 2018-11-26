@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// REQUIRES: objc_interop
 
 import Swift
 import Builtin
@@ -14,44 +13,44 @@ class X {
 }
 sil_vtable X {}
 
-sil @$S14dynamic_lookup1XCfD : $@convention(method) (X) -> ()
+sil @$s14dynamic_lookup1XCfD : $@convention(method) (X) -> ()
 
 // [objc] t.X.f (t.X)() -> ()
-sil @$S14dynamic_lookup1XC1fyyFTo : $@convention(objc_method) (X) -> () {
+sil @$s14dynamic_lookup1XC1fyyFTo : $@convention(objc_method) (X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.Type)() -> ()
-sil @$S14dynamic_lookup1XC1gyyFZTo : $@convention(thin) (@thick X.Type) -> () {
+sil @$s14dynamic_lookup1XC1gyyFZTo : $@convention(thin) (@thick X.Type) -> () {
 bb0(%0 : $@thick X.Type):
   %14 = tuple ()                                  // user: %15
   return %14 : $()
 }
 
-sil @$S14dynamic_lookup1XCyS2icigTo : $@convention(objc_method) (Int, X) -> Int {
+sil @$s14dynamic_lookup1XCyS2icigTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
-  %4 = function_ref @$SSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
-sil @$SSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
+sil @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
 
 // [objc] dynamic_lookup.X.value.getter : Swift.Int
-sil @$S14dynamic_lookup1XC5valueSivgTo : $@convention(objc_method) (X) -> Int {
+sil @$s14dynamic_lookup1XC5valueSivgTo : $@convention(objc_method) (X) -> Int {
 bb0(%0 : $X):
-  %4 = function_ref @$SSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %4 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
   %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
   return %7 : $Int
 }
 
-// CHECK: define{{( protected)?}} swiftcc void @dynamic_lookup_br(%objc_object*)
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_lookup_br(%objc_object*)
 sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
@@ -82,7 +81,7 @@ bb3:
   return %43 : $()
 }
 
-// CHECK: define{{( protected)?}} swiftcc void @dynamic_lookup_static_br(%swift.type*)
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_lookup_static_br(%swift.type*)
 sil @dynamic_lookup_static_br : $@convention(thin) (@thick AnyObject.Type) -> () {
 bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(g)", align {{(4|8)}}
@@ -126,7 +125,7 @@ bb3:
   return %43 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
 sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@convention(thin) (AnyObject, Int) -> () {
 bb0(%0 : $AnyObject, %1 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
@@ -149,7 +148,7 @@ bb0(%0 : $AnyObject, %1 : $Int):
 bb1(%13 : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
   %14 = partial_apply %13(%11) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int
   %15 = load %3a : $*Int
-  %16 = apply %14(%15) : $@callee_owned Int -> Int
+  %16 = apply %14(%15) : $@callee_owned (Int) -> Int
   br bb3
 
 bb2:

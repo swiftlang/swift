@@ -116,11 +116,11 @@ public:
     T Value;
     iterator(T value) : Value(value) {}
   public:
-    typedef T value_type;
-    typedef T reference;
-    typedef void pointer;
-    typedef typename std::make_signed<T>::type difference_type;
-    typedef std::random_access_iterator_tag iterator_category;
+    using value_type = T;
+    using reference = T;
+    using pointer = void;
+    using difference_type = typename std::make_signed<T>::type;
+    using iterator_category = std::random_access_iterator_tag;
 
     T operator*() const { return Value; }
     iterator &operator++() {

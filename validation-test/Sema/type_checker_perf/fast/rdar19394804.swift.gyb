@@ -1,0 +1,24 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+class rdar19394804 {
+  let data = [
+    [
+      "first": [
+        [
+          "key1": "value"
+        ],
+        [
+          "key2": "value"
+        ]
+      ]
+    ],
+%for i in range(0, N):
+    [
+      "key1": "value",
+      "key2": []
+    ],
+%end
+  ]
+}

@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend -typecheck -verify -enable-objc-interop %s
 
 class Foo {}
 _ = Foo()

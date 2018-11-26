@@ -55,11 +55,11 @@ public:
 
     // Generic arguments.
     // This must always be the first piece of trailing data.
-    asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
+    asImpl().addGenericFields(Target);
 
     // Reserve a word to cache the payload size if the type has dynamic layout.
     auto &strategy = getEnumImplStrategy(IGM,
-           Target->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
+           Target->getDeclaredTypeInContext()->getCanonicalType());
     if (strategy.needsPayloadSizeInMetadata())
       asImpl().addPayloadSize();
   }
@@ -70,7 +70,8 @@ public:
 /// pointer-sized chunks) into the metadata for the next field.
 template <class Impl>
 class EnumMetadataScanner : public EnumMetadataVisitor<Impl> {
-  typedef EnumMetadataVisitor<Impl> super;
+  using super = EnumMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 
@@ -81,10 +82,8 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addGenericArgument(CanType argument) { addPointer(); }
-  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
-    addPointer();
-  }
+  void addGenericArgument() { addPointer(); }
+  void addGenericWitnessTable() { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 

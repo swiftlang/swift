@@ -17,9 +17,9 @@
 
 public enum ApproximateCount {
   case Unknown
-  case Precise(IntMax)
-  case Underestimate(IntMax)
-  case Overestimate(IntMax)
+  case Precise(Int64)
+  case Underestimate(Int64)
+  case Overestimate(Int64)
 }
 
 public protocol ApproximateCountableSequence : Sequence {
@@ -680,7 +680,7 @@ final public class ForkJoinPool {
       _runningThreadsMutex.withLock {
         _submissionQueuesMutex.withLock {
           _workDequesMutex.withLock {
-            let i = _runningThreads.index { $0 === thread }!
+            let i = _runningThreads.firstIndex { $0 === thread }!
             ForkJoinPool._threadRegistry[thread._tid!] = nil
             _runningThreads.remove(at: i)
             _submissionQueues.remove(at: i)
@@ -729,7 +729,7 @@ final public class ForkJoinPool {
 
   internal func _stealTask() -> ForkJoinTaskBase? {
     return _workDequesMutex.withLock {
-      let randomOffset = pickRandom(_workDeques.indices)
+      let randomOffset = _workDeques.indices.randomElement()!
       let count = _workDeques.count
       for i in _workDeques.indices {
         let index = (i + randomOffset) % count
@@ -767,7 +767,7 @@ final public class ForkJoinPool {
     _submissionQueuesMutex.withLock {
       precondition(!_submissionQueues.isEmpty)
       for task in tasks {
-        pickRandom(_submissionQueues).append(task)
+        _submissionQueues.randomElement()!.append(task)
       }
     }
   }
@@ -784,7 +784,7 @@ final public class ForkJoinPool {
       let done = _submissionQueuesMutex.withLock {
         () -> Bool in
         if !_submissionQueues.isEmpty {
-          pickRandom(_submissionQueues).append(task)
+          _submissionQueues.randomElement()!.append(task)
           return true
         }
         return false

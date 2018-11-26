@@ -82,7 +82,7 @@ inline unsigned getNumTagBytes(size_t size, unsigned emptyCases,
           numTags < 65536 ? 2 : 4);
 }
 
-inline int getEnumTagSinglePayloadImpl(
+inline unsigned getEnumTagSinglePayloadImpl(
     const OpaqueValue *enumAddr, unsigned emptyCases, const Metadata *payload,
     size_t payloadSize, size_t payloadNumExtraInhabitants,
     int (*getExtraInhabitantIndex)(const OpaqueValue *, const Metadata *)) {
@@ -110,36 +110,41 @@ inline int getEnumTagSinglePayloadImpl(
       unsigned caseIndexFromExtraTagBits =
           payloadSize >= 4 ? 0 : (extraTagBits - 1U) << (payloadSize * 8U);
 
+#if defined(__BIG_ENDIAN__)
+      // On BE high order bytes contain the index
+      unsigned long caseIndexFromValue = 0;
+      unsigned numPayloadTagBytes = std::min(size_t(8), payloadSize);
+      if (numPayloadTagBytes)
+        memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 8 -
+               numPayloadTagBytes,
+               valueAddr, numPayloadTagBytes);
+#else
       // In practice we should need no more than four bytes from the payload
       // area.
       unsigned caseIndexFromValue = 0;
       unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-#if defined(__BIG_ENDIAN__)
-      if (numPayloadTagBytes)
-        small_memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 4 -
-                         numPayloadTagBytes,
-                     valueAddr, numPayloadTagBytes, true);
-#else
       if (numPayloadTagBytes)
         small_memcpy(&caseIndexFromValue, valueAddr,
                      numPayloadTagBytes, true);
 #endif
-      return (caseIndexFromExtraTagBits | caseIndexFromValue) +
-             payloadNumExtraInhabitants;
+      unsigned noPayloadIndex =
+          (caseIndexFromExtraTagBits | caseIndexFromValue) +
+          payloadNumExtraInhabitants;
+      return noPayloadIndex + 1;
     }
   }
 
   // If there are extra inhabitants, see whether the payload is valid.
   if (payloadNumExtraInhabitants > 0) {
-    return getExtraInhabitantIndex(enumAddr, payload);
+    return getExtraInhabitantIndex(enumAddr, payload) + 1;
   }
 
   // Otherwise, we have always have a valid payload.
-  return -1;
+  return 0;
 }
 
 inline void storeEnumTagSinglePayloadImpl(
-    OpaqueValue *value, int whichCase, unsigned emptyCases,
+    OpaqueValue *value, unsigned whichCase, unsigned emptyCases,
     const Metadata *payload, size_t payloadSize,
     size_t payloadNumExtraInhabitants,
     void (*storeExtraInhabitant)(OpaqueValue *, int whichCase,
@@ -155,21 +160,23 @@ inline void storeEnumTagSinglePayloadImpl(
 
   // For payload or extra inhabitant cases, zero-initialize the extra tag bits,
   // if any.
-  if (whichCase < (int)payloadNumExtraInhabitants) {
+  if (whichCase <= payloadNumExtraInhabitants) {
     if (numExtraTagBytes != 0)
       small_memset(extraTagBitAddr, 0, numExtraTagBytes);
 
     // If this is the payload case, we're done.
-    if (whichCase == -1)
+    if (whichCase == 0)
       return;
 
     // Store the extra inhabitant.
-    storeExtraInhabitant(value, whichCase, payload);
+    unsigned noPayloadIndex = whichCase - 1;
+    storeExtraInhabitant(value, noPayloadIndex, payload);
     return;
   }
 
   // Factor the case index into payload and extra tag parts.
-  unsigned caseIndex = whichCase - payloadNumExtraInhabitants;
+  unsigned noPayloadIndex = whichCase - 1;
+  unsigned caseIndex = noPayloadIndex - payloadNumExtraInhabitants;
   unsigned payloadIndex, extraTagIndex;
   if (payloadSize >= 4) {
     extraTagIndex = 1;
@@ -188,6 +195,8 @@ inline void storeEnumTagSinglePayloadImpl(
                  reinterpret_cast<uint8_t *>(&payloadIndex) + 4 -
                      numPayloadTagBytes,
                  numPayloadTagBytes, true);
+  if (payloadSize > 4)
+	    memset(valueAddr + 4, 0, payloadSize - 4);
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr,
                  reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -

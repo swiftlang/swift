@@ -948,7 +948,7 @@ bb0(%0 : $Ping):
 
 sil_vtable Ping {
   #Ping.ping!1: @_TFC4main4Ping4pingfS0_FT_S0_	// main.Ping.ping (main.Ping)() -> main.Ping
-  #Ping.deinit!deallocator: @_TFC4main4PingD	// main.Ping.__deallocating_deinit
+  #Ping.deinit!deallocator.1: @_TFC4main4PingD	// main.Ping.__deallocating_deinit
   #Ping.init!initializer.1: @_TFC4main4PingcfMS0_FT_S0_	// main.Ping.init (main.Ping.Type)() -> main.Ping
 }
 
@@ -1040,7 +1040,7 @@ bb0(%0 : $*T, %1 : $Int):
 
 sil_vtable T {
   #T.reach!1: @_TFC1p1T5reachfS0_FT_T_	// p.T.reach (p.T)() -> ()
-  #T.deinit!deallocator: @_TFC1p1TD	// p.T.__deallocating_deinit
+  #T.deinit!deallocator.1: @_TFC1p1TD	// p.T.__deallocating_deinit
   #T.init!initializer.1: @_TFC1p1TcfMS0_FT_S0_	// p.T.init (p.T.Type)() -> p.T
 }
 

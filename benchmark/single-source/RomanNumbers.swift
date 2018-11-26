@@ -25,7 +25,7 @@ public let RomanNumbers = [
     tags: [.api, .String, .algorithm])
 ]
 
-let romanTable: DictionaryLiteral<String, Int> = [
+let romanTable: KeyValuePairs<String, Int> = [
   "M": 1000,
   "CM": 900,
   "D": 500,

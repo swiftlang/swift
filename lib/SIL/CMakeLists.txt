@@ -1,13 +1,19 @@
-add_swift_library(swiftSIL STATIC
+add_swift_host_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
   Bridging.cpp
+  DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
   InstructionUtils.cpp
+  MemAccessUtils.cpp
   Linker.cpp
+  LinearLifetimeChecker.cpp
   LoopInfo.cpp
+  Notifications.cpp
+  OperandOwnership.cpp
   OptimizationRemark.cpp
+  OwnershipUtils.cpp
   PrettyStackTrace.cpp
   Projection.cpp
   SIL.cpp
@@ -25,6 +31,7 @@ add_swift_library(swiftSIL STATIC
   SILInstructions.cpp
   SILLocation.cpp
   SILModule.cpp
+  SILFunctionBuilder.cpp
   SILOpenedArchetypesTracker.cpp
   SILPrinter.cpp
   SILProfiler.cpp
@@ -36,7 +43,7 @@ add_swift_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  ValueOwnershipKindClassifier.cpp
+  ValueOwnership.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema

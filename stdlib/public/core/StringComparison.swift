@@ -12,11 +12,30 @@
 
 import SwiftShims
 
-//HACK: This gets rid of some retains/releases that was slowing down the 
-//memcmp fast path for comparing ascii strings. rdar://problem/37473470
+// TODO: pick values that give us the best branching pattern
+@usableFromInline // FIXME(sil-serialize-all)
+internal
+enum _GutsClassification: UInt {
+  case smallUTF8 = 0
+  case irregular = 1
+  case regularASCII = 2
+  case regularUTF16 = 4
+}
+
+extension _StringGuts {
+  @inlinable
+  var classification: _GutsClassification {
+    if _isSmall { return .smallUTF8 }
+    if _isContiguous { return isASCII ? .regularASCII : .regularUTF16 }
+    return .irregular
+  }
+}
+
+// HACK: This gets rid of some retains/releases that was slowing down the
+// memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
-@effects(readonly)
-@_versioned // @opaque
+@_effects(readonly)
+@usableFromInline // @opaque
 internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ rhs: _StringGuts._RawBitPattern
@@ -24,20 +43,36 @@ func _compareUnicode(
   let left = _StringGuts(rawBits: lhs)
   let right = _StringGuts(rawBits: rhs)
 
-  if _slowPath(!left._isContiguous || !right._isContiguous) {
-    if !left._isContiguous {
-      return left._asOpaque()._compareOpaque(right).rawValue
-    } else {
-      return right._asOpaque()._compareOpaque(left).flipped.rawValue
-    }
-  }
+  switch (left.classification, right.classification) {
+    // Both small: fast in-register comparison
+    case (.smallUTF8, .smallUTF8):
+      return left._smallUTF8String._compare(right._smallUTF8String).rawValue
 
-  return left._compareContiguous(right)
+    // Either irregular: branch to opaque code
+    case (.irregular, _):
+      return left._asOpaque()._compare(right).rawValue
+    case (_, .irregular):
+      return right._asOpaque()._compare(left).flipped.rawValue
+
+    // One small, other contiguous in memory
+    case (.smallUTF8, _):
+      return left._smallUTF8String._compare(_contiguous: right).rawValue
+    case (_, .smallUTF8):
+      return right._smallUTF8String._compare(
+        _contiguous: left
+      ).flipped.rawValue
+
+    // Both contiguous
+    case (.regularASCII, _):
+      return left._unmanagedASCIIView._compare(_contiguous: right).rawValue
+    case (.regularUTF16, _):
+      return left._unmanagedUTF16View._compare(_contiguous: right).rawValue
+  }
 }
 
 @inline(never) // @outlined
-@effects(readonly)
-@_versioned // @opaque
+@_effects(readonly)
+@usableFromInline // @opaque
 internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ leftRange: Range<Int>,
@@ -46,19 +81,173 @@ func _compareUnicode(
   let left = _StringGuts(rawBits: lhs)
   let right = _StringGuts(rawBits: rhs)
 
-   if _slowPath(!left._isContiguous || !right._isContiguous) {
-     if !left._isContiguous {
-       return left._asOpaque()[leftRange]._compareOpaque(
-         right, rightRange
-       ).rawValue
-     } else {
-       return right._asOpaque()[rightRange]._compareOpaque(
-         left, leftRange
-       ).flipped.rawValue
-     }
-   }
+  switch (left.classification, right.classification) {
+    // Both small: fast in-register comparison
+    case (.smallUTF8, .smallUTF8):
+      return left._smallUTF8String[leftRange]._compare(
+        right._smallUTF8String[rightRange]
+      ).rawValue
 
-  return left._compareContiguous(leftRange, right, rightRange)
+    // Either irregular: branch to opaque code
+    case (.irregular, _):
+      return left._asOpaque()[leftRange]._compare(right, rightRange).rawValue
+    case (_, .irregular):
+      return right._asOpaque()[rightRange]._compare(
+        left, leftRange
+      ).flipped.rawValue
+
+    // One small, other contiguous in memory
+    case (.smallUTF8, _):
+      return left._smallUTF8String[leftRange]._compare(
+        _contiguous: right, rightRange
+      ).rawValue
+    case (_, .smallUTF8):
+      return right._smallUTF8String[rightRange]._compare(
+        _contiguous: left, leftRange
+      ).flipped.rawValue
+
+    // Both contiguous
+    case (.regularASCII, _):
+      return left._unmanagedASCIIView[leftRange]._compare(
+        _contiguous: right, rightRange
+      ).rawValue
+    case (.regularUTF16, _):
+      return left._unmanagedUTF16View[leftRange]._compare(
+        _contiguous: right, rightRange
+      ).rawValue
+  }
+}
+
+// TODO: coalesce many of these into a protocol to simplify the code
+
+extension _SmallUTF8String {
+  @inlinable
+  func _compare(_ other: _SmallUTF8String) -> _Ordering {
+#if arch(i386) || arch(arm)
+    _conditionallyUnreachable()
+#else
+    // TODO: Ensure normality when adding UTF-8 support
+    _sanityCheck(self.isASCII && other.isASCII, "Need to ensure normality")
+    if self._storage == other._storage { return .equal }
+    for i in 0..<Swift.min(self.count, other.count) {
+      if self[i] < other[i] { return .less }
+      if self[i] > other[i] { return .greater }
+    }
+    return self.count < other.count ? .less : .greater
+#endif // 64-bit
+  }
+  func _compare(_contiguous other: _StringGuts) -> _Ordering {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      // TODO: fast in-register comparison
+      return self._compare(other._unmanagedASCIIView)
+    }
+    return self._compare(other._unmanagedUTF16View)
+#endif // 64-bit
+  }
+
+  func _compare(
+    _contiguous other: _StringGuts, _ otherRange: Range<Int>
+  ) -> _Ordering {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      return self._compare(other._unmanagedASCIIView[otherRange])
+    }
+    return self._compare(other._unmanagedUTF16View[otherRange])
+#endif // 64-bit
+  }
+
+  func _compare(_ other: _UnmanagedString<UInt8>) -> _Ordering {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    if _fastPath(self.isASCII) {
+      return self.withUnmanagedASCII { selfView in
+        return _Ordering(
+          signedNotation: selfView.compareASCII(to: other))
+      }
+    }
+    return self.withUnmanagedUTF16 { $0._compare(other) }
+#endif // 64-bit
+  }
+
+  func _compare(_ other: _UnmanagedString<UInt16>) -> _Ordering {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    if _fastPath(self.isASCII) {
+      return self.withUnmanagedASCII { $0._compare(other) }
+    }
+    return self.withUnmanagedUTF16 { $0._compare(other) }
+#endif // 64-bit    
+  }
+}
+
+extension _UnmanagedString where CodeUnit == UInt8 {
+  func _compare(_contiguous other: _StringGuts) -> _Ordering {
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      return self._compare(other._unmanagedASCIIView)
+    }
+    return self._compare(other._unmanagedUTF16View)
+  }
+  func _compare(
+    _contiguous other: _StringGuts, _ otherRange: Range<Int>
+  ) -> _Ordering {
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      return self._compare(other._unmanagedASCIIView[otherRange])
+    }
+    return self._compare(other._unmanagedUTF16View[otherRange])
+  }
+
+  func _compare(_ other: _UnmanagedString<UInt8>) -> _Ordering {
+    fatalError("Should have hit the ascii comp in StringComparable.compare")
+  }
+  func _compare(_ other: _UnmanagedString<UInt16>) -> _Ordering {
+    return self._compareStringsPreLoop(other)
+  }
+}
+
+extension _UnmanagedString where CodeUnit == UInt16 {
+  func _compare(_contiguous other: _StringGuts) -> _Ordering {
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      return self._compare(other._unmanagedASCIIView)
+    }
+    return self._compare(other._unmanagedUTF16View)
+  }
+  func _compare(
+    _contiguous other: _StringGuts, _ otherRange: Range<Int>
+  ) -> _Ordering {
+    _sanityCheck(other._isContiguous)
+    if other.isASCII {
+      return self._compare(other._unmanagedASCIIView[otherRange])
+    }
+    return self._compare(other._unmanagedUTF16View[otherRange])
+  }
+
+  func _compare(_ other: _UnmanagedString<UInt8>) -> _Ordering {
+    return other._compare(self).flipped
+  }
+  func _compare(_ other: _UnmanagedString<UInt16>) -> _Ordering {
+    return self._compareStringsPreLoop(other)
+  }
+}
+
+extension _UnmanagedOpaqueString {
+  func _compare(_ other: _StringGuts) -> _Ordering {
+    return self._compareOpaque(other)
+  }
+  func _compare(_ other: _StringGuts, _ otherRange: Range<Int>) -> _Ordering {
+    return self._compareOpaque(other, otherRange)
+  }
 }
 
 //
@@ -157,13 +346,14 @@ extension _FixedArray16 where T == UInt16 {
   }
 }
 
-@_versioned internal
+@_frozen
+@usableFromInline internal
 enum _Ordering: Int, Equatable {
   case less = -1
   case equal = 0
   case greater = 1
 
-  @_versioned internal
+  @usableFromInline internal
   var flipped: _Ordering {
     switch self {
       case .less: return .greater
@@ -173,7 +363,7 @@ enum _Ordering: Int, Equatable {
   }
 
   @inline(__always)
-  @_versioned internal
+  @usableFromInline internal
   init(signedNotation int: Int) {
     self = int < 0 ? .less : int == 0 ? .equal : .greater
   }
@@ -237,7 +427,9 @@ extension _UnmanagedOpaqueString {
   ) -> Int {
     let count = Swift.min(self.count, otherRange.count)
     for idx in 0..<count {
-      guard self[idx] == other[idx + otherRange.lowerBound] else {
+      guard self[idx] == other.codeUnit(
+        atCheckedOffset: idx + otherRange.lowerBound
+      ) else {
         return idx
       }
     }
@@ -348,14 +540,14 @@ extension _UnmanagedOpaqueString {
     if idx+1 < self.count {
       buffer[0] = self[idx]
       buffer[1] = self[idx+1]
-  
+
       let bufferPointer = _unsafeBufferPointerCast(
         &buffer, 2, to: UInt16.self
       )
       return Swift._parseRawScalar(buffer: bufferPointer, startingFrom: 0)
     } else {
       buffer[0] = self[idx]
-  
+
       let bufferPointer = _unsafeBufferPointerCast(
         &buffer, 1, to: UInt16.self
       )
@@ -387,7 +579,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     _sanityCheck(Int32(exactly: value) != nil, "top bit shouldn't be set")
     return (UnicodeScalar(_unchecked: value), idx+2)
   }
-  
+
   internal func _reverseParseRawScalar(
     endingAt idx: Int // one-past-the-end
   ) -> (UnicodeScalar, scalarStartIndex: Int) {
@@ -418,7 +610,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   ) -> Int? {
     return self._tryNormalize(into: _castOutputBuffer(outputBuffer))
   }
-  
+
   internal func _tryNormalize(
     into outputBuffer: UnsafeMutableBufferPointer<UInt16>
   ) -> Int? {
@@ -437,7 +629,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return numericCast(count)
   }
-  
+
   internal func _slowNormalize() -> [UInt16] {
     _sanityCheck(self.count > 0, "called on empty string")
 
@@ -487,15 +679,14 @@ internal func _tryNormalize(
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
     // FIXME Results should be the same across all platforms.
     if self.start == other.start {
       return (self.count &- other.count).signum()
     }
     var cmp = Int(truncatingIfNeeded:
-      _stdlib_memcmp(
+      _swift_stdlib_memcmp(
         self.rawStart, other.rawStart,
         Swift.min(self.count, other.count)))
     if cmp == 0 {
@@ -505,68 +696,16 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   }
 }
 
-public extension _StringGuts {  
-  @inline(__always)
-  public
-  func _compareContiguous(_ other: _StringGuts) -> Int {
-    _sanityCheck(self._isContiguous && other._isContiguous)
-    switch (self.isASCII, other.isASCII) {
-    case (true, true):
-      fatalError("Should have hit the ascii comp in StringComparable.compare()")
-    case (true, false):
-      return self._unmanagedASCIIView._compareStringsPreLoop(
-        other: other._unmanagedUTF16View
-      ).rawValue
-    case (false, true):
-      // Same compare, just invert result
-      return other._unmanagedASCIIView._compareStringsPreLoop(
-        other: self._unmanagedUTF16View
-      ).flipped.rawValue
-    case (false, false):
-      return self._unmanagedUTF16View._compareStringsPreLoop(
-        other: other._unmanagedUTF16View
-      ).rawValue
-    }
-  }
-
-  @inline(__always)
-  public
-  func _compareContiguous(
-    _ selfRange: Range<Int>, 
-    _ other: _StringGuts, 
-    _ otherRange: Range<Int>
-  ) -> Int {
-    _sanityCheck(self._isContiguous && other._isContiguous)
-    switch (self.isASCII, other.isASCII) {
-    case (true, true):
-      fatalError("Should have hit the ascii comp in StringComparable.compare()")
-    case (true, false):
-      return self._unmanagedASCIIView[selfRange]._compareStringsPreLoop(
-        other: other._unmanagedUTF16View[otherRange]
-      ).rawValue
-    case (false, true):
-      // Same compare, just invert result
-      return other._unmanagedASCIIView[otherRange]._compareStringsPreLoop(
-        other: self._unmanagedUTF16View[selfRange]
-      ).flipped.rawValue
-    case (false, false):
-      return self._unmanagedUTF16View[selfRange]._compareStringsPreLoop(
-        other: other._unmanagedUTF16View[otherRange]
-      ).rawValue
-    }
-  }
-}
-
 extension _UnmanagedOpaqueString {
   @inline(never) // @outlined
-  @_versioned
+  @usableFromInline
   internal
   func _compareOpaque(_ other: _StringGuts) -> _Ordering {
     return self._compareOpaque(other, 0..<other.count)
   }
 
   @inline(never) // @outlined
-  @_versioned
+  @usableFromInline
   internal
   func _compareOpaque(
     _ other: _StringGuts, _ otherRange: Range<Int>
@@ -578,7 +717,7 @@ extension _UnmanagedOpaqueString {
     // really ASCII strings that were bridged improperly. E.g., unknown nul-
     // termination of an all-ASCII file loaded by String.init(contentsOfFile:).
     //
-    
+
     let selfCount = self.count
     let otherCount = otherRange.count
     let count = Swift.min(selfCount, otherCount)
@@ -588,21 +727,21 @@ extension _UnmanagedOpaqueString {
     }
 
     let selfCU = self[idx]
-    let otherCU = other[idx + otherRange.lowerBound]
+    let otherCU = other.codeUnit(atCheckedOffset: idx + otherRange.lowerBound)
 
     //
     // Fast path: if one is ASCII, we can often compare the code units directly.
     //
     let selfIsASCII = selfCU <= 0x7F
     let otherIsASCII = otherCU <= 0x7F
-    
-    let selfIsSingleSegmentScalar = 
-        self.hasNormalizationBoundary(after: idx) 
+
+    let selfIsSingleSegmentScalar =
+        self.hasNormalizationBoundary(after: idx)
         && _hasNormalizationBoundary(before: selfCU)
-    let otherIsSingleSegmentScalar = 
-        other.hasNormalizationBoundary(after: idx) 
+    let otherIsSingleSegmentScalar =
+        other.hasNormalizationBoundary(after: idx)
         && _hasNormalizationBoundary(before: otherCU)
-    
+
     if _fastPath(selfIsASCII || otherIsASCII) {
       _sanityCheck(idx < selfCount && idx < otherCount,
         "Should be caught by check against min-count")
@@ -610,16 +749,16 @@ extension _UnmanagedOpaqueString {
       // "_isNormalizedSuperASCII" case. 99.9% of the time, we're here because
       // the non-contig string is ASCII. We never want to hit the pathological
       // path for those.
-      
-      if selfIsASCII && otherIsASCII {            
+
+      if selfIsASCII && otherIsASCII {
         if selfIsSingleSegmentScalar && otherIsSingleSegmentScalar {
           return _lexicographicalCompare(selfCU, otherCU)
         }
-        
+
         return self._compareOpaquePathological(
           other, otherRange, startingFrom: Swift.max(0, idx-1))
       }
-      
+
       if selfIsASCII && selfIsSingleSegmentScalar
       && self._parseRawScalar(startingFrom: idx).0._isNormalizedSuperASCII {
          return .less
@@ -641,7 +780,7 @@ extension _UnmanagedOpaqueString {
   ) -> _Ordering {
     // Compare by pulling in a segment at a time, normalizing then comparing
     // individual code units
-    var selfIterator = _NormalizedCodeUnitIterator(self, startIndex: startingFrom)
+    var selfIterator = _NormalizedCodeUnitIterator(self[startingFrom...])
     return selfIterator.compare(with:
       _NormalizedCodeUnitIterator(other, otherRange, startIndex: startingFrom)
     )
@@ -680,7 +819,7 @@ extension UnicodeScalar {
     return impl(&inBuffer, count: inLength, into: outputBuffer)
   }
 
-  static internal let maxValue = 0x0010_FFFF
+  internal static let maxValue = 0x0010_FFFF
 }
 
 private struct _UnicodeScalarExceptions {
@@ -698,10 +837,10 @@ private struct _UnicodeScalarExceptions {
       guard let scalar = UnicodeScalar(rawValue) else { continue }
 
       // Fast path: skip unassigned code points
-      guard scalar._isDefined else { continue }
+      guard scalar.properties.generalCategory != .unassigned else { continue }
 
       // Fast path: skip unless QC_FCD=no
-      if _fastPath(!scalar._hasFullCompExclusion) {
+      if _fastPath(!scalar.properties.isFullCompositionExclusion) {
         continue
       }
 
@@ -772,9 +911,9 @@ extension UnicodeScalar {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  @_versioned
+  @usableFromInline
   internal func _compareStringsPreLoop(
-    other: _UnmanagedString<UInt16>
+    _ other: _UnmanagedString<UInt16>
   ) -> _Ordering {
     let count = Swift.min(self.count, other.count)
 
@@ -788,81 +927,98 @@ extension _UnmanagedString where CodeUnit == UInt8 {
     let otherCU = other[idx]
 
     //
-    // Fast path: if other is super-ASCII post-normalization, we must be less. If
-    // other is ASCII and a single-scalar segment, we have our answer.
+    // Fast path: if other is super-ASCII post-normalization, we must be less.
+    // If other is ASCII and a single-scalar segment, we have our answer.
     //
     if otherCU > 0x7F {
       if _fastPath(
         other._parseRawScalar(startingFrom: idx).0._isNormalizedSuperASCII
       ) {
-       return .less
+        return .less
       }
-    } else {
-      let selfASCIIChar = UInt16(self[idx])
-      _sanityCheck(selfASCIIChar != otherCU, "should be different")
-      if idx+1 == other.count {
-        return _lexicographicalCompare(selfASCIIChar, otherCU)
-      }
-      if _fastPath(other.hasNormalizationBoundary(after: idx)) {
-        return _lexicographicalCompare(selfASCIIChar, otherCU)
-      }
+
+      // Rare pathological case, e.g. Kelvin symbol
+      var selfIterator = _NormalizedCodeUnitIterator(self)
+      return selfIterator.compare(with: _NormalizedCodeUnitIterator(other))
+    }
+
+    let selfASCIIChar = UInt16(self[idx])
+    _sanityCheck(selfASCIIChar != otherCU, "should be different")
+    if idx+1 == other.count {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
+    }
+    if _fastPath(other.hasNormalizationBoundary(after: idx)) {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
     }
 
     //
     // Otherwise, need to normalize the segment and then compare
     //
-    let selfASCIIChar = UInt16(self[idx])
     return _compareStringsPostSuffix(
-      selfASCIIChar: selfASCIIChar, otherUTF16: other[idx...]
-      )
+      selfASCIIChar: selfASCIIChar, otherUTF16WithLeadingASCII: other[idx...]
+    )
   }
 }
 
 extension _StringGuts {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
     }
-    
-    let nextCU = self[nextIndex]
+
+    let nextCU = self.codeUnit(atCheckedOffset: nextIndex)
     return _hasNormalizationBoundary(before: nextCU)
   }
 }
 
 extension _UnmanagedOpaqueString {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
     }
-    
+
     let nextCU = self[nextIndex]
     return _hasNormalizationBoundary(before: nextCU)
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
-  func hasNormalizationBoundary(after index: Int) -> Bool {
+  internal func hasNormalizationBoundary(after index: Int) -> Bool {
     let nextIndex = index + 1
     if nextIndex >= self.count {
       return true
     }
-    
+
     let nextCU = self[nextIndex]
     return _hasNormalizationBoundary(before: nextCU)
   }
 }
 
+extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
+  internal func hasNormalizationBoundary(after index: Index) -> Bool {
+    let nextIndex = self.index(after: index)
+    if nextIndex == self.endIndex {
+      return true
+    }
+
+    let nextCU = self[nextIndex]
+    return _hasNormalizationBoundary(before: nextCU)
+  }
+}
+
+@inline(never) // @outlined
 private func _compareStringsPostSuffix(
   selfASCIIChar: UInt16,
-  otherUTF16: _UnmanagedString<UInt16>
+  otherUTF16WithLeadingASCII: _UnmanagedString<UInt16>
 ) -> _Ordering {
-  let otherCU = otherUTF16[0]
+  let otherCU = otherUTF16WithLeadingASCII[0]
   _sanityCheck(otherCU <= 0x7F, "should be ASCII, otherwise no need to call")
 
-  let segmentEndIdx = otherUTF16._findNormalizationSegmentEnd(startingFrom: 0)
-  let segment = otherUTF16[..<segmentEndIdx]
+  let segmentEndIdx = otherUTF16WithLeadingASCII._findNormalizationSegmentEnd(
+    startingFrom: 0)
+  let segment = otherUTF16WithLeadingASCII[..<segmentEndIdx]
 
   // Fast path: If prenormal, we're done.
   if _Normalization._prenormalQuickCheckYes(segment) {
@@ -899,7 +1055,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return segmentEndIdx
   }
-  
+
   internal func _findNormalizationSegmentStart(
     endingAt idx: Int // one-past-the-end
   ) -> Int {
@@ -922,8 +1078,8 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     // Corner case: if we're sub-surrogate, back up
     if _slowPath(
-      idx > 0 
-      && _isTrailingSurrogate(self[idx]) 
+      idx > 0
+      && _isTrailingSurrogate(self[idx])
       && _isLeadingSurrogate(self[idx-1])
     ) {
       idx -= 1
@@ -973,11 +1129,11 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     let nextCU = self[idx+1]
     return nextCU < 0x300 || _hasNormalizationBoundary(before: nextCU)
   }
-  
-  @_versioned
+
+  @usableFromInline
   internal
   func _compareStringsPreLoop(
-    other: _UnmanagedString<UInt16>
+    _ other: _UnmanagedString<UInt16>
   ) -> _Ordering {
     let count = Swift.min(self.count, other.count)
 
@@ -1011,7 +1167,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     if self.count == other.count {
       return false
     }
-  
+
     let minimumLength = Swift.min(self.count, other.count)
     for i in 0..<minimumLength {
       if self[i] != other[i] {
@@ -1020,7 +1176,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
     return true
   }
-  
+
   private func _compareStringsSuffix(
     other: _UnmanagedString<UInt16>,
     randomIndex: Int
@@ -1042,9 +1198,9 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     // which case, we will want to effectively compare the two consecutive
     // segments together.
     //
-    let (selfSegmentStartIdx, selfSegmentEndIdx) = 
+    let (selfSegmentStartIdx, selfSegmentEndIdx) =
       self._findNormalizationSegment(spanning: randomIndex)
-    let (otherSegmentStartIdx, otherSegmentEndIdx) = 
+    let (otherSegmentStartIdx, otherSegmentEndIdx) =
       other._findNormalizationSegment(spanning: randomIndex)
     let comparisonStartIdx = Swift.min(selfSegmentStartIdx, otherSegmentStartIdx)
 
@@ -1100,7 +1256,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     } else {
       otherSegmentLengthOpt = otherSegment._tryNormalize(into: &otherOutputBuffer)
     }
-  
+
     if _slowPath(selfSegmentLengthOpt == nil || otherSegmentLengthOpt == nil) {
       // If we couldn't normalize a segment into a generously large stack buffer,
       // we have a pathological String.
@@ -1113,7 +1269,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
 
     if Swift.shorterPrefixesOther(
       &selfOutputBuffer, selfLength,
-      &otherOutputBuffer, otherLength) 
+      &otherOutputBuffer, otherLength)
     {
       let selfSlice = self[selfSegmentStartIdx...]
       let otherSlice = other[otherSegmentStartIdx...]
@@ -1184,7 +1340,7 @@ private func shorterPrefixesOther(
   if selfBuffer.count == otherBuffer.count {
     return false
   }
-  
+
   let minimumLength = Swift.min(selfBuffer.count, otherBuffer.count)
   for i in 0..<minimumLength {
     if selfBuffer[i] != otherBuffer[i] {

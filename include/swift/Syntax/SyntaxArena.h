@@ -17,26 +17,26 @@
 #ifndef SWIFT_SYNTAX_SYNTAXARENA_H
 #define SWIFT_SYNTAX_SYNTAXARENA_H
 
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
 namespace syntax {
 
 /// Memory manager for Syntax nodes.
-class SyntaxArena {
+class SyntaxArena : public llvm::ThreadSafeRefCountedBase<SyntaxArena> {
   SyntaxArena(const SyntaxArena &) = delete;
   void operator=(const SyntaxArena &) = delete;
 
+  llvm::BumpPtrAllocator Allocator;
+
 public:
-  struct Implementation;
-  Implementation &Impl;
+  SyntaxArena() {}
 
-  SyntaxArena();
-  ~SyntaxArena();
-
-  llvm::BumpPtrAllocator &getAllocator() const;
-  void *Allocate(size_t size, size_t alignment);
-  void *AllocateRawSyntax(size_t size, size_t alignment);
+  llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
+  void *Allocate(size_t size, size_t alignment) {
+    return Allocator.Allocate(size, alignment);
+  }
 };
 
 } // namespace syntax

@@ -1,0 +1,1330 @@
+{
+  key.offset: 0,
+  key.length: 2065,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Foo",
+      key.offset: 0,
+      key.length: 173,
+      key.runtime_name: "_TtC4main3Foo",
+      key.nameoffset: 6,
+      key.namelength: 3,
+      key.bodyoffset: 17,
+      key.bodylength: 155,
+      key.inheritedtypes: [
+        {
+          key.name: "Bar"
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 12,
+          key.length: 3
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "test",
+          key.offset: 22,
+          key.length: 14,
+          key.typename: "Int",
+          key.nameoffset: 26,
+          key.namelength: 4
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testOutlet",
+          key.offset: 51,
+          key.length: 20,
+          key.typename: "Int",
+          key.nameoffset: 55,
+          key.namelength: 10,
+          key.attributes: [
+            {
+              key.offset: 41,
+              key.length: 9,
+              key.attribute: source.decl.attribute.iboutlet
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testMethod()",
+          key.offset: 77,
+          key.length: 53,
+          key.nameoffset: 82,
+          key.namelength: 12,
+          key.bodyoffset: 96,
+          key.bodylength: 33,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.stmt.if,
+              key.offset: 105,
+              key.length: 19,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.elements: [
+                {
+                  key.kind: source.lang.swift.structure.elem.condition_expr,
+                  key.offset: 108,
+                  key.length: 4
+                }
+              ],
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.stmt.brace,
+                  key.offset: 113,
+                  key.length: 11,
+                  key.nameoffset: 0,
+                  key.namelength: 0,
+                  key.bodyoffset: 114,
+                  key.bodylength: 9
+                }
+              ]
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testAction()",
+          key.offset: 146,
+          key.length: 25,
+          key.selector_name: "testAction",
+          key.nameoffset: 151,
+          key.namelength: 12,
+          key.bodyoffset: 165,
+          key.bodylength: 5,
+          key.attributes: [
+            {
+              key.offset: 136,
+              key.length: 9,
+              key.attribute: source.decl.attribute.ibaction
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Foo2",
+      key.offset: 189,
+      key.length: 13,
+      key.runtime_name: "_TtC4main4Foo2",
+      key.nameoffset: 195,
+      key.namelength: 4,
+      key.bodyoffset: 201,
+      key.bodylength: 0,
+      key.attributes: [
+        {
+          key.offset: 175,
+          key.length: 13,
+          key.attribute: source.decl.attribute.ibdesignable
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Foo3",
+      key.offset: 204,
+      key.length: 108,
+      key.runtime_name: "_TtC4main4Foo3",
+      key.nameoffset: 210,
+      key.namelength: 4,
+      key.bodyoffset: 216,
+      key.bodylength: 95,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testIBInspectable",
+          key.offset: 236,
+          key.length: 27,
+          key.typename: "Int",
+          key.nameoffset: 240,
+          key.namelength: 17,
+          key.attributes: [
+            {
+              key.offset: 221,
+              key.length: 14,
+              key.attribute: source.decl.attribute.ibinspectable
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.setter_accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testGKInspectable",
+          key.offset: 283,
+          key.length: 27,
+          key.typename: "Int",
+          key.nameoffset: 287,
+          key.namelength: 17,
+          key.attributes: [
+            {
+              key.offset: 268,
+              key.length: 14,
+              key.attribute: source.decl.attribute.gkinspectable
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MyProt",
+      key.offset: 314,
+      key.length: 18,
+      key.runtime_name: "_TtP4main6MyProt_",
+      key.nameoffset: 323,
+      key.namelength: 6,
+      key.bodyoffset: 331,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "OuterCls",
+      key.offset: 334,
+      key.length: 41,
+      key.runtime_name: "_TtC4main8OuterCls",
+      key.nameoffset: 340,
+      key.namelength: 8,
+      key.bodyoffset: 350,
+      key.bodylength: 24,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "InnerCls1",
+          key.offset: 355,
+          key.length: 18,
+          key.nameoffset: 361,
+          key.namelength: 9,
+          key.bodyoffset: 372,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "OuterCls",
+      key.offset: 377,
+      key.length: 45,
+      key.nameoffset: 387,
+      key.namelength: 8,
+      key.bodyoffset: 397,
+      key.bodylength: 24,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "InnerCls2",
+          key.offset: 402,
+          key.length: 18,
+          key.nameoffset: 408,
+          key.namelength: 9,
+          key.bodyoffset: 419,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "GenCls",
+      key.offset: 424,
+      key.length: 23,
+      key.nameoffset: 430,
+      key.namelength: 6,
+      key.bodyoffset: 446,
+      key.bodylength: 0,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T1",
+          key.offset: 437,
+          key.length: 2,
+          key.nameoffset: 437,
+          key.namelength: 2
+        },
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "T2",
+          key.offset: 441,
+          key.length: 2,
+          key.nameoffset: 441,
+          key.namelength: 2
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "TestParamAndCall",
+      key.offset: 449,
+      key.length: 212,
+      key.runtime_name: "_TtC4main16TestParamAndCall",
+      key.nameoffset: 455,
+      key.namelength: 16,
+      key.bodyoffset: 473,
+      key.bodylength: 187,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testParams(arg1:name:)",
+          key.offset: 478,
+          key.length: 120,
+          key.nameoffset: 483,
+          key.namelength: 35,
+          key.bodyoffset: 520,
+          key.bodylength: 77,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "arg1",
+              key.offset: 494,
+              key.length: 9,
+              key.typename: "Int",
+              key.nameoffset: 494,
+              key.namelength: 4
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "name",
+              key.offset: 505,
+              key.length: 12,
+              key.typename: "String",
+              key.nameoffset: 505,
+              key.namelength: 4
+            },
+            {
+              key.kind: source.lang.swift.stmt.if,
+              key.offset: 529,
+              key.length: 63,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.elements: [
+                {
+                  key.kind: source.lang.swift.structure.elem.condition_expr,
+                  key.offset: 532,
+                  key.length: 6
+                }
+              ],
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.stmt.brace,
+                  key.offset: 539,
+                  key.length: 53,
+                  key.nameoffset: 0,
+                  key.namelength: 0,
+                  key.bodyoffset: 540,
+                  key.bodylength: 51,
+                  key.substructure: [
+                    {
+                      key.kind: source.lang.swift.expr.call,
+                      key.name: "testParams",
+                      key.offset: 553,
+                      key.length: 29,
+                      key.nameoffset: 553,
+                      key.namelength: 10,
+                      key.bodyoffset: 564,
+                      key.bodylength: 17,
+                      key.substructure: [
+                        {
+                          key.kind: source.lang.swift.expr.argument,
+                          key.offset: 564,
+                          key.length: 1,
+                          key.nameoffset: 0,
+                          key.namelength: 0,
+                          key.bodyoffset: 564,
+                          key.bodylength: 1
+                        },
+                        {
+                          key.kind: source.lang.swift.expr.argument,
+                          key.name: "name",
+                          key.offset: 567,
+                          key.length: 14,
+                          key.nameoffset: 567,
+                          key.namelength: 4,
+                          key.bodyoffset: 572,
+                          key.bodylength: 9
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testParamAndArg(arg1:param:)",
+          key.offset: 604,
+          key.length: 55,
+          key.nameoffset: 609,
+          key.namelength: 42,
+          key.bodyoffset: 653,
+          key.bodylength: 5,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "arg1",
+              key.offset: 625,
+              key.length: 9,
+              key.typename: "Int",
+              key.nameoffset: 625,
+              key.namelength: 4
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "par",
+              key.offset: 636,
+              key.length: 14,
+              key.typename: "Int",
+              key.nameoffset: 636,
+              key.namelength: 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.comment.mark,
+      key.offset: 666,
+      key.length: 16,
+      key.nameoffset: 0,
+      key.namelength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "TestMarkers",
+      key.offset: 684,
+      key.length: 206,
+      key.runtime_name: "_TtC4main11TestMarkers",
+      key.nameoffset: 690,
+      key.namelength: 11,
+      key.bodyoffset: 703,
+      key.bodylength: 186,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.syntaxtype.comment.mark,
+          key.offset: 711,
+          key.length: 16,
+          key.nameoffset: 0,
+          key.namelength: 0
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "test(arg1:)",
+          key.offset: 732,
+          key.length: 156,
+          key.typename: "Int",
+          key.nameoffset: 737,
+          key.namelength: 16,
+          key.bodyoffset: 762,
+          key.bodylength: 125,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "arg1",
+              key.offset: 742,
+              key.length: 10,
+              key.typename: "Bool",
+              key.nameoffset: 742,
+              key.namelength: 4
+            },
+            {
+              key.kind: source.lang.swift.syntaxtype.comment.mark,
+              key.offset: 774,
+              key.length: 12,
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.stmt.if,
+              key.offset: 795,
+              key.length: 70,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.elements: [
+                {
+                  key.kind: source.lang.swift.structure.elem.condition_expr,
+                  key.offset: 798,
+                  key.length: 6
+                }
+              ],
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.stmt.brace,
+                  key.offset: 805,
+                  key.length: 60,
+                  key.nameoffset: 0,
+                  key.namelength: 0,
+                  key.bodyoffset: 806,
+                  key.bodylength: 58,
+                  key.substructure: [
+                    {
+                      key.kind: source.lang.swift.syntaxtype.comment.mark,
+                      key.offset: 822,
+                      key.length: 12,
+                      key.nameoffset: 0,
+                      key.namelength: 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "test2(arg1:)",
+      key.offset: 892,
+      key.length: 105,
+      key.nameoffset: 897,
+      key.namelength: 17,
+      key.bodyoffset: 916,
+      key.bodylength: 80,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "arg1",
+          key.offset: 903,
+          key.length: 10,
+          key.typename: "Bool",
+          key.nameoffset: 903,
+          key.namelength: 4
+        },
+        {
+          key.kind: source.lang.swift.stmt.if,
+          key.offset: 921,
+          key.length: 74,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.condition_expr,
+              key.offset: 924,
+              key.length: 6
+            }
+          ],
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.stmt.brace,
+              key.offset: 931,
+              key.length: 64,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.bodyoffset: 932,
+              key.bodylength: 62,
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.syntaxtype.comment.mark,
+                  key.offset: 960,
+                  key.length: 29,
+                  key.nameoffset: 0,
+                  key.namelength: 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Foo",
+      key.offset: 999,
+      key.length: 58,
+      key.nameoffset: 1009,
+      key.namelength: 3,
+      key.bodyoffset: 1014,
+      key.bodylength: 42,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "anExtendedFooFunction()",
+          key.offset: 1019,
+          key.length: 36,
+          key.nameoffset: 1024,
+          key.namelength: 23,
+          key.bodyoffset: 1049,
+          key.bodylength: 5
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.setter_accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Qtys",
+      key.offset: 1079,
+      key.length: 15,
+      key.nameoffset: 1089,
+      key.namelength: 4
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "417",
+      key.offset: 1099,
+      key.length: 11,
+      key.nameoffset: 1099,
+      key.namelength: 3,
+      key.bodyoffset: 1103,
+      key.bodylength: 6,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "d",
+          key.offset: 1103,
+          key.length: 6,
+          key.nameoffset: 1103,
+          key.namelength: 1,
+          key.bodyoffset: 1106,
+          key.bodylength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.foreach,
+      key.offset: 1114,
+      key.length: 17,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.id,
+          key.offset: 1118,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1123,
+          key.length: 5
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1118,
+          key.length: 1,
+          key.nameoffset: 1118,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 1129,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1130,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.foreach,
+      key.offset: 1132,
+      key.length: 37,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.id,
+          key.offset: 1136,
+          key.length: 5
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "i",
+          key.offset: 1140,
+          key.length: 1,
+          key.nameoffset: 1140,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 1167,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1168,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.while,
+      key.offset: 1170,
+      key.length: 36,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.condition_expr,
+          key.offset: 1176,
+          key.length: 27
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1180,
+          key.length: 1,
+          key.nameoffset: 1180,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1191,
+          key.length: 1,
+          key.nameoffset: 1191,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 1204,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1205,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.repeatwhile,
+      key.offset: 1207,
+      key.length: 22,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1223,
+          key.length: 6
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 1214,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1215,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.if,
+      key.offset: 1230,
+      key.length: 33,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.condition_expr,
+          key.offset: 1233,
+          key.length: 27
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "v",
+          key.offset: 1237,
+          key.length: 1,
+          key.nameoffset: 1237,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "z",
+          key.offset: 1248,
+          key.length: 1,
+          key.nameoffset: 1248,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.stmt.brace,
+          key.offset: 1261,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1262,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.stmt.switch,
+      key.offset: 1264,
+      key.length: 67,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1271,
+          key.length: 1
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.stmt.case,
+          key.offset: 1277,
+          key.length: 14,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.pattern,
+              key.offset: 1282,
+              key.length: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.stmt.case,
+          key.offset: 1294,
+          key.length: 17,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.pattern,
+              key.offset: 1299,
+              key.length: 1
+            },
+            {
+              key.kind: source.lang.swift.structure.elem.pattern,
+              key.offset: 1302,
+              key.length: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.stmt.case,
+          key.offset: 1314,
+          key.length: 15,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.elements: [
+            {
+              key.kind: source.lang.swift.structure.elem.pattern,
+              key.offset: 1314,
+              key.length: 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "myArray",
+      key.offset: 1333,
+      key.length: 23,
+      key.nameoffset: 1337,
+      key.namelength: 7
+    },
+    {
+      key.kind: source.lang.swift.expr.array,
+      key.offset: 1347,
+      key.length: 9,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.bodyoffset: 1348,
+      key.bodylength: 7,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1348,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1351,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1354,
+          key.length: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "myDict",
+      key.offset: 1357,
+      key.length: 28,
+      key.nameoffset: 1361,
+      key.namelength: 6
+    },
+    {
+      key.kind: source.lang.swift.expr.dictionary,
+      key.offset: 1370,
+      key.length: 15,
+      key.nameoffset: 0,
+      key.namelength: 0,
+      key.bodyoffset: 1371,
+      key.bodylength: 13,
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1371,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1373,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1376,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1378,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1381,
+          key.length: 1
+        },
+        {
+          key.kind: source.lang.swift.structure.elem.expr,
+          key.offset: 1383,
+          key.length: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "ClassObjcAttr",
+      key.offset: 1412,
+      key.length: 60,
+      key.runtime_name: "_TtC4main13ClassObjcAttr",
+      key.nameoffset: 1418,
+      key.namelength: 13,
+      key.bodyoffset: 1444,
+      key.bodylength: 27,
+      key.inheritedtypes: [
+        {
+          key.name: "NSObject"
+        }
+      ],
+      key.attributes: [
+        {
+          key.offset: 1406,
+          key.length: 5,
+          key.attribute: source.decl.attribute.objc
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 1434,
+          key.length: 8
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "m()",
+          key.offset: 1459,
+          key.length: 11,
+          key.nameoffset: 1464,
+          key.namelength: 3,
+          key.bodyoffset: 1469,
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 1449,
+              key.length: 5,
+              key.attribute: source.decl.attribute.objc
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "ClassObjcAttr2",
+      key.offset: 1486,
+      key.length: 66,
+      key.runtime_name: "Blah",
+      key.nameoffset: 1492,
+      key.namelength: 14,
+      key.bodyoffset: 1519,
+      key.bodylength: 32,
+      key.inheritedtypes: [
+        {
+          key.name: "NSObject"
+        }
+      ],
+      key.attributes: [
+        {
+          key.offset: 1474,
+          key.length: 11,
+          key.attribute: source.decl.attribute.objc.name
+        }
+      ],
+      key.elements: [
+        {
+          key.kind: source.lang.swift.structure.elem.typeref,
+          key.offset: 1509,
+          key.length: 8
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "m()",
+          key.offset: 1539,
+          key.length: 11,
+          key.nameoffset: 1544,
+          key.namelength: 3,
+          key.bodyoffset: 1549,
+          key.bodylength: 0,
+          key.attributes: [
+            {
+              key.offset: 1524,
+              key.length: 10,
+              key.attribute: source.decl.attribute.objc.name
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.protocol,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "FooProtocol",
+      key.offset: 1554,
+      key.length: 81,
+      key.runtime_name: "_TtP4main11FooProtocol_",
+      key.nameoffset: 1563,
+      key.namelength: 11,
+      key.bodyoffset: 1576,
+      key.bodylength: 58,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Bar",
+          key.offset: 1581,
+          key.length: 18,
+          key.nameoffset: 1596,
+          key.namelength: 3
+        },
+        {
+          key.kind: source.lang.swift.decl.associatedtype,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Baz",
+          key.offset: 1604,
+          key.length: 29,
+          key.nameoffset: 1619,
+          key.namelength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "a.b",
+      key.offset: 1648,
+      key.length: 21,
+      key.nameoffset: 1648,
+      key.namelength: 3,
+      key.bodyoffset: 1652,
+      key.bodylength: 16,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "c",
+          key.offset: 1652,
+          key.length: 10,
+          key.nameoffset: 1652,
+          key.namelength: 1,
+          key.bodyoffset: 1655,
+          key.bodylength: 7
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "h",
+          key.offset: 1664,
+          key.length: 4,
+          key.nameoffset: 1664,
+          key.namelength: 1,
+          key.bodyoffset: 1667,
+          key.bodylength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.expr.call,
+      key.name: "`init`",
+      key.offset: 1764,
+      key.length: 25,
+      key.nameoffset: 1764,
+      key.namelength: 6,
+      key.bodyoffset: 1771,
+      key.bodylength: 17,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "x",
+          key.offset: 1771,
+          key.length: 6,
+          key.nameoffset: 1771,
+          key.namelength: 1,
+          key.bodyoffset: 1774,
+          key.bodylength: 3
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.name: "y",
+          key.offset: 1779,
+          key.length: 6,
+          key.nameoffset: 1779,
+          key.namelength: 1,
+          key.bodyoffset: 1782,
+          key.bodylength: 3
+        },
+        {
+          key.kind: source.lang.swift.expr.argument,
+          key.offset: 1787,
+          key.length: 2,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.bodyoffset: 1787,
+          key.bodylength: 2,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.expr.closure,
+              key.offset: 1787,
+              key.length: 2,
+              key.nameoffset: 0,
+              key.namelength: 0,
+              key.bodyoffset: 1788,
+              key.bodylength: 0,
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.stmt.brace,
+                  key.offset: 1787,
+                  key.length: 2,
+                  key.nameoffset: 0,
+                  key.namelength: 0,
+                  key.bodyoffset: 1788,
+                  key.bodylength: 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "C",
+      key.offset: 1790,
+      key.length: 119,
+      key.runtime_name: "_TtC4main1C",
+      key.nameoffset: 1796,
+      key.namelength: 1,
+      key.bodyoffset: 1799,
+      key.bodylength: 109
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.setter_accessibility: source.lang.swift.accessibility.internal,
+      key.name: "$",
+      key.offset: 1910,
+      key.length: 24,
+      key.nameoffset: 1927,
+      key.namelength: 1
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "foo(x:)",
+      key.offset: 1935,
+      key.length: 34,
+      key.nameoffset: 1953,
+      key.namelength: 13,
+      key.bodyoffset: 1968,
+      key.bodylength: 0,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "x",
+          key.offset: 1959,
+          key.length: 6,
+          key.typename: "Int",
+          key.nameoffset: 1959,
+          key.namelength: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MyEnum",
+      key.offset: 1990,
+      key.length: 36,
+      key.nameoffset: 1995,
+      key.namelength: 6,
+      key.bodyoffset: 2003,
+      key.bodylength: 22,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 2006,
+          key.length: 18,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "Bar(arg:)",
+              key.offset: 2011,
+              key.length: 13,
+              key.nameoffset: 2011,
+              key.namelength: 13
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "arg",
+          key.offset: 2015,
+          key.length: 8,
+          key.typename: "Int",
+          key.nameoffset: 2015,
+          key.namelength: 3
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.enum,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "MySecondEnum",
+      key.offset: 2028,
+      key.length: 36,
+      key.nameoffset: 2033,
+      key.namelength: 12,
+      key.bodyoffset: 2047,
+      key.bodylength: 16,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.enumcase,
+          key.offset: 2050,
+          key.length: 12,
+          key.nameoffset: 0,
+          key.namelength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.enumelement,
+              key.accessibility: source.lang.swift.accessibility.internal,
+              key.name: "One",
+              key.offset: 2055,
+              key.length: 7,
+              key.nameoffset: 2055,
+              key.namelength: 3,
+              key.elements: [
+                {
+                  key.kind: source.lang.swift.structure.elem.init_expr,
+                  key.offset: 2061,
+                  key.length: 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  key.diagnostics: [
+    {
+      key.line: 71,
+      key.column: 5,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "getter/setter can only be defined for a single variable",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    },
+    {
+      key.line: 77,
+      key.column: 1,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "C-style for statement has been removed in Swift 3",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.ranges: [
+        {
+          key.offset: 1136,
+          key.length: 30
+        }
+      ]
+    },
+    {
+      key.line: 116,
+      key.column: 1,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "expected declaration",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.diagnostics: [
+        {
+          key.line: 114,
+          key.column: 7,
+          key.severity: source.diagnostic.severity.note,
+          key.description: "in declaration of 'C'"
+        }
+      ]
+    }
+  ]
+}

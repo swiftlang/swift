@@ -5,7 +5,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set(UUID_LIBRARIES "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(UUID_INCLUDE "")
-  set(UUID_LIBRARIES "ole32.lib")
+  set(UUID_LIBRARIES "rpcrt4.lib")
 else()
   find_package(UUID REQUIRED)
   set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
@@ -64,17 +64,21 @@ generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
-add_swift_library(swiftBasic STATIC
+add_swift_host_library(swiftBasic STATIC
+  AnyValue.cpp
   Cache.cpp
   ClusteredBitVector.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
+  ExponentialGrowthAppendingBinaryByteStream.cpp
   FileSystem.cpp
+  FileTypes.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp
   Mangler.cpp
+  OutputFileMap.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp

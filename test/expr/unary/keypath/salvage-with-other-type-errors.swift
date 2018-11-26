@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // Ensure that key path exprs can tolerate being re-type-checked when necessary
 // to diagnose other errors in adjacent exprs.
@@ -6,7 +6,7 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) {
+    init<B>(_ a: P<B>) { // expected-note {{where 'B' = 'String'}}
         fatalError()
     }
 }
@@ -27,7 +27,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{'+' cannot be applied}} expected-note {{}}
+    static let j = S(\A.id + "id") // expected-error {{initializer 'init(_:)' requires that 'String' conform to 'K'}}
 }
 
 // SR-5034
@@ -51,8 +51,9 @@ protocol Bindable: class { }
 
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {
-    if self[keyPath:targetKeyPath] != change {  // expected-error{{}}
-      // expected-note@-1{{overloads for '!=' exist with these partially matching parameter lists: (Self, Self), (_OptionalNilComparisonType, Wrapped?)}}
+    if self[keyPath:targetKeyPath] != change {  // expected-error{{}} 
+      // expected-note@-1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+      // expected-note@-2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
       self[keyPath: targetKeyPath] = change!
     }
   }

@@ -23,7 +23,7 @@ public func run_NSStringConversion(_ N: Int) {
 #if _runtime(_ObjC)
 let test:NSString = NSString(cString: "test", encoding: String.Encoding.ascii.rawValue)!
   for _ in 1...N * 10000 {
-    _ = test as String
+    blackHole(identity(test) as String)
   }
 #endif
 }

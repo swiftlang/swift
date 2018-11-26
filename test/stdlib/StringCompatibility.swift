@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 
 // REQUIRES: executable_test
 
@@ -116,8 +115,6 @@ extension MyString : Hashable {
   }
 }
 
-#if _runtime(_ObjC)
-
 extension MyString {
   public func hasPrefix(_ prefix: String) -> Bool {
     return self.base.hasPrefix(prefix)
@@ -127,8 +124,6 @@ extension MyString {
     return self.base.hasSuffix(suffix)
   }
 }
-
-#endif
 
 extension MyString : StringProtocol {
   typealias UTF8Index = String.UTF8Index
@@ -176,86 +171,11 @@ extension MyString : StringProtocol {
 }
 //===----------------------------------------------------------------------===//
 
-#if swift(>=4)
-
 public typealias ExpectedConcreteSlice = Substring
 public typealias ExpectedStringFromString = String
 let swift = 4
 
-#else
-
-public typealias ExpectedConcreteSlice = String
-public typealias ExpectedStringFromString = String?
-let swift = 3
-
-#endif
-
 var Tests = TestSuite("StringCompatibility")
-
-#if !swift(>=4) && _runtime(_ObjC)
-import Foundation
-
-Tests.test("String/Legacy/UTF16View.Index/StrideableAPIs") {
-  let i = String.UTF16View.Index(0)
-  expectEqual(0, i.distance(to: i))
-  expectEqual(0, i.distance(to: i.samePosition(in: "")))
-  expectEqual(i, i.advanced(by: 0))
-}
-
-Tests.test("String/Legacy/UTF16View/OptionalIndices") {
-  let s = "somethingToTest".utf16
-  let i = s.startIndex
-  let j = Optional(i)
-  expectEqual(s.index(after: i), s.index(after: j))
-  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: s.endIndex))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: Optional(s.endIndex)))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: i, to: Optional(s.endIndex)))
-  expectEqual(s[i], s[j])
-}
-
-Tests.test("String/Legacy/UTF8View/OptionalIndices") {
-  let s = "somethingToTest".utf8
-  let i = s.startIndex
-  let j = Optional(i)
-  expectEqual(s.index(after: i), s.index(after: j))
-  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: s.endIndex))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: Optional(s.endIndex)))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: i, to: Optional(s.endIndex)))
-  expectEqual(s[i], s[j])
-}
-
-Tests.test("String/Legacy/UnicodeScalarView/OptionalIndices") {
-  let s = "somethingToTest".unicodeScalars
-  let i = s.startIndex
-  let j = Optional(i)
-  expectEqual(s.index(after: i), s.index(after: j))
-  expectEqual(s.index(i, offsetBy: 2), s.index(j, offsetBy: 2))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: s.endIndex))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: j, to: Optional(s.endIndex)))
-  expectEqual(
-    s.distance(from: i, to: s.endIndex),
-    s.distance(from: i, to: Optional(s.endIndex)))
-  expectEqual(s[i], s[j])
-}
-#endif
 
 Tests.test("String/Range/Slice/ExpectedType/\(swift)") {
   var s = "hello world"
@@ -283,8 +203,10 @@ Tests.test("Substring/Range/Slice/ExpectedType/\(swift)") {
   var sub = s[s.startIndex ..< s.endIndex]
   var subsub = sub[s.startIndex ..< s.endIndex]
 
-  expectType(ExpectedConcreteSlice.self, &sub)
-  expectType(ExpectedConcreteSlice.self, &subsub)
+  // slicing a String in Swift 3 produces a String
+  // but slicing a Substring should still produce a Substring
+  expectType(Substring.self, &sub)
+  expectType(Substring.self, &subsub)
 }
 
 Tests.test("Substring/ClosedRange/Slice/ExpectedType/\(swift)") {
@@ -341,11 +263,7 @@ Tests.test("LosslessStringConvertible/generic/\(swift)") {
   f(String.self)
 }
 
-#if swift(>=4)
 public typealias ExpectedUTF8ViewSlice = String.UTF8View.SubSequence
-#else
-public typealias ExpectedUTF8ViewSlice = String.UTF8View
-#endif
 
 Tests.test("UTF8ViewSlicing") {
   let s = "Hello, String.UTF8View slicing world!".utf8
@@ -353,28 +271,5 @@ Tests.test("UTF8ViewSlicing") {
   expectType(ExpectedUTF8ViewSlice.self, &slice)
   _ = s[s.startIndex..<s.endIndex] as String.UTF8View.SubSequence
 }
-
-#if !swift(>=4)
-Tests.test("LosslessStringConvertible/force unwrap/\(swift)") {
-  // Force unwrap should still work in Swift 3 mode
-  _ = String("")!
-}
-#endif
-
-#if !swift(>=4)
-Tests.test("popFirst") {
-  var str = "abcdef"
-  expectOptionalEqual("a", str.popFirst())
-  expectOptionalEqual("bcdef", str)
-  expectOptionalEqual("b", str.characters.popFirst())
-  expectOptionalEqual("cdef", str)
-  expectOptionalEqual("c", str.unicodeScalars.popFirst())
-  expectOptionalEqual("def", str)
-  expectOptionalEqual("d", str.popFirst())
-  expectOptionalEqual("e", str.popFirst())
-  expectOptionalEqual("f", str.popFirst())
-  expectNil(str.popFirst())
-}
-#endif
 
 runAllTests()

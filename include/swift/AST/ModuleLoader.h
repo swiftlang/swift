@@ -44,7 +44,7 @@ class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
 
-  DependencyTracker();
+  explicit DependencyTracker(bool TrackSystemDeps);
 
   /// Adds a file as a dependency.
   ///

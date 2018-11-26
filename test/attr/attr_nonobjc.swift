@@ -8,7 +8,7 @@ import Foundation
     caloriesBurned = 5
   }
 
-  func defeatEnemy(_ b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
+  @objc func defeatEnemy(_ b: Bool) -> Bool { // expected-note {{'defeatEnemy' previously declared here}}
     return !b
   }
 
@@ -18,7 +18,7 @@ import Foundation
   }
 
   // This is not allowed, though
-  func defeatEnemy(_ s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
+  @objc func defeatEnemy(_ s: String) -> Bool { // expected-error {{method 'defeatEnemy' with Objective-C selector 'defeatEnemy:' conflicts with previous declaration with the same Objective-C selector}}
     return s != ""
   }
 
@@ -34,9 +34,9 @@ class BlueLightSaber : LightSaber {
 }
 
 @objc class InchoateToad {
-  init(x: Int) {} // expected-note {{previously declared}}
+  @objc init(x: Int) {} // expected-note {{previously declared}}
   @nonobjc init(x: Float) {}
-  init(x: String) {} // expected-error {{conflicts with previous declaration with the same Objective-C selector}}
+  @objc init(x: String) {} // expected-error {{conflicts with previous declaration with the same Objective-C selector}}
 }
 
 @nonobjc class NonObjCClassNotAllowed { } // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}} {{1-10=}}
@@ -110,4 +110,8 @@ protocol SR4226_Protocol : class {}
 
 extension SR4226_Protocol {
   @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared @nonobjc}}
+}
+
+@objc enum SomeEnum: Int {
+  @nonobjc case what // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
 }

@@ -21,13 +21,25 @@
 #include "llvm/Support/FileSystem.h"
 #include <fstream>
 #include <regex>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/param.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
 
 using namespace llvm;
+
+#if defined(_WIN32)
+namespace {
+int STDOUT_FILENO = _fileno(stdout);
+}
+#endif
 
 namespace {
 struct TestOptions {
@@ -64,7 +76,6 @@ static sourcekitd_uid_t KeyRequest;
 static sourcekitd_uid_t KeyCompilerArgs;
 static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeyLength;
-static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyName;
@@ -286,7 +297,6 @@ static int skt_main(int argc, const char **argv) {
   KeyCompilerArgs = sourcekitd_uid_get_from_cstr("key.compilerargs");
   KeyOffset = sourcekitd_uid_get_from_cstr("key.offset");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
-  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeyKind = sourcekitd_uid_get_from_cstr("key.kind");
   KeyCodeCompleteOptions =
       sourcekitd_uid_get_from_cstr("key.codecomplete.options");

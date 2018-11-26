@@ -1,0 +1,1104 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+// REQUIRES: CPU=x86_64
+
+import StdlibUnittest
+
+/// A fixed-width integer that has twice the bit width of its base type.
+///
+/// You can use the `DoubleWidth` type to continue calculations with the result
+/// of a full width arithmetic operation. Normally, when you perform a full
+/// width operation, the result is a tuple of the high and low parts of the
+/// result.
+///
+///     let a = 2241543570477705381
+///     let b = 186319822866995413
+///     let c = a.multipliedFullWidth(by: b)
+///     // c == (high: 22640526660490081, low: 7959093232766896457)
+///
+/// The tuple `c` can't be used in any further comparisons or calculations. To
+/// use this value, create a `DoubleWidth` instance from the result. You can
+/// use the `DoubleWidth` instance in the same way that you would use any other
+/// integer type.
+///
+///     let d = DoubleWidth(a.multipliedFullWidth(by: b))
+///     // d == 417644001000058515200174966092417353
+///
+///     // Check the calculation:
+///     print(d / DoubleWidth(a) == b)
+///     // Prints "true"
+///
+///     if d > Int.max {
+///         print("Too big to be an 'Int'!")
+///     } else {
+///         print("Small enough to fit in an 'Int'")
+///     }
+///     // Prints "Too big to be an 'Int'!"
+///
+/// The `DoubleWidth` type is not intended as a replacement for a variable-width
+/// integer type. Nesting `DoubleWidth` instances, in particular, may result in
+/// undesirable performance.
+public struct DoubleWidth<Base : FixedWidthInteger> {
+  public typealias High = Base
+  public typealias Low = Base.Magnitude
+
+#if _endian(big)
+  internal var _storage: (high: High, low: Low)
+#else
+  internal var _storage: (low: Low, high: High)
+#endif
+
+  /// The high part of the value.
+  public var high: High {
+    return _storage.high
+  }
+
+  /// The low part of the value.
+  public var low: Low {
+    return _storage.low
+  }
+
+  /// Creates a new instance from the given tuple of high and low parts.
+  ///
+  /// - Parameter value: The tuple to use as the source of the new instance's
+  ///   high and low parts.
+  public init(_ value: (high: High, low: Low)) {
+#if _endian(big)
+    self._storage = (high: value.0, low: value.1)
+#else
+    self._storage = (low: value.1, high: value.0)
+#endif
+  }
+
+  // We expect users to invoke the public initializer above as demonstrated in
+  // the documentation (that is, by passing in the result of a full width
+  // operation).
+  //
+  // Internally, we'll need to create new instances by supplying high and low
+  // parts directly; ((double parentheses)) greatly impair readability,
+  // especially when nested:
+  //
+  //   DoubleWidth<DoubleWidth>((DoubleWidth((0, 0)), DoubleWidth((0, 0))))
+  //
+  // For that reason, we'll include an internal initializer that takes two
+  // separate arguments.
+  internal init(_ _high: High, _ low: Low) {
+    self.init((_high, low))
+  }
+
+  public init() {
+    self.init(0, 0)
+  }
+}
+
+extension DoubleWidth : CustomStringConvertible {
+  public var description: String {
+    return String(self, radix: 10)
+  }
+}
+
+extension DoubleWidth : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "(\(_storage.high), \(_storage.low))"
+  }
+}
+
+extension DoubleWidth : Equatable {
+  public static func ==(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
+    return lhs._storage.low == rhs._storage.low
+        && lhs._storage.high == rhs._storage.high
+  }
+}
+
+extension DoubleWidth : Comparable {
+  public static func <(lhs: DoubleWidth, rhs: DoubleWidth) -> Bool {
+    if lhs._storage.high < rhs._storage.high { return true }
+    else if lhs._storage.high > rhs._storage.high { return false }
+    else { return lhs._storage.low < rhs._storage.low }
+  }
+}
+
+extension DoubleWidth : Hashable {
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(low)
+    hasher.combine(high)
+  }
+}
+
+extension DoubleWidth : Numeric {
+  public typealias Magnitude = DoubleWidth<Low>
+
+  public var magnitude: Magnitude {
+    let result = Magnitude(Low(truncatingIfNeeded: _storage.high), _storage.low)
+    if Base.isSigned && _storage.high < (0 as High) {
+      return ~result &+ 1
+    } else {
+      return result
+    }
+  }
+
+  internal init(_ _magnitude: Magnitude) {
+    self.init(High(_magnitude._storage.high), _magnitude._storage.low)
+  }
+
+  public init<T : BinaryInteger>(_ source: T) {
+    guard let result = DoubleWidth<Base>(exactly: source) else {
+      preconditionFailure("Value is outside the representable range")
+    }
+    self = result
+  }
+
+  public init?<T : BinaryInteger>(exactly source: T) {
+    // Can't represent a negative 'source' if Base is unsigned.
+    guard DoubleWidth.isSigned || source >= 0 else { return nil }
+    
+    // Is 'source' entirely representable in Low?
+    if let low = Low(exactly: source.magnitude) {
+      self.init(source < (0 as T) ? (~0, ~low &+ 1) : (0, low))
+    } else {
+      // At this point we know source.bitWidth > Base.bitWidth, or else we
+      // would've taken the first branch.
+      let lowInT = source & T(~0 as Low)
+      let highInT = source >> Low.bitWidth
+      
+      let low = Low(lowInT)
+      guard let high = High(exactly: highInT) else { return nil }
+      self.init(high, low)
+    }
+  }
+}
+
+#if false
+
+// This conformance is only possible once the type is in the stdlib, as it uses
+// Builtin
+extension DoubleWidth: _ExpressibleByBuiltinIntegerLiteral {
+  public init(_builtinIntegerLiteral _x: Builtin.IntegerLiteral) {
+    var _x = _x
+    self = DoubleWidth()
+
+    // If we can capture the entire literal in a single Int64, stop there.
+    // This avoids some potential deep recursion due to literal expressions in
+    // other DoubleWidth methods.
+    let (_value, _overflow) = Builtin.s_to_s_checked_trunc_IntLiteral_Int64(_x)
+    if !Bool(_overflow) {
+      self = DoubleWidth(Int64(_value))
+      return
+    }
+
+    // Convert all but the most significant 64 bits as unsigned integers.
+    let _shift = Builtin.sext_Int64_IntLiteral((64 as Int64)._value)
+    let lowWordCount = (bitWidth - 1) / 64
+    for i in 0..<lowWordCount {
+      let value =
+        DoubleWidth(UInt64(Builtin.s_to_u_checked_trunc_IntLiteral_Int64(_x).0))
+          &<< DoubleWidth(i * 64)
+      self |= value
+      _x = Builtin.ashr_IntLiteral(_x, _shift)
+    }
+
+    // Finally, convert the most significant 64 bits and check for overflow.
+    let overflow: Bool
+    if Base.isSigned {
+      let (_value, _overflow) = Builtin.s_to_s_checked_trunc_IntLiteral_Int64(_x)
+      self |= DoubleWidth(Int64(_value)) &<< DoubleWidth(lowWordCount * 64)
+      overflow = Bool(_overflow)
+    } else {
+      let (_value, _overflow) = Builtin.s_to_u_checked_trunc_IntLiteral_Int64(_x)
+      self |= DoubleWidth(UInt64(_value)) &<< DoubleWidth(lowWordCount * 64)
+      overflow = Bool(_overflow)
+    }
+    precondition(!overflow, "Literal integer out of range for this type")
+  }
+}
+
+#endif
+
+extension DoubleWidth {
+  public struct Words {
+    public var _high: High.Words
+    public var _low: Low.Words
+
+    public init(_ value: DoubleWidth<Base>) {
+      // Multiples of word size only.
+      guard Base.bitWidth == Base.Magnitude.bitWidth &&
+        (UInt.bitWidth % Base.bitWidth == 0 ||
+        Base.bitWidth % UInt.bitWidth == 0) else {
+        fatalError("Access to words is not supported on this type")
+      }
+      self._high = value._storage.high.words
+      self._low = value._storage.low.words
+      assert(!_low.isEmpty)
+    }
+  }
+}
+
+extension DoubleWidth.Words: RandomAccessCollection {
+  public typealias Index = Int
+  
+  public var startIndex: Index {
+    return 0
+  }
+
+  public var endIndex: Index {
+    return count
+  }
+  
+  public var count: Int {
+    if Base.bitWidth < UInt.bitWidth { return 1 }
+    return _low.count + _high.count
+  }
+
+  public subscript(_ i: Index) -> UInt {
+    if Base.bitWidth < UInt.bitWidth {
+      precondition(i == 0, "Invalid index")
+      assert(2 * Base.bitWidth <= UInt.bitWidth)
+      return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
+    }
+    if i < _low.count {
+      return _low[i + _low.startIndex]
+    }
+    
+    return _high[i - _low.count + _high.startIndex]
+  }
+}
+
+extension DoubleWidth : FixedWidthInteger {
+  public var words: Words {
+    return Words(self)
+  }
+
+  public static var isSigned: Bool {
+    return Base.isSigned
+  }
+
+  public static var max: DoubleWidth {
+    return self.init(High.max, Low.max)
+  }
+
+  public static var min: DoubleWidth {
+    return self.init(High.min, Low.min)
+  }
+
+  public static var bitWidth: Int {
+    return High.bitWidth + Low.bitWidth
+  }
+
+% for (operator, name) in [('+', 'adding'), ('-', 'subtracting')]:
+%   highAffectedByLowOverflow = 'Base.max' if operator == '+' else 'Base.min'
+  public func ${name}ReportingOverflow(_ rhs: DoubleWidth)
+    -> (partialValue: DoubleWidth, overflow: Bool) {
+    let (low, lowOverflow) =
+      _storage.low.${name}ReportingOverflow(rhs._storage.low)
+    let (high, highOverflow) =
+      _storage.high.${name}ReportingOverflow(rhs._storage.high)
+    let result = (high &${operator} (lowOverflow ? 1 : 0), low)
+    let overflow = highOverflow ||
+      high == ${highAffectedByLowOverflow} && lowOverflow
+    return (partialValue: DoubleWidth(result), overflow: overflow)
+  }
+% end
+
+  public func multipliedReportingOverflow(
+    by rhs: DoubleWidth
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
+    let (carry, product) = multipliedFullWidth(by: rhs)
+    let result = DoubleWidth(truncatingIfNeeded: product)
+    
+    let isNegative = DoubleWidth.isSigned &&
+      (self < (0 as DoubleWidth)) != (rhs < (0 as DoubleWidth))
+    let didCarry = isNegative
+      ? carry != ~(0 as DoubleWidth)
+      : carry != (0 as DoubleWidth)
+    let hadPositiveOverflow =
+      DoubleWidth.isSigned && !isNegative && product.leadingZeroBitCount == 0
+
+    return (result, didCarry || hadPositiveOverflow)
+  }
+
+  public func quotientAndRemainder(
+    dividingBy other: DoubleWidth
+  ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
+    let (quotient, remainder) =
+      Magnitude._divide(self.magnitude, by: other.magnitude)
+    guard DoubleWidth.isSigned else {
+      return (DoubleWidth(quotient), DoubleWidth(remainder))
+    }
+    let isNegative = (self.high < (0 as High)) != (other.high < (0 as High))
+    let quotient_ = isNegative
+      ? quotient == DoubleWidth.min.magnitude
+        ? DoubleWidth.min
+        : 0 - DoubleWidth(quotient)
+      : DoubleWidth(quotient)
+    let remainder_ = self.high < (0 as High)
+      ? 0 - DoubleWidth(remainder)
+      : DoubleWidth(remainder)
+    return (quotient_, remainder_)
+  }
+
+  public func dividedReportingOverflow(
+    by other: DoubleWidth
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
+    if other == (0 as DoubleWidth) { return (self, true) }
+    if DoubleWidth.isSigned && other == -1 && self == .min {
+      return (self, true)
+    }
+    return (quotientAndRemainder(dividingBy: other).quotient, false)
+  }
+
+  public func remainderReportingOverflow(
+    dividingBy other: DoubleWidth
+  ) -> (partialValue: DoubleWidth, overflow: Bool) {
+    if other == (0 as DoubleWidth) { return (self, true) }
+    if DoubleWidth.isSigned && other == -1 && self == .min { return (0, true) }
+    return (quotientAndRemainder(dividingBy: other).remainder, false)
+  }
+
+  public func multipliedFullWidth(
+    by other: DoubleWidth
+  ) -> (high: DoubleWidth, low: DoubleWidth.Magnitude) {
+    let isNegative = DoubleWidth.isSigned &&
+      (self < (0 as DoubleWidth)) != (other < (0 as DoubleWidth))
+
+    func mul(_ x: Low, _ y: Low) -> (partial: Low, carry: Low) {
+      let (high, low) = x.multipliedFullWidth(by: y)
+      return (low, high)
+    }
+        
+    func sum(_ x: Low, _ y: Low, _ z: Low) -> (partial: Low, carry: Low) {
+      let (sum1, overflow1) = x.addingReportingOverflow(y)
+      let (sum2, overflow2) = sum1.addingReportingOverflow(z)
+      let carry: Low = (overflow1 ? 1 : 0) + (overflow2 ? 1 : 0)
+      return (sum2, carry)
+    }
+        
+    let lhs = self.magnitude
+    let rhs = other.magnitude
+        
+    let a = mul(rhs._storage.low, lhs._storage.low)
+    let b = mul(rhs._storage.low, lhs._storage.high)
+    let c = mul(rhs._storage.high, lhs._storage.low)
+    let d = mul(rhs._storage.high, lhs._storage.high)
+        
+    let mid1 = sum(a.carry, b.partial, c.partial)
+    let mid2 = sum(b.carry, c.carry, d.partial)
+        
+    let low =
+      DoubleWidth<Low>(mid1.partial, a.partial)
+    let high =
+      DoubleWidth(High(mid2.carry + d.carry), mid1.carry + mid2.partial)
+        
+    if isNegative {
+      let (lowComplement, overflow) = (~low).addingReportingOverflow(1)
+      return (~high + (overflow ? 1 : 0 as DoubleWidth), lowComplement)
+    } else {
+      return (high, low)
+    }
+  }
+
+  public func dividingFullWidth(
+    _ dividend: (high: DoubleWidth, low: DoubleWidth.Magnitude)
+  ) -> (quotient: DoubleWidth, remainder: DoubleWidth) {
+    let other = DoubleWidth<DoubleWidth>(dividend)
+    let (quotient, remainder) =
+      Magnitude._divide(other.magnitude, by: self.magnitude)
+    guard DoubleWidth.isSigned else {
+      return (DoubleWidth(quotient), DoubleWidth(remainder))
+    }
+    let isNegative =
+      (self.high < (0 as High)) != (other.high.high < (0 as High))
+    let quotient_ = isNegative
+      ? quotient == DoubleWidth.min.magnitude
+        ? DoubleWidth.min
+        : 0 - DoubleWidth(quotient)
+      : DoubleWidth(quotient)
+    let remainder_ = other.high.high < (0 as High)
+      ? 0 - DoubleWidth(remainder)
+      : DoubleWidth(remainder)
+    return (quotient_, remainder_)
+  }
+
+% for operator in ['&', '|', '^']:
+  public static func ${operator}=(
+    lhs: inout DoubleWidth, rhs: DoubleWidth
+  ) {
+    lhs._storage.low ${operator}= rhs._storage.low
+    lhs._storage.high ${operator}= rhs._storage.high
+  }
+% end
+
+  public static func <<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    if DoubleWidth.isSigned && rhs < (0 as DoubleWidth) {
+      lhs >>= 0 - rhs
+      return
+    }
+    
+    // Shift is larger than this type's bit width.
+    if rhs._storage.high != (0 as High) ||
+      rhs._storage.low >= DoubleWidth.bitWidth
+    {
+      lhs = 0
+      return
+    }
+
+    lhs &<<= rhs
+  }
+  
+  public static func >>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    if DoubleWidth.isSigned && rhs < (0 as DoubleWidth) {
+      lhs <<= 0 - rhs
+      return
+    }
+
+    // Shift is larger than this type's bit width.
+    if rhs._storage.high != (0 as High) ||
+      rhs._storage.low >= DoubleWidth.bitWidth
+    {
+      lhs = lhs < (0 as DoubleWidth) ? ~0 : 0
+      return
+    }
+
+    lhs &>>= rhs
+  }
+
+  /// Returns this value "masked" by its bit width.
+  ///
+  /// "Masking" notionally involves repeatedly incrementing or decrementing this
+  /// value by `self.bitWidth` until the result is contained in the range
+  /// `0..<self.bitWidth`.
+  internal func _masked() -> DoubleWidth {
+    // FIXME(integers): test types with bit widths that aren't powers of 2
+    if DoubleWidth.bitWidth.nonzeroBitCount == 1 {
+      return self & DoubleWidth(DoubleWidth.bitWidth &- 1)
+    }
+    if DoubleWidth.isSigned && self._storage.high < (0 as High) {
+      return self % DoubleWidth(DoubleWidth.bitWidth) + self
+    }
+    return self % DoubleWidth(DoubleWidth.bitWidth)
+  }
+
+  public static func &<<=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let rhs = rhs._masked()
+
+    guard rhs._storage.low < Base.bitWidth else {
+      lhs._storage.high = High(
+        truncatingIfNeeded: lhs._storage.low &<<
+          (rhs._storage.low &- Low(Base.bitWidth)))
+      lhs._storage.low = 0
+      return
+    }
+
+    guard rhs._storage.low != (0 as Low) else { return }
+    lhs._storage.high &<<= High(rhs._storage.low)
+    lhs._storage.high |= High(
+      truncatingIfNeeded: lhs._storage.low &>>
+        (Low(Base.bitWidth) &- rhs._storage.low))
+    lhs._storage.low &<<= rhs._storage.low
+  }
+  
+  public static func &>>=(lhs: inout DoubleWidth, rhs: DoubleWidth) {
+    let rhs = rhs._masked()
+
+    guard rhs._storage.low < Base.bitWidth else {
+      lhs._storage.low = Low(
+        truncatingIfNeeded: lhs._storage.high &>>
+          High(rhs._storage.low &- Low(Base.bitWidth)))
+      lhs._storage.high = lhs._storage.high < (0 as High) ? ~0 : 0
+      return
+    }
+
+    guard rhs._storage.low != (0 as Low) else { return }
+    lhs._storage.low &>>= rhs._storage.low
+    lhs._storage.low |= Low(
+      truncatingIfNeeded: lhs._storage.high &<<
+        High(Low(Base.bitWidth) &- rhs._storage.low))
+    lhs._storage.high &>>= High(rhs._storage.low)
+  }
+  
+%{
+binaryOperators = [
+  ('+', 'adding', '_', '+'),
+  ('-', 'subtracting', '_', '-'),
+  ('*', 'multiplied', 'by', '*'),
+  ('/', 'divided', 'by', '/'),
+  ('%', 'remainder', 'dividingBy', '/'),
+]
+}%
+% for (operator, name, firstArg, kind) in binaryOperators:
+
+  // FIXME(integers): remove this once the operators are back to Numeric
+  public static func ${operator} (
+    lhs: DoubleWidth, rhs: DoubleWidth
+  ) -> DoubleWidth {
+    var lhs = lhs
+    lhs ${operator}= rhs
+    return lhs
+  }
+
+%   argumentLabel = (firstArg + ':') if firstArg != '_' else ''
+  public static func ${operator}=(
+    lhs: inout DoubleWidth, rhs: DoubleWidth
+  ) {
+    let (result, overflow) = lhs.${name}ReportingOverflow(${argumentLabel}rhs)
+    precondition(!overflow, "Overflow in ${operator}=")
+    lhs = result
+  }
+% end
+
+  public init(_truncatingBits bits: UInt) {
+    _storage.low = Low(_truncatingBits: bits)
+    _storage.high = High(_truncatingBits: bits >> UInt(Low.bitWidth))
+  }
+
+  public init(integerLiteral x: Int) {
+    self.init(x)
+  }
+  public var leadingZeroBitCount: Int {
+    return high == (0 as High)
+      ? High.bitWidth + low.leadingZeroBitCount
+      : high.leadingZeroBitCount
+  }
+
+  public var trailingZeroBitCount: Int {
+    return low == (0 as Low)
+      ? Low.bitWidth + high.trailingZeroBitCount
+      : low.trailingZeroBitCount
+  }
+
+  public var nonzeroBitCount: Int {
+    return high.nonzeroBitCount + low.nonzeroBitCount
+  }
+
+  public var byteSwapped: DoubleWidth {
+    return DoubleWidth(
+      High(truncatingIfNeeded: low.byteSwapped),
+      Low(truncatingIfNeeded: high.byteSwapped))
+  }
+}
+
+extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
+  /// Returns the quotient and remainder after dividing a triple-width magnitude
+  /// `lhs` by a double-width magnitude `rhs`.
+  ///
+  /// This operation is conceptually that described by Burnikel and Ziegler
+  /// (1998).
+  internal static func _divide(
+    _ lhs: (high: Low, mid: Low, low: Low), by rhs: Magnitude
+  ) -> (quotient: Low, remainder: Magnitude) {
+    // The following invariants are guaranteed to hold by dividingFullWidth or
+    // quotientAndRemainder before this method is invoked:
+    assert(lhs.high != (0 as Low))
+    assert(rhs.leadingZeroBitCount == 0)
+    assert(Magnitude(lhs.high, lhs.mid) < rhs)
+
+    // Estimate the quotient.
+    var quotient = lhs.high == rhs.high
+      ? Low.max
+      : rhs.high.dividingFullWidth((lhs.high, lhs.mid)).quotient
+    // Compute quotient * rhs.
+    // TODO: This could be performed more efficiently.
+    var product =
+      DoubleWidth<Magnitude>(
+        0, Magnitude(quotient.multipliedFullWidth(by: rhs.low)))
+    let (x, y) = quotient.multipliedFullWidth(by: rhs.high)
+    product += DoubleWidth<Magnitude>(Magnitude(0, x), Magnitude(y, 0))
+    // Compute the remainder after decrementing quotient as necessary.
+    var remainder =
+      DoubleWidth<Magnitude>(
+        Magnitude(0, lhs.high), Magnitude(lhs.mid, lhs.low))
+    while remainder < product {
+      quotient = quotient &- 1
+      remainder += DoubleWidth<Magnitude>(0, rhs)
+    }
+    remainder -= product
+
+    return (quotient, remainder.low)
+  }
+
+  /// Returns the quotient and remainder after dividing a quadruple-width
+  /// magnitude `lhs` by a double-width magnitude `rhs`.
+  internal static func _divide(
+    _ lhs: DoubleWidth<Magnitude>, by rhs: Magnitude
+  ) -> (quotient: Magnitude, remainder: Magnitude) {
+    guard _fastPath(rhs > (0 as Magnitude)) else {
+      fatalError("Division by zero")
+    }
+    guard _fastPath(rhs >= lhs.high) else {
+      fatalError("Division results in an overflow")
+    }
+
+    if lhs.high == (0 as Magnitude) {
+      return lhs.low.quotientAndRemainder(dividingBy: rhs)
+    }
+
+    if rhs.high == (0 as Low) {
+      let a = lhs.high.high % rhs.low
+      let b = a == (0 as Low)
+        ? lhs.high.low % rhs.low
+        : rhs.low.dividingFullWidth((a, lhs.high.low)).remainder
+      let (x, c) = b == (0 as Low)
+        ? lhs.low.high.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((b, lhs.low.high))
+      let (y, d) = c == (0 as Low)
+        ? lhs.low.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((c, lhs.low.low))
+      return (Magnitude(x, y), Magnitude(0, d))
+    }
+
+    // Left shift both rhs and lhs, then divide and right shift the remainder.
+    let shift = rhs.leadingZeroBitCount
+    let rhs = rhs &<< shift
+    let lhs = lhs &<< shift
+    if lhs.high.high == (0 as Low)
+      && Magnitude(lhs.high.low, lhs.low.high) < rhs {
+      let (quotient, remainder) =
+        Magnitude._divide((lhs.high.low, lhs.low.high, lhs.low.low), by: rhs)
+      return (Magnitude(0, quotient), remainder &>> shift)
+    }
+    let (x, a) =
+      Magnitude._divide((lhs.high.high, lhs.high.low, lhs.low.high), by: rhs)
+    let (y, b) =
+      Magnitude._divide((a.high, a.low, lhs.low.low), by: rhs)
+    return (Magnitude(x, y), b &>> shift)
+  }
+
+  /// Returns the quotient and remainder after dividing a double-width
+  /// magnitude `lhs` by a double-width magnitude `rhs`.
+  internal static func _divide(
+    _ lhs: Magnitude, by rhs: Magnitude
+  ) -> (quotient: Magnitude, remainder: Magnitude) {
+    guard _fastPath(rhs > (0 as Magnitude)) else {
+      fatalError("Division by zero")
+    }
+    guard rhs < lhs else {
+      if _fastPath(rhs > lhs) { return (0, lhs) }
+      return (1, 0)
+    }
+
+    if lhs.high == (0 as Low) {
+      let (quotient, remainder) =
+        lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+      return (Magnitude(quotient), Magnitude(remainder))
+    }
+
+    if rhs.high == (0 as Low) {
+      let (x, a) = lhs.high.quotientAndRemainder(dividingBy: rhs.low)
+      let (y, b) = a == (0 as Low)
+        ? lhs.low.quotientAndRemainder(dividingBy: rhs.low)
+        : rhs.low.dividingFullWidth((a, lhs.low))
+      return (Magnitude(x, y), Magnitude(0, b))
+    }
+
+    // Left shift both rhs and lhs, then divide and right shift the remainder.
+    let shift = rhs.leadingZeroBitCount
+    let rhs = rhs &<< shift
+    let high = (lhs &>> (Magnitude.bitWidth &- shift)).low
+    let lhs = lhs &<< shift
+    let (quotient, remainder) =
+      Magnitude._divide((high, lhs.high, lhs.low), by: rhs)
+    return (Magnitude(0, quotient), remainder &>> shift)
+  }
+}
+
+extension DoubleWidth : SignedNumeric, SignedInteger
+  where Base : SignedInteger {}
+
+
+//===----------------------------------------------------------------------===//
+// Tests
+//===----------------------------------------------------------------------===//
+
+var dwTests = TestSuite("DoubleWidth")
+
+typealias UInt128 = DoubleWidth<UInt64>
+typealias UInt256 = DoubleWidth<UInt128>
+typealias UInt512 = DoubleWidth<UInt256>
+typealias UInt1024 = DoubleWidth<UInt512>
+
+typealias Int128 = DoubleWidth<Int64>
+typealias Int256 = DoubleWidth<Int128>
+typealias Int512 = DoubleWidth<Int256>
+typealias Int1024 = DoubleWidth<Int512>
+
+func checkSignedIntegerConformance<T: SignedInteger>(_ x: T) {}
+func checkUnsignedIntegerConformance<T: UnsignedInteger>(_ x: T) {}
+
+dwTests.test("Literals") {
+  let w: DoubleWidth<UInt8> = 100
+  expectTrue(w == 100 as Int)
+  
+  let x: DoubleWidth<UInt8> = 1000
+  expectTrue(x == 1000 as Int)
+  
+  let y: DoubleWidth<Int8> = 1000
+  expectTrue(y == 1000 as Int)
+  
+  let z: DoubleWidth<Int8> = -1000
+  expectTrue(z == -1000 as Int)
+  
+  expectCrashLater()
+  _ = -1 as DoubleWidth<UInt8>
+}
+
+#if false
+// Uncomment these tests once _ExpressibleByBuiltinIntegerLiteral
+// conformance is available
+dwTests.test("Literals/Large/Signed") {
+  let a: Int256 =
+    0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  let b: Int256 =
+    -0x8000000000000000000000000000000000000000000000000000000000000000
+  expectEqual(a, Int256.max)
+  expectEqual(b, Int256.min)
+  expectCrashLater()
+  _ = -0x8000000000000000000000000000000000000000000000000000000000000001
+    as Int256
+}
+
+dwTests.test("Literals/Large/SignedOverflow") {
+  expectCrashLater()
+  _ = 0x8000000000000000000000000000000000000000000000000000000000000000
+    as Int256
+}
+
+dwTests.test("Literals/Large/Unsigned") {
+  let a: UInt256 =
+    0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  let b: UInt256 = 0
+  expectEqual(a, UInt256.max)
+  expectEqual(b, UInt256.min)
+  expectCrashLater()
+  _ = -1 as UInt256
+}
+
+dwTests.test("Literals/Large/UnsignedOverflow") {
+  expectCrashLater()
+  _ = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0
+    as UInt256
+}
+#endif
+
+dwTests.test("Arithmetic/unsigned") {
+  let x: DoubleWidth<UInt8> = 1000
+  let y: DoubleWidth<UInt8> = 1111
+  expectEqual(x + 1, 1001)
+  expectEqual(x + x, 2000)
+  expectEqual(x - (1 as DoubleWidth<UInt8>), 999)
+  expectEqual(x - x, 0)
+  expectEqual(y - x, 111)
+
+  expectEqual(x * 7, 7000)
+  expectEqual(y * 7, 7777)
+
+  expectEqual(x / 3, 333)
+  expectEqual(x / x, 1)
+  expectEqual(x / y, 0)
+  expectEqual(y / x, 1)
+
+  expectEqual(x % 3, 1)
+  expectEqual(x % y, x)
+}
+
+dwTests.test("Arithmetic/signed") {
+  let x: DoubleWidth<Int8> = 1000
+  let y: DoubleWidth<Int8> = -1111
+  expectEqual(x + 1, 1001)
+  expectEqual(x + x, 2000)
+  expectEqual(x - (1 as DoubleWidth<Int8>), 999)
+  expectEqual(x - x, 0)
+  expectEqual(0 - x, -1000)
+  expectEqual(x + y, -111)
+  expectEqual(x - y, 2111)
+
+  expectEqual(x * 7, 7000)
+  expectEqual(y * 7, -7777)
+  expectEqual(x * -7, -7000)
+  expectEqual(y * -7, 7777)
+
+  expectEqual(x / 3, 333)
+  expectEqual(x / -3, -333)
+  expectEqual(x / x, 1)
+  expectEqual(x / y, 0)
+  expectEqual(y / x, -1)
+  expectEqual(y / y, 1)
+
+  expectEqual(x % 3, 1)
+  expectEqual(x % -3, 1)
+  expectEqual(y % 3, -1)
+  expectEqual(y % -3, -1)
+
+  expectEqual(-y, 1111)
+  expectEqual(-x, -1000)
+}
+
+dwTests.test("Nested") {
+  do {
+    let x = UInt1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, 0)
+    expectTrue(y == (0 as Int))
+    expectTrue(o)
+  }
+
+  do {
+    let x = Int1024.max
+    let (y, o) = x.addingReportingOverflow(1)
+    expectEqual(y, Int1024.min)
+    expectLT(y, 0)
+    expectTrue(y < (0 as Int))
+    expectTrue(y < (0 as UInt))
+    expectTrue(o)
+  }
+
+  expectFalse(UInt1024.isSigned)
+  expectEqual(UInt1024.bitWidth, 1024)
+  expectTrue(Int1024.isSigned)
+  expectEqual(Int1024.bitWidth, 1024)
+
+  expectEqualSequence(
+    UInt1024.max.words, repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
+}
+
+dwTests.test("inits") {
+  typealias DWU16 = DoubleWidth<UInt8>
+
+  expectTrue(DWU16(UInt16.max) == UInt16.max)
+  expectNil(DWU16(exactly: UInt32.max))
+  expectEqual(DWU16(truncatingIfNeeded: UInt64.max), DWU16.max)
+
+  expectCrashLater()
+  _ = DWU16(UInt32.max)
+}
+
+dwTests.test("Magnitude") {
+  typealias DWU16 = DoubleWidth<UInt8>
+  typealias DWI16 = DoubleWidth<Int8>
+
+  expectTrue(DWU16.min.magnitude == UInt16.min.magnitude)
+  expectTrue((42 as DWU16).magnitude == (42 as UInt16).magnitude)
+  expectTrue(DWU16.max.magnitude == UInt16.max.magnitude)
+
+  expectTrue(DWI16.min.magnitude == Int16.min.magnitude)
+  expectTrue((-42 as DWI16).magnitude == (-42 as Int16).magnitude)
+  expectTrue(DWI16().magnitude == Int16(0).magnitude) // See SR-6602.
+  expectTrue((42 as DWI16).magnitude == (42 as Int16).magnitude)
+  expectTrue(DWI16.max.magnitude == Int16.max.magnitude)
+}
+
+dwTests.test("TwoWords") {
+  typealias DW = DoubleWidth<Int>
+
+  expectEqual(-1 as DW, DW(truncatingIfNeeded: -1 as Int8))
+
+  expectNil(Int(exactly: DW(Int.min) - 1))
+  expectNil(Int(exactly: DW(Int.max) + 1))
+
+  expectTrue(DW(Int.min) - 1 < Int.min)
+  expectTrue(DW(Int.max) + 1 > Int.max)
+}
+
+dwTests.test("Bitshifts") {
+  typealias DWU64 = DoubleWidth<DoubleWidth<DoubleWidth<UInt8>>>
+  typealias DWI64 = DoubleWidth<DoubleWidth<DoubleWidth<Int8>>>
+
+  func f<T: FixedWidthInteger, U: FixedWidthInteger>(_ x: T, type: U.Type) {
+    let y = U(x)
+    expectEqual(T.bitWidth, U.bitWidth)
+    for i in -(T.bitWidth + 1)...(T.bitWidth + 1) {
+      expectTrue(x << i == y << i)
+      expectTrue(x >> i == y >> i)
+
+      expectTrue(x &<< i == y &<< i)
+      expectTrue(x &>> i == y &>> i)
+    }
+  }
+
+  f(1 as UInt64, type: DWU64.self)
+  f(~(~0 as UInt64 >> 1), type: DWU64.self)
+  f(UInt64.max, type: DWU64.self)
+  // 0b01010101_10100101_11110000_10100101_11110000_10100101_11110000_10100101
+  f(17340530535757639845 as UInt64, type: DWU64.self)
+
+  f(1 as Int64, type: DWI64.self)
+  f(Int64.min, type: DWI64.self)
+  f(Int64.max, type: DWI64.self)
+  // 0b01010101_10100101_11110000_10100101_11110000_10100101_11110000_10100101
+  f(6171603459878809765 as Int64, type: DWI64.self)
+}
+
+dwTests.test("Remainder/DividingBy0") {
+  func f(_ x: Int1024, _ y: Int1024) -> Int1024 {
+    return x % y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+dwTests.test("RemainderReportingOverflow/DividingByMinusOne") {
+  func f(_ x: Int256, _ y: Int256) -> Int256 {
+    return x.remainderReportingOverflow(dividingBy: y).partialValue
+  }
+  expectEqual(f(.max, -1), 0)
+  expectEqual(f(.min, -1), 0)
+}
+
+dwTests.test("Division/By0") {
+  func f(_ x: Int1024, _ y: Int1024) -> Int1024 {
+    return x / y
+  }
+  expectCrashLater()
+  _ = f(42, 0)
+}
+
+dwTests.test("DivideMinByMinusOne") {
+  func f(_ x: Int1024) -> Int1024 {
+    return x / -1
+  }
+  expectCrashLater()
+  _ = f(Int1024.min)
+}
+
+dwTests.test("isMultiple") {
+  func isMultipleTest<T: FixedWidthInteger>(type: T.Type) {
+    expectTrue(T.min.isMultiple(of: 2))
+    expectFalse(T.max.isMultiple(of: 10))
+    // Test that these do not crash.
+    expectTrue((0 as T).isMultiple(of: 0))
+    expectFalse((1 as T).isMultiple(of: 0))
+    expectTrue(T.min.isMultiple(of: 0 &- 1))
+  }
+  isMultipleTest(type: Int128.self)
+  isMultipleTest(type: UInt128.self)
+}
+
+dwTests.test("MultiplyMinByMinusOne") {
+  func f(_ x: Int1024) -> Int1024 {
+    return x * -1
+  }
+  expectCrashLater()
+  _ = f(Int1024.min)
+}
+
+typealias DWI16 = DoubleWidth<Int8>
+typealias DWU16 = DoubleWidth<UInt8>
+
+dwTests.test("Conversions") {
+  expectTrue(DWI16(1 << 15 - 1) == Int(1 << 15 - 1))
+  expectTrue(DWI16(-1 << 15) == Int(-1 << 15))
+  expectTrue(DWU16(1 << 16 - 1) == Int(1 << 16 - 1))
+  expectTrue(DWU16(0) == Int(0))
+
+  expectTrue(DWI16(Double(1 << 15 - 1)) == Int(1 << 15 - 1))
+  expectTrue(DWI16(Double(-1 << 15)) == Int(-1 << 15))
+  expectTrue(DWU16(Double(1 << 16 - 1)) == Int(1 << 16 - 1))
+  expectTrue(DWU16(Double(0)) == Int(0))
+
+  expectTrue(DWI16(Double(1 << 15 - 1) + 0.9) == Int(1 << 15 - 1))
+  expectTrue(DWI16(Double(-1 << 15) - 0.9) == Int(-1 << 15))
+  expectTrue(DWU16(Double(1 << 16 - 1) + 0.9) == Int(1 << 16 - 1))
+  expectTrue(DWU16(Double(0) - 0.9) == Int(0))
+
+  expectEqual(DWI16(0.00001), 0)
+  expectEqual(DWU16(0.00001), 0)
+}
+
+dwTests.test("Exact Conversions") {
+  expectEqual(DWI16(Double(1 << 15 - 1)), DWI16(exactly: Double(1 << 15 - 1))!)
+  expectEqual(DWI16(Double(-1 << 15)), DWI16(exactly: Double(-1 << 15))!)
+  expectEqual(DWU16(Double(1 << 16 - 1)), DWU16(exactly: Double(1 << 16 - 1))!)
+  expectEqual(DWU16(Double(0)), DWU16(exactly: Double(0))!)
+
+  expectNil(DWI16(exactly: Double(1 << 15 - 1) + 0.9))
+  expectNil(DWI16(exactly: Double(-1 << 15) - 0.9))
+  expectNil(DWU16(exactly: Double(1 << 16 - 1) + 0.9))
+  expectNil(DWU16(exactly: Double(0) - 0.9))
+
+  expectNil(DWI16(exactly: Double(1 << 15)))
+  expectNil(DWI16(exactly: Double(-1 << 15) - 1))
+  expectNil(DWU16(exactly: Double(1 << 16)))
+  expectNil(DWU16(exactly: Double(-1)))
+
+  expectNil(DWI16(exactly: 0.00001))
+  expectNil(DWU16(exactly: 0.00001))
+
+  expectNil(DWU16(exactly: Double.nan))
+  expectNil(DWU16(exactly: Float.nan))
+  expectNil(DWU16(exactly: Double.infinity))
+  expectNil(DWU16(exactly: Float.infinity))
+}
+
+dwTests.test("Conversions/SignedMax+1") {
+  expectCrashLater()
+  _ = DWI16(1 << 15)
+}
+
+dwTests.test("Conversions/SignedMin-1") {
+  expectCrashLater()
+  _ = DWI16(-1 << 15 - 1)
+}
+
+dwTests.test("Conversions/UnsignedMax+1") {
+  expectCrashLater()
+  _ = DWU16(1 << 16)
+}
+
+dwTests.test("Conversions/Unsigned-1") {
+  expectCrashLater()
+  _ = DWU16(-1)
+}
+
+dwTests.test("Conversions/String") {
+  expectEqual(String(Int256.max, radix: 16),
+    "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+  expectEqual(String(Int256.min, radix: 16),
+    "-8000000000000000000000000000000000000000000000000000000000000000")
+  
+  expectEqual(String(Int256.max, radix: 2), """
+    1111111111111111111111111111111111111111111111111111111111111111\
+    1111111111111111111111111111111111111111111111111111111111111111\
+    1111111111111111111111111111111111111111111111111111111111111111\
+    111111111111111111111111111111111111111111111111111111111111111
+    """)
+  expectEqual(String(Int256.min, radix: 2), """
+    -100000000000000000000000000000000000000000000000000000000000000\
+    0000000000000000000000000000000000000000000000000000000000000000\
+    0000000000000000000000000000000000000000000000000000000000000000\
+    00000000000000000000000000000000000000000000000000000000000000000
+    """)
+  
+  expectEqual(String(Int128.max, radix: 10),
+    "170141183460469231731687303715884105727")
+  expectEqual(String(Int128.min, radix: 10),
+    "-170141183460469231731687303715884105728")
+}
+
+dwTests.test("Words") {
+  expectEqualSequence((0 as DoubleWidth<Int8>).words, [0])
+  expectEqualSequence((1 as DoubleWidth<Int8>).words, [1])
+  expectEqualSequence((-1 as DoubleWidth<Int8>).words, [UInt.max])
+  expectEqualSequence((256 as DoubleWidth<Int8>).words, [256])
+  expectEqualSequence((-256 as DoubleWidth<Int8>).words, [UInt.max - 255])
+  expectEqualSequence(DoubleWidth<Int8>.max.words, [32767])
+  expectEqualSequence(DoubleWidth<Int8>.min.words, [UInt.max - 32767])
+
+  expectEqualSequence((0 as Int1024).words,
+    repeatElement(0 as UInt, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((-1 as Int1024).words,
+    repeatElement(UInt.max, count: 1024 / UInt.bitWidth))
+  expectEqualSequence((1 as Int1024).words,
+    [1] + Array(repeating: 0, count: 1024 / UInt.bitWidth - 1))
+}
+
+dwTests.test("Conditional Conformance") {
+  checkSignedIntegerConformance(0 as Int128)
+  checkSignedIntegerConformance(0 as Int1024)
+
+  checkUnsignedIntegerConformance(0 as UInt128)
+  checkUnsignedIntegerConformance(0 as UInt1024)
+}
+
+runAllTests()

@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t
-// RUN: %FileCheck %s --check-prefix=CHECK-%target-object-format --check-prefix=CHECK < %t
-// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE -check-prefix CHECK-%target-object-format %s
 
 // REQUIRES: CPU=x86_64
 
@@ -50,7 +48,7 @@ bb0:
 
 // CHECK: define linkonce_odr hidden swiftcc void @qux()
 // CHECK: define hidden swiftcc void @fred()
-// CHECK: define{{( protected)?}} swiftcc void @frieda()
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @frieda()
 
 // NEGATIVE-NOT: @foo
 // NEGATIVE-NOT: @bar

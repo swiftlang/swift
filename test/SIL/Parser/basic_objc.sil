@@ -25,7 +25,7 @@ protocol SomeClassProtocol : class {}
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
 // CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
 sil @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
-entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
+entry(%a : @trivial $@objc_metatype SomeClass.Type, %b : @trivial $@objc_metatype SomeClassProtocol.Type):
   %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
   %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
   %z = tuple (%x : $AnyObject, %y : $AnyObject)
@@ -35,7 +35,7 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
 sil @requires_any_object : $@convention(thin) <T: AnyObject> (@owned T) -> ()
 
 sil @foo : $@convention(thin) (@owned ObjCProto) -> () {
-entry(%a : $ObjCProto):
+entry(%a : @owned $ObjCProto):
   %f = function_ref @requires_any_object : $@convention(thin) <T: AnyObject> (@owned T) -> ()
   %0 = apply %f<ObjCProto>(%a) : $@convention(thin) <T: AnyObject> (@owned T) -> ()
   return %0 : $()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -emit-silgen -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
 // Test top-level/module locations.
 class TopLevelObjectTy {
@@ -21,7 +21,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // Check allocating initializer
 // CHECK-LABEL: sil_locations_top_level.TopLevelObjectTy.__allocating_init
-// CHECK: sil hidden @$S23sil_locations_top_level16TopLevelObjectTyC{{[_0-9a-zA-Z]*}}fC
+// CHECK: sil hidden @$s23sil_locations_top_level16TopLevelObjectTyC{{[_0-9a-zA-Z]*}}fC
 // CHECK: alloc_ref {{.*}}line:5:3:auto_gen
 // CHECK: function_ref
 
@@ -31,7 +31,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 // CHECK: return {{.*}}// {{.*}} line:5:12
 
 // Check explicit destructor
-// CHECK_LABEL: sil hidden @$S23sil_locations_top_level16TopLevelObjectTyCfd
+// CHECK_LABEL: sil hidden @$s23sil_locations_top_level16TopLevelObjectTyCfd
 // CHECK:   return {{.*}}// {{.*}} line:8:3
 
 // Check allocating constructor
@@ -40,9 +40,9 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // Check explicit constructor
 // FIXME: The ConstructorDecl location is wrong here (looks like it's wrong in the AST).
-// CHECK-LABEL: sil hidden @$S23sil_locations_top_level33TopLevelObjectTyWithoutDestructorC{{[_0-9a-zA-Z]*}}fc
+// CHECK-LABEL: sil hidden @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorC{{[_0-9a-zA-Z]*}}fc
 // CHECK: return {{.*}}// {{.*}} line:14:3:imp_return
 
 // Check implicit destructor
-// CHECK_LABEL: sil hidden @$S23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
+// CHECK_LABEL: sil hidden @$s23sil_locations_top_level33TopLevelObjectTyWithoutDestructorCfd
 // CHECK:   return {{.*}}// {{.*}} line:12:7:imp_return:auto_gen

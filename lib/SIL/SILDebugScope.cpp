@@ -23,7 +23,7 @@
 using namespace swift;
 
 SILDebugScope::SILDebugScope(SILLocation Loc, SILFunction *SILFn,
-                             const SILDebugScope *ParentScope ,
+                             const SILDebugScope *ParentScope,
                              const SILDebugScope *InlinedCallSite)
     : Loc(Loc), InlinedCallSite(InlinedCallSite) {
   if (ParentScope)

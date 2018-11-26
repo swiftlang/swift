@@ -102,17 +102,17 @@ OBJC_FUNC(ObjCRelease, ModRef, release)
 /// %objc_object* objc_retain(%objc_object* %P)
 OBJC_FUNC(ObjCRetain, NoModRef, retain)
 
-/// void swift_unknownRetain(%swift.refcounted* %P)
-SWIFT_FUNC(UnknownRetain, NoModRef, unknownRetain)
+/// void swift_unknownObjectRetain(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRetain, NoModRef, unknownObjectRetain)
 
-/// void swift_unknownRetain_n(%swift.refcounted* %P)
-SWIFT_FUNC(UnknownRetainN, NoModRef, unknownRetain_n)
+/// void swift_unknownObjectRetain_n(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRetainN, NoModRef, unknownObjectRetain_n)
 
-/// void swift_unknownRelease(%swift.refcounted* %P)
-SWIFT_FUNC(UnknownRelease, ModRef, unknownRelease)
+/// void swift_unknownObjectRelease(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRelease, ModRef, unknownObjectRelease)
 
-/// void swift_unknownRelease_n(%swift.refcounted* %P)
-SWIFT_FUNC(UnknownReleaseN, ModRef, unknownRelease_n)
+/// void swift_unknownObjectRelease_n(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectReleaseN, ModRef, unknownObjectRelease_n)
 
 /// void __swift_fixLifetime(%swift.refcounted* %P)
 SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(FixLifetime, NoModRef, fixLifetime)

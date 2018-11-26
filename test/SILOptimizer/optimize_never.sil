@@ -72,17 +72,17 @@ public func foo4(x: Int32, _ c: C) -> Int32
 public func boo4(c: C) -> Int32
 
 
-sil_global [serialized] @$Ss7ProcessO5_argcs5Int32VvZ : $Int32
+sil_global [serialized] @$ss7ProcessO5_argcs5Int32VvZ : $Int32
 
 
 sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 
-sil_global [serialized] @$Ss7ProcessO11_unsafeArgvSpySpys4Int8VGGvZ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+sil_global [serialized] @$ss7ProcessO11_unsafeArgvSpySpys4Int8VGGvZ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 
 
 
-sil hidden [noinline] @$S14optimize_never1CC3foos5Int32VyF : $@convention(method) (@guaranteed C) -> Int32 {
+sil hidden [noinline] @$s14optimize_never1CC3foos5Int32VyF : $@convention(method) (@guaranteed C) -> Int32 {
 bb0(%0 : $C):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -90,12 +90,12 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [serialized] @$Ss5Int32V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil [transparent] [serialized] @$ss5Int32V22_builtinIntegerLiteralABBI__tcfC : $@convention(thin) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
 
 
-sil @$S14optimize_never1CCfD : $@convention(method) (@owned C) -> () {
+sil @$s14optimize_never1CCfD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
-  %2 = function_ref @$S14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
+  %2 = function_ref @$s14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $C
   dealloc_ref %4 : $C
@@ -104,20 +104,20 @@ bb0(%0 : $C):
 }
 
 
-sil @$S14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject {
+sil @$s14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %2 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
   return %2 : $Builtin.NativeObject
 }
 
 
-sil hidden @$S14optimize_never1CCACycfc : $@convention(method) (@owned C) -> @owned C {
+sil hidden @$s14optimize_never1CCACycfc : $@convention(method) (@owned C) -> @owned C {
 bb0(%0 : $C):
   return %0 : $C
 }
 
 
-sil hidden [noinline] @$S14optimize_never1DC3foos5Int32VyF : $@convention(method) (@guaranteed D) -> Int32 {
+sil hidden [noinline] @$s14optimize_never1DC3foos5Int32VyF : $@convention(method) (@guaranteed D) -> Int32 {
 bb0(%0 : $D):
   %2 = integer_literal $Builtin.Int32, 11
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -125,9 +125,9 @@ bb0(%0 : $D):
 }
 
 
-sil @$S14optimize_never1DCfD : $@convention(method) (@owned D) -> () {
+sil @$s14optimize_never1DCfD : $@convention(method) (@owned D) -> () {
 bb0(%0 : $D):
-  %2 = function_ref @$S14optimize_never1DCfd : $@convention(method) (@guaranteed D) -> @owned Builtin.NativeObject
+  %2 = function_ref @$s14optimize_never1DCfd : $@convention(method) (@guaranteed D) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed D) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $D
   dealloc_ref %4 : $D
@@ -136,22 +136,22 @@ bb0(%0 : $D):
 }
 
 
-sil @$S14optimize_never1DCfd : $@convention(method) (@guaranteed D) -> @owned Builtin.NativeObject {
+sil @$s14optimize_never1DCfd : $@convention(method) (@guaranteed D) -> @owned Builtin.NativeObject {
 bb0(%0 : $D):
   %2 = upcast %0 : $D to $C
-  %3 = function_ref @$S14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
+  %3 = function_ref @$s14optimize_never1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
   %4 = apply %3(%2) : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject
   return %4 : $Builtin.NativeObject
 }
 
 
-sil hidden @$S14optimize_never1DCACycfc : $@convention(method) (@owned D) -> @owned D {
+sil hidden @$s14optimize_never1DCACycfc : $@convention(method) (@owned D) -> @owned D {
 bb0(%0 : $D):
   %1 = alloc_stack $D
   store %0 to %1 : $*D
   %3 = upcast %0 : $D to $C
 
-  %4 = function_ref @$S14optimize_never1CCACycfc : $@convention(method) (@owned C) -> @owned C
+  %4 = function_ref @$s14optimize_never1CCACycfc : $@convention(method) (@owned C) -> @owned C
   %5 = apply %4(%3) : $@convention(method) (@owned C) -> @owned C
   %6 = unchecked_ref_cast %5 : $C to $D
   store %6 to %1 : $*D
@@ -160,7 +160,7 @@ bb0(%0 : $D):
 }
 
 
-sil @$S14optimize_never10transform1ys5Int32VxlF : $@convention(thin) <T> (@in T) -> Int32 {
+sil @$s14optimize_never10transform1ys5Int32VxlF : $@convention(thin) <T> (@in T) -> Int32 {
 bb0(%0 : $*T):
   %2 = integer_literal $Builtin.Int32, 2
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -171,17 +171,17 @@ bb0(%0 : $*T):
 
 
 // Check that both calls are not inlined or devirtualized.
-// CHECK-LABEL: sil [Onone] @$S14optimize_never4foo1ys5Int32Vx_AA1CCtlF
+// CHECK-LABEL: sil [Onone] @$s14optimize_never4foo1ys5Int32Vx_AA1CCtlF
 // CHECK-NOT: checked_cast_br
-// CHECK: function_ref @$S14optimize_never10transform1ys5Int32VxlF
+// CHECK: function_ref @$s14optimize_never10transform1ys5Int32VxlF
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
 // CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
-sil [Onone] @$S14optimize_never4foo1ys5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
+sil [Onone] @$s14optimize_never4foo1ys5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
 bb0(%0 : $*T, %1 : $C):
-  %4 = function_ref @$S14optimize_never10transform1ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
+  %4 = function_ref @$s14optimize_never10transform1ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
   copy_addr %0 to [initialization] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
@@ -202,18 +202,18 @@ bb0(%0 : $*T, %1 : $C):
 }
 
 
-sil [transparent] [serialized] @$Ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32
+sil [transparent] [serialized] @$ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32
 
 
-// CHECK-LABEL: sil @$S14optimize_never4boo1ys5Int32VAA1CCF
+// CHECK-LABEL: sil @$s14optimize_never4boo1ys5Int32VAA1CCF
 // CHECK-NOT: return
 // This call should not be inlined, because the callee is annotated with @_optimize(none)
-// CHECK: function_ref @$S14optimize_never4foo1ys5Int32Vx_AA1CCtlF
+// CHECK: function_ref @$s14optimize_never4foo1ys5Int32Vx_AA1CCtlF
 // CHECK: apply
 // CHECK: return
-sil @$S14optimize_never4boo1ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
+sil @$s14optimize_never4boo1ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
-  %2 = function_ref @$S14optimize_never4foo1ys5Int32Vx_AA1CCtlF : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  %2 = function_ref @$s14optimize_never4foo1ys5Int32Vx_AA1CCtlF : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %5 = alloc_stack $Int32
@@ -226,27 +226,27 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [serialized] @$SSi22_builtinIntegerLiteralSiBi2048__tcfC : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI__tcfC : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 
-sil @$S14optimize_never10transform2ys5Int32VADF : $@convention(thin) (Int32) -> Int32 {
+sil @$s14optimize_never10transform2ys5Int32VADF : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   return %0 : $Int32
 }
 
 
 // Check that both calls are not inlined or devirtualized.
-// CHECK-LABEL: sil [Onone] @$S14optimize_never4foo2ys5Int32VAD_AA1CCtF
+// CHECK-LABEL: sil [Onone] @$s14optimize_never4foo2ys5Int32VAD_AA1CCtF
 // CHECK-NOT: checked_cast_br
-// CHECK: function_ref @$S14optimize_never10transform2ys5Int32VADF
+// CHECK: function_ref @$s14optimize_never10transform2ys5Int32VADF
 // CHECK: apply
 // CHECK-NOT: checked_cast_br
 // CHECK: class_method {{%.*}} : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
 // CHECK: apply
 // CHECK: return
-sil [Onone] @$S14optimize_never4foo2ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
+sil [Onone] @$s14optimize_never4foo2ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
 bb0(%0 : $Int32, %1 : $C):
-  %4 = function_ref @$S14optimize_never10transform2ys5Int32VADF : $@convention(thin) (Int32) -> Int32
+  %4 = function_ref @$s14optimize_never10transform2ys5Int32VADF : $@convention(thin) (Int32) -> Int32
   %5 = apply %4(%0) : $@convention(thin) (Int32) -> Int32
   %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %7 = apply %6(%1) : $@convention(method) (@guaranteed C) -> Int32
@@ -263,15 +263,15 @@ bb0(%0 : $Int32, %1 : $C):
 }
 
 
-// CHECK-LABEL: sil @$S14optimize_never4boo2ys5Int32VAA1CCF
+// CHECK-LABEL: sil @$s14optimize_never4boo2ys5Int32VAA1CCF
 // CHECK-NOT: return
 // This call should not be inlined, because the callee is annotated with @_optimize(none)
-// CHECK: function_ref @$S14optimize_never4foo2ys5Int32VAD_AA1CCtF
+// CHECK: function_ref @$s14optimize_never4foo2ys5Int32VAD_AA1CCtF
 // CHECK: apply
 // CHECK: return
-sil @$S14optimize_never4boo2ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
+sil @$s14optimize_never4boo2ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
-  %2 = function_ref @$S14optimize_never4foo2ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32
+  %2 = function_ref @$s14optimize_never4foo2ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   strong_retain %0 : $C
@@ -286,7 +286,7 @@ bb0(%0 : $C):
 // CHECK: generic specialization <Swift.Int32> of {{.*}}.foo3
 
 
-sil @$S14optimize_never10transform3ys5Int32VxlF : $@convention(thin) <T> (@in T) -> Int32 {
+sil @$s14optimize_never10transform3ys5Int32VxlF : $@convention(thin) <T> (@in T) -> Int32 {
 bb0(%0 : $*T):
   %2 = integer_literal $Builtin.Int32, 2
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -295,9 +295,9 @@ bb0(%0 : $*T):
 }
 
 
-sil @$S14optimize_never4foo3ys5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
+sil @$s14optimize_never4foo3ys5Int32Vx_AA1CCtlF : $@convention(thin) <T> (@in T, @owned C) -> Int32 {
 bb0(%0 : $*T, %1 : $C):
-  %4 = function_ref @$S14optimize_never10transform3ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
+  %4 = function_ref @$s14optimize_never10transform3ys5Int32VxlF : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
   %5 = alloc_stack $T
   copy_addr %0 to [initialization] %5 : $*T
   %7 = apply %4<T>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Int32
@@ -321,16 +321,16 @@ bb0(%0 : $*T, %1 : $C):
 // Everything in this function should get devirtualized, inlined and folded together,
 // because neither this function nor any of its callees are annotated to be
 // excluded from the optimization.
-// CHECK-LABEL: sil @$S14optimize_never4boo3ys5Int32VAA1CCF
+// CHECK-LABEL: sil @$s14optimize_never4boo3ys5Int32VAA1CCF
 // CHECK: bb0
-// CHECK-NOT: function_ref @$S14optimize_never4foo3ys5Int32Vx_AA1CCtlF
+// CHECK-NOT: function_ref @$s14optimize_never4foo3ys5Int32Vx_AA1CCtlF
 // Presence of checked_cast_br indicates that the speculative devirtualization
 // was performed. And this is only possible, if the original call is inlined.
 // CHECK: checked_cast_br [exact] {{%.*}} : $C to $C, bb2, bb3
 // CHECK: return
-sil @$S14optimize_never4boo3ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
+sil @$s14optimize_never4boo3ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
-  %2 = function_ref @$S14optimize_never4foo3ys5Int32Vx_AA1CCtlF : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  %2 = function_ref @$s14optimize_never4foo3ys5Int32Vx_AA1CCtlF : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   %5 = alloc_stack $Int32
@@ -343,15 +343,15 @@ bb0(%0 : $C):
 }
 
 
-sil @$S14optimize_never10transform4ys5Int32VADF : $@convention(thin) (Int32) -> Int32 {
+sil @$s14optimize_never10transform4ys5Int32VADF : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   return %0 : $Int32
 }
 
 
-sil @$S14optimize_never4foo4ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
+sil @$s14optimize_never4foo4ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32 {
 bb0(%0 : $Int32, %1 : $C):
-  %4 = function_ref @$S14optimize_never10transform4ys5Int32VADF : $@convention(thin) (Int32) -> Int32
+  %4 = function_ref @$s14optimize_never10transform4ys5Int32VADF : $@convention(thin) (Int32) -> Int32
   %5 = apply %4(%0) : $@convention(thin) (Int32) -> Int32
   %6 = class_method %1 : $C, #C.foo!1 : (C) -> () -> Int32, $@convention(method) (@guaranteed C) -> Int32
   %7 = apply %6(%1) : $@convention(method) (@guaranteed C) -> Int32
@@ -371,16 +371,16 @@ bb0(%0 : $Int32, %1 : $C):
 // Everything in this function should get devirtualized and inlined,
 // because neither this function nor any of its callees are annotated to be
 // excluded from the optimization.
-// CHECK-LABEL: sil @$S14optimize_never4boo4ys5Int32VAA1CCF
+// CHECK-LABEL: sil @$s14optimize_never4boo4ys5Int32VAA1CCF
 // CHECK: bb0
-// CHECK-NOT: function_ref @$S14optimize_never4foo4ys5Int32VAD_AA1CCtF
+// CHECK-NOT: function_ref @$s14optimize_never4foo4ys5Int32VAD_AA1CCtF
 // Presence of checked_cast_br indicates that the speculative devirtualization
 // was performed. And this is only possible, if the original call is inlined.
 // CHECK: checked_cast_br [exact] {{%.*}} : $C to $C, bb2, bb3
 // CHECK: return
-sil @$S14optimize_never4boo4ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
+sil @$s14optimize_never4boo4ys5Int32VAA1CCF : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
-  %2 = function_ref @$S14optimize_never4foo4ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32
+  %2 = function_ref @$s14optimize_never4foo4ys5Int32VAD_AA1CCtF : $@convention(thin) (Int32, @owned C) -> Int32
   %3 = integer_literal $Builtin.Int32, 1
   %4 = struct $Int32 (%3 : $Builtin.Int32)
   strong_retain %0 : $C
@@ -389,41 +389,41 @@ bb0(%0 : $C):
   return %6 : $Int32
 }
 
-sil hidden [Onone] @$S14optimize_never4BaseC3foos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
+sil hidden [Onone] @$s14optimize_never4BaseC3foos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
 bb0(%0 : $Base):
   %2 = integer_literal $Builtin.Int32, 1
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
 
-sil hidden @$S14optimize_never4BaseC3boos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
+sil hidden @$s14optimize_never4BaseC3boos5Int32VyF : $@convention(method) (@guaranteed Base) -> Int32 {
 bb0(%0 : $Base):
   %2 = integer_literal $Builtin.Int32, 2
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
-sil hidden @$S14optimize_never8Derived1C3foos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
+sil hidden @$s14optimize_never8Derived1C3foos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
 bb0(%0 : $Derived1):
   %2 = integer_literal $Builtin.Int32, 3
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
 
-sil hidden [Onone] @$S14optimize_never8Derived1C3boos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
+sil hidden [Onone] @$s14optimize_never8Derived1C3boos5Int32VyF : $@convention(method) (@guaranteed Derived1) -> Int32 {
 bb0(%0 : $Derived1):
   %2 = integer_literal $Builtin.Int32, 4
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
 
-sil hidden @$S14optimize_never8Derived2C3foos5Int32VyF : $@convention(method) (@guaranteed Derived2) -> Int32 {
+sil hidden @$s14optimize_never8Derived2C3foos5Int32VyF : $@convention(method) (@guaranteed Derived2) -> Int32 {
 bb0(%0 : $Derived2):
   %2 = integer_literal $Builtin.Int32, 5
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   return %3 : $Int32
 }
 
-sil hidden @$S14optimize_never8Derived2C3boos5Int32VyF : $@convention(method) (@guaranteed Derived2) -> Int32 {
+sil hidden @$s14optimize_never8Derived2C3boos5Int32VyF : $@convention(method) (@guaranteed Derived2) -> Int32 {
 bb0(%0 : $Derived2):
   %2 = integer_literal $Builtin.Int32, 6
   %3 = struct $Int32 (%2 : $Builtin.Int32)
@@ -434,13 +434,13 @@ bb0(%0 : $Derived2):
 // method foo in the class Base, which mentioned in the class_method
 // instruction is marked with @_optimize(none).
 //
-// CHECK-LABEL: sil @$S14optimize_never19testDoNotDevirtBase1os5Int32VAA0G0C_tF
+// CHECK-LABEL: sil @$s14optimize_never19testDoNotDevirtBase1os5Int32VAA0G0C_tF
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br
 // CHECK: class_method {{%[0-9]+}} : $Base, #Base.foo!1 : (Base) -> () -> Int32
 // CHECK-NOT: checked_cast_br
 // CHECK: return
-sil @$S14optimize_never19testDoNotDevirtBase1os5Int32VAA0G0C_tF : $@convention(thin) (@owned Base) -> Int32 {
+sil @$s14optimize_never19testDoNotDevirtBase1os5Int32VAA0G0C_tF : $@convention(thin) (@owned Base) -> Int32 {
 bb0(%0 : $Base):
   %2 = class_method %0 : $Base, #Base.foo!1 : (Base) -> () -> Int32, $@convention(method) (@guaranteed Base) -> Int32
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> Int32
@@ -452,14 +452,14 @@ bb0(%0 : $Base):
 // is marked with @_optimize(none) and thus should not
 // participate in speculative devirtualization.
 //
-// CHECK-LABEL: sil @$S14optimize_never23testDoNotDevirtDerived11os5Int32VAA4BaseC_tF
+// CHECK-LABEL: sil @$s14optimize_never23testDoNotDevirtDerived11os5Int32VAA4BaseC_tF
 // CHECK: bb0
 // CHECK: class_method {{%[0-9]+}} : $Base, #Base.boo!1 : (Base) -> () -> Int32
 // CHECK: checked_cast_br [exact] {{%[0-9]+}} : $Base to $Base
 // CHECK: checked_cast_br [exact] {{%[0-9]+}} : $Base to $Derived2
 // CHECK-NOT: class_method
 // CHECK: }
-sil @$S14optimize_never23testDoNotDevirtDerived11os5Int32VAA4BaseC_tF : $@convention(thin) (@owned Base) -> Int32 {
+sil @$s14optimize_never23testDoNotDevirtDerived11os5Int32VAA4BaseC_tF : $@convention(thin) (@owned Base) -> Int32 {
 bb0(%0 : $Base):
   %2 = class_method %0 : $Base, #Base.boo!1 : (Base) -> () -> Int32, $@convention(method) (@guaranteed Base) -> Int32
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> Int32
@@ -468,29 +468,29 @@ bb0(%0 : $Base):
 }
 
 sil_vtable C {
-  #C.foo!1: @$S14optimize_never1CC3foos5Int32VyF
-  #C.deinit!deallocator: @$S14optimize_never1CCfD
-  #C.init!initializer.1: @$S14optimize_never1CCACycfc
+  #C.foo!1: @$s14optimize_never1CC3foos5Int32VyF
+  #C.deinit!deallocator.1: @$s14optimize_never1CCfD
+  #C.init!initializer.1: @$s14optimize_never1CCACycfc
 }
 
 sil_vtable D {
-  #C.foo!1: @$S14optimize_never1DC3foos5Int32VyF
-  #C.init!initializer.1: @$S14optimize_never1DCACycfc
-  #D.deinit!deallocator: @$S14optimize_never1DCfD
+  #C.foo!1: @$s14optimize_never1DC3foos5Int32VyF
+  #C.init!initializer.1: @$s14optimize_never1DCACycfc
+  #D.deinit!deallocator.1: @$s14optimize_never1DCfD
 }
 
 sil_vtable Base {
-  #Base.foo!1: @$S14optimize_never4BaseC3foos5Int32VyF
-  #Base.boo!1: @$S14optimize_never4BaseC3boos5Int32VyF
+  #Base.foo!1: @$s14optimize_never4BaseC3foos5Int32VyF
+  #Base.boo!1: @$s14optimize_never4BaseC3boos5Int32VyF
 }
 
 sil_vtable Derived1 {
-  #Base.foo!1: @$S14optimize_never8Derived1C3foos5Int32VyF
-  #Base.boo!1: @$S14optimize_never8Derived1C3boos5Int32VyF
+  #Base.foo!1: @$s14optimize_never8Derived1C3foos5Int32VyF
+  #Base.boo!1: @$s14optimize_never8Derived1C3boos5Int32VyF
 }
 
 sil_vtable Derived2 {
-  #Base.foo!1: @$S14optimize_never8Derived2C3foos5Int32VyF
-  #Base.boo!1: @$S14optimize_never8Derived2C3boos5Int32VyF
+  #Base.foo!1: @$s14optimize_never8Derived2C3foos5Int32VyF
+  #Base.boo!1: @$s14optimize_never8Derived2C3boos5Int32VyF
 }
 

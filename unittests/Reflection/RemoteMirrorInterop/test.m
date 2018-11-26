@@ -24,7 +24,7 @@
 
 
 void *Load(char *path) {
-  void *Handle = dlopen(path, RTLD_LAZY);
+  void *Handle = dlopen(path, RTLD_LOCAL);
   if (Handle == NULL) {
     fprintf(stderr, "loading %s: %s\n", path, dlerror());
     exit(1);
@@ -111,6 +111,13 @@ int main(int argc, char **argv) {
     printf("Unknown typeref!\n");
   }
   
+  uintptr_t Metadata = *(uintptr_t *)Obj;
+  swift_metadata_interop_t LookedUp =
+    swift_reflection_interop_lookupMetadata(Context, Metadata);
+  printf("Original metadata: %p\n", (void *)Metadata);
+  printf("Looked up metadata: Metadata=%p Library=%d\n",
+         (void *)LookedUp.Metadata, LookedUp.Library);
+  
   swift_typeinfo_t TypeInfo = swift_reflection_interop_infoForInstance(Context, Obj);
   if (TypeInfo.Kind != SWIFT_UNKNOWN) {
     printf("Kind:%u Size:%u Alignment:%u Stride:%u NumFields:%u\n",
@@ -118,7 +125,7 @@ int main(int argc, char **argv) {
            TypeInfo.NumFields);
   
     for (unsigned i = 0; i < TypeInfo.NumFields; ++i) {
-      swift_childinfo_t ChildInfo = swift_reflection_interop_childOfInstance(
+      swift_childinfo_interop_t ChildInfo = swift_reflection_interop_childOfInstance(
         Context, Obj, i);
       printf("  [%u]: %s Offset:%u Kind:%u\n", i,
              ChildInfo.Name, ChildInfo.Offset, ChildInfo.Kind);

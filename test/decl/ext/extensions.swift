@@ -17,6 +17,7 @@ extension extension_for_invalid_type_5 { // expected-error {{use of undeclared t
 }
 
 //===--- Test that we only allow extensions at file scope.
+struct Foo { }
 
 extension NestingTest1 { // expected-error {{use of undeclared type 'NestingTest1'}}
   extension Foo {} // expected-error {{declaration is only valid at file scope}}
@@ -47,9 +48,7 @@ extension S1.Type {} // expected-error {{cannot extend a metatype 'S1.Type'}}
 extension S1.NestedStruct {} // no-error
 
 struct S1_2 {
-  // expected-error @+4 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-error @+3 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
   enum Type {}
 }
@@ -122,6 +121,6 @@ extension C1.NestedStruct {
 }
 struct WrapperContext {
   extension C1.NestedStruct { // expected-error {{declaration is only valid at file scope}}
-    static let propUsingMember = originalValue // expected-error {{use of unresolved identifier 'originalValue'}}
+    static let propUsingMember = originalValue
   }
 }

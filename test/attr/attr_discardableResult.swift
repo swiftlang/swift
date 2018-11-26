@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // ---------------------------------------------------------------------------
 // Mark function's return value as discardable and silence warning
@@ -149,7 +149,7 @@ func f(a : () -> Int) {
   42  // expected-warning {{integer literal is unused}}
   
   4 + 5 // expected-warning {{result of operator '+' is unused}}
-  a() // expected-warning {{result of call is unused, but produces 'Int'}}
+  a() // expected-warning {{result of call to function returning 'Int' is unused}}
 }
 
 @warn_unused_result func g() -> Int { } // expected-warning {{'warn_unused_result' attribute behavior is now the default}} {{1-21=}}
@@ -185,3 +185,12 @@ func testOptionalChaining(c1: C1?, s1: S1?) {
   return closure
 }
 SR2948({}) // okay
+
+class SR7562_A {
+    @discardableResult required init(input: Int) { }
+}
+
+class SR7562_B : SR7562_A {}
+
+SR7562_A(input: 10) // okay
+SR7562_B(input: 10) // okay

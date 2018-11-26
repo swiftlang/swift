@@ -37,25 +37,51 @@ public let StringComparison = [
   BenchmarkInfo(
     name: "StringComparison_${Name}",
     runFunction: run_StringComparison_${Name},
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_${Name}) }),
 % end # Names
 ]
-    
+
+public let StringHashing = [
 % for Name in Names:
-  @inline(never)
-  public func run_StringComparison_${Name}(_ N: Int) {
-    let workload = Workload.${Name}
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+  BenchmarkInfo(
+    name: "StringHashing_${Name}",
+    runFunction: run_StringHashing_${Name},
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_${Name}) }),
+% end # Names
+]
+
+% for Name in Names:
+
+var Workload_${Name}: Workload! = Workload.${Name}
+
+@inline(never)
+public func run_StringComparison_${Name}(_ N: Int) {
+  let workload: Workload = Workload_${Name}
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
+}
+
+@inline(never)
+public func run_StringHashing_${Name}(_ N: Int) {
+  let workload: Workload = Workload.${Name}
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
 % end # Names
 
 struct Workload {
@@ -269,3 +295,7 @@ struct Workload {
   )
   
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

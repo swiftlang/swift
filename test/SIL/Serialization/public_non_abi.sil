@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_public_non_abi.sil
-// RUN: %target-sil-opt -linker -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s
 
 sil_stage raw
 
@@ -20,6 +20,11 @@ bb0:
 }
 
 // Make sure the function body is deserialized.
-// CHECK-LABEL: sil shared_external [serialized] [canonical] @public_non_abi_function : $@convention(thin) () -> ()
+// CHECK-LABEL: sil shared_external [serialized] @public_non_abi_function : $@convention(thin) () -> ()
+// CHECK: function_ref @other_public_non_abi_function
 // CHECK: return
 sil hidden_external [serialized] @public_non_abi_function : $@convention(thin) () -> ()
+
+// Make sure the function body is deserialized.
+// CHECK-LABEL: sil shared_external [serialized] @other_public_non_abi_function : $@convention(thin) () -> ()
+// CHECK: return

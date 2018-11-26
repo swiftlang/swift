@@ -14,8 +14,8 @@ import SwiftShims
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-public func fabs<T: FloatingPoint>(_ x: T) -> T
-  where T.Magnitude == T {
+@available(swift, deprecated: 4.2, renamed: "abs")
+public func fabs<T: FloatingPoint>(_ x: T) -> T {
   return x.magnitude
 }
 
@@ -57,6 +57,64 @@ public func round<T: FloatingPoint>(_ x: T) -> T {
 @_transparent
 public func trunc<T: FloatingPoint>(_ x: T) -> T {
   return x.rounded(.towardZero)
+}
+
+@_transparent
+public func scalbn<T: FloatingPoint>(_ x: T, _ n : Int) -> T {
+  return T(sign: .plus, exponent: T.Exponent(n), significand: x)
+}
+
+@_transparent
+public func modf<T: FloatingPoint>(_ x: T) -> (T, T) {
+  // inf/NaN: return canonicalized x, fractional part zero.
+  guard x.isFinite else { return (x+0, 0) }
+  let integral = trunc(x)
+  let fractional = x - integral
+  return (integral, fractional)
+}
+
+@_transparent
+public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
+  guard x.isFinite else { return (x+0, 0) }
+  guard x != 0 else { return (x, 0) }
+  // The C stdlib `frexp` uses a different notion of significand / exponent
+  // than IEEE 754, so we need to adjust them by a factor of two.
+  return (x.significand / 2, Int(x.exponent + 1))
+}
+
+%for T in ['Float','Double']:
+@available(swift, deprecated: 4.2, renamed: "scalbn")
+@_transparent
+public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
+  return ${T}(sign: .plus, exponent: n, significand: x)
+}
+
+%end
+
+//  Floating-point properties that are exposed as functions in the C math
+//  library. Mark those function names unavailable and direct users to the
+//  properties instead.
+@available(*, unavailable, message: "use the floatingPointClass property.")
+public func fpclassify<T: FloatingPoint>(_ value: T) -> Int { fatalError() }
+
+@available(*, unavailable, message: "use the isNormal property.")
+public func isnormal<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
+
+@available(*, unavailable, message: "use the isFinite property.")
+public func isfinite<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
+
+@available(*, unavailable, message: "use the isInfinite property.")
+public func isinf<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
+
+@available(*, unavailable, message: "use the isNaN property.")
+public func isnan<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
+
+@available(*, unavailable, message: "use the sign property.")
+public func signbit<T: FloatingPoint>(_ value: T) -> Int { fatalError() }
+
+@available(swift, deprecated: 4.2, message: "use the exponent property.")
+public func ilogb<T: BinaryFloatingPoint>(_ x: T) -> Int {
+  return Int(x.exponent)
 }
 
 %{
@@ -119,11 +177,7 @@ BinaryFunctions = [
 
 # These functions have special implementations.
 OtherFunctions = [
-    'fpclassify',
-    'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit',
-    'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma',
-    'remquo', 'nan',
-    'jn', 'yn'
+    'scalbn', 'lgamma', 'remquo', 'nan', 'jn', 'yn'
 ]
 
 # These functions are imported correctly as-is.
@@ -168,7 +222,7 @@ def TypedBinaryFunctions():
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -185,7 +239,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
@@ -202,18 +256,18 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 // Swift overlays when building Foundation. For now, just like normal
 // UnaryFunctions, we define overlays only for OverlayFloatTypes.
 % for ufunc in UnaryIntrinsicFunctions:
-%     for T, CT, f in OverlayFloatTypes():
-%       if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%       end
+%  for T, CT, f in OverlayFloatTypes():
+%   if T == 'Float80':
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+%   end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
   return ${T}(${ufunc}${f}(${CT}(x)))
 }
-%       if T == 'Float80':
+%   if T == 'Float80':
 #endif
-%       end
-%     end
+%   end
+%  end
 % end
 #endif
 
@@ -221,7 +275,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 
 % for T, CT, f, bfunc in TypedBinaryFunctions():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
 public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
@@ -233,166 +287,28 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 
 % end
 
-// Other functions
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-@available(*, deprecated, message: "use the floatingPointClass property.")
-public func fpclassify(_ value: ${T}) -> Int {
-%if T == 'Double':
-#if os(Linux) || os(Haiku)
-  return Int(__fpclassify(CDouble(value)))
-#elseif os(Windows)
-  return Int(_dclass(CDouble(value)))
-#else
-  return Int(__fpclassifyd(CDouble(value)))
-#endif
-%else:
-#if os(Windows) 
-  return Int(_${f}dclass(${CT}(value)))
-#else
-  return Int(__fpclassify${f}(${CT}(value)))
-#endif
-%end
-}
-
-@available(*, unavailable, message: "use the isNormal property.")
-public func isnormal(_ value: ${T}) -> Bool { return value.isNormal }
-
-@available(*, unavailable, message: "use the isFinite property.")
-public func isfinite(_ value: ${T}) -> Bool { return value.isFinite }
-
-@available(*, unavailable, message: "use the isInfinite property.")
-public func isinf(_ value: ${T}) -> Bool { return value.isInfinite }
-
-@available(*, unavailable, message: "use the isNaN property.")
-public func isnan(_ value: ${T}) -> Bool { return value.isNaN }
-
-@available(*, unavailable, message: "use the sign property.")
-public func signbit(_ value: ${T}) -> Int { return value.sign.rawValue }
-
-%  if T == 'Float80':
-#endif
-%  end
-% end
-
-% # These are AllFloatTypes not OverlayFloatTypes because of the tuple return.
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-@_transparent
-public func modf(_ value: ${T}) -> (${T}, ${T}) {
-  var ipart = ${CT}(0)
-  let fpart = modf${f}(${CT}(value), &ipart)
-  return (${T}(ipart), ${T}(fpart))
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-
-% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-@_transparent
-public func ldexp(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(ldexp${f}(${CT}(x), Int32(n)))
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+%  else:
+//  lgamma not available on Windows, apparently?
+#if !os(Windows)
 %  end
-@_transparent
-public func frexp(_ value: ${T}) -> (${T}, Int) {
-  var exp = Int32(0)
-  let frac = frexp${f}(${CT}(value), &exp)
-  return (${T}(frac), Int(exp))
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-
-% # This is AllFloatTypes not OverlayFloatTypes because of the Int return.
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-@_transparent
-public func ilogb(_ x: ${T}) -> Int {
-  return Int(ilogb${f}(${CT}(x)) as Int32)
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-
-% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-@_transparent
-public func scalbn(_ x: ${T}, _ n: Int) -> ${T} {
-  return ${T}(scalbn${f}(${CT}(x), Int32(n)))
-}
-%  if T == 'Float80':
-#endif
-%  end
-
-% end
-
-% # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
-% for T, CT, f in AllFloatTypes():
-%  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
-%  end
-#if os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
   var sign = Int32(0)
   let value = lgamma${f}_r(${CT}(x), &sign)
   return (${T}(value), Int(sign))
 }
-#elseif os(Windows)
-// TODO(compnerd): implement
-#else
-% # On Darwin platforms the real lgamma_r is not imported
-% # because it hides behind macro _REENTRANT.
-% # This is not @transparent because _stdlib_lgamma() is not public.
-public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = Int32(0)
-  let value = withUnsafeMutablePointer(to: &sign) {
-    (signp: UnsafeMutablePointer<Int32>) -> ${CT} in
-    return _stdlib_lgamma${f}_r(${CT}(x), signp)
-  }
-  return (${T}(value), Int(sign))
-}
 #endif
-%  if T == 'Float80':
-#endif
-%  end
 
 % end
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
@@ -408,8 +324,10 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
+@available(swift, deprecated: 4.2, message:
+           "use ${T}(nan: ${T}.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> ${T} {
   return ${T}(nan${f}(tag))

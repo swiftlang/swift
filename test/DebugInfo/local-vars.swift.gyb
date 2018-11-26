@@ -2,12 +2,13 @@
 // test only verifies that the variables show up in the debug info at
 // all. There are other tests testing liveness and representation.
 
+// REQUIRES: rdar45708367
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
 // RUN: %llvm-dwarfdump %t.o \
 // RUN:   | %FileCheck %t.swift --check-prefix=DWARF
-// RUN: %llvm-dwarfdump --verify %t.o
+// DISABLED_RDAR_43340064 %llvm-dwarfdump --verify %t.o
 // RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
 // RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
 
@@ -84,6 +85,7 @@ def derive_name((type, val)):
 
 for name, type, val in map(derive_name, type_initializer_map):
   generic = (type in ['T', 'U'])
+  function = "->" in type
 }%                                  
 %  if generic:
 public class ContextA_${name}<T, U : Proto> {
@@ -329,7 +331,9 @@ public func arg_${name}(_ v: ${type}) {
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_artificial
 %  end
+%  if not function:
   use(v)
+%  end
 }
 
 public func arg_inout_${name}(_ v: inout ${type}) {

@@ -15,17 +15,25 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/Type.h"
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 namespace llvm {
   class MemoryBuffer;
 }
+
+namespace swift {
+namespace syntax {
+class SourceFileSyntax;
+} // namespace syntax
+} // namespace swift
+
 namespace SourceKit {
 
 struct EntityInfo {
@@ -188,9 +196,26 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
 
+struct SourceFileRange {
+  /// The byte offset at which the range begins
+  uintptr_t Start;
+  /// The byte offset at which the end ends
+  uintptr_t End;
+};
+
+enum class SyntaxTreeTransferMode {
+  /// Don't transfer the syntax tree
+  Off,
+  /// Transfer the syntax tree incrementally
+  Incremental,
+  /// Always transfer the entire syntax tree
+  Full
+};
+
+enum class SyntaxTreeSerializationFormat { JSON, ByteTree };
+
 class EditorConsumer {
   virtual void anchor();
-
 public:
   virtual ~EditorConsumer() { }
 
@@ -198,13 +223,16 @@ public:
 
   virtual void handleRequestError(const char *Description) = 0;
 
-  virtual bool handleSyntaxMap(unsigned Offset, unsigned Length,
+  virtual bool syntaxMapEnabled() = 0;
+  virtual void handleSyntaxMap(unsigned Offset, unsigned Length,
                                UIdent Kind) = 0;
 
-  virtual bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
+  virtual bool documentStructureEnabled() = 0;
+
+  virtual void handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
 
-  virtual bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
+  virtual void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                          UIdent Kind, UIdent AccessLevel,
                                          UIdent SetterAccessLevel,
                                          unsigned NameOffset,
@@ -220,26 +248,30 @@ public:
                                          ArrayRef<StringRef> InheritedTypes,
                                          ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) = 0;
 
-  virtual bool endDocumentSubStructure() = 0;
+  virtual void endDocumentSubStructure() = 0;
 
-  virtual bool handleDocumentSubStructureElement(UIdent Kind,
-                                                 unsigned Offset,
+  virtual void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
                                                  unsigned Length) = 0;
 
-  virtual bool recordAffectedRange(unsigned Offset, unsigned Length) = 0;
+  virtual void recordAffectedRange(unsigned Offset, unsigned Length) = 0;
 
-  virtual bool recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
+  virtual void recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
 
-  virtual bool recordFormattedText(StringRef Text) = 0;
+  virtual void recordFormattedText(StringRef Text) = 0;
 
-  virtual bool setDiagnosticStage(UIdent DiagStage) = 0;
-  virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info,
+  virtual void setDiagnosticStage(UIdent DiagStage) = 0;
+  virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
                                 UIdent DiagStage) = 0;
 
-  virtual bool handleSourceText(StringRef Text) = 0;
+  virtual void handleSourceText(StringRef Text) = 0;
 
-  virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
-  virtual bool syntaxTreeEnabled() = 0;
+  virtual void
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                   std::unordered_set<unsigned> &ReusedNodeIds) = 0;
+  virtual bool syntaxTreeEnabled() {
+    return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
+  }
+  virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
 
   virtual void finished() {}
 };
@@ -383,9 +415,9 @@ struct AvailableAttrInfo {
   bool IsDeprecated = false;
   UIdent Platform;
   llvm::SmallString<32> Message;
-  llvm::Optional<clang::VersionTuple> Introduced;
-  llvm::Optional<clang::VersionTuple> Deprecated;
-  llvm::Optional<clang::VersionTuple> Obsoleted;
+  llvm::Optional<llvm::VersionTuple> Introduced;
+  llvm::Optional<llvm::VersionTuple> Deprecated;
+  llvm::Optional<llvm::VersionTuple> Obsoleted;
 };
 
 struct NoteRegion {
@@ -518,7 +550,6 @@ public:
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
   virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          bool EnableSyntaxMap,
                           EditorConsumer &Consumer,
                           ArrayRef<const char *> Args) = 0;
 
@@ -540,7 +571,7 @@ public:
                                          ArrayRef<const char *> Args,
                                          bool UsingSwiftArgs,
                                          bool SynthesizedExtensions,
-                                         Optional<unsigned> swiftVersion) = 0;
+                                         StringRef swiftVersion) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,

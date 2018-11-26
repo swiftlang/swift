@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// UNSUPPORTED: resilient_stdlib
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -13,7 +12,7 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @"$S33big_types_corner_cases_as_library9BigStructVwCP"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @"$s33big_types_corner_cases_as_library9BigStructVwCP"
 // CHECK: [[RETVAL:%.*]] = bitcast %T33big_types_corner_cases_as_library9BigStructV* {{.*}} to %swift.opaque*
 // CHECK: ret %swift.opaque* [[RETVAL]]
 let bigStructGlobalArray : [BigStruct] = [

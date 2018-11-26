@@ -70,7 +70,7 @@ sil @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
 bb0(%0 : @trivial $*Builtin.NativeObject):
   %1 = load_borrow %0 : $*Builtin.NativeObject
   %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
-  end_borrow %1 from %0 : $Builtin.NativeObject, $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   %3 = tuple()
   return %3 : $()
 }
@@ -103,22 +103,23 @@ bb0(%0 : @owned $Builtin.NativeObject):
 sil @begin_borrow_store_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   %2 = alloc_stack $Builtin.NativeObject
   %3 = begin_borrow %0 : $Builtin.NativeObject
   store_borrow %3 to %2 : $*Builtin.NativeObject
-  end_borrow %3 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   dealloc_stack %2 : $*Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
 
+// We no longer lower copy_unowned_value. So make sure that we actually don't.
+//
 // CHECK-LABEL: sil @copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned Builtin.NativeObject):
-// CHECK-NEXT: strong_retain_unowned [[ARG]] : $@sil_unowned Builtin.NativeObject
-// CHECK-NEXT: [[OWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned Builtin.NativeObject to $Builtin.NativeObject
-// CHECK-NEXT: strong_release [[OWNED_ARG]] : $Builtin.NativeObject
+// CHECK-NEXT: [[STRONG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: strong_release [[STRONG]] : $Builtin.NativeObject
 // CHECK-NEXT: unowned_release [[ARG]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return

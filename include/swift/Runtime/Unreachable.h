@@ -18,11 +18,12 @@
 #ifndef SWIFT_RUNTIME_UNREACHABLE_H
 #define SWIFT_RUNTIME_UNREACHABLE_H
 
-#include "llvm/Support/Compiler.h"
 #include <assert.h>
 #include <stdlib.h>
 
-LLVM_ATTRIBUTE_NORETURN
+#include "swift/Runtime/Config.h"
+
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 inline static void swift_runtime_unreachable(const char *msg) {
   assert(false && msg);
   (void)msg;

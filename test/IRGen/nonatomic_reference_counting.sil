@@ -47,8 +47,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain|swift_nonatomic_retain)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease|swift_nonatomic_release)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain|swift_nonatomic_retain)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease|swift_nonatomic_release)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -93,8 +93,8 @@ bb0:
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_nonatomic_rr_n
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRetain_n|swift_nonatomic_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_nonatomic_unknownRelease_n|swift_nonatomic_release_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRetain_n|swift_nonatomic_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_nonatomic_unknownObjectRelease_n|swift_nonatomic_release_n)}}
 // CHECK: ret
 sil @test_unknown_nonatomic_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -109,8 +109,8 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: define {{.*}}@test_unknown_mixed_rr_n
-// CHECK: call {{.*}}@{{(swift_unknownRetain_n|swift_retain_n)}}
-// CHECK: call {{.*}}@{{(swift_unknownRelease_n|swift_release_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRetain_n|swift_retain_n)}}
+// CHECK: call {{.*}}@{{(swift_unknownObjectRelease_n|swift_release_n)}}
 // CHECK: ret
 sil @test_unknown_mixed_rr_n: $@convention(thin) <T where T : P> (@owned T) -> () {
 bb0(%0 : $T):
@@ -195,22 +195,6 @@ bb0:
   return %3 : $()
 }
 
-// CHECK-LABEL: define {{.*}}@test_nonatomic_pin_unpin
-// CHECK: call {{.*}}@swift_nonatomic_tryPin
-// CHECK: call {{.*}}@swift_nonatomic_unpin
-// CHECK: ret
-sil @test_nonatomic_pin_unpin: $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_ref $C
-  %1 = unchecked_ref_cast %0 : $C to  $Builtin.NativeObject
-  %2 = strong_pin [nonatomic] %1 : $Builtin.NativeObject
-  %f = function_ref @doSomething : $@convention(thin) () -> ()
-  %r = apply %f () : $@convention(thin) () -> ()
-  strong_unpin [nonatomic] %2 : $Optional<Builtin.NativeObject>
-  %3 = tuple ()
-  return %3 : $()
-}
-
 // C.__deallocating_deinit
 sil @_TFC28nonatomic_reference_counting1CD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
@@ -220,6 +204,6 @@ bb0(%0 : $C):
 }
 
 sil_vtable C {
-  #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+  #C.deinit!deallocator.1: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 

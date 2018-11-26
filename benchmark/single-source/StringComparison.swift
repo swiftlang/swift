@@ -34,167 +34,359 @@ public let StringComparison = [
   BenchmarkInfo(
     name: "StringComparison_ascii",
     runFunction: run_StringComparison_ascii,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_ascii) }),
   BenchmarkInfo(
     name: "StringComparison_latin1",
     runFunction: run_StringComparison_latin1,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_latin1) }),
   BenchmarkInfo(
     name: "StringComparison_fastPrenormal",
     runFunction: run_StringComparison_fastPrenormal,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_fastPrenormal) }),
   BenchmarkInfo(
     name: "StringComparison_slowerPrenormal",
     runFunction: run_StringComparison_slowerPrenormal,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_slowerPrenormal) }),
   BenchmarkInfo(
     name: "StringComparison_nonBMPSlowestPrenormal",
     runFunction: run_StringComparison_nonBMPSlowestPrenormal,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_nonBMPSlowestPrenormal) }),
   BenchmarkInfo(
     name: "StringComparison_emoji",
     runFunction: run_StringComparison_emoji,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_emoji) }),
   BenchmarkInfo(
     name: "StringComparison_abnormal",
     runFunction: run_StringComparison_abnormal,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_abnormal) }),
   BenchmarkInfo(
     name: "StringComparison_zalgo",
     runFunction: run_StringComparison_zalgo,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_zalgo) }),
   BenchmarkInfo(
     name: "StringComparison_longSharedPrefix",
     runFunction: run_StringComparison_longSharedPrefix,
-    tags: [.validation, .api, .String]),    
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_longSharedPrefix) }),
 ]
-    
-  @inline(never)
-  public func run_StringComparison_ascii(_ N: Int) {
-    let workload = Workload.ascii
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+
+public let StringHashing = [
+  BenchmarkInfo(
+    name: "StringHashing_ascii",
+    runFunction: run_StringHashing_ascii,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_ascii) }),
+  BenchmarkInfo(
+    name: "StringHashing_latin1",
+    runFunction: run_StringHashing_latin1,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_latin1) }),
+  BenchmarkInfo(
+    name: "StringHashing_fastPrenormal",
+    runFunction: run_StringHashing_fastPrenormal,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_fastPrenormal) }),
+  BenchmarkInfo(
+    name: "StringHashing_slowerPrenormal",
+    runFunction: run_StringHashing_slowerPrenormal,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_slowerPrenormal) }),
+  BenchmarkInfo(
+    name: "StringHashing_nonBMPSlowestPrenormal",
+    runFunction: run_StringHashing_nonBMPSlowestPrenormal,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_nonBMPSlowestPrenormal) }),
+  BenchmarkInfo(
+    name: "StringHashing_emoji",
+    runFunction: run_StringHashing_emoji,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_emoji) }),
+  BenchmarkInfo(
+    name: "StringHashing_abnormal",
+    runFunction: run_StringHashing_abnormal,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_abnormal) }),
+  BenchmarkInfo(
+    name: "StringHashing_zalgo",
+    runFunction: run_StringHashing_zalgo,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_zalgo) }),
+  BenchmarkInfo(
+    name: "StringHashing_longSharedPrefix",
+    runFunction: run_StringHashing_longSharedPrefix,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_longSharedPrefix) }),
+]
+
+
+var Workload_ascii: Workload! = Workload.ascii
+
+@inline(never)
+public func run_StringComparison_ascii(_ N: Int) {
+  let workload: Workload = Workload_ascii
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_latin1(_ N: Int) {
-    let workload = Workload.latin1
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_ascii(_ N: Int) {
+  let workload: Workload = Workload.ascii
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_latin1: Workload! = Workload.latin1
+
+@inline(never)
+public func run_StringComparison_latin1(_ N: Int) {
+  let workload: Workload = Workload_latin1
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_fastPrenormal(_ N: Int) {
-    let workload = Workload.fastPrenormal
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_latin1(_ N: Int) {
+  let workload: Workload = Workload.latin1
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_fastPrenormal: Workload! = Workload.fastPrenormal
+
+@inline(never)
+public func run_StringComparison_fastPrenormal(_ N: Int) {
+  let workload: Workload = Workload_fastPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_slowerPrenormal(_ N: Int) {
-    let workload = Workload.slowerPrenormal
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_fastPrenormal(_ N: Int) {
+  let workload: Workload = Workload.fastPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_slowerPrenormal: Workload! = Workload.slowerPrenormal
+
+@inline(never)
+public func run_StringComparison_slowerPrenormal(_ N: Int) {
+  let workload: Workload = Workload_slowerPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_nonBMPSlowestPrenormal(_ N: Int) {
-    let workload = Workload.nonBMPSlowestPrenormal
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_slowerPrenormal(_ N: Int) {
+  let workload: Workload = Workload.slowerPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_nonBMPSlowestPrenormal: Workload! = Workload.nonBMPSlowestPrenormal
+
+@inline(never)
+public func run_StringComparison_nonBMPSlowestPrenormal(_ N: Int) {
+  let workload: Workload = Workload_nonBMPSlowestPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_emoji(_ N: Int) {
-    let workload = Workload.emoji
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_nonBMPSlowestPrenormal(_ N: Int) {
+  let workload: Workload = Workload.nonBMPSlowestPrenormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_emoji: Workload! = Workload.emoji
+
+@inline(never)
+public func run_StringComparison_emoji(_ N: Int) {
+  let workload: Workload = Workload_emoji
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_abnormal(_ N: Int) {
-    let workload = Workload.abnormal
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_emoji(_ N: Int) {
+  let workload: Workload = Workload.emoji
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_abnormal: Workload! = Workload.abnormal
+
+@inline(never)
+public func run_StringComparison_abnormal(_ N: Int) {
+  let workload: Workload = Workload_abnormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_zalgo(_ N: Int) {
-    let workload = Workload.zalgo
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_abnormal(_ N: Int) {
+  let workload: Workload = Workload.abnormal
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_zalgo: Workload! = Workload.zalgo
+
+@inline(never)
+public func run_StringComparison_zalgo(_ N: Int) {
+  let workload: Workload = Workload_zalgo
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
-  @inline(never)
-  public func run_StringComparison_longSharedPrefix(_ N: Int) {
-    let workload = Workload.longSharedPrefix
-    let tripCount = workload.tripCount
-    let payload = workload.payload
-    for _ in 1...tripCount*N {
-      for s1 in payload {
-        for s2 in payload {
-          blackHole(s1 < s2)
-        }
+}
+
+@inline(never)
+public func run_StringHashing_zalgo(_ N: Int) {
+  let workload: Workload = Workload.zalgo
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
+
+var Workload_longSharedPrefix: Workload! = Workload.longSharedPrefix
+
+@inline(never)
+public func run_StringComparison_longSharedPrefix(_ N: Int) {
+  let workload: Workload = Workload_longSharedPrefix
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for s1 in payload {
+      for s2 in payload {
+        blackHole(s1 < s2)
       }
     }
   }
-    
+}
+
+@inline(never)
+public func run_StringHashing_longSharedPrefix(_ N: Int) {
+  let workload: Workload = Workload.longSharedPrefix
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      blackHole(str.hashValue)
+    }
+  }
+}
+  
 
 struct Workload {
   static let N = 100
@@ -407,3 +599,7 @@ struct Workload {
   )
   
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

@@ -319,3 +319,35 @@ bb3:
   dealloc_stack %0 : $*Builtin.Int32
   return %9999 : $()
 }
+
+class RefElemClass {
+  var x : Int32
+
+  init()
+}
+
+// Check hoisting of ref_element_addr in conditional control flow (for exclusivity)
+//
+// CHECK-LABEL: sil @hoist_ref_elem
+// CHECK: bb0(%0 : $RefElemClass):
+// CHECK-NEXT:   ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+// CHECK-NEXT:   br bb1
+sil @hoist_ref_elem : $@convention(thin) (RefElemClass) -> () {
+bb0(%0 : $RefElemClass):
+  br bb1
+
+// loop.
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  cond_br undef, bb4, bb1
+
+bb3:
+  %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+  br bb1
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}

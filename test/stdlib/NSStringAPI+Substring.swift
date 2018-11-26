@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -28,7 +28,7 @@ var tests = TestSuite("NSStringAPIs/Substring")
 tests.test("range(of:)/NilRange") {
   let ss = "aabcdd"[1, -1]
   let range = ss.range(of: "bc")
-  expectOptionalEqual("bc", range.map { ss[$0] })
+  expectEqual("bc", range.map { ss[$0] })
 }
 
 tests.test("range(of:)/NonNilRange") {
@@ -36,13 +36,13 @@ tests.test("range(of:)/NonNilRange") {
   let ss = s[1, -1]
   let searchRange = s.range(fromStart: 2, fromEnd: -2)
   let range = ss.range(of: "bc", range: searchRange)
-  expectOptionalEqual("bc", range.map { ss[$0] })
+  expectEqual("bc", range.map { ss[$0] })
 }
 
 tests.test("rangeOfCharacter") {
   let ss = "__hello__"[2, -2]
   let range = ss.rangeOfCharacter(from: CharacterSet.alphanumerics)
-  expectOptionalEqual("h", range.map { ss[$0] })
+  expectEqual("h", range.map { ss[$0] })
 }
 
 tests.test("compare(_:options:range:locale:)/NilRange") {

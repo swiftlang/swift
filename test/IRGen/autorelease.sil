@@ -1,75 +1,48 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck -check-prefix=%target-cpu %s
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-ptrsize -check-prefix %target-cpu %s
 
 // rdar://16565958
 
 import Builtin
 import Swift
 
-// x86_64: [[OBJC:%objc_object]] = type
-// armv7:  [[OBJC:%objc_object]] = type
-// armv7s: [[OBJC:%objc_object]] = type
-// armv7k: [[OBJC:%objc_object]] = type
-// arm64:  [[OBJC:%objc_object]] = type
-// i386:   [[OBJC:%objc_object]] = type
+// CHECK: [[OBJC:%objc_object]] = type
 
 class C {}
 sil_vtable C {}
 sil @_TFC11autorelease1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
-bb0(%0 : $C):
+bb0(%0 : @owned $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
 sil @foo : $@convention(thin) (@owned C?) -> @autoreleased C? {
-bb0(%0 : $C?):
+bb0(%0 : @owned $C?):
   return %0 : $C?
 }
-// x86_64:    define{{( protected)?}} swiftcc i64 @foo(i64) {{.*}} {
-// x86_64:      [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
-// x86_64-NEXT: ret i64 [[T0]]
 
-// i386:     define{{( protected)?}} swiftcc i32 @foo(i32) {{.*}} {
-// i386:       [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
-// i386-NEXT:  ret i32 [[T0]]
+// CHECK-32:      define{{( dllexport| protected)?}} swiftcc i32 @foo(i32) {{.*}} {
+// CHECK-32:        [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
+// CHECK-32-NEXT:   ret i32 [[T0]]
 
-// arm64:    define{{( protected)?}} swiftcc i64 @foo(i64) {{.*}} {
-// arm64:      [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
-// arm64-NEXT: ret i64 [[T0]]
-
-// armv7:    define{{( protected)?}} swiftcc i32 @foo(i32) {{.*}} {
-// armv7:      [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
-// armv7-NEXT: ret i32 [[T0]]
-
-// armv7s:    define{{( protected)?}} swiftcc i32 @foo(i32) {{.*}} {
-// armv7s:      [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
-// armv7s-NEXT: ret i32 [[T0]]
-
-// armv7k:    define{{( protected)?}} swiftcc i32 @foo(i32) {{.*}} {
-// armv7k:      [[T0:%.*]] = tail call i32 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i32 (i32)*)(i32 %0)
-// armv7k-NEXT: ret i32 [[T0]]
+// CHECK-64:      define{{( dllexport| protected)?}} swiftcc i64 @foo(i64) {{.*}} {
+// CHECK-64:        [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
+// CHECK-64-NEXT:   ret i64 [[T0]]
 
 sil @bar : $@convention(thin) (@owned C?) -> @owned C? {
-bb0(%0 : $C?):
+bb0(%0 : @owned $C?):
   %1 = function_ref @foo : $@convention(thin) (@owned C?) -> @autoreleased C?
   %2 = apply %1(%0) : $@convention(thin) (@owned C?) -> @autoreleased C?
   return %2 : $C?
 }
-// x86_64:    define{{( protected)?}} swiftcc i64 @bar(i64)
+
+// x86_64:    define{{( dllexport| protected)?}} swiftcc i64 @bar(i64)
 // x86_64:      [[T0:%.*]] = call swiftcc i64 @foo(i64 %0)
 // x86_64-NEXT: [[T1:%.*]] = inttoptr i64 [[T0]] to i8*
 // x86_64-NEXT: [[T2:%.*]] = notail call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
 // x86_64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
 // x86_64-NEXT: ret i64 [[T3]]
 
-// i386:    define{{( protected)?}} swiftcc i32 @bar(i32)
-// i386:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
-// i386-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*
-// i386-NEXT: [[T2:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
-// i386-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i32
-// i386-NEXT: ret i32 [[T3]]
-
-// arm64:    define{{( protected)?}} swiftcc i64 @bar(i64)
+// arm64:    define{{( dllexport| protected)?}} swiftcc i64 @bar(i64)
 // arm64:      [[T0:%.*]] = call swiftcc i64 @foo(i64 %0)
 // arm64-NEXT: call void asm sideeffect "mov
 // arm64-NEXT: [[T1:%.*]] = inttoptr i64 [[T0]] to i8*
@@ -77,7 +50,14 @@ bb0(%0 : $C?):
 // arm64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
 // arm64-NEXT: ret i64 [[T3]]
 
-// armv7:    define{{( protected)?}} swiftcc i32 @bar(i32)
+// i386:    define{{( dllexport| protected)?}} swiftcc i32 @bar(i32)
+// i386:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
+// i386-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*
+// i386-NEXT: [[T2:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
+// i386-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i32
+// i386-NEXT: ret i32 [[T3]]
+
+// armv7:    define{{( dllexport| protected)?}} swiftcc i32 @bar(i32)
 // armv7:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
 // armv7-NEXT: call void asm sideeffect "mov
 // armv7-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*
@@ -85,7 +65,7 @@ bb0(%0 : $C?):
 // armv7-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i32
 // armv7-NEXT: ret i32 [[T3]]
 
-// armv7s:    define{{( protected)?}} swiftcc i32 @bar(i32)
+// armv7s:    define{{( dllexport| protected)?}} swiftcc i32 @bar(i32)
 // armv7s:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
 // armv7s-NEXT: call void asm sideeffect "mov
 // armv7s-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*
@@ -93,7 +73,7 @@ bb0(%0 : $C?):
 // armv7s-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i32
 // armv7s-NEXT: ret i32 [[T3]]
 
-// armv7k:    define{{( protected)?}} swiftcc i32 @bar(i32)
+// armv7k:    define{{( dllexport| protected)?}} swiftcc i32 @bar(i32)
 // armv7k:      [[T0:%.*]] = call swiftcc i32 @foo(i32 %0)
 // armv7k-NEXT: call void asm sideeffect "mov
 // armv7k-NEXT: [[T1:%.*]] = inttoptr i32 [[T0]] to i8*

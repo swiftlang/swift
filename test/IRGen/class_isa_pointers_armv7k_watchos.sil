@@ -17,13 +17,13 @@ class Purebred {
 }
 sil_vtable Purebred {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @purebred_method(%T33class_isa_pointers_armv7k_watchos8PurebredC*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @purebred_method(%T33class_isa_pointers_armv7k_watchos8PurebredC*) {{.*}} {
 // CHECK:         [[ISA_PTR:%.*]] = bitcast %T33class_isa_pointers_armv7k_watchos8PurebredC* %0 to %swift.type**
 // CHECK:         [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_PTR]]
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @purebred_method : $@convention(thin) (@owned Purebred) -> () {
-entry(%0 : $Purebred):
+entry(%0 : @owned $Purebred):
   %m = class_method %0 : $Purebred, #Purebred.method!1 : (Purebred) -> () -> (), $@convention(method) (@guaranteed Purebred) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Purebred) -> ()
   return %z : $()
@@ -38,14 +38,14 @@ class Mongrel: Gizmo {
 }
 sil_vtable Mongrel {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @mongrel_method(%T33class_isa_pointers_armv7k_watchos7MongrelC*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @mongrel_method(%T33class_isa_pointers_armv7k_watchos7MongrelC*) {{.*}} {
 // CHECK:         [[T0:%.*]] = bitcast {{.*}} %0 to %objc_object*
 // CHECK:         [[T1:%.*]] = call %objc_class* @object_getClass(%objc_object* [[T0]])
 // CHECK:         [[ISA:%.*]] = bitcast %objc_class* [[T1]] to %swift.type*
 // CHECK:         [[VTABLE:%.*]] = bitcast %swift.type* [[ISA]]
 // CHECK:         getelementptr inbounds {{.*}} [[VTABLE]]
 sil @mongrel_method : $@convention(thin) (@owned Mongrel) -> () {
-entry(%0 : $Mongrel):
+entry(%0 : @owned $Mongrel):
   %m = class_method %0 : $Mongrel, #Mongrel.method!1 : (Mongrel) -> () -> (), $@convention(method) (@guaranteed Mongrel) -> ()
   %z = apply %m(%0) : $@convention(method) (@guaranteed Mongrel) -> ()
   return %z : $()
@@ -53,15 +53,15 @@ entry(%0 : $Mongrel):
 
 // ObjC stubs expected by ObjC metadata emission
 
-sil private @$S33class_isa_pointers_armv7k_watchos7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
-entry(%0 : $Purebred):
+sil private @$s33class_isa_pointers_armv7k_watchos7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
+entry(%0 : @unowned $Purebred):
   unreachable
 }
-sil private @$S33class_isa_pointers_armv7k_watchos7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
-entry(%0 : $Int, %1 : $Purebred):
+sil private @$s33class_isa_pointers_armv7k_watchos7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
+entry(%0 : @trivial $Int, %1 : @unowned $Purebred):
   unreachable
 }
-sil private @$S33class_isa_pointers_armv7k_watchos7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
-entry(%0 : $Purebred):
+sil private @$s33class_isa_pointers_armv7k_watchos7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
+entry(%0 : @unowned $Purebred):
   unreachable
 }

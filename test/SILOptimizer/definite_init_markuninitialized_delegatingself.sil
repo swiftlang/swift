@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
 
 // This test only tests mark_uninitialized [delegatingself]
 
@@ -77,75 +77,6 @@ bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
   return %13 : $()
 }
 
-// CHECK-LABEL: sil @test_delegating_box_release
-// CHECK: bb0([[ARG:%.*]] : @owned $RootClassWithNontrivialStoredProperties):
-// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-// CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELFBOX]]
-// CHECK-NEXT: store [[ARG]] to [init] [[PB]]
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [take] [[PB]]
-// CHECK-NEXT: [[METATYPE:%[0-9]+]] = value_metatype $@thick RootClassWithNontrivialStoredProperties.Type, [[SELF]] : $RootClassWithNontrivialStoredProperties
-// CHECK-NEXT: dealloc_partial_ref [[SELF]] : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
-// CHECK-NEXT: dealloc_box [[SELFBOX]]
-sil @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
-bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
-  %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
-  store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-
-  %13 = tuple ()
-  return %13 : $()
-}
-
-
-// CHECK-LABEL: sil @test_delegating_rvalue_release
-// CHECK: bb0([[ARG:%.*]] : @owned $RootClassWithNontrivialStoredProperties):
-// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-// CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELFBOX]]
-// CHECK-NEXT: store [[ARG]] to [init] [[PB]]
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [take] [[PB]]
-// CHECK-NEXT: [[METATYPE:%[0-9]+]] = value_metatype $@thick RootClassWithNontrivialStoredProperties.Type, [[SELF]] : $RootClassWithNontrivialStoredProperties
-// CHECK-NEXT: dealloc_partial_ref [[SELF]] : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
-// CHECK-NEXT: [[SELF2:%[0-9]+]] = load [take] [[PB]]
-// CHECK-NEXT: [[METATYPE2:%[0-9]+]] = value_metatype $@thick RootClassWithNontrivialStoredProperties.Type, [[SELF2]] : $RootClassWithNontrivialStoredProperties
-// CHECK-NEXT: dealloc_partial_ref [[SELF2]] : $RootClassWithNontrivialStoredProperties, [[METATYPE2]] : $@thick RootClassWithNontrivialStoredProperties.Type
-// CHECK-NEXT: dealloc_box [[SELFBOX]]
-sil @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
-bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
-  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>, 0
-  %4 = mark_uninitialized [delegatingself] %2a : $*RootClassWithNontrivialStoredProperties
-  store %0 to [init] %4 : $*RootClassWithNontrivialStoredProperties
-  %6 = load [take] %4 : $*RootClassWithNontrivialStoredProperties
-  destroy_value %6 : $RootClassWithNontrivialStoredProperties
-  destroy_value %2 : $<τ_0_0> { var τ_0_0 } <RootClassWithNontrivialStoredProperties>
-
-  %13 = tuple ()
-  return %13 : $()
-}
-
-// CHECK-LABEL: sil @test_delegating_derived_release
-// CHECK: bb0([[ARG:%.*]] : @owned $DerivedClassWithNontrivialStoredProperties):
-// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack $DerivedClassWithNontrivialStoredProperties
-// CHECK-NEXT: store [[ARG]] to [init] [[SELFBOX]]
-// CHECK-NEXT: [[SELF:%[0-9]+]] = load [take] [[SELFBOX]]
-// CHECK-NEXT: [[METATYPE:%[0-9]+]] = value_metatype $@thick DerivedClassWithNontrivialStoredProperties.Type, [[SELF]] : $DerivedClassWithNontrivialStoredProperties
-// CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
-// CHECK-NEXT: dealloc_stack [[SELFBOX]]
-sil @test_delegating_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
-bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
-  %2 = alloc_stack $DerivedClassWithNontrivialStoredProperties
-  %4 = mark_uninitialized [delegatingself] %2 : $*DerivedClassWithNontrivialStoredProperties
-  store %0 to [init] %4 : $*DerivedClassWithNontrivialStoredProperties
-
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
-  dealloc_stack %2 : $*DerivedClassWithNontrivialStoredProperties
-
-  %13 = tuple ()
-  return %13 : $()
-}
-
 // <rdar://problem/20608881> DI miscompiles this testcase into a memory leak
 struct MyStruct3 {
   @sil_stored var c: C
@@ -182,10 +113,13 @@ bb1:
 bb2:
 
 // CHECK-NEXT:  [[BIT:%[0-9]+]] = load [trivial] [[CONTROL]] : $*Builtin.Int1
-// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
 
 // CHECK: [[INITIALIZED]]:
 // CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyStruct3
+// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
+
+// CHECK: [[UNINITIALIZED]]:
 // CHECK-NEXT:  br [[EXIT]]
 
 // CHECK: [[EXIT]]:
@@ -201,74 +135,3 @@ bb2:
 class MyClass3 {
 }
 sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
-
-// CHECK-LABEL: sil hidden @test_conditional_destroy_class_delegating_init
-sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1, @owned MyClass3) -> () {
-bb0(%0 : @trivial $Builtin.Int1, %1 : @owned $MyClass3):
-// CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
-
-  %2 = alloc_stack $MyClass3
-  %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
-  store %1 to [init] %3 : $*MyClass3
-
-// CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
-  cond_br %0, bb1, bb2
-
-// CHECK: [[SUCCESS]]:
-bb1:
-  %4 = load [take] %3 : $*MyClass3
-  %5 = function_ref @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
-  %6 = apply %5(%4) : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
-  store %6 to [init] %3 : $*MyClass3
-
-// CHECK:       [[SET:%[0-9]+]] = integer_literal $Builtin.Int2, -2
-// CHECK-NEXT:  [[OLD:%.*]] = load [trivial] [[CONTROL]]
-// CHECK-NEXT:  [[UPDATE:%.*]] = builtin "or_Int2"([[OLD]] : $Builtin.Int2, [[SET]] : $Builtin.Int2)
-// CHECK-NEXT:  store [[UPDATE]] to [trivial] [[CONTROL]] : $*Builtin.Int2
-
-// CHECK:       [[SET:%[0-9]+]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:  [[OLD:%.*]] = load [trivial] [[CONTROL]]
-// CHECK-NEXT:  [[UPDATE:%.*]] = builtin "or_Int2"([[OLD]] : $Builtin.Int2, [[SET]] : $Builtin.Int2)
-// CHECK-NEXT:  store [[UPDATE]] to [trivial] [[CONTROL]] : $*Builtin.Int2
-
-// CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}({{.*}})  : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
-// CHECK-NEXT:  store [[NEW_SELF]] to [init] [[SELF_BOX]] : $*MyClass3
-
-// CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
-  br bb2
-
-// CHECK: [[CHECK]]:
-bb2:
-
-// CHECK-NEXT:  [[BIT:%.*]] = load [trivial] [[CONTROL]]
-// CHECK-NEXT:  [[COND:%.*]] = builtin "trunc_Int2_Int1"([[BIT]] : $Builtin.Int2) : $Builtin.Int1
-// CHECK-NEXT:  cond_br [[COND]], [[PARTIAL:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
-
-// CHECK: [[PARTIAL]]:
-// CHECK-NEXT:  [[BIT:%.*]] = load [trivial] [[CONTROL]]
-// CHECK-NEXT:  [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
-// CHECK-NEXT:  [[SHIFTED:%.*]] = builtin "lshr_Int2"([[BIT]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2) : $Builtin.Int2
-// CHECK-NEXT:  [[COND:%.*]] = builtin "trunc_Int2_Int1"([[SHIFTED]] : $Builtin.Int2) : $Builtin.Int1
-// CHECK-NEXT:  cond_br [[COND]], [[INITIALIZED:bb[0-9]+]], [[CONSUMED:bb[0-9]+]]
-
-// CHECK: [[INITIALIZED]]:
-// CHECK-NEXT:  destroy_addr [[SELF_BOX]] : $*MyClass3
-// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
-
-// CHECK: [[CONSUMED]]:
-// CHECK-NEXT:  br [[EXIT]]
-
-// CHECK: [[UNINITIALIZED]]:
-// CHECK-NEXT:  [[OLD_SELF:%[0-9]+]] = load [take] [[SELF_BOX]] : $*MyClass3
-// CHECK-NEXT:  [[METATYPE:%[0-9]+]] = value_metatype $@thick MyClass3.Type, [[OLD_SELF]] : $MyClass3
-// CHECK-NEXT:  dealloc_partial_ref [[OLD_SELF]] : $MyClass3, [[METATYPE]] : $@thick MyClass3.Type
-// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
-
-// CHECK: [[EXIT]]:
-
-  destroy_addr %3 : $*MyClass3
-  dealloc_stack %2 : $*MyClass3
-  %7 = tuple ()
-  return %7 : $()
-}

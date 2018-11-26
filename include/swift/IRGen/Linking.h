@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
@@ -31,6 +32,7 @@ class Triple;
 namespace swift {
 namespace irgen {
 class IRGenModule;
+class Alignment;
 
 /// Determine if the triple uses the DLL storage.
 bool useDllStorage(const llvm::Triple &triple);
@@ -45,7 +47,7 @@ public:
 
   bool IsWholeModule;
 
-  UniversalLinkageInfo(IRGenModule &IGM);
+  explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
                        bool isWholeModule);
@@ -116,6 +118,24 @@ class LinkEntity {
     /// ConstructorDecl* inside a protocol or a class.
     DispatchThunkAllocator,
 
+    /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
+    /// or a class.
+    MethodDescriptor,
+
+    /// A method descriptor for an initializing constructor.  The pointer
+    /// is a ConstructorDecl* inside a class.
+    MethodDescriptorInitializer,
+
+    /// A method descriptor for an allocating constructor.  The pointer is a
+    /// ConstructorDecl* inside a protocol or a class.
+    MethodDescriptorAllocator,
+
+    /// A method lookup function for a class.  The pointer is a ClassDecl*.
+    MethodLookupFunction,
+
+    /// A resilient enum tag index. The pointer is a EnumElementDecl*.
+    EnumCase,
+
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -130,6 +150,11 @@ class LinkEntity {
 
     /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
     SwiftMetaclassStub,
+
+    /// A callback used by newer Objective-C runtimes to initialize class
+    /// metadata for classes where doesClassMetadataRequireUpdate() is true
+    /// but doesClassMetadataRequireInitialization() is false.
+    ObjCMetadataUpdateFunction,
 
     /// A class metadata base offset global variable.  This stores the offset
     /// of the immediate members of a class (generic parameters, field offsets,
@@ -159,6 +184,10 @@ class LinkEntity {
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataInstantiationFunction,
 
+    /// The in-place initialization cache for a generic nominal type.
+    /// The pointer is a NominalTypeDecl*.
+    TypeMetadataSingletonInitializationCache,
+
     /// The completion function for a generic or resilient nominal type.
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataCompletionFunction,
@@ -166,10 +195,34 @@ class LinkEntity {
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
     ModuleDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// The alias referring to the base of the requirements within the
+    /// protocol descriptor, which is used to determine the offset of a
+    /// particular requirement in the witness table.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementsBaseDescriptor,
+
+    /// An descriptor for an associated type within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular associated type.
+    /// The pointer is an AssociatedTypeDecl*.
+    AssociatedTypeDescriptor,
+
+    /// An descriptor for an associated conformance within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular associated conformance.
+    /// The pointer is a ProtocolDecl*; the index of the associated conformance
+    /// is stored in the data.
+    AssociatedConformanceDescriptor,
+
+    /// A default accessor for an associated conformance of a protocol.
+    /// The pointer is a ProtocolDecl*; the index of the associated conformance
+    /// is stored in the data.
+    DefaultAssociatedConformanceAccessor,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -192,22 +245,13 @@ class LinkEntity {
     /// ProtocolConformance*.
     DirectProtocolWitnessTable,
 
-    /// A witness accessor function. The secondary pointer is a
+    /// A protocol witness table pattern. The secondary pointer is a
     /// ProtocolConformance*.
-    ProtocolWitnessTableAccessFunction,
-
-    /// A generic protocol witness table cache.  The secondary pointer is a
-    /// ProtocolConformance*.
-    GenericProtocolWitnessTableCache,
+    ProtocolWitnessTablePattern,
 
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
-
-    /// A function which returns the type metadata for the associated type
-    /// of a protocol.  The secondary pointer is a ProtocolConformance*.
-    /// The index of the associated type declaration is stored in the data.
-    AssociatedTypeMetadataAccessFunction,
 
     /// A function which returns the witness table for a protocol-constrained
     /// associated type of a protocol.  The secondary pointer is a
@@ -277,7 +321,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::DefaultAssociatedConformanceAccessor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -293,6 +337,21 @@ class LinkEntity {
     Pointer = const_cast<void*>(static_cast<const void*>(decl));
     SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
+  }
+
+  void setForProtocolAndAssociatedConformance(Kind kind,
+                                              const ProtocolDecl *proto,
+                                              CanType associatedType,
+                                              ProtocolDecl *associatedProtocol){
+    assert(isDeclKind(kind));
+    Pointer = static_cast<ValueDecl *>(const_cast<ProtocolDecl *>(proto));
+    SecondaryPointer = nullptr;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind)) |
+           LINKENTITY_SET_FIELD(AssociatedConformanceIndex,
+                                getAssociatedConformanceIndex(
+                                                          proto,
+                                                          associatedType,
+                                                          associatedProtocol));
   }
 
   void setForProtocolConformance(Kind kind, const ProtocolConformance *c) {
@@ -360,14 +419,12 @@ class LinkEntity {
   }
 
   // We store associated conformances using their index in the requirement
-  // list of the requirement signature of the conformance's protocol.
-  static unsigned getAssociatedConformanceIndex(
-                                      const ProtocolConformance *conformance,
+  // list of the requirement signature of the protocol.
+  static unsigned getAssociatedConformanceIndex(const ProtocolDecl *proto,
                                                 CanType associatedType,
                                                 ProtocolDecl *requirement) {
     unsigned index = 0;
-    for (const auto &reqt :
-           conformance->getProtocol()->getRequirementSignature()) {
+    for (const auto &reqt : proto->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
           reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
@@ -379,13 +436,29 @@ class LinkEntity {
     llvm_unreachable("requirement not found in protocol");
   }
 
+  // We store associated conformances using their index in the requirement
+  // list of the requirement signature of the conformance's protocol.
+  static unsigned getAssociatedConformanceIndex(
+                                      const ProtocolConformance *conformance,
+                                      CanType associatedType,
+                                      ProtocolDecl *requirement) {
+    return getAssociatedConformanceIndex(conformance->getProtocol(),
+                                         associatedType, requirement);
+  }
+
   static std::pair<CanType, ProtocolDecl*>
-  getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
+  getAssociatedConformanceByIndex(const ProtocolDecl *proto,
                                   unsigned index) {
-    auto &reqt = conformance->getProtocol()->getRequirementSignature()[index];
+    auto &reqt = proto->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
              reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
+  }
+
+  static std::pair<CanType, ProtocolDecl*>
+  getAssociatedConformanceByIndex(const ProtocolConformance *conformance,
+                                  unsigned index) {
+    return getAssociatedConformanceByIndex(conformance->getProtocol(), index);
   }
 
   void setForType(Kind kind, CanType type) {
@@ -397,18 +470,22 @@ class LinkEntity {
 
   LinkEntity() = default;
 
-public:
-  static LinkEntity forDispatchThunk(SILDeclRef declRef) {
-    assert(!declRef.isForeign &&
-           !declRef.isDirectReference &&
-           !declRef.isCurried);
-
-    LinkEntity::Kind kind;
+  static bool isValidResilientMethodRef(SILDeclRef declRef) {
+    if (declRef.isForeign ||
+        declRef.isDirectReference ||
+        declRef.isCurried)
+      return false;
 
     auto *decl = declRef.getDecl();
-    assert(isa<ClassDecl>(decl->getDeclContext()) ||
-           isa<ProtocolDecl>(decl->getDeclContext()));
+    return (isa<ClassDecl>(decl->getDeclContext()) ||
+            isa<ProtocolDecl>(decl->getDeclContext()));
+  }
 
+public:
+  static LinkEntity forDispatchThunk(SILDeclRef declRef) {
+    assert(isValidResilientMethodRef(declRef));
+
+    LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
       kind = Kind::DispatchThunk;
@@ -424,13 +501,48 @@ public:
     }
 
     LinkEntity entity;
-    entity.setForDecl(kind, decl);
+    entity.setForDecl(kind, declRef.getDecl());
+    return entity;
+  }
+
+  static LinkEntity forMethodDescriptor(SILDeclRef declRef) {
+    assert(isValidResilientMethodRef(declRef));
+
+    LinkEntity::Kind kind;
+    switch (declRef.kind) {
+    case SILDeclRef::Kind::Func:
+      kind = Kind::MethodDescriptor;
+      break;
+    case SILDeclRef::Kind::Initializer:
+      kind = Kind::MethodDescriptorInitializer;
+      break;
+    case SILDeclRef::Kind::Allocator:
+      kind = Kind::MethodDescriptorAllocator;
+      break;
+    default:
+      llvm_unreachable("Bad SILDeclRef for method descriptor");
+    }
+
+    LinkEntity entity;
+    entity.setForDecl(kind, declRef.getDecl());
+    return entity;
+  }
+
+  static LinkEntity forMethodLookupFunction(ClassDecl *classDecl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::MethodLookupFunction, classDecl);
     return entity;
   }
 
   static LinkEntity forFieldOffset(VarDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::FieldOffset, decl);
+    return entity;
+  }
+
+  static LinkEntity forEnumCase(EnumElementDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::EnumCase, decl);
     return entity;
   }
 
@@ -455,6 +567,12 @@ public:
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::SwiftMetaclassStub, decl);
+    return entity;
+  }
+
+  static LinkEntity forObjCMetadataUpdateFunction(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCMetadataUpdateFunction, decl);
     return entity;
   }
 
@@ -486,9 +604,16 @@ public:
     return entity;
   }
 
-  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl){
+  static LinkEntity forTypeMetadataInstantiationFunction(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::TypeMetadataInstantiationFunction, decl);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataSingletonInitializationCache(
+                                                      NominalTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::TypeMetadataSingletonInitializationCache, decl);
     return entity;
   }
 
@@ -558,6 +683,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forProtocolRequirementsBaseDescriptor(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementsBaseDescriptor, decl);
+    return entity;
+  }
+
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
@@ -597,17 +728,9 @@ public:
   }
 
   static LinkEntity
-  forProtocolWitnessTableAccessFunction(const ProtocolConformance *C) {
+  forProtocolWitnessTablePattern(const ProtocolConformance *C) {
     LinkEntity entity;
-    entity.setForProtocolConformance(Kind::ProtocolWitnessTableAccessFunction,
-                                     C);
-    return entity;
-  }
-
-  static LinkEntity
-  forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
+    entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
     return entity;
   }
 
@@ -639,12 +762,20 @@ public:
   }
 
   static LinkEntity
-  forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
-                                          AssociatedType association) {
+  forAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
     LinkEntity entity;
-    entity.setForProtocolConformanceAndAssociatedType(
-                     Kind::AssociatedTypeMetadataAccessFunction, C,
-                     association.getAssociation());
+    entity.setForDecl(Kind::AssociatedTypeDescriptor, assocType);
+    return entity;
+  }
+
+  static LinkEntity
+  forAssociatedConformanceDescriptor(AssociatedConformance conformance) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::AssociatedConformanceDescriptor,
+        conformance.getSourceProtocol(),
+        conformance.getAssociation(),
+        conformance.getAssociatedRequirement());
     return entity;
   }
 
@@ -656,6 +787,17 @@ public:
                      Kind::AssociatedTypeWitnessTableAccessFunction, C,
                      association.getAssociation(),
                      association.getAssociatedRequirement());
+    return entity;
+  }
+
+  static LinkEntity
+  forDefaultAssociatedConformanceAccessor(AssociatedConformance conformance) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::DefaultAssociatedConformanceAccessor,
+        conformance.getSourceProtocol(),
+        conformance.getAssociation(),
+        conformance.getAssociatedRequirement());
     return entity;
   }
 
@@ -734,15 +876,21 @@ public:
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
-    assert(getKind() == Kind::AssociatedTypeMetadataAccessFunction);
-    return getAssociatedTypeByIndex(getProtocolConformance(),
-                              LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
+    assert(getKind() == Kind::AssociatedTypeDescriptor);
+    return reinterpret_cast<AssociatedTypeDecl *>(Pointer);
   }
 
   std::pair<CanType, ProtocolDecl *> getAssociatedConformance() const {
-    assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
-    return getAssociatedConformanceByIndex(getProtocolConformance(),
+    if (getKind() == Kind::AssociatedTypeWitnessTableAccessFunction) {
+      return getAssociatedConformanceByIndex(getProtocolConformance(),
                        LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
+    }
+
+    assert(getKind() == Kind::AssociatedConformanceDescriptor ||
+           getKind() == Kind::DefaultAssociatedConformanceAccessor);
+    return getAssociatedConformanceByIndex(
+             cast<ProtocolDecl>(getDecl()),
+             LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));
   }
 
   ProtocolDecl *getAssociatedProtocol() const {
@@ -766,25 +914,23 @@ public:
   bool isForeignTypeMetadataCandidate() const {
     return getKind() == Kind::ForeignTypeMetadataCandidate;
   }
+  bool isObjCClassRef() const {
+    return getKind() == Kind::ObjCClassRef;
+  }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module) const {
-    if (getKind() == Kind::SILGlobalVariable &&
-        getSILGlobalVariable()->getDecl())
-      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
-
-    if (getKind() == Kind::SILFunction) {
-      if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-        return clangOwner->isWeakImported(module);
-      if (getSILFunction()->isWeakLinked())
-        return getSILFunction()->isAvailableExternally();
-    }
-
-    if (!isDeclKind(getKind()))
-      return false;
-
-    return getDecl()->isWeakImported(module);
-  }
+  bool isWeakImported(ModuleDecl *module) const;
+  
+  /// Return the source file whose codegen should trigger emission of this
+  /// link entity, if one can be identified.
+  const SourceFile *getSourceFileForEmission() const;
+  
+  /// Get the preferred alignment for the definition of this entity.
+  Alignment getAlignment(IRGenModule &IGM) const;
+  
+  /// Get the default LLVM type to use for forward declarations of this
+  /// entity.
+  llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };
@@ -801,17 +947,15 @@ class LinkInfo {
 
 public:
   /// Compute linkage information for the given
+  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
+                      ForDefinition_t forDefinition);
+
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 
-  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
-                      ForDefinition_t forDefinition);
-  
-  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
-                      StringRef name,
-                      SILLinkage linkage,
-                      ForDefinition_t isDefinition,
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo, StringRef name,
+                      SILLinkage linkage, ForDefinition_t isDefinition,
                       bool isWeakImported);
 
   StringRef getName() const {
@@ -838,12 +982,16 @@ public:
                      llvm::GlobalValue::VisibilityTypes Visibility,
                      llvm::GlobalValue::DLLStorageClassTypes DLLStorage);
 };
+
+StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                    StringRef name);
 }
 }
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
-template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
-  typedef swift::irgen::LinkEntity LinkEntity;
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LinkEntity> {
+  using LinkEntity = swift::irgen::LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
     entity.Pointer = nullptr;
@@ -868,5 +1016,5 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
   }
 };
-
+}
 #endif

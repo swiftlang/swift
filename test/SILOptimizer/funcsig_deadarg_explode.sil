@@ -1,0 +1,35 @@
+
+// This file makes sure that we do not explode dead parameters.
+
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+class Klass {}
+struct S {
+  var k1: Klass
+  var k2: Klass
+}
+
+sil @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil @callee : $@convention(thin) (@guaranteed S, @guaranteed S, @guaranteed S) -> () {
+bb0(%0 : $S, %1 : $S, %2 : $S):
+  %3 = function_ref @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = struct_extract %1 : $S, #S.k1
+  apply %3(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @caller : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : $S):
+  %1 = function_ref @callee : $@convention(thin) (@guaranteed S, @guaranteed S, @guaranteed S) -> ()
+  apply %1(%0, %0, %0) : $@convention(thin) (@guaranteed S, @guaranteed S, @guaranteed S) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared @$s6calleeTf4dxd_n : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[KLASS:%[0-9]+]] : $Klass):

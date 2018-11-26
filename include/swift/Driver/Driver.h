@@ -18,11 +18,11 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Sanitizers.h"
-#include "swift/Driver/OutputFileMap.h"
-#include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
@@ -43,6 +43,9 @@ namespace opt {
 }
 
 namespace swift {
+  namespace sys {
+    class TaskQueue;
+  }
   class DiagnosticEngine;
 namespace driver {
   class Action;
@@ -50,7 +53,6 @@ namespace driver {
   class Compilation;
   class Job;
   class JobAction;
-  class OutputFileMap;
   class ToolChain;
 
 /// \brief A class encapsulating information about the outputs the driver
@@ -65,7 +67,17 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
-    /// A single process that batches together multiple StandardCompile jobs.
+    /// A single process that batches together multiple StandardCompile Jobs.
+    ///
+    /// Note: this is a transient value to use _only_ for the individual
+    /// BatchJobs that are the temporary containers for multiple StandardCompile
+    /// Jobs built by ToolChain::constructBatchJob.
+    ///
+    /// In particular, the driver treats a batch-mode-enabled Compilation as
+    /// having OutputInfo::CompilerMode == StandardCompile, with the
+    /// Compilation::BatchModeEnabled flag set to true, _not_ as a
+    /// BatchModeCompile Compilation. The top-level OutputInfo::CompilerMode for
+    /// a Compilation should never be BatchModeCompile.
     BatchModeCompile,
 
     /// Invoke the REPL
@@ -79,7 +91,7 @@ public:
   Mode CompilerMode = Mode::StandardCompile;
 
   /// The output type which should be used for compile actions.
-  types::ID CompilerOutputType = types::ID::TY_INVALID;
+  file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
 
   /// Describes if and how the output of compile actions should be
   /// linked together.
@@ -90,7 +102,10 @@ public:
 
   /// Whether or not the output should contain debug info.
   // FIXME: Eventually this should be replaced by dSYM generation.
-  IRGenDebugInfoKind DebugInfoKind = IRGenDebugInfoKind::None;
+  IRGenDebugInfoLevel DebugInfoLevel = IRGenDebugInfoLevel::None;
+
+  /// What kind of debug info to generate.
+  IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
@@ -116,6 +131,14 @@ public:
   std::string SDKPath;
 
   OptionSet<SanitizerKind> SelectedSanitizers;
+
+  /// Might this sort of compile have explicit primary inputs?
+  /// When running a single compile for the whole module (in other words
+  /// "whole-module-optimization" mode) there must be no -primary-input's and
+  /// nothing in a (preferably non-existent) -primary-filelist. Left to its own
+  /// devices, the driver would forget to omit the primary input files, so
+  /// return a flag here.
+  bool mightHaveExplicitPrimaryInputs(const CommandOutput &Output) const;
 };
 
 class Driver {
@@ -156,9 +179,6 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
-  /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  unsigned DriverBatchSeed = 0;
-
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);
@@ -192,6 +212,13 @@ public:
   /// because ToolChain has virtual methods.
   std::unique_ptr<ToolChain>
   buildToolChain(const llvm::opt::InputArgList &ArgList);
+
+  /// Compute the task queue for this compilation and command line argument
+  /// vector.
+  ///
+  /// \return A TaskQueue, or nullptr if an invalid number of parallel jobs is
+  /// specified.  This condition is signalled by a diagnostic.
+  std::unique_ptr<sys::TaskQueue> buildTaskQueue(const Compilation &C);
 
   /// Construct a compilation object for a given ToolChain and command line
   /// argument vector.
@@ -227,12 +254,15 @@ public:
   ///
   /// \param TC The current tool chain.
   /// \param Args The input arguments.
+  /// \param BatchMode Whether the driver has been explicitly or implicitly
+  /// instructed to use batch mode.
   /// \param Inputs The inputs to the driver.
   /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
   void buildOutputInfo(const ToolChain &TC,
                        const llvm::opt::DerivedArgList &Args,
-                       const InputFileList &Inputs, OutputInfo &OI) const;
+                       const bool BatchMode, const InputFileList &Inputs,
+                       OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
@@ -251,7 +281,7 @@ public:
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  std::unique_ptr<OutputFileMap>
+  Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 
@@ -278,22 +308,19 @@ public:
   ///
   /// \param C The Compilation which this Job will eventually be part of
   /// \param JA The Action for which a Job should be created
-  /// \param OI The OutputInfo for which a Job should be created
   /// \param OFM The OutputFileMap for which a Job should be created
-  /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
   Job *buildJobsForAction(Compilation &C, const JobAction *JA,
-                          const OutputInfo &OI, const OutputFileMap *OFM,
-                          StringRef workingDirectory, const ToolChain &TC,
+                          const OutputFileMap *OFM,
+                          StringRef workingDirectory,
                           bool AtTopLevel, JobCacheMap &JobCache) const;
 
 private:
   void computeMainOutput(Compilation &C, const JobAction *JA,
-                         const OutputInfo &OI, const OutputFileMap *OFM,
-                         const ToolChain &TC, bool AtTopLevel,
+                         const OutputFileMap *OFM, bool AtTopLevel,
                          SmallVectorImpl<const Action *> &InputActions,
                          SmallVectorImpl<const Job *> &InputJobs,
                          const TypeToPathMap *OutputMap,
@@ -303,7 +330,7 @@ private:
                          llvm::SmallString<128> &Buf,
                          CommandOutput *Output) const;
 
-  void chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
+  void chooseSwiftModuleOutputPath(Compilation &C,
                                    const OutputFileMap *OFM,
                                    const TypeToPathMap *OutputMap,
                                    StringRef workingDirectory,
@@ -313,37 +340,42 @@ private:
                                       const TypeToPathMap *OutputMap,
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
+
+  void chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
+                                    StringRef workingDirectory,
+                                    llvm::SmallString<128> &buffer,
+                                    CommandOutput *output) const;
+
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;
 
   void chooseSerializedDiagnosticsPath(Compilation &C, const JobAction *JA,
-                                       const OutputInfo &OI,
                                        const TypeToPathMap *OutputMap,
                                        StringRef workingDirectory,
                                        CommandOutput *Output) const;
 
-  void chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
+  void chooseDependenciesOutputPaths(Compilation &C,
                                      const TypeToPathMap *OutputMap,
                                      StringRef workingDirectory,
                                      llvm::SmallString<128> &Buf,
                                      CommandOutput *Output) const;
 
-  void chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
+  void chooseOptimizationRecordPath(Compilation &C,
                                     StringRef workingDirectory,
                                     llvm::SmallString<128> &Buf,
                                     CommandOutput *Output) const;
 
-  void chooseObjectiveCHeaderOutputPath(Compilation &C, const OutputInfo &OI,
+  void chooseObjectiveCHeaderOutputPath(Compilation &C,
                                         const TypeToPathMap *OutputMap,
                                         StringRef workingDirectory,
                                         CommandOutput *Output) const;
 
-  void chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
+  void chooseLoadedModuleTracePath(Compilation &C,
                                    StringRef workingDirectory,
                                    llvm::SmallString<128> &Buf,
                                    CommandOutput *Output) const;
 
-  void chooseTBDPath(Compilation &C, const OutputInfo &OI,
+  void chooseTBDPath(Compilation &C, const TypeToPathMap *OutputMap,
                      StringRef workingDirectory, llvm::SmallString<128> &Buf,
                      CommandOutput *Output) const;
 
@@ -371,6 +403,16 @@ private:
   /// \param Args The arguments passed to the driver (excluding the path to the
   /// driver)
   void parseDriverKind(ArrayRef<const char *> Args);
+
+  /// Examine potentially conficting arguments and warn the user if
+  /// there is an actual conflict.
+  /// \param Args The input arguments.
+  /// \param Inputs The inputs to the driver.
+  /// \param BatchModeOut An out-parameter flag that indicates whether to
+  /// batch the jobs of the resulting \c Mode::StandardCompile compilation.
+  OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
+                                       const InputFileList &Inputs,
+                                       bool &BatchModeOut) const;
 };
 
 } // end namespace driver

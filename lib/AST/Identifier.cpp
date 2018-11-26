@@ -22,6 +22,8 @@ using namespace swift;
 
 void *DeclBaseName::SubscriptIdentifierData =
     &DeclBaseName::SubscriptIdentifierData;
+void *DeclBaseName::ConstructorIdentifierData =
+    &DeclBaseName::ConstructorIdentifierData;
 void *DeclBaseName::DestructorIdentifierData =
     &DeclBaseName::DestructorIdentifierData;
 
@@ -182,7 +184,7 @@ llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
 }
 
 llvm::raw_ostream &DeclName::printPretty(llvm::raw_ostream &os) const {
-  return print(os, /*skipEmptyArgumentNames=*/true);
+  return print(os, /*skipEmptyArgumentNames=*/!isSpecial());
 }
 
 ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,

@@ -90,10 +90,10 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
 func insertA<T>(array : inout [T], elt : T) {
-  array.append(T.self); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}} expected-note {{expected an argument list of type '(T)'}}
+  array.append(T.self); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}} expected-note {{expected an argument list of type '(__owned T)'}}
 
   // FIXME: Kind of weird
-  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(T)'}}
+  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}} expected-note {{expected an argument list of type '(__owned T)'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -135,9 +135,9 @@ func test20770032() {
 
 
 
-func tuple_splat1(_ a : Int, _ b : Int) { // expected-note {{'tuple_splat1' declared here}}
+func tuple_splat1(_ a : Int, _ b : Int) { // expected-note 2 {{'tuple_splat1' declared here}}
   let x = (1,2)
-  tuple_splat1(x)          // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  tuple_splat1(x)          // expected-error {{missing argument for parameter #2 in call}}
   tuple_splat1(1, 2)       // Ok.
   tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
 }

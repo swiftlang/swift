@@ -30,8 +30,7 @@ cFuncSuffix2 = {32: 'f', 64: 'd', 80: 'ld'}
 
 /// Returns `true` iff isspace(u) would return nonzero when the current
 /// locale is the C locale.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
   return "\t\n\u{b}\u{c}\r ".utf16.contains(u)
 }
@@ -125,7 +124,7 @@ extension ${Self} : LosslessStringConvertible {
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
   ///   `text` has invalid characters or is in an invalid format, the result
   ///   is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?<S: StringProtocol>(_ text: S) {
     let u16 = text.utf16
 
@@ -150,3 +149,7 @@ extension ${Self} : LosslessStringConvertible {
 % end
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

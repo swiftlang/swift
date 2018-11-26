@@ -11,17 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "objectoutliner"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/AST/ASTMangler.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
 namespace {
 
 class ObjectOutliner {
+  SILOptFunctionBuilder &FunctionBuilder;
   NominalTypeDecl *ArrayDecl = nullptr;
   int GlobIdx = 0;
 
@@ -45,7 +47,9 @@ class ObjectOutliner {
   void replaceFindStringCall(ApplyInst *FindStringCall);
 
 public:
-  ObjectOutliner(NominalTypeDecl *ArrayDecl) : ArrayDecl(ArrayDecl) { }
+  ObjectOutliner(SILOptFunctionBuilder &FunctionBuilder,
+                 NominalTypeDecl *ArrayDecl)
+      : FunctionBuilder(FunctionBuilder), ArrayDecl(ArrayDecl) { }
 
   bool run(SILFunction *F);
 };
@@ -286,20 +290,25 @@ bool ObjectOutliner::optimizeObjectAllocation(
   ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
   SILType TailType;
   unsigned NumTailElems = 0;
-  if (!TailCounts.empty()) {
-    // We only support a single tail allocated array.
-    if (TailCounts.size() > 1)
+
+  // We only support a single tail allocated arrays.
+  // Stdlib's tail allocated arrays don't have any side-effects in the
+  // constructor if the element type is trivial.
+  // TODO: also exclude custom tail allocated arrays which might have
+  // side-effects in the destructor.
+  if (TailCounts.size() != 1)
       return false;
-    // The number of tail allocated elements must be constant.
-    if (auto *ILI = dyn_cast<IntegerLiteralInst>(TailCounts[0].get())) {
-      if (ILI->getValue().getActiveBits() > 20)
-        return false;
-      NumTailElems = ILI->getValue().getZExtValue();
-      TailType = ARI->getTailAllocatedTypes()[0];
-    } else {
+
+  // The number of tail allocated elements must be constant.
+  if (auto *ILI = dyn_cast<IntegerLiteralInst>(TailCounts[0].get())) {
+    if (ILI->getValue().getActiveBits() > 20)
       return false;
-    }
+    NumTailElems = ILI->getValue().getZExtValue();
+    TailType = ARI->getTailAllocatedTypes()[0];
+  } else {
+    return false;
   }
+
   SILType Ty = ARI->getType();
   ClassDecl *Cl = Ty.getClassOrBoundGenericClass();
   if (!Cl)
@@ -326,8 +335,8 @@ bool ObjectOutliner::optimizeObjectAllocation(
       return false;
   }
 
-  DEBUG(llvm::dbgs() << "Outline global variable in " <<
-        ARI->getFunction()->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "Outline global variable in "
+                          << ARI->getFunction()->getName() << '\n');
 
   SILModule *Module = &ARI->getFunction()->getModule();
   assert(!Cl->isResilient(Module->getSwiftModule(),
@@ -426,7 +435,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
     return;
 
   SILDeclRef declRef(FD, SILDeclRef::Kind::Func);
-  SILFunction *replacementFunc = Module->getOrCreateFunction(
+  SILFunction *replacementFunc = FunctionBuilder.getOrCreateFunction(
       FindStringCall->getLoc(), declRef, NotForDefinition);
 
   SILFunctionType *FTy = replacementFunc->getLoweredFunctionType();
@@ -468,7 +477,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FunctionRefInst *FRI = B.createFunctionRef(FindStringCall->getLoc(),
                                              replacementFunc);
   ApplyInst *NewCall = B.createApply(FindStringCall->getLoc(), FRI,
-                                     FindStringCall->getSubstitutions(),
+                                     FindStringCall->getSubstitutionMap(),
                                      { FindStringCall->getArgument(0),
                                        FindStringCall->getArgument(1),
                                        CacheAddr },
@@ -478,11 +487,12 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FindStringCall->eraseFromParent();
 }
 
-class ObjectOutlinerPass : public SILFunctionTransform
-{
+class ObjectOutlinerPass : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
-    ObjectOutliner Outliner(F->getModule().getASTContext().getArrayDecl());
+    SILOptFunctionBuilder FuncBuilder(*this);
+    ObjectOutliner Outliner(FuncBuilder,
+                            F->getModule().getASTContext().getArrayDecl());
     if (Outliner.run(F)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
 // rdar://problem/31969605
@@ -42,3 +41,25 @@ func bar(_: () throws -> ()) {}
 func bar_empty() {}
 
 bar(bar_empty)
+
+func consumeNoEscape(_ f: (Int) -> Int) {}
+func consumeEscaping(_ f: @escaping (Int) -> Int) {}
+func takesAny(_ f: Any)  {}
+
+func twoFns(_ f: (Int) -> Int, _ g: @escaping (Int) -> Int) {
+  // expected-note@-1 {{parameter 'f' is implicitly non-escaping}}
+  takesAny(f) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
+  takesAny(g)
+  var h = g
+  h = f // expected-error {{assigning non-escaping parameter 'f' to an @escaping closure}}
+}
+
+takesAny(consumeNoEscape)
+takesAny(consumeEscaping)
+
+var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape
+var escapingParam: (@escaping (Int) -> Int) -> () = consumeEscaping
+noEscapeParam = escapingParam // expected-error {{cannot assign value of type '(@escaping (Int) -> Int) -> ()' to type '((Int) -> Int) -> ()}}
+
+escapingParam = takesAny
+noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}

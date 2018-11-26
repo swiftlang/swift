@@ -46,20 +46,6 @@ using namespace swift::immediate;
 
 namespace {
 
-class REPLContext {
-public:
-  /// The SourceMgr buffer ID of the REPL input.
-  unsigned CurBufferID;
-  
-  /// The index into the source file's Decls at which to start
-  /// typechecking the next REPL input.
-  unsigned CurElem;
-
-  /// The index into the source file's Decls at which to start
-  /// irgenning the next REPL input.
-  unsigned CurIRGenElem;
-};
-
 enum class REPLInputKind : int {
   /// The REPL got a "quit" signal.
   REPLQuit,
@@ -168,27 +154,49 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 #if HAVE_UNICODE_LIBEDIT
 
-static bool appendToREPLFile(SourceFile &SF,
-                             PersistentParserState &PersistentState,
-                             REPLContext &RC,
-                             std::unique_ptr<llvm::MemoryBuffer> Buffer) {
-  assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
+static ModuleDecl *
+typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
+                   PersistentParserState &PersistentState,
+                   std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+  using ImplicitModuleImportKind = SourceFile::ImplicitModuleImportKind;
+  assert(MostRecentModule);
+  ASTContext &Ctx = MostRecentModule->getASTContext();
 
-  SourceManager &SrcMgr = SF.getParentModule()->getASTContext().SourceMgr;
-  RC.CurBufferID = SrcMgr.addNewSourceBuffer(std::move(Buffer));
+  auto REPLModule = ModuleDecl::create(Ctx.getIdentifier(Name), Ctx);
+  auto BufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(Buffer));
+  auto ImportKind = ImplicitModuleImportKind::None;
+  auto &REPLInputFile = *new (Ctx) SourceFile(*REPLModule, SourceFileKind::REPL,
+                                              BufferID, ImportKind);
+  REPLModule->addFile(REPLInputFile);
+
+  ModuleDecl::ImportedModule ImportOfMostRecentModule{
+      /*AccessPath*/{}, MostRecentModule};
+  REPLInputFile.addImports(std::make_pair(ImportOfMostRecentModule,
+                                          SourceFile::ImportOptions()));
+
+  SmallVector<ModuleDecl::ImportedModule, 8> Imports;
+  MostRecentModule->getImportedModules(Imports,
+                                       ModuleDecl::ImportFilter::Private);
+  if (!Imports.empty()) {
+    SmallVector<std::pair<ModuleDecl::ImportedModule,
+                          SourceFile::ImportOptions>, 8> ImportsWithOptions;
+    for (auto Import : Imports) {
+      ImportsWithOptions.emplace_back(Import,
+                                      SourceFile::ImportFlags::Exported);
+    }
+    REPLInputFile.addImports(ImportsWithOptions);
+  }
 
   bool FoundAnySideEffects = false;
-  unsigned CurElem = RC.CurElem;
   bool Done;
   do {
     FoundAnySideEffects |=
-        parseIntoSourceFile(SF, RC.CurBufferID, &Done, nullptr,
+        parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
                             &PersistentState);
-    performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
-                        CurElem);
-    CurElem = SF.Decls.size();
   } while (!Done);
-  return FoundAnySideEffects;
+  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
+                      /*Options*/None);
+  return REPLModule;
 }
 
 /// An arbitrary, otherwise-unused char value that editline interprets as
@@ -327,8 +335,6 @@ public:
     fflush(stdout);
     el_end(e);
   }
-  
-  SourceFile &getREPLInputFile();
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
     ide::SourceCompleteResult SCR;
@@ -402,7 +408,7 @@ public:
         return REPLInputKind::REPLDirective;
       }
 
-      SCR = ide::isSourceInputComplete(CurrentLines.str());
+      SCR = ide::isSourceInputComplete(CurrentLines.str(), SourceFileKind::REPL);
       // Keep reading if input is unfinished.
     } while (!SCR.IsComplete);
 
@@ -667,6 +673,8 @@ private:
     if (trimmed > 0)
       llvm::outs() << "  (and " << trimmed << " more)\n";
   }
+
+  SourceFile &getFileForCodeCompletion();
   
   unsigned char onComplete(int ch) {
     const LineInfoW *line = el_wline(e);
@@ -677,7 +685,7 @@ private:
     
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions.populate(getREPLInputFile(), Prefix);
+      completions.populate(getFileForCodeCompletion(), Prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());
@@ -736,11 +744,7 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
   CompilerInstance &CI;
-
-public:
-  SourceFile &REPLInputFile;
-
-private:
+  ModuleDecl *MostRecentModule;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
@@ -757,8 +761,8 @@ private:
   const SILOptions SILOpts;
 
   REPLInput Input;
-  REPLContext RC;
   PersistentParserState PersistentState;
+  unsigned NextLineNumber = 0;
 
 private:
 
@@ -858,18 +862,20 @@ private:
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
     // Parse the current line(s).
-    auto InputBuf = std::unique_ptr<llvm::MemoryBuffer>(
-        llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
-    bool ShouldRun = appendToREPLFile(REPLInputFile, PersistentState, RC,
-                                      std::move(InputBuf));
+    auto InputBuf = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
+    SmallString<8> Name{"REPL_"};
+    llvm::raw_svector_ostream(Name) << NextLineNumber;
+    ++NextLineNumber;
+    ModuleDecl *M = typeCheckREPLInput(MostRecentModule, Name, PersistentState,
+                                       std::move(InputBuf));
     
     // SILGen the module and produce SIL diagnostics.
     std::unique_ptr<SILModule> sil;
     
     if (!CI.getASTContext().hadError()) {
-      sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
-                                 RC.CurIRGenElem);
-      performSILLinking(sil.get());
+      // We don't want anything to get stripped, so pretend we're doing a
+      // non-whole-module generation.
+      sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
       runSILLoweringPasses(*sil);
     }
@@ -879,46 +885,35 @@ private:
         return false;
 
       CI.getASTContext().Diags.resetHadAnyError();
-      while (REPLInputFile.Decls.size() > RC.CurElem)
-        REPLInputFile.Decls.pop_back();
-      
+
       // FIXME: Handling of "import" declarations?  Is there any other
       // state which needs to be reset?
       
       return true;
     }
-    
-    RC.CurElem = REPLInputFile.Decls.size();
-    
-    DumpSource += Line;
-    
-    // If we didn't see an expression, statement, or decl which might have
-    // side-effects, keep reading.
-    if (!ShouldRun)
-      return true;
+    MostRecentModule = M;
 
-    const PrimarySpecificPaths PSPs =
-        CI.getPrimarySpecificPathsForAtMostOnePrimary();
+    DumpSource += Line;
+
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
     auto LineModule = performIRGeneration(
-        IRGenOpts, REPLInputFile, std::move(sil), "REPLLine", PSPs,
-        getGlobalLLVMContext(), RC.CurIRGenElem);
-    RC.CurIRGenElem = RC.CurElem;
-    
+        IRGenOpts, M, std::move(sil), "REPLLine", PrimarySpecificPaths(),
+        getGlobalLLVMContext(), /*parallelOutputFilenames*/{});
+
     if (CI.getASTContext().hadError())
       return false;
 
     // LineModule will get destroy by the following link process.
     // Make a copy of it to be able to correct produce DumpModule.
-    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(LineModule.get()));
+    std::unique_ptr<llvm::Module> SaveLineModule(CloneModule(*LineModule));
     
     if (!linkLLVMModules(Module, std::move(LineModule))) {
       return false;
     }
 
-    std::unique_ptr<llvm::Module> NewModule(CloneModule(Module));
+    std::unique_ptr<llvm::Module> NewModule(CloneModule(*Module));
 
     Module->getFunction("main")->eraseFromParent();
 
@@ -930,8 +925,7 @@ private:
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(CI, *NewModule, ImportedModules, InitFns,
-                             IRGenOpts, SILOpts))
+    if (autolinkImportedModules(M, IRGenOpts))
       return false;
     
     llvm::Module *TempModule = NewModule.get();
@@ -961,8 +955,7 @@ public:
                   llvm::LLVMContext &LLVMCtx,
                   bool ParseStdlib)
     : CI(CI),
-      REPLInputFile(CI.getMainModule()->
-                      getMainSourceFile(SourceFileKind::REPL)),
+      MostRecentModule(CI.getMainModule()),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
       LLVMContext(LLVMCtx),
@@ -971,19 +964,19 @@ public:
       IRGenOpts(),
       SILOpts(),
       Input(*this),
-      RC{
-        /*BufferID*/ 0U,
-        /*CurElem*/ 0,
-        /*CurIRGenElem*/ 0
-      }
+      PersistentState(CI.getASTContext())
   {
     ASTContext &Ctx = CI.getASTContext();
-    if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
-      CI.getDiags().diagnose(SourceLoc(),
-                             diag::error_immediate_mode_missing_stdlib);
-      return;
+    Ctx.LangOpts.EnableAccessControl = false;
+    if (!ParseStdlib) {
+      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
+        CI.getDiags().diagnose(SourceLoc(),
+                               diag::error_immediate_mode_missing_stdlib);
+        return;
+      }
+      tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts,
+                       CI.getDiags());
     }
-    tryLoadLibraries(CI.getLinkLibraries(), Ctx.SearchPathOpts, CI.getDiags());
 
     llvm::EngineBuilder builder{std::unique_ptr<llvm::Module>{Module}};
     std::string ErrorMsg;
@@ -1005,7 +998,13 @@ public:
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
-    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;
+    IRGenOpts.IntegratedREPL = true;
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
+    IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
+
+    // The very first module is a dummy.
+    CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL).ASTStage =
+        SourceFile::TypeChecked;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any
@@ -1016,14 +1015,13 @@ public:
       auto Buffer =
           llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                                "<REPL Initialization>");
-      appendToREPLFile(REPLInputFile, PersistentState, RC, std::move(Buffer));
+      (void)typeCheckREPLInput(MostRecentModule, "__Warmup", PersistentState,
+                               std::move(Buffer));
 
       if (Ctx.hadError())
         return;
     }
-    
-    RC.CurElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
-    
+
     if (llvm::sys::Process::StandardInIsUserInput())
       llvm::outs() <<
           "***  You are running Swift's integrated REPL,  ***\n"
@@ -1033,13 +1031,14 @@ public:
           "***  Type ':help' for assistance.              ***\n";
   }
   
-  swift::ModuleDecl *getMainModule() const {
-    return REPLInputFile.getParentModule();
-  }
   StringRef getDumpSource() const { return DumpSource; }
   
   /// Get the REPLInput object owned by the REPL instance.
   REPLInput &getInput() { return Input; }
+
+  SourceFile &getFileForCodeCompletion() {
+    return MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
+  }
   
   /// Responds to a REPL input. Returns true if the repl should continue,
   /// false if it should quit.
@@ -1069,8 +1068,6 @@ public:
                "  :constraints debug (on|off) - turn on/off the debug "
                    "output for the constraint-based type checker\n"
                "  :dump_ir - dump the LLVM IR generated by the REPL\n"
-               "  :dump_ast - dump the AST representation of"
-                   " the REPL input\n"
                "  :dump_decl <name> - dump the AST representation of the "
                    "named declarations\n"
                "  :dump_source - dump the user input (ignoring"
@@ -1085,8 +1082,6 @@ public:
           return false;
         } else if (L.peekNextToken().getText() == "dump_ir") {
           DumpModule.print(llvm::dbgs(), nullptr, false, true);
-        } else if (L.peekNextToken().getText() == "dump_ast") {
-          REPLInputFile.dump();
         } else if (L.peekNextToken().getText() == "dump_decl" ||
                    L.peekNextToken().getText() == "print_decl") {
           PrintOrDump doPrint = (L.peekNextToken().getText() == "print_decl")
@@ -1094,8 +1089,10 @@ public:
           L.lex(Tok);
           L.lex(Tok);
           ASTContext &ctx = CI.getASTContext();
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()),
-                                   &REPLInputFile, nullptr);
+          SourceFile &SF =
+              MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
+          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF,
+                                   nullptr);
           for (auto result : lookup.Results) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
@@ -1200,7 +1197,9 @@ public:
   }
 };
 
-inline SourceFile &REPLInput::getREPLInputFile() { return Env.REPLInputFile; }
+inline SourceFile &REPLInput::getFileForCodeCompletion() {
+  return Env.getFileForCodeCompletion();
+}
 
 void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   out << "while processing REPL source:\n";

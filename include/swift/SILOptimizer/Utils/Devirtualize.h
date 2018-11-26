@@ -35,22 +35,6 @@ namespace OptRemark {
 class Emitter;
 }
 
-/// A pair representing results of devirtualization.
-///  - The first element is the value representing the result of the
-///    devirtualized call.
-///  - The second element is the new apply/try_apply instruction.
-/// If no devirtualization was possible, the pair:
-/// <nullptr, FullApplySite()> is returned.
-///
-/// Two elements are required, because a result of the new devirtualized
-/// apply/try_apply instruction (second element) eventually needs to be
-/// casted to produce a properly typed value (first element).
-///
-/// *NOTE* The reason why we use a ValueBase here instead of a SILInstruction is
-/// that a devirtualization result may be a BB arg if there was a cast in
-/// between optional types.
-typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
-
 /// Compute all subclasses of a given class.
 ///
 /// \p CHA class hierarchy analysis
@@ -64,9 +48,14 @@ void getAllSubclasses(ClassHierarchyAnalysis *CHA,
                       SILModule &M,
                       ClassHierarchyAnalysis::ClassList &Subs);
 
-DevirtualizationResult tryDevirtualizeApply(ApplySite AI,
-                                            ClassHierarchyAnalysis *CHA,
-                                            OptRemark::Emitter *ORE = nullptr);
+/// Attempt to devirtualize the given apply site.  If this fails,
+/// the returned ApplySite will be null.
+///
+/// If this succeeds, the caller must call deleteDevirtualizedApply on
+/// the original apply site.
+ApplySite tryDevirtualizeApply(ApplySite AI,
+                               ClassHierarchyAnalysis *CHA,
+                               OptRemark::Emitter *ORE = nullptr);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
@@ -74,15 +63,45 @@ bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
                                 bool isEffectivelyFinalMethod = false);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
                                   MethodInst *MI);
-DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
-                                               SILValue ClassInstance,
-                                               OptRemark::Emitter *ORE);
-DevirtualizationResult
+
+/// Devirtualize the given apply site, which is known to be devirtualizable.
+///
+/// The caller must call deleteDevirtualizedApply on the original apply site.
+FullApplySite devirtualizeClassMethod(FullApplySite AI,
+                                      SILValue ClassInstance,
+                                      OptRemark::Emitter *ORE);
+
+/// Attempt to devirtualize the given apply site, which is known to be
+/// of a class method.  If this fails, the returned FullApplySite will be null.
+///
+/// If this succeeds, the caller must call deleteDevirtualizedApply on
+/// the original apply site.
+FullApplySite
 tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
                            OptRemark::Emitter *ORE,
                            bool isEffectivelyFinalMethod = false);
-DevirtualizationResult
-tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
-}
+
+/// Attempt to devirtualize the given apply site, which is known to be
+/// of a witness method.  If this fails, the returned FullApplySite
+/// will be null.
+///
+/// If this succeeds, the caller must call deleteDevirtualizedApply on
+/// the original apply site.
+ApplySite tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
+
+/// Delete a successfully-devirtualized apply site.  This must always be
+/// called after devirtualizing an apply; not only is it not semantically
+/// equivalent to leave the old apply in-place, but the SIL isn't necessary
+/// well-formed.
+///
+/// Devirtualization is responsible for replacing uses of the original
+/// apply site with uses of the new one.  The only thing this does is delete
+/// the instruction and any now-trivially-dead operands; it is separated
+/// from the actual devirtualization step only to apply the caller to log
+/// information about the original apply site.  This is probably not a
+/// good enough reason to complicate the API.
+void deleteDevirtualizedApply(ApplySite AI);
+
+} // end namespace swift
 
 #endif

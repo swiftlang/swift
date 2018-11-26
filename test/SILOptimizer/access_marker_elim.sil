@@ -67,7 +67,7 @@ bb0:
 // they are gone from the output.
 //
 // UNCHECKED-LABEL: sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
-// UNCHECKED: bb0(%0 : ${ var Builtin.Int64 }):
+// UNCHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
 // UNCHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
 // UNCHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
 // UNCHECKED-NOT: begin_access
@@ -88,7 +88,7 @@ bb0:
 // CHECKED:  return %{{.*}} : $()
 // CHECKED-LABEL: } // end sil function 'f020_boxArg'
 sil hidden @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
-bb0(%0 : ${ var Builtin.Int64 }):
+bb0(%0 : @owned ${ var Builtin.Int64 }):
   %1 = project_box %0 : ${ var Builtin.Int64 }, 0
   %3 = integer_literal $Builtin.Int64, 42
   %5 = begin_access [modify] [unknown] %1 : $*Builtin.Int64

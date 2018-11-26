@@ -15,35 +15,40 @@ func hexAddrVal<T>(_ x: T) -> String {
 }
 
 func repr(_ x: NSString) -> String {
-  return "\(NSStringFromClass(object_getClass(x)))\(hexAddrVal(x)) = \"\(x)\""
+  return "\(NSStringFromClass(object_getClass(x)!))\(hexAddrVal(x)) = \"\(x)\""
 }
 
-func repr(_ x: _StringGuts) -> String {
-  if x._isNative {
-    return "Native("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count), "
-      + "capacity: \(x.capacity))"
-  } else if x._isCocoa {
-    return "Cocoa("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count))"
-  } else if x._isSmall {
-    return "Cocoa("
-      + "owner: <tagged>, "
-      + "count: \(x.count))"
-  } else if x._isUnmanaged {
-    return "Unmanaged("
-      + "count: \(x.count))"
+func repr(_ x: _StringRepresentation) -> String {
+  switch x._form {
+  case ._small:
+    return """
+      Small(count: \(x._count))
+      """
+  case ._cocoa(let object):
+    return """
+      Cocoa(\
+      owner: \(hexAddrVal(object)), \
+      count: \(x._count))
+      """
+  case ._native(let object):
+    return """
+      Native(\
+      owner: \(hexAddrVal(object)), \
+      count: \(x._count), \
+      capacity: \(x._capacity))
+      """
+  case ._immortal(_):
+    return """
+      Unmanaged(count: \(x._count))
+      """
   }
-  return "?????"
 }
 
 func repr(_ x: String) -> String {
-  return "String(\(repr(x._guts))) = \"\(x)\""
+  return "String(\(repr(x._classify()))) = \"\(x)\""
 }
 
-// CHECK: Testing
+// CHECK-LABEL: Testing...
 print("Testing...")
 
 //===--------- Native Strings ---------===
@@ -58,7 +63,7 @@ print("  \(repr(nsb))")
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Unmanaged(count: 0))
+// CHECK-NEXT: String({{Unmanaged|Small}}(count: 0))
 print("  \(repr(empty))")
 
 
@@ -72,7 +77,7 @@ func nonASCII() {
   // CHECK-NEXT: has UTF-16: true
   print("has UTF-16: \(CFStringGetCharactersPtr(unsafeBitCast(nsUTF16, to: CFString.self)) != nil)")
 
-  // CHECK: --- UTF-16 basic round-tripping ---
+  // CHECK-LABEL: --- UTF-16 basic round-tripping ---
   print("--- UTF-16 basic round-tripping ---")
 
   // check that no extraneous objects are created
@@ -95,7 +100,7 @@ func nonASCII() {
   // CHECK-NEXT: String(Native(owner: @[[sliceAddress:[x0-9a-f]+]], count: 6
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  let slice = newNSUTF16[i2..<i8]
+  let slice = String(newNSUTF16[i2..<i8])
   print("  \(repr(slice))")
 
   // The storage of the slice implements NSString directly
@@ -122,7 +127,7 @@ func ascii() {
   print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x0600) != nil)")
   print("has ASCII pointer: \(CFStringGetCStringPtr(unsafeBitCast(nsASCII, to: CFString.self), 0x08000100) != nil)")
 
-  // CHECK: --- ASCII basic round-tripping ---
+  // CHECK-LABEL: --- ASCII basic round-tripping ---
   print("--- ASCII basic round-tripping ---")
 
   // CHECK-NEXT: [[nsstringclass:(__NSCFString|NSTaggedPointerString)]]@[[asciiaddress:[x0-9a-f]+]] = "foobar"
@@ -136,14 +141,14 @@ func ascii() {
   let nsRoundTripASCII = newNSASCII as NSString
   print("  \(repr(nsRoundTripASCII))")
 
-  // CHECK: --- ASCII slicing ---
+  // CHECK-LABEL: --- ASCII slicing ---
   print("--- ASCII slicing ---")
 
   let i3 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 3)
   let i6 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 6)
-  
+
   // Slicing the String
-  print("  \(repr(newNSASCII[i3..<i6]))")
+  print("  \(repr(String(newNSASCII[i3..<i6])))")
 
   // Representing a slice as an NSString
   let nsSliceASCII = newNSASCII[i3..<i6] as NSString
@@ -158,26 +163,29 @@ ascii()
 
 // String literals default to UTF-16.
 
-// CHECK: --- Literals ---
+// CHECK-LABEL: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Unmanaged(count: 6)) = "foobar"
+// CHECK-NEXT: String({{Unmanaged|Small}}(count: 6)) = "foobar"
 // CHECK-NEXT: true
 let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
-print("  \(asciiLiteral._guts.isASCII)")
+print("  \(asciiLiteral._classify()._isASCII)")
 
 // CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
-print("  \(!asciiLiteral._guts.isASCII)")
+print("  \(nonASCIILiteral._classify()._isASCII)")
 
 // ===------- Appending -------===
 
 // These tests are in NewStringAppending.swift.
 
 // ===---------- Comparison --------===
+
+// CHECK-LABEL: --- Comparison ---
+print("--- Comparison ---")
 
 var s = "ABCDEF"
 let s1 = s + "G"

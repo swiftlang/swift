@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-stdlib-swiftgyb-swift3
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -51,15 +51,6 @@ def prepare_bit_pattern(bit_pattern, dst_bits, dst_signed):
     if dst <= ((1 << (dst_bits - 1)) - 1):
         return dst
     return dst - mask - 1
-
-def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
-    if src_bits <= word_bits:
-        bit_pattern = prepare_bit_pattern(bit_pattern, src_bits, True)
-        return prepare_bit_pattern(bit_pattern, word_bits, True)
-    if src_bits == word_bits * 2:
-        return prepare_bit_pattern(
-            bit_pattern ^ (bit_pattern >> 32), word_bits, True)
-
 }%
 
 //===----------------------------------------------------------------------===//
@@ -242,16 +233,24 @@ hash_value_test_template = gyb.parse_template("hash_value",
 % for self_ty in all_integer_types(word_bits):
 %   Self = self_ty.stdlib_name
 
-FixedPoint.test("${Self}.hashValue") {
+FixedPoint.test("${Self}.hash(into:)") {
 
 %   for bit_pattern in test_bit_patterns:
 
   do {
 %     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
     let input = get${Self}(${input})
-    let output = getInt(input.hashValue)
-    let expected = getInt(${get_fixed_point_hash(input, self_ty.bits, word_bits)})
-    expectEqual(expected, output)
+    var hasher = Hasher()
+    input.hash(into: &hasher)
+    let output = getInt(hasher.finalize())
+
+%     reference = prepare_bit_pattern(bit_pattern, self_ty.bits, False)
+%     if self_ty.bits == 64:
+    let expected = Hasher._hash(seed: 0, ${reference} as UInt64)
+%     else:
+    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits / 8})
+%     end
+    expectEqual(expected, output, "input: \(input)")
   }
 
 %   end
@@ -269,7 +268,6 @@ FixedPoint.test("${Self}.hashValue") {
   ${gyb.execute_template(
       hash_value_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
-      get_fixed_point_hash=get_fixed_point_hash,
       test_bit_patterns=test_bit_patterns,
       word_bits=32)}
 
@@ -278,7 +276,6 @@ FixedPoint.test("${Self}.hashValue") {
   ${gyb.execute_template(
       hash_value_test_template,
       prepare_bit_pattern=prepare_bit_pattern,
-      get_fixed_point_hash=get_fixed_point_hash,
       test_bit_patterns=test_bit_patterns,
       word_bits=64)}
 

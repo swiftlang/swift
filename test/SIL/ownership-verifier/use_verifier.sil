@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null 2>&1  %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null 2>&1  %s
 // REQUIRES: asserts
 
 // This file is meant to contain tests that previously the verifier treated
@@ -12,8 +12,6 @@ import Builtin
 //////////////////
 // Declarations //
 //////////////////
-
-sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
 
 typealias AnyObject = Builtin.AnyObject
 
@@ -36,8 +34,6 @@ case trivial_payload(Builtin.Int32)
 case nontrivial_payload(Builtin.NativeObject)
 }
 
-sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
-
 struct TrivialStruct {
   var f1: Builtin.Int32
   var f2: Builtin.Int32
@@ -55,7 +51,7 @@ struct TupleContainingNonTrivialStruct {
 
 class SuperKlass {
   func d() {}
-  static func f() {}
+  class func f() {}
 }
 class SubKlass : SuperKlass {}
 class X {
@@ -67,8 +63,6 @@ protocol SwiftKlassP : class {
   func foo()
 }
 
-sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
-
 struct Val {
 }
 class Ref {
@@ -78,14 +72,9 @@ struct Aleph {
   var b:Val
 }
 
-sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-
 struct Int {
   var value: Builtin.Int64
 }
-
-sil @no_arg_or_output_function : $@convention(thin) () -> ()
 
 class RefWithInt {
   var value: Builtin.Int32
@@ -94,6 +83,27 @@ class RefWithInt {
 }
 
 struct EmptyStruct {}
+
+class RefWithRef {
+  var value: RefWithRef
+
+  init()
+}
+
+sil @no_arg_or_output_function : $@convention(thin) () -> ()
+
+
+sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
+
+sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+
+sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+
+sil @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 ////////////////
 // Test Cases //
@@ -111,6 +121,15 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = alloc_stack $Builtin.NativeObject
   store_borrow %0 to %1 : $*Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @load_borrow_from_class : $@convention(thin) (@guaranteed RefWithRef) -> () {
+bb0(%0 : @guaranteed $RefWithRef):
+  %1 = ref_element_addr %0 : $RefWithRef, #RefWithRef.value
+  %2 = load_borrow %1 : $*RefWithRef
+  end_borrow %2 : $RefWithRef
   %9999 = tuple()
   return %9999 : $()
 }
@@ -157,7 +176,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
   apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   %3 = begin_borrow %0 : $Builtin.NativeObject
   apply %2(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
-  end_borrow %3 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   %9999 = tuple()
@@ -168,7 +187,7 @@ sil @forwarding_guaranteed_nonfunction_values_doesnt_end_lifetime : $@convention
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $SuperKlass
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -276,7 +295,7 @@ sil @ref_element_addr_test : $@convention(thin) (@owned RefWithInt) -> () {
 bb0(%0 : @owned $RefWithInt):
   %1 = begin_borrow %0 : $RefWithInt
   %2 = ref_element_addr %1 : $RefWithInt, #RefWithInt.value
-  end_borrow %1 from %0 : $RefWithInt, $RefWithInt
+  end_borrow %1 : $RefWithInt
   destroy_value %0 : $RefWithInt
   %9999 = tuple()
   return %9999 : $()
@@ -296,7 +315,7 @@ bb0(%0 : @owned $Ref):
   %1 = builtin "unsafeGuaranteed"(%0 : $Ref) : $(Ref, Builtin.Int8)
   %2 = begin_borrow %1 : $(Ref, Builtin.Int8)
   %3 = tuple_extract %2 : $(Ref, Builtin.Int8), 1
-  end_borrow %2 from %1 : $(Ref, Builtin.Int8), $(Ref, Builtin.Int8)
+  end_borrow %2 : $(Ref, Builtin.Int8)
   builtin "unsafeGuaranteedEnd"(%3 : $Builtin.Int8) : $()
   destroy_value %1 : $(Ref, Builtin.Int8)
   %9999 = tuple()
@@ -309,7 +328,7 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   unchecked_enum_data %1 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
-  end_borrow %1 from %0 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+  end_borrow %1 : $Optional<Builtin.NativeObject>
   %2 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1
   return %2 : $Builtin.NativeObject
 }
@@ -331,7 +350,7 @@ bb0:
   end_unpaired_access [dynamic] %11 : $*Builtin.UnsafeValueBuffer
   begin_unpaired_access [read] [dynamic] %21 : $*Builtin.Int32, %11 : $*Builtin.UnsafeValueBuffer
   end_unpaired_access [dynamic] %11 : $*Builtin.UnsafeValueBuffer
-  end_borrow %011 from %01 : $RefWithInt, $RefWithInt
+  end_borrow %011 : $RefWithInt
   dealloc_stack %11 : $*Builtin.UnsafeValueBuffer
   destroy_value %01 : $RefWithInt
 
@@ -433,6 +452,61 @@ bb3:
   return %9999 : $()
 }
 
+// Make sure that we can propagate through an argument through an enum that is
+// switched upon and whose payload is then destroyed.
+sil @switch_enum_owned_payload_test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @switch_enum_owned_payload_test3 : $@convention(thin) () -> () {
+bb0:
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can propagate through an argument through an enum that is
+// switched upon and whose payload is then destroyed.
+sil @switch_enum_owned_payload_test4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 // Make sure that we can properly handle a guaranteed switch_enum.
 sil @switch_enum_guaranteed_arg_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
@@ -440,7 +514,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -458,12 +532,12 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   br bb3
 
 bb2:
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -479,14 +553,14 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -499,14 +573,14 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  end_borrow %2 from %1 : $Optional<Builtin.NativeObject>, $Optional<Builtin.NativeObject>
+  end_borrow %2 : $Optional<Builtin.NativeObject>
   destroy_value %1 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
@@ -679,7 +753,7 @@ bb51:
   return %9999 : $()
 }
 
-// We check first for objects and then for metatypes.
+// We check first for objects, then for metatypes, then for guaranteed values
 sil @checked_cast_br_test : $@convention(thin) (@owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %6 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -706,11 +780,11 @@ bb6:
   checked_cast_br %6 : $Builtin.NativeObject to $SuperKlass, bb7, bb8
 
 bb7(%7 : @guaranteed $SuperKlass):
-  end_borrow_argument %7 : $SuperKlass
+  end_borrow %7 : $SuperKlass
   br bb9
 
 bb8(%8 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %8 : $Builtin.NativeObject
+  end_borrow %8 : $Builtin.NativeObject
   br bb9
 
 bb9:
@@ -818,7 +892,7 @@ bb4:
 
 bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
   %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  end_borrow_argument %5 : $ThreeDifferingPayloadEnum
+  end_borrow %5 : $ThreeDifferingPayloadEnum
   return %6 : $ThreeDifferingPayloadEnum
 }
 
@@ -845,8 +919,8 @@ bb4:
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow_argument %6 : $ThreeDifferingPayloadEnum
-  end_borrow %1 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %6 : $ThreeDifferingPayloadEnum
+  end_borrow %1 : $Builtin.NativeObject
   br bb6(%7 : $ThreeDifferingPayloadEnum)
 
 bb6(%8 : @owned $ThreeDifferingPayloadEnum):
@@ -926,11 +1000,11 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $NonTrivialS
   // First test guaranteed
   %2 = begin_borrow %0 : $(Builtin.NativeObject, Builtin.Int32)
   (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Builtin.Int32)
-  end_borrow %2 from %0 : $(Builtin.NativeObject, Builtin.Int32), $(Builtin.NativeObject, Builtin.Int32)
+  end_borrow %2 : $(Builtin.NativeObject, Builtin.Int32)
 
   %5 = begin_borrow %1 : $NonTrivialStructWithTrivialField
   (%6, %7) = destructure_struct %5 : $NonTrivialStructWithTrivialField
-  end_borrow %5 from %1 : $NonTrivialStructWithTrivialField, $NonTrivialStructWithTrivialField
+  end_borrow %5 : $NonTrivialStructWithTrivialField
 
   // Then test destructive.
   (%8, %9) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
@@ -962,7 +1036,7 @@ bb0(%0 : @owned $SwiftKlassP):
   %cast = unchecked_ref_cast %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP to $Builtin.NativeObject
   %3 = witness_method $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP, #SwiftKlassP.foo!1, %2 : $@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
   apply %3<@opened("3B64717A-E2B3-11E6-9646-985AEB89C610") SwiftKlassP>(%2) : $@convention(witness_method: SwiftKlassP) <τ_0_0 where τ_0_0 : SwiftKlassP> (@guaranteed τ_0_0) -> ()
-  end_borrow %1 from %0 : $SwiftKlassP, $SwiftKlassP
+  end_borrow %1 : $SwiftKlassP
   destroy_value %0 : $SwiftKlassP
   %9999 = tuple()
   return %9999 : $()
@@ -1014,3 +1088,40 @@ bb0(%0 : @trivial $@thick SubKlass.Type):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @switch_enum_apply_test : $@convention(thin) () -> @owned Builtin.NativeObject {
+bb0:
+  %0 = function_ref @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  %1 = apply %0() : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  unreachable
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  return %2 : $Builtin.NativeObject
+}
+
+// Make sure that we allow for @owned parameters to be passed as @guaranteed
+// parameters since we are performing an "instantaneous" borrow.
+sil @owned_passed_to_guaranteed_apply_parameter : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0k(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @owned_partial_apply_used_as_callee_guaranteed : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+  %1 = partial_apply %0() : $@convention(thin) () -> @owned Builtin.NativeObject
+  %2 = convert_function %1 : $@callee_owned () -> @owned Builtin.NativeObject to $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %3 = apply %2() : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %2 : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

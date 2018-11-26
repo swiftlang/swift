@@ -181,7 +181,7 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return Value;
 
     // We know how to propagate through phi arguments only.
-    auto *V = dyn_cast<SILPHIArgument>(Value);
+    auto *V = dyn_cast<SILPhiArgument>(Value);
     if (!V)
       return SILValue();
 
@@ -193,7 +193,8 @@ SILValue CheckedCastBrJumpThreading::isArgValueEquivalentToCondition(
       return SILValue();
 
     SmallVector<SILValue, 4> IncomingValues;
-    if (!V->getIncomingValues(IncomingValues) || IncomingValues.empty())
+    if (!V->getSingleTerminatorOperands(IncomingValues)
+        || IncomingValues.empty())
       return SILValue();
 
     ValueBase *Def = nullptr;
@@ -248,8 +249,8 @@ modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
 
   assert(!Cloner.hasValue());
   Cloner.emplace(CCBBlock);
-  Cloner->clone();
-  SILBasicBlock *TargetFailureBB = Cloner->getDestBB();
+  Cloner->cloneBlock();
+  SILBasicBlock *TargetFailureBB = Cloner->getNewBB();
   auto *TI = TargetFailureBB->getTerminator();
   SILBuilderWithScope Builder(TI);
   // This BB copy branches to a FailureBB.
@@ -285,8 +286,8 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
       // for all SuccessPreds.
       assert(!Cloner.hasValue());
       Cloner.emplace(CCBBlock);
-      Cloner->clone();
-      SILBasicBlock *TargetSuccessBB = Cloner->getDestBB();
+      Cloner->cloneBlock();
+      SILBasicBlock *TargetSuccessBB = Cloner->getNewBB();
       auto *TI = TargetSuccessBB->getTerminator();
       SILBuilderWithScope Builder(TI);
       // This BB copy branches to SuccessBB.
@@ -375,7 +376,7 @@ bool CheckedCastBrJumpThreading::checkCloningConstraints() {
 bool CheckedCastBrJumpThreading::
 areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
                                       SILValue DomCondition) {
-  auto *Arg = dyn_cast<SILPHIArgument>(Condition);
+  auto *Arg = dyn_cast<SILPhiArgument>(Condition);
   if (!Arg)
     return false;
 
@@ -387,8 +388,9 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
   // Incoming values for the BBArg.
   SmallVector<SILValue, 4> IncomingValues;
 
-  if (ArgBB->getIterator() != ArgBB->getParent()->begin() &&
-      (!Arg->getIncomingValues(IncomingValues) || IncomingValues.empty()))
+  if (ArgBB->getIterator() != ArgBB->getParent()->begin()
+      && (!Arg->getSingleTerminatorOperands(IncomingValues)
+          || IncomingValues.empty()))
     return false;
 
   // Check for each predecessor, if the incoming value coming from it
@@ -414,8 +416,8 @@ areEquivalentConditionsAlongSomePaths(CheckedCastBranchInst *DomCCBI,
       }
 
       // Condition is the same if BB is reached over a pass through Pred.
-      DEBUG(llvm::dbgs() << "Condition is the same if reached over ");
-      DEBUG(PredBB->print(llvm::dbgs()));
+      LLVM_DEBUG(llvm::dbgs() << "Condition is the same if reached over ");
+      LLVM_DEBUG(PredBB->print(llvm::dbgs()));
 
       // See if it is reached over Success or Failure path.
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
@@ -667,9 +669,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     return;
 
   // Second phase: transformation.
-  // Remove critical edges for the SSA-updater. We do this once and keep the
-  // CFG critical-edge free during our transformations.
-  splitAllCriticalEdges(*Fn, true, nullptr, nullptr);
+  Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
     Optional<BasicBlockCloner> Cloner;
@@ -684,11 +684,11 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     edit->modifyCFGForUnknownPreds();
 
     if (Cloner.hasValue()) {
-      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getDestBB(),
-                            edit->CCBBlock, false);
+      updateSSAAfterCloning(*Cloner.getPointer(), Cloner->getNewBB(),
+                            edit->CCBBlock);
 
-      if (!Cloner->getDestBB()->pred_empty())
-        BlocksForWorklist.push_back(Cloner->getDestBB());
+      if (!Cloner->getNewBB()->pred_empty())
+        BlocksForWorklist.push_back(Cloner->getNewBB());
     }
     if (!edit->CCBBlock->pred_empty())
       BlocksForWorklist.push_back(edit->CCBBlock);

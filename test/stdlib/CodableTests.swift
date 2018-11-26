@@ -22,7 +22,7 @@ class TestCodableSuper { }
 #endif
 
 // MARK: - Helper Functions
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
 func makePersonNameComponents(namePrefix: String? = nil,
                               givenName: String? = nil,
                               middleName: String? = nil,
@@ -117,7 +117,7 @@ struct UUIDCodingWrapper : Codable, Equatable {
 // MARK: - Tests
 class TestCodable : TestCodableSuper {
     // MARK: - AffineTransform
-#if os(OSX)
+#if os(macOS)
     lazy var affineTransformValues: [Int : AffineTransform] = [
         #line : AffineTransform.identity,
         #line : AffineTransform(),
@@ -220,7 +220,7 @@ class TestCodable : TestCodableSuper {
             #line : CGAffineTransform(a: 0.498, b: -0.284, c: -0.742, d: 0.3248, tx: 12, ty: 44)
         ]
 
-        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             values[#line] = CGAffineTransform(rotationAngle: .pi / 2)
         }
 
@@ -246,7 +246,7 @@ class TestCodable : TestCodableSuper {
             #line : CGPoint(x: 10, y: 20)
         ]
 
-        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             // Limit on magnitude in JSON. See rdar://problem/12717407
             values[#line] = CGPoint(x: CGFloat.greatestFiniteMagnitude,
                                     y: CGFloat.greatestFiniteMagnitude)
@@ -274,7 +274,7 @@ class TestCodable : TestCodableSuper {
             #line : CGSize(width: 30, height: 40)
         ]
 
-        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             // Limit on magnitude in JSON. See rdar://problem/12717407
             values[#line] = CGSize(width: CGFloat.greatestFiniteMagnitude,
                                    height: CGFloat.greatestFiniteMagnitude)
@@ -303,7 +303,7 @@ class TestCodable : TestCodableSuper {
             #line : CGRect(x: 10, y: 20, width: 30, height: 40)
         ]
 
-        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             // Limit on magnitude in JSON. See rdar://problem/12717407
             values[#line] = CGRect.infinite
         }
@@ -330,7 +330,7 @@ class TestCodable : TestCodableSuper {
             #line : CGVector(dx: 0.0, dy: -9.81)
         ]
 
-        if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+        if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
             // Limit on magnitude in JSON. See rdar://problem/12717407
             values[#line] = CGVector(dx: CGFloat.greatestFiniteMagnitude,
                                      dy: CGFloat.greatestFiniteMagnitude)
@@ -371,7 +371,7 @@ class TestCodable : TestCodableSuper {
     }
 
     // MARK: - DateInterval
-    @available(OSX 10.12, iOS 10.10, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     lazy var dateIntervalValues: [Int : DateInterval] = [
         #line : DateInterval(),
         #line : DateInterval(start: Date.distantPast, end: Date()),
@@ -379,14 +379,14 @@ class TestCodable : TestCodableSuper {
         #line : DateInterval(start: Date.distantPast, end: Date.distantFuture)
     ]
 
-    @available(OSX 10.12, iOS 10.10, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_JSON() {
         for (testLine, interval) in dateIntervalValues {
             expectRoundTripEqualityThroughJSON(for: interval, lineNumber: testLine)
         }
     }
 
-    @available(OSX 10.12, iOS 10.10, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_DateInterval_Plist() {
         for (testLine, interval) in dateIntervalValues {
             expectRoundTripEqualityThroughPlist(for: interval, lineNumber: testLine)
@@ -442,6 +442,8 @@ class TestCodable : TestCodableSuper {
     lazy var indexSetValues: [Int : IndexSet] = [
         #line : IndexSet(),
         #line : IndexSet(integer: 42),
+    ]
+    lazy var indexSetMaxValues: [Int : IndexSet] = [
         #line : IndexSet(integersIn: 0 ..< Int.max)
     ]
 
@@ -449,10 +451,19 @@ class TestCodable : TestCodableSuper {
         for (testLine, indexSet) in indexSetValues {
             expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, indexSet) in indexSetMaxValues {
+                expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
+            }
+        }
     }
 
     func test_IndexSet_Plist() {
         for (testLine, indexSet) in indexSetValues {
+            expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
+        }
+        for (testLine, indexSet) in indexSetMaxValues {
             expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
         }
     }
@@ -482,21 +493,21 @@ class TestCodable : TestCodableSuper {
     }
 
     // MARK: - Measurement
-    @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     lazy var unitValues: [Int : Dimension] = [
         #line : UnitAcceleration.metersPerSecondSquared,
         #line : UnitMass.kilograms,
         #line : UnitLength.miles
     ]
 
-    @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_JSON() {
         for (testLine, unit) in unitValues {
             expectRoundTripEqualityThroughJSON(for: Measurement(value: 42, unit: unit), lineNumber: testLine)
         }
     }
 
-    @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+    @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_Plist() {
         for (testLine, unit) in unitValues {
             expectRoundTripEqualityThroughJSON(for: Measurement(value: 42, unit: unit), lineNumber: testLine)
@@ -506,6 +517,9 @@ class TestCodable : TestCodableSuper {
     // MARK: - NSRange
     lazy var nsrangeValues: [Int : NSRange] = [
         #line : NSRange(),
+        #line : NSRange(location: 5, length: 20),
+    ]
+    lazy var nsrangeMaxValues: [Int : NSRange] = [
         #line : NSRange(location: 0, length: Int.max),
         #line : NSRange(location: NSNotFound, length: 0),
     ]
@@ -514,30 +528,39 @@ class TestCodable : TestCodableSuper {
         for (testLine, range) in nsrangeValues {
             expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, range) in nsrangeMaxValues {
+                expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
+            }
+        }
     }
 
     func test_NSRange_Plist() {
         for (testLine, range) in nsrangeValues {
             expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
         }
+        for (testLine, range) in nsrangeMaxValues {
+            expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
+        }
     }
 
     // MARK: - PersonNameComponents
-    @available(OSX 10.11, iOS 9.0, *)
+    @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     lazy var personNameComponentsValues: [Int : PersonNameComponents] = [
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed"),
         #line : makePersonNameComponents(givenName: "John", familyName: "Appleseed", nickname: "Johnny"),
         #line : makePersonNameComponents(namePrefix: "Dr.", givenName: "Jane", middleName: "A.", familyName: "Appleseed", nameSuffix: "Esq.", nickname: "Janie")
     ]
 
-    @available(OSX 10.11, iOS 9.0, *)
+    @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_JSON() {
         for (testLine, components) in personNameComponentsValues {
             expectRoundTripEqualityThroughJSON(for: components, lineNumber: testLine)
         }
     }
 
-    @available(OSX 10.11, iOS 9.0, *)
+    @available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *)
     func test_PersonNameComponents_Plist() {
         for (testLine, components) in personNameComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
@@ -572,7 +595,7 @@ class TestCodable : TestCodableSuper {
             #line : URL(string: "documentation", relativeTo: URL(string: "http://swift.org")!)!
         ]
 
-        if #available(OSX 10.11, iOS 9.0, *) {
+        if #available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *) {
             values[#line] = URL(fileURLWithPath: "bin/sh", relativeTo: URL(fileURLWithPath: "/"))
         }
 
@@ -770,27 +793,30 @@ var tests = [
     "test_TimeZone_Plist" : TestCodable.test_TimeZone_Plist,
     "test_URL_JSON" : TestCodable.test_URL_JSON,
     "test_URL_Plist" : TestCodable.test_URL_Plist,
-    "test_URLComponents_JSON" : TestCodable.test_URLComponents_JSON,
-    "test_URLComponents_Plist" : TestCodable.test_URLComponents_Plist,
     "test_UUID_JSON" : TestCodable.test_UUID_JSON,
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
 ]
 
-#if os(OSX)
+#if os(macOS)
     tests["test_AffineTransform_JSON"] = TestCodable.test_AffineTransform_JSON
     tests["test_AffineTransform_Plist"] = TestCodable.test_AffineTransform_Plist
 #endif
 
-if #available(OSX 10.11, iOS 9.0, *) {
+if #available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *) {
     tests["test_PersonNameComponents_JSON"] = TestCodable.test_PersonNameComponents_JSON
     tests["test_PersonNameComponents_Plist"] = TestCodable.test_PersonNameComponents_Plist
 }
 
-if #available(OSX 10.12, iOS 10.10, watchOS 3.0, tvOS 10.0, *) {
+if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // tests["test_DateInterval_JSON"] = TestCodable.test_DateInterval_JSON
     tests["test_DateInterval_Plist"] = TestCodable.test_DateInterval_Plist
     // tests["test_Measurement_JSON"] = TestCodable.test_Measurement_JSON
     // tests["test_Measurement_Plist"] = TestCodable.test_Measurement_Plist
+}
+
+if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+    tests["test_URLComponents_JSON"] = TestCodable.test_URLComponents_JSON
+    tests["test_URLComponents_Plist"] = TestCodable.test_URLComponents_Plist
 }
 
 var CodableTests = TestSuite("TestCodable")

@@ -22,7 +22,7 @@ sil @_TFV4test1S3foofS0_US_1P__FQ_T_ : $@convention(method) <T where T : P> (@in
 // CHECK: call
 // test.bar (test.S, test.X) -> ()
 sil @_TF4test3barFTVS_1SVS_1X_T_ : $@convention(thin) (S, X) -> () {
-bb0(%0 : $S, %1 : $X):
+bb0(%0 : @unowned $S, %1 : @unowned $X):
   debug_value %0 : $S  // let s                   // id: %2
   debug_value %1 : $X  // let x                   // id: %3
   // function_ref test.S.foo (test.S)<A : test.P>(A) -> ()

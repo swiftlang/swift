@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -23,7 +23,7 @@ class ParentNode : Node {
 
 sil @_test_exact_checked_cast_branch : $@convention(method) (@guaranteed Node) -> Int {
 bb0(%0 : $Node):
-//CHECK-LABEL: @_test_exact_checked_cast_branch
+//CHECK-LABEL: define{{.*}}@_test_exact_checked_cast_branch
 //CHECK:       = load %swift.type
 //CHECK-NEXT:  = icmp eq %swift.type
 //CHECK-NEXT:  = bitcast
@@ -38,6 +38,43 @@ bb2(%5 : $ParentNode):                            // Preds: bb0
 
 bb3:                                              // Preds: bb0
   br bb1                              // id: %12
+}
+
+class BaseBase {
+  @inline(never) func foo()
+  init()
+  deinit
+}
+
+class Base<T> : BaseBase {
+  override init()
+  deinit
+}
+
+final class DerivedInt : Base<Int> {
+  @inline(never) override final func foo()
+  override init()
+  deinit
+}
+
+sil @test_exact_checked_cast_branch_dynamic_init : $@convention(thin) (@guaranteed BaseBase) -> Int {
+bb0(%0 : $BaseBase):
+//CHECK-LABEL: define{{.*}}@test_exact_checked_cast_branch_dynamic_init
+//CHECK: call swiftcc {{.*}}@"$s9exactcast10DerivedIntCMa"({{.*}})
+//CHECK: load
+//CHECK: bitcast
+//CHECK: icmp eq %swift.type
+//CHECK: br
+  checked_cast_br [exact] %0 : $BaseBase to $DerivedInt, bb2, bb3 // id: %2
+
+bb1:
+  return undef : $Int
+
+bb2(%5 : $DerivedInt):
+  br bb1
+
+bb3:
+  br bb1
 }
 
 sil @_TFC9pic_crash4NodecfMS0_FT5indexSi_S0_ : $@convention(method) (Int, @owned Node) -> @owned Node
@@ -57,10 +94,30 @@ sil_vtable Node {
 }
 
 sil_vtable ParentNode {
-  #Node.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(index : Swift.Int) -> pic_crash.ParentNode
-  #Node.check!1: @_test_exact_checked_cast_branch	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
-  #Node.index!getter.1: @_TFC9pic_crash4Nodeg5indexSi	// pic_crash.Node.index.getter : Swift.Int
-  #Node.index!setter.1: @_TFC9pic_crash4Nodes5indexSi	// pic_crash.Node.index.setter : Swift.Int
-  #ParentNode.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(left : pic_crash.Node, right : pic_crash.Node, index : Swift.Int) -> pic_crash.ParentNode
+  #Node.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT5indexSi_S0_ [override]	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(index : Swift.Int) -> pic_crash.ParentNode
+  #Node.check!1: @_test_exact_checked_cast_branch [override]	// pic_crash.Node.check (pic_crash.Node)() -> Swift.Int
+  #Node.index!getter.1: @_TFC9pic_crash4Nodeg5indexSi [override]	// pic_crash.Node.index.getter : Swift.Int
+  #Node.index!setter.1: @_TFC9pic_crash4Nodes5indexSi [override]	// pic_crash.Node.index.setter : Swift.Int
+  #ParentNode.init!initializer.1: @_TFC9pic_crash10ParentNodecfMS0_FT4leftCS_4Node5rightS1_5indexSi_S0_ 	// pic_crash.ParentNode.init (pic_crash.ParentNode.Type)(left : pic_crash.Node, right : pic_crash.Node, index : Swift.Int) -> pic_crash.ParentNode
 }
 
+sil @$s5test104BaseB0C3fooyyF : $@convention(method) (@guaranteed BaseBase) -> ()
+sil @$s5test104BaseB0CfD : $@convention(method) (@owned BaseBase) -> ()
+sil @$s5test14BaseCfD : $@convention(method) (@owned BaseBase) -> ()
+sil @$s5test110DerivedIntC3fooyyF : $@convention(method) (@guaranteed DerivedInt) -> ()
+sil @$s5test110DerivedIntCfD : $@convention(method) (@owned DerivedInt) -> ()
+
+sil_vtable BaseBase {
+  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF
+  #BaseBase.deinit!deallocator.1: @$s5test104BaseB0CfD
+}
+
+sil_vtable Base {
+  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test104BaseB0C3fooyyF [inherited]
+  #Base.deinit!deallocator.1: @$s5test14BaseCfD
+}
+
+sil_vtable DerivedInt {
+  #BaseBase.foo!1: (BaseBase) -> () -> () : @$s5test110DerivedIntC3fooyyF [override]
+  #DerivedInt.deinit!deallocator.1: @$s5test110DerivedIntCfD
+}

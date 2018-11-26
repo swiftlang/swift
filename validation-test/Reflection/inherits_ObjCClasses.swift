@@ -2,7 +2,10 @@
 
 // RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -lswiftSwiftReflectionTest %t/ObjCClasses.o %s -o %t/inherits_ObjCClasses
+// RUN: %target-codesign %t/inherits_ObjCClasses
+
 // RUN: %target-run %target-swift-reflection-test %t/inherits_ObjCClasses | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test

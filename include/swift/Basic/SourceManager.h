@@ -13,7 +13,9 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
+#include "clang/Basic/FileManager.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
@@ -24,16 +26,20 @@ namespace swift {
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
-  /// \brief The buffer ID where a hashbang line #! is allowed.
-  unsigned HashbangBufferID = 0U;
-
   /// Associates buffer identifiers to buffer IDs.
-  llvm::StringMap<unsigned> BufIdentIDMap;
+  llvm::DenseMap<StringRef, unsigned> BufIdentIDMap;
 
-  // #line directive handling.
+  /// A cache mapping buffer identifiers to vfs Status entries.
+  ///
+  /// This is as much a hack to prolong the lifetime of status objects as it is
+  /// to speed up stats.
+  mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
+
+  // \c #sourceLocation directive handling.
   struct VirtualFile {
     CharSourceRange Range;
     std::string Name;
@@ -43,11 +49,23 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
+  SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+                    llvm::vfs::getRealFileSystem())
+    : FileSystem(FS) {}
+
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
   }
   const llvm::SourceMgr &getLLVMSourceMgr() const {
     return LLVMSourceMgr;
+  }
+
+  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+    FileSystem = FS;
+  }
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() {
+    return FileSystem;
   }
 
   void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
@@ -66,15 +84,6 @@ public:
   }
 
   SourceLoc getCodeCompletionLoc() const;
-
-  void setHashbangBufferID(unsigned BufferID) {
-    assert(HashbangBufferID == 0U && "Hashbang buffer ID already set");
-    HashbangBufferID = BufferID;
-  }
-
-  unsigned getHashbangBufferID() const {
-    return HashbangBufferID;
-  }
 
   /// Returns true if \c LHS is before \c RHS in the source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
@@ -103,17 +112,17 @@ public:
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
 
-  /// Add a #line-defined virtual file region.
+  /// Add a \c #sourceLocation-defined virtual file region.
   ///
   /// By default, this region continues to the end of the buffer.
   ///
   /// \returns True if the new file was added, false if the file already exists.
   /// The name and line offset must match exactly in that case.
   ///
-  /// \sa closeVirtualFile.
+  /// \sa closeVirtualFile
   bool openVirtualFile(SourceLoc loc, StringRef name, int lineOffset);
 
-  /// Close a #line-defined virtual file region.
+  /// Close a \c #sourceLocation-defined virtual file region.
   void closeVirtualFile(SourceLoc end);
 
   /// Creates a copy of a \c MemoryBuffer and adds it to the \c SourceManager,
@@ -134,6 +143,11 @@ public:
   /// Returns the identifier for the buffer with the given ID.
   ///
   /// \p BufferID must be a valid buffer ID.
+  ///
+  /// This should not be used for displaying information about the \e contents
+  /// of a buffer, since lines within the buffer may be marked as coming from
+  /// other files using \c #sourceLocation. Use #getDisplayNameForLoc instead
+  /// in that case.
   StringRef getIdentifierForBuffer(unsigned BufferID) const;
 
   /// \brief Returns a SourceRange covering the entire specified buffer.
@@ -163,22 +177,19 @@ public:
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
 
-  /// Returns the identifier string for the buffer containing the given source
-  /// location.
+  /// Returns a buffer identifier suitable for display to the user containing
+  /// the given source location.
   ///
-  /// This respects #line directives.
-  StringRef getBufferIdentifierForLoc(SourceLoc Loc) const {
-    if (auto VFile = getVirtualFile(Loc))
-      return VFile->Name;
-    else
-      return getIdentifierForBuffer(findBufferContainingLoc(Loc));
-  }
+  /// This respects \c #sourceLocation directives and the 'use-external-names'
+  /// directive in VFS overlay files. If you need an on-disk file name, use
+  /// #getIdentifierForBuffer instead.
+  StringRef getDisplayNameForLoc(SourceLoc Loc) const;
 
   /// Returns the line and column represented by the given source location.
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
   ///
-  /// This respects #line directives.
+  /// This respects \c #sourceLocation directives.
   std::pair<unsigned, unsigned>
   getLineAndColumn(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
@@ -193,7 +204,7 @@ public:
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
   ///
-  /// This does not respect #line directives.
+  /// This does not respect \c #sourceLocation directives.
   unsigned getLineNumber(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
     return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);

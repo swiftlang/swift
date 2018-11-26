@@ -35,7 +35,17 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
-  bool visitNameAliasType(NameAliasType *ty) { return false; }
+  bool visitNameAliasType(NameAliasType *ty) {
+    if (auto parent = ty->getParent())
+      if (doIt(parent)) return true;
+
+    for (auto arg : ty->getInnermostGenericArgs())
+      if (doIt(arg))
+        return true;
+    
+    return false;
+
+  }
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitParenType(ParenType *ty) {
@@ -75,7 +85,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitAnyFunctionType(AnyFunctionType *ty) {
     for (const auto &param : ty->getParams()) {
-      if (doIt(param.getType()))
+      if (doIt(param.getOldType()))
         return true;
     }
 
@@ -167,8 +177,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILBoxType(SILBoxType *ty) {
-    for (auto &arg : ty->getGenericArgs()) {
-      if (doIt(arg.getReplacement()))
+    for (Type type : ty->getSubstitutions().getReplacementTypes()) {
+      if (type && doIt(type))
         return true;
     }
     return false;

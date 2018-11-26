@@ -28,7 +28,7 @@ let _: Container.YourType<Int>
 
 typealias DS<T> = MyType<String, T>
 
-typealias BadA<T : Int> = MyType<String, T>  // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
+typealias BadA<T : Int> = MyType<String, T>  // expected-error {{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 typealias BadB<T where T == Int> = MyType<String, T>  // expected-error {{associated types must not have a generic parameter list}}
 // expected-error@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
@@ -77,7 +77,7 @@ let _ : D = D(a: 1, b: 2)  // expected-error {{cannot convert value of type 'MyT
 let _ : D<Int, Int, Float> = D<Int, Int, Float>(a: 1, b: 2)
 
 // FIXME: This is not a great error.
-// expected-error @+1 {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
+// expected-error @+1 {{cannot convert value of type 'D<Int, Int, Float>' (aka 'MyType<Int, Int>') to specified type 'D'}}
 let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 
 
@@ -147,10 +147,8 @@ class GenericClass<T> {
     return TAI(a: t, b: s)
   }
 
-  // FIXME: Would be nice to preserve sugar here
-
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>'}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'MyType<T, Int>'}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -267,11 +265,11 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Float, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // FIXME // expected-error {{cannot convert value of type 'MyType<Float, Double>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{'Double' is not convertible to 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -419,3 +417,18 @@ takesInt(10)
 
 func failsRequirementCheck(_: Element<Int>) {}
 // expected-error@-1 {{type 'Int' does not conform to protocol 'Sequence'}}
+
+//
+// Sugar in base types of a typealias.
+//
+struct X<T, U> {
+  typealias GY<V> = [V]
+}
+
+typealias GX<T> = X<T, T>
+
+func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.Element) {
+  let i: Int = gx   // expected-error{{cannot convert value of type 'GX<Int>' (aka 'X<Int, Int>') to specified type 'Int'}}
+  let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
+  let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
+}

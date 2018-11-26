@@ -13,6 +13,8 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
+list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree" "-Xfrontend" "-enable-operator-designated-types")
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-Wall")
@@ -45,10 +47,11 @@ if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
 endif()
 
+add_subdirectory(SwiftShims)
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
-  add_subdirectory(SwiftShims)
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)

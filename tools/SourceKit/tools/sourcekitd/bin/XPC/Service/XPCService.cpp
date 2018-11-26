@@ -12,7 +12,6 @@
 
 #include "sourcekitd/Internal-XPC.h"
 #include "sourcekitd/Logging.h"
-#include "sourcekitd/XpcTracing.h"
 
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/Concurrency.h"
@@ -277,8 +276,6 @@ static void getInitializationInfo(xpc_connection_t peer) {
 
   assert(xpc_get_type(reply) == XPC_TYPE_DICTIONARY);
   uint64_t Delay = xpc_dictionary_get_uint64(reply, xpc::KeySemaEditorDelay);
-  uint64_t TracingEnabled = xpc_dictionary_get_uint64(reply,
-                                                      xpc::KeyTracingEnabled);
   xpc_release(reply);
 
   if (Delay != 0) {
@@ -288,10 +285,6 @@ static void getInitializationInfo(xpc_connection_t peer) {
       OS << Delay;
     }
     setenv("SOURCEKIT_DELAY_SEMA_EDITOR", Buf.c_str(), /*overwrite=*/1);
-  }
-
-  if (TracingEnabled) {
-    SourceKit::trace::enable();
   }
 }
 
@@ -326,14 +319,14 @@ static void fatal_error_handler(void *user_data, const std::string& reason,
   // Write the result out to stderr avoiding errs() because raw_ostreams can
   // call report_fatal_error.
   fprintf(stderr, "SOURCEKITD SERVER FATAL ERROR: %s\n", reason.c_str());
-  ::abort();
+  if (gen_crash_diag)
+    ::abort();
 }
 
 int main(int argc, const char *argv[]) {
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd::initialize();
-  sourcekitd::trace::initialize();
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?
@@ -372,42 +365,3 @@ void SKUIDToUIDMap::set(sourcekitd_uid_t SKDUID, UIdent UID) {
     this->Map[SKDUID] = UID;
   });
 }
-
-void sourcekitd::trace::sendTraceMessage(trace::sourcekitd_trace_message_t Msg) {
-  if (!SourceKit::trace::enabled()) {
-    xpc_release(Msg);
-    return;
-  }
-
-  xpc_connection_t Peer = MainConnection;
-  if (!Peer) {
-    SourceKit::trace::disable();
-    xpc_release(Msg);
-    return;
-  }
-
-  xpc_object_t Contents = xpc_array_create(nullptr, 0);
-  xpc_array_set_uint64(Contents, XPC_ARRAY_APPEND,
-                       static_cast<uint64_t>(xpc::Message::TraceMessage));
-  xpc_array_set_uint64(Contents, XPC_ARRAY_APPEND,
-                       trace::getTracingSession());
-  xpc_array_set_value(Contents, XPC_ARRAY_APPEND, Msg);
-  xpc_release(Msg);
-
-  xpc_object_t Message = xpc_dictionary_create(nullptr, nullptr,  0);
-  xpc_dictionary_set_value(Message, xpc::KeyInternalMsg, Contents);
-  xpc_release(Contents);
-
-  xpc_object_t Reply =
-    xpc_connection_send_message_with_reply_sync(Peer, Message);
-  xpc_release(Message);
-
-  if (xpc_get_type(Reply) == XPC_TYPE_ERROR) {
-    SourceKit::trace::disable();
-    xpc_release(Reply);
-    return;
-  }
-
-  xpc_release(Reply);
-}
-

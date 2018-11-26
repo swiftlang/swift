@@ -5,7 +5,7 @@
 //
 // Type parameters
 //
-infix operator ~> { precedence 255 }
+infix operator ~>
 
 func ~> <Target, Args, Result> (
   target: Target,
@@ -37,9 +37,9 @@ var x = seq ~> split
 // Indirect return
 //
 
-// CHECK-LABEL: define internal swiftcc { i8*, %swift.refcounted* } @"$S21partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA"(%T21partial_apply_generic5SpoonV* noalias nocapture, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc { i8*, %swift.refcounted* } @"$s21partial_apply_generic5split{{[_0-9a-zA-Z]*}}FTA"(%T21partial_apply_generic5SpoonV* noalias nocapture, %swift.refcounted* swiftself)
 // CHECK:         [[REABSTRACT:%.*]] = bitcast %T21partial_apply_generic5SpoonV* %0 to %swift.opaque*
-// CHECK:         tail call swiftcc { i8*, %swift.refcounted* } @"$S21partial_apply_generic5split{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture [[REABSTRACT]],
+// CHECK:         tail call swiftcc { i8*, %swift.refcounted* } @"$s21partial_apply_generic5split{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture [[REABSTRACT]],
 
 struct HugeStruct { var a, b, c, d: Int }
 struct S {
@@ -48,9 +48,9 @@ struct S {
 
 let s = S()
 var y = s.hugeStructReturn
-// CHECK-LABEL: define internal swiftcc { i64, i64, i64, i64 } @"$S21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFFTA"(i64, i64, i64, i64, %swift.refcounted* swiftself) #0 {
+// CHECK-LABEL: define internal swiftcc { i64, i64, i64, i64 } @"$s21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFFTA"(i64, i64, i64, i64, %swift.refcounted* swiftself) #0 {
 // CHECK: entry:
-// CHECK:   %5 = tail call swiftcc { i64, i64, i64, i64 } @"$S21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFF"(i64 %0, i64 %1, i64 %2, i64 %3)
+// CHECK:   %5 = tail call swiftcc { i64, i64, i64, i64 } @"$s21partial_apply_generic1SV16hugeStructReturnyAA04HugeE0VAFF"(i64 %0, i64 %1, i64 %2, i64 %3)
 // CHECK:   ret { i64, i64, i64, i64 } %5
 // CHECK: }
 

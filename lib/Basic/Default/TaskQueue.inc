@@ -24,6 +24,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include "llvm/ADT/StringExtras.h"
+
 using namespace llvm::sys;
 
 namespace swift {
@@ -92,14 +94,16 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     SmallVector<const char *, 128> Argv;
     Argv.push_back(T->ExecPath);
     Argv.append(T->Args.begin(), T->Args.end());
-    Argv.push_back(0);
+    Argv.push_back(nullptr);
 
-    const char *const *envp = T->Env.empty() ? nullptr : T->Env.data();
+    llvm::Optional<llvm::ArrayRef<llvm::StringRef>> Envp =
+        T->Env.empty() ? decltype(Envp)(None)
+                       : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
     bool ExecutionFailed = false;
-    ProcessInfo PI = ExecuteNoWait(T->ExecPath, Argv.data(),
-                                   (const char **)envp,
-                                   /*redirects*/nullptr, /*memoryLimit*/0,
+    ProcessInfo PI = ExecuteNoWait(T->ExecPath,
+                                   llvm::toStringRefArray(Argv.data()), Envp,
+                                   /*redirects*/None, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {
       return true;
@@ -117,7 +121,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // a signal during execution.
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None);
+            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None, TaskProcessInformation(PI.Pid));
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -128,7 +132,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), StringRef(), T->Context);
+        StringRef(), StringRef(), TaskProcessInformation(PI.Pid), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;

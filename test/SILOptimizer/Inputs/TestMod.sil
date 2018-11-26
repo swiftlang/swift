@@ -1,3 +1,4 @@
+
 // Test module for the specialize_cg_update_crash.sil test.
 
 sil_stage canonical
@@ -19,32 +20,32 @@ class MyClass {
 sil @_TFC7TestMod7MyClassD : $@convention(method) (@owned MyClass) -> ()
 sil @_TFC7TestMod7MyClasscfMS0_FT_S0_ : $@convention(method) (@owned MyClass) -> @owned MyClass
 
-sil @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <X> (@in X) -> @out X {
+sil @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <X> (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
   %4 = tuple ()
   return %4 : $()
 }
 
-sil @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <X> (@in X) -> @out X {
+sil @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <X> (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
-  %3 = function_ref @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %3 = function_ref @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %9 = tuple ()
   return %9 : $()
 }
 
-sil @_TFC7TestMod7MyClass8mymethodurfS0_Fq_q_ : $@convention(method) <X> (@in X, @guaranteed MyClass) -> @out X {
+sil @_TFC7TestMod7MyClass8mymethodurfS0_Fq_q_ : $@convention(method) <X> (@in_guaranteed X, @guaranteed MyClass) -> @out X {
 bb0(%0 : $*X, %1 : $*X, %2 : $MyClass):
-  %5 = function_ref @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %5 = function_ref @_TF7TestMod11genlibfunc3urFq_q_ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %11 = tuple ()
   return %11 : $()
 }
 
 // This is the critical function.
-sil @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <X> (@in X) -> @out X {
+sil @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <X> (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
 
   // First reference the method, which lets the method be deserialized, but not processed.
-  %x0 = function_ref @_TFC7TestMod7MyClass8mymethodurfS0_Fq_q_ : $@convention(method) <X> (@in X, @guaranteed MyClass) -> @out X
+  %x0 = function_ref @_TFC7TestMod7MyClass8mymethodurfS0_Fq_q_ : $@convention(method) <X> (@in_guaranteed X, @guaranteed MyClass) -> @out X
 
   // Then reference the metatype which reads the vtable and processes the method.
   // The bug was that during reading the vtable (and processing the vtable functions),
@@ -58,6 +59,6 @@ bb0(%0 : $*X, %1 : $*X):
 sil_vtable MyClass {
   #MyClass.init!initializer.1: @_TFC7TestMod7MyClasscfMS0_FT_S0_	// TestMod.MyClass.init (TestMod.MyClass.Type)() -> TestMod.MyClass
   #MyClass.mymethod!1: @_TFC7TestMod7MyClass8mymethodurfS0_Fq_q_	// TestMod.MyClass.mymethod <A> (TestMod.MyClass)(A) -> A
-  #MyClass.deinit!deallocator: @_TFC7TestMod7MyClassD	// TestMod.MyClass.__deallocating_deinit
+  #MyClass.deinit!deallocator.1: @_TFC7TestMod7MyClassD	// TestMod.MyClass.__deallocating_deinit
 }
 

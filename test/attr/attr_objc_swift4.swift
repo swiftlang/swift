@@ -11,7 +11,7 @@ class DynamicMembers {
   dynamic func foo() { } // expected-error{{'dynamic' instance method 'foo()' must also be '@objc'}}{{3-3=@objc }}
   
   dynamic var bar: NSObject? = nil
- // expected-error@-1{{'dynamic' var 'bar' must also be '@objc'}}{{3-3=@objc }}
+ // expected-error@-1{{'dynamic' property 'bar' must also be '@objc'}}{{3-3=@objc }}
 }
 
 func test(sc: ObjCSubclass, dm: DynamicMembers) {

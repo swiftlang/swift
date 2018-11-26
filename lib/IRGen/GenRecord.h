@@ -22,7 +22,9 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "GenEnum.h"
+#include "GenOpaque.h"
 #include "LoadableTypeInfo.h"
+#include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -68,6 +70,10 @@ public:
     return Layout.isPOD();
   }
 
+  IsABIAccessible_t isABIAccessible() const {
+    return Layout.getType().isABIAccessible();
+  }
+
   Address projectAddress(IRGenFunction &IGF, Address seq,
                          NonFixedOffsets offsets) const {
     return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
@@ -92,6 +98,11 @@ public:
   }
 };
 
+enum FieldsAreABIAccessible_t : bool {
+  FieldsAreNotABIAccessible = false,
+  FieldsAreABIAccessible = true,
+};
+
 /// A metaprogrammed TypeInfo implementation for record types.
 template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
@@ -100,17 +111,25 @@ class RecordTypeInfoImpl : public Base,
   friend class llvm::TrailingObjects<Impl, FieldImpl_>;
 
 public:
-  typedef FieldImpl_ FieldImpl;
+  using FieldImpl = FieldImpl_;
 
 private:
   const unsigned NumFields;
+  const unsigned AreFieldsABIAccessible : 1;
+
+  mutable Optional<const FieldImpl *> ExtraInhabitantProvidingField;
+  mutable Optional<bool> MayHaveExtraInhabitants;
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   template <class... As> 
-  RecordTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
-      : Base(std::forward<As>(args)...), NumFields(fields.size()) {
+  RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
+                     FieldsAreABIAccessible_t fieldsABIAccessible,
+                     As&&...args)
+      : Base(std::forward<As>(args)...),
+        NumFields(fields.size()),
+        AreFieldsABIAccessible(fieldsABIAccessible) {
     std::uninitialized_copy(fields.begin(), fields.end(),
                             this->template getTrailingObjects<FieldImpl>());
   }
@@ -137,6 +156,11 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitAssignWithCopyCall(IGF, T, dest, src);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -149,17 +173,17 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
     }
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitAssignWithTakeCall(IGF, T, dest, src);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -172,12 +196,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
   }
 
@@ -188,6 +207,11 @@ public:
         isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
           IGF, dest, src, T, isOutlined);
+    }
+
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
     if (isOutlined || T.hasOpenedExistential()) {
@@ -202,12 +226,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
     }
   }
 
@@ -215,10 +234,17 @@ public:
                           SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                 asImpl().Impl::getSize(IGF, T),
-                 std::min(dest.getAlignment(), src.getAlignment()).getValue());
+      IGF.Builder.CreateMemCpy(dest.getAddress(),
+                               dest.getAlignment().getValue(),
+                               src.getAddress(),
+                               src.getAlignment().getValue(),
+                 asImpl().Impl::getSize(IGF, T));
       return;
+    }
+
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitInitializeWithTakeCall(IGF, T, dest, src);
     }
 
     if (isOutlined || T.hasOpenedExistential()) {
@@ -233,17 +259,17 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
     }
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
                bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitDestroyCall(IGF, T, addr);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -255,33 +281,250 @@ public:
                                     field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
-                                            &typeToMetadataVec);
+      this->callOutlinedDestroy(IGF, addr, T);
     }
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
-    // get the size before insertions
-    auto SZ = typeToMetadataVec.size();
+  // The extra inhabitants of a record are determined from its fields.
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    if (!MayHaveExtraInhabitants.hasValue()) {
+      MayHaveExtraInhabitants = false;
+      for (auto &field : asImpl().getFields())
+        if (field.getTypeInfo().mayHaveExtraInhabitants(IGM)) {
+          MayHaveExtraInhabitants = true;
+          break;
+        }
+    }
+    return *MayHaveExtraInhabitants;
+  }
+  
+  // Perform an operation using the field that provides extra inhabitants for
+  // the aggregate, whether that field is known statically or dynamically.
+  llvm::Value *withExtraInhabitantProvidingField(IRGenFunction &IGF,
+         Address structAddr,
+         SILType structType,
+         bool isOutlined,
+         llvm::Type *resultTy,
+         llvm::function_ref<llvm::Value* (const FieldImpl &field)> body,
+         llvm::function_ref<llvm::Value* ()> outline) const {
+    // If we know one field consistently provides extra inhabitants, delegate
+    // to that field.
+    if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM)){
+      return body(*field);
+    }
+    
+    // Otherwise, we have to figure out which field at runtime.
+    // The decision tree could be rather large, so invoke the value witness
+    // unless we're emitting the value witness.
+    if (!isOutlined)
+      return outline();
+
+    // The number of extra inhabitants the instantiated type has can be used
+    // to figure out which field the runtime chose. The runtime uses the same
+    // algorithm as above--use the field with the most extra inhabitants,
+    // favoring the earliest field in a tie. If we test the number of extra
+    // inhabitants in the struct against each field type's, then the first
+    // match should indicate which field we chose.
+    //
+    // We can reduce the decision space somewhat if there are fixed-layout
+    // fields, since we know the only possible runtime choices are
+    // either the fixed field with the most extra inhabitants (if any), or
+    // one of the unknown-layout fields.
+    //
+    // See whether we have a fixed candidate.
+    const FieldImpl *fixedCandidate = nullptr;
+    unsigned fixedCount = 0;
+    for (auto &field : asImpl().getFields()) {
+      if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
+        continue;
+      
+      if (const FixedTypeInfo *fixed =
+            dyn_cast<FixedTypeInfo>(&field.getTypeInfo())) {
+        auto fieldCount = fixed->getFixedExtraInhabitantCount(IGF.IGM);
+        if (fieldCount > fixedCount) {
+          fixedCandidate = &field;
+          fixedCount = fieldCount;
+        }
+      }
+    }
+    
+    // Loop through checking to see whether we picked the fixed candidate
+    // (if any) or one of the unknown-layout fields.
+    llvm::Value *instantiatedCount
+      = emitLoadOfExtraInhabitantCount(IGF, structType);
+    
+    auto contBB = IGF.createBasicBlock("chose_field_for_xi");
+    llvm::PHINode *contPhi = nullptr;
+    if (resultTy != IGF.IGM.VoidTy)
+      contPhi = llvm::PHINode::Create(resultTy,
+                                      asImpl().getFields().size());
+    
+    // If two fields have the same type, they have the same extra inhabitant
+    // count, and we'll pick the first. We don't have to check both.
+    SmallPtrSet<SILType, 4> visitedTypes;
+    
+    for (auto &field : asImpl().getFields()) {
+      if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
+        continue;
+
+      ConditionalDominanceScope condition(IGF);
+
+      llvm::Value *fieldCount;
+      if (isa<FixedTypeInfo>(field.getTypeInfo())) {
+        // Skip fixed fields except for the candidate with the most known
+        // extra inhabitants we picked above.
+        if (&field != fixedCandidate)
+          continue;
+        
+        fieldCount = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedCount);
+      } else {
+        auto fieldTy = field.getType(IGF.IGM, structType);
+        // If this field has the same type as a field we already tested,
+        // we'll never pick this one, since they both have the same count.
+        if (!visitedTypes.insert(fieldTy).second)
+          continue;
+      
+        fieldCount = emitLoadOfExtraInhabitantCount(IGF, fieldTy);
+      }
+      auto equalsCount = IGF.Builder.CreateICmpEQ(instantiatedCount,
+                                                  fieldCount);
+      
+      auto yesBB = IGF.createBasicBlock("");
+      auto noBB = IGF.createBasicBlock("");
+      
+      IGF.Builder.CreateCondBr(equalsCount, yesBB, noBB);
+      
+      IGF.Builder.emitBlock(yesBB);
+      auto value = body(field);
+      if (contPhi)
+        contPhi->addIncoming(value, IGF.Builder.GetInsertBlock());
+      IGF.Builder.CreateBr(contBB);
+      
+      IGF.Builder.emitBlock(noBB);
+    }
+    
+    // We shouldn't have picked a number of extra inhabitants inconsistent
+    // with any individual field.
+    IGF.Builder.CreateUnreachable();
+    
+    IGF.Builder.emitBlock(contBB);
+    if (contPhi)
+      IGF.Builder.Insert(contPhi);
+   
+    return contPhi;
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address structAddr,
+                                       SILType structType,
+                                       bool isOutlined) const override {
+    return withExtraInhabitantProvidingField(IGF, structAddr, structType,
+                                             isOutlined,
+                                             IGF.IGM.Int32Ty,
+      [&](const FieldImpl &field) -> llvm::Value* {
+        Address fieldAddr = asImpl().projectFieldAddress(
+                                            IGF, structAddr, structType, field);
+        return field.getTypeInfo().getExtraInhabitantIndex(IGF, fieldAddr,
+                                         field.getType(IGF.IGM, structType),
+                                         false /*not outlined for field*/);
+      },
+      [&]() -> llvm::Value * {
+        return emitGetExtraInhabitantIndexCall(IGF, structType, structAddr);
+      });
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF,
+                            llvm::Value *index,
+                            Address structAddr,
+                            SILType structType,
+                            bool isOutlined) const override {
+    withExtraInhabitantProvidingField(IGF, structAddr, structType, isOutlined,
+                                      IGF.IGM.VoidTy,
+      [&](const FieldImpl &field) -> llvm::Value* {
+        Address fieldAddr = asImpl().projectFieldAddress(
+                                            IGF, structAddr, structType, field);
+        field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
+                                         field.getType(IGF.IGM, structType),
+                                         false /*not outlined for field*/);
+        return nullptr;
+      },
+      [&]() -> llvm::Value * {
+        emitStoreExtraInhabitantCall(IGF, structType, index, structAddr);
+        return nullptr;
+      });
+  }
+      
+  const FieldImpl *
+  getFixedExtraInhabitantProvidingField(IRGenModule &IGM) const {
+    if (!ExtraInhabitantProvidingField.hasValue()) {
+      unsigned mostExtraInhabitants = 0;
+      const FieldImpl *fieldWithMost = nullptr;
+      const FieldImpl *singleNonFixedField = nullptr;
+
+      // TODO: If two fields have the same type, they have the same extra
+      // inhabitant count, and we'll pick the first. We don't have to check
+      // both. However, we don't always have access to the substituted struct
+      // type from this context, which would be necessary to make that
+      // judgment reliably.
+      
+      for (auto &field : asImpl().getFields()) {
+        auto &ti = field.getTypeInfo();
+        if (!ti.mayHaveExtraInhabitants(IGM))
+          continue;
+        
+        auto *fixed = dyn_cast<FixedTypeInfo>(&field.getTypeInfo());
+        // If any field is non-fixed, we can't definitively pick a best one,
+        // unless it happens to be the only non-fixed field and none of the
+        // other fields have extra inhabitants.
+        if (!fixed) {
+          // If we already saw a non-fixed field, then we can't pick one
+          // at compile time.
+          if (singleNonFixedField) {
+            singleNonFixedField = fieldWithMost = nullptr;
+            break;
+          }
+          
+          // Otherwise, note this field for later. If we have no fixed
+          // candidates, it may be the only choice for extra inhabitants.
+          singleNonFixedField = &field;
+          continue;
+        }
+        
+        unsigned count = fixed->getFixedExtraInhabitantCount(IGM);
+        if (count > mostExtraInhabitants) {
+          mostExtraInhabitants = count;
+          fieldWithMost = &field;
+        }
+      }
+      
+      if (fieldWithMost) {
+        if (singleNonFixedField) {
+          // If we have a non-fixed and fixed candidate, we can't know for
+          // sure now.
+          ExtraInhabitantProvidingField = nullptr;
+        } else {
+          // If we had all fixed fields, pick the one with the most extra
+          // inhabitants.
+          ExtraInhabitantProvidingField = fieldWithMost;
+        }
+      } else {
+        // If there were no fixed candidates, but we had a single non-fixed
+        // field with potential extra inhabitants, then it's our only choice.
+        ExtraInhabitantProvidingField = singleNonFixedField;
+      }
+    }
+    return *ExtraInhabitantProvidingField;
+  }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
-      auto fType = field.getType(IGF.IGM, T);
-      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                                   fType);
+      auto fType = field.getType(collector.IGF.IGM, T);
+      field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        typeToMetadataVec.size() != SZ) {
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.insert(std::make_pair(canType, metadata));
-    }
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
@@ -300,7 +543,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ false, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   /// The index+1 of the unique non-empty field, or zero if there is none.
   unsigned UniqueNonEmptyFieldIndexPlusOne;
@@ -315,22 +558,6 @@ protected:
 
 public:
   using super::getStorageType;
-
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcBuffer,
-                                           SILType type) const override {
-    if (auto field = getUniqueNonEmptyField()) {
-      auto &fieldTI = field->getTypeInfo();
-      Address fieldResult =
-        fieldTI.initializeBufferWithTakeOfBuffer(IGF, destBuffer, srcBuffer,
-                                                 field->getType(IGF.IGM, type));
-      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
-    } else {
-      return super::initializeBufferWithTakeOfBuffer(IGF, destBuffer,
-                                                     srcBuffer, type);
-    }
-  }
 
   Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
                                            Address destBuffer,
@@ -356,6 +583,9 @@ private:
       // Ignore empty fields.
       if (field.isEmpty()) continue;
 
+      // If the field is not ABI-accessible, suppress this.
+      if (!field.isABIAccessible()) continue;
+
       // If we've already found an index, then there isn't a
       // unique non-empty field.
       if (result) return 0;
@@ -375,23 +605,67 @@ private:
   }
 };
 
-/// An implementation of RecordTypeInfo for non-loadable types. 
+/// An implementation of RecordTypeInfo for fixed-layout types that
+/// aren't necessarily loadable.
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 protected:
   template <class... As> 
-  RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+  RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
+    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...) {}
+
+  using super::asImpl;
+
+public:
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM)) {
+      auto &fieldTI = cast<FixedTypeInfo>(field->getTypeInfo());
+      return fieldTI.getFixedExtraInhabitantCount(IGM);
+    }
+    
+    return 0;
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                     unsigned bits,
+                                     unsigned index) const override {
+    // We are only called if the type is known statically to have extra
+    // inhabitants.
+    auto &field = *asImpl().getFixedExtraInhabitantProvidingField(IGM);
+    auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
+    APInt fieldValue = fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
+    return fieldValue.shl(field.getFixedByteOffset().getValueInBits());
+  }
+
+  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM);
+    if (!field)
+      return APInt();
+    
+    const FixedTypeInfo &fieldTI
+      = cast<FixedTypeInfo>(field->getTypeInfo());
+    auto targetSize = asImpl().getFixedSize().getValueInBits();
+    
+    if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
+      return APInt(targetSize, 0);
+    
+    APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
+    if (targetSize > fieldMask.getBitWidth())
+      fieldMask = fieldMask.zext(targetSize);
+    fieldMask = fieldMask.shl(field->getFixedByteOffset().getValueInBits());
+    return fieldMask;
+  }
 };
 
 /// An implementation of RecordTypeInfo for loadable types. 
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
-    : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+    : public RecordTypeInfo<Impl, Base, FieldImpl, true, false> {
+  using super = RecordTypeInfo<Impl, Base, FieldImpl, true, false>;
 
   unsigned ExplosionSize : 16;
 
@@ -399,7 +673,8 @@ protected:
   using super::asImpl;
 
   template <class... As> 
-  RecordTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
+  RecordTypeInfo(ArrayRef<FieldImpl> fields,
+                 unsigned explosionSize,
                  As &&...args)
     : super(fields, std::forward<As>(args)...),
       ExplosionSize(explosionSize) {}
@@ -550,14 +825,17 @@ public:
     fieldTypesForLayout.reserve(astFields.size());
 
     bool loadable = true;
+    auto fieldsABIAccessible = FieldsAreABIAccessible;
 
     unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
       auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
-      assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
+
+      if (!fieldTI.isABIAccessible())
+        fieldsABIAccessible = FieldsAreNotABIAccessible;
 
       fields.push_back(FieldImpl(asImpl()->getFieldInfo(i, astField, fieldTI)));
 
@@ -582,11 +860,14 @@ public:
     // Create the type info.
     if (loadable) {
       assert(layout.isFixedLayout());
+      assert(fieldsABIAccessible);
       return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
     } else if (layout.isFixedLayout()) {
+      assert(fieldsABIAccessible);
       return asImpl()->createFixed(fields, std::move(layout));
     } else {
-      return asImpl()->createNonFixed(fields, std::move(layout));
+      return asImpl()->createNonFixed(fields, fieldsABIAccessible,
+                                      std::move(layout));
     }
   }  
 };

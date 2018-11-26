@@ -16,10 +16,6 @@
 #include "swift/Runtime/Unreachable.h"
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
 
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/getsect.h>
-#endif
-
 using namespace swift;
 using namespace swift::reflection;
 using namespace swift::remote;
@@ -50,6 +46,18 @@ swift_reflection_getSupportedMetadataVersion() {
   return SWIFT_REFLECTION_METADATA_VERSION;
 }
 
+template <uint8_t WordSize>
+static int minimalDataLayoutQueryFunction(void *ReaderContext,
+                                          DataLayoutQueryType type,
+                                          void *inBuffer, void *outBuffer) {
+  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+    auto result = static_cast<uint8_t *>(outBuffer);
+    *result = WordSize;
+    return 1;
+  }
+  return 0;
+}
+
 SwiftReflectionContextRef
 swift_reflection_createReflectionContext(void *ReaderContext,
                                          uint8_t PointerSize,
@@ -60,14 +68,31 @@ swift_reflection_createReflectionContext(void *ReaderContext,
   assert((PointerSize == 4 || PointerSize == 8) && "We only support 32-bit and 64-bit.");
   assert(PointerSize == sizeof(uintptr_t) &&
          "We currently only support the pointer size this file was compiled with.");
-  
-  auto GetSize = PointerSize == 4
-    ? [](void *){ return (uint8_t)4; }
-    : [](void *){ return (uint8_t)8; };
+
+  auto *DataLayout = PointerSize == 4 ? minimalDataLayoutQueryFunction<4>
+                                      : minimalDataLayoutQueryFunction<8>;
   MemoryReaderImpl ReaderImpl {
     ReaderContext,
-    GetSize,
-    GetSize,
+    DataLayout,
+    Free,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress
+  };
+
+  return new SwiftReflectionContext(ReaderImpl);
+}
+
+SwiftReflectionContextRef
+swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
+                                    QueryDataLayoutFunction DataLayout,
+                                    FreeBytesFunction Free,
+                                    ReadBytesFunction ReadBytes,
+                                    GetStringLengthFunction GetStringLength,
+                                    GetSymbolAddressFunction GetSymbolAddress) {
+  MemoryReaderImpl ReaderImpl {
+    ReaderContext,
+    DataLayout,
     Free,
     ReadBytes,
     GetStringLength,
@@ -89,36 +114,12 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
   Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
 }
 
-#if defined(__APPLE__) && defined(__MACH__)
-#ifndef __LP64__
-typedef const struct mach_header MachHeader;
-#else
-typedef const struct mach_header_64 MachHeader;
-#endif
-
-template <typename Section>
-static bool findSection(MachHeader *Header, const char *Name,
-                        Section &Sect) {
-  unsigned long Size;
-  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
-  if (!Address)
-    return false;
-  
-  Sect.section.Begin = Address;
-  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
-  Sect.section.End = reinterpret_cast<void *>(End);
-  Sect.offset = 0;
-  
-  return true;
-}
-
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
   auto Context = ContextRef->nativeContext;
   return Context->addImage(RemoteAddress(imageStart));
 }
-#endif
 
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
@@ -145,6 +146,12 @@ int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
   auto Context = ContextRef->nativeContext;
   return Context->ownsObject(RemoteAddress(Object));
+}
+
+int
+swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
+  auto Context = ContextRef->nativeContext;
+  return Context->ownsAddress(RemoteAddress(Address));
 }
 
 uintptr_t
@@ -243,14 +250,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Reference: {
     auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
     switch (ReferenceTI.getReferenceKind()) {
-    case ReferenceKind::Strong:
-      return SWIFT_STRONG_REFERENCE;
-    case ReferenceKind::Unowned:
-      return SWIFT_UNOWNED_REFERENCE;
-    case ReferenceKind::Weak:
-      return SWIFT_WEAK_REFERENCE;
-    case ReferenceKind::Unmanaged:
-      return SWIFT_UNMANAGED_REFERENCE;
+    case ReferenceKind::Strong: return SWIFT_STRONG_REFERENCE;
+#define REF_STORAGE(Name, name, NAME) \
+    case ReferenceKind::Name: return SWIFT_##NAME##_REFERENCE;
+#include "swift/AST/ReferenceStorage.def"
     }
   }
   }

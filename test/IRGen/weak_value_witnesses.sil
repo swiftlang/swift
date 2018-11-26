@@ -25,37 +25,39 @@ struct Gen<T> {
   var y: T
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses8JustWeakVwTK"(
-// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %T20weak_value_witnesses8JustWeakV*
-// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %T20weak_value_witnesses8JustWeakV*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8JustWeakV, %T20weak_value_witnesses8JustWeakV* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: call %swift.weak* @swift_weakTakeInit(%swift.weak* returned [[DEST_X]], %swift.weak* [[SRC_X]])
-// CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8JustWeakV* [[DEST]] to %swift.opaque*
-// CHECK-NEXT: ret %swift.opaque* [[T0]]
+// CHECK-NOT: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses8JustWeakVwTK"(
 
 // The default memcpy-ing witness is good enough for NoWeak.
-// CHECK-NOT: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses6NoWeakVwtk"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self)
+// CHECK-NOT: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses6NoWeakVwtk"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self)
 
-// CHECK-NOT: @"$S20weak_value_witnesses6NoWeakVwTK"
+// CHECK-NOT: @"$s20weak_value_witnesses6NoWeakVwTK"
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses8JustWeakVwCP"
+// CHECK: entry:
+// CHECK:  load %swift.refcounted*, %swift.refcounted**
+// CHECK:  call %swift.refcounted* @swift_retain
+// CHECK:  store %swift.refcounted*
+// CHECK:  load %swift.refcounted*
+// CHECK:  getelementptr inbounds i8
+// CHECK:  ret %swift.opaque
+// CHECK:}
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses8SomeWeakVwCP"
+// CHECK:entry:
+// CHECK:  load %swift.refcounted*, %swift.refcounted**
+// CHECK:  call %swift.refcounted* @swift_retain
+// CHECK:  store %swift.refcounted*
+// CHECK:  load %swift.refcounted*
+// CHECK:  getelementptr inbounds i8
+// CHECK:  ret %swift.opaque
+// CHECK:}
 
 // Weak references must be taken by swift_weakTakeInit.
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses8SomeWeakVwtk"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %SomeWeak)
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses8SomeWeakVwtk"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %SomeWeak)
 // CHECK:         call %swift.weak* @swift_weakTakeInit
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses8SomeWeakVwTK"(
-// CHECK:      [[DEST:%.*]] = bitcast [24 x i8]* %dest to %T20weak_value_witnesses8SomeWeakV*
-// CHECK-NEXT: [[SRC:%.*]] = bitcast [24 x i8]* %src to %T20weak_value_witnesses8SomeWeakV*
-// CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[DEST]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[SRC]], i32 0, i32 0
-// CHECK-NEXT: [[T0:%.*]] = load %T20weak_value_witnesses1CC*, %T20weak_value_witnesses1CC** [[SRC_X]], align 8
-// CHECK-NEXT: store %T20weak_value_witnesses1CC* [[T0]], %T20weak_value_witnesses1CC** [[DEST_X]], align 8
-// CHECK-NEXT: [[DEST_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[DEST]], i32 0, i32 1
-// CHECK-NEXT: [[SRC_Y:%.*]] = getelementptr inbounds %T20weak_value_witnesses8SomeWeakV, %T20weak_value_witnesses8SomeWeakV* [[SRC]], i32 0, i32 1
-// CHECK-NEXT: call %swift.weak* @swift_weakTakeInit(%swift.weak* returned [[DEST_Y]], %swift.weak* [[SRC_Y]])
-// CHECK-NEXT: [[T0:%.*]] = bitcast %T20weak_value_witnesses8SomeWeakV* [[DEST]] to %swift.opaque*
-// CHECK-NEXT: ret %swift.opaque* [[T0]]
+// CHECK-NOT: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses8SomeWeakVwTK"(
 
 // Generic types must be taken using their value witness.
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses3GenVwtk"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %"Gen<T>")
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s20weak_value_witnesses3GenVwtk"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %"Gen<T>")
 // CHECK:         call %swift.opaque* %initializeWithTake

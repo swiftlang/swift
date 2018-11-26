@@ -8,23 +8,22 @@
 func Close(_ fn: () -> Int64) { fn() }
 typealias MyFloat = Float
 
-// CHECK: define hidden swiftcc void @"$S5inout13modifyFooHeap{{[_0-9a-zA-Z]*}}F"
+// CHECK: define hidden swiftcc void @"$s5inout13modifyFooHeap{{[_0-9a-zA-Z]*}}F"
 // CHECK: %[[ALLOCA:.*]] = alloca %Ts5Int64V*
 // CHECK: call void @llvm.dbg.declare(metadata
 // CHECK-SAME:                        %[[ALLOCA]], metadata ![[A:[0-9]+]]
 
 // Closure with promoted capture.
-// PROMO-CHECK: define {{.*}}@"$S5inout13modifyFooHeapyys5Int64Vz_SftFADyXEfU_"
+// PROMO-CHECK: define {{.*}}@"$s5inout13modifyFooHeapyys5Int64Vz_SftFADyXEfU_"
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
-// PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata !DIExpression())
+// PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata !DIExpression(DW_OP_deref))
 
-// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$Ss5Int64VD"
-// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$Ss5Int64VzD"
+// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
 // PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1
 // PROMO-CHECK-SAME:                       type: ![[INT]]
 func modifyFooHeap(_ a: inout Int64,
   // CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: ![[RINT:[0-9]+]]
-  // CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$Ss5Int64VzD"
+  // CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
                    _ b: MyFloat)
 {
     let b = b
@@ -37,16 +36,16 @@ func modifyFooHeap(_ a: inout Int64,
 }
 
 // Inout reference type.
-// FOO-CHECK: define {{.*}}@"$S5inout9modifyFooyys5Int64Vz_SftF"
+// FOO-CHECK: define {{.*}}@"$s5inout9modifyFooyys5Int64Vz_SftF"
 // FOO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
-// FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata !DIExpression())
+// FOO-CHECK-SAME:          metadata ![[U:[0-9]+]], metadata !DIExpression(DW_OP_deref))
 func modifyFoo(_ u: inout Int64,
 // FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+3]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
   // FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: ![[RINT:[0-9]+]]
-  // FOO-CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$Ss5Int64VzD"
+  // FOO-CHECK-DAG: ![[RINT]] = !DICompositeType({{.*}}identifier: "$ss5Int64VD"
                _ v: MyFloat)
-// FOO-CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$S5inout7MyFloataD",{{.*}} baseType: ![[FLOAT:[0-9]+]]
-// FOO-CHECK-DAG: ![[FLOAT]] = !DICompositeType({{.*}}identifier: "$SSfD"
+// FOO-CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s5inout7MyFloataD",{{.*}} baseType: ![[FLOAT:[0-9]+]]
+// FOO-CHECK-DAG: ![[FLOAT]] = !DICompositeType({{.*}}identifier: "$sSfD"
 {
     if (v > 2.71) {
       u = u - 41

@@ -14,6 +14,8 @@
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -49,8 +51,11 @@ void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///
 /// This actually updates \p VD as well.
-void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
-                 AccessLevel desiredAccess, bool isForSetter = false);
+void fixItAccess(InFlightDiagnostic &diag,
+                 ValueDecl *VD,
+                 AccessLevel desiredAccess,
+                 bool isForSetter = false,
+                 bool shouldUseDefaultAccess = false);
 
 /// Emit fix-its to correct the argument labels in \p expr, which is the
 /// argument tuple or single argument of a call.
@@ -59,10 +64,26 @@ void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
-bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool diagnoseArgumentLabelError(ASTContext &ctx,
+                                const Expr *expr,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
+
+/// If \p assignExpr has a destination expression that refers to a declaration
+/// with a non-owning attribute, such as 'weak' or 'unowned' and the initializer
+/// expression refers to a class constructor, emit a warning that the assigned
+/// instance will be immediately deallocated.
+void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                          const AssignExpr *assignExpr);
+
+/// If \p pattern binds to a declaration with a non-owning attribute, such as
+/// 'weak' or 'unowned' and \p initializer refers to a class constructor,
+/// emit a warning that the bound instance will be immediately deallocated.
+void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                          const Pattern *pattern,
+                                          SourceLoc equalLoc,
+                                          const Expr *initializer);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user

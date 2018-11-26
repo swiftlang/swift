@@ -20,6 +20,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
@@ -65,11 +67,16 @@ struct IRGenContext {
 
 private:
   IRGenContext(ASTContext &ctx, ModuleDecl *module)
-    : SILMod(SILModule::createEmptyModule(module, SILOpts)),
+    : IROpts(createIRGenOptions()),
+      SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
-      IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
-          LLVMContext, "<fake module name>", "<fake output filename>",
-          "<fake main input filename>") {}
+      IGM(IRGen, IRGen.createTargetMachine(), LLVMContext) {}
+
+  static IRGenOptions createIRGenOptions() {
+    IRGenOptions IROpts;
+    IROpts.EnableResilienceBypass = true;
+    return IROpts;
+  }
 
 public:
   static std::unique_ptr<IRGenContext>
@@ -172,11 +179,17 @@ public:
 
     // Build a SubstitutionMap.
     auto *genericSig = decl->getGenericSignature();
-    auto genericParams = genericSig->getSubstitutableParams();
+
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+      if (canonical)
+        genericParams.push_back(gp);
+    });
     if (genericParams.size() != args.size())
       return Type();
 
-    auto subMap = genericSig->getSubstitutionMap(
+    auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *t) -> Type {
           for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
             if (t->isEqual(genericParams[i]))
@@ -352,10 +365,9 @@ public:
       auto flags = param.getFlags();
       auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(ownership == ValueOwnership::InOut)
-                                .withShared(ownership == ValueOwnership::Shared)
-                                .withOwned(ownership == ValueOwnership::Owned)
-                                .withVariadic(flags.isVariadic());
+                                .withValueOwnership(ownership)
+                                .withVariadic(flags.isVariadic())
+                                .withAutoClosure(flags.isAutoClosure());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
     }
@@ -395,8 +407,10 @@ public:
     if (!base->isTypeParameter())
       return Type();
 
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
     for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              /*ignoreNew=*/true)) {
+                                              flags)) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
         return DependentMemberType::get(base, assocType);
     }
@@ -404,23 +418,13 @@ public:
     return Type();
   }
 
-  Type createUnownedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnownedStorageType::get(base, Ctx);
+#define REF_STORAGE(Name, ...) \
+  Type create##Name##StorageType(Type base) { \
+    if (!base->allowsOwnership()) \
+      return Type(); \
+    return Name##StorageType::get(base, Ctx); \
   }
-
-  Type createUnmanagedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnmanagedStorageType::get(base, Ctx);
-  }
-
-  Type createWeakStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return WeakStorageType::get(base, Ctx);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   Type createSILBoxType(Type base) {
     return SILBoxType::get(base->getCanonicalType());
@@ -433,6 +437,16 @@ public:
                                    Demangle::Node::Kind::Class);
     if (!typeDecl) return Type();
     return createNominalType(typeDecl, /*parent*/ Type());
+  }
+
+  ProtocolDecl *createObjCProtocolDecl(StringRef name) {
+    auto typeDecl =
+        findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
+                                   ForeignModuleKind::Imported,
+                                   Demangle::Node::Kind::Protocol);
+    if (auto *protocolDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl))
+      return protocolDecl;
+    return nullptr;
   }
 
   Type createForeignClassType(StringRef mangledName) {
@@ -452,8 +466,7 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl =
-      decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
     // If we don't have a parent type, fast-path.
     if (!parent) {
@@ -746,7 +759,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        Result = cast<NominalTypeDecl>(decl);
+        // A synthesized type from the Clang importer may resolve to a
+        // compatibility alias.
+        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
+          if (resultAlias->isCompatibilityAlias()) {
+            Result = resultAlias->getUnderlyingTypeLoc().getType()
+                                ->getAnyNominal();
+          }
+        } else {
+          Result = dyn_cast<NominalTypeDecl>(decl);
+        }
+        HadError |= !Result;
       } else {
         HadError = true;
         Result = nullptr;
@@ -802,6 +825,9 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
   virtual Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) = 0;
+  virtual Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressForExistential(RemoteAddress object,
+                                         Type staticType) = 0;
 
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
@@ -1154,6 +1180,105 @@ public:
     if (result) return RemoteAddress(*result);
     return getFailure<RemoteAddress>();
   }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto result = Reader.readMetadataFromInstance(*pointerval);
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(result.getValue());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               RemoteAddress(*pointerval));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto result =
+        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    RemoteAddress metadataAddress = result->first;
+    RemoteAddress valueAddress = result->second;
+
+    auto typeResult =
+        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               std::move(valueAddress));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressOpaqueExistential(RemoteAddress object) {
+    auto result = Reader.readMetadataAndValueOpaqueExistential(object);
+    if (!result)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    RemoteAddress metadataAddress = result->first;
+    RemoteAddress valueAddress = result->second;
+
+    auto typeResult =
+        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
+                                               std::move(valueAddress));
+  }
+
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
+    // The value of the address is just the input address.
+    // The type is obtained through the following sequence of steps:
+    // 1) Loading a pointer from the input address
+    // 2) Reading it as metadata and resolving the type
+    // 3) Wrapping the resolved type in an existential metatype.
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(*pointerval);
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto wrappedType = ExistentialMetatypeType::get(typeResult);
+    if (!wrappedType)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
+                                               std::move(object));
+  }
+
+  /// Resolve the dynamic type and the value address of an existential,
+  /// given its address and its static type. For class and error existentials,
+  /// this API takes a pointer to the instance reference rather than the
+  /// instance reference itself.
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressForExistential(RemoteAddress object,
+                                         Type staticType) override {
+    // If this is not an existential, give up.
+    if (!staticType->isAnyExistentialType())
+      return getFailure<std::pair<Type, RemoteAddress>>();
+
+    // Handle the case where this is an ExistentialMetatype.
+    if (!staticType->isExistentialType())
+      return getDynamicTypeAndAddressExistentialMetatype(object);
+
+    // This should be an existential type at this point.
+    auto layout = staticType->getExistentialLayout();
+    switch (layout.getKind()) {
+    case ExistentialLayout::Kind::Class:
+      return getDynamicTypeAndAddressClassExistential(object);
+    case ExistentialLayout::Kind::Error:
+      return getDynamicTypeAndAddressErrorExistential(object);
+    case ExistentialLayout::Kind::Opaque:
+      return getDynamicTypeAndAddressOpaqueExistential(object);
+    }
+    llvm_unreachable("invalid type kind");
+  }
 };
 
 } // end anonymous namespace
@@ -1210,4 +1335,22 @@ RemoteASTContext::getOffsetOfMember(Type type, RemoteAddress optMetadata,
 Result<remote::RemoteAddress>
 RemoteASTContext::getHeapMetadataForObject(remote::RemoteAddress address) {
   return asImpl(Impl)->getHeapMetadataForObject(address);
+}
+
+Result<std::pair<Type, remote::RemoteAddress>>
+RemoteASTContext::getDynamicTypeAndAddressForExistential(
+    remote::RemoteAddress address, Type staticType) {
+  return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
+                                                              staticType);
+}
+
+Type swift::remoteAST::getTypeForMangling(ASTContext &ctx,
+                                          StringRef mangling) {
+  Demangle::Context Dem;
+  auto node = Dem.demangleSymbolAsNode(mangling);
+  if (!node)
+    return Type();
+
+  RemoteASTTypeBuilder builder(ctx);
+  return swift::Demangle::decodeMangledType(builder, node);
 }

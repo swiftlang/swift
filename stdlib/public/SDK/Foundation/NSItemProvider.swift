@@ -12,10 +12,10 @@
 
 @_exported import Foundation // Clang module
 
-@available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+@available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
 extension NSItemProvider  {
 
-  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   public func registerObject<
     T : _ObjectiveCBridgeable
   > (
@@ -33,7 +33,7 @@ extension NSItemProvider  {
     }
   }
 
-  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   public func canLoadObject<
     T : _ObjectiveCBridgeable
   >(ofClass: T.Type) -> Bool
@@ -41,7 +41,7 @@ extension NSItemProvider  {
     return self.canLoadObject(ofClass: T._ObjectiveCType.self)
   }
 
-  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   public func loadObject<
     T : _ObjectiveCBridgeable
   >(

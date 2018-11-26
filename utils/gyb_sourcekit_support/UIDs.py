@@ -49,7 +49,9 @@ UID_KEYS = [
     KEY('SerializedSyntaxTree', 'key.serialized_syntax_tree'),
     KEY('SourceText', 'key.sourcetext'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
-    KEY('EnableSyntaxTree', 'key.enablesyntaxtree'),
+    KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
+    KEY('SyntaxTreeSerializationFormat', 
+        'key.syntax_tree_serialization_format'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('Description', 'key.description'),
     KEY('TypeName', 'key.typename'),
@@ -125,7 +127,6 @@ UID_KEYS = [
     KEY('Names', 'key.names'),
     KEY('UIDs', 'key.uids'),
     KEY('SyntacticOnly', 'key.syntactic_only'),
-    KEY('Actionable', 'key.actionable'),
     KEY('ParentLoc', 'key.parent_loc'),
     KEY('IsTestCandidate', 'key.is_test_candidate'),
     KEY('Overrides', 'key.overrides'),
@@ -154,6 +155,8 @@ UID_KEYS = [
     KEY('RetrieveRefactorActions', 'key.retrieve_refactor_actions'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
+    KEY('CompileID', 'key.compileid'),
+    KEY('CompilerArgsString', 'key.compilerargs-string'),
 ]
 
 
@@ -204,6 +207,9 @@ UID_REQUESTS = [
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),
     REQUEST('SemanticRefactoring', 'source.request.semantic.refactoring'),
+    REQUEST('EnableCompileNotifications',
+            'source.request.enable-compile-notifications'),
+    REQUEST('TestNotification', 'source.request.test_notification'),
 ]
 
 
@@ -242,6 +248,14 @@ UID_KINDS = [
          'source.lang.swift.decl.function.accessor.mutableaddress'),
     KIND('RefAccessorMutableAddress',
          'source.lang.swift.ref.function.accessor.mutableaddress'),
+    KIND('DeclAccessorRead',
+         'source.lang.swift.decl.function.accessor.read'),
+    KIND('RefAccessorRead',
+         'source.lang.swift.ref.function.accessor.read'),
+    KIND('DeclAccessorModify',
+         'source.lang.swift.decl.function.accessor.modify'),
+    KIND('RefAccessorModify',
+         'source.lang.swift.ref.function.accessor.modify'),
     KIND('DeclConstructor', 'source.lang.swift.decl.function.constructor'),
     KIND('RefConstructor', 'source.lang.swift.ref.function.constructor'),
     KIND('DeclDestructor', 'source.lang.swift.decl.function.destructor'),
@@ -396,4 +410,11 @@ UID_KINDS = [
     KIND('Unknown', 'source.syntacticrename.unknown'),
     KIND('StatNumRequests', 'source.statistic.num-requests'),
     KIND('StatNumSemaRequests', 'source.statistic.num-semantic-requests'),
+    KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
+    KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
+    KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
+    KIND('SyntaxTreeSerializationJSON', 
+         'source.syntaxtree.serialization.format.json'),
+    KIND('SyntaxTreeSerializationByteTree', 
+         'source.syntaxtree.serialization.format.bytetree'),
 ]

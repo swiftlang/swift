@@ -21,7 +21,7 @@ extension NSRange : Hashable {
 #endif
     }
 
-    public static func==(_ lhs: NSRange, _ rhs: NSRange) -> Bool {
+    public static func==(lhs: NSRange, rhs: NSRange) -> Bool {
         return lhs.location == rhs.location && lhs.length == rhs.length
     }
 }
@@ -37,7 +37,7 @@ extension NSRange : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension NSRange {
-    public init?(_ string: String) {
+    public init?(_ string: __shared String) {
         var savedLocation = 0
         if string.isEmpty {
             // fail early if the string is empty
@@ -140,7 +140,7 @@ extension NSRange {
 
 extension NSRange {
   public init<R: RangeExpression>(_ region: R)
-  where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+  where R.Bound: FixedWidthInteger {
     let r = region.relative(to: 0..<R.Bound.max)
     self.init(location: numericCast(r.lowerBound), length: numericCast(r.count))
   }
@@ -178,7 +178,7 @@ extension Range where Bound == Int {
 }
 
 extension Range where Bound == String.Index {
-  public init?(_ range: NSRange, in string: String) {
+  public init?(_ range: NSRange, in string: __shared String) {
     let u = string.utf16
     guard range.location != NSNotFound,
       let start = u.index(u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
@@ -197,7 +197,7 @@ extension NSRange : CustomReflectable {
     }
 }
 
-extension NSRange : CustomPlaygroundQuickLookable {
+extension NSRange : _CustomPlaygroundQuickLookable {
     @available(*, deprecated, message: "NSRange.customPlaygroundQuickLook will be removed in a future Swift version")
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .range(Int64(location), Int64(length))

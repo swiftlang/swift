@@ -228,7 +228,7 @@ func shortFormWithWildcardInMiddle() {}
 @available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}} {{32-32=, *}}
 func shortFormMissingWildcard() {}
 
-@availability(OSX, introduced: 10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
+@availability(OSX, introduced: 10.10) // expected-error {{'@availability' has been renamed to '@available'}} {{2-14=available}}
 func someFuncUsingOldAttribute() { }
 
 
@@ -680,9 +680,9 @@ class Sub : Base {
   override func unavailableMultiNewlyUnnamed(a: Int, b: Int) {} // expected-error {{'unavailableMultiNewlyUnnamed(a:b:)' has been renamed to 'shinyLabeledArguments(_:_:)'}} {{17-45=shinyLabeledArguments}} {{46-46=_ }} {{54-54=_ }}
 
   override init(unavailableArgNames: Int) {} // expected-error {{'init(unavailableArgNames:)' has been renamed to 'init(shinyNewName:)'}} {{17-17=shinyNewName }}
-  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init' has been renamed to 'init(a:)'}} {{17-18=a}}
+  override init(_ unavailableUnnamed: Int) {} // expected-error {{'init(_:)' has been renamed to 'init(a:)'}} {{17-18=a}}
   override init(unavailableNewlyUnnamed: Int) {} // expected-error {{'init(unavailableNewlyUnnamed:)' has been renamed to 'init(_:)'}} {{17-17=_ }}
-  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
+  override init(_ unavailableMultiUnnamed: Int, _ b: Int) {} // expected-error {{'init(_:_:)' has been renamed to 'init(a:b:)'}} {{17-18=a}} {{49-51=}}
   override init(unavailableMultiNewlyUnnamed a: Int, b: Int) {} // expected-error {{'init(unavailableMultiNewlyUnnamed:b:)' has been renamed to 'init(_:_:)'}} {{17-45=_}} {{54-54=_ }}
 
   override func unavailableTooFew(a: Int, b: Int) {} // expected-error {{'unavailableTooFew(a:b:)' has been renamed to 'shinyLabeledArguments(x:)'}} {{none}}
@@ -807,3 +807,245 @@ rdar32526620_2(a: 42, b: .bar)
 func rdar32526620_3(a: Int, b: E_32526620, c: String) {} // expected-note {{here}}
 rdar32526620_3(a: 42, b: .bar, c: "question")
 // expected-error@-1 {{'rdar32526620_3(a:b:c:)' has been replaced by instance method 'E_32526620.set(a:c:)'}} {{1-15=E_32526620.bar.set}} {{23-32=}}
+
+
+var deprecatedGetter: Int {
+  @available(*, deprecated) get { return 0 }
+  set {}
+}
+var deprecatedGetterOnly: Int {
+  @available(*, deprecated) get { return 0 }
+}
+var deprecatedSetter: Int {
+  get { return 0 }
+  @available(*, deprecated) set {}
+}
+var deprecatedBoth: Int {
+  @available(*, deprecated) get { return 0 }
+  @available(*, deprecated) set {}
+}
+var deprecatedMessage: Int {
+  @available(*, deprecated, message: "bad getter") get { return 0 }
+  @available(*, deprecated, message: "bad setter") set {}
+}
+var deprecatedRename: Int {
+  @available(*, deprecated, renamed: "betterThing()") get { return 0 }
+  @available(*, deprecated, renamed: "setBetterThing(_:)") set {}
+}
+@available(*, deprecated, message: "bad variable")
+var deprecatedProperty: Int {
+  @available(*, deprecated, message: "bad getter") get { return 0 }
+  @available(*, deprecated, message: "bad setter") set {}
+}
+
+_ = deprecatedGetter // expected-warning {{getter for 'deprecatedGetter' is deprecated}} {{none}}
+deprecatedGetter = 0
+deprecatedGetter += 1 // expected-warning {{getter for 'deprecatedGetter' is deprecated}} {{none}}
+
+_ = deprecatedGetterOnly // expected-warning {{getter for 'deprecatedGetterOnly' is deprecated}} {{none}}
+
+_ = deprecatedSetter
+deprecatedSetter = 0 // expected-warning {{setter for 'deprecatedSetter' is deprecated}} {{none}}
+deprecatedSetter += 1 // expected-warning {{setter for 'deprecatedSetter' is deprecated}} {{none}}
+
+_ = deprecatedBoth // expected-warning {{getter for 'deprecatedBoth' is deprecated}} {{none}}
+deprecatedBoth = 0 // expected-warning {{setter for 'deprecatedBoth' is deprecated}} {{none}}
+deprecatedBoth += 1 // expected-warning {{getter for 'deprecatedBoth' is deprecated}} {{none}} expected-warning {{setter for 'deprecatedBoth' is deprecated}} {{none}}
+
+_ = deprecatedMessage // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}}
+deprecatedMessage = 0 // expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+deprecatedMessage += 1 // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}} expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+
+_ = deprecatedRename // expected-warning {{getter for 'deprecatedRename' is deprecated: renamed to 'betterThing()'}} {{none}}
+deprecatedRename = 0  // expected-warning {{setter for 'deprecatedRename' is deprecated: renamed to 'setBetterThing(_:)'}} {{none}}
+deprecatedRename += 1 // expected-warning {{getter for 'deprecatedRename' is deprecated: renamed to 'betterThing()'}} {{none}} expected-warning {{setter for 'deprecatedRename' is deprecated: renamed to 'setBetterThing(_:)'}} {{none}}
+
+_ = deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated: bad variable}} {{none}}
+deprecatedProperty = 0 // expected-warning {{'deprecatedProperty' is deprecated: bad variable}} {{none}}
+deprecatedProperty += 1 // expected-warning {{'deprecatedProperty' is deprecated: bad variable}} {{none}}
+
+var unavailableGetter: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+  set {}
+}
+var unavailableGetterOnly: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+}
+var unavailableSetter: Int {
+  get { return 0 }
+  @available(*, unavailable) set {} // expected-note * {{here}}
+}
+var unavailableBoth: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable) set {} // expected-note * {{here}}
+}
+var unavailableMessage: Int {
+  @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+}
+var unavailableRename: Int {
+  @available(*, unavailable, renamed: "betterThing()") get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable, renamed: "setBetterThing(_:)") set {} // expected-note * {{here}}
+}
+@available(*, unavailable, message: "bad variable")
+var unavailableProperty: Int { // expected-note * {{here}}
+  @available(*, unavailable, message: "bad getter") get { return 0 }
+  @available(*, unavailable, message: "bad setter") set {}
+}
+
+_ = unavailableGetter // expected-error {{getter for 'unavailableGetter' is unavailable}} {{none}}
+unavailableGetter = 0
+unavailableGetter += 1 // expected-error {{getter for 'unavailableGetter' is unavailable}} {{none}}
+
+_ = unavailableGetterOnly // expected-error {{getter for 'unavailableGetterOnly' is unavailable}} {{none}}
+
+_ = unavailableSetter
+unavailableSetter = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}} {{none}}
+unavailableSetter += 1 // expected-error {{setter for 'unavailableSetter' is unavailable}} {{none}}
+
+_ = unavailableBoth // expected-error {{getter for 'unavailableBoth' is unavailable}} {{none}}
+unavailableBoth = 0 // expected-error {{setter for 'unavailableBoth' is unavailable}} {{none}}
+unavailableBoth += 1 // expected-error {{getter for 'unavailableBoth' is unavailable}} {{none}} expected-error {{setter for 'unavailableBoth' is unavailable}} {{none}}
+
+_ = unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+_ = unavailableRename // expected-error {{getter for 'unavailableRename' has been renamed to 'betterThing()'}} {{none}}
+unavailableRename = 0  // expected-error {{setter for 'unavailableRename' has been renamed to 'setBetterThing(_:)'}} {{none}}
+unavailableRename += 1 // expected-error {{getter for 'unavailableRename' has been renamed to 'betterThing()'}} {{none}} expected-error {{setter for 'unavailableRename' has been renamed to 'setBetterThing(_:)'}} {{none}}
+
+_ = unavailableProperty // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+unavailableProperty = 0 // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+unavailableProperty += 1 // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+
+struct DeprecatedAccessors {
+  var deprecatedMessage: Int {
+    @available(*, deprecated, message: "bad getter") get { return 0 }
+    @available(*, deprecated, message: "bad setter") set {}
+  }
+
+  static var staticDeprecated: Int {
+    @available(*, deprecated, message: "bad getter") get { return 0 }
+    @available(*, deprecated, message: "bad setter") set {}
+  }
+
+  @available(*, deprecated, message: "bad property")
+  var deprecatedProperty: Int {
+    @available(*, deprecated, message: "bad getter") get { return 0 }
+    @available(*, deprecated, message: "bad setter") set {}
+  }
+
+  subscript(_: Int) -> Int {
+    @available(*, deprecated, message: "bad subscript getter") get { return 0 }
+    @available(*, deprecated, message: "bad subscript setter") set {}
+  }
+
+  @available(*, deprecated, message: "bad subscript!")
+  subscript(alsoDeprecated _: Int) -> Int {
+    @available(*, deprecated, message: "bad subscript getter") get { return 0 }
+    @available(*, deprecated, message: "bad subscript setter") set {}
+  }
+
+  mutating func testAccessors(other: inout DeprecatedAccessors) {
+    _ = deprecatedMessage // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}}
+    deprecatedMessage = 0 // expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+    deprecatedMessage += 1 // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}} expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+
+    _ = other.deprecatedMessage // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}}
+    other.deprecatedMessage = 0 // expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+    other.deprecatedMessage += 1 // expected-warning {{getter for 'deprecatedMessage' is deprecated: bad getter}} {{none}} expected-warning {{setter for 'deprecatedMessage' is deprecated: bad setter}} {{none}}
+
+    _ = other.deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated: bad property}} {{none}}
+    other.deprecatedProperty = 0 // expected-warning {{'deprecatedProperty' is deprecated: bad property}} {{none}}
+    other.deprecatedProperty += 1 // expected-warning {{'deprecatedProperty' is deprecated: bad property}} {{none}}
+
+    _ = DeprecatedAccessors.staticDeprecated // expected-warning {{getter for 'staticDeprecated' is deprecated: bad getter}} {{none}}
+    DeprecatedAccessors.staticDeprecated = 0 // expected-warning {{setter for 'staticDeprecated' is deprecated: bad setter}} {{none}}
+    DeprecatedAccessors.staticDeprecated += 1 // expected-warning {{getter for 'staticDeprecated' is deprecated: bad getter}} {{none}} expected-warning {{setter for 'staticDeprecated' is deprecated: bad setter}} {{none}}
+
+    _ = other[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} {{none}}
+    other[0] = 0 // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}} {{none}}
+    other[0] += 1 // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} {{none}} expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}} {{none}}
+
+    _ = other[alsoDeprecated: 0] // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
+    other[alsoDeprecated: 0] = 0 // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
+    other[alsoDeprecated: 0] += 1 // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
+  }
+}
+
+struct UnavailableAccessors {
+  var unavailableMessage: Int {
+    @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+  }
+
+  static var staticUnavailable: Int {
+    @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+  }
+
+  @available(*, unavailable, message: "bad property")
+  var unavailableProperty: Int { // expected-note * {{here}}
+    @available(*, unavailable, message: "bad getter") get { return 0 }
+    @available(*, unavailable, message: "bad setter") set {}
+  }
+
+  subscript(_: Int) -> Int {
+    @available(*, unavailable, message: "bad subscript getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad subscript setter") set {} // expected-note * {{here}}
+  }
+
+  @available(*, unavailable, message: "bad subscript!")
+  subscript(alsoUnavailable _: Int) -> Int { // expected-note * {{here}}
+    @available(*, unavailable, message: "bad subscript getter") get { return 0 }
+    @available(*, unavailable, message: "bad subscript setter") set {}
+  }
+
+  mutating func testAccessors(other: inout UnavailableAccessors) {
+    _ = unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+    unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+    unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+    _ = other.unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+    other.unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+    other.unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+    _ = other.unavailableProperty // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+    other.unavailableProperty = 0 // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+    other.unavailableProperty += 1 // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+
+    _ = UnavailableAccessors.staticUnavailable // expected-error {{getter for 'staticUnavailable' is unavailable: bad getter}} {{none}}
+    UnavailableAccessors.staticUnavailable = 0 // expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
+    UnavailableAccessors.staticUnavailable += 1 // expected-error {{getter for 'staticUnavailable' is unavailable: bad getter}} {{none}} expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
+
+    _ = other[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} {{none}}
+    other[0] = 0 // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}} {{none}}
+    other[0] += 1 // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} {{none}} expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}} {{none}}
+
+    _ = other[alsoUnavailable: 0] // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
+    other[alsoUnavailable: 0] = 0 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
+    other[alsoUnavailable: 0] += 1 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
+  }
+}
+
+class BaseDeprecatedInit {
+  @available(*, deprecated) init(bad: Int) { }
+}
+
+class SubInheritedDeprecatedInit: BaseDeprecatedInit { }
+
+_ = SubInheritedDeprecatedInit(bad: 0) // expected-warning {{'init(bad:)' is deprecated}}
+
+// Should produce no warnings.
+enum SR8634_Enum: Int {
+  case a
+  @available(*, deprecated, message: "I must not be raised in synthesized code")
+  case b
+  case c
+}
+
+struct SR8634_Struct: Equatable {
+  @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
+  let a: Int
+}

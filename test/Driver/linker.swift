@@ -33,12 +33,21 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
+// RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-apple-macosx10.9.1 %s -sdk %S/../Inputs/clang-importer-sdk -lfoo -framework bar -Lbaz -Fgarply -Fsystem car -F cdr -Xlinker -undefined -Xlinker dynamic_lookup -o sdk.out 2>&1 > %t.complex.txt
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.simple.txt
+// RUN: %FileCheck -check-prefix IOS-linker-order %s < %t.simple.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt
+// RUN: %FileCheck -check-prefix LINUX-linker-order %s < %t.linux.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
@@ -56,11 +65,12 @@
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
 
 // Here we specify an output file name using '-o'. For ease of writing these
 // tests, we happen to specify the same file name as is inferred in the
@@ -83,7 +93,7 @@
 
 // SIMPLE: bin/ld{{"? }}
 // SIMPLE-NOT: -syslibroot
-// SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
 
@@ -240,6 +250,20 @@
 // CYGWIN-x86_64-DAG: -Xlinker -undefined
 // CYGWIN-x86_64: -o linker
 
+// WINDOWS-x86_64: swift
+// WINDOWS-x86_64: -o [[OBJECTFILE:.*]]
+
+// WINDOWS-x86_64: clang++{{"? }}
+// WINDOWS-x86_64-DAG: [[OBJECTFILE]]
+// WINDOWS-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift/windows/x86_64]]
+// WINDOWS-x86_64-DAG: -F foo -iframework car -F cdr
+// WINDOWS-x86_64-DAG: -framework bar
+// WINDOWS-x86_64-DAG: -L baz
+// WINDOWS-x86_64-DAG: -lboo
+// WINDOWS-x86_64-DAG: -Xlinker -undefined
+// WINDOWS-x86_64: -o linker
+
+
 // COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib
 // COMPLEX-DAG: -syslibroot {{.*}}/Inputs/clang-importer-sdk
@@ -268,6 +292,24 @@
 // LINUX_DYNLIB-x86_64-DAG: -L bar
 // LINUX_DYNLIB-x86_64: -o dynlib.out
 
+// IOS-linker-order: swift
+// IOS-linker-order: -o [[OBJECTFILE:.*]]
+
+// IOS-linker-order: bin/ld{{"? }}
+// IOS-linker-order: -rpath [[STDLIB_PATH:[^ ]+/lib/swift/iphonesimulator]]
+// IOS-linker-order: -L foo
+// IOS-linker-order: -rpath customrpath
+// IOS-linker-order: -o {{.*}}
+
+// LINUX-linker-order: swift
+// LINUX-linker-order: -o [[OBJECTFILE:.*]]
+
+// LINUX-linker-order: clang++{{"? }}
+// LINUX-linker-order: -Xlinker -rpath -Xlinker {{[^ ]+/lib/swift/linux}}
+// LINUX-linker-order: -L foo
+// LINUX-linker-order: -Xlinker -rpath -Xlinker customrpath
+// LINUX-linker-order: -o {{.*}}
+
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
 // DEBUG-NEXT: bin/ld{{"? }}
@@ -294,11 +336,11 @@
 
 
 // FILELIST: bin/ld{{"? }}
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -filelist {{"?[^-]}}
-// FILELIST-NOT: .o
-// FILELIST: /a.o
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
+// FILELIST: /a.o{{"? }}
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -o linker
 
 

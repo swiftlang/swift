@@ -346,7 +346,7 @@ public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zer
   public mutating func next() -> Element? {
     if reachedEnd { return nil }
 
-    guard let values = (iterators.next()...) {   // call "next" on each of the iterators, put the results into a tuple named "values"
+    guard let values = (iterators.next()...) else {   // call "next" on each of the iterators, put the results into a tuple named "values"
       reachedEnd = true
       return nil
     }
@@ -757,9 +757,9 @@ if e1 == e2 { ... } // error: e1 and e2 don't necessarily have the same dynamic 
 One explicit way to allow such operations in a type-safe manner is to introduce an "open existential" operation of some sort, which extracts and gives a name to the dynamic type stored inside an existential. For example:
 
 ```Swift
-if let storedInE1 = e1 openas T {     // T is a the type of storedInE1, a copy of the value stored in e1
-  if let storedInE2 = e2 as? T {      // is e2 also a T?
-    if storedInE1 == storedInE2 { ... } // okay: storedInT1 and storedInE2 are both of type T, which we know is Equatable
+if let storedInE1 = e1 openas T { // T is the type of storedInE1, a copy of the value stored in e1
+  if let storedInE2 = e2 as? T {  // Does e2 have type T? If so, copy its value to storedInE2
+    if storedInE1 == storedInE2 { ... } // Okay: storedInT1 and storedInE2 are both of type T, which we know is Equatable
   }
 }
 ```

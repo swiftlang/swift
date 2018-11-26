@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s -enable-astscope-lookup
+// RUN: %target-typecheck-verify-swift -enable-astscope-lookup
 
 // Name binding in default arguments
 
@@ -25,7 +25,8 @@ protocol P1 {
 // Protocols involving associated types.
 protocol AProtocol {
   associatedtype e : e
-  // expected-error@-1 {{use of undeclared type 'e'}}
+  // expected-error@-1 {{inheritance from non-protocol, non-class type 'Self.e'}}
+  // expected-error@-2 {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
 }
 
 // Extensions.
@@ -118,6 +119,6 @@ protocol Fooable {
 struct S<T> // expected-error{{expected '{' in struct}}
 extension S // expected-error{{expected '{' in extension}}
 
-let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
-// expected-error@-1 {{'a' used within its own type}}
-// FIXME: That second error is bogus.
+let a = b ; let b = a
+// expected-note@-1 {{'a' declared here}}
+// expected-error@-2 {{ambiguous use of 'a'}}

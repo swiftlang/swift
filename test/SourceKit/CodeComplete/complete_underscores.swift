@@ -33,7 +33,7 @@ func test001() {
   #^TOP_LEVEL_0,,_^#
 }
 // REQUIRES: objc_interop
-// RUN: %complete-test %s -hide-none -tok=TOP_LEVEL_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=TOP_LEVEL_0
+// RUN: %complete-test %s -hide-none -tok=TOP_LEVEL_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=TOP_LEVEL_0
 // TOP_LEVEL_0-LABEL: Results for filterText: [
 // TOP_LEVEL_0-DAG: Foo
 // TOP_LEVEL_0-DAG: FooStruct
@@ -57,7 +57,7 @@ func test001() {
 func test002(x: Foo) {
   x.#^FOO_QUALIFIED_0,,^#
 }
-// RUN: %complete-test %s -tok=FOO_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=FOO_QUALIFIED_0
+// RUN: %complete-test %s -tok=FOO_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=FOO_QUALIFIED_0
 // FOO_QUALIFIED_0: Results for filterText: [
 // FOO_QUALIFIED_0-DAG:   foo()
 // FOO_QUALIFIED_0-DAG:   extFoo()
@@ -68,7 +68,7 @@ func test002(x: Foo) {
 func test003(x: _Bar) {
   x.#^BAR_QUALIFIED_0,,_^#
 }
-// RUN: %complete-test %s -tok=BAR_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=BAR_QUALIFIED_0
+// RUN: %complete-test %s -tok=BAR_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=BAR_QUALIFIED_0
 // BAR_QUALIFIED_0: Results for filterText: [
 // BAR_QUALIFIED_0-DAG:   bar()
 // BAR_QUALIFIED_0-DAG:   _bar()
@@ -89,7 +89,7 @@ func test003(x: _Bar) {
 func test004(x: Baz) {
   x.#^BAZ_QUALIFIED_0,,^#
 }
-// RUN: %complete-test %s -tok=BAZ_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=BAZ_QUALIFIED_0
+// RUN: %complete-test %s -tok=BAZ_QUALIFIED_0  -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=BAZ_QUALIFIED_0
 // BAZ_QUALIFIED_0: Results for filterText: [
 // BAZ_QUALIFIED_0-DAG:   baz()
 // BAZ_QUALIFIED_0-DAG:   _baz()

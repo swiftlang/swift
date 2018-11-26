@@ -23,7 +23,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProfReader.h"
 #include <deque>
 
 namespace swift {
@@ -95,6 +94,11 @@ public:
 
   /// The most recent conformance...
   NormalProtocolConformance *lastEmittedConformance = nullptr;
+
+  /// Profiler instances for constructors, grouped by associated decl.
+  /// Each profiler is shared by all member initializers for a nominal type.
+  /// Constructors within extensions are profiled separately.
+  llvm::DenseMap<Decl *, SILProfiler *> constructorProfilers;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
 
@@ -168,11 +172,6 @@ public:
     return Types.getTypeLowering(t).getLoweredType();
   }
 
-  /// Translate a formal enum element decl into its lowered form.
-  ///
-  /// This just turns ImplicitlyUnwrappedOptional's cases into Optional's.
-  EnumElementDecl *getLoweredEnumElementDecl(EnumElementDecl *element);
-  
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
@@ -223,7 +222,7 @@ public:
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
   /// Generate code for a source file of the module.
-  void emitSourceFile(SourceFile *sf, unsigned startElem);
+  void emitSourceFile(SourceFile *sf);
   
   /// Generates code for the given FuncDecl and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
@@ -249,7 +248,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind);
+                               DefaultArgumentKind kind, DeclContext *DC);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -332,22 +331,28 @@ public:
 
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
-  
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+
+  /// Should the self argument of the given method always be emitted as
+  /// an r-value (meaning that it can be borrowed only if that is not
+  /// semantically detectable), or it acceptable to emit it as a borrowed
+  /// storage reference?
+  bool shouldEmitSelfAsRValue(FuncDecl *method, CanType selfType);
+
+  /// Is the self method of the given nonmutating method passed indirectly?
+  bool isNonMutatingSelfIndirect(SILDeclRef method);
+
+  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor);
 
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,
                               GenericEnvironment *genericEnv,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
-                              SubstitutionList subs,
+                              SubstitutionMap subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy);
+                              CanType baseTy,
+                              bool forPropertyDescriptor);
 
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
@@ -425,7 +430,7 @@ public:
   void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionList subs);
+  void useConformancesFromSubstitutions(SubstitutionMap subs);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
@@ -434,12 +439,25 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  SubstitutionList
+  SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
+
+  /// Map the substitutions for the original declaration to substitutions for
+  /// the overridden declaration.
+  static SubstitutionMap mapSubstitutionsForWitnessOverride(
+                                               AbstractFunctionDecl *original,
+                                               AbstractFunctionDecl *overridden,
+                                               SubstitutionMap subs);
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
-  
+
+  /// Get or create the shared profiler instance for a type's constructors.
+  /// This takes care to create separate profilers for extensions, which may
+  /// reside in a different file than the one where the base type is defined.
+  SILProfiler *getOrCreateProfilerForConstructors(DeclContext *ctx,
+                                                  ConstructorDecl *cd);
+
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

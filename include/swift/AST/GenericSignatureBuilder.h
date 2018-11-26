@@ -22,6 +22,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
@@ -45,7 +46,6 @@ namespace swift {
 class DeclContext;
 class DependentMemberType;
 class GenericParamList;
-class GenericSignature;
 class GenericSignatureBuilder;
 class GenericTypeParamType;
 class LazyResolver;
@@ -124,7 +124,7 @@ public:
       conformsTo;
 
     /// Same-type constraints within this equivalence class.
-    std::vector<Constraint<PotentialArchetype *>> sameTypeConstraints;
+    std::vector<Constraint<Type>> sameTypeConstraints;
 
     /// Concrete type to which this equivalence class is equal.
     ///
@@ -213,15 +213,6 @@ public:
                                      ProtocolDecl *proto,
                                      FloatingRequirementSource source);
 
-    /// Record a same-type constraint between \c type1 and \c type2 determined
-    /// via the given source.
-    ///
-    /// \returns true if this same-type constraint merges two equivalence
-    /// classes, and false otherwise.
-    bool recordSameTypeConstraint(PotentialArchetype *type1,
-                                  PotentialArchetype *type2,
-                                  const RequirementSource *source);
-
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
     /// that concrete type as written.
@@ -287,6 +278,10 @@ public:
     /// Cached nested-type information, which contains the best declaration
     /// for a given name.
     llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
+
+    /// Cached access paths.
+    llvm::SmallDenseMap<const ProtocolDecl *, ConformanceAccessPath, 8>
+        conformanceAccessPathCache;
   };
 
   friend class RequirementSource;
@@ -345,6 +340,12 @@ private:
                                    FloatingRequirementSource source,
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
+
+  /// Add any conditional requirements from the given conformance.
+  ///
+  /// \returns \c true if an error occurred, \c false if not.
+  bool addConditionalRequirements(ProtocolConformanceRef conformance,
+                                  ModuleDecl *inferForModule, SourceLoc loc);
 
   /// Resolve the conformance of the given type to the given protocol when the
   /// potential archetype is known to be equivalent to a concrete type.
@@ -445,17 +446,16 @@ private:
   /// Note that we have added the nested type nestedPA
   void addedNestedType(PotentialArchetype *nestedPA);
 
-  /// Add a rewrite rule that makes \c otherPA a part of the given equivalence
-  /// class.
-  void addSameTypeRewriteRule(EquivalenceClass *equivClass,
-                              PotentialArchetype *otherPA);
+  /// Add a rewrite rule from that makes the two types equivalent.
+  ///
+  /// \returns true if a new rewrite rule was added, and false otherwise.
+  bool addSameTypeRewriteRule(CanType type1, CanType type2);
 
-  /// \brief Add a new conformance requirement specifying that the given
-  /// potential archetypes are equivalent.
-  ConstraintResult addSameTypeRequirementBetweenArchetypes(
-                                               PotentialArchetype *T1,
-                                               PotentialArchetype *T2,
-                                               const RequirementSource *Source);
+  /// \brief Add a same-type requirement between two types that are known to
+  /// refer to type parameters.
+  ConstraintResult addSameTypeRequirementBetweenTypeParameters(
+                                         ResolvedType type1, ResolvedType type2,
+                                         const RequirementSource *source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
@@ -518,7 +518,7 @@ public:
     Optional<ProtocolConformanceRef>
     operator()(CanType dependentType,
                Type conformingReplacementType,
-               ProtocolType *conformedProtocol) const {
+               ProtocolDecl *conformedProtocol) const {
       return builder->lookupConformance(dependentType,
                                         conformingReplacementType,
                                         conformedProtocol);
@@ -532,7 +532,7 @@ public:
   /// Lookup a protocol conformance in a module-agnostic manner.
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType dependentType, Type conformingReplacementType,
-                    ProtocolType *conformedProtocol);
+                    ProtocolDecl *conformedProtocol);
 
 
   /// Retrieve the lazy resolver, if there is one.
@@ -574,19 +574,8 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addRequirement(const RequirementRepr *req,
-                                  ModuleDecl *inferForModule);
-
-  /// \brief Add a new requirement.
-  ///
-  /// \param inferForModule Infer additional requirements from the types
-  /// relative to the given module.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addRequirement(const RequirementRepr *Req,
+  ConstraintResult addRequirement(const Requirement &req,
                                   FloatingRequirementSource source,
-                                  const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
   /// \brief Add an already-checked requirement.
@@ -600,7 +589,9 @@ public:
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const Requirement &req,
+                                  const RequirementRepr *reqRepr,
                                   FloatingRequirementSource source,
+                                  const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
   /// \brief Add all of a generic signature's parameters and requirements.
@@ -618,7 +609,9 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ModuleDecl &module, TypeLoc type,
+  void inferRequirements(ModuleDecl &module,
+                         Type type,
+                         const TypeRepr *typeRepr,
                          FloatingRequirementSource source);
 
   /// Infer requirements from the given pattern, recursively.
@@ -809,9 +802,6 @@ public:
   bool areInSameEquivalenceClass(Type type1, Type type2);
 
   /// Simplify the given dependent type down to its canonical representation.
-  ///
-  /// \returns null if the type involved dependent member types that
-  /// don't have associated types.
   Type getCanonicalTypeParameter(Type type);
 
   /// Verify the correctness of the given generic signature.
@@ -1462,6 +1452,11 @@ public:
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
 
+  /// Whether this is a top-level requirement written in source.
+  /// FIXME: This is a hack because expandConformanceRequirement()
+  /// is too eager; we should remove this once we fix it properly.
+  bool isTopLevel() const { return kind == Explicit; }
+
   /// Return the "inferred" version of this source, if it isn't already
   /// inferred.
   FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
@@ -1490,8 +1485,10 @@ struct GenericSignatureBuilder::Constraint {
   Type getSubjectDependentType(
                        TypeArrayView<GenericTypeParamType> genericParams) const;
 
-  /// Determine whether the subject is equivalence to the given potential
-  /// archetype.
+  /// Determine whether the subject is equivalence to the given type.
+  bool isSubjectEqualTo(Type type) const;
+
+  /// Determine whether the subject is equivalence to the given type.
   bool isSubjectEqualTo(const PotentialArchetype *pa) const;
 
   /// Determine whether this constraint has the same subject as the
@@ -1740,10 +1737,20 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   case GenericSignatureBuilder::ConstraintResult::Unresolved:
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 /// Canonical ordering for dependent types.
 int compareDependentTypes(Type type1, Type type2);
+
+template<typename T>
+Type GenericSignatureBuilder::Constraint<T>::getSubjectDependentType(
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
+  if (auto type = subject.dyn_cast<Type>())
+    return type;
+
+  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
+}
 
 } // end namespace swift
 

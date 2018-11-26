@@ -5,7 +5,7 @@ public protocol A {}
 public class AC : A{}
 
 public class CVC<A1: AC> where A1: A {
-  // CHECK-LABEL: define{{.*}} @"$S21superclass_constraint3CVCCACyxGycfc"
+  // CHECK-LABEL: define{{.*}} @"$s21superclass_constraint3CVCCACyxGycfc"
   public init() {
     // CHECK: [[A:%.*]] = alloca %T21superclass_constraint3CVCC*
     // CHECK-NOT: ret %T21superclass_constraint3CVCC*

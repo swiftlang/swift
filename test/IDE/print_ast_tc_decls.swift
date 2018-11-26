@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
 //
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
@@ -108,7 +108,7 @@ struct d0100_FooStruct {
 // PASS_COMMON-LABEL: {{^}}struct d0100_FooStruct {{{$}}
 
   var instanceVar1: Int = 0
-// PASS_COMMON-NEXT: {{^}}  var instanceVar1: Int{{$}}
+// PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var instanceVar1: Int{{$}}
 
   var computedProp1: Int {
     get {
@@ -130,10 +130,10 @@ struct d0100_FooStruct {
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
 
   func instanceFuncWithDefaultArg1(a: Int = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(a: Int = default){{$}}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg1(a: Int = 0){{$}}
 
   func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0) {}
-// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = default, b: Double = default){{$}}
+// PASS_COMMON-NEXT: {{^}}  func instanceFuncWithDefaultArg2(a: Int = 0, b: Double = 0){{$}}
 
   func varargInstanceFunc0(v: Int...) {}
 // PASS_COMMON-NEXT: {{^}}  func varargInstanceFunc0(v: Int...){{$}}
@@ -192,8 +192,8 @@ struct d0100_FooStruct {
 
   class NestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class NestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum NestedEnum {}
@@ -207,7 +207,7 @@ struct d0100_FooStruct {
 // PASS_COMMON-NEXT: {{^}}  typealias NestedTypealias = Int{{$}}
 
   static var staticVar1: Int = 42
-// PASS_COMMON-NEXT: {{^}}  static var staticVar1: Int{{$}}
+// PASS_COMMON-NEXT: {{^}}  @_hasInitialValue static var staticVar1: Int{{$}}
 
   static var computedStaticProp1: Int {
     get {
@@ -268,8 +268,8 @@ extension d0100_FooStruct {
 
   class ExtNestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class ExtNestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum ExtNestedEnum {
@@ -303,7 +303,7 @@ extension d0100_FooStruct.ExtNestedStruct {
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 var fooObject: d0100_FooStruct = d0100_FooStruct()
-// PASS_ONE_LINE-DAG: {{^}}var fooObject: d0100_FooStruct{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_hasInitialValue var fooObject: d0100_FooStruct{{$}}
 
 struct d0110_ReadWriteProperties {
 // PASS_RW_PROP_GET_SET-LABEL:    {{^}}struct d0110_ReadWriteProperties {{{$}}
@@ -432,7 +432,7 @@ class d0120_TestClassBase {
   final class var baseClassVar3: Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  final class var baseClassVar3: Int { get }{{$}}
   static var baseClassVar4: Int = 0
-// PASS_COMMON-NEXT: {{^}}  static var baseClassVar4: Int{{$}}
+// PASS_COMMON-NEXT: {{^}}  @_hasInitialValue static var baseClassVar4: Int{{$}}
   static var baseClassVar5: Int { return 0 }
 // PASS_COMMON-NEXT: {{^}}  static var baseClassVar5: Int { get }{{$}}
 
@@ -529,7 +529,7 @@ class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -541,13 +541,13 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBOutlet @_implicitly_unwrapped_optional @objc weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_implicitly_unwrapped_optional @_hasInitialValue weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable @_hasInitialValue var inspectableProp: Int{{$}}
 
   @GKInspectable var inspectableProp2: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @GKInspectable @objc var inspectableProp2: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @GKInspectable @_hasInitialValue var inspectableProp2: Int{{$}}
 }
 
 struct d0190_LetVarDecls {
@@ -555,21 +555,21 @@ struct d0190_LetVarDecls {
 // PASS_PRINT_MODULE_INTERFACE-LABEL: {{^}}struct d0190_LetVarDecls {{{$}}
 
   let instanceVar1: Int = 0
-// PASS_PRINT_AST-NEXT: {{^}}  let instanceVar1: Int{{$}}
-// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  let instanceVar1: Int{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  @_hasInitialValue let instanceVar1: Int{{$}}
+// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  @_hasInitialValue let instanceVar1: Int{{$}}
 
   let instanceVar2 = 0
-// PASS_PRINT_AST-NEXT: {{^}}  let instanceVar2: Int{{$}}
-// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  let instanceVar2: Int{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  @_hasInitialValue let instanceVar2: Int{{$}}
+// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  @_hasInitialValue let instanceVar2: Int{{$}}
 
   static let staticVar1: Int = 42
-// PASS_PRINT_AST-NEXT: {{^}}  static let staticVar1: Int{{$}}
-// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  static let staticVar1: Int{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  @_hasInitialValue static let staticVar1: Int{{$}}
+// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  @_hasInitialValue static let staticVar1: Int{{$}}
 
   static let staticVar2 = 42
   // FIXME: PRINTED_WITHOUT_TYPE
-// PASS_PRINT_AST-NEXT: {{^}}  static let staticVar2: Int{{$}}
-// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  static let staticVar2: Int{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  @_hasInitialValue static let staticVar2: Int{{$}}
+// PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  @_hasInitialValue static let staticVar2: Int{{$}}
 }
 
 struct d0200_EscapedIdentifiers {
@@ -587,12 +587,13 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{.*}}static func __derived_enum_equals(_ a: d0200_EscapedIdentifiers.`enum`, _ b: d0200_EscapedIdentifiers.`enum`) -> Bool
 // PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}    func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   class `class` {}
 // PASS_COMMON-NEXT: {{^}}  class `class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   typealias `protocol` = `class`
@@ -602,8 +603,8 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
-// PASS_COMMON: {{^}}    @objc deinit{{$}}
-// PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON:      {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where`>(
@@ -611,7 +612,7 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  func `func`<`let`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `let` : {{(d0200_EscapedIdentifiers.)?}}`protocol`, `where` : {{(d0200_EscapedIdentifiers.)?}}`protocol`{{$}}
 
   var `var`: `struct` = `struct`()
-// PASS_COMMON-NEXT: {{^}}  var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
+// PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
 
   var tupleType: (`var`: Int, `let`: `struct`)
 // PASS_COMMON-NEXT: {{^}}  var tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`){{$}}
@@ -634,16 +635,16 @@ struct d0210_Qualifications {
 // PASS_QUAL_IF_AMBIGUOUS: {{^}}struct d0210_Qualifications {{{$}}
 
   var propFromStdlib1: Int = 0
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  var propFromStdlib1: Int{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  var propFromStdlib1: Int{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  @_hasInitialValue var propFromStdlib1: Int{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  @_hasInitialValue var propFromStdlib1: Int{{$}}
 
   var propFromSwift1: FooSwiftStruct = FooSwiftStruct()
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  var propFromSwift1: FooSwiftStruct{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  var propFromSwift1: foo_swift_module.FooSwiftStruct{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  @_hasInitialValue var propFromSwift1: FooSwiftStruct{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  @_hasInitialValue var propFromSwift1: foo_swift_module.FooSwiftStruct{{$}}
 
   var propFromClang1: FooStruct1 = FooStruct1(x: 0, y: 0.0)
-// PASS_QUAL_UNQUAL-NEXT:       {{^}}  var propFromClang1: FooStruct1{{$}}
-// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  var propFromClang1: FooStruct1{{$}}
+// PASS_QUAL_UNQUAL-NEXT:       {{^}}  @_hasInitialValue var propFromClang1: FooStruct1{{$}}
+// PASS_QUAL_IF_AMBIGUOUS-NEXT: {{^}}  @_hasInitialValue var propFromClang1: FooStruct1{{$}}
 
 
   func instanceFuncFromStdlib1(a: Int) -> Float {
@@ -677,43 +678,43 @@ class d0250_ExplodePattern {
   var instanceVar1 = 0
   var instanceVar2 = 0.0
   var instanceVar3 = ""
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar1: Int{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar2: Double{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar3: String{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar1: Int{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar2: Double{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar3: String{{$}}
 
   var instanceVar4 = FooStruct()
   var (instanceVar5, instanceVar6) = (FooStruct(), FooStruct())
   var (instanceVar7, instanceVar8) = (FooStruct(), FooStruct())
   var (instanceVar9, instanceVar10) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
   final var (instanceVar11, instanceVar12) = (FooStruct(), FooStruct())
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar4: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar5: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar6: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar7: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar8: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar9: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  var instanceVar10: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar11: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final var instanceVar12: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar4: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar5: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar6: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar7: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar8: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar9: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue var instanceVar10: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final var instanceVar11: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final var instanceVar12: FooStruct{{$}}
 
   let instanceLet1 = 0
   let instanceLet2 = 0.0
   let instanceLet3 = ""
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet1: Int{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet2: Double{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet3: String{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet1: Int{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet2: Double{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet3: String{{$}}
 
   let instanceLet4 = FooStruct()
   let (instanceLet5, instanceLet6) = (FooStruct(), FooStruct())
   let (instanceLet7, instanceLet8) = (FooStruct(), FooStruct())
   let (instanceLet9, instanceLet10) : (FooStruct, FooStruct) = (FooStruct(), FooStruct())
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet4: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet5: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet6: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet7: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet8: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet9: FooStruct{{$}}
-// PASS_EXPLODE_PATTERN: {{^}}  final let instanceLet10: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet4: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet5: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet6: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet7: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet8: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet9: FooStruct{{$}}
+// PASS_EXPLODE_PATTERN: {{^}}  @_hasInitialValue final let instanceLet10: FooStruct{{$}}
 }
 
 class d0260_ExplodePattern_TestClassBase {
@@ -878,11 +879,11 @@ protocol AssociatedType1 {
 //===---
 
 var d0300_topLevelVar1: Int = 42
-// PASS_COMMON: {{^}}var d0300_topLevelVar1: Int{{$}}
+// PASS_COMMON: {{^}}@_hasInitialValue var d0300_topLevelVar1: Int{{$}}
 // PASS_COMMON-NOT: d0300_topLevelVar1
 
 var d0400_topLevelVar2: Int = 42
-// PASS_COMMON: {{^}}var d0400_topLevelVar2: Int{{$}}
+// PASS_COMMON: {{^}}@_hasInitialValue var d0400_topLevelVar2: Int{{$}}
 // PASS_COMMON-NOT: d0400_topLevelVar2
 
 var d0500_topLevelVar2: Int {
@@ -901,13 +902,13 @@ class d0600_InClassVar1 {
 // PASS_COMMON-NOT: instanceVar1
 
   var instanceVar2: Int = 42
-// PASS_COMMON: {{^}}  var instanceVar2: Int{{$}}
+// PASS_COMMON: {{^}}  @_hasInitialValue var instanceVar2: Int{{$}}
 // PASS_COMMON-NOT: instanceVar2
 
   // FIXME: this is sometimes printed without a type, see PASS_EXPLODE_PATTERN.
   // FIXME: PRINTED_WITHOUT_TYPE
   var instanceVar3 = 42
-// PASS_COMMON: {{^}}  var instanceVar3
+// PASS_COMMON: {{^}}  @_hasInitialValue var instanceVar3
 // PASS_COMMON-NOT: instanceVar3
 
   var instanceVar4: Int {
@@ -1015,6 +1016,7 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  {{.*}}static func __derived_enum_equals(_ a: d2000_EnumDecl1, _ b: d2000_EnumDecl1) -> Bool
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 enum d2100_EnumDecl2 {
@@ -1072,6 +1074,7 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1085,6 +1088,7 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1109,7 +1113,7 @@ infix operator %%%
 func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}infix operator %%%{{$}}
+// PASS_2500-LABEL: {{^}}infix operator %%% : DefaultPrecedence{{$}}
 // PASS_2500: {{^}}func %%% (lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 precedencegroup BoringPrecedence {
@@ -1348,11 +1352,11 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 
 // Protocol with where clauses
 
-protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int, Self : FooProtocol {}
-// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : FooProtocol, QuxProtocol where Self.Qux == Int {
+protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int {}
+// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self.Qux == Int {
 
-protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int, Self : FooProtocol {
-// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : FooProtocol, QuxProtocol where Self.Qux == Int {
+protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self.Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 
@@ -1375,3 +1379,5 @@ public typealias MyPairI<B> = MyPair<Int, B>
 // PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
 public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
+public typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
+// PASS_PRINT_AST: public typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol

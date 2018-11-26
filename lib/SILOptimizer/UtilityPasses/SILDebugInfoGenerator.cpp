@@ -95,7 +95,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
     if (FileBaseName.empty())
       return;
 
-    DEBUG(llvm::dbgs() << "** SILDebugInfoGenerator **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** SILDebugInfoGenerator **\n");
 
     std::vector<SILFunction *> PrintedFuncs;
     int FileIdx = 0;
@@ -110,7 +110,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
       char *FileNameBuf = (char *)M->allocate(FileName.size() + 1, 1);
       strcpy(FileNameBuf, FileName.c_str());
 
-      DEBUG(llvm::dbgs() << "Write debug SIL file " << FileName << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "Write debug SIL file " << FileName << '\n');
 
       std::error_code EC;
       llvm::raw_fd_ostream OutFile(FileName, EC,

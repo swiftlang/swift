@@ -23,22 +23,24 @@ function usage() {
   echo "-n --dry-run"
   echo "Do a dry run."
   echo ""
-  if [[ "$(uname -s)" == "Linux" ]] ; then
-    echo "-t --test"
-    echo "Run tests."
-    echo ""
-  fi
+  echo "-t --test"
+  echo "Run tests."
+  echo ""
+  echo "--distcc"
+  echo "Build with distcc to speed up the toolchain build"
+  echo ""
 }
 
+RESULT_DIR=$PWD
 cd "$(dirname $0)/.." || exit
-SRC_DIR=$PWD
 
 # Set defaults
+DISTCC_FLAG=
 DRY_RUN=
 BUNDLE_PREFIX=
 case $(uname -s) in
   Darwin)
-    SWIFT_PACKAGE=buildbot_osx_package
+    SWIFT_PACKAGE=buildbot_osx_package,no_test
   ;;
   Linux)
     SWIFT_PACKAGE=buildbot_linux,no_test
@@ -60,9 +62,11 @@ while [ $# -ne 0 ]; do
       if [ "$(uname -s)" == "Linux" ]; then
         SWIFT_PACKAGE=buildbot_linux
       else
-        echo "--test is not supported on \"$(uname -s)\". See --help"
-        exit 1
+        SWIFT_PACKAGE=buildbot_osx_package
       fi
+  ;;
+    --distcc)
+      DISTCC_FLAG="--distcc"
   ;;
   -h|--help)
     usage
@@ -93,6 +97,7 @@ YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
 TOOLCHAIN_VERSION="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
+DARWIN_TOOLCHAIN_VERSION="0.0.${YEAR}${MONTH}${DAY}"
 ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
 SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
 BUNDLE_PREFIX=${BUNDLE_PREFIX:?Please specify a bundle prefix}
@@ -101,14 +106,15 @@ DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
-SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
-SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
-SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
+SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
+SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"
+SWIFT_INSTALL_SYMROOT="${RESULT_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
-SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
+SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
+DISTCC_FLAG="${DISTCC_FLAG}"
 
-./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
@@ -118,5 +124,5 @@ DRY_RUN="${DRY_RUN}"
         darwin_toolchain_display_name="${DISPLAY_NAME}" \
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
-        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_version="${DARWIN_TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local"

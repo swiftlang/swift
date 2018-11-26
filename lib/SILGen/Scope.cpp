@@ -56,7 +56,7 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
     assert(v->getType().isAddressOnly(SGF.getModule()) &&
            "RValue invariants imply that all RValue subtypes that are "
            "addresses must be address only.");
-    auto boxTy = SILBoxType::get(v->getType().getSwiftRValueType());
+    auto boxTy = SILBoxType::get(v->getType().getASTType());
     SILValue box = SGF.B.createAllocBox(loc, boxTy);
     SILValue addr = SGF.B.createProjectBox(loc, box, 0);
     SGF.B.createCopyAddr(loc, v, addr, IsTake, IsInitialization);
@@ -120,44 +120,16 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 }
 
 void Scope::popImpl() {
-  SmallVector<SILValue, 16> cleanupsToPropagateToOuterScope;
-
-  // Deactivate any postpone cleanups in the current scope.
-  if (currentlyActivePostponedCleanup) {
-    bool inScope;
-    do {
-      inScope = false;
-      auto &deferredCleanups =
-          currentlyActivePostponedCleanup->deferredCleanups;
-      if (deferredCleanups.empty())
-        break;
-      auto &top = deferredCleanups.back();
-      auto topCleanupDepth = top.first.getDepth();
-      if (topCleanupDepth > depth.getDepth()) {
-        cleanups.forwardCleanup(top.first);
-        cleanupsToPropagateToOuterScope.push_back(top.second);
-        deferredCleanups.pop_back();
-        inScope = true;
-      }
-    } while (inScope);
-  }
-
-  cleanups.stack.checkIterator(depth);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  assert(cleanups.innermostScope == depth && "popping scopes out of order");
-
+  verify();
   cleanups.innermostScope = savedInnermostScope;
   cleanups.endScope(depth, loc);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  if (cleanups.innermostScope)
+    cleanups.stack.checkIterator(cleanups.innermostScope->depth);
+  cleanups.popTopDeadCleanups();
+}
 
-  // Propagate the cleanup to the current parent scope.
-  for (auto valueToCleanup : cleanupsToPropagateToOuterScope) {
-    auto handle = cleanups.SGF.enterDestroyCleanup(valueToCleanup);
-    // Propagate cleanup to parent Scope.
-    if (currentlyActivePostponedCleanup->depth.getDepth() < depth.getDepth()) {
-      currentlyActivePostponedCleanup->deferredCleanups.push_back(
-          std::make_pair(handle, valueToCleanup));
-    }
-  }
+void Scope::verify() {
+  assert(cleanups.innermostScope == this && "popping scopes out of order");
+  assert(depth.isValid());
+  cleanups.stack.checkIterator(depth);
 }

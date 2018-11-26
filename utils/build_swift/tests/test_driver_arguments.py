@@ -645,6 +645,7 @@ class TestDriverArgumentParser(unittest.TestCase):
                 '--test', '0',
                 '--validation-test', '0',
                 '--long-test', '0',
+                '--stress-test', '0',
             ])
 
             self.assertFalse(namespace.test_linux)

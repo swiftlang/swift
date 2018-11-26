@@ -1,389 +1,188 @@
-//===--- StringCharacterView.swift - String's Collection of Characters ----===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  String is-not-a Sequence or Collection, but it exposes a
-//  collection of characters.
-//
-//===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#70 : The character string view should have a custom iterator type
-// to allow performance optimizations of linear traversals.
-
-import SwiftShims
-
-extension String {
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public typealias CharacterView = _CharacterView
-  
-  /// A view of a string's contents as a collection of characters.
+// String is a bidirectional collection of `Character`s, aka graphemes
+extension String: BidirectionalCollection {
+  /// A type that represents the number of steps between two `String.Index`
+  /// values, where one value is reachable from the other.
   ///
-  /// In Swift, every string provides a view of its contents as characters. In
-  /// this view, many individual characters---for example, "é", "김", and
-  /// "🇮🇳"---can be made up of multiple Unicode scalar values. These scalar
-  /// values are combined by Unicode's boundary algorithms into *extended
-  /// grapheme clusters*, represented by the `Character` type. Each element of
-  /// a `CharacterView` collection is a `Character` instance.
-  ///
-  ///     let flowers = "Flowers 💐"
-  ///     for c in flowers.characters {
-  ///         print(c)
-  ///     }
-  ///     // F
-  ///     // l
-  ///     // o
-  ///     // w
-  ///     // e
-  ///     // r
-  ///     // s
-  ///     //
-  ///     // 💐
-  ///
-  /// You can convert a `String.CharacterView` instance back into a string
-  /// using the `String` type's `init(_:)` initializer.
-  ///
-  ///     let name = "Marie Curie"
-  ///     if let firstSpace = name.characters.index(of: " ") {
-  ///         let firstName = String(name.characters[..<firstSpace])
-  ///         print(firstName)
-  ///     }
-  ///     // Prints "Marie"
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct _CharacterView {
-    @_versioned
-    internal var _base: String
+  /// In Swift, *reachability* refers to the ability to produce one value from
+  /// the other through zero or more applications of `index(after:)`.
+  public typealias IndexDistance = Int
 
-    /// The offset of this view's `_guts` from an original guts. This works
-    /// around the fact that `_StringGuts` is always zero-indexed.
-    /// `_baseOffset` should be subtracted from `Index.encodedOffset` before
-    /// that value is used as a `_guts` index.
-    @_versioned
-    internal var _baseOffset: Int
+  public typealias SubSequence = Substring
 
-    /// Creates a view of the given string.
-    @_inlineable // FIXME(sil-serialize-all)
-    public init(_ text: String) {
-      self._base = text
-      self._baseOffset = 0
-    }
+  /// The position of the first character in a nonempty string.
+  ///
+  /// In an empty string, `startIndex` is equal to `endIndex`.
+  @inlinable // FIXME(sil-serialize-all)
+  public var startIndex: Index { return Index(encodedOffset: 0) }
 
-    @_inlineable // FIXME(sil-serialize-all)
-    public // @testable
-    init(_ _base: String, baseOffset: Int = 0) {
-      self._base = _base
-      self._baseOffset = baseOffset
-    }
-  }
-  
-  /// A view of the string's contents as a collection of characters.
-  @_transparent // FIXME(sil-serialize-all)
-  public var _characters: _CharacterView {
-    get {
-      return _CharacterView(self)
-    }
-    set {
-      self = newValue._base
-    }
+  /// A string's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
+  ///
+  /// In an empty string, `endIndex` is equal to `startIndex`.
+  @inlinable // FIXME(sil-serialize-all)
+  public var endIndex: Index { return Index(encodedOffset: _guts.count) }
+
+  /// The number of characters in a string.
+  public var count: Int {
+    return distance(from: startIndex, to: endIndex)
   }
 
-  /// A view of the string's contents as a collection of characters.
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public var characters: CharacterView {
-    get {
-      return _characters
-    }
-    set {
-      _characters = newValue
-    }
-  }
-
-  /// Applies the given closure to a mutable view of the string's characters.
+  /// Returns the position immediately after the given index.
   ///
-  /// Do not use the string that is the target of this method inside the
-  /// closure passed to `body`, as it may not have its correct value. Instead,
-  /// use the closure's `CharacterView` argument.
-  ///
-  /// This example below uses the `withMutableCharacters(_:)` method to
-  /// truncate the string `str` at the first space and to return the remainder
-  /// of the string.
-  ///
-  ///     var str = "All this happened, more or less."
-  ///     let afterSpace = str.withMutableCharacters {
-  ///         chars -> String.CharacterView in
-  ///         if let i = chars.index(of: " ") {
-  ///             let result = chars[chars.index(after: i)...]
-  ///             chars.removeSubrange(i...)
-  ///             return result
-  ///         }
-  ///         return String.CharacterView()
-  ///     }
-  ///
-  ///     print(str)
-  ///     // Prints "All"
-  ///     print(String(afterSpace))
-  ///     // Prints "this happened, more or less."
-  ///
-  /// - Parameter body: A closure that takes a character view as its argument.
-  ///   If `body` has a return value, that value is also used as the return
-  ///   value for the `withMutableCharacters(_:)` method. The `CharacterView`
-  ///   argument is valid only for the duration of the closure's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please mutate String or Substring directly")
-  public mutating func withMutableCharacters<R>(
-    _ body: (inout CharacterView) -> R
-  ) -> R {
-    // Naively mutating self.characters forces multiple references to
-    // exist at the point of mutation. Instead, temporarily move the
-    // guts of this string into a CharacterView.
-    var tmp = _CharacterView("")
-    (_guts, tmp._base._guts) = (tmp._base._guts, _guts)
-    let r = body(&tmp)
-    (_guts, tmp._base._guts) = (tmp._base._guts, _guts)
-    return r
-  }
-
-  /// Creates a string from the given character view.
-  ///
-  /// Use this initializer to recover a string after performing a collection
-  /// slicing operation on a string's character view.
-  ///
-  ///     let poem = """
-  ///           'Twas brillig, and the slithy toves /
-  ///           Did gyre and gimbal in the wabe: /
-  ///           All mimsy were the borogoves /
-  ///           And the mome raths outgrabe.
-  ///           """
-  ///     let excerpt = String(poem.characters.prefix(22)) + "..."
-  ///     print(excerpt)
-  ///     // Prints "'Twas brillig, and the..."
-  ///
-  /// - Parameter characters: A character view to convert to a string.
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public init(_ characters: CharacterView) {
-    self = characters._base
-  }
-}
-
-extension String._CharacterView : _SwiftStringView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _persistentContent : String {
-    return _base
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _wholeString : String {
-    return _base
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _encodedOffsetRange : Range<Int> {
-    return _base._encodedOffsetRange
-  }
-}
-
-extension String._CharacterView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal var _guts: _StringGuts {
-    return _base._guts
-  }
-}
-
-extension String._CharacterView {
-  internal typealias UnicodeScalarView = String.UnicodeScalarView
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal var unicodeScalars: UnicodeScalarView {
-    return UnicodeScalarView(_base._guts, coreOffset: _baseOffset)
-  }
-}
-
-/// `String.CharacterView` is a collection of `Character`.
-extension String._CharacterView : BidirectionalCollection {
-  public typealias Index = String.Index
-  public typealias IndexDistance = String.IndexDistance
-
-  /// Translates a view index into an index in the underlying base string using
-  /// this view's `_baseOffset`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _toBaseIndex(_ index: Index) -> Index {
-    return Index(
-      encodedOffset: index.encodedOffset - _baseOffset,
-      index._cache)
-  }
-
-  /// Translates an index in the underlying base string into a view index using
-  /// this view's `_baseOffset`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal func _toViewIndex(_ index: Index) -> Index {
-    return Index(
-      encodedOffset: index.encodedOffset + _baseOffset,
-      index._cache)
-  }
-
-  /// The position of the first character in a nonempty character view.
-  /// 
-  /// In an empty character view, `startIndex` is equal to `endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var startIndex: Index {
-    return _toViewIndex(_base.startIndex)
-  }
-
-  /// A character view's "past the end" position---that is, the position one
-  /// greater than the last valid subscript argument.
-  ///
-  /// In an empty character view, `endIndex` is equal to `startIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var endIndex: Index {
-    return _toViewIndex(_base.endIndex)
-  }
-
-  /// Returns the next consecutive position after `i`.
-  ///
-  /// - Precondition: The next position is valid.
-  @_inlineable // FIXME(sil-serialize-all)
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    return _toViewIndex(_base.index(after: _toBaseIndex(i)))
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in ascii.characterIndex(after: i) },
+      utf16: { utf16, i in utf16.characterIndex(after: i) },
+      opaque: { opaque, i in opaque.characterIndex(after: i) })
   }
 
-  /// Returns the previous consecutive position before `i`.
+  /// Returns the position immediately before the given index.
   ///
-  /// - Precondition: The previous position is valid.
-  @_inlineable // FIXME(sil-serialize-all)
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    return _toViewIndex(_base.index(before: _toBaseIndex(i)))
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in ascii.characterIndex(before: i) },
+      utf16: { utf16, i in utf16.characterIndex(before: i) },
+      opaque: { opaque, i in opaque.characterIndex(before: i) })
+  }
+
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  ///
+  ///     let s = "Swift"
+  ///     let i = s.index(s.startIndex, offsetBy: 4)
+  ///     print(s[i])
+  ///     // Prints "t"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  ///
+  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
+  public func index(_ i: Index, offsetBy distance: IndexDistance) -> Index {
+    return _visitGuts(_guts, args: (i, distance),
+      ascii: { ascii, args in let (i, n) = args
+        return ascii.characterIndex(i, offsetBy: n) },
+      utf16: { utf16, args in let (i, n) = args
+        return utf16.characterIndex(i, offsetBy: n) },
+      opaque: { opaque, args in let (i, n) = args
+        return opaque.characterIndex(i, offsetBy: n) })
+  }
+
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let s = "Swift"
+  ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
+  ///         print(s[i])
+  ///     }
+  ///     // Prints "t"
+  ///
+  /// The next example attempts to retrieve an index six positions from
+  /// `s.startIndex` but fails, because that distance is beyond the index
+  /// passed as `limit`.
+  ///
+  ///     let j = s.index(s.startIndex, offsetBy: 6, limitedBy: s.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of the
+  /// collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `distance < 0`, a
+  ///     limit that is greater than `i` has no effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that index
+  ///   would be beyond `limit` in the direction of movement. In that case,
+  ///   the method returns `nil`.
+  ///
+  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
+  public func index(
+    _ i: Index, offsetBy distance: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _visitGuts(_guts, args: (i, distance, limit),
+      ascii: { ascii, args in let (i, n, limit) = args
+        return ascii.characterIndex(i, offsetBy: n, limitedBy: limit) },
+      utf16: { utf16, args in let (i, n, limit) = args
+        return utf16.characterIndex(i, offsetBy: n, limitedBy: limit) },
+      opaque: { opaque, args in let (i, n, limit) = args
+        return opaque.characterIndex(i, offsetBy: n, limitedBy: limit) })
+  }
+
+  /// Returns the distance between two indices.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`.
+  ///
+  /// - Complexity: O(*k*), where *k* is the resulting distance.
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _visitGuts(_guts, args: (start, end),
+      ascii: { ascii, args in let (start, end) = args
+        return ascii.characterDistance(from: start, to: end) },
+      utf16: { utf16, args in let (start, end) = args
+        return utf16.characterDistance(from: start, to: end) },
+      opaque: { opaque, args in let (start, end) = args
+        return opaque.characterDistance(from: start, to: end) })
   }
 
   /// Accesses the character at the given position.
   ///
-  /// The following example searches a string's character view for a capital
-  /// letter and then prints the character at the found index:
+  /// You can use the same indices for subscripting a string and its substring.
+  /// For example, this code finds the first letter after the first space:
   ///
-  ///     let greeting = "Hello, friend!"
-  ///     if let i = greeting.characters.index(where: { "A"..."Z" ~= $0 }) {
-  ///         print("First capital letter: \(greeting.characters[i])")
+  ///     let str = "Greetings, friend! How are you?"
+  ///     let firstSpace = str.firstIndex(of: " ") ?? str.endIndex
+  ///     let substr = str[firstSpace...]
+  ///     if let nextCapital = substr.firstIndex(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///         print("Capital after a space: \(str[nextCapital])")
   ///     }
-  ///     // Prints "First capital letter: H"
+  ///     // Prints "Capital after a space: H"
   ///
-  /// - Parameter position: A valid index of the character view. `position`
-  ///   must be less than the view's end index.
-  @_inlineable // FIXME(sil-serialize-all)
+  /// - Parameter i: A valid index of the string. `i` must be less than the
+  ///   string's end index.
   public subscript(i: Index) -> Character {
-    return _base[_toBaseIndex(i)]
-  }
-}
-
-extension String._CharacterView : RangeReplaceableCollection {
-  /// Creates an empty character view.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init() {
-    self.init("")
-  }
-
-  /// Replaces the characters within the specified bounds with the given
-  /// characters.
-  ///
-  /// Invalidates all indices with respect to the string.
-  ///
-  /// - Parameters:
-  ///   - bounds: The range of characters to replace. The bounds of the range
-  ///     must be valid indices of the character view.
-  ///   - newElements: The new characters to add to the view.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the character
-  ///   view and `newElements`. If the call to `replaceSubrange(_:with:)`
-  ///   simply removes characters at the end of the view, the complexity is
-  ///   O(*n*), where *n* is equal to `bounds.count`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func replaceSubrange<C>(
-    _ bounds: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Element == Character {
-    _base.replaceSubrange(
-      _toBaseIndex(bounds.lowerBound) ..< _toBaseIndex(bounds.upperBound),
-      with: newElements)
-  }
-
-  /// Reserves enough space in the character view's underlying storage to store
-  /// the specified number of ASCII characters.
-  ///
-  /// Because each element of a character view can require more than a single
-  /// ASCII character's worth of storage, additional allocation may be
-  /// necessary when adding characters to the character view after a call to
-  /// `reserveCapacity(_:)`.
-  ///
-  /// - Parameter n: The minimum number of ASCII character's worth of storage
-  ///   to allocate.
-  ///
-  /// - Complexity: O(*n*), where *n* is the capacity being reserved.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func reserveCapacity(_ n: Int) {
-    _base.reserveCapacity(n)
-  }
-
-  /// Appends the given character to the character view.
-  ///
-  /// - Parameter c: The character to append to the character view.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func append(_ c: Character) {
-    _base.append(c)
-  }
-
-  /// Appends the characters in the given sequence to the character view.
-  /// 
-  /// - Parameter newElements: A sequence of characters.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
-  where S.Element == Character {
-    _base.append(contentsOf: newElements)
-  }
-}
-
-// Algorithms
-extension String._CharacterView {
-  /// Accesses the characters in the given range.
-  ///
-  /// The example below uses this subscript to access the characters up to, but
-  /// not including, the first comma (`","`) in the string.
-  ///
-  ///     let str = "All this happened, more or less."
-  ///     let i = str.characters.index(of: ",")!
-  ///     let substring = str.characters[str.characters.startIndex ..< i]
-  ///     print(String(substring))
-  ///     // Prints "All this happened"
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public subscript(bounds: Range<Index>) -> String.CharacterView {
-    let offsetRange: Range<Int> =
-      _toBaseIndex(bounds.lowerBound).encodedOffset ..<
-      _toBaseIndex(bounds.upperBound).encodedOffset
-    return String.CharacterView(
-      String(_base._guts._extractSlice(offsetRange)),
-      baseOffset: bounds.lowerBound.encodedOffset)
+    return _visitGuts(_guts, args: i,
+      ascii: { ascii, i in return ascii.character(at: i) },
+      utf16: { utf16, i in return utf16.character(at: i) },
+      opaque: { opaque, i in return opaque.character(at: i) })
   }
 }

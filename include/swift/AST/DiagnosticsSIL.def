@@ -89,13 +89,9 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-WARNING(exclusivity_access_required_warn,none,
-        "overlapping accesses to %0, but "
-        "%select{initialization|read|modification|deinitialization}1 requires "
-        "exclusive access; "
-        "%select{consider copying to a local variable|"
-                "consider calling MutableCollection.swapAt(_:_:)}2",
-        (StringRef, unsigned, bool))
+ERROR(unimplemented_generator_witnesses,none,
+      "protocol conformance emission for generator coroutines is unimplemented",
+      ())
 
 ERROR(exclusivity_access_required,none,
       "overlapping accesses to %0, but "
@@ -109,11 +105,6 @@ ERROR(exclusivity_access_required_unknown_decl,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
-
-WARNING(exclusivity_access_required_unknown_decl_warn,none,
-        "overlapping accesses, but "
-        "%select{initialization|read|modification|deinitialization}0 requires "
-"exclusive access; consider copying to a local variable", (unsigned))
 
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())
@@ -136,6 +127,9 @@ ERROR(variable_inout_before_initialized,none,
       " initialized", (StringRef, bool))
 ERROR(variable_closure_use_uninit,none,
       "%select{variable|constant}1 '%0' captured by a closure before being"
+      " initialized", (StringRef, bool))
+ERROR(variable_defer_use_uninit,none,
+      "%select{variable|constant}1 '%0' used in defer before being"
       " initialized", (StringRef, bool))
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
@@ -196,8 +190,15 @@ ERROR(immutable_property_already_initialized,none,
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,none,
      "initial value already provided in 'let' declaration", ())
+ERROR(mutation_of_property_of_immutable_value,none,
+      "cannot mutate %select{property %0|subscript}1 of immutable value '%2'",
+      (DeclBaseName, bool, StringRef))
+ERROR(using_mutating_accessor_on_immutable_value,none,
+      "mutating accessor for %select{property %0|subscript}1 may not"
+      " be used on immutable value '%2'",
+      (DeclBaseName, bool, StringRef))
 ERROR(mutating_method_called_on_immutable_value,none,
-      "mutating %select{method|property access|subscript|operator}1 %0 may not"
+      "mutating %select{method|operator}1 %0 may not"
       " be used on immutable value '%2'",
       (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
@@ -205,9 +206,6 @@ ERROR(immutable_value_passed_inout,none,
       (StringRef))
 ERROR(assignment_to_immutable_value,none,
       "immutable value '%0' must not be assigned to",
-      (StringRef))
-ERROR(mutating_protocol_witness_method_on_let_constant,none,
-      "cannot perform mutating operation: '%0' is a 'let' constant",
       (StringRef))
 
 WARNING(designated_init_in_cross_module_extension,none,
@@ -300,8 +298,47 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+ERROR(non_physical_addressof,none,
+      "addressof only works with purely physical lvalues; "
+      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
+      "`withUnsafePointer` or `withUnsafeBytes`", ())
+ERROR(non_borrowed_indirect_addressof,none,
+      "addressof only works with borrowable in-memory rvalues; "
+      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
+      "`withUnsafePointer` or `withUnsafeBytes`", ())
+
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
+
+// Float-point to integer conversions
+ERROR(float_to_int_overflow, none,
+  "invalid%select{| implicit}2 conversion: '%0' overflows %1", (StringRef, Type, bool))
+
+ERROR(negative_fp_literal_overflow_unsigned, none,
+  "negative literal '%0' cannot be converted to %select{|unsigned }2%1",
+  (StringRef, Type, bool))
+
+// Overflow and underflow warnings for floating-point truncation
+WARNING(warning_float_trunc_overflow, none,
+  "'%0' overflows to %select{|-}2inf during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_trunc_underflow, none,
+  "'%0' underflows and loses precision during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_trunc_hex_inexact, none,
+  "'%0' loses precision during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_overflows_maxbuiltin, none,
+  "'%0' overflows to %select{|-}1inf because its magnitude exceeds "
+  "the limits of a float literal", (StringRef, bool))
+
+// Integer to floating-point conversions
+WARNING(warning_int_to_fp_inexact, none,
+  "'%1' is not exactly representable as %0; it becomes '%2'",
+  (Type, StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

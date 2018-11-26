@@ -182,17 +182,22 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
 
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
-  // Don't add the swifterror attribute on ABI that don't pass it in a register.
+  llvm::AttrBuilder b;
+  // Don't add the swifterror attribute on ABIs that don't pass it in a register.
   // We create a shadow stack location of the swifterror parameter for the
   // debugger on such platforms and so we can't mark the parameter with a
   // swifterror attribute.
-  if (!this->IsSwiftErrorInRegister)
-    return;
-
-  llvm::AttrBuilder b;
-  b.addAttribute(llvm::Attribute::SwiftError);
-  attrs = attrs.addAttributes(this->LLVMContext,
-                              argIndex + llvm::AttributeList::FirstArgIndex, b);
+  if (IsSwiftErrorInRegister)
+    b.addAttribute(llvm::Attribute::SwiftError);
+  
+  // The error result should not be aliased, captured, or pointed at invalid
+  // addresses regardless.
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  b.addDereferenceableAttr(getPointerSize().getValue());
+  
+  auto attrIndex = argIndex + llvm::AttributeList::FirstArgIndex;
+  attrs = attrs.addAttributes(this->LLVMContext, attrIndex, b);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
@@ -1637,10 +1642,8 @@ void CallEmission::emitToMemory(Address addr,
   // result that's actually being passed indirectly.
   //
   // TODO: SIL address lowering should be able to handle such cases earlier.
-  CanType origResultType =
-      origFnType->getDirectFormalResultsType().getSwiftRValueType();
-  CanType substResultType =
-      substFnType->getDirectFormalResultsType().getSwiftRValueType();
+  auto origResultType = origFnType->getDirectFormalResultsType().getASTType();
+  auto substResultType = substFnType->getDirectFormalResultsType().getASTType();
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
@@ -2760,7 +2763,7 @@ Address IRGenFunction::getErrorResultSlot(SILType errorType) {
   if (!ErrorResultSlot) {
     auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
-    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo);
+    IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
     builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
 
     // Create the alloca.  We don't use allocateStack because we're
@@ -3102,7 +3105,6 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   // Store the expanded type elements.
   auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
   unsigned expandedMapIdx = 0;
-  SmallVector<llvm::Value *, 8> expandedElts(expandedTys.size(), nullptr);
 
   auto eltsArray = native.claimAll();
   SmallVector<llvm::Value *, 8> nativeElts(eltsArray.begin(), eltsArray.end());

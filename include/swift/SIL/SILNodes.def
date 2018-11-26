@@ -9,10 +9,62 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines macros used for macro-metaprogramming with SIL nodes.
-//
+///
+/// \file
+///
+/// This file defines macros used for macro-metaprogramming with SIL nodes. It
+/// supports changing how macros expand by #defining an auxillary variable
+/// before including SILNodes.def as summarized in the chart below:
+///
+/// | #define            | Operation                                               |
+/// |--------------------+---------------------------------------------------------|
+/// | N/A                | Visit single value insts as insts                       |
+/// | VALUE              | Visit single value insts as values                      |
+/// | ABSTRACT_VALUE     | Visit abstract single value insts as values             |
+/// | APPLYSITE_INST     | Visit full and partial apply site insts as apply sites. |
+/// | FULLAPPLYSITE_INST | Visit full apply site insts as apply sites.             |
+///
+/// We describe the triggering variables below:
+///
+/// 1. VALUE(ID, PARENT).
+///
+///     If defined will cause SingleValueInsts to passed to VALUE(ID, PARENT)
+///     instead of to FULL_INST.
+///
+/// 2. ABSTRACT_VALUE(ID, PARENT).
+///
+///     If defined this will cause ABSTRACT_SINGLE_VALUE_INST to expand to
+///     ABSTRACT_VALUE INSTEAD OF ABSTRACT_INST.
+///
+/// 3. FULLAPPLYSITE_INST(ID, PARENT).
+///
+///   If defined this will cause:
+///
+///       * FULLAPPLYSITE_SINGLE_VALUE_INST,
+///       * FULLAPPLYSITE_MULTIPLE_VALUE_INST,
+///       * FULLAPPLYSITE_TERMINATOR_INST,
+///
+///   To expand to FULLAPPLYSITE_INST(ID, PARENT) instead of SINGLE_VALUE_INST,
+///   MULTIPLE_VALUE_INST, or TERMINATOR_INST.
+///
+/// 4. APPLYSITE_INST(ID, PARENT)
+///
+///   If defined this will cuase:
+///
+///         * APPLYSITE_SINGLE_VALUE_INST
+///         * APPLYSITE_MULTIPLE_VALUE_INST
+///         * APPLYSITE_TERMINATOR_INST
+///
+///   to expand to APPLYSITE_INST(ID, PARENT) instead of delegating to
+///   SINGLE_VALUE_INST.
+///
 //===----------------------------------------------------------------------===//
+
+#ifdef APPLYSITE_INST
+#ifdef FULLAPPLYSITE_INST
+#error "Can not query for apply site and full apply site in one include"
+#endif
+#endif
 
 /// NODE(ID, PARENT)
 ///
@@ -23,7 +75,7 @@
 #define NODE(ID, PARENT)
 #endif
 
-/// SINGLE_VALUE_INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+/// SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
 ///   A concrete subclass of SingleValueInstruction, which inherits from
 ///   both ValueBase and SILInstruction.  ID is a member of both ValueKind
@@ -38,6 +90,36 @@
 #endif
 #endif
 
+/// APPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                             MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a partial or full apply site. ID is a member
+///   of ApplySiteKind.
+#ifndef APPLYSITE_SINGLE_VALUE_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, PARENT)
+#else
+#define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// FULLAPPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                 MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a full apply site. ID is a member of
+///   FullApplySiteKind and ApplySiteKind.
+#ifndef FULLAPPLYSITE_SINGLE_VALUE_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
 /// MULTIPLE_VALUE_INST(Id, TextualName, Parent, MemBehavior, MayRelease)
 ///
 ///   A concrete subclass of MultipleValueInstruction. ID is a member of
@@ -46,6 +128,36 @@
 #ifndef MULTIPLE_VALUE_INST
 #define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// APPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                               MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally either a partial or full apply
+///   site. ID is a member of ApplySiteKind.
+#ifndef APPLYSITE_MULTIPLE_VALUE_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, PARENT)
+#else
+#define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                   MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally a full apply site. ID is a
+///   member of FullApplySiteKind and ApplySiteKind.
+#ifndef FULLAPPLYSITE_MULTIPLE_VALUE_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
 #endif
 
 /// MULTIPLE_VALUE_INST_RESULT(ID, PARENT)
@@ -113,6 +225,34 @@
 #ifndef TERMINATOR
 #define TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+/// ID is a member of ApplySiteKind, TerminatorKind, and ApplySiteKind and name
+/// of a subclass of TermInst.
+#ifndef APPLYSITE_TERMINATOR_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, NAME)
+#else
+#define APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// FULLAPPLYSITE_TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+/// ID is a member of FullApplySiteKind, TerminatorKind, and ApplySiteKind and
+/// name of a subclass of TermInst.
+#ifndef FULLAPPLYSITE_TERMINATOR_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
 #endif
 
 /// ABSTRACT_NODE(ID, PARENT)
@@ -199,6 +339,14 @@
 #define VALUE_RANGE(ID, FIRST, LAST) NODE_RANGE(ID, FIRST, LAST)
 #endif
 
+/// ARGUMENT_RANGE(ID, FIRST, LAST)
+///
+///   The enumerator range of an abstract class in the SILArgument
+///   hierarchy.
+#ifndef ARGUMENT_RANGE
+#define ARGUMENT_RANGE(ID, FIRST, LAST) VALUE_RANGE(ID, FIRST, LAST)
+#endif
+
 /// INST_RANGE(ID, PARENT)
 ///
 ///   The enumerator range of an abstract class in the SILInstruction
@@ -210,9 +358,9 @@
 ABSTRACT_NODE(ValueBase, SILNode)
 
 ABSTRACT_VALUE(SILArgument, ValueBase)
-  ARGUMENT(SILPHIArgument, SILArgument)
+  ARGUMENT(SILPhiArgument, SILArgument)
   ARGUMENT(SILFunctionArgument, SILArgument)
-  VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
+  ARGUMENT_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
 
 ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
@@ -264,9 +412,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(StringLiteralInst, string_literal,
                       LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(ConstStringLiteralInst, const_string_literal,
-                      LiteralInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
+    SINGLE_VALUE_INST_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_SINGLE_VALUE_INST(MethodInst, SingleValueInstruction)
@@ -302,14 +448,12 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(RawPointerToRefInst, raw_pointer_to_ref,
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(RefToUnownedInst, ref_to_unowned,
+#define LOADABLE_REF_STORAGE(Name, name, ...) \
+    SINGLE_VALUE_INST(RefTo##Name##Inst, ref_to_##name, \
+                      ConversionInst, None, DoesNotRelease) \
+    SINGLE_VALUE_INST(Name##ToRefInst, name##_to_ref, \
                       ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(UnownedToRefInst, unowned_to_ref,
-                      ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(RefToUnmanagedInst, ref_to_unmanaged,
-                      ConversionInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(UnmanagedToRefInst, unmanaged_to_ref,
-                      ConversionInst, None, DoesNotRelease)
+#include "swift/AST/ReferenceStorage.def"
     SINGLE_VALUE_INST(ConvertFunctionInst, convert_function,
                       ConversionInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(ConvertEscapeToNoEscapeInst, convert_escape_to_noescape,
@@ -361,22 +505,22 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(CopyBlockWithoutEscapingInst, copy_block_without_escaping,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(CopyValueInst, copy_value,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  SINGLE_VALUE_INST(CopyUnownedValueInst, copy_unowned_value,
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  SINGLE_VALUE_INST(Copy##Name##ValueInst, copy_##name##_value, \
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+#include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  SINGLE_VALUE_INST(StrongPinInst, strong_pin,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
   // optimizer should not assume that the same object is pointed to after
   // the isUnique instruction. It appears to write a new object reference.
   SINGLE_VALUE_INST(IsUniqueInst, is_unique,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  SINGLE_VALUE_INST(IsUniqueOrPinnedInst, is_unique_or_pinned,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
   SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
@@ -393,10 +537,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SILInstruction, MayWrite, DoesNotRelease)
   SINGLE_VALUE_INST(BeginAccessInst, begin_access,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  SINGLE_VALUE_INST(LoadUnownedInst, load_unowned,
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  SINGLE_VALUE_INST(Load##Name##Inst, load_##name, \
                     SingleValueInstruction, MayRead, DoesNotRelease)
-  SINGLE_VALUE_INST(LoadWeakInst, load_weak,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+#include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MarkUninitializedBehaviorInst, mark_uninitialized_behavior,
@@ -409,13 +553,13 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Function Application
-  SINGLE_VALUE_INST(ApplyInst, apply,
-                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  FULLAPPLYSITE_SINGLE_VALUE_INST(ApplyInst, apply,
+                                  SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(BuiltinInst, builtin,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  
+  APPLYSITE_SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
+                              SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -498,7 +642,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, KeyPathInst)
 
-NODE_RANGE(ValueBase, SILPHIArgument, KeyPathInst)
+NODE_RANGE(ValueBase, SILPhiArgument, KeyPathInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
@@ -512,8 +656,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(UnwindInst, unwind,
              TermInst, None, DoesNotRelease)
-  TERMINATOR(TryApplyInst, try_apply,
-             TermInst, MayHaveSideEffects, MayRelease)
+  FULLAPPLYSITE_TERMINATOR_INST(TryApplyInst, try_apply,
+                                TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(BranchInst, br,
              TermInst, None, DoesNotRelease)
   TERMINATOR(CondBranchInst, cond_br,
@@ -556,22 +700,20 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(StrongReleaseInst, strong_release,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
-  NON_VALUE_INST(StrongRetainUnownedInst, strong_retain_unowned,
-                 RefCountingInst, MayHaveSideEffects,
-       DoesNotRelease)
-  NON_VALUE_INST(StrongUnpinInst, strong_unpin,
-                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-  NON_VALUE_INST(UnownedRetainInst, unowned_retain,
-                 RefCountingInst, MayHaveSideEffects, DoesNotRelease)
-  NON_VALUE_INST(UnownedReleaseInst, unowned_release,
-                 RefCountingInst, MayHaveSideEffects,
-       MayRelease)
   NON_VALUE_INST(UnmanagedRetainValueInst, unmanaged_retain_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(UnmanagedReleaseValueInst, unmanaged_release_value,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
   NON_VALUE_INST(UnmanagedAutoreleaseValueInst, unmanaged_autorelease_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NON_VALUE_INST(StrongRetain##Name##Inst, strong_retain_##name, \
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease) \
+  NON_VALUE_INST(Name##RetainInst, name##_retain, \
+                 RefCountingInst, MayHaveSideEffects, DoesNotRelease) \
+  NON_VALUE_INST(Name##ReleaseInst, name##_release, \
+                 RefCountingInst, MayHaveSideEffects, MayRelease)
+#include "swift/AST/ReferenceStorage.def"
   NON_VALUE_INST(RetainValueInst, retain_value,
                  RefCountingInst, MayHaveSideEffects, DoesNotRelease)
   NON_VALUE_INST(RetainValueAddrInst, retain_value_addr,
@@ -602,8 +744,6 @@ NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndBorrowInst, end_borrow,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(EndBorrowArgumentInst, end_borrow_argument,
-               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(EndAccessInst, end_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(BeginUnpairedAccessInst, begin_unpaired_access,
@@ -620,10 +760,10 @@ NON_VALUE_INST(DebugValueInst, debug_value,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugValueAddrInst, debug_value_addr,
                SILInstruction, None, DoesNotRelease)
-NON_VALUE_INST(StoreUnownedInst, store_unowned,
-               SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(StoreWeakInst, store_weak,
-               SILInstruction, MayWrite, DoesNotRelease)
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NON_VALUE_INST(Store##Name##Inst, store_##name, \
+                 SILInstruction, MayWrite, DoesNotRelease)
+#include "swift/AST/ReferenceStorage.def"
 NON_VALUE_INST(CopyAddrInst, copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(DestroyAddrInst, destroy_addr,
@@ -655,19 +795,20 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
-MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
-                    SILInstruction, MayHaveSideEffects, MayRelease)
+FULLAPPLYSITE_MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
+                                  MultipleValueInstruction, MayHaveSideEffects, MayRelease)
 MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
-                    SILInstruction, None, DoesNotRelease)
+                    MultipleValueInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
-                    SILInstruction, None, DoesNotRelease)
+                    MultipleValueInstruction, None, DoesNotRelease)
 INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
-NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
+NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE
+#undef ARGUMENT_RANGE
 #undef VALUE_RANGE
 #undef NODE_RANGE
 #undef ABSTRACT_SINGLE_VALUE_INST
@@ -675,13 +816,21 @@ NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
 #undef ABSTRACT_VALUE
 #undef ABSTRACT_NODE
 #undef ABSTRACT_VALUE_AND_INST
+#undef FULLAPPLYSITE_TERMINATOR_INST
+#undef APPLYSITE_TERMINATOR_INST
 #undef TERMINATOR
 #undef NON_VALUE_INST
 #undef MULTIPLE_VALUE_INST_RESULT
+#undef FULLAPPLYSITE_MULTIPLE_VALUE_INST
+#undef APPLYSITE_MULTIPLE_VALUE_INST
 #undef MULTIPLE_VALUE_INST
+#undef FULLAPPLYSITE_SINGLE_VALUE_INST
+#undef APPLYSITE_SINGLE_VALUE_INST
 #undef SINGLE_VALUE_INST
 #undef FULL_INST
 #undef INST
 #undef ARGUMENT
 #undef VALUE
 #undef NODE
+#undef APPLYSITE_INST
+#undef FULLAPPLYSITE_INST

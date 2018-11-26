@@ -1,3 +1,4 @@
+#include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -81,7 +82,7 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, BufID, LangOpts, "unknown");
+    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
 
     bool Done = false;
     while (!Done) {

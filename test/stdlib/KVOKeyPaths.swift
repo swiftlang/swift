@@ -21,8 +21,8 @@ struct Guts {
 
 class Target : NSObject, NSKeyValueObservingCustomization {
     // This dynamic property is observed by KVO
-    dynamic var objcValue: String
-    dynamic var objcValue2: String {
+    @objc dynamic var objcValue: String
+    @objc dynamic var objcValue2: String {
         willSet {
             willChangeValue(for: \.objcValue2)
         }
@@ -30,7 +30,7 @@ class Target : NSObject, NSKeyValueObservingCustomization {
             didChangeValue(for: \.objcValue2)
         }
     }
-    dynamic var objcValue3: String
+    @objc dynamic var objcValue3: String
     
     // This Swift-typed property causes vtable usage on this class.
     var swiftValue: Guts

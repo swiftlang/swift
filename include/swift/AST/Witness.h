@@ -19,7 +19,6 @@
 #define SWIFT_AST_WITNESS_H
 
 #include "swift/AST/ConcreteDeclRef.h"
-#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 
@@ -93,7 +92,7 @@ class Witness {
     /// the witness declaration from the synthetic environment.
     ConcreteDeclRef declRef;
     GenericEnvironment *syntheticEnvironment;
-    SubstitutionList reqToSyntheticEnvSubs;
+    SubstitutionMap reqToSyntheticEnvSubs;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -118,6 +117,15 @@ public:
     return Witness(requirement);
   }
 
+  /// Create a witness for the given requirement.
+  ///
+  /// Deserialized witnesses do not have a synthetic environment.
+  static Witness forDeserialized(ValueDecl *decl,
+                                 SubstitutionMap substitutions) {
+    // TODO: It's probably a good idea to have a separate 'deserialized' bit.
+    return Witness(decl, substitutions, nullptr, SubstitutionMap());
+  }
+
   /// Create a witness that requires substitutions.
   ///
   /// \param decl The declaration for the witness.
@@ -130,9 +138,9 @@ public:
   /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
   Witness(ValueDecl *decl,
-          SubstitutionList substitutions,
+          SubstitutionMap substitutions,
           GenericEnvironment *syntheticEnv,
-          SubstitutionList reqToSyntheticEnvSubs);
+          SubstitutionMap reqToSyntheticEnvSubs);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the synthetic environment
@@ -150,29 +158,28 @@ public:
   /// Determines whether there is a witness at all.
   explicit operator bool() const { return !storage.isNull(); }
 
-  /// Determine whether this witness requires any substitutions.
-  bool requiresSubstitution() const { return storage.is<StoredWitness *>(); }
-
   /// Retrieve the substitutions required to use this witness from the
   /// synthetic environment.
   ///
   /// The substitutions are substitutions for the witness, providing interface
   /// types from the synthetic environment.
-  SubstitutionList getSubstitutions() const {
+  SubstitutionMap getSubstitutions() const {
     return getDeclRef().getSubstitutions();
   }
 
   /// Retrieve the synthetic generic environment.
   GenericEnvironment *getSyntheticEnvironment() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->syntheticEnvironment;
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->syntheticEnvironment;
+    return nullptr;
   }
 
   /// Retrieve the substitution map that maps the interface types of the
   /// requirement to the interface types of the synthetic environment.
-  SubstitutionList getRequirementToSyntheticSubs() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->reqToSyntheticEnvSubs;
+  SubstitutionMap getRequirementToSyntheticSubs() const {
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->reqToSyntheticEnvSubs;
+    return {};
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

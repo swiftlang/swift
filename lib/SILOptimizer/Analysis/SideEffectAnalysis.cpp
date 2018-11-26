@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,19 +12,192 @@
 
 #define DEBUG_TYPE "sil-sea"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 
-using FunctionEffects = SideEffectAnalysis::FunctionEffects;
-using Effects = SideEffectAnalysis::Effects;
+// -----------------------------------------------------------------------------
+// GenericFunctionEffectAnalysis
+// -----------------------------------------------------------------------------
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::initialize(
+    SILPassManager *PM) {
+  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate() {
+  functionInfoMap.clear();
+  allocator.DestroyAll();
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate(
+    SILFunction *F, InvalidationKind K) {
+  if (FunctionInfo *FInfo = functionInfoMap.lookup(F)) {
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    invalidateIncludingAllCallers(FInfo);
+  }
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::getCalleeEffects(
+    FunctionEffects &calleeEffects, FullApplySite fullApply) {
+  if (calleeEffects.summarizeCall(fullApply))
+    return;
+
+  auto callees = BCA->getCalleeList(fullApply);
+  if (!callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      fullApply.getOrigCalleeType()->isCalleeConsumed()) {
+    calleeEffects.setWorstEffects();
+    return;
+  }
+
+  // We can see all the callees, so merge the effects from all of them.
+  for (auto *callee : callees)
+    calleeEffects.mergeFrom(getEffects(callee));
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
+    FunctionInfo *functionInfo, FunctionOrder &bottomUpOrder,
+    int recursionDepth) {
+  functionInfo->needUpdateCallers = true;
+
+  if (bottomUpOrder.prepareForVisiting(functionInfo))
+    return;
+
+  auto *F = functionInfo->F;
+  if (functionInfo->functionEffects.summarizeFunction(F))
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
+
+  // Check all instructions of the function
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
+      if (auto fullApply = FullApplySite::isa(&I))
+        analyzeCall(functionInfo, fullApply, bottomUpOrder, recursionDepth);
+      else
+        functionInfo->functionEffects.analyzeInstruction(&I);
+    }
+  }
+  LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeCall(
+    FunctionInfo *functionInfo, FullApplySite fullApply,
+    FunctionOrder &bottomUpOrder, int recursionDepth) {
+
+  FunctionEffects applyEffects;
+  if (applyEffects.summarizeCall(fullApply)) {
+    functionInfo->functionEffects.mergeFromApply(applyEffects, fullApply);
+    return;
+  }
+
+  if (recursionDepth >= MaxRecursionDepth) {
+    functionInfo->functionEffects.setWorstEffects();
+    return;
+  }
+  CalleeList callees = BCA->getCalleeList(fullApply);
+  if (!callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      fullApply.getOrigCalleeType()->isCalleeConsumed()) {
+    functionInfo->functionEffects.setWorstEffects();
+    return;
+  }
+  // Derive the effects of the apply from the known callees.
+  // Defer merging callee effects until the callee is scheduled
+  for (SILFunction *callee : callees) {
+    FunctionInfo *calleeInfo = getFunctionInfo(callee);
+    calleeInfo->addCaller(functionInfo, fullApply);
+    if (!calleeInfo->isVisited()) {
+      // Recursively visit the called function.
+      analyzeFunction(calleeInfo, bottomUpOrder, recursionDepth + 1);
+      bottomUpOrder.tryToSchedule(calleeInfo);
+    }
+  }
+}
+
+template <typename FunctionEffects>
+void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
+    FunctionInfo *initialInfo) {
+  allocNewUpdateID();
+
+  LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
+                          << getCurrentUpdateID() << '\n');
+
+  // Collect and analyze all functions to recompute, starting at initialInfo.
+  FunctionOrder bottomUpOrder(getCurrentUpdateID());
+  analyzeFunction(initialInfo, bottomUpOrder, 0);
+
+  // Build the bottom-up order.
+  bottomUpOrder.tryToSchedule(initialInfo);
+  bottomUpOrder.finishScheduling();
+
+  // Second step: propagate the side-effect information up the call-graph until
+  // it stabilizes.
+  bool needAnotherIteration;
+  do {
+    LLVM_DEBUG(llvm::dbgs() << "new iteration\n");
+    needAnotherIteration = false;
+
+    for (FunctionInfo *functionInfo : bottomUpOrder) {
+      if (!functionInfo->needUpdateCallers)
+        continue;
+
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
+      functionInfo->needUpdateCallers = false;
+
+      // Propagate the function effects to all callers.
+      for (const auto &E : functionInfo->getCallers()) {
+        assert(E.isValid());
+
+        // Only include callers which we are actually recomputing.
+        if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
+          continue;
+
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
+
+        if (E.Caller->functionEffects.mergeFromApply(
+                functionInfo->functionEffects, FullApplySite(E.FAS))) {
+          E.Caller->needUpdateCallers = true;
+          if (!E.Caller->isScheduledAfter(functionInfo)) {
+            // This happens if we have a cycle in the call-graph.
+            needAnotherIteration = true;
+          }
+        }
+      }
+    }
+  } while (needAnotherIteration);
+}
+
+// Instantiate template members.
+template class swift::GenericFunctionEffectAnalysis<FunctionSideEffects>;
+template class swift::GenericFunctionEffectAnalysis<FunctionAccessedStorage>;
+
+// -----------------------------------------------------------------------------
+// FunctionSideEffects
+// -----------------------------------------------------------------------------
+
 using MemoryBehavior = SILInstruction::MemoryBehavior;
 
 MemoryBehavior
-FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
+FunctionSideEffects::getMemBehavior(RetainObserveKind ScanKind) const {
 
   bool Observe = (ScanKind == RetainObserveKind::ObserveRetains);
   if ((Observe && mayAllocObjects()) || mayReadRC())
@@ -46,7 +219,7 @@ FunctionEffects::getMemBehavior(RetainObserveKind ScanKind) const {
   return Behavior;
 }
 
-bool FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
+bool FunctionSideEffects::mergeFrom(const FunctionSideEffects &RHS) {
   bool Changed = mergeFlags(RHS);
   Changed |= GlobalEffects.mergeFrom(RHS.GlobalEffects);
   Changed |= LocalEffects.mergeFrom(RHS.LocalEffects);
@@ -64,33 +237,26 @@ bool FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
   return Changed;
 }
 
-bool FunctionEffects::mergeFromApply(
-                  const FunctionEffects &ApplyEffects, FullApplySite FAS) {
-  return mergeFromApply(ApplyEffects, FAS.getInstruction());
-}
-
-bool FunctionEffects::mergeFromApply(
-                  const FunctionEffects &ApplyEffects, SILInstruction *AS) {
+bool FunctionSideEffects::mergeFromApply(
+    const FunctionSideEffects &ApplyEffects, FullApplySite FAS) {
   bool Changed = mergeFlags(ApplyEffects);
   Changed |= GlobalEffects.mergeFrom(ApplyEffects.GlobalEffects);
-  auto FAS = FullApplySite::isa(AS);
-  unsigned numCallerArgs = FAS ? FAS.getNumArguments() : 1;
+  unsigned numCallerArgs = FAS.getNumArguments();
   unsigned numCalleeArgs = ApplyEffects.ParamEffects.size();
   assert(numCalleeArgs >= numCallerArgs);
   for (unsigned Idx = 0; Idx < numCalleeArgs; Idx++) {
     // Map the callee argument effects to parameters of this function.
     // If there are more callee parameters than arguments it means that the
     // callee is the result of a partial_apply.
-    Effects *E = (Idx < numCallerArgs ? getEffectsOn(FAS ? FAS.getArgument(Idx) : AS->getOperand(Idx)) :
-                  &GlobalEffects);
+    FunctionSideEffectFlags *E = (Idx < numCallerArgs
+                                  ? getEffectsOn(FAS.getArgument(Idx))
+                                  : &GlobalEffects);
     Changed |= E->mergeFrom(ApplyEffects.ParamEffects[Idx]);
   }
   return Changed;
 }
 
-void FunctionEffects::dump() const {
-  llvm::errs() << *this << '\n';
-}
+void FunctionSideEffects::dump() const { llvm::errs() << *this << '\n'; }
 
 static SILValue skipAddrProjections(SILValue V) {
   for (;;) {
@@ -130,7 +296,7 @@ static SILValue skipValueProjections(SILValue V) {
   llvm_unreachable("there is no escape from an infinite loop");
 }
 
-Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
+FunctionSideEffectFlags *FunctionSideEffects::getEffectsOn(SILValue Addr) {
   SILValue BaseAddr = skipValueProjections(skipAddrProjections(Addr));
   switch (BaseAddr->getKind()) {
   case swift::ValueKind::SILFunctionArgument: {
@@ -152,26 +318,27 @@ Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
   return &GlobalEffects;
 }
 
-bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
-                                           SILFunction *F) {
-  if (F->hasSemanticsAttr("arc.programtermination_point")) {
-    Effects.Traps = true;
+// Return true if the given function has defined effects that were successfully
+// recorded in this FunctionSideEffects object.
+bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
+  if (F->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT)) {
+    Traps = true;
     return true;
   }
   switch (F->getEffectsKind()) {
     case EffectsKind::ReleaseNone:
-      Effects.GlobalEffects.Reads = true;
-      Effects.GlobalEffects.Writes = true;
-      Effects.GlobalEffects.Releases = false;
+      GlobalEffects.Reads = true;
+      GlobalEffects.Writes = true;
+      GlobalEffects.Releases = false;
       return true;
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
-      // @effects(readonly) is worthless if we have owned parameters, because
+      // @_effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
       if (!F->hasOwnedParameters()) {
-        Effects.GlobalEffects.Reads = true;
+        GlobalEffects.Reads = true;
         return true;
       }
       break;
@@ -182,10 +349,35 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
   return false;
 }
 
-bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
-                                            ArraySemanticsCall ASC) {
+// Return true if this function's effects have been fully summarized in this
+// FunctionSideEffects object without visiting its body.
+bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
+  assert(ParamEffects.empty() && "Expect uninitialized effects.");
+  if (!F->empty())
+    ParamEffects.resize(F->getArguments().size());
+
+  // Handle @_effects attributes
+  if (setDefinedEffects(F)) {
+    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName()
+                            << '\n');
+    return true;
+  }
+
+  if (!F->isDefinition()) {
+    // We can't assume anything about external functions.
+    LLVM_DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
+    setWorstEffects();
+    return true;
+  }
+  return false;
+}
+
+// Return true if the side effects of this semantic call are fully known without
+// visiting the callee and have been recorded in this FunctionSideEffects
+// object.
+bool FunctionSideEffects::setSemanticEffects(ArraySemanticsCall ASC) {
   assert(ASC.hasSelf());
-  auto &SelfEffects = FE.ParamEffects[FE.ParamEffects.size() - 1];
+  auto &SelfEffects = ParamEffects[ParamEffects.size() - 1];
 
   // Currently we only handle array semantics.
   // TODO: also handle other semantic functions.
@@ -205,7 +397,7 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Reads = true;
         SelfEffects.Releases |= !ASC.hasGuaranteedSelf();
-        FE.Traps = true;
+        Traps = true;
         return true;
       }
       return false;
@@ -218,7 +410,7 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
                                 ->getOrigCalleeConv()
                                 .getNumIndirectSILResults())) {
           assert(!ASC.hasGetElementDirectResult());
-          FE.ParamEffects[i].Writes = true;
+          ParamEffects[i].Writes = true;
         }
         return true;
       }
@@ -240,9 +432,9 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
     case ArrayCallKind::kMakeMutable:
       if (!ASC.mayHaveBridgedObjectElementType()) {
         SelfEffects.Writes = true;
-        FE.GlobalEffects.Releases = true;
-        FE.AllocsObjects = true;
-        FE.ReadsRC = true;
+        GlobalEffects.Releases = true;
+        AllocsObjects = true;
+        ReadsRC = true;
         return true;
       }
       return false;
@@ -252,290 +444,139 @@ bool SideEffectAnalysis::getSemanticEffects(FunctionEffects &FE,
   }
 }
 
-void SideEffectAnalysis::analyzeFunction(FunctionInfo *FInfo,
-                                         FunctionOrder &BottomUpOrder,
-                                         int RecursionDepth) {
-  FInfo->NeedUpdateCallers = true;
+// Summarize the callee side effects of a call instruction using this
+// FunctionSideEffects object without analyzing the callee function bodies or
+// scheduling the callees for bottom-up propagation.
+//
+// Return true if this call-site's effects are summarized without visiting the
+// callee.
+bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
+  assert(ParamEffects.empty() && "Expect uninitialized effects.");
+  ParamEffects.resize(fullApply.getNumArguments());
 
-  if (BottomUpOrder.prepareForVisiting(FInfo))
-    return;
-
-  // Handle @effects attributes
-  if (getDefinedEffects(FInfo->FE, FInfo->F)) {
-    DEBUG(llvm::dbgs() << "  -- has defined effects " <<
-          FInfo->F->getName() << '\n');
-    return;
-  }
-  
-  if (!FInfo->F->isDefinition()) {
-    // We can't assume anything about external functions.
-    DEBUG(llvm::dbgs() << "  -- is external " << FInfo->F->getName() << '\n');
-    FInfo->FE.setWorstEffects();
-    return;
-  }
-  
-  DEBUG(llvm::dbgs() << "  >> analyze " << FInfo->F->getName() << '\n');
-
-  // Check all instructions of the function
-  for (auto &BB : *FInfo->F) {
-    for (auto &I : BB) {
-      analyzeInstruction(FInfo, &I, BottomUpOrder, RecursionDepth);
+  // Is this a call to a semantics function?
+  if (auto apply = dyn_cast<ApplyInst>(fullApply.getInstruction())) {
+    ArraySemanticsCall ASC(apply);
+    if (ASC && ASC.hasSelf()) {
+      if (setSemanticEffects(ASC))
+        return true;
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished " << FInfo->F->getName() << '\n');
+
+  if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
+    // Does the function have any @_effects?
+    if (setDefinedEffects(SingleCallee))
+      return true;
+  }
+  return false;
 }
 
-void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
-                                            SILInstruction *I,
-                                            FunctionOrder &BottomUpOrder,
-                                            int RecursionDepth) {
-  if (FullApplySite FAS = FullApplySite::isa(I)) {
-    // Is this a call to a semantics function?
-    if (auto apply = dyn_cast<ApplyInst>(FAS.getInstruction())) {
-      ArraySemanticsCall ASC(apply);
-      if (ASC && ASC.hasSelf()) {
-        FunctionEffects ApplyEffects(FAS.getNumArguments());
-        if (getSemanticEffects(ApplyEffects, ASC)) {
-          FInfo->FE.mergeFromApply(ApplyEffects, FAS);
-          return;
-        }
-      }
-    }
-
-    if (SILFunction *SingleCallee = FAS.getReferencedFunction()) {
-      // Does the function have any @effects?
-      if (getDefinedEffects(FInfo->FE, SingleCallee))
-        return;
-    }
-
-    if (RecursionDepth < MaxRecursionDepth) {
-      CalleeList Callees = BCA->getCalleeList(FAS);
-      if (Callees.allCalleesVisible() &&
-          // @callee_owned function calls implicitly release the context, which
-          // may call deinits of boxed values.
-          // TODO: be less conservative about what destructors might be called.
-          !FAS.getOrigCalleeType()->isCalleeConsumed()) {
-        // Derive the effects of the apply from the known callees.
-        for (SILFunction *Callee : Callees) {
-          FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
-          CalleeInfo->addCaller(FInfo, FAS);
-          if (!CalleeInfo->isVisited()) {
-            // Recursively visit the called function.
-            analyzeFunction(CalleeInfo, BottomUpOrder, RecursionDepth + 1);
-            BottomUpOrder.tryToSchedule(CalleeInfo);
-          }
-        }
-        return;
-      }
-    }
-    // Be conservative for everything else.
-    FInfo->FE.setWorstEffects();
-    return;
-  }
+void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   // Handle some kind of instructions specially.
   switch (I->getKind()) {
-    case SILInstructionKind::FixLifetimeInst:
-      // A fix_lifetime instruction acts like a read on the operand. Retains can move after it
-      // but the last release can't move before it.
-      FInfo->FE.getEffectsOn(I->getOperand(0))->Reads = true;
-      return;
-    case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::DeallocStackInst:
-      return;
-    case SILInstructionKind::StrongRetainInst:
-    case SILInstructionKind::StrongRetainUnownedInst:
-    case SILInstructionKind::RetainValueInst:
-    case SILInstructionKind::UnownedRetainInst:
-      FInfo->FE.getEffectsOn(I->getOperand(0))->Retains = true;
-      return;
-    case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::UnownedReleaseInst:
-      FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
-      return;
-    case SILInstructionKind::UnconditionalCheckedCastInst:
-      FInfo->FE.getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads = true;
-      FInfo->FE.Traps = true;
-      return;
-    case SILInstructionKind::LoadInst:
-      FInfo->FE.getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
-      return;
-    case SILInstructionKind::StoreInst:
-      FInfo->FE.getEffectsOn(cast<StoreInst>(I)->getDest())->Writes = true;
-      return;
-    case SILInstructionKind::CondFailInst:
-      FInfo->FE.Traps = true;
-      return;
-    case SILInstructionKind::PartialApplyInst: {
-      FInfo->FE.AllocsObjects = true;
-      auto *PAI = cast<PartialApplyInst>(I);
-      auto Args = PAI->getArguments();
-      auto Params = PAI->getSubstCalleeType()->getParameters();
-      Params = Params.slice(Params.size() - Args.size(), Args.size());
-      for (unsigned Idx : indices(Args)) {
-        if (isIndirectFormalParameter(Params[Idx].getConvention()))
-          FInfo->FE.getEffectsOn(Args[Idx])->Reads = true;
-      }
-      return;
+  case SILInstructionKind::FixLifetimeInst:
+    // A fix_lifetime instruction acts like a read on the operand. Retains can
+    // move after it but the last release can't move before it.
+    getEffectsOn(I->getOperand(0))->Reads = true;
+    return;
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DeallocStackInst:
+    return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::RetainValueInst:
+    getEffectsOn(I->getOperand(0))->Retains = true;
+    return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::ReleaseValueInst:
+    getEffectsOn(I->getOperand(0))->Releases = true;
+    return;
+  case SILInstructionKind::UnconditionalCheckedCastInst:
+    getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads =
+        true;
+    Traps = true;
+    return;
+  case SILInstructionKind::LoadInst:
+    getEffectsOn(cast<LoadInst>(I)->getOperand())->Reads = true;
+    return;
+  case SILInstructionKind::StoreInst:
+    getEffectsOn(cast<StoreInst>(I)->getDest())->Writes = true;
+    return;
+  case SILInstructionKind::CondFailInst:
+    Traps = true;
+    return;
+  case SILInstructionKind::PartialApplyInst: {
+    AllocsObjects = true;
+    auto *PAI = cast<PartialApplyInst>(I);
+    auto Args = PAI->getArguments();
+    auto Params = PAI->getSubstCalleeType()->getParameters();
+    Params = Params.slice(Params.size() - Args.size(), Args.size());
+    for (unsigned Idx : indices(Args)) {
+      if (isIndirectFormalParameter(Params[Idx].getConvention()))
+        getEffectsOn(Args[Idx])->Reads = true;
     }
-    case SILInstructionKind::BuiltinInst: {
-      auto *BInst = cast<BuiltinInst>(I);
-      auto &BI = BInst->getBuiltinInfo();
-      switch (BI.ID) {
-        case BuiltinValueKind::IsUnique:
-          // TODO: derive this information in a more general way, e.g. add it
-          // to Builtins.def
-          FInfo->FE.ReadsRC = true;
-          break;
-        case BuiltinValueKind::CondUnreachable:
-          FInfo->FE.Traps = true;
-          return;
-        default:
-          break;
-      }
-      const IntrinsicInfo &IInfo = BInst->getIntrinsicInfo();
-      if (IInfo.ID == llvm::Intrinsic::trap) {
-        FInfo->FE.Traps = true;
-        return;
-      }
-      // Detailed memory effects of builtins are handled below by checking the
-      // memory behavior of the instruction.
+    return;
+  }
+  case SILInstructionKind::BuiltinInst: {
+    auto *BInst = cast<BuiltinInst>(I);
+    auto &BI = BInst->getBuiltinInfo();
+    switch (BI.ID) {
+    case BuiltinValueKind::IsUnique:
+      // TODO: derive this information in a more general way, e.g. add it
+      // to Builtins.def
+      ReadsRC = true;
       break;
-    }
+    case BuiltinValueKind::CondUnreachable:
+      Traps = true;
+      return;
     default:
       break;
+    }
+    const IntrinsicInfo &IInfo = BInst->getIntrinsicInfo();
+    if (IInfo.ID == llvm::Intrinsic::trap) {
+      Traps = true;
+      return;
+    }
+    // Detailed memory effects of builtins are handled below by checking the
+    // memory behavior of the instruction.
+    break;
+  }
+  default:
+    break;
   }
 
   if (isa<AllocationInst>(I)) {
     // Excluding AllocStackInst (which is handled above).
-    FInfo->FE.AllocsObjects = true;
+    AllocsObjects = true;
   }
   
   // Check the general memory behavior for instructions we didn't handle above.
   switch (I->getMemoryBehavior()) {
-    case MemoryBehavior::None:
-      break;
-    case MemoryBehavior::MayRead:
-      FInfo->FE.GlobalEffects.Reads = true;
-      break;
-    case MemoryBehavior::MayWrite:
-      FInfo->FE.GlobalEffects.Writes = true;
-      break;
-    case MemoryBehavior::MayReadWrite:
-      FInfo->FE.GlobalEffects.Reads = true;
-      FInfo->FE.GlobalEffects.Writes = true;
-      break;
-    case MemoryBehavior::MayHaveSideEffects:
-      FInfo->FE.setWorstEffects();
-      break;
+  case MemoryBehavior::None:
+    break;
+  case MemoryBehavior::MayRead:
+    GlobalEffects.Reads = true;
+    break;
+  case MemoryBehavior::MayWrite:
+    GlobalEffects.Writes = true;
+    break;
+  case MemoryBehavior::MayReadWrite:
+    GlobalEffects.Reads = true;
+    GlobalEffects.Writes = true;
+    break;
+  case MemoryBehavior::MayHaveSideEffects:
+    setWorstEffects();
+    break;
   }
   if (I->mayTrap())
-    FInfo->FE.Traps = true;
-}
-
-void SideEffectAnalysis::initialize(SILPassManager *PM) {
-  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
-}
-
-void SideEffectAnalysis::recompute(FunctionInfo *Initial) {
-  allocNewUpdateID();
-
-  DEBUG(llvm::dbgs() << "recompute side-effect analysis with UpdateID " <<
-        getCurrentUpdateID() << '\n');
-
-  // Collect and analyze all functions to recompute, starting at Initial.
-  FunctionOrder BottomUpOrder(getCurrentUpdateID());
-  analyzeFunction(Initial, BottomUpOrder, 0);
-
-  // Build the bottom-up order.
-  BottomUpOrder.tryToSchedule(Initial);
-  BottomUpOrder.finishScheduling();
-
-  // Second step: propagate the side-effect information up the call-graph until
-  // it stabilizes.
-  bool NeedAnotherIteration;
-  do {
-    DEBUG(llvm::dbgs() << "new iteration\n");
-    NeedAnotherIteration = false;
-
-    for (FunctionInfo *FInfo : BottomUpOrder) {
-      if (FInfo->NeedUpdateCallers) {
-        DEBUG(llvm::dbgs() << "  update callers of " << FInfo->F->getName() <<
-              '\n');
-        FInfo->NeedUpdateCallers = false;
-
-        // Propagate the side-effects to all callers.
-        for (const auto &E : FInfo->getCallers()) {
-          assert(E.isValid());
-
-          // Only include callers which we are actually recomputing.
-          if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-            DEBUG(llvm::dbgs() << "    merge into caller " <<
-                  E.Caller->F->getName() << '\n');
-
-            if (E.Caller->FE.mergeFromApply(FInfo->FE, E.FAS)) {
-              E.Caller->NeedUpdateCallers = true;
-              if (!E.Caller->isScheduledAfter(FInfo)) {
-                // This happens if we have a cycle in the call-graph.
-                NeedAnotherIteration = true;
-              }
-            }
-          }
-        }
-      }
-    }
-  } while (NeedAnotherIteration);
-}
-
-void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS) {
-  assert(ApplyEffects.ParamEffects.empty() &&
-         "Not using a new ApplyEffects?");
-  ApplyEffects.ParamEffects.resize(FAS.getNumArguments());
-
-  // Is this a call to a semantics function?
-  if (auto apply = dyn_cast<ApplyInst>(FAS.getInstruction())) {
-    ArraySemanticsCall ASC(apply);
-    if (ASC && ASC.hasSelf()) {
-      if (getSemanticEffects(ApplyEffects, ASC))
-        return;
-    }
-  }
-
-  if (SILFunction *SingleCallee = FAS.getReferencedFunction()) {
-    // Does the function have any @effects?
-    if (getDefinedEffects(ApplyEffects, SingleCallee))
-      return;
-  }
-
-  auto Callees = BCA->getCalleeList(FAS);
-  if (!Callees.allCalleesVisible() ||
-      // @callee_owned function calls implicitly release the context, which
-      // may call deinits of boxed values.
-      // TODO: be less conservative about what destructors might be called.
-      FAS.getOrigCalleeType()->isCalleeConsumed()) {
-    ApplyEffects.setWorstEffects();
-    return;
-  }
-
-  // We can see all the callees. So we just merge the effects from all of
-  // them.
-  for (auto *Callee : Callees) {
-    const FunctionEffects &CalleeFE = getEffects(Callee);
-    ApplyEffects.mergeFrom(CalleeFE);
-  }
-}
-
-void SideEffectAnalysis::invalidate() {
-  Function2Info.clear();
-  Allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
-}
-
-void SideEffectAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
-  if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
-    invalidateIncludingAllCallers(FInfo);
-  }
+    Traps = true;
 }
 
 SILAnalysis *swift::createSideEffectAnalysis(SILModule *M) {

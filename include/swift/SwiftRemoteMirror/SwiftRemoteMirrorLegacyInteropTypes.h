@@ -36,6 +36,23 @@ typedef struct swift_typeref_interop {
   int Library;
 } swift_typeref_interop_t;
 
+/// The description of a Swift type as returned by interop wrappers.
+/// (NOTE: This is just a typedef, as interop requires no changes to the
+/// underlying type. The typedef allows client code to use consistent
+/// names, and transition gracefully if any differences are needed in
+/// this type in the future.)
+typedef swift_typeinfo_t swift_typeinfo_interop_t;
+
+/// The representation of a child of a Swift entity as returned by
+/// interop wrappers.
+typedef struct swift_childinfo_interop {
+  /// The memory for Name is owned by the reflection context.
+  const char *Name;
+  unsigned Offset;
+  swift_layout_kind_t Kind;
+  swift_typeref_interop_t TR;
+} swift_childinfo_interop_t;
+
 /// An opaque reflection context object.
 typedef struct SwiftReflectionInteropContext *SwiftReflectionInteropContextRef;
 

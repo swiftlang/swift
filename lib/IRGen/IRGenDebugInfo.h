@@ -45,7 +45,7 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// \c llvm::DebugLoc.
 class IRGenDebugInfo {
 public:
-  static IRGenDebugInfo *
+  static std::unique_ptr<IRGenDebugInfo>
   createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
                        IRGenModule &IGM, llvm::Module &M,
                        StringRef MainOutputFilenameForDebugInfo);
@@ -57,7 +57,7 @@ public:
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
-                     Optional<SILLocation> Loc = None);
+                     SILLocation Loc);
 
   void clearLoc(IRBuilder &Builder);
 
@@ -68,10 +68,12 @@ public:
   /// Restore the current debug location from the stack.
   void popLoc();
 
-  /// Emit the final line 0 location for the unified trap block at the
-  /// end of the function.
-  void setArtificialTrapLocation(IRBuilder &Builder,
-                                 const SILDebugScope *Scope);
+  /// If we are not emitting CodeView, this does nothing since the ``llvm.trap``
+  /// instructions should already have an artificial location of zero.
+  /// In CodeView, since zero is not an artificial location, we emit the
+  /// location of the unified trap block at the end of the fuction as an
+  /// artificial inline location pointing to the user's instruction.
+  void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope);
 
   /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
   void setEntryPointLoc(IRBuilder &Builder);
@@ -136,16 +138,18 @@ public:
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS);
 
+  enum { NotHeapAllocated = false };
+  
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit,
+                                     bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name);
+                        unsigned Depth, unsigned Index, StringRef AssocType);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();

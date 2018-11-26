@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,26 +31,10 @@
 namespace swift { extern "C" {
 #endif
 
-// This declaration is not universally correct.  We verify its correctness for
-// the current platform in the runtime code.
-#if defined(__linux__) && defined (__arm__)
-typedef           int __swift_ssize_t;
-#elif defined(_WIN32)
-#if defined(_M_ARM) || defined(_M_IX86)
-typedef           int __swift_ssize_t;
-#elif defined(_M_X64) || defined(_M_ARM64)
-typedef long long int __swift_ssize_t;
-#else
-#error unsupported machine type
-#endif
-#else
-typedef      long int __swift_ssize_t;
-#endif
-
 // This declaration might not be universally correct.
 // We verify its correctness for the current platform in the runtime code.
 #if defined(__linux__)
-# if defined(__ANDROID__)
+# if defined(__ANDROID__) && !defined(__aarch64__)
 typedef __swift_uint16_t __swift_mode_t;
 # else
 typedef __swift_uint32_t __swift_mode_t;
@@ -64,90 +48,74 @@ typedef __swift_uint16_t __swift_mode_t;
 #endif
 
 
-// General utilities <stdlib.h>
-// Memory management functions
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_free(void *ptr);
-
 // Input/output <stdio.h>
 SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_putchar_unlocked(int c);
+int _swift_stdlib_putchar_unlocked(int c);
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
-                                     __swift_size_t nitems);
+__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+                                           __swift_size_t nitems);
+
+// General utilities <stdlib.h>
+// Memory management functions
+static inline void _swift_stdlib_free(void *ptr) {
+  extern void free(void *);
+  free(ptr);
+}
 
 // String handling <string.h>
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen(const char *s);
-
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen_unsigned(const unsigned char *s);
+SWIFT_READONLY
+static inline __swift_size_t _swift_stdlib_strlen(const char *s) {
+  extern __swift_size_t strlen(const char *);
+  return strlen(s);
+}
 
 SWIFT_READONLY
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
+static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *s) {
+  return _swift_stdlib_strlen((const char *)s);
+}
 
-// <unistd.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_close(int fd);
+SWIFT_READONLY
+static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
+                                       __swift_size_t n) {
+  extern int memcmp(const void *, const void *, __swift_size_t);
+  return memcmp(s1, s2, n);
+}
 
-// Semaphores <semaphore.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
-// We can't use sem_t itself here, nor is there a platform-consistent
-// definition to copy for a __swift_sem_t type. Instead we use
-// void* in place of sem_t* and cast it back on the Swift side.
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void *_stdlib_sem_open2(const char *name, int oflag);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void *_stdlib_sem_open4(const char *name, int oflag,
-                        __swift_mode_t mode, unsigned int value);
+// Casting helper. This code needs to work when included from C or C++.
+// Casting away const with a C-style cast warns in C++. Use a const_cast
+// there.
+#ifdef __cplusplus
+#define CONST_CAST(type, value) const_cast<type>(value)
+#else
+#define CONST_CAST(type, value) (type)value
 #endif
-
-// File control <fcntl.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_open(const char *path, int oflag, __swift_mode_t mode);
-#if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_openat(int fd, const char *path, int oflag, __swift_mode_t mode);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_fcntl(int fd, int cmd, int value);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_fcntlPtr(int fd, int cmd, void* ptr);
-#endif
-
-// I/O control <ioctl.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_ioctl(int fd, unsigned long int request, int value);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
-#endif
-
-// Environment
-#if defined(__APPLE__) || defined(__FreeBSD__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *_stdlib_getEnviron();
-#endif
-
-// System error numbers <errno.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_getErrno();
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_setErrno(int value);
 
 // Non-standard extensions
-SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_malloc_size(const void *ptr);
-
-// Random number <random>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937(void);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+#if defined(__APPLE__)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  extern __swift_size_t malloc_size(const void *);
+  return malloc_size(ptr);
+}
+#elif defined(__linux__) || defined(__CYGWIN__) || defined(__ANDROID__) \
+   || defined(__HAIKU__) || defined(__FreeBSD__)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+#if defined(__ANDROID__)
+#if __ANDROID_API__ >= 17
+  extern __swift_size_t malloc_usable_size(const void *ptr);
+#endif
+#else
+  extern __swift_size_t malloc_usable_size(void *ptr);
+#endif
+  return malloc_usable_size(CONST_CAST(void *, ptr));
+}
+#elif defined(_WIN32)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  extern __swift_size_t _msize(void *ptr);
+  return _msize(CONST_CAST(void *, ptr));
+}
+#else
+#error No malloc_size analog known for this platform/libc.
+#endif
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
@@ -182,45 +150,14 @@ long double _stdlib_squareRootl(long double _self) {
 }
 #endif
 
-// Apple's math.h does not declare lgamma_r() etc by default
+// Apple's math.h does not declare lgamma_r() etc by default, but they're
+// unconditionally exported by libsystem_m.dylib in all OS versions that
+// support Swift development; we simply need to provide declarations here.
 #if defined(__APPLE__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-float _stdlib_lgammaf_r(float x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-double _stdlib_lgamma_r(double x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-long double _stdlib_lgammal_r(long double x, int *psigngam);
+float lgammaf_r(float x, int *psigngam);
+double lgamma_r(double x, int *psigngam);
+long double lgammal_r(long double x, int *psigngam);
 #endif // defined(__APPLE__)
-
-
-// TLS - thread local storage
-
-#if defined(__linux__)
-# if defined(__ANDROID__)
-typedef int __swift_thread_key_t;
-# else
-typedef unsigned int __swift_thread_key_t;
-# endif
-#elif defined(__FreeBSD__)
-typedef int __swift_thread_key_t;
-#elif defined(_WIN32)
-typedef unsigned long __swift_thread_key_t;
-#elif defined(__HAIKU__)
-typedef int __swift_thread_key_t;
-#else
-typedef unsigned long __swift_thread_key_t;
-#endif
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                              void (* _Nullable destructor)(void * _Nullable));
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _stdlib_thread_getspecific(__swift_thread_key_t key);
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_thread_setspecific(__swift_thread_key_t key,
-                               const void * _Nullable value);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

@@ -55,6 +55,12 @@ class C5b : C4 {
   func wibble() { }
 }
 
+class C6 : C {
+  init() { super.init(string: "") }
+  required convenience init(string: String) { self.init() }
+}
+
+
 class Foo {
   required init() { }
   // expected-note@-1{{'required' initializer is declared in superclass here}}
@@ -70,4 +76,29 @@ class Baz : Bar {
 
 class Baz2 : Bar {
   init() { super.init() } // expected-error {{'required' modifier must be present on all overrides of a required initializer}}
+}
+
+
+class HasRequiredConvenienceInit {
+  init() {}
+  required convenience init(conveniently: Int) { self.init() } // expected-note {{here}}
+}
+
+class InheritsAllInits: HasRequiredConvenienceInit {}
+
+class InheritsConvenienceInits: HasRequiredConvenienceInit {
+  override init() {}
+}
+
+class DoesNotInheritConvenienceInits: HasRequiredConvenienceInit {
+  init(value: Int) { super.init() }
+} // expected-error {{'required' initializer 'init(conveniently:)' must be provided by subclass of 'HasRequiredConvenienceInit'}}
+
+class ProvidesNewConvenienceInit: HasRequiredConvenienceInit {
+  init(value: Int) { super.init() }
+  required convenience init(conveniently: Int) { self.init(value: 1) }
+}
+
+class ProvidesNewDesignatedInit: HasRequiredConvenienceInit {
+  required init(conveniently: Int) { super.init() }
 }

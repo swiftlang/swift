@@ -12,7 +12,7 @@
 
 @_exported import Foundation // Clang module
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, _MutableBoxing {
     public typealias ReferenceType = NSPersonNameComponents
     internal var _handle: _MutableHandle<NSPersonNameComponents>
@@ -21,7 +21,7 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         _handle = _MutableHandle(adoptingReference: NSPersonNameComponents())
     }
     
-    fileprivate init(reference: NSPersonNameComponents) {
+    fileprivate init(reference: __shared NSPersonNameComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
@@ -75,14 +75,14 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         return _handle.map { $0.hash }
     }
     
-    @available(OSX 10.11, iOS 9.0, *)
+    @available(macOS 10.11, iOS 9.0, *)
     public static func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
         // Don't copy references here; no one should be storing anything
         return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
     }
 }
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 extension PersonNameComponents : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var description: String {
         return self.customMirror.children.reduce("") {
@@ -107,7 +107,7 @@ extension PersonNameComponents : CustomStringConvertible, CustomDebugStringConve
     }
 }
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 extension PersonNameComponents : _ObjectiveCBridgeable {
     public static func _getObjectiveCType() -> Any.Type {
         return NSPersonNameComponents.self
@@ -129,6 +129,7 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSPersonNameComponents?) -> PersonNameComponents {
         var result: PersonNameComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)
@@ -136,7 +137,7 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
     }
 }
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 extension NSPersonNameComponents : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
     @nonobjc
@@ -145,7 +146,7 @@ extension NSPersonNameComponents : _HasCustomAnyHashableRepresentation {
     }
 }
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 extension PersonNameComponents : Codable {
     private enum CodingKeys : Int, CodingKey {
         case namePrefix

@@ -122,7 +122,7 @@ class TestUserInfo : TestUserInfoSuper {
         expectNotEqual(note1, note5)
     }
 
-    func notification(_ notif: Notification) {
+    @objc func notification(_ notif: Notification) {
         posted = notif
     }
 

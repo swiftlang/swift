@@ -1,5 +1,5 @@
-// RUN: %swift -target i386-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
-// RUN: %swift -target armv7-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
+// RUN: %swift -assume-parsing-unqualified-ownership-sil -target i386-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
+// RUN: %swift -assume-parsing-unqualified-ownership-sil -target armv7-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
@@ -14,7 +14,7 @@ import Builtin
 class C {}
 sil_vtable C {}
 
-sil @$S11enum_32_bit1CCfD : $@convention(thin) (@owned C) -> ()
+sil @$s11enum_32_bit1CCfD : $@convention(thin) (@owned C) -> ()
 
 // CHECK-LABEL: %T11enum_32_bit3FooO = type <{ [4 x i8] }>
 enum Foo {
@@ -37,19 +37,19 @@ enum Bas {
   case Z
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @foo(i32)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @foo(i32)
 sil @foo : $@convention(thin) (@owned Foo) -> () {
 entry(%0 : $Foo):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @bar(i32)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bar(i32)
 sil @bar : $@convention(thin) (@owned Bar) -> () {
 entry(%0 : $Bar):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @bas(i32)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bas(i32)
 sil @bas : $@convention(thin) (@owned Bas) -> () {
 entry(%0 : $Bas):
   return undef : $()

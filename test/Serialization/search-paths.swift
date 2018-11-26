@@ -25,8 +25,6 @@
 // RUN: %target-swift-frontend %s -emit-module -o %t/main.swiftmodule -I %t -I %t/secret -F %t/Frameworks -Fsystem %t/SystemFrameworks
 // RUN: llvm-bcanalyzer -dump %t/main.swiftmodule | %FileCheck %s
 
-// XFAIL: linux
-
 import has_xref // expected-error {{missing required modules: 'has_alias', 'struct_with_operators'}}
 
 numeric(42) // expected-error {{use of unresolved identifier 'numeric'}}

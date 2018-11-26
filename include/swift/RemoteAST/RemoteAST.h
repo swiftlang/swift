@@ -211,7 +211,18 @@ public:
   /// Given a heap object, resolve its heap metadata.
   Result<remote::RemoteAddress>
   getHeapMetadataForObject(remote::RemoteAddress address);
+
+  /// Given an existential and its static type, resolve its dynamic
+  /// type and address. A single step of unwrapping is performed, i.e. if the
+  /// value stored inside the existential is itself an existential, the
+  /// caller can decide whether to iterate itself.
+  Result<std::pair<Type, remote::RemoteAddress>>
+  getDynamicTypeAndAddressForExistential(remote::RemoteAddress address,
+                                         Type staticType);
 };
+
+Type getTypeForMangling(ASTContext &ctx,
+                        StringRef mangling);
 
 } // end namespace remoteAST
 } // end namespace swift

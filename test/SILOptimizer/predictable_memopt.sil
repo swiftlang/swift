@@ -3,7 +3,6 @@
 import Builtin
 import Swift
 
-
 // CHECK-LABEL: sil @simple_reg_promotion
 // CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: return %0 : $Int
@@ -837,4 +836,68 @@ bb1:
 bb2:
   destroy_addr %1 : $*Builtin.NativeObject
   unreachable
+}
+
+
+class K {
+  init()
+}
+
+sil @init_k : $@convention(thin) () -> @out K
+
+struct S {
+  var k: K
+}
+
+// CHECK-LABEL: sil @recursive_struct_destroy_with_apply : $@convention(thin) () -> S {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'recursive_struct_destroy_with_apply'
+sil @recursive_struct_destroy_with_apply : $@convention(thin) () -> S {
+bb0:
+  %0 = alloc_stack $S
+  %1 = struct_element_addr %0 : $*S, #S.k
+  %2 = function_ref @init_k : $@convention(thin) () -> @out K
+  %3 = apply %2(%1) : $@convention(thin) () -> @out K
+  %4 = load %0 : $*S
+  dealloc_stack %0 : $*S
+  return %4 : $S
+}
+
+struct SWithOpt {
+  var k: Optional<K>
+}
+
+// CHECK-LABEL: sil @recursive_struct_destroy_with_enum_init : $@convention(thin) (@owned K) -> @owned SWithOpt {
+// CHECK: alloc_stack
+// CHECK: } // end sil function 'recursive_struct_destroy_with_enum_init'
+sil @recursive_struct_destroy_with_enum_init : $@convention(thin) (@owned K) -> @owned SWithOpt {
+bb0(%arg : $K):
+  %0 = alloc_stack $SWithOpt
+  %1 = struct_element_addr %0 : $*SWithOpt, #SWithOpt.k
+  %2 = init_enum_data_addr %1 : $*Optional<K>, #Optional.some!enumelt.1
+  store %arg to %2 : $*K
+  inject_enum_addr %1 : $*Optional<K>, #Optional.some!enumelt.1
+  %4 = load %0 : $*SWithOpt
+  dealloc_stack %0 : $*SWithOpt
+  return %4 : $SWithOpt
+}
+
+// We do not support this now, so make sure we do not do anything.
+//
+// CHECK-LABEL: sil @promote_init_enum_data_addr : $@convention(thin)
+// CHECK: alloc_stack
+// CHECK: load
+// CHECK: [[RESULT:%.*]] = load
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'promote_init_enum_data_addr'
+sil @promote_init_enum_data_addr : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $Optional<Int>
+  %2 = load %0 : $*Int
+  %3 = init_enum_data_addr %1 : $*Optional<Int>, #Optional.some!enumelt.1
+  store %2 to %3 : $*Int
+  inject_enum_addr %1 : $*Optional<Int>, #Optional.some!enumelt.1
+  %4 = load %3 : $*Int
+  dealloc_stack %1 : $*Optional<Int>
+  return %4 : $Int
 }

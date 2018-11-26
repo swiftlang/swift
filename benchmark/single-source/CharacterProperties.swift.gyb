@@ -23,26 +23,26 @@ import Foundation
 public let CharacterPropertiesFetch = BenchmarkInfo(
   name: "CharacterPropertiesFetch",
   runFunction: run_CharacterPropertiesFetch,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { blackHole(workload) })
 
 public let CharacterPropertiesStashed = BenchmarkInfo(
   name: "CharacterPropertiesStashed",
   runFunction: run_CharacterPropertiesStashed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesStashed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupStash() })
 
 public let CharacterPropertiesStashedMemo = BenchmarkInfo(
   name: "CharacterPropertiesStashedMemo",
   runFunction: run_CharacterPropertiesStashedMemo,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { setupMemo() })
 
 public let CharacterPropertiesPrecomputed = BenchmarkInfo(
   name: "CharacterPropertiesPrecomputed",
   runFunction: run_CharacterPropertiesPrecomputed,
   tags: [.validation, .api, .String],
-  setUpFunction: { run_CharacterPropertiesPrecomputed(1) },
-  tearDownFunction: nil)
+  setUpFunction: { setupPrecomputed() })
 
 extension Character {
   var firstScalar: UnicodeScalar { return unicodeScalars.first! }
@@ -75,6 +75,13 @@ func is${Property}Stashed(_ c: Character) -> Bool {
 }
 % end
 
+func setupStash() {
+  blackHole(workload)
+% for Property, Set in Properties.items():
+    blackHole(${Set})
+% end
+}
+
 // Memoize the stashed set
 % for Property, Set in Properties.items():
 var ${Set}Memo = Set<UInt32>()
@@ -89,22 +96,41 @@ func is${Property}StashedMemo(_ c: Character) -> Bool {
 }
 % end
 
-// Precompute whole scalar set
+func setupMemo() {
+  blackHole(workload)
 % for Property, Set in Properties.items():
-var ${Set}Precomputed: Set<UInt32> = {
+    blackHole(${Set}Memo)
+% end
+}
+
+// Precompute whole scalar set
+func precompute(_ charSet: CharacterSet) -> Set<UInt32> {
   var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if ${Set}.contains(scalar) {
-      result.insert(scalar.value)
+  for plane in 0...0x10 {
+    guard charSet.hasMember(inPlane: UInt8(plane)) else { continue }
+    let offset = plane &* 0x1_0000
+    for codePoint in 0...0xFFFF {
+      guard let scalar = UnicodeScalar(codePoint &+ offset) else { continue }
+      if charSet.contains(scalar) {
+        result.insert(scalar.value)
+      }
     }
   }
   return result
-}()
+}
+% for Property, Set in Properties.items():
+var ${Set}Precomputed: Set<UInt32> = precompute(${Set})
 func is${Property}Precomputed(_ c: Character) -> Bool {
   return ${Set}Precomputed.contains(c.firstScalar.value)
 }
 % end
+
+func setupPrecomputed() {
+  blackHole(workload)
+% for Property, Set in Properties.items():
+    blackHole(${Set}Precomputed)
+% end
+}
 
 // Compute on the fly
 //
@@ -175,3 +201,6 @@ public func run_CharacterPropertiesPrecomputed(_ N: Int) {
 
 // TODO: run_CharacterPropertiesComputed
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

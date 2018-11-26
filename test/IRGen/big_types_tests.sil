@@ -1,9 +1,6 @@
-// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
-
-// UNSUPPORTED: resilient_stdlib
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-
 // REQUIRES: OS=macosx
 
 sil_stage canonical
@@ -22,13 +19,13 @@ public struct BigStruct {
   var i8 : Int32 = 8
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testDestroyValue(%T15big_types_tests9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testDestroyValue(%T15big_types_tests9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
 // CHECK-NEXT: entry
-// CHECK-NEXT: call %T15big_types_tests9BigStructV* @"$S15big_types_tests9BigStructVWh0_"(%T15big_types_tests9BigStructV* %0)
+// CHECK-NEXT: call %T15big_types_tests9BigStructV* @"$s15big_types_tests9BigStructVWOs"(%T15big_types_tests9BigStructV* %0)
 // CHECK-NEXT: ret void
 sil @testDestroyValue : $@convention(thin) (@owned BigStruct) -> ()  {
 entry(%x : $BigStruct):
-  destroy_value %x : $BigStruct
+  release_value %x : $BigStruct
   %ret = tuple ()
   return %ret : $()
 }

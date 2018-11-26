@@ -14,42 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
+#include "ThreadLocalStorage.h"
 #include <memory>
 #include <stdio.h>
-
-// Pick an implementation strategy.
-#ifndef SWIFT_EXCLUSIVITY_USE_THREADLOCAL
-
-// If we're using Clang, and Clang claims not to support thread_local,
-// it must be because we're on a platform that doesn't support it.
-// Use pthreads.
-// Workaround: has_feature(cxx_thread_local) is wrong on two old Apple
-// simulators. clang thinks thread_local works there, but it doesn't.
-#if TARGET_OS_SIMULATOR && !TARGET_RT_64_BIT &&                      \
-  ((TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED__ < 100000) || \
-   (TARGET_OS_WATCH && __WATCHOS_OS_VERSION_MIN_REQUIRED__ < 30000))
-// 32-bit iOS 9 simulator or 32-bit watchOS 2 simulator - use pthreads
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
-#elif __clang__ && !__has_feature(cxx_thread_local)
-// clang without thread_local support - use pthreads
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
-#else
-// Use thread_local
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 1
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 0
-#endif
-
-#endif
-
-#if SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
-#include <pthread.h>
-#endif
 
 // Pick a return-address strategy
 #if __GNUC__
@@ -78,20 +50,11 @@ LLVM_ATTRIBUTE_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
-  static std::atomic<long> reportedConflicts{0};
-  constexpr long maxReportedConflicts = 100;
-  // Don't report more that 100 conflicts. Hopefully, this will improve
-  // performance in case there are conflicts inside a tight loop.
-  if (reportedConflicts.fetch_add(1, std::memory_order_relaxed) >=
-      maxReportedConflicts) {
-    return;
-  }
-
   constexpr unsigned maxMessageLength = 100;
   constexpr unsigned maxAccessDescriptionLength = 50;
   char message[maxMessageLength];
   snprintf(message, sizeof(message),
-           "Simultaneous accesses to 0x%tx, but modification requires "
+           "Simultaneous accesses to 0x%" PRIxPTR ", but modification requires "
            "exclusive access",
            reinterpret_cast<uintptr_t>(pointer));
   fprintf(stderr, "%s.\n", message);
@@ -102,7 +65,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   fprintf(stderr, "%s ", oldAccess);
   if (oldPC) {
     dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%tx).\n", reinterpret_cast<uintptr_t>(oldPC));
+    fprintf(stderr, " (0x%" PRIxPTR ").\n", reinterpret_cast<uintptr_t>(oldPC));
   } else {
     fprintf(stderr, "<unknown>.\n");
   }
@@ -114,8 +77,6 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   // The top frame is in swift_beginAccess, don't print it.
   constexpr unsigned framesToSkip = 1;
   printCurrentBacktrace(framesToSkip);
-
-  bool keepGoing = isWarningOnly(newFlags);
 
   RuntimeErrorDetails::Thread secondaryThread = {
     .description = oldAccess,
@@ -131,22 +92,35 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .numExtraThreads = 1,
     .threads = &secondaryThread
   };
-  uintptr_t flags = RuntimeErrorFlagNone;
-  if (!keepGoing)
-    flags = RuntimeErrorFlagFatal;
-  _swift_reportToDebugger(flags, message, &details);
-
-  if (keepGoing) {
-    return;
-  }
-
-  // 0 means no backtrace will be printed.
-  fatalError(0, "Fatal access conflict detected.\n");
+  _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }
 
 namespace {
 
 /// A single access that we're tracking.
+///
+/// The following inputs are accepted by the begin_access runtime entry
+/// point. This table show the action performed by the current runtime to
+/// convert those inputs into stored fields in the Access scratch buffer.
+///
+/// Pointer | Runtime     | Access | PC    | Reported| Access
+/// Argument| Behavior    | Pointer| Arg   | PC      | PC
+/// -------- ------------- -------- ------- --------- ----------
+/// null    | [trap or missing enforcement]
+/// nonnull | [nontracked]| null   | null  | caller  | [discard]
+/// nonnull | [nontracked]| null   | valid | <same>  | [discard]
+/// nonnull | [tracked]   | <same> | null  | caller  | caller
+/// nonnull | [tracked]   | <same> | valid | <same>  | <same>
+///
+/// [nontracked] means that the Access scratch buffer will not be added to the
+/// runtime's list of tracked accesses. However, it may be passed to a
+/// subsequent call to end_unpaired_access. The null Pointer field then
+/// identifies the Access record as nontracked.
+///
+/// The runtime owns the contents of the scratch buffer, which is allocated by
+/// the compiler but otherwise opaque. The runtime may later reuse the Pointer
+/// or PC fields or any spare bits for additional flags, and/or a pointer to
+/// out-of-line storage.
 struct Access {
   void *Pointer;
   void *PC;
@@ -188,7 +162,7 @@ class AccessSet {
 public:
   constexpr AccessSet() {}
 
-  void insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
+  bool insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
     auto action = getAccessAction(flags);
 
     for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
@@ -205,13 +179,16 @@ public:
       reportExclusivityConflict(cur->getAccessAction(), cur->PC,
                                 flags, pc, pointer);
 
-      // If we're only warning, don't report multiple conflicts.
-      break;
+      // 0 means no backtrace will be printed.
+      fatalError(0, "Fatal access conflict detected.\n");
     }
+    if (!isTracking(flags))
+      return false;
 
     // Insert to the front of the array so that remove tends to find it faster.
     access->initialize(pc, pointer, Head, action);
     Head = access;
+    return true;
   }
 
   void remove(Access *access) {
@@ -234,6 +211,16 @@ public:
 
     swift_runtime_unreachable("access not found in set");
   }
+
+#ifndef NDEBUG
+  /// Only available with asserts. Intended to be used with
+  /// swift_dumpTrackedAccess().
+  void forEach(std::function<void (Access *)> action) {
+    for (auto *iter = Head; iter != nullptr; iter = iter->getNext()) {
+      action(iter);
+    }
+  }
+#endif
 };
 
 } // end anonymous namespace
@@ -241,46 +228,63 @@ public:
 // Each of these cases should define a function with this prototype:
 //   AccessSets &getAllSets();
 
-#if SWIFT_EXCLUSIVITY_USE_THREADLOCAL
-// Use direct language support for thread-locals.
+#if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+// Use the reserved TSD key if possible.
 
-static_assert(LLVM_ENABLE_THREADS, "LLVM_THREAD_LOCAL will use a global?");
+static AccessSet &getAccessSet() {
+  AccessSet *set = static_cast<AccessSet*>(
+    SWIFT_THREAD_GETSPECIFIC(SWIFT_EXCLUSIVITY_TLS_KEY));
+  if (set)
+    return *set;
+  
+  static OnceToken_t setupToken;
+  SWIFT_ONCE_F(setupToken, [](void *) {
+    pthread_key_init_np(SWIFT_EXCLUSIVITY_TLS_KEY, [](void *pointer) {
+      delete static_cast<AccessSet*>(pointer);
+    });
+  }, nullptr);
+  
+  set = new AccessSet();
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_EXCLUSIVITY_TLS_KEY, set);
+  return *set;
+}
+
+#elif SWIFT_TLS_HAS_THREADLOCAL
+// Second choice is direct language support for thread-locals.
+
 static LLVM_THREAD_LOCAL AccessSet ExclusivityAccessSet;
 
 static AccessSet &getAccessSet() {
   return ExclusivityAccessSet;
 }
 
-#elif SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
-// Use pthread_getspecific.
+#else
+// Use the platform thread-local data API.
 
-static pthread_key_t createAccessSetPthreadKey() {
-  pthread_key_t key;
-  int result = pthread_key_create(&key, [](void *pointer) {
+static __swift_thread_key_t createAccessSetThreadKey() {
+  __swift_thread_key_t key;
+  int result = SWIFT_THREAD_KEY_CREATE(&key, [](void *pointer) {
     delete static_cast<AccessSet*>(pointer);
   });
 
   if (result != 0) {
-    fatalError(0, "couldn't create pthread key for exclusivity: %s\n",
+    fatalError(0, "couldn't create thread key for exclusivity: %s\n",
                strerror(result));
   }
   return key;
 }
 
 static AccessSet &getAccessSet() {
-  static pthread_key_t key = createAccessSetPthreadKey();
+  static __swift_thread_key_t key = createAccessSetThreadKey();
 
-  AccessSet *set = static_cast<AccessSet*>(pthread_getspecific(key));
+  AccessSet *set = static_cast<AccessSet*>(SWIFT_THREAD_GETSPECIFIC(key));
   if (!set) {
     set = new AccessSet();
-    pthread_setspecific(key, set);
+    SWIFT_THREAD_SETSPECIFIC(key, set);
   }
   return *set;
 }
 
-/** An access set accessed via pthread_get_specific. *************************/
-#else
-#error No implementation chosen for exclusivity!
 #endif
 
 /// Begin tracking a dynamic access.
@@ -293,16 +297,20 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
 
   Access *access = reinterpret_cast<Access*>(buffer);
 
-  // If exclusivity checking is disabled, record in the access
-  // buffer that we didn't track anything.
+  // If exclusivity checking is disabled, record in the access buffer that we
+  // didn't track anything. pc is currently undefined in this case.
   if (_swift_disableExclusivityChecking) {
     access->Pointer = nullptr;
     return;
   }
 
-  if (!pc) pc = get_return_address();
+  // If the provided `pc` is null, then the runtime may override it for
+  // diagnostics.
+  if (!pc)
+    pc = get_return_address();
 
-  getAccessSet().insert(access, pc, pointer, flags);
+  if (!getAccessSet().insert(access, pc, pointer, flags))
+    access->Pointer = nullptr;
 }
 
 /// End tracking a dynamic access.
@@ -318,3 +326,17 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 
   getAccessSet().remove(access);
 }
+
+#ifndef NDEBUG
+
+// Dump the accesses that are currently being tracked by the runtime.
+//
+// This is only intended to be used in the debugger.
+void swift::swift_dumpTrackedAccesses() {
+  getAccessSet().forEach([](Access *a) {
+      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s\n",
+              a->Pointer, a->PC, getAccessName(a->getAccessAction()));
+  });
+}
+
+#endif

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize
 
 sil_stage canonical
 
@@ -35,13 +35,13 @@ entry(%0 : $*T):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_allocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_allocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[METATYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_ADDR]]
 // CHECK:  [[CAST:%.*]] = bitcast %swift.type* [[METATYPE]]
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:  [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:  [[FLAG_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:  [[FLAG_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:  [[FLAG_WITNESS:%.*]] = load i8*, i8** [[FLAG_WITNESS_ADDR]]
 // CHECK:  [[FLAGS:%.*]] = ptrtoint i8* [[FLAG_WITNESS]]
 // CHECK:  [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -109,13 +109,13 @@ entry:
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_deallocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_deallocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[META_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[META:%.*]] = load %swift.type*, %swift.type** [[META_ADDR]]
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[META]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** %3, {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[MASKED:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -132,10 +132,10 @@ entry:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[META]] to i8***
 // CHECK:   [[VWT_ADDR2:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT2:%.*]] = load i8**, i8*** [[VWT_ADDR2]]
-// CHECK:   [[VW_ADDR2:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 9
+// CHECK:   [[VW_ADDR2:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 8
 // CHECK:   [[VW2:%.*]] = load i8*, i8** [[VW_ADDR2]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[VW2]] to {{(i64|i32)}}
-// CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
+// CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 255
 // CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
 // CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
@@ -160,11 +160,11 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -178,7 +178,7 @@ bb0(%0 : $*Existential):
 // CHECK: boxed:
 // CHECK:   [[REFADDR:%.*]] = bitcast [{{(24|12)}} x i8]* %0 to %swift.refcounted**
 // CHECK:   [[REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[REFADDR]]
-// CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
+// CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 255
 // CHECK:   [[HEADERSIZEPLUSALIGN:%.*]] = add {{(i64 16|i32 8)}}, [[ALIGNMASK]]
 // CHECK:   [[NOTALIGNMASK:%.*]] = xor {{(i64|i32)}} [[ALIGNMASK]], -1
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
@@ -188,7 +188,7 @@ bb0(%0 : $*Existential):
 // CHECK:   ret %swift.opaque* [[VALUEADDRBOXED]]
 
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}} @test_open_existential_addr_mutable
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}} @test_open_existential_addr_mutable
 // CHECK:  [[META_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[META_ADDR]]
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 2
@@ -203,11 +203,11 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_mutable_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
+// CHECK: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_mutable_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -219,7 +219,7 @@ bb0(%0 : $*Existential):
 // CHECK:   ret %swift.opaque* [[VALUEADDRINLINE]]
 
 // CHECK: boxed:
-// CHECK:  [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
+// CHECK:  [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 255
 // CHECK:  [[OPAQUE_ADDR:%.*]] = bitcast [{{(24|12)}} x i8]* %0 to %swift.opaque*
 // CHECK:  [[REFANDADDR:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_makeBoxUnique(%swift.opaque* [[OPAQUE_ADDR]], %swift.type* %1, {{(i64|i32)}} [[ALIGNMASK]])
 // CHECK:  [[REF:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[REFANDADDR]], 0
@@ -227,7 +227,7 @@ bb0(%0 : $*Existential):
 // CHECK:  ret %swift.opaque* [[ADDR]]
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_destroy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_destroy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* %0)
 // CHECK:   ret void
 sil @test_destroy_existential_addr :$@convention(thin) (@in Existential) -> () {
@@ -237,14 +237,14 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 // CHECK:  [[BUFFER_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 0
 // CHECK:  [[CAST:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:  [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:  [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:  [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:  [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:  [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:  [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -268,7 +268,7 @@ bb0(%0 : $*Existential):
 // CHECK:   call void @swift_release(%swift.refcounted* [[REFERENCE]])
 // CHECK:   ret void
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_assignWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_assignWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:  [[ALLOCA:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:  call void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]], %T25existentials_opaque_boxed11ExistentialP* %0)
 // CHECK:  ret void
@@ -282,7 +282,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[TMPBUFFER:%.*]] = alloca [{{(24|12)}} x i8]
 // CHECK:  [[SELFASSIGN:%.*]] = icmp eq %T25existentials_opaque_boxed11ExistentialP* %0, %1
 // CHECK:  br i1 [[SELFASSIGN]], label %done, label %cont
@@ -301,7 +301,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[MASKED:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -339,7 +339,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[DEST_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[DEST_VWT:%.*]] = load i8**, i8*** [[DEST_VWT_ADDR]]
-// CHECK:   [[DEST_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[DEST_VWT]], i32 10
+// CHECK:   [[DEST_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[DEST_VWT]], i32 9
 // CHECK:   [[DEST_VW:%.*]] = load i8*, i8** [[DEST_VW_ADDR]]
 // CHECK:   [[DEST_FLAGS:%.*]] = ptrtoint i8* [[DEST_VW]] to {{(i64|i32)}}
 // CHECK:   [[DEST_ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[DEST_FLAGS]], 131072
@@ -347,7 +347,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[SRC_TYPE]] to i8***
 // CHECK:   [[SRC_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[SRC_VWT:%.*]] = load i8**, i8*** [[SRC_VWT_ADDR]]
-// CHECK:   [[SRC_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SRC_VWT]], i32 10
+// CHECK:   [[SRC_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SRC_VWT]], i32 9
 // CHECK:   [[SRC_VW:%.*]] = load i8*, i8** [[SRC_VW_ADDR]]
 // CHECK:   [[SRC_FLAGS:%.*]] = ptrtoint i8* [[SRC_VW]] to {{(i64|i32)}}
 // CHECK:   [[SRC_ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[SRC_FLAGS]], 131072
@@ -429,10 +429,10 @@ bb0(%0 : $*Existential):
 // CHECK: done:
 // CHECK:   ret void
 
-// CHECK: define{{( protected)?}} swiftcc void @test_assignWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_assignWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[ALLOCA:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
 // CHECK:   ret void
 sil @test_assignWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -443,29 +443,15 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
-// CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
-// CHECK:   [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
-// CHECK:   [[LOCAL_METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
-// CHECK:   store %swift.type* [[METADATA]], %swift.type** [[LOCAL_METADATA_ADDR]]
-// CHECK:   [[PWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 2
-// CHECK:   [[PWT:%.*]] = load i8**, i8*** [[PWT_ADDR]]
-// CHECK:   [[LOCAL_PWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 2
-// CHECK:   store i8** [[PWT]], i8*** [[LOCAL_PWT_ADDR]]
-// CHECK:   [[BUFFER_ARG_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 0
-// CHECK:   [[BUFFER_LOCAL_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 0
-// CHECK:   [[CAST_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST_ADDR]], {{(i64|i32)}} -1
-// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
-// CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
-// CHECK:   [[INITWITHTAKEBUFFER:%.*]] = bitcast i8* [[VW]]
-// CHECK:     call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[BUFFER_LOCAL_ADDR]], {{.*}} [[BUFFER_ARG_ADDR]], %swift.type* [[METADATA]])
-// CHECK:   ret %T25existentials_opaque_boxed11ExistentialP* %1
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK:  %2 = bitcast %T25existentials_opaque_boxed11ExistentialP* %1 to i8*
+// CHECK:  %3 = bitcast %T25existentials_opaque_boxed11ExistentialP* %0 to i8*
+// CHECK:  call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* align {{(8|4)}} %2, i8* align {{(8|4)}} %3, {{(i64 40|i32 20)}}, i1 false)
+// CHECK:  ret %T25existentials_opaque_boxed11ExistentialP* %1
 
-// CHECK: define{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
 sil @test_initWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -476,11 +462,11 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_initWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWc0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
-// CHECK-LABEL: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWc0_"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[ARG_TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:   [[LOCAL_TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
@@ -507,7 +493,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-@_alignment(32)
+@_alignment(16)
 struct FixedOveralign : Existential {
 	var x : Int64
 }
@@ -518,10 +504,11 @@ struct FixedOveralign : Existential {
 // CHECK:  [[CONTAINER:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
 // CHECK:  [[INLINEBUFFER:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* [[CONTAINER]], i32 0, i32 0
-// CHECK:  [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.3, i32 0, i32 2), {{(i64|i32)}} 64, {{(i64|i32)}} 31)
-// CHECK:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>*
-// CHECK:  [[VALUE_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>, <{ %swift.refcounted, [{{(16|24)}} x i8], [32 x i8] }>* [[BOX_ADDR]], i32 0, i32 {{(1|2)}}
-// CHECK:  [[INIT_EXIST_ADDR:%.*]] = bitcast [32 x i8]* [[VALUE_ADDR]] to %T25existentials_opaque_boxed14FixedOveralignV*
+// CHECK:  [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.3, i32 0, i32 2), {{(i64|i32)}} 32, {{(i64|i32)}} 15)
+// CHECK-64:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[BOX_TYPE:<{ %swift.refcounted, \[16 x i8\] }>]]*
+// CHECK-32:  [[BOX_ADDR:%.*]] = bitcast %swift.refcounted* [[BOX]] to [[BOX_TYPE:<{ %swift.refcounted, \[8 x i8\], \[16 x i8\] }>]]*
+// CHECK:  [[VALUE_ADDR:%.*]] = getelementptr inbounds [[BOX_TYPE]], [[BOX_TYPE]]* [[BOX_ADDR]], i32 0, i32 {{(1|2)}}
+// CHECK:  [[INIT_EXIST_ADDR:%.*]] = bitcast [16 x i8]* [[VALUE_ADDR]] to %T25existentials_opaque_boxed14FixedOveralignV*
 // CHECK:  [[INLINEBUFFER_ADDR:%.*]] = bitcast [{{(24|12)}} x i8]* [[INLINEBUFFER]] to %swift.refcounted**
 // CHECK:  store %swift.refcounted* [[BOX]], %swift.refcounted** [[INLINEBUFFER_ADDR]]
 // CHECK:  ret void

@@ -17,6 +17,7 @@ extension ARCamera {
     /**
      A value describing the camera's tracking state.
      */
+    @_frozen
     public enum TrackingState {
         public enum Reason {
             /** Tracking is limited due to initialization in progress. */
@@ -71,6 +72,41 @@ extension ARCamera {
             
             return .limited(reason)
         }
+    }
+    
+    @available(iOS, introduced: 12.0)
+    @nonobjc
+    public func unprojectPoint(
+      _ point: CGPoint,
+      ontoPlane planeTransform: simd_float4x4,
+      orientation: UIInterfaceOrientation,
+      viewportSize: CGSize
+    ) -> simd_float3? {
+        let result = __unprojectPoint(
+          point,
+          ontoPlaneWithTransform: planeTransform,
+          orientation: orientation,
+          viewportSize: viewportSize)
+        if result.x.isNaN || result.y.isNaN || result.z.isNaN {
+            return nil
+        }
+        
+        return result
+    }
+}
+
+@available(iOS, introduced: 12.0)
+extension ARSCNView {
+    @nonobjc public func unprojectPoint(
+      _ point: CGPoint, ontoPlane planeTransform: simd_float4x4
+    ) -> simd_float3? {
+        let result = __unprojectPoint(
+          point, ontoPlaneWithTransform: planeTransform)
+        if result.x.isNaN || result.y.isNaN || result.z.isNaN {
+            return nil
+        }
+        
+        return result
     }
 }
 
@@ -152,5 +188,62 @@ extension ARPlaneGeometry {
     @nonobjc public var boundaryVertices: [vector_float3] {
         let buffer = UnsafeBufferPointer(start: __boundaryVertices, count: Int(__boundaryVertexCount))
         return Array(buffer)
+    }
+}
+
+@available(iOS, introduced: 12.0)
+extension ARPlaneAnchor {
+    /**
+     A value describing the classification of a plane anchor.
+     */
+    public enum Classification {
+        
+        public enum Status {
+            
+            /** Plane classification is currently unavailable. */
+            case notAvailable
+            
+            /** ARKit has not yet determined the classification of this plane. */
+            case undetermined
+            
+            /** ARKit is confident the plane is not any of the known classes. */
+            case unknown
+        }
+        
+        /** The classification is not any of the known classes. */
+        case none(Status)
+        
+        case wall
+        
+        case floor
+        
+        case ceiling
+        
+        case table
+        
+        case seat
+    }
+    
+    
+    /**
+     Classification of the plane.
+     */
+    public var classification: ARPlaneAnchor.Classification {
+        switch __classification {
+        case .wall: return .wall
+        case .floor: return .floor
+        case .ceiling: return .ceiling
+        case .table: return .table
+        case .seat: return .seat
+        case .none: fallthrough
+        default:
+            switch __classificationStatus {
+            case .notAvailable: return .none(.notAvailable)
+            case .unknown: return .none(.unknown)
+            case .undetermined: fallthrough
+            case .known: fallthrough
+            default: return .none(.undetermined)
+            }
+        }
     }
 }

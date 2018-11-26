@@ -216,6 +216,11 @@ func weirdBlockDocComment() {}
 // ###line 1010
 func docCommentWithGybLineNumber() {}
 
+#sourceLocation(file: "custom.swuft", line: 2000)
+/// Oooh, custom!
+func customSourceLocation() {}
+#sourceLocation() // reset
+
 /**
 func unterminatedBlockDocComment() {}
 
@@ -288,7 +293,10 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:166:6: Enum/decl_enum_1 RawComment=[/// decl_enum_1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:168:8: EnumElement/decl_enum_1.Case1 RawComment=[/// Case1 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:171:8: EnumElement/decl_enum_1.Case2 RawComment=[/// Case2 Aaa.\n]
+// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
 // CHECK-NEXT: comment_attach.swift:174:8: EnumElement/decl_enum_1.Case3 RawComment=[/// Case3 Aaa.\n]
+// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
+// CHECK-NEXT: Param/decl_enum_1.<anonymous> RawComment=none BriefComment=none DocCommentAsXML=none
 // CHECK-NEXT: comment_attach.swift:177:8: EnumElement/decl_enum_1.Case4 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:177:15: EnumElement/decl_enum_1.Case5 RawComment=[/// Case4 Case5 Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:181:7: Class/decl_class_1 RawComment=[/// decl_class_1 Aaa.\n]
@@ -304,3 +312,4 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:207:6: Func/emptyBlockDocComment RawComment=[/***/]
 // CHECK-NEXT: comment_attach.swift:210:6: Func/weirdBlockDocComment RawComment=[/**/]
 // CHECK-NEXT: comment_attach.swift:217:6: Func/docCommentWithGybLineNumber RawComment=[/// docCommentWithGybLineNumber Aaa.\n/// Bbb.\n/// Ccc.\n]
+// CHECK-NEXT: custom.swuft:2001:6: Func/customSourceLocation RawComment=[/// Oooh, custom!\n]

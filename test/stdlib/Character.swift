@@ -93,10 +93,10 @@ let testCharacters = [
 ]
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
-  let n = pickRandom((minSize + 1)..<maxSize)
-  var result = String(pickRandom(baseScalars))
+  let n = Int.random(in: (minSize + 1) ..< maxSize)
+  var result = String(baseScalars.randomElement()!)
   for _ in 0..<n {
-    result += String(pickRandom(continuingScalars))
+    result += String(continuingScalars.randomElement()!)
   }
   return result
 }
@@ -202,6 +202,9 @@ CharacterTests.test("Unicode 9 grapheme breaking") {
   // Only run it on ObjC platforms. Supported Linux versions do not have a
   // recent enough ICU for Unicode 9 support.
 #if _runtime(_ObjC)
+  // Check for Unicode 9 or later
+  guard #available(iOS 10.0, macOS 10.12, *) else { return }
+
   let flags = "🇺🇸🇨🇦🇩🇰🏳️‍🌈"
   expectEqual(4, flags.count)
   expectEqual(flags.reversed().count, flags.count)
@@ -228,12 +231,7 @@ func checkRoundTripThroughCharacter(_ s: String) {
 }
 
 func isSmallRepresentation(_ s: String) -> Bool {
-  switch Character(s)._representation {
-    case .smallUTF16:
-      return true
-    default:
-      return false
-  }
+  return Character(s)._isSmall
 }
 
 func checkUnicodeScalars(_ s: String) {
@@ -253,8 +251,9 @@ func checkUnicodeScalars(_ s: String) {
 }
 
 func checkRepresentation(_ s: String) {
+  let utf16 = Array(s.utf16)
   let expectSmall
-    = s.utf16.count < 4 || s.utf16.count == 4 && s._guts[3] < 0x8000
+    = utf16.count < 4 || utf16.count == 4 && utf16[3] < 0x8000
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"
@@ -307,12 +306,11 @@ CharacterTests.test(
   let asciiDomain = Array(0..<127)
   let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0))! })
   let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1))! })
-  typealias PredicateFn = (UnicodeScalar) -> (UnicodeScalar) -> Bool
   expectEqualMethodsForDomain(
     ascii0to126,
     ascii1to127,
-    { x in { String(x) < String($0) } } as PredicateFn,
-    { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
+    { x in { String(x) < String($0) } },
+    { x in { String(Character(x)) < String(Character($0)) } })
 }
 
 CharacterTests.test("String.append(_: Character)") {

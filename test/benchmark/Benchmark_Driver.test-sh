@@ -1,0 +1,15 @@
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// REQUIRES: benchmark
+// REQUIRES: CMAKE_GENERATOR=Ninja
+
+// Integration tests between Benchmark_Driver and Benchmark_O
+
+// RUN: %Benchmark_Driver run 1 Ackermann 1 \
+// RUN:                 | %FileCheck %s --check-prefix RUNJUSTONCE
+// RUNJUSTONCE-LABEL: Ackermann
+// RUNJUSTONCE-NOT: Ackermann
+
+// RUN: %Benchmark_Driver check 1 \
+// RUN:                 | %FileCheck %s --check-prefix DOCTORCHECK
+// DOCTORCHECK: Ackermann

@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 protocol A { func a() }
 protocol B { func b() }
@@ -18,38 +17,45 @@ protocol C : class { func c() }
 protocol AB : A, B { func ab() }
 protocol ABO : A, B, O { func abo() }
 
-// CHECK: @"$S17protocol_metadata1AMp" = hidden constant %swift.protocol {
-// -- size 72
-// -- flags: 1 = Swift | 2 = Not Class-Constrained | 4 = Needs Witness Table
-// CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 1, i16 1,
-// CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[A_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1AMp", i32 0, i32 12) to i64)) to i32)
-// CHECK-SAME: }
-
-// CHECK: @"$S17protocol_metadata1BMp" = hidden constant %swift.protocol {
-// CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 1, i16 1,
-// CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[B_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1BMp", i32 0, i32 12) to i64)) to i32)
-// CHECK: }
-
-// CHECK: @"$S17protocol_metadata1CMp" = hidden constant %swift.protocol {
-// -- flags: 1 = Swift | 4 = Needs Witness Table
-// CHECK-SAME:   i32 72, i32 5,
-// CHECK-SAME:   i16 1, i16 1,
-// CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([1 x %swift.protocol_requirement]* [[C_REQTS:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata1CMp", i32 0, i32 12) to i64)) to i32)
-// CHECK-SAME: }
-
 // -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, [1 x i8*]*, i8*, i8* } {
+// CHECK-LABEL: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant
 // CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
 // -- size, flags: 1 = Swift
 // CHECK-SAME:   i32 96, i32 1
 // CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
 // CHECK-SAME: }
 
-// CHECK: [[A_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
-// CHECK: [[B_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
-// CHECK: [[C_REQTS]] = internal unnamed_addr constant [1 x %swift.protocol_requirement] [%swift.protocol_requirement { i32 17, i32 0 }]
+// CHECK: [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
+
+// CHECK-LABEL: @"$s17protocol_metadata1AMp" = hidden constant
+// CHECK-SAME:   i32 65603,
+// CHECK-SAME:   @"$s17protocol_metadataMXM"
+// CHECK-SAME:   [[A_NAME]]
+// CHECK-SAME:   i32 0,
+// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i32 0,
+// CHECK-SAME: }
+
+// CHECK: [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
+// CHECK-LABEL: @"$s17protocol_metadata1BMp" = hidden constant
+// CHECK-SAME:   i32 65603,
+// CHECK-SAME:   @"$s17protocol_metadataMXM"
+// CHECK-SAME:   i32 0,
+// CHECK-SAME:   [[B_NAME]]
+// CHECK-SAME:   i32 1,
+// CHECK: }
+
+// CHECK: [[C_NAME:@.*]] = private constant [2 x i8] c"C\00"
+// CHECK-LABEL: @"$s17protocol_metadata1CMp" = hidden constant
+// CHECK-SAME:   i32 67,
+// CHECK-SAME:   @"$s17protocol_metadataMXM"
+// CHECK-SAME:   [[C_NAME]]
+// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i32 1,
+// CHECK-SAME:   i32 0,
+// AnyObject layout constraint
+// CHECK-SAME:   i32 31, i32 0, i32 0
+// CHECK-SAME: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
 // CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, [4 x i8*]*, i8*, i8* } {
@@ -62,24 +68,20 @@ protocol ABO : A, B, O { func abo() }
 
 // -- inheritance lists for refined protocols
 
-// CHECK: [[AB_INHERITED:@.*]] = private constant { {{.*}}* } {
-// CHECK:   i64 2,
-// CHECK:   %swift.protocol* @"$S17protocol_metadata1AMp",
-// CHECK:   %swift.protocol* @"$S17protocol_metadata1BMp"
-// CHECK: }
-// CHECK: [[AB_REQTS:@.*]] = internal unnamed_addr constant [3 x %swift.protocol_requirement] [%swift.protocol_requirement zeroinitializer, %swift.protocol_requirement zeroinitializer, %swift.protocol_requirement { i32 17, i32 0 }]
-// CHECK: @"$S17protocol_metadata2ABMp" = hidden constant %swift.protocol { 
-// CHECK-SAME:   [[AB_INHERITED]]
-// CHECK-SAME:   i32 72, i32 7,
-// CHECK-SAME:   i16 3, i16 3,
-// CHECK-SAME:   i32 trunc (i64 sub (i64 ptrtoint ([3 x %swift.protocol_requirement]* [[AB_REQTS]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.protocol, %swift.protocol* @"$S17protocol_metadata2ABMp", i32 0, i32 12) to i64)) to i32)
-// CHECK-SAME: }
+// CHECK: [[AB_NAME:@.*]] = private constant [3 x i8] c"AB\00"
+// CHECK: @"$s17protocol_metadata2ABMp" = hidden constant
+// CHECK-SAME:   i32 65603,
+// CHECK-SAME:   @"$s17protocol_metadataMXM"
+// CHECK-SAME:   [[AB_NAME]]
+// CHECK-SAME:   i32 2, i32 3, i32 0
 
-// CHECK: [[ABO_INHERITED:@.*]] = private constant { {{.*}}* } {
-// CHECK:   i64 3,
-// CHECK:   %swift.protocol* @"$S17protocol_metadata1AMp",
-// CHECK:   %swift.protocol* @"$S17protocol_metadata1BMp",
-// CHECK:   {{.*}}* @_PROTOCOL__TtP17protocol_metadata1O_
+// Inheritance from A
+// CHECK-SAME:   i32 128, i32 0
+// CHECK-SAME: @"$s17protocol_metadata1AMp"
+
+// Inheritance from B
+// CHECK-SAME:   i32 128, i32 0
+// CHECK-SAME:   @"$s17protocol_metadata1BMp"
 // CHECK: }
 
 protocol Comprehensive {
@@ -91,49 +93,49 @@ protocol Comprehensive {
   static var global: Assoc { get set }
 }
 
-// CHECK: [[COMPREHENSIVE_REQTS:@.*]] = internal unnamed_addr constant [11 x %swift.protocol_requirement]
-// CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0 },
+// CHECK: [[COMPREHENSIVE_ASSOC_NAME:@.*]] = private constant [6 x i8] c"Assoc\00"
+
+// CHECK: @"$s17protocol_metadata13ComprehensiveMp" = hidden constant
+// CHECK-SAME: i32 65603
+// CHECK-SAME: i32 1
+// CHECK-SAME: i32 11,
+// CHECK-SAME: i32 trunc
+// CHECK-SAME: [6 x i8]* [[COMPREHENSIVE_ASSOC_NAME]]
+// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 2, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 1, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 19, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 20, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 21, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 22, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 5, i32 0 }]
+// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0 }
 
-// CHECK: [[COMPREHENSIVE_ASSOC_NAME:@.*]] = private constant [6 x i8] c"Assoc\00"
-
-// CHECK: @"$S17protocol_metadata13ComprehensiveMp" = hidden constant %swift.protocol
-// CHECK-SAME: i32 72, i32 7, i16 11, i16 11,
-// CHECK-SAME: [11 x %swift.protocol_requirement]* [[COMPREHENSIVE_REQTS]]
-// CHECK-SAME: i32 0
-// CHECK-SAME: i32 trunc
-// CHECK-SAME: [6 x i8]* [[COMPREHENSIVE_ASSOC_NAME]]
 
 func reify_metadata<T>(_ x: T) {}
 
-// CHECK: define hidden swiftcc void @"$S17protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F"
+// CHECK: define hidden swiftcc void @"$s17protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F"
 func protocol_types(_ a: A,
                     abc: A & B & C,
                     abco: A & B & C & O) {
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 true, %swift.type* null, i64 1, %swift.protocol** {{%.*}})
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp" to [[INT]])
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 true, %swift.type* null, i64 1, [[INT]]* {{%.*}})
   reify_metadata(a)
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1BMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1CMp"
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 3, %swift.protocol** {{%.*}})
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp"
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1BMp"
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1CMp"
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 3, [[INT]]* {{%.*}})
   reify_metadata(abc)
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1BMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1CMp"
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1AMp"
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1BMp"
+  // CHECK: store [[INT]] ptrtoint ({{.*}} @"$s17protocol_metadata1CMp"
   // CHECK: [[O_REF:%.*]] = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP17protocol_metadata1O_"
-  // CHECK: [[O_REF_BITCAST:%.*]] = bitcast i8* [[O_REF]] to %swift.protocol*
-  // CHECK: store %swift.protocol* [[O_REF_BITCAST]]
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 4, %swift.protocol** {{%.*}})
+  // CHECK: [[O_REF_INT:%.*]] = ptrtoint i8* [[O_REF]] to [[INT]]
+  // CHECK: [[O_REF_DESCRIPTOR:%.*]] = or [[INT]] [[O_REF_INT]], 1
+  // CHECK: store [[INT]] [[O_REF_DESCRIPTOR]]
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 4, [[INT]]* {{%.*}})
   reify_metadata(abco)
 }
 

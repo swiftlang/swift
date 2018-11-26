@@ -8,6 +8,8 @@ func foo(_ x: inout Int64) {
   // not.
   // CHECK: %[[X:.*]] = alloca %Ts5Int64V*, align {{(4|8)}}
   // CHECK-NEXT: call void @llvm.dbg.declare
+  // CHECK-NEXT: %[[ZEROED:[0-9]+]] = bitcast %Ts5Int64V** %[[X]] to i8*{{$}}
+  // CHECK-NEXT: call void @llvm.memset.{{.*}}(i8* align {{(4|8)}} %[[ZEROED]], i8 0
   // CHECK: store %Ts5Int64V* %0, %Ts5Int64V** %[[X]], align {{(4|8)}}
   // CHECK-SAME: !dbg ![[LOC0:.*]]
   // CHECK-NEXT: getelementptr inbounds %Ts5Int64V, %Ts5Int64V* %0, i32 0, i32 0,

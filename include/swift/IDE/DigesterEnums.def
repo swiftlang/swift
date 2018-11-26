@@ -1,21 +1,41 @@
 #ifndef NODE_KIND
-#define NODE_KIND(NAME)
+#define NODE_KIND(NAME, EXTERNAL_NAME)
 #endif
 
 #ifndef NODE_ANNOTATION
 #define NODE_ANNOTATION(NAME)
 #endif
 
-#ifndef DECL_ATTR
-#define DECL_ATTR(NAME)
+#ifndef NODE_ANNOTATION_CHANGE_KIND
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) NODE_ANNOTATION(NAME)
 #endif
 
 #ifndef KEY
 #define KEY(NAME)
 #endif
 
+#ifndef KEY_STRING
+#define KEY_STRING(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_BOOL
+#define KEY_BOOL(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_STRING_ARR
+#define KEY_STRING_ARR(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_UINT
+#define KEY_UINT(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
 #ifndef KNOWN_TYPE
 #define KNOWN_TYPE(NAME)
+#endif
+
+#ifndef KNOWN_PROTOCOL
+#define KNOWN_PROTOCOL(NAME)
 #endif
 
 #ifndef DIFF_ITEM_KIND
@@ -30,76 +50,126 @@
 #define SPECIAL_CASE_ID(NAME)
 #endif
 
-NODE_KIND(Root)
-NODE_KIND(TypeDecl)
-NODE_KIND(TypeNominal)
-NODE_KIND(TypeFunc)
-NODE_KIND(TypeNameAlias)
-NODE_KIND(Function)
-NODE_KIND(Constructor)
-NODE_KIND(Getter)
-NODE_KIND(Setter)
-NODE_KIND(Var)
-NODE_KIND(TypeAlias)
+#ifndef NODE_KIND_RANGE
+#define NODE_KIND_RANGE(ID, First, Last)
+#endif
+
+NODE_KIND(Root, Root)
+NODE_KIND(Conformance, Conformance)
+NODE_KIND(TypeWitness, TypeWitness)
+NODE_KIND(TypeNominal, TypeNominal)
+NODE_KIND(TypeFunc, TypeFunc)
+NODE_KIND(TypeAlias, TypeNameAlias)
+NODE_KIND_RANGE(Type, TypeNominal, TypeAlias)
+
+NODE_KIND(DeclFunction, Function)
+NODE_KIND(DeclConstructor, Constructor)
+NODE_KIND(DeclGetter, Getter)
+NODE_KIND(DeclSetter, Setter)
+NODE_KIND(DeclSubscript, Subscript)
+NODE_KIND_RANGE(DeclAbstractFunc, DeclFunction, DeclSubscript)
+
+NODE_KIND(DeclOperator, OperatorDecl)
+NODE_KIND(DeclType, TypeDecl)
+NODE_KIND(DeclVar, Var)
+NODE_KIND(DeclTypeAlias, TypeAlias)
+NODE_KIND(DeclAssociatedType, AssociatedType)
+NODE_KIND_RANGE(Decl, DeclFunction, DeclAssociatedType)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
 NODE_ANNOTATION(Updated)
-NODE_ANNOTATION(RemovingErrorParam)
-NODE_ANNOTATION(ImplicitOptionalToOptional)
-NODE_ANNOTATION(OptionalToImplicitOptional)
-NODE_ANNOTATION(WrapOptional)
-NODE_ANNOTATION(WrapImplicitOptional)
-NODE_ANNOTATION(UnwrapOptional)
-NODE_ANNOTATION(GenericParamUpCast)
-NODE_ANNOTATION(GenericParamDownCast)
-NODE_ANNOTATION(TypeAliasChangeFromInt)
-NODE_ANNOTATION(GetterToProperty)
-NODE_ANNOTATION(SetterToProperty)
 NODE_ANNOTATION(PropertyName)
-NODE_ANNOTATION(TypeRewritten)
 NODE_ANNOTATION(TypeRewrittenLeft)
 NODE_ANNOTATION(TypeRewrittenRight)
-NODE_ANNOTATION(ModernizeEnum)
-NODE_ANNOTATION(UnwrapUnmanaged)
 NODE_ANNOTATION(RemovedDecl)
-NODE_ANNOTATION(Rename)
 NODE_ANNOTATION(RenameOldName)
 NODE_ANNOTATION(RenameNewName)
-NODE_ANNOTATION(NowThrowing)
-NODE_ANNOTATION(NowMutating)
-NODE_ANNOTATION(StaticChange)
-NODE_ANNOTATION(OwnershipChange)
+NODE_ANNOTATION(RawTypeLeft)
+NODE_ANNOTATION(RawTypeRight)
 
-DECL_ATTR(deprecated)
-DECL_ATTR(fixedLayout)
+NODE_ANNOTATION_CHANGE_KIND(ImplicitOptionalToOptional)
+NODE_ANNOTATION_CHANGE_KIND(OptionalToImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(GetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(SetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(DictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(ArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleOptionalStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(TypeAliasDeclToRawRepresentable)
+NODE_ANNOTATION_CHANGE_KIND(RevertTypeAliasDeclToRawRepresentable)
+
+NODE_ANNOTATION_CHANGE_KIND(RevertDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertOptionalDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertOptionalArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertSimpleStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertSimpleOptionalStringRepresentableUpdate)
+
+NODE_ANNOTATION_CHANGE_KIND(ModernizeEnum)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapUnmanaged)
+NODE_ANNOTATION_CHANGE_KIND(Rename)
+
+// Keep type rewritten the last one.
+NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
+
+KEY_BOOL(IsImplicit, implicit)
+KEY_BOOL(IsThrowing, throwing)
+KEY_BOOL(IsMutating, mutating)
+KEY_BOOL(IsStatic, static)
+KEY_BOOL(IsDeprecated, deprecated)
+KEY_BOOL(IsOverriding, overriding)
+KEY_BOOL(IsProtocolReq, protocolReq)
+KEY_BOOL(HasDefaultArg, hasDefaultArg)
+KEY_BOOL(HasSetter, hasSetter)
+KEY_BOOL(IsLet, isLet)
+KEY_BOOL(IsOpen, isOpen)
+KEY_BOOL(IsInternal, isInternal)
+KEY_BOOL(HasStorage, hasStorage)
+KEY_BOOL(HasDidset, hasDidset)
+KEY_BOOL(HasWillset, hasWillset)
 
 KEY(kind)
-KEY(name)
-KEY(selfIndex)
-KEY(usr)
-KEY(location)
+
+KEY_STRING(Name, name)
+KEY_STRING(PrintedName, printedName)
+KEY_STRING(Usr, usr)
+KEY_STRING(Location, location)
+KEY_STRING(ModuleName, moduleName)
+KEY_STRING(SuperclassUsr, superclassUsr)
+KEY_STRING(EnumRawTypeName, enumRawTypeName)
+KEY_STRING(GenericSig, genericSig)
+KEY_STRING(FuncSelfKind, funcSelfKind)
+KEY_STRING(ParamValueOwnership, paramValueOwnership)
+
+KEY_STRING_ARR(SuperclassNames, superclassNames)
+
+KEY_UINT(SelfIndex, selfIndex)
+KEY_UINT(FixedBinaryOrder, fixedbinaryorder)
+
 KEY(children)
-KEY(printedName)
-KEY(moduleName)
-KEY(throwing)
-KEY(mutating)
-KEY(static)
+KEY(conformances)
 KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
 KEY(ownership)
-KEY(superclassUsr)
-KEY(parentExtensionReqs)
-KEY(hasDefaultArg)
-KEY(conformingProtocols)
-KEY(enumRawTypeName)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
 KNOWN_TYPE(Void)
 KNOWN_TYPE(Unmanaged)
 KNOWN_TYPE(Function)
+KNOWN_TYPE(Dictionary)
+KNOWN_TYPE(String)
+KNOWN_TYPE(Array)
+KNOWN_TYPE(Int)
+
+KNOWN_PROTOCOL(RawRepresentable)
 
 DIFF_ITEM_KIND(CommonDiffItem)
 DIFF_ITEM_KIND(TypeMemberDiffItem)
@@ -141,7 +211,9 @@ SPECIAL_CASE_ID(StaticAbsToSwiftAbs)
 SPECIAL_CASE_ID(NSOpenGLGetVersion)
 SPECIAL_CASE_ID(ToIntMax)
 SPECIAL_CASE_ID(ToUIntMax)
+SPECIAL_CASE_ID(UIApplicationMain)
 
+#undef NODE_KIND_RANGE
 #undef SPECIAL_CASE_ID
 #undef DIFF_ITEM_KEY_KIND_INT
 #undef DIFF_ITEM_KEY_KIND_STRING
@@ -149,7 +221,12 @@ SPECIAL_CASE_ID(ToUIntMax)
 #undef DIFF_ITEM_KEY_KIND
 #undef DIFF_ITEM_KIND
 #undef KNOWN_TYPE
+#undef KNOWN_PROTOCOL
+#undef KEY_UINT
+#undef KEY_STRING_ARR
+#undef KEY_BOOL
+#undef KEY_STRING
 #undef KEY
-#undef DECL_ATTR
+#undef NODE_ANNOTATION_CHANGE_KIND
 #undef NODE_ANNOTATION
 #undef NODE_KIND

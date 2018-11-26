@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -verify -import-objc-header %S/Inputs/objc_bridged_generic_nonnull.h -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -verify -import-objc-header %S/Inputs/objc_bridged_generic_nonnull.h -enable-sil-ownership %s
 // REQUIRES: objc_interop
 
 public func test<T>(_ x: NonnullMembers<T>) -> T? {

@@ -39,12 +39,12 @@ static bool requiresHeapHeader(LayoutKind kind) {
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
+StructLayout::StructLayout(IRGenModule &IGM,
+                           NominalTypeDecl *decl,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
-  ASTTy = astTy;
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
@@ -91,41 +91,43 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
     }
   }
 
+  assert(typeToFill == nullptr || Ty == typeToFill);
+
   // If the struct is not @_fixed_layout, it will have a dynamic
   // layout outside of its resilience domain.
-  if (astTy && astTy->getAnyNominal())
-    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceExpansion::Minimal))
+  if (decl) {
+    if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
-  assert(typeToFill == nullptr || Ty == typeToFill);
-  if (ASTTy)
-    applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
+    applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
+  }
 }
 
 void irgen::applyLayoutAttributes(IRGenModule &IGM,
-                                  CanType ASTTy,
+                                  NominalTypeDecl *decl,
                                   bool IsFixedLayout,
                                   Alignment &MinimumAlign) {
-  assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
-  
   auto &Diags = IGM.Context.Diags;
-  auto decl = ASTTy->getAnyNominal();
-  if (!decl)
-    return;
-  
+
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
-    assert(alignment->Value != 0
-           && ((alignment->Value - 1) & alignment->Value) == 0
+    auto value = alignment->getValue();
+    assert(value != 0 && ((value - 1) & value) == 0
            && "alignment not a power of two!");
     
     if (!IsFixedLayout)
       Diags.diagnose(alignment->getLocation(),
                      diag::alignment_dynamic_type_layout_unsupported);
-    else if (alignment->Value < MinimumAlign.getValue())
+    else if (value < MinimumAlign.getValue())
       Diags.diagnose(alignment->getLocation(),
                    diag::alignment_less_than_natural, MinimumAlign.getValue());
-    else
-      MinimumAlign = Alignment(alignment->Value);
+    else {
+      auto requestedAlignment = Alignment(value);
+      MinimumAlign = IGM.getCappedAlignment(requestedAlignment);
+      if (requestedAlignment > MinimumAlign)
+        Diags.diagnose(alignment->getLocation(),
+                       diag::alignment_more_than_maximum,
+                       MinimumAlign.getValue());
+    }
   }
 }
 

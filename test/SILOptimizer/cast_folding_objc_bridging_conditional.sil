@@ -10,7 +10,7 @@ struct MyError: Error {}
 
 // CHECK-LABEL: sil @cast_nserror_to_specific_error
 sil @cast_nserror_to_specific_error : $@convention(thin) (@in NSError, @in NSNumber, @in NSValue) -> () {
-entry(%0 : $*NSError, %1 : $*NSNumber, %2 : $*NSValue):
+entry(%0 : @trivial $*NSError, %1 : @trivial $*NSNumber, %2 : @trivial $*NSValue):
   %f = function_ref @use : $@convention(thin) <T> (@in T) -> ()
   %a = alloc_stack $MyError
   // CHECK: checked_cast_addr_br {{.*}} NSError {{.*}} to MyError

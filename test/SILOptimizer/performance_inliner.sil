@@ -1,3 +1,4 @@
+
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
@@ -301,10 +302,10 @@ bb0(%0 : $*Int64):
 sil @trivial_witness_method_caller : $@convention(thin) () -> () {
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
-  %2 = function_ref @$Ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64 // user: %5
+  %2 = function_ref @$ss5Int64V22_builtinIntegerLiteralABBI__tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64 // user: %5
   %3 = metatype $@thin Int64.Type
-  %4 = integer_literal $Builtin.Int2048, 0
-  %5 = apply %2(%4, %3) : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  %4 = integer_literal $Builtin.IntLiteral, 0
+  %5 = apply %2(%4, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
   store %5 to %1 : $*Int64
   %6 = function_ref @trivial_witness_method : $@convention(witness_method: P) (@inout Int64) -> Int64
   %7 = apply %6 (%1) : $@convention(witness_method: P) (@inout Int64) -> Int64
@@ -313,7 +314,7 @@ sil @trivial_witness_method_caller : $@convention(thin) () -> () {
 }
 
 // Int64.init(_builtinIntegerLiteral:)
-sil [transparent] [serialized] @$Ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+sil [transparent] [serialized] @$ss5Int64V22_builtinIntegerLiteralABBI__tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
 
 
 // We can inline function_refs with c calling convention.
@@ -710,13 +711,13 @@ bb0:
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0
-  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 sil @unknown_function : $@convention(thin) () -> ()
 
@@ -896,7 +897,7 @@ class C {
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing
-sil [noinline] @callThrowing : $@convention(method) <T> (@in T, @owned @callee_owned () -> (@out T, @error Error), @guaranteed C) -> @out T {
+sil [noinline] @callThrowing : $@convention(method) <T> (@in_guaranteed T, @guaranteed @callee_owned () -> (@out T, @error Error), @guaranteed C) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned () -> (@out T, @error Error), %3 : $C):
   strong_retain %2 : $@callee_owned () -> (@out T, @error Error)
   try_apply %2(%0) : $@callee_owned () -> (@out T, @error Error), normal bb1, error bb4
@@ -932,8 +933,8 @@ bb0(%0 : $C):
   %7 = function_ref @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
   %8 = partial_apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
   %9 = alloc_stack $Int32
-  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
-  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
   %12 = load %9 : $*Int32
   dealloc_stack %9 : $*Int32
   dealloc_stack %3 : $*Int32

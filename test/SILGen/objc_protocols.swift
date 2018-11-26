@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -24,34 +25,27 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[THIS:%.*]] : @owned $T):
+// CHECK-LABEL: sil hidden @$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[THIS:%.*]] : @guaranteed $T):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_THIS]] : {{\$.*}},  #NSRuncing.runce!1.foreign
-// CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
-// CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.runce!1.foreign
+// CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[METHOD:%.*]] = objc_method [[BORROWED_THIS]] : {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
-// CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
-// CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
+// CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
+// CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
 
 // -- Arguments are not consumed by objc calls
-// CHECK: destroy_value [[THIS]]
+// CHECK-NOT: destroy_value [[THIS]]
 func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@owned T) -> () {
+// CHECK-LABEL: sil hidden @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $T):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:\$S14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
-  // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[ARG_COPY]])
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:\$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
+  // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[ARG]])
   // CHECK:   destroy_value [[METHOD]]
   _ = x.runce
 
@@ -61,18 +55,19 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   _ = T.runce
 
   // CHECK:   [[METATYPE:%.*]] = metatype $@thick T.Type
-  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:\$S14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTcTO]]
+  // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2:\$s14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTcTO]]
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[METATYPE]])
   // CHECK:   destroy_value [[METHOD:%.*]]
   _ = T.mince
-  // CHECK:   destroy_value [[ARG]]
+  // CHECK-NOT:   destroy_value [[ARG]]
 }
-// CHECK: } // end sil function '$S14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
+// CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
-// CHECK: bb0([[SELF:%.*]] : @owned $Self):
-// CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:\$S14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
-// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>([[SELF]])
+// CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
+// CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:\$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
+// CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
+// CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>([[SELF_COPY]])
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
@@ -86,58 +81,52 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '[[THUNK1_THUNK]]'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK2]] :
-// CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:\$S14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
+// CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:\$s14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
 
 // CHECK: sil shared [serializable] [thunk] @[[THUNK2_THUNK]] :
-// CHECK:      [[FN:%.*]] = objc_method %0 : $@thick Self.Type, #NSRuncing.mince!1.foreign
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>(%0)
+// CHECK:      [[METATYPE:%.*]] = thick_to_objc_metatype %0
+// CHECK:      [[FN:%.*]] = objc_method [[METATYPE]] : $@objc_metatype Self.Type, #NSRuncing.mince!1.foreign
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>([[METATYPE]])
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[THIS:%.*]] : @owned $NSRuncing):
+// CHECK-LABEL: sil hidden @$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK: bb0([[THIS:%.*]] : @guaranteed $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
-// CHECK: [[BORROWED_THIS_1:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[THIS1:%.*]] = open_existential_ref [[BORROWED_THIS_1]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+// CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS1]] : $[[OPENED]], #NSRuncing.runce!1.foreign
 // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<[[OPENED]]>([[THIS1]])
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
-// CHECK: [[BORROWED_THIS_2:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[THIS2:%.*]] = open_existential_ref [[BORROWED_THIS_2]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
+// CHECK: [[THIS2:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED2:@opened(.*) NSRuncing]]
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS2]] : $[[OPENED2]], #NSRuncing.copyRuncing!1.foreign
 // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<[[OPENED2]]>([[THIS2:%.*]])
 
 // -- Arguments are not consumed by objc calls
-// CHECK: end_borrow [[BORROWED_THIS_2]] from [[THIS]]
-// CHECK: end_borrow [[BORROWED_THIS_1]] from [[THIS]]
-// CHECK: destroy_value [[THIS]]
+// CHECK-NOT: destroy_value [[THIS]]
 func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@owned NSRuncing) -> () {
+// CHECK-LABEL: sil hidden @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@guaranteed NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $NSRuncing):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[BORROWED_ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
-  // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
-  // CHECK:   [[FN:%.*]] = function_ref @$S14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
-  // CHECK:   [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[OPENED_ARG_COPY]])
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $NSRuncing):
+  // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
+  // CHECK:   [[FN:%.*]] = function_ref @$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO
+  // CHECK:   [[RESULT:%.*]] = apply [[FN]]<[[OPENED]]>([[OPENED_ARG]])
   // CHECK:   destroy_value [[RESULT]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   destroy_value [[ARG]]
+  // CHECK-NOT:   destroy_value [[ARG]]
   _ = x.runce
 
   // FIXME: rdar://21289579
   // _ = NSRuncing.runce
 }
-// CHECK : } // end sil function '$S14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
+// CHECK : } // end sil function '$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!1.foreign
@@ -168,10 +157,10 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 // CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
@@ -183,9 +172,9 @@ extension Bar : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -195,8 +184,8 @@ extension Bas : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$S18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- Inherited objc protocols
 
@@ -207,8 +196,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -216,7 +205,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$S18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -230,14 +219,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @$S14objc_protocols19StoredPropertyCountC5countSivgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] @$s14objc_protocols19StoredPropertyCountC5countSivgTo
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols21ComputedPropertyCountC5countSivgTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols21ComputedPropertyCountC5countSivgTo
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -258,7 +247,7 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden @$S14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
+// CHECK-LABEL: sil hidden @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
@@ -277,12 +266,12 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   var i2 = im.init(int: i)
   return i2
 }
-// CHECK: } // end sil function '$S14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF'
+// CHECK: } // end sil function '$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF'
 
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
 
 final class InitializableConformerByExtension {
   init() {}
@@ -293,7 +282,7 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden [thunk] @$S14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
 
 // Make sure we're crashing from trying to use materializeForSet here.
 @objc protocol SelectionItem {
@@ -303,3 +292,39 @@ extension InitializableConformerByExtension: Initializable {
 func incrementTime(contents: SelectionItem) {
   contents.time += 1.0
 }
+
+@objc
+public protocol DangerousEscaper {
+  @objc
+  func malicious(_ mayActuallyEscape: () -> ())
+}
+
+// Make sure we emit an withoutActuallyEscaping sentinel.
+
+// CHECK-LABEL: sil @$s14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
+// CHECK: bb0([[CLOSURE_ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (), [[SELF:%.*]] : @guaranteed $DangerousEscaper):
+// CHECK:  [[OE:%.*]] = open_existential_ref [[SELF]]
+// CHECK:  [[CLOSURE_COPY1:%.*]]  = copy_value [[CLOSURE_ARG]]
+// CHECK:  [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY1]]
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NOESCAPE]])
+// CHECK:  [[WITHOUT_ESCAPING:%.*]] = mark_dependence [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL]] : $@callee_guaranteed () -> () on [[NOESCAPE]]
+// CHECK:  [[WITHOUT_ESCAPING_COPY:%.*]] = copy_value [[WITHOUT_ESCAPING]] : $@callee_guaranteed () -> ()
+// CHECK:  [[BLOCK:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
+// CHECK:  [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
+// CHECK:  store [[WITHOUT_ESCAPING_COPY]] to [init] [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
+// CHECK:  [[BLOCK_INVOKE:%.*]] = function_ref @$sIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[BLOCK_CLOSURE:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage @callee_guaranteed () -> (), invoke [[BLOCK_INVOKE]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+// CHECK:  [[BLOCK_CLOSURE_COPY:%.*]] = copy_block_without_escaping [[BLOCK_CLOSURE]] : $@convention(block) @noescape () -> () withoutEscaping [[WITHOUT_ESCAPING]] : $@callee_guaranteed () -> ()
+// CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
+// CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
+// CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!1.foreign
+// CHECK:  apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
+// CHECK:  return {{.*}} : $()
+
+public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
+  villian.malicious(closure)
+}
+

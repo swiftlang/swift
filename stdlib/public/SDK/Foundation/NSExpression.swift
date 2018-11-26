@@ -15,7 +15,7 @@
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
   public
-  convenience init(format expressionFormat: String, _ args: CVarArg...) {
+  convenience init(format expressionFormat: __shared String, _ args: CVarArg...) {
     let va_args = getVaList(args)
     self.init(format: expressionFormat, arguments: va_args)
   }

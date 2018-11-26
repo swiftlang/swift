@@ -23,7 +23,10 @@
 using namespace swift;
 using namespace irgen;
 
-static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
+static unsigned getNumLowObjCReservedBits(const IRGenModule &IGM) {
+  if (!IGM.ObjCInterop)
+    return 0;
+
   // Get the index of the first non-reserved bit.
   SpareBitVector ObjCMask = IGM.TargetInfo.ObjCPointerReservedBits;
   ObjCMask.flipAll();
@@ -34,7 +37,7 @@ static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
 
 /// Return the number of extra inhabitants for a pointer that reserves
 /// the given number of low bits.
-static unsigned getPointerExtraInhabitantCount(IRGenModule &IGM,
+static unsigned getPointerExtraInhabitantCount(const IRGenModule &IGM,
                                                unsigned numReservedLowBits) {  
   // FIXME: We could also make extra inhabitants using spare bits, but we
   // probably don't need to.
@@ -45,7 +48,7 @@ static unsigned getPointerExtraInhabitantCount(IRGenModule &IGM,
   return std::min((uint64_t)INT_MAX, rawCount);
 }
 
-unsigned irgen::getHeapObjectExtraInhabitantCount(IRGenModule &IGM) {
+unsigned irgen::getHeapObjectExtraInhabitantCount(const IRGenModule &IGM) {
   // This must be consistent with the extra inhabitant count produced
   // by the runtime's getHeapObjectExtraInhabitantCount function in
   // KnownMetadata.cpp.
@@ -59,7 +62,7 @@ unsigned irgen::getFunctionPointerExtraInhabitantCount(IRGenModule &IGM) {
 /*****************************************************************************/
 
 static APInt
-getPointerFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+getPointerFixedExtraInhabitantValue(const IRGenModule &IGM, unsigned bits,
                                     unsigned index, unsigned offset,
                                     unsigned numReservedLowBits) {
   assert(index < getPointerExtraInhabitantCount(IGM, numReservedLowBits) &&
@@ -72,7 +75,7 @@ getPointerFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
   return apValue;
 }
 
-APInt irgen::getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
+APInt irgen::getHeapObjectFixedExtraInhabitantValue(const IRGenModule &IGM,
                                                     unsigned bits,
                                                     unsigned index,
                                                     unsigned offset) {

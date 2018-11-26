@@ -19,14 +19,13 @@ import SwiftShims
 /// Unicode [replacement characters][rc].
 ///
 /// [rc]:
-/// http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+/// https://unicode.org/glossary/#replacement_character
 ///
 /// - Parameter strippingNewline: If `true`, newline characters and character
 ///   combinations are stripped from the result; otherwise, newline characters
 ///   or character combinations are preserved. The default is `true`.
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
-@_inlineable // FIXME(sil-serialize-all)
 public func readLine(strippingNewline: Bool = true) -> String? {
   var linePtrVar: UnsafeMutablePointer<UInt8>?
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
@@ -65,10 +64,9 @@ public func readLine(strippingNewline: Bool = true) -> String? {
       }
     }
   }
-  let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
-    input: UnsafeMutableBufferPointer(
-      start: linePtr,
-      count: readBytes)).0
-  _stdlib_free(linePtr)
+  let result = String._fromUTF8(
+    UnsafeBufferPointer(start: linePtr, count: readBytes),
+    repair: true)!
+  _swift_stdlib_free(linePtr)
   return result
 }

@@ -15,5 +15,20 @@ module visualc [system] {
     header "sal.h"
     export *
   }
+
+  module vadefs {
+    header "vadefs.h"
+    export *
+  }
+
+  module vcruntime {
+    header "vcruntime.h"
+    export *
+  }
+
+  module stdint {
+    header "stdint.h"
+    export *
+  }
 }
 

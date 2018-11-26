@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "DictionaryKeys.h"
-#include "sourcekitd/sourcekitd.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
+#include "sourcekitd/RawData.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/Logging.h"
 #include "SourceKit/Core/LLVM.h"
@@ -74,6 +74,8 @@ public:
   virtual Optional<StringRef> getString() const { return None; }
   virtual const char *getCString() const { return nullptr; }
   virtual bool getBool() const { return false; }
+  virtual const void *getDataPtr() const { return nullptr; }
+  virtual size_t getDataSize() const { return 0; }
 };
 
 class SKDDictionary: public SKDObject {
@@ -255,6 +257,8 @@ public:
       case CustomBufferKind::DocStructureElementArray:
       case CustomBufferKind::AttributesArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
+      case CustomBufferKind::RawData:
+        return SOURCEKITD_VARIANT_TYPE_DATA;
     }
     llvm::report_fatal_error("sourcekitd object did not resolve to a known type");
   }
@@ -263,8 +267,12 @@ public:
     return BufferKind;
   }
 
-  const void *getDataPtr() const {
+  const void *getDataPtr() const override {
     return BufferPtr->getBuffer().data();
+  }
+
+  size_t getDataSize() const override {
+    return BufferPtr->getBuffer().size();
   }
 
   static bool classof(const SKDObject *O) {
@@ -626,6 +634,11 @@ void ResponseBuilder::Dictionary::set(UIdent Key, StringRef Str) {
                                       new SKDString(Str));
 }
 
+void ResponseBuilder::Dictionary::set(UIdent Key, const std::string &Str) {
+  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key),
+                                      new SKDString(std::string(Str)));
+}
+
 void ResponseBuilder::Dictionary::set(UIdent Key, int64_t Val) {
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), new SKDInt64(Val));
 }
@@ -635,6 +648,15 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   auto ArrayObject = new SKDArray();
   for (auto Str : Strs) {
     ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDString(Str));
+  }
+  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
+}
+
+void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
+                                      ArrayRef<std::string> Strs) {
+  auto ArrayObject = new SKDArray();
+  for (auto Str : Strs) {
+    ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDString(std::string(Str)));
   }
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
 }
@@ -901,6 +923,13 @@ static sourcekitd_uid_t SKDVar_uid_get_value(sourcekitd_variant_t obj) {
   return SKD_OBJ(obj)->getUID();
 }
 
+static const void *SKDVar_data_get_ptr(sourcekitd_variant_t obj) {
+  return SKD_OBJ(obj)->getDataPtr();
+}
+
+static size_t SKDVar_data_get_size(sourcekitd_variant_t obj) {
+  return SKD_OBJ(obj)->getDataSize();
+}
 
 static VariantFunctions SKDVariantFuncs = {
   SKDVar_get_type,
@@ -921,7 +950,9 @@ static VariantFunctions SKDVariantFuncs = {
   SKDVar_string_get_length,
   SKDVar_string_get_ptr,
   SKDVar_int64_get_value,
-  SKDVar_uid_get_value
+  SKDVar_uid_get_value,
+  SKDVar_data_get_size,
+  SKDVar_data_get_ptr,
 };
 
 static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
@@ -951,6 +982,10 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
       case CustomBufferKind::AttributesArray:
         return {{ (uintptr_t)getVariantFunctionsForAttributesArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::RawData:
+        return {{ (uintptr_t)getVariantFunctionsForRawData(),
+                  (uintptr_t)DataObject->getDataPtr(),
+                  (uintptr_t)DataObject->getDataSize() }};
     }
   }
   

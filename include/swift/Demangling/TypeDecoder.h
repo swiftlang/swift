@@ -22,6 +22,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
+#include "swift/Strings.h"
 #include <vector>
 
 namespace swift {
@@ -29,7 +30,7 @@ namespace Demangle {
 
 /// Strip generic arguments from the "spine" of a context node, producing a
 /// bare context to be used in (e.g.) forming nominal type descriptors.
-NodePointer stripGenericArgsFromContextNode(const NodePointer &node,
+NodePointer stripGenericArgsFromContextNode(NodePointer node,
                                             NodeFactory &factory);
 
 /// Describe a function parameter, parameterized on the type
@@ -56,6 +57,7 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
+  void setAutoClosure() { Flags = Flags.withAutoClosure(true); }
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
@@ -73,6 +75,34 @@ public:
     return FunctionParam(Label, Type, flags);
   }
 };
+
+
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static inline Optional<StringRef> getObjCClassOrProtocolName(
+    const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+#endif
 
 /// Decode a mangled type to construct an abstract type, forming such
 /// types by invoking a custom builder.
@@ -111,10 +141,17 @@ class TypeDecoder {
 
       return decodeMangledType(Node->getChild(0));
     case NodeKind::Class:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (auto mangledName = getObjCClassOrProtocolName(Node))
+        return Builder.createObjCClassType(mangledName->str());
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
-    case NodeKind::SymbolicReference:
+    case NodeKind::TypeSymbolicReference:
     {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
@@ -124,10 +161,18 @@ class TypeDecoder {
       return Builder.createNominalType(typeDecl, parent);
     }
     case NodeKind::BoundGenericClass:
+    {
+#if SWIFT_OBJC_INTEROP
+      if (Node->getNumChildren() == 2)
+        if (auto mangledName = getObjCClassOrProtocolName(Node->getChild(0)))
+          return Builder.createObjCClassType(mangledName->str());
+#endif
+      LLVM_FALLTHROUGH;
+    }
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
     case NodeKind::BoundGenericOtherNominalType: {
-      if (Node->getNumChildren() != 2)
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
@@ -161,7 +206,7 @@ class TypeDecoder {
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
-      if (Node->getNumChildren() == 2) {
+      if (Node->getNumChildren() >= 2) {
         auto repr = Node->getChild(i++);
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
@@ -228,7 +273,8 @@ class TypeDecoder {
                                                    IsClassBound);
     }
 
-    case NodeKind::Protocol: {
+    case NodeKind::Protocol:
+    case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node)) {
         return Builder.createProtocolCompositionType(Proto, BuiltType(),
                                                      /*IsClassBound=*/false);
@@ -246,6 +292,8 @@ class TypeDecoder {
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
     case NodeKind::NoEscapeFunctionType:
+    case NodeKind::AutoClosureType:
+    case NodeKind::EscapingAutoClosureType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
@@ -275,7 +323,9 @@ class TypeDecoder {
       flags =
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
-              .withEscaping(Node->getKind() == NodeKind::FunctionType);
+              .withEscaping(
+                          Node->getKind() == NodeKind::FunctionType ||
+                          Node->getKind() == NodeKind::EscapingAutoClosureType);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
@@ -468,21 +518,21 @@ class TypeDecoder {
   }
 
 private:
-  bool decodeMangledNominalType(const Demangle::NodePointer &node,
+  bool decodeMangledNominalType(Demangle::NodePointer node,
                                 BuiltNominalTypeDecl &typeDecl,
                                 BuiltType &parent) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
     Demangle::NodePointer nominalNode;
-    if (node->getKind() == NodeKind::SymbolicReference) {
+    if (node->getKind() == NodeKind::TypeSymbolicReference) {
       // A symbolic reference can be directly resolved to a nominal type.
       nominalNode = node;
     } else {
       if (node->getNumChildren() < 2)
         return false;
 
-      auto moduleOrParentType = node->getChild(0);
+      auto parentContext = node->getChild(0);
 
       // Nested types are handled a bit funny here because a
       // nominal typeref always stores its full mangled name,
@@ -490,14 +540,22 @@ private:
       // mangled name already includes the module and parent
       // types, if any.
       nominalNode = node;
-      if (moduleOrParentType->getKind() != NodeKind::Module) {
-        parent = decodeMangledType(moduleOrParentType);
-        if (!parent) return false;
-
+      switch (parentContext->getKind()) {
+      case Node::Kind::Module:
+        break;
+      case Node::Kind::Extension:
+        // Decode the type being extended.
+        if (parentContext->getNumChildren() < 2)
+          return false;
+        parentContext = parentContext->getChild(1);
+        LLVM_FALLTHROUGH;
+      default:
+        parent = decodeMangledType(parentContext);
         // Remove any generic arguments from the context node, producing a
-        // node that reference the nominal type declaration.
+        // node that references the nominal type declaration.
         nominalNode =
           stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+        break;
       }
     }
     typeDecl = Builder.createNominalTypeDecl(nominalNode);
@@ -506,19 +564,24 @@ private:
     return true;
   }
 
-  BuiltProtocolDecl decodeMangledProtocolType(
-                                           const Demangle::NodePointer &node) {
+  BuiltProtocolDecl decodeMangledProtocolType(Demangle::NodePointer node) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledProtocolType(node->getChild(0));
 
-    if (node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
+    if ((node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
+        && node->getKind() != NodeKind::ProtocolSymbolicReference)
       return BuiltProtocolDecl();
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcProtocolName = getObjCClassOrProtocolName(node))
+      return Builder.createObjCProtocolDecl(objcProtocolName->str());
+#endif
 
     return Builder.createProtocolDecl(node);
   }
 
   bool decodeMangledFunctionInputType(
-      const Demangle::NodePointer &node,
+      Demangle::NodePointer node,
       std::vector<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
@@ -529,7 +592,7 @@ private:
     }
 
     auto decodeParamTypeAndFlags =
-        [&](const Demangle::NodePointer &typeNode,
+        [&](Demangle::NodePointer typeNode,
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
 
@@ -550,6 +613,13 @@ private:
       case NodeKind::Owned:
         setOwnership(ValueOwnership::Owned);
         break;
+
+      case NodeKind::AutoClosureType:
+      case NodeKind::EscapingAutoClosureType: {
+        param.setAutoClosure();
+        hasParamFlags = true;
+        break;
+      }
 
       default:
         break;

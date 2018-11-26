@@ -39,7 +39,7 @@ namespace swift {
 Type getBuiltinType(ASTContext &Context, StringRef Name);
 
 /// OverloadedBuiltinKind - Whether and how a builtin is overloaded.
-enum class OverloadedBuiltinKind : unsigned char {
+enum class OverloadedBuiltinKind : uint8_t {
   /// The builtin is not overloaded.
   None,
 

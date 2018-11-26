@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <swift/Runtime/Debug.h>
 #include <dispatch/dispatch.h>
 #include <objc/runtime.h>
 #include <stdio.h>
@@ -47,3 +48,10 @@ static void _dispatch_overlay_constructor() {
   }
 }
 
+extern "C" void
+_swift_dispatch_source_create_abort(void)
+{
+  swift::swift_reportError(0,
+      "dispatch_source_create returned NULL, invalid parameters passed to dispatch_source_create");
+  abort();
+}

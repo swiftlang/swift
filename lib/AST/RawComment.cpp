@@ -109,6 +109,7 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
   LangOptions FakeLangOpts;
   Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+          HashbangMode::Disallowed,
           CommentRetentionMode::ReturnAsTokens,
           TriviaRetentionMode::WithoutTrivia,
           Offset, EndOffset);
@@ -163,8 +164,8 @@ static const Decl* getGroupDecl(const Decl *D) {
   // Extensions always exist in the same group with the nominal.
   if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
                                                 getInnermostTypeContext())) {
-    if (auto ExtTy = ED->getExtendedType())
-      GroupD = ExtTy->getAnyNominal();
+    if (auto ExtNominal = ED->getExtendedNominal())
+      GroupD = ExtNominal;
   }
   return GroupD;
 }

@@ -43,12 +43,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -196,7 +197,8 @@ public:
   friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
+  ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
+                SILFunction *Orig, IsSerialized_t Serialized,
                 StringRef ClonedName,
                 IndicesSet &PromotableIndices);
 
@@ -205,7 +207,8 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
+  static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
+                                 SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
                                  IndicesSet &PromotableIndices);
 
@@ -244,8 +247,8 @@ void ReachabilityInfo::compute() {
   Matrix = ReachingBlockSet::allocateMatrix(N);
   ReachingBlockSet NewSet = ReachingBlockSet::allocateSet(N);
 
-  DEBUG(llvm::dbgs() << "Computing Reachability for " << F->getName()
-        << " with " << N << " blocks.\n");
+  LLVM_DEBUG(llvm::dbgs() << "Computing Reachability for " << F->getName()
+             << " with " << N << " blocks.\n");
 
   // Iterate to a fix point, two times for a topological DAG.
   bool Changed;
@@ -279,12 +282,12 @@ void ReachabilityInfo::compute() {
           CurSet.set(PredID);
         }
       }
-      DEBUG(llvm::dbgs() << "  Block " << BlockMap[&BB] << " reached by ";
-            for (unsigned i = 0; i < N; ++i) {
-              if (CurSet.test(i))
-                llvm::dbgs() << i << " ";
-            }
-            llvm::dbgs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  Block " << BlockMap[&BB] << " reached by ";
+                 for (unsigned i = 0; i < N; ++i) {
+                   if (CurSet.test(i))
+                     llvm::dbgs() << i << " ";
+                 }
+                 llvm::dbgs() << "\n");
     }
   } while (Changed);
 
@@ -305,11 +308,12 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
+ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
+                             SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
                              IndicesSet &PromotableIndices)
   : SILClonerWithScopes<ClosureCloner>(
-                           *initCloned(Orig, Serialized, ClonedName, PromotableIndices)),
+      *initCloned(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices)),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -328,7 +332,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
   auto fnConv = F->getConventions();
   auto Parameters = fnConv.funcTy->getParameters();
 
-  DEBUG(llvm::dbgs() << "Preparing New Args!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
   auto fnTy = F->getLoweredFunctionType();
 
@@ -344,9 +348,9 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // the arg index when working with PromotableIndices.
     unsigned ArgIndex = Index + fnConv.getSILArgIndexOfFirstParam();
 
-    DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
-          << (PromotableIndices.count(ArgIndex)?"yes":"no")
-          << " Param: "; param.dump());
+    LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
+               << (PromotableIndices.count(ArgIndex)?"yes":"no")
+               << " Param: "; param.dump());
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
@@ -371,7 +375,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
       convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
                                         : ParameterConvention::Direct_Owned;
     }
-    OutTys.push_back(SILParameterInfo(paramBoxedTy.getSwiftRValueType(),
+    OutTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(),
                                       convention));
   }
 }
@@ -402,7 +406,8 @@ static std::string getSpecializedName(SILFunction *F,
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
+ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
+                          SILFunction *Orig, IsSerialized_t Serialized,
                           StringRef ClonedName,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
@@ -427,7 +432,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  auto *Fn = M.createFunction(
+  auto *Fn = FunctionBuilder.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
@@ -452,14 +457,17 @@ ClosureCloner::populateCloned() {
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
+
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   for (; I != E; ++ArgNo, ++I) {
     if (!PromotableIndices.count(ArgNo)) {
-      // Otherwise, create a new argument which copies the original argument
+      // Simply create a new argument which copies the original argument
       SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
           (*I)->getType(), (*I)->getDecl());
-      ValueMap.insert(std::make_pair(*I, MappedValue));
+      entryArgs.push_back(MappedValue);
       continue;
     }
 
@@ -479,6 +487,8 @@ ClosureCloner::populateCloned() {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
       MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
     }
+    entryArgs.push_back(MappedValue);
+
     BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
 
     // Track the projections of the box.
@@ -488,17 +498,9 @@ ClosureCloner::populateCloned() {
       }
     }
   }
-
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(Orig, ClonedEntryBB, entryArgs);
 }
 
 /// If this operand originates from a mapped ProjectBox, return the mapped
@@ -641,7 +643,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // We assume that the value is already guaranteed.
     assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
            "Expected argument value to be guaranteed");
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -666,7 +668,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -692,7 +694,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
@@ -817,7 +819,7 @@ public:
   ///
   /// These are considered to be escapes.
   bool visitSILInstruction(SILInstruction *I) {
-    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
     return false;
   }
 
@@ -844,7 +846,8 @@ public:
     SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
     auto convention = substConv.getSILArgumentConvention(argIndex);
     if (!convention.isIndirectConvention()) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found non indirect apply user: " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found non indirect apply user: "
+                              << *AI);
       return false;
     }
     Mutations.push_back(AI);
@@ -903,7 +906,7 @@ public:
 
   bool visitStoreInst(StoreInst *SI) {
     if (CurrentOp.get()->getOperandNumber() != 1) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *SI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *SI);
       return false;
     }
     Mutations.push_back(SI);
@@ -912,7 +915,7 @@ public:
 
   bool visitAssignInst(AssignInst *AI) {
     if (CurrentOp.get()->getOperandNumber() != 1) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);
       return false;
     }
     Mutations.push_back(AI);
@@ -949,7 +952,7 @@ static bool isNonEscapingUse(Operand *InitialOp,
 
 bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
                                    EscapeMutationScanningState &State) {
-  DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+  LLVM_DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
 
   unsigned OpNo = CurrentOp->getOperandNumber();
   assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
@@ -958,7 +961,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // box is being captured twice by the same closure, which is odd and
   // unexpected: bail instead of trying to handle this case.
   if (State.IM.count(PAI)) {
-    DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
     return false;
   }
 
@@ -973,7 +976,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
 
   auto *Fn = PAI->getReferencedFunction();
   if (!Fn || !Fn->isDefinition()) {
-    DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                           "reference.\n");
     return false;
   }
@@ -987,7 +990,8 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
   if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
-    DEBUG(llvm::dbgs() << "        FAIL! Box is an address only argument!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
+                               "argument!\n");
     return false;
   }
 
@@ -995,26 +999,26 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // it does, then conservatively refuse to promote any captures of this
   // value.
   if (!isNonMutatingCapture(BoxArg)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
     return false;
   }
 
   // Record the index and continue.
-  DEBUG(llvm::dbgs()
-        << "        Partial apply does not escape, may be optimizable!\n");
-  DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "        Partial apply does not escape, may be optimizable!\n");
+  LLVM_DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
   State.IM.insert(std::make_pair(PAI, Index));
   return true;
 }
 
 static bool isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
                                        EscapeMutationScanningState &State) {
-  DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
+  LLVM_DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
 
   for (Operand *AddrOp : PBI->getUses()) {
     if (!isNonEscapingUse(AddrOp, State)) {
-      DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
-                         << *AddrOp->getUser());
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
+                              << *AddrOp->getUser());
       return false;
     }
   }
@@ -1066,19 +1070,19 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
-  DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
+  LLVM_DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
   EscapeMutationScanningState State{{}, false, IM};
 
   // Scan the box for interesting uses.
   if (any_of(ABI->getUses(), [&State](Operand *Op) {
         return !scanUsesForEscapesAndMutations(Op, State);
       })) {
-    DEBUG(llvm::dbgs()
-          << "Found an escaping use! Can not optimize this alloc box?!\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found an escaping use! Can not optimize this alloc box?!\n");
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
+  LLVM_DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
 
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
@@ -1094,8 +1098,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     return false;
   };
 
-  DEBUG(llvm::dbgs()
-        << "Checking for any mutations that invalidate captures...\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *I : State.Mutations) {
     auto Iter = IM.begin();
@@ -1106,8 +1110,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // block is after the partial_apply.
       if (RI.isReachable(PAI->getParent(), I->getParent()) ||
           (PAI->getParent() == I->getParent() && isAfter(PAI, I))) {
-        DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
-        DEBUG(llvm::dbgs() << "    Because of user: " << *I);
+        LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
+        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *I);
         auto Prev = Iter++;
         IM.erase(Prev);
         continue;
@@ -1116,17 +1120,18 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     }
     // If there are no valid captures left, then stop.
     if (IM.empty()) {
-      DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
       return false;
     }
   }
 
-  DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
   return true;
 }
 
 static SILFunction *
-constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
+constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
+                        PartialApplyInst *PAI, FunctionRefInst *FRI,
                         IndicesSet &PromotableIndices) {
   SILFunction *F = PAI->getFunction();
 
@@ -1146,7 +1151,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(Orig, Serialized, ClonedName, PromotableIndices);
+  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }
@@ -1199,14 +1204,15 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
 /// necessary. Also, if the closure is cloned, the cloned function is added to
 /// the worklist.
 static SILFunction *
-processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
+processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
+                        PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
 
   // Clone the closure with the given promoted captures.
-  SILFunction *ClonedFn = constructClonedFunction(PAI, FRI, PromotableIndices);
+  SILFunction *ClonedFn = constructClonedFunction(FuncBuilder, PAI, FRI, PromotableIndices);
   Worklist.push_back(ClonedFn);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
@@ -1221,7 +1227,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
     SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutions());
+        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
@@ -1261,7 +1267,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
-      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getLoc(), FnVal, PAI->getSubstitutionMap(), Args,
       PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
@@ -1293,7 +1299,7 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
           for (auto &IndexPair : IndexMap)
             Map[IndexPair.first].insert(IndexPair.second);
         }
-        DEBUG(llvm::dbgs() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "\n");
       }
     }
   }
@@ -1325,8 +1331,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(SILFunction *F,
                                       SmallVectorImpl<SILFunction*> &Worklist) {
-  DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
-                     << F->getName() << "********\n");
+  LLVM_DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
+                          << F->getName() << "********\n");
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;
@@ -1334,11 +1340,13 @@ void CapturePromotionPass::processFunction(SILFunction *F,
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.
+  SILOptFunctionBuilder FuncBuilder(*this);
   for (auto &IndicesPair : IndicesMap) {
     PartialApplyInst *PAI = IndicesPair.first;
-    SILFunction *ClonedFn = processPartialApplyInst(PAI, IndicesPair.second,
+    SILFunction *ClonedFn = processPartialApplyInst(FuncBuilder,
+                                                    PAI, IndicesPair.second,
                                                     Worklist);
-    notifyAddFunction(ClonedFn);
+    (void)ClonedFn;
   }
   invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
 }

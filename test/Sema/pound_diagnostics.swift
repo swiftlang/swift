@@ -62,3 +62,13 @@ func foo() {
   default: break
   }
 }
+
+public // expected-error @+1 {{expected declaration}}
+#warning("public warning") // expected-warning {{public warning}}
+func bar() {}
+
+class C { // expected-note {{in declaration of 'C'}}
+  private // expected-error @+1 {{expected declaration}}
+  #error("private error") // expected-error  {{private error}}
+  func bar() {}
+}

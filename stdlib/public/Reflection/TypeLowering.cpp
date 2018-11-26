@@ -26,9 +26,9 @@
 #include <iostream>
 
 #ifdef DEBUG_TYPE_LOWERING
-  #define DEBUG(expr) expr;
+  #define DEBUG_LOG(expr) expr;
 #else
-  #define DEBUG(expr)
+  #define DEBUG_LOG(expr)
 #endif
 
 namespace swift {
@@ -158,18 +158,10 @@ public:
       printHeader("reference");
       auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
       switch (ReferenceTI.getReferenceKind()) {
-      case ReferenceKind::Strong:
-        printField("kind", "strong");
-        break;
-      case ReferenceKind::Unowned:
-        printField("kind", "unowned");
-        break;
-      case ReferenceKind::Weak:
-        printField("kind", "weak");
-        break;
-      case ReferenceKind::Unmanaged:
-        printField("kind", "unmanaged");
-        break;
+      case ReferenceKind::Strong: printField("kind", "strong"); break;
+#define REF_STORAGE(Name, name, ...) \
+      case ReferenceKind::Name: printField("kind", #name); break;
+#include "swift/AST/ReferenceStorage.def"
       }
 
       switch (ReferenceTI.getReferenceCounting()) {
@@ -205,7 +197,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
-  std::vector<const NominalTypeRef *> Protocols;
+  std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
@@ -226,8 +218,9 @@ class ExistentialTypeInfoBuilder {
       return false;
 
     for (auto *P : Protocols) {
-      if (P->isErrorProtocol())
-        return true;
+      if (auto *NTD = dyn_cast<NominalTypeRef>(P))
+        if (NTD->isErrorProtocol())
+          return true;
     }
     return false;
   }
@@ -240,10 +233,24 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
+      auto *NTD = dyn_cast<NominalTypeRef>(P);
+      auto *OP = dyn_cast<ObjCProtocolTypeRef>(P);
+      if (!NTD && !OP) {
+        DEBUG_LOG(std::cerr << "Bad protocol: "; P->dump())
+        Invalid = true;
+        continue;
+      }
+
+      // Don't look up field info for imported Objective-C protocols.
+      if (OP) {
+        ObjC = true;
+        continue;
+      }
+
       std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
           TC.getBuilder().getFieldTypeInfo(P);
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No field descriptor: "; P->dump())
+        DEBUG_LOG(std::cerr << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
@@ -278,7 +285,7 @@ public:
       ObjC(false), WitnessTableCount(0),
       Invalid(false) {}
 
-  void addProtocol(const NominalTypeRef *P) {
+  void addProtocol(const TypeRef *P) {
     Protocols.push_back(P);
   }
 
@@ -294,14 +301,22 @@ public:
       // Anything else should either be a superclass constraint, or
       // we have an invalid typeref.
       if (!isa<NominalTypeRef>(T) &&
-          !isa<BoundGenericTypeRef>(T)) {
-        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+          !isa<BoundGenericTypeRef>(T) &&
+          !isa<ObjCClassTypeRef>(T)) {
+        DEBUG_LOG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
         return;
       }
+
+      // Don't look up field info for imported Objective-C classes.
+      if (auto *OC = dyn_cast<ObjCClassTypeRef>(T)) {
+        addAnyObject();
+        return;
+      }
+
       const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No field descriptor: "; T->dump())
+        DEBUG_LOG(std::cerr << "No field descriptor: "; T->dump())
         Invalid = true;
         return;
       }
@@ -318,7 +333,7 @@ public:
         break;
 
       default:
-        DEBUG(std::cerr << "Bad existential member: "; T->dump())
+        DEBUG_LOG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
         return;
       }
@@ -341,7 +356,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG(std::cerr << "@objc existential with witness tables\n");
+        DEBUG_LOG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
       }
 
@@ -376,7 +391,7 @@ public:
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef());
       if (TI == nullptr) {
-        DEBUG(std::cerr << "No TypeInfo for RawPointer\n");
+        DEBUG_LOG(std::cerr << "No TypeInfo for RawPointer\n");
         return nullptr;
       }
 
@@ -407,7 +422,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG(std::cerr << "@objc existential with witness tables\n");
+        DEBUG_LOG(std::cerr << "@objc existential with witness tables\n");
         return nullptr;
       }
 
@@ -441,12 +456,35 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
 
-  // The extra inhabitants of a record are the same as the extra
-  // inhabitants of the first field of the record.
-  if (Empty) {
-    NumExtraInhabitants = numExtraInhabitants;
-    Empty = false;
+  switch (Kind) {
+  // The extra inhabitants of a struct or tuple are the same as the extra
+  // inhabitants of the field that has the most.
+  // Opaque existentials pick up the extra inhabitants of their type metadata
+  // field.
+  case RecordKind::Struct:
+  case RecordKind::OpaqueExistential:
+  case RecordKind::Tuple:
+    NumExtraInhabitants = std::max(NumExtraInhabitants, numExtraInhabitants);
+    break;
+  
+  // For other kinds of records, we only use the extra inhabitants of the
+  // first field.
+  case RecordKind::ClassExistential:
+  case RecordKind::ClassInstance:
+  case RecordKind::ClosureContext:
+  case RecordKind::ErrorExistential:
+  case RecordKind::ExistentialMetatype:
+  case RecordKind::Invalid:
+  case RecordKind::MultiPayloadEnum:
+  case RecordKind::NoPayloadEnum:
+  case RecordKind::SinglePayloadEnum:
+  case RecordKind::ThickFunction:
+    if (Empty) {
+      NumExtraInhabitants = numExtraInhabitants;
+    }
+    break;
   }
+  Empty = false;
 
   return offset;
 }
@@ -455,7 +493,7 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
                                      const TypeRef *TR) {
   const TypeInfo *TI = TC.getTypeInfo(TR);
   if (TI == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for field type: "; TR->dump());
+    DEBUG_LOG(std::cerr << "No TypeInfo for field type: "; TR->dump());
     Invalid = true;
     return;
   }
@@ -505,7 +543,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
 
   auto *BuiltinTI = Builder.getBuiltinTypeInfo(TR);
   if (BuiltinTI == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
+    DEBUG_LOG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
     return nullptr;
   }
 
@@ -532,7 +570,7 @@ TypeConverter::getThinFunctionTypeInfo() {
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getThinFunctionTypeRef());
   if (descriptor == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for function type\n");
+    DEBUG_LOG(std::cerr << "No TypeInfo for function type\n");
     return nullptr;
   }
 
@@ -568,7 +606,7 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   auto *descriptor = getBuilder().getBuiltinTypeInfo(
       getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
-    DEBUG(std::cerr << "No TypeInfo for metatype type\n");
+    DEBUG_LOG(std::cerr << "No TypeInfo for metatype type\n");
     return nullptr;
   }
 
@@ -706,19 +744,16 @@ public:
     return true;
   }
 
-  bool
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+  bool visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
     return true;
   }
 
-  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return true;
+#define REF_STORAGE(Name, ...) \
+  bool \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return true; \
   }
-
-  bool
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return true;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   bool
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
@@ -821,13 +856,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
+    DEBUG_LOG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
+    DEBUG_LOG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return MetatypeRepresentation::Unknown;
   }
 
@@ -840,19 +875,16 @@ public:
     return MetatypeRepresentation::Unknown;
   }
 
-  MetatypeRepresentation
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
+  MetatypeRepresentation visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
     return MetatypeRepresentation::Unknown;
   }
 
-  MetatypeRepresentation visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return MetatypeRepresentation::Unknown;
+#define REF_STORAGE(Name, ...) \
+  MetatypeRepresentation \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return MetatypeRepresentation::Unknown; \
   }
-
-  MetatypeRepresentation
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return MetatypeRepresentation::Unknown;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   MetatypeRepresentation visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return MetatypeRepresentation::Unknown;
@@ -903,7 +935,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
-      DEBUG(std::cerr << "No TypeInfo for case type: "; TR->dump());
+      DEBUG_LOG(std::cerr << "No TypeInfo for case type: "; TR->dump());
       Invalid = true;
       return;
     }
@@ -1049,7 +1081,7 @@ public:
     /// metadata.
     auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
     if (descriptor == nullptr) {
-      DEBUG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
+      DEBUG_LOG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
       return nullptr;
     }
     return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
@@ -1066,7 +1098,7 @@ public:
 
       // Otherwise, we're out of luck.
       if (FD.first == nullptr) {
-        DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
+        DEBUG_LOG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
         return nullptr;
       }
     }
@@ -1100,7 +1132,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
+      DEBUG_LOG(std::cerr << "Invalid field descriptor: "; TR->dump());
       return nullptr;
     }
 
@@ -1148,7 +1180,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
-      DEBUG(std::cerr << "Unknown metatype representation: "; M->dump());
+      DEBUG_LOG(std::cerr << "Unknown metatype representation: "; M->dump());
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -1167,7 +1199,7 @@ public:
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
-      DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
+      DEBUG_LOG(std::cerr << "Invalid existential metatype: "; EM->dump());
       return nullptr;
     }
 
@@ -1176,13 +1208,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
+    DEBUG_LOG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
+    DEBUG_LOG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return nullptr;
   }
 
@@ -1196,6 +1228,11 @@ public:
                                    ReferenceCounting::Unknown);
   }
 
+  const TypeInfo *visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
+    return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                   ReferenceCounting::Unknown);
+  }
+
   // Apply a storage qualifier, like 'weak', 'unowned' or 'unowned(unsafe)'
   // to a type with reference semantics, such as a class reference or
   // class-bound existential.
@@ -1203,7 +1240,7 @@ public:
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
     if (TI == nullptr) {
-      DEBUG(std::cerr << "Invalid reference type");
+      DEBUG_LOG(std::cerr << "Invalid reference type");
       return nullptr;
     }
 
@@ -1246,7 +1283,7 @@ public:
     }
 
     // Anything else -- give up
-    DEBUG(std::cerr << "Invalid reference type");
+    DEBUG_LOG(std::cerr << "Invalid reference type");
     return nullptr;
   }
 
@@ -1255,19 +1292,12 @@ public:
     return rebuildStorageTypeInfo(TC.getTypeInfo(TR), Kind);
   }
 
-  const TypeInfo *
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unowned);
+#define REF_STORAGE(Name, name, ...) \
+  const TypeInfo * \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Name); \
   }
-
-  const TypeInfo *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return visitAnyStorageTypeRef(WS->getType(), ReferenceKind::Weak);
-  }
-
-  const TypeInfo *
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unmanaged);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const TypeInfo *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return TC.getReferenceTypeInfo(ReferenceKind::Strong,
@@ -1275,7 +1305,7 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    DEBUG(std::cerr << "Can't lower opaque TypeRef");
+    DEBUG_LOG(std::cerr << "Can't lower opaque TypeRef");
     return nullptr;
   }
 };
@@ -1289,7 +1319,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
   if (!RecursionCheck.insert(TR).second) {
-    DEBUG(std::cerr << "TypeRef recursion detected");
+    DEBUG_LOG(std::cerr << "TypeRef recursion detected");
     return nullptr;
   }
 
@@ -1307,7 +1337,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
       getBuilder().getFieldTypeInfo(TR);
   if (FD.first == nullptr) {
-    DEBUG(std::cerr << "No field descriptor: "; TR->dump());
+    DEBUG_LOG(std::cerr << "No field descriptor: "; TR->dump());
     return nullptr;
   }
 
@@ -1337,7 +1367,7 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
-    DEBUG(std::cerr << "Invalid field descriptor: "; TR->dump());
+    DEBUG_LOG(std::cerr << "Invalid field descriptor: "; TR->dump());
     return nullptr;
   }
 

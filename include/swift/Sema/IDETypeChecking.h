@@ -30,15 +30,14 @@ namespace swift {
   class ExtensionDecl;
   class ProtocolDecl;
   class Type;
+  class TypeChecker;
   class DeclContext;
   class ConcreteDeclRef;
   class ValueDecl;
   class DeclName;
 
   /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(Decl *D);
+  void typeCheckCompletionDecl(Decl *D);
 
   /// \brief Check if T1 is convertible to T2.
   ///
@@ -53,12 +52,6 @@ namespace swift {
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
-
-  /// \brief Given an unresolved member E and its parent P, this function tries
-  /// to infer the type of E.
-  /// \returns true on success, false on error.
-  bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
-                               Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
   enum InterestedMemberKind : uint8_t {
     Viable,
@@ -131,11 +124,11 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  /// A unique_ptr for LazyResolver that can perform additional cleanup.
-  using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;
-
-  /// Creates a lazy type resolver for use in lookups.
-  OwnedResolver createLazyResolver(ASTContext &Ctx);
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -147,8 +140,8 @@ namespace swift {
     bool IsSynthesized;
   };
 
-  typedef llvm::function_ref<void(ArrayRef<ExtensionInfo>)>
-      ExtensionGroupOperation;
+  using ExtensionGroupOperation =
+      llvm::function_ref<void(ArrayRef<ExtensionInfo>)>;
 
   class SynthesizedExtensionAnalyzer {
     struct Implementation;

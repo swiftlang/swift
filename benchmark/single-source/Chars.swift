@@ -14,14 +14,12 @@
 import TestsUtils
 
 public let Chars = BenchmarkInfo(
-  name: "Chars",
+  name: "Chars2",
   runFunction: run_Chars,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { blackHole(alphabetInput) })
 
-@inline(never)
-public func run_Chars(_ N: Int) {
-  // Permute some characters.
-  let alphabet: [Character] = [
+var alphabetInput: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",
     "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
     "S", "T", "U",
@@ -30,12 +28,19 @@ public func run_Chars(_ N: Int) {
     "2", "a", "t", "i", "o", "e", "q", "n", "X", "Y", "Z", "?", "m", "Z", ","
     ]
 
-  for _ in 0...N {
+@inline(never)
+public func run_Chars(_ N: Int) {
+  // Permute some characters.
+  let alphabet: [Character] = alphabetInput
+
+  for _ in 0..<50*N {
     for firstChar in alphabet {
-      for middleChar in alphabet {
-        for lastChar in alphabet {
-          _ = ((firstChar == middleChar) != (middleChar < lastChar))
-        }
+      for lastChar in alphabet {
+        blackHole(firstChar < lastChar)
+        blackHole(firstChar == lastChar)
+        blackHole(firstChar > lastChar)
+        blackHole(firstChar <= lastChar)
+        blackHole(firstChar >= lastChar)
       }
     }
   }

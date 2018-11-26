@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %s -check-prefix=CHECK-FIRST-FILE
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s -primary-file %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %S/Inputs/witness_tables_multifile_2.swift -check-prefix=CHECK-SECOND-FILE
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=CHECK-FIRST-FILE
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -primary-file %S/Inputs/witness_tables_multifile_2.swift | %FileCheck %S/Inputs/witness_tables_multifile_2.swift -check-prefix=CHECK-SECOND-FILE
 
 
 protocol InheritsFooable : Fooable {}

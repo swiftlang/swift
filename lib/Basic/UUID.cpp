@@ -42,7 +42,7 @@ swift::UUID::UUID(FromRandom_t) {
 
 swift::UUID::UUID(FromTime_t) {
 #if defined(_WIN32)
-  ::GUID uuid;
+  ::UUID uuid;
   ::CoCreateGuid(&uuid);
 
   memcpy(Value, &uuid, Size);
@@ -53,7 +53,8 @@ swift::UUID::UUID(FromTime_t) {
 
 swift::UUID::UUID() {
 #if defined(_WIN32)
-  ::GUID uuid = GUID();
+  ::UUID uuid = *((::UUID *)&Value);
+  UuidCreateNil(&uuid);
 
   memcpy(Value, &uuid, Size);
 #else
@@ -63,18 +64,11 @@ swift::UUID::UUID() {
 
 Optional<swift::UUID> swift::UUID::fromString(const char *s) {
 #if defined(_WIN32)
-  int length = strlen(s) + 1;
-  wchar_t *unicodeString = new wchar_t[length];
+  RPC_CSTR t = const_cast<RPC_CSTR>(reinterpret_cast<const unsigned char*>(s));
 
-  size_t convertedChars = 0;
-  errno_t conversionResult =
-    mbstowcs_s(&convertedChars, unicodeString, length, s, length);
-  assert(conversionResult == 0 &&
-    "expected successful conversion of char* to wchar_t*");
-
-  ::GUID uuid;
-  HRESULT parseResult = CLSIDFromString(unicodeString, &uuid);
-  if (parseResult != 0) {
+  ::UUID uuid;
+  RPC_STATUS status = UuidFromStringA(t, &uuid);
+  if (status == RPC_S_INVALID_STRING_UUID) {
     return None;
   }
 
@@ -92,19 +86,14 @@ Optional<swift::UUID> swift::UUID::fromString(const char *s) {
 void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
   out.resize(UUID::StringBufferSize);
 #if defined(_WIN32)
-  ::GUID uuid;
+  ::UUID uuid;
   memcpy(&uuid, Value, Size);
 
-  LPOLESTR unicodeStr;
-  StringFromCLSID(uuid, &unicodeStr);
+  RPC_CSTR str;
+  UuidToStringA(&uuid, &str);
 
-  char str[StringBufferSize];
-  int strLen = wcstombs(str, unicodeStr, sizeof(str));
-
-  assert(strLen == 37 && "expected ascii convertible output from StringFromCLSID.");
-  (void)strLen;
-
-  memcpy(out.data(), str, StringBufferSize);
+  char* signedStr = reinterpret_cast<char*>(str);
+  memcpy(out.data(), signedStr, StringBufferSize);
 #else
   uuid_unparse_upper(Value, out.data());
 #endif
@@ -115,13 +104,14 @@ void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
 
 int swift::UUID::compare(UUID y) const {
 #if defined(_WIN32)
-  ::GUID uuid1;
+  RPC_STATUS s;
+  ::UUID uuid1;
   memcpy(&uuid1, Value, Size);
 
-  ::GUID uuid2;
+  ::UUID uuid2;
   memcpy(&uuid2, y.Value, Size);
 
-  return memcmp(Value, y.Value, Size);
+  return UuidCompare(&uuid1, &uuid2, &s);
 #else
   return uuid_compare(Value, y.Value);
 #endif

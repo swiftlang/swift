@@ -26,7 +26,7 @@ Algorithm.test("min,max") {
   let a3 = MinimalComparableValue(0, identity: 3)
   let b1 = MinimalComparableValue(1, identity: 4)
   let b2 = MinimalComparableValue(1, identity: 5)
-  let b3 = MinimalComparableValue(1, identity: 6)
+  _ = MinimalComparableValue(1, identity: 6)
   let c1 = MinimalComparableValue(2, identity: 7)
   let c2 = MinimalComparableValue(2, identity: 8)
   let c3 = MinimalComparableValue(2, identity: 9)
@@ -80,7 +80,7 @@ Algorithm.test("sorted/strings") {
     ["apple", "Banana", "cherry"].sorted())
 
   let s = ["apple", "Banana", "cherry"].sorted() {
-    $0.characters.count > $1.characters.count
+    $0.count > $1.count
   }
   expectEqual(["Banana", "cherry", "apple"], s)
 }
@@ -134,13 +134,14 @@ struct A<T> : MutableCollection, RandomAccessCollection {
 }
 
 func randomArray() -> A<Int> {
-  let count = Int(rand32(exclusiveUpperBound: 50))
-  return A(randArray(count))
+  let count = Int.random(in: 0 ..< 50)
+  let array = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
+  return A(array)
 }
 
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
-    var a = randomArray()
+    let a = randomArray()
     _blackHole(a.sorted(by: $0))
   }
   withInvalidOrderings {
@@ -218,7 +219,7 @@ Algorithm.test("sorted/complexity") {
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
+  let _: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
 }
 
 Algorithm.test("sort3/simple")
@@ -226,7 +227,7 @@ Algorithm.test("sort3/simple")
     [1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]
   ]) {
     var input = $0
-    _sort3(&input, 0, 1, 2)
+    input._sort3(0, 1, 2, by: <)
     expectEqual([1, 2, 3], input)
 }
 
@@ -242,7 +243,7 @@ Algorithm.test("sort3/stable")
   ]) {
     // decorate with offset, but sort by value
     var input = Array($0.enumerated())
-    _sort3(&input, 0, 1, 2) { $0.element < $1.element }
+    input._sort3(0, 1, 2) { $0.element < $1.element }
     // offsets should still be ordered for equal values
     expectTrue(isSorted(input) {
       if $0.element == $1.element {
@@ -250,6 +251,53 @@ Algorithm.test("sort3/stable")
       }
       return $0.element < $1.element
     })
+}
+
+Algorithm.test("heapSort") {
+  // This function generate next permutation of 0-1 using long arithmetics 
+  // approach.
+  func addOne(to num: inout [Int]) {
+
+    if num.isEmpty {
+      return
+    }
+    // Consider our num array reflects a binary integer.
+    // Here we are trying to add one to it.
+    var i = num.index(before: num.endIndex)
+    var carrier = 1
+
+    while carrier != 0 {
+      let b = num[i] + carrier
+      // Updating i's bit.
+      num[i] = b % 2
+      // Recalculate new carrier.
+      carrier = b / 2
+
+      // If the length of number was n, we don't want to create new number with
+      // length n + 1 in this test.
+      if i == num.startIndex {
+        break
+      } else {
+        num.formIndex(before: &i)
+      }
+    }
+  } // addOne end.
+
+  // Test binary number size.
+  let numberLength = 11
+  var binaryNumber = [Int](repeating: 0, count: numberLength)
+
+  // We are testing sort on all permutations off 0-1s of size `numberLength`
+  // except the all 1's case (Its equals to all 0's case).
+  while !binaryNumber.allSatisfy({ $0 == 1 }) {
+    var buffer = binaryNumber
+
+    buffer._heapSort(within: buffer.startIndex..<buffer.endIndex, by: <)
+
+    expectTrue(isSorted(buffer, by: <))
+
+    addOne(to: &binaryNumber)
+  }
 }
 
 runAllTests()

@@ -1,0 +1,151 @@
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/property_descriptor.sil
+// RUN: %target-swift-frontend -emit-ir %t/property_descriptor.sil | %FileCheck --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK %t/property_descriptor.sil
+
+sil_stage canonical
+
+import Swift
+
+public struct ExternalGeneric<T: Comparable> {
+  @sil_stored public var ro: T { get }
+  @sil_stored public var rw: T { get set }
+
+  public var computedRO: T { get }
+  public var computedRW: T { get set }
+
+  public subscript<U: Hashable>(_: U) -> T { get set }
+
+  public var computedWithTrivialDescriptor: Int { get }
+
+  init()
+}
+
+public struct External {
+  @sil_stored public var ro: Int { get }
+  @sil_stored public var rw: Int { get set }
+
+  public var computedRO: Int { get }
+  public var computedRW: Int { get set }
+
+  public subscript(_: String) -> Int { get set }
+
+  public var computedWithTrivialDescriptor: Int { get }
+
+  init()
+}
+
+public struct ExternalReabstractions<T> {
+  @sil_stored public var ro: T { get }
+  @sil_stored public var reabstracted: () -> () { get set }
+}
+
+// -- struct property, offset resolved from field offset vector in metadata
+// CHECK-64: @"$s19property_descriptor15ExternalGenericV2roxvpMV" =
+// CHECK-32: @"$s19property_descriptor15ExternalGenericV2roxvpMV" =
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
+sil_property #ExternalGeneric.ro <T: Comparable> (
+  stored_property #ExternalGeneric.ro : $T)
+// CHECK-64: @"$s19property_descriptor15ExternalGenericV2rwxvpMV" =
+// CHECK-32: @"$s19property_descriptor15ExternalGenericV2rwxvpMV" =
+// CHECK-SAME: <{ <i32 0x01ff_fffe>,
+sil_property #ExternalGeneric.rw <T: Comparable> (
+  stored_property #ExternalGeneric.rw : $T)
+
+// CHECK: @"$s19property_descriptor15ExternalGenericV10computedROxvpMV" =
+// -- 0x0108_0000 - computed, readonly, has arguments
+// CHECK-SAME:  <{ <i32 0x0208_0000>,
+// CHECK-SAME:     @id_computed, 
+// CHECK-SAME:     [[GET_COMPUTEDRO:@keypath_get[.0-9]*]],
+// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRO:@keypath_get_arg_layout[.0-9]*]],
+// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
+// CHECK-SAME:     [[ARG_INIT_COMPUTEDRO:@keypath_arg_init[.0-9]*]] }>
+sil_property #ExternalGeneric.computedRO <T: Comparable> (
+  gettable_property $T,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T)
+
+// CHECK: @"$s19property_descriptor15ExternalGenericV10computedRWxvpMV" =
+// -- 0x01c8_0000 - computed, settable, mutating, has arguments
+// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
+// CHECK-SAME:     @id_computed,
+// CHECK-SAME:     [[GET_COMPUTEDRW:@keypath_get[.0-9]*]],
+// CHECK-SAME:     [[SET_COMPUTEDRW:@keypath_set[.0-9]*]],
+// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRW:@keypath_get_arg_layout[.0-9]*]],
+// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
+// CHECK-SAME:     [[ARG_INIT_COMPUTEDRW:@keypath_arg_init[.0-9]*]] }>
+sil_property #ExternalGeneric.computedRW <T: Comparable> (
+  settable_property $T,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T,
+    setter @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ())
+
+// CHECK: @"$s19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" =
+// -- 0x01c8_0000 - computed, settable, mutating, has arguments
+// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
+// CHECK-SAME:     @id_computed,
+// CHECK-SAME:     [[GET_SUBSCRIPT:@keypath_get[.0-9]*]],
+// CHECK-SAME:     [[SET_SUBSCRIPT:@keypath_set[.0-9]*]],
+// CHECK-SAME:     [[GET_ARG_LAYOUT_SUBSCRIPT:@keypath_get_arg_layout[.0-9]*]],
+// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
+// CHECK-SAME:     [[ARG_INIT_SUBSCRIPT:@keypath_arg_init[.0-9]*]] }>
+sil_property #ExternalGeneric.subscript <T: Comparable><U: Hashable> (
+  settable_property $T,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, UnsafeRawPointer) -> @out T,
+    setter @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ())
+
+// CHECK: @"$s19property_descriptor8ExternalV2roSivpMV" =
+// CHECK-64: @"$s19property_descriptor8ExternalV2rwSivpMV" =
+// CHECK-32: @"$s19property_descriptor8ExternalV2rwSivpMV" =
+sil_property #External.ro (stored_property #External.ro : $Int)
+sil_property #External.rw (stored_property #External.rw : $Int)
+sil_property #External.computedRO (
+  gettable_property $Int,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int)
+sil_property #External.computedRW (
+  settable_property $Int,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int,
+    setter @set_computed : $@convention(thin) (@in_guaranteed Int, @inout External) -> ())
+sil_property #External.subscript (
+  settable_property $Int,
+    id @id_computed : $@convention(thin) () -> (),
+    getter @get_computed_subscript : $@convention(thin) (@in_guaranteed External, UnsafeRawPointer) -> @out Int,
+    setter @set_computed_subscript : $@convention(thin) (@in_guaranteed Int, @inout External, UnsafeRawPointer) -> ())
+
+sil_property #ExternalReabstractions.ro <T> (
+  stored_property #ExternalReabstractions.ro : $T)
+
+sil_property #ExternalReabstractions.reabstracted <T> (
+  settable_property $() -> (),
+    id ##ExternalReabstractions.reabstracted,
+    getter @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed () -> @out (),
+    setter @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed () -> @out (), @inout ExternalReabstractions<T>) -> ())
+
+// All trivial descriptors should share a definition by aliasing to the common
+// definition
+
+// CHECK-LABEL: @"$s19property_descriptor15ExternalGenericV29computedWithTrivialDescriptorSivpMV" =
+// CHECK-SAME:    { i32 } zeroinitializer, align 4
+sil_property #ExternalGeneric.computedWithTrivialDescriptor <T: Comparable> ()
+
+// CHECK-LABEL: @"$s19property_descriptor8ExternalV29computedWithTrivialDescriptorSivpMV" =
+// CHECK-SAME:    alias {{.*}} @"$s19property_descriptor15ExternalGenericV29computedWithTrivialDescriptorSivpMV"
+sil_property #External.computedWithTrivialDescriptor ()
+
+sil @id_computed : $@convention(thin) () -> ()
+sil @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int
+sil @set_computed : $@convention(thin) (@in_guaranteed Int, @inout External) -> ()
+
+sil @get_computed_subscript : $@convention(thin) (@in_guaranteed External, UnsafeRawPointer) -> @out Int
+sil @set_computed_subscript : $@convention(thin) (@in_guaranteed Int, @inout External, UnsafeRawPointer) -> ()
+
+sil @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T
+sil @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ()
+
+sil @get_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, UnsafeRawPointer) -> @out T
+sil @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ()
+
+sil @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed () -> @out ()
+sil @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed () -> @out (), @inout ExternalReabstractions<T>) -> ()

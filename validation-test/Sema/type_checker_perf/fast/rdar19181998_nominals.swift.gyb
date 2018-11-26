@@ -1,0 +1,19 @@
+// RUN: %scale-test --begin 1 --end 30 --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+struct A<T> {
+  struct B {
+    init(_: T) {}
+  }
+}
+
+public func test(_ fn: @escaping () -> Void) {}
+test {
+  let _ = [
+%for i in range(0, N):
+      A.B(1),
+%end
+      A.B(1.0)
+    ]
+}

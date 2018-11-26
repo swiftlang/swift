@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,13 +48,14 @@ SILValue stripUpCasts(SILValue V);
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
 
+/// Return the underlying SILValue after stripping off non-projection address
+/// casts. The result will still be an address--this does not look through
+/// pointer-to-address.
+SILValue stripAddressAccess(SILValue V);
+
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
-
-/// Return the underlying SILValue after stripping off all address projection
-/// instructions which have a single operand.
-SILValue stripUnaryAddressProjections(SILValue V);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
@@ -78,14 +79,21 @@ SILValue stripExpectIntrinsic(SILValue V);
 SILValue stripBorrow(SILValue V);
 
 /// Return a non-null SingleValueInstruction if the given instruction merely
-/// copies a value, possibly changing its type or ownership state, but otherwise
-/// having no effect.
+/// copies the value of its first operand, possibly changing its type or
+/// ownership state, but otherwise having no effect.
+///
+/// The returned instruction may have additional "incidental" operands;
+/// mark_dependence for example.
 ///
 /// This is useful for checking all users of a value to verify that the value is
 /// only used in recognizable patterns without otherwise "escaping". These are
 /// instructions that the use-visitor can recurse into. Note that the value's
 /// type may be changed by a cast.
 SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
+
+/// Return true if this instruction terminates a SIL-level scope. Scope end
+/// instructions do not produce a result.
+bool isEndOfScopeMarker(SILInstruction *user);
 
 /// Return true if the given instruction has no effect on it's operand values
 /// and produces no result. These are typically end-of scope markers.
@@ -102,49 +110,21 @@ bool isIncidentalUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
+/// Return true when the instruction represents added instrumentation for
+/// run-time sanitizers.
+bool isSanitizerInstrumentation(SILInstruction *Instruction);
+
 /// If V is a convert_function or convert_escape_to_noescape return its operand
 /// recursively.
 SILValue stripConvertFunctions(SILValue V);
-
-/// Given an address accessed by an instruction that reads or modifies
-/// memory, return the base address of the formal access. If the given address
-/// is produced by an initialization sequence, which cannot correspond to a
-/// formal access, then return an invalid SILValue.
-///
-/// This must return a valid SILValue for the address operand of begin_access.
-SILValue findAccessedAddressBase(SILValue sourceAddr);
-
-/// Return true if the given address producer may be the source of a formal
-/// access (a read or write of a potentially aliased, user visible variable).
-///
-/// If this returns false, then the address can be safely accessed without
-/// a begin_access marker. To determine whether to emit begin_access:
-///   base = findAccessedAddressBase(address)
-///   needsAccessMarker = base && baseAddressNeedsFormalAccess(base)
-bool isPossibleFormalAccessBase(SILValue baseAddress);
 
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
-struct LLVM_LIBRARY_VISIBILITY FindClosureResult {
-  PartialApplyInst *PAI = nullptr;
-  bool isReabstructionThunk = false;
-  FindClosureResult(PartialApplyInst *PAI, bool isReabstructionThunk)
-      : PAI(PAI), isReabstructionThunk(isReabstructionThunk) {}
-};
-
-/// If V is a function closure, return the partial_apply and the
-/// IsReabstractionThunk flag set to true if the closure is indirectly captured
-/// by a reabstraction thunk.
-FindClosureResult findClosureForAppliedArg(SILValue V);
-
-/// Visit each address accessed by the given memory operation.
-///
-/// This only visits instructions that modify memory in some user-visible way,
-/// which could be considered part of a formal access.
-void visitAccessedAddress(SILInstruction *I,
-                          std::function<void(Operand *)> visitor);
+/// If V is a function closure, return the reaching set of partial_apply's.
+void findClosuresForFunctionValue(SILValue V,
+                                  TinyPtrVector<PartialApplyInst *> &results);
 
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.

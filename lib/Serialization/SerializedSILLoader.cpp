@@ -20,16 +20,16 @@
 
 using namespace swift;
 
-SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
-                                         SILModule *SILMod,
-                                         Callback *callback) {
+SerializedSILLoader::SerializedSILLoader(
+    ASTContext &Ctx, SILModule *SILMod,
+    DeserializationNotificationHandlerSet *callbacks) {
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callback);
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callbacks);
 #ifndef NDEBUG
         SILMod->verify();
 #endif
@@ -47,8 +47,8 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+                 << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
         return Func;
       retVal = Func;
@@ -65,14 +65,15 @@ SILFunction *SerializedSILLoader::lookupSILFunction(StringRef Name,
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Name, declarationOnly)) {
-      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
-            << Des->getModuleIdentifier().str() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+                 << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
         // This is not the linkage we are looking for.
         if (Func->getLinkage() != *Linkage) {
-          DEBUG(llvm::dbgs()
-                << "Wrong linkage for Function: " << Func->getName() << " : "
-                << (int)Func->getLinkage() << "\n");
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Wrong linkage for Function: "
+                     << Func->getName() << " : "
+                     << (int)Func->getLinkage() << "\n");
           Des->invalidateFunction(Func);
           Func->getModule().eraseFunction(Func);
           continue;
@@ -180,5 +181,3 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
-// Anchor the SerializedSILLoader v-table.
-void SerializedSILLoader::Callback::_anchor() {}

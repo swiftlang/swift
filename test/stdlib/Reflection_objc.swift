@@ -2,6 +2,7 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
 // REQUIRES: executable_test
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
@@ -14,8 +15,9 @@
 
 import Swift
 import Foundation
+import simd
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 
 typealias OSImage = NSImage
@@ -283,6 +285,11 @@ testQLO(HasAttributedQLO.self)
 testQLO(HasStringQLO.self)
 // CHECK-NEXT: HasStringQLO overboard
 // CHECK-NEXT: CanaryBase overboard
+
+// simd types get no reflection info, so should have no mirror children
+let x = float4(0)
+print("float4 has \(Mirror(reflecting: x).children.count) children")
+// CHECK-NEXT: float4 has 0 children
 
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")

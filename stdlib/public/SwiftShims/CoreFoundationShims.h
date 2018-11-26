@@ -53,57 +53,61 @@ typedef _swift_shims_CFIndex _swift_shims_CFComparisonResult;
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint16_t _swift_shims_UniChar;
+typedef __swift_uint8_t _swift_shims_UInt8;
 
 // Buffer is nullable in case the string is zero-length.
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_CFStringGetCharacters(
     _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFRange range,
     _swift_shims_UniChar *_Nullable buffer);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_CFIndex _swift_stdlib_CFStringGetBytes(
+    _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFRange range,
+    _swift_shims_CFStringEncoding encoding, _swift_shims_UInt8 lossByte,
+    _swift_shims_Boolean isExternalRepresentation,
+    _swift_shims_UInt8 *_Nonnull buffer, _swift_shims_CFIndex maxBufLen,
+    _swift_shims_CFIndex *_Nullable usedBufLen);
+
+SWIFT_RUNTIME_STDLIB_API
 const _swift_shims_UniChar *_Nullable _swift_stdlib_CFStringGetCharactersPtr(
     _swift_shims_CFStringRef _Nonnull theString);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 _swift_shims_CFIndex _swift_stdlib_CFStringGetLength(
     _swift_shims_CFStringRef _Nonnull theString);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithSubstring(
     _swift_shims_CFAllocatorRef _Nullable alloc,
     _swift_shims_CFStringRef _Nonnull str, _swift_shims_CFRange range);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 _swift_shims_UniChar _swift_stdlib_CFStringGetCharacterAtIndex(
     _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFIndex idx);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 __attribute__((ns_returns_retained))
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateCopy(
     _swift_shims_CFAllocatorRef _Nullable alloc,
     _swift_shims_CFStringRef _Nonnull theString);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
+__attribute__((ns_returns_retained))
+_swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithBytes(
+    _swift_shims_CFAllocatorRef _Nullable alloc,
+    const __swift_uint8_t *_Nonnull bytes, _swift_shims_CFIndex numBytes,
+    _swift_shims_CFStringEncoding encoding,
+    _swift_shims_Boolean isExternalRepresentation);
+
+SWIFT_RUNTIME_STDLIB_API
 const char *_Nullable _swift_stdlib_CFStringGetCStringPtr(
     _swift_shims_CFStringRef _Nonnull theString,
+
     _swift_shims_CFStringEncoding encoding);
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-_swift_shims_CFComparisonResult
-_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef _Nonnull theString1,
-                              _swift_shims_CFStringRef _Nonnull theString2,
-                              _swift_shims_CFStringCompareFlags compareOptions);
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-_swift_shims_Boolean _swift_stdlib_CFStringFindWithOptions(
-    _swift_shims_CFStringRef _Nonnull theString,
-    _swift_shims_CFStringRef _Nonnull stringToFind,
-    _swift_shims_CFRange rangeToSearch,
-    _swift_shims_CFStringCompareFlags searchOptions,
-    _swift_shims_CFRange *_Nullable result);
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_objcDebugDescription(
     id _Nonnull nsObject);
 #endif // __OBJC2__

@@ -163,7 +163,6 @@ public enum DispatchTimeInterval : Equatable {
 	case milliseconds(Int)
 	case microseconds(Int)
 	case nanoseconds(Int)
-	@_downgrade_exhaustivity_check
 	case never
 
 	internal var rawValue: Int64 {

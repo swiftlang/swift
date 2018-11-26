@@ -34,14 +34,14 @@ public:
       ProtocolImplementations;
 
   ClassHierarchyAnalysis(SILModule *Mod)
-      : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
-      init(); 
-    }
+      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {
+    init();
+  }
 
   ~ClassHierarchyAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClassHierarchy;
+    return S->getKind() == SILAnalysisKind::ClassHierarchy;
   }
 
   /// Invalidate all information in this analysis.
@@ -54,11 +54,11 @@ public:
   virtual void invalidate(SILFunction *F, InvalidationKind K) override { }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override { }
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {}
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }
@@ -80,10 +80,6 @@ public:
     return IndirectSubclassesCache[C];
   }
 
-  const NominalTypeList &getProtocolImplementations(ProtocolDecl *P) {
-    return ProtocolImplementationsCache[P];
-  }
-
   /// Returns true if the class is inherited by another class in this module.
   bool hasKnownDirectSubclasses(ClassDecl *C) {
     return DirectSubclassesCache.count(C);
@@ -94,11 +90,6 @@ public:
   bool hasKnownIndirectSubclasses(ClassDecl *C) {
     return IndirectSubclassesCache.count(C) &&
            !IndirectSubclassesCache[C].empty();
-  }
-
-  /// Returns true if the protocol is implemented by any class in this module.
-  bool hasKnownImplementations(ProtocolDecl *C) {
-    return ProtocolImplementationsCache.count(C);
   }
 
 private:
@@ -114,9 +105,6 @@ private:
 
   /// A cache that maps a class to all of its known indirect subclasses.
   llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
-
-  /// A cache that maps a protocol to all of its known implementations.
-  ProtocolImplementations ProtocolImplementationsCache;
 };
 
 }

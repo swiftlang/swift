@@ -148,7 +148,7 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -159,7 +159,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
@@ -172,43 +172,52 @@ public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
-/// A type that can produce a collection of all of its values.
+/// A type that provides a collection of all of its values.
 ///
-/// Simple Enumerations
-/// ===================
+/// Types that conform to the `CaseIterable` protocol are typically
+/// enumerations without associated values. When using a `CaseIterable` type,
+/// you can access a collection of all of the type's cases by using the type's
+/// `allCases` property.
 ///
-/// For any Swift enumeration where every case does not have an associated
-/// value, the Swift compiler can automatically fill out the `CaseIterable`
-/// conformance. When defining your own custom enumeration, specify a
-/// conformance to `CaseIterable` to take advantage of this automatic
-/// derivation.
+/// For example, the `CompassDirection` enumeration declared in this example
+/// conforms to `CaseIterable`. You access the number of cases and the cases
+/// themselves through `CompassDirection.allCases`.
 ///
-/// For example, every case of the `CardinalPoint` enumeration defined here
-/// does not have an associated value:
-///
-///     enum CardinalPoint: CaseIterable {
+///     enum CompassDirection: CaseIterable {
 ///         case north, south, east, west
 ///     }
 ///
-/// So the compiler automatically creates a conformance.
+///     print("There are \(CompassDirection.allCases.count) directions.")
+///     // Prints "There are 4 directions."
+///     let caseList = CompassDirection.allCases
+///                                    .map({ "\($0)" })
+///                                    .joined(separator: ", ")
+///     // caseList == "north, south, east, west"
 ///
-///     for cardinality in CardinalPoint.allCases {
-///         print(cardinality)
-///     }
-///     // Prints "north"
-///     // Prints "south"
-///     // Prints "east"
-///     // Prints "west"
+/// Conforming to the CaseIterable Protocol
+/// =======================================
+///
+/// The compiler can automatically provide an implementation of the
+/// `CaseIterable` requirements for any enumeration without associated values
+/// or `@available` attributes on its cases. The synthesized `allCases`
+/// collection provides the cases in order of their declaration.
+///
+/// You can take advantage of this compiler support when defining your own
+/// custom enumeration by declaring conformance to `CaseIterable` in the
+/// enumeration's original declaration. The `CompassDirection` example above
+/// demonstrates this automatic implementation.
 public protocol CaseIterable {
+  /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection
     where AllCases.Element == Self
-  /// Returns a collection of all values of this type.
+  
+  /// A collection of all values of this type.
   static var allCases: AllCases { get }
 }
 
@@ -224,7 +233,7 @@ public protocol ExpressibleByNilLiteral {
 }
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
-  init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
+  init(_builtinIntegerLiteral value: Builtin.IntLiteral)
 }
 
 /// A type that can be initialized with an integer literal.
@@ -439,7 +448,6 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
@@ -461,18 +469,6 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
   init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word)
-}
-
-public protocol _ExpressibleByBuiltinConstStringLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(_builtinConstStringLiteral constantString: Builtin.RawPointer)
-}
-
-public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
-  : _ExpressibleByBuiltinConstStringLiteral {
-
-  init(_builtinConstUTF16StringLiteral constantUTF16String: Builtin.RawPointer)
 }
 
 /// A type that can be initialized with a string literal.
@@ -505,7 +501,6 @@ public protocol ExpressibleByStringLiteral
 extension ExpressibleByStringLiteral
   where StringLiteralType == ExtendedGraphemeClusterLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)
@@ -653,10 +648,10 @@ public protocol ExpressibleByArrayLiteral {
 ///     print(frequencies.count)
 ///     // Prints "0"
 ///
-/// - Note: A dictionary literal is *not* the same as an instance of
-///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
-///   initialize a type that conforms to `ExpressibleByDictionaryLiteral` simply
-///   by assigning an instance of one of these types.
+/// - Note:
+///   A dictionary literal is *not* the same as an instance of `Dictionary`.
+///   You can't initialize a type that conforms to `ExpressibleByDictionaryLiteral`
+///   simply by assigning an instance of `Dictionary`, `KeyValuePairs`, or similar.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
 /// =========================================================
@@ -714,7 +709,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///
 /// The `ExpressibleByStringInterpolation` protocol is deprecated. Do not add
 /// new conformances to the protocol.
-@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
+@available(*, deprecated, message: "it will be replaced or redesigned in Swift 5.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
 public protocol _ExpressibleByStringInterpolation {
   /// Creates an instance by concatenating the given values.
@@ -764,18 +759,6 @@ public protocol _ExpressibleByColorLiteral {
   init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
 }
 
-extension _ExpressibleByColorLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4.0,
-    message: "This initializer is only meant to be used by color literals")
-  public init(
-    colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float
-  ) {
-    self.init(
-      _colorLiteralRed: red, green: green, blue: blue, alpha: alpha)
-  }
-}
-
 /// A type that can be initialized using an image literal (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
 public protocol _ExpressibleByImageLiteral {
@@ -810,67 +793,3 @@ public protocol _ExpressibleByFileReferenceLiteral {
 /// then Array would no longer be a _DestructorSafeContainer.
 public protocol _DestructorSafeContainer {
 }
-
-// Deprecated by SE-0115.
-
-@available(*, deprecated, renamed: "ExpressibleByNilLiteral")
-public typealias NilLiteralConvertible
-  = ExpressibleByNilLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinIntegerLiteral")
-public typealias _BuiltinIntegerLiteralConvertible
-  = _ExpressibleByBuiltinIntegerLiteral
-@available(*, deprecated, renamed: "ExpressibleByIntegerLiteral")
-public typealias IntegerLiteralConvertible
-  = ExpressibleByIntegerLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinFloatLiteral")
-public typealias _BuiltinFloatLiteralConvertible
-  = _ExpressibleByBuiltinFloatLiteral
-@available(*, deprecated, renamed: "ExpressibleByFloatLiteral")
-public typealias FloatLiteralConvertible
-  = ExpressibleByFloatLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinBooleanLiteral")
-public typealias _BuiltinBooleanLiteralConvertible
-  = _ExpressibleByBuiltinBooleanLiteral
-@available(*, deprecated, renamed: "ExpressibleByBooleanLiteral")
-public typealias BooleanLiteralConvertible
-  = ExpressibleByBooleanLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
-public typealias _BuiltinUnicodeScalarLiteralConvertible
-  = _ExpressibleByBuiltinUnicodeScalarLiteral
-@available(*, deprecated, renamed: "ExpressibleByUnicodeScalarLiteral")
-public typealias UnicodeScalarLiteralConvertible
-  = ExpressibleByUnicodeScalarLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
-public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible
-  = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-@available(*, deprecated, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
-public typealias ExtendedGraphemeClusterLiteralConvertible
-  = ExpressibleByExtendedGraphemeClusterLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinStringLiteral")
-public typealias _BuiltinStringLiteralConvertible
-  = _ExpressibleByBuiltinStringLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
-public typealias _BuiltinUTF16StringLiteralConvertible
-  = _ExpressibleByBuiltinUTF16StringLiteral
-@available(*, deprecated, renamed: "ExpressibleByStringLiteral")
-public typealias StringLiteralConvertible
-  = ExpressibleByStringLiteral
-@available(*, deprecated, renamed: "ExpressibleByArrayLiteral")
-public typealias ArrayLiteralConvertible
-  = ExpressibleByArrayLiteral
-@available(*, deprecated, renamed: "ExpressibleByDictionaryLiteral")
-public typealias DictionaryLiteralConvertible
-  = ExpressibleByDictionaryLiteral
-@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
-public typealias StringInterpolationConvertible
-  = ExpressibleByStringInterpolation
-@available(*, deprecated, renamed: "_ExpressibleByColorLiteral")
-public typealias _ColorLiteralConvertible
-  = _ExpressibleByColorLiteral
-@available(*, deprecated, renamed: "_ExpressibleByImageLiteral")
-public typealias _ImageLiteralConvertible
-  = _ExpressibleByImageLiteral
-@available(*, deprecated, renamed: "_ExpressibleByFileReferenceLiteral")
-public typealias _FileReferenceLiteralConvertible
-  = _ExpressibleByFileReferenceLiteral
-

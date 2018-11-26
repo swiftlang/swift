@@ -67,7 +67,7 @@ public struct _stdlib_ShardedAtomicCounter {
     var _state: Int
 
     public init() {
-      _state = Int(Int32(bitPattern: rand32()))
+      _state = Int.random(in: .min ... .max)
     }
 
     public mutating func randomInt() -> Int {

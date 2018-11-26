@@ -55,5 +55,5 @@ func test_constantFoldOr4() -> Int {
   }
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
-// expected-warning@+1 {{'ExpressibleByStringInterpolation' is deprecated: it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'}}
+// expected-warning@+1 {{'ExpressibleByStringInterpolation' is deprecated: it will be replaced or redesigned in Swift 5.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'}}
 typealias X = ExpressibleByStringInterpolation

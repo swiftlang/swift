@@ -234,11 +234,11 @@ class Bottom<T : Bottom<Top>> {}
 // Invalid inheritance clause
 
 struct UnsolvableInheritance1<T : T.A> {}
-// expected-error@-1 {{inheritance from non-protocol, non-class type 'T.A'}}
+// expected-error@-1 {{'A' is not a member type of 'T'}}
 
 struct UnsolvableInheritance2<T : U.A, U : T.A> {}
-// expected-error@-1 {{inheritance from non-protocol, non-class type 'U.A'}}
-// expected-error@-2 {{inheritance from non-protocol, non-class type 'T.A'}}
+// expected-error@-1 {{'A' is not a member type of 'U'}}
+// expected-error@-2 {{'A' is not a member type of 'T'}}
 
-enum X7<T> where X7.X : G { case X } // expected-error{{enum element 'X' is not a member type of 'X7<T>'}}
+enum X7<T> where X7.X : G { case X } // expected-error{{enum case 'X' is not a member type of 'X7<T>'}}
 // expected-error@-1{{use of undeclared type 'G'}}

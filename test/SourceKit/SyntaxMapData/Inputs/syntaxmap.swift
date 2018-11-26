@@ -49,3 +49,8 @@ func bar() {}
 // unknownprotocol://awesomeguy.com
 
 _ = -123
+
+func testArgumentLabels(in class: Int, _ case: (_ default: Int) -> Void) -> (in: Int, String) {
+  let result: (in: Int, String) = (0, "test")
+  return something ? result : (in: 2, "foo")
+}

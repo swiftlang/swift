@@ -21,7 +21,7 @@ FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorFree;
 FOUNDATION_EXPORT const NSDataDeallocator NSDataDeallocatorNone;
 
 @interface NSData (FoundationSPI)
-- (BOOL)_isCompact;
+- (BOOL)_isCompact API_AVAILABLE(macos(10.10), ios(8.0), watchos(2.0), tvos(9.0));
 @end
 
 BOOL __NSDataWriteToURL(NS_NON_BRIDGED(NSData *) _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _Nonnull url NS_RELEASES_ARGUMENT, NSDataWritingOptions writingOptions, NSError **errorPtr);

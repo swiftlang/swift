@@ -4,8 +4,8 @@
 
 import Swift
 
-// CHECK: @"$Ss1XVN" = external global %swift.type
-// CHECK: @"$Ss1XVs1PsWP" = external global i8*
+// CHECK: @"$ss1XVN" = external {{(dllimport )?}}global %swift.type
+// CHECK: @"$ss1XVs1PsWP" = external {{(dllimport )?}}global i8*
 
 func doSomething<T : P>(_ t : T) -> Y {
   return t.doSomething()

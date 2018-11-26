@@ -20,42 +20,57 @@
 namespace swift {
 class ModuleFile;
 
-/// \brief Imports serialized Swift modules into an ASTContext.
-class SerializedModuleLoader : public ModuleLoader {
-private:
-  ASTContext &Ctx;
-  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
+/// Common functionality shared between \c SerializedModuleLoader and
+/// \c ParseableInterfaceModuleLoader.
+class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  explicit SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker);
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+
+protected:
+  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
+  ASTContext &Ctx;
+  SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker);
+
+  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  bool findModule(AccessPathElem moduleID,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  bool &isFramework);
+
+  virtual std::error_code
+  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+                  StringRef ModuleDocFilename,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  llvm::SmallVectorImpl<char> &Scratch);
 
 public:
-  /// \brief Create a new importer that can load serialized Swift modules
-  /// into the given ASTContext.
-  static std::unique_ptr<SerializedModuleLoader>
-  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
-    return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker)
-    };
-  }
+  virtual ~SerializedModuleLoaderBase();
+  SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
+  SerializedModuleLoaderBase(SerializedModuleLoaderBase &&) = delete;
+  SerializedModuleLoaderBase &operator=(const SerializedModuleLoaderBase &) = delete;
+  SerializedModuleLoaderBase &operator=(SerializedModuleLoaderBase &&) = delete;
 
-  ~SerializedModuleLoader();
+  /// Attempt to load a serialized AST into the given module.
+  ///
+  /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
+  /// printed. (Note that \p diagLoc is allowed to be invalid.)
+  FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+                    bool isFramework = false);
 
-  SerializedModuleLoader(const SerializedModuleLoader &) = delete;
-  SerializedModuleLoader(SerializedModuleLoader &&) = delete;
-  SerializedModuleLoader &operator=(const SerializedModuleLoader &) = delete;
-  SerializedModuleLoader &operator=(SerializedModuleLoader &&) = delete;
-
-  /// \brief Check whether the module with a given name can be imported without
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
   virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
   ///
@@ -68,24 +83,6 @@ public:
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
-  /// Attempt to load a serialized AST into the given module.
-  ///
-  /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
-  /// printed. (Note that \p diagLoc is allowed to be invalid.)
-  FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
-                    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
-                    bool isFramework = false);
-
-  /// \brief Register a memory buffer that contains the serialized
-  /// module for the given access path. This API is intended to be
-  /// used by LLDB to add swiftmodules discovered in the __apple_ast
-  /// section of a Mach-O file to the search path.
-  /// FIXME: make this an actual access *path* once submodules are designed.
-  void registerMemoryBuffer(StringRef AccessPath,
-                            std::unique_ptr<llvm::MemoryBuffer> input) {
-    MemoryBuffers[AccessPath] = std::move(input);
-  }
 
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
@@ -100,9 +97,39 @@ public:
   virtual void verifyAllModules() override;
 };
 
+/// Imports serialized Swift modules into an ASTContext.
+class SerializedModuleLoader : public SerializedModuleLoaderBase {
+
+  SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker)
+    : SerializedModuleLoaderBase(ctx, tracker)
+  {}
+
+public:
+  virtual ~SerializedModuleLoader();
+
+  /// Register a memory buffer that contains the serialized
+  /// module for the given access path. This API is intended to be
+  /// used by LLDB to add swiftmodules discovered in the __apple_ast
+  /// section of a Mach-O file to the search path.
+  /// FIXME: make this an actual access *path* once submodules are designed.
+  void registerMemoryBuffer(StringRef AccessPath,
+                            std::unique_ptr<llvm::MemoryBuffer> input) {
+    MemoryBuffers[AccessPath] = std::move(input);
+  }
+
+  /// Create a new importer that can load serialized Swift modules
+  /// into the given ASTContext.
+  static std::unique_ptr<SerializedModuleLoader>
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
+    return std::unique_ptr<SerializedModuleLoader>{
+      new SerializedModuleLoader(ctx, tracker)
+    };
+  }
+};
+
 /// A file-unit loaded from a serialized AST file.
 class SerializedASTFile final : public LoadedFile {
-  friend class SerializedModuleLoader;
+  friend class SerializedModuleLoaderBase;
   friend class SerializedSILLoader;
   friend class ModuleFile;
 
@@ -172,6 +199,9 @@ public:
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;

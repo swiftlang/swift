@@ -110,11 +110,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_1 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_2 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_3 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IF_LET_BIND_4 | %FileCheck %s -check-prefix=FOOSTRUCT_NODOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_1 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_2 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_3 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_4 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT_BOOL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_5 | %FileCheck %s -check-prefix=FOOSTRUCT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GUARD_LET_BIND_6 | %FileCheck %s -check-prefix=FOOSTRUCT_NODOT
 
 
 struct FooStruct {
@@ -582,6 +584,9 @@ func testIfLetBinding2(x: FooStruct?) {
 func testIfLetBinding3(x: FooStruct?) {
   if let y = x, let z = y.#^IF_LET_BIND_3^# {}
 }
+func testIfLetBinding3(x: FooStruct?) {
+  if let y = x, let z = y#^IF_LET_BIND_4^# {}
+}
 func testGuardLetBinding1(x: FooStruct?) {
   guard let y = x, y.#^GUARD_LET_BIND_1^# else {}
 }
@@ -597,6 +602,9 @@ func testGuardLetBinding4(x: FooStruct?) {
 func testGuardLetBinding5(x: FooStruct?) {
   guard let y = x, let z = y.#^GUARD_LET_BIND_5^# else {}
 }
+func testGuardLetBinding5(x: FooStruct?) {
+  guard let y = x, z = y#^GUARD_LET_BIND_6^# else {}
+}
 
 // FOOSTRUCT_DOT: Begin completions
 // FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
@@ -609,3 +617,9 @@ func testGuardLetBinding5(x: FooStruct?) {
 // FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: boolGen()[#Bool#];
 // FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#];
 // FOOSTRUCT_DOT_BOOL: End completions
+
+// FOOSTRUCT_NODOT: Begin completions
+// FOOSTRUCT_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#];
+// FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .boolGen()[#Bool#];
+// FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .intGen()[#Int#];
+// FOOSTRUCT_NODOT: End completions

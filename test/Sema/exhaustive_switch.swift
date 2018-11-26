@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -44,6 +45,19 @@ enum Result<T> {
     case (.Error, _): return 3
     case (_, .Error): return 4
     }
+  }
+}
+
+func overParenthesized() {
+  // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
+  let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
+  switch x {
+  case let .Error(e):
+    print(e)
+  case let .Ok((.Error(e), b)):
+    print(e, b)
+  case let .Ok((.Ok(a), b)): // No warning here.
+    print(a, b)
   }
 }
 
@@ -313,6 +327,7 @@ func switcheroo(a: XX, b: XX) -> Int {
 enum PatternCasts {
   case one(Any)
   case two
+  case three(String)
 }
 
 func checkPatternCasts() {
@@ -322,6 +337,7 @@ func checkPatternCasts() {
   case .one(let s as String): print(s)
   case .one: break
   case .two: break
+  case .three: break
   }
 
   // But should warn here.
@@ -329,12 +345,24 @@ func checkPatternCasts() {
   case .one(_): print(s)
   case .one: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
   case .two: break
+  case .three: break
+  }
+
+  // And not here
+  switch x {
+  case .one: break
+  case .two: break
+  case .three(let s as String?): print(s as Any)
   }
 }
 
 enum MyNever {}
 func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
 func myFatalError() -> MyNever { fatalError() }
+
+@_frozen public enum UninhabitedT4<A> {
+  case x(A)
+}
 
 func checkUninhabited() {
   // Scrutinees of uninhabited type may match any number and kind of patterns
@@ -355,6 +383,10 @@ func checkUninhabited() {
     case myFatalError(): break
     }
   }
+
+  func test4(x: UninhabitedT4<Never>) {
+    switch x {} // No diagnostic.
+  }
 }
 
 enum Runcible {
@@ -367,8 +399,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.fork, _)'}}
   // expected-note@-2 {{add missing case: '(.hat, .hat)'}}
-  // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
-  // expected-note@-4 {{add missing case: '(_, .fork)'}}
+  // expected-note@-3 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -380,10 +411,8 @@ func checkDiagnosticMinimality(x: Runcible?) {
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.fork, _)'}}
   // expected-note@-2 {{add missing case: '(.hat, .spoon)'}}
-  // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
-  // expected-note@-4 {{add missing case: '(.spoon, .hat)'}}
-  // expected-note@-5 {{add missing case: '(.spoon, .fork)'}}
-  // expected-note@-6 {{add missing case: '(_, .fork)'}}
+  // expected-note@-3 {{add missing case: '(.spoon, .hat)'}}
+  // expected-note@-4 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -444,7 +473,7 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
@@ -460,8 +489,7 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  // No diagnostic
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, _): return true
   case (.case1, _): return true
@@ -474,6 +502,21 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
+  }
+
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
+  case (.case0, _): return true
+  case (.case1, _): return true
+  case (.case2, _): return true
+  case (.case3, _): return true
+  case (.case4, _): return true
+  case (.case5, _): return true
+  case (.case6, _): return true
+  case (.case7, _): return true
+  case (.case8, _): return true
+  case (.case9, _): return true
+  case (.case10, _): return true
+  @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
   }
 
 
@@ -529,6 +572,10 @@ func quiteBigEnough() -> Bool {
   case .two: return true
   case .three: return true
   }
+
+  // Make sure we haven't just stopped emitting diagnostics.
+  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 12 {{add missing case}} expected-note {{handle unknown values}}
+  }
 }
 
 indirect enum InfinitelySized {
@@ -547,13 +594,13 @@ indirect enum MutuallyRecursive {
 
 func infinitelySized() -> Bool {
   switch (InfinitelySized.one, InfinitelySized.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 10 {{add missing case:}}
+  // expected-note@-1 8 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
   
   switch (MutuallyRecursive.one, MutuallyRecursive.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 10 {{add missing case:}}
+  // expected-note@-1 8 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
@@ -800,5 +847,372 @@ func sr6975() {
     print("b")
   case .a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     print("second a")
+  }
+
+  func foo(_ str: String) -> Int {
+    switch str { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{do you want to add a default clause?}}
+    case let (x as Int) as Any:
+      return x
+    }
+  }
+  _ = foo("wtf")
+}
+
+public enum NonExhaustive {
+  case a, b
+}
+
+public enum NonExhaustivePayload {
+  case a(Int), b(Bool)
+}
+
+@_frozen public enum TemporalProxy {
+  case seconds(Int)
+  case milliseconds(Int)
+  case microseconds(Int)
+  case nanoseconds(Int)
+  case never
+}
+
+// Inlinable code is considered "outside" the module and must include a default
+// case.
+@inlinable
+public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  case .a: break
+  }
+
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  case .a: break
+  case .b: break
+  }
+  
+  switch value {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  switch value {
+  case .a: break
+  case .b: break
+  @unknown case _: break // no-warning
+  }
+
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  case .a: break
+  @unknown case _: break
+  }
+
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.a'}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  @unknown case _: break
+  }
+
+  switch value {
+  case _: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  // Test being part of other spaces.
+  switch value as Optional { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.some(_)'}}
+  case .a?: break
+  case .b?: break
+  case nil: break
+  }
+
+  switch value as Optional {
+  case .a?: break
+  case .b?: break
+  case nil: break
+  @unknown case _: break
+  } // no-warning
+
+  switch value as Optional {
+  case _?: break
+  case nil: break
+  } // no-warning
+
+  switch (value, flag) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, false)'}}
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  }
+
+  switch (value, flag) {
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  @unknown case _: break
+  } // no-warning
+
+  switch (flag, value) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  }
+
+  switch (flag, value) {
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  @unknown case _: break
+  } // no-warning
+
+  switch (value, value) { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, _)'}}
+  case (.a, _), (_, .a): break
+  case (.b, _), (_, .b): break
+  }
+
+  switch (value, value) {
+  case (.a, _), (_, .a): break
+  case (.b, _), (_, .b): break
+  @unknown case _: break
+  } // no-warning
+
+  // Test payloaded enums.
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  case .a: break
+  }
+
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{3-3=@unknown default:\n<#fatalError#>()\n}}
+  case .a: break
+  case .b: break
+  }
+  
+  switch payload {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  switch payload {
+  case .a: break
+  case .b: break
+  @unknown case _: break // no-warning
+  }
+
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  case .a: break
+  @unknown case _: break
+  }
+
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
+  case .a: break
+  case .b(false): break
+  }
+
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  case .a: break
+  case .b(false): break
+  @unknown case _: break
+  }
+
+  // Test fully-covered switches.
+  switch interval {
+  case .seconds, .milliseconds, .microseconds, .nanoseconds: break
+  case .never: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch flag {
+  case true: break
+  case false: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch flag as Optional {
+  case _?: break
+  case nil: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch (flag, value) {
+  case (true, _): break
+  case (false, _): break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+}
+
+public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, flag: Bool) {
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}}
+  case .a: break
+  }
+
+  switch value { // no-warning
+  case .a: break
+  case .b: break
+  }
+  
+  switch value {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  switch value {
+  case .a: break
+  case .b: break
+  @unknown case _: break // no-warning
+  }
+
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  case .a: break
+  @unknown case _: break
+  }
+
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.a'}} {{none}} expected-note {{add missing case: '.b'}} {{none}}
+  @unknown case _: break
+  }
+
+  switch value {
+  case _: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  // Test being part of other spaces.
+  switch value as Optional { // no-warning
+  case .a?: break
+  case .b?: break
+  case nil: break
+  }
+
+  switch value as Optional {
+  case _?: break
+  case nil: break
+  } // no-warning
+
+  switch (value, flag) { // no-warning
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  }
+
+  switch (flag, value) { // no-warning
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  }
+
+  switch (value, value) { // no-warning
+  case (.a, _): break
+  case (.b, _): break
+  case (_, .a): break
+  case (_, .b): break
+  }
+
+  switch (value, value) { // no-warning
+  case (.a, _): break
+  case (.b, _): break
+  case (_, .a): break
+  case (_, .b): break
+  @unknown case _: break
+  }
+
+  // Test payloaded enums.
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  case .a: break
+  }
+
+  switch payload { // no-warning
+  case .a: break
+  case .b: break
+  }
+  
+  switch payload {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  switch payload {
+  case .a: break
+  case .b: break
+  @unknown case _: break // no-warning
+  }
+
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}
+  case .a: break
+  @unknown case _: break
+  }
+
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  case .a: break
+  case .b(false): break
+  }
+
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  case .a: break
+  case .b(false): break
+  @unknown case _: break
+  }
+}
+
+enum UnavailableCase {
+  case a
+  case b
+  @available(*, unavailable)
+  case oopsThisWasABadIdea
+}
+
+enum UnavailableCaseOSSpecific {
+  case a
+  case b
+
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  @available(macOS, unavailable)
+  @available(iOS, unavailable)
+  @available(tvOS, unavailable)
+  @available(watchOS, unavailable)
+  case unavailableOnAllTheseApplePlatforms
+#else
+  @available(*, unavailable)
+  case dummyCaseForOtherPlatforms
+#endif
+}
+
+enum UnavailableCaseOSIntroduced {
+  case a
+  case b
+
+  @available(macOS 50, iOS 50, tvOS 50, watchOS 50, *)
+  case notYetIntroduced
+}
+
+func testUnavailableCases(_ x: UnavailableCase, _ y: UnavailableCaseOSSpecific, _ z: UnavailableCaseOSIntroduced) {
+  switch x {
+  case .a: break
+  case .b: break
+  } // no-error
+
+  switch y {
+  case .a: break
+  case .b: break
+  } // no-error
+
+  switch z {
+  case .a: break
+  case .b: break
+  case .notYetIntroduced: break
+  } // no-error
+}
+
+// The following test used to behave differently when the uninhabited enum was
+// defined in the same module as the function (as opposed to using Swift.Never).
+enum NoError {}
+extension Result where T == NoError {
+  func testUninhabited() {
+    switch self {
+    case .Error(_):
+      break
+    // No .Ok case possible because of the 'NoError'.
+    }
+
+    switch self {
+    case .Error(_):
+      break
+    case .Ok(_):
+      break // But it's okay to write one.
+    }
   }
 }

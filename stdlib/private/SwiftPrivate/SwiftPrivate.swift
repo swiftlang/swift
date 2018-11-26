@@ -23,14 +23,14 @@ public func asHex<T : FixedWidthInteger>(_ x: T) -> String {
   // FIXME(integers): support a more general BinaryInteger protocol
 public func asHex<S : Sequence>(_ x: S) -> String
   where
-  S.Iterator.Element : FixedWidthInteger {
+  S.Element : FixedWidthInteger {
   return "[ " + x.lazy.map { asHex($0) }.joined(separator: ", ") + " ]"
 }
 
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : Sequence, U
->(_ seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
+>(_ seq: S, _ initial: U, _ combine: (U, S.Element) -> U) -> [U] {
   var result: [U] = []
   result.reserveCapacity(seq.underestimatedCount)
   var runningResult = initial
@@ -41,22 +41,10 @@ public func scan<
   return result
 }
 
-public func randomShuffle<T>(_ a: [T]) -> [T] {
-  var result = a
-  for i in (1..<a.count).reversed() {
-    // FIXME: 32 bits are not enough in general case!
-    let j = Int(rand32(exclusiveUpperBound: UInt32(i + 1)))
-    if i != j {
-      result.swapAt(i, j)
-    }
-  }
-  return result
-}
-
 public func gather<C : Collection, IndicesSequence : Sequence>(
   _ collection: C, _ indices: IndicesSequence
-) -> [C.Iterator.Element]
-  where IndicesSequence.Iterator.Element == C.Index {
+) -> [C.Element]
+  where IndicesSequence.Element == C.Index {
   return Array(indices.map { collection[$0] })
 }
 

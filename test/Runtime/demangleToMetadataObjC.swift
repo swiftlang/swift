@@ -5,6 +5,8 @@
 import StdlibUnittest
 import Foundation
 import CoreFoundation
+import CoreLocation
+import Dispatch
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
@@ -12,6 +14,7 @@ let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 @objc enum E: Int { case a }
 @objc protocol P1 { }
 protocol P2 { }
+@objc protocol P3: P1 { }
 
 DemangleToMetadataTests.test("@objc classes") {
   expectEqual(type(of: C()), _typeByMangledName("4main1CC")!)
@@ -58,7 +61,7 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
 }
 
 DemangleToMetadataTests.test("Imported enum types") {
-  expectEqual(NSURLSessionTask.State.self,
+  expectEqual(URLSessionTask.State.self,
     _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
@@ -72,6 +75,32 @@ DemangleToMetadataTests.test("@objc protocol conformances") {
   expectEqual(CG4<C, C>.self,
     _typeByMangledName("4main3CG4CyAA1CCAA1CCG")!)
   expectNil(_typeByMangledName("4main3CG4CyAA1DCAA1DCG"))
+}
+
+DemangleToMetadataTests.test("synthesized declarations") {
+  expectEqual(CLError.self, _typeByMangledName("SC7CLErrorLeV")!)
+  expectNil(_typeByMangledName("SC7CLErrorV"))
+  expectEqual(CLError.Code.self, _typeByMangledName("So7CLErrorV")!)
+
+  let error = NSError(domain: NSCocoaErrorDomain, code: 0)
+  let reflectionString = String(reflecting: CLError(_nsError: error))
+  expectTrue(reflectionString.hasPrefix("__C_Synthesized.related decl 'e' for CLError(_nsError:"))
+}
+
+DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
+  expectEqual(DispatchQueue.Attributes.self,
+    _typeByMangledName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
+}
+
+DemangleToMetadataTests.test("runtime conformance lookup via foreign superclasses") {
+  expectEqual(Set<CFMutableString>.self,
+    _typeByMangledName("ShySo18CFMutableStringRefaG")!)
+}
+
+class F<T: P1> { }
+
+DemangleToMetadataTests.test("runtime conformance check for @objc protocol inheritance") {
+  expectEqual(F<P3>.self, _typeByMangledName("4main1FCyAA2P3PG")!)
 }
 
 runAllTests()

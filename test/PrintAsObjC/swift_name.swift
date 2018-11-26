@@ -5,7 +5,7 @@
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
@@ -38,6 +38,6 @@ public enum TestE : Int{
 	case A1
 	case B1
 }
-// CHECK: typedef SWIFT_ENUM(NSInteger, TestE)
+// CHECK: typedef SWIFT_ENUM(NSInteger, TestE, closed)
 // CHECK-NEXT: {{^}} A2 SWIFT_COMPILE_NAME("A1") = 0,
 // CHECK-NEXT: {{^}} TestEB1 = 1,

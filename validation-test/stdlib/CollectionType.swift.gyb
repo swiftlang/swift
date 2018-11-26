@@ -144,8 +144,6 @@ func callGenericCollectionFilter<S : Collection>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
@@ -161,9 +159,6 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalCollectionWithCustomFilter<OpaqueValue<Int>>.timesFilterWasCalled = 0
-%     end
       var result = call${dispatch}CollectionFilter(s) {
         (element) in
         _blackHole(closureLifetimeTracker)
@@ -172,22 +167,16 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
       }
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(1, MinimalCollectionWithCustomFilter<OpaqueValue<Int>>.timesFilterWasCalled)
-%     end
-      expectEqual(
-        test.sequence, s.map { $0.value }, "collection should not be consumed")
+      expectEqual(test.sequence, s.map { $0.value }, 
+        "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate once per element")
-      expectGE(
-        2 * result.count, result.capacity,
+      expectGE(2 * result.count, result.capacity,
         "filter() should not reserve capacity"
         + "(it does not know how much the predicate will filter out)")
     }
   }
 }
-
-%   end
 
 % end
 
@@ -196,11 +185,7 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
 //===----------------------------------------------------------------------===//
 var MinimalCollectionWithCustomMap_timesMapWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-struct MinimalCollectionWith${Implementation}Map<Element>
-  : Collection {
-
+struct MinimalCollectionWithDefaultMap<Element>: Collection {
   init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalCollection(
       elements: data, underestimatedCount: underestimatedCount)
@@ -227,43 +212,10 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   var _data: MinimalCollection<Element>
-
-
-%   if Implementation == 'Custom':
-
-  static var timesMapWasCalled: Int {
-    get {
-      return MinimalCollectionWithCustomMap_timesMapWasCalled
-    }
-    set {
-      MinimalCollectionWithCustomMap_timesMapWasCalled = newValue
-    }
-  }
-
-  func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    MinimalCollectionWithCustomMap.timesMapWasCalled += 1
-    return try _data.map(transform)
-  }
-
-%   end
-
 }
-
-% end
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  transform: (OpaqueValue<Int>) -> T
-) -> [T] {
-  var result = collection.map(transform)
-  expectType([T].self, &result)
-  return result
-}
-
-func callStaticCollectionMap<T>(
-  _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
   transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -280,9 +232,7 @@ func callGenericCollectionMap<C : Collection, T>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-%   for dispatch in [ 'Static', 'Generic' ]:
+% for dispatch in [ 'Static', 'Generic' ]:
 
 CollectionTypeTests.test(
   "map/Collection/${Implementation}Implementation/${dispatch}"
@@ -293,19 +243,12 @@ CollectionTypeTests.test(
       UnderestimatedCountBehavior.half,
       UnderestimatedCountBehavior.value(0)
     ] {
-      let s = MinimalCollectionWith${Implementation}Map<
-        OpaqueValue<Int>
-      >(
+      let s = MinimalCollectionWithDefaultMap<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalCollectionWithCustomMap<
-        OpaqueValue<Int>
-      >.timesMapWasCalled = 0
-%     end
       var result = call${dispatch}CollectionMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
@@ -314,12 +257,6 @@ CollectionTypeTests.test(
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(
-        1, MinimalCollectionWithCustomMap<
-          OpaqueValue<Int>
-        >.timesMapWasCalled)
-%     end
       expectEqual(test.sequence, s.map { $0.value },
         "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled,
@@ -328,8 +265,6 @@ CollectionTypeTests.test(
     }
   }
 }
-
-%   end
 
 % end
 
@@ -570,8 +505,8 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
   // in non-generic code.  rdar://22109071
   var collection = MinimalMutableRandomAccessCollection(
     elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
-  var i = collection.startIndex
-  var j = collection.index(i, offsetBy: 5)
+  let i = collection.startIndex
+  let j = collection.index(i, offsetBy: 5)
   collection[i..<j].sort()
   expectEqualSequence(
     [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
@@ -603,15 +538,6 @@ CollectionTypeTests.test("isEmpty/dispatch") {
   expectCustomizable(tester, tester.log.isEmpty)
 }
 
-//===----------------------------------------------------------------------===//
-// first
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("first/dispatch") {
-  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first
-  expectCustomizable(tester, tester.log.first)
-}
 
 //===----------------------------------------------------------------------===//
 // count
@@ -624,12 +550,12 @@ CollectionTypeTests.test("count/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// index(of:)
+// firstIndex(of:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
+CollectionTypeTests.test("firstIndex(of:)/WhereElementIsEquatable/dispatch") {
   let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
-  _ = tester.index(of: MinimalEquatableValue(1))
+  _ = tester.firstIndex(of: MinimalEquatableValue(1))
   expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
 }
 
@@ -640,14 +566,14 @@ func callGenericFind_<
   C : Collection
 >(_ collection: C, _ element: C.Iterator.Element) -> C.Index? 
 where C.Iterator.Element : Equatable {
-  return collection.index(of: element)
+  return collection.firstIndex(of: element)
 }
 
 func callStaticFind_(
   _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set.index(of: element)
+  return set.firstIndex(of: element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -659,7 +585,7 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
     let s = Set<MinimalHashableValue>(
       test.sequence.map { MinimalHashableValue($0.value) })
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectEqual(
       test.expected
         .map { _ in MinimalHashableValue(test.element.value) },
@@ -671,11 +597,11 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
         0, MinimalHashableValue.timesEqualEqualWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectNotEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     }
     if test.expected != nil {
@@ -702,7 +628,7 @@ extension Collection where
   func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[startIndex..<endIndex]
-    while let foundIndex = tail.index(of: element) {
+    while let foundIndex = tail.firstIndex(of: element) {
       result.append(foundIndex)
       tail = tail[index(after: foundIndex)..<endIndex]
     }
@@ -710,7 +636,7 @@ extension Collection where
   }
 }
 
-CollectionTypeTests.test("index(of:)/ContinueSearch") {
+CollectionTypeTests.test("firstIndex(of:)/ContinueSearch") {
   do {
     let c = MinimalCollection(elements: [] as [MinimalEquatableValue])
     expectEqualSequence(
@@ -748,41 +674,10 @@ extension Collection {
 //===----------------------------------------------------------------------===//
 
 CollectionTypeTests.test("Collection/split/dispatch") {
-  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }
-
-//===----------------------------------------------------------------------===//
-// prefix(through:)
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("Collection/prefix(through:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  _ = tester.prefix(through: 1)
-  expectCustomizable(tester, tester.log.prefixThrough)
-}
-
-//===----------------------------------------------------------------------===//
-// prefix(upTo:)
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("Collection/prefix(upTo:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.prefix(upTo: 1)
-  expectCustomizable(tester, tester.log.prefixUpTo)
-}
-
-//===----------------------------------------------------------------------===//
-// suffix(from:)
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
-  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
-  _ = tester.suffix(from: 1)
-  expectCustomizable(tester, tester.log.suffixFrom)
-}
-
 
 //===----------------------------------------------------------------------===//
 // MutableCollection

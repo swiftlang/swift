@@ -55,10 +55,6 @@ static bool isLocalObject(SILValue Obj) {
     V = getUnderlyingObject(V);
     if (isa<AllocationInst>(V))
       continue;
-    if (auto I = dyn_cast<StrongPinInst>(V)) {
-      WorkList.push_back(I->getOperand());
-      continue;
-    }
     if (isa<StructInst>(V) || isa<TupleInst>(V) || isa<EnumInst>(V)) {
       // A compound value is local, if all of its components are local.
       for (auto &Op : cast<SingleValueInstruction>(V)->getAllOperands()) {
@@ -67,11 +63,11 @@ static bool isLocalObject(SILValue Obj) {
       continue;
     }
 
-    if (auto *Arg = dyn_cast<SILPHIArgument>(V)) {
+    if (auto *Arg = dyn_cast<SILPhiArgument>(V)) {
       // A BB argument is local if all of its
       // incoming values are local.
       SmallVector<SILValue, 4> IncomingValues;
-      if (Arg->getIncomingValues(IncomingValues)) {
+      if (Arg->getSingleTerminatorOperands(IncomingValues)) {
         for (auto InValue : IncomingValues) {
           WorkList.push_back(InValue);
         }

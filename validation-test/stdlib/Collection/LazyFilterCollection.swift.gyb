@@ -98,7 +98,8 @@ CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
   do {
     let predicate: (Int) -> Bool = { $0 % 3 == 0 || $0 % 5 == 0 }
 
-    let base = randArray(500)
+    let count = 500
+    let base = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
     var expected : [Int] = []
     for element in base where predicate(element) {
       expected.append(element)

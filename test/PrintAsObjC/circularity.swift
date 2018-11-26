@@ -5,7 +5,7 @@
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
@@ -23,18 +23,18 @@ import Foundation
 // CHECK-LABEL: @interface A1 : ProtoImpl
 class A1: ProtoImpl {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsProto<A2>) {}
+  @objc func test(_: NeedsProto<A2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface A2 : ProtoImpl
 class A2: ProtoImpl {
   // CHECK: - (void)test:
-  func test(_: NeedsProto<A1>) {}
+  @objc func test(_: NeedsProto<A1>) {}
 } // CHECK: @end
 
 // CHECK-LABEL: @interface B1 : ProtoImpl
 class B1: ProtoImpl {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsProto<B2>) {}
+  @objc func test(_: NeedsProto<B2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface B2 : ProtoImpl
 class B2: ProtoImpl {
@@ -43,7 +43,7 @@ class B2: ProtoImpl {
 // CHECK-LABEL: @interface C1 : ProtoImpl
 class C1: ProtoImpl {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsProto<C2>) {}
+  @objc func test(_: NeedsProto<C2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @protocol C2 <Proto>
 @objc protocol C2: Proto {
@@ -52,7 +52,7 @@ class C1: ProtoImpl {
 // CHECK-LABEL: @interface D1 : ProtoImpl
 class D1: ProtoImpl {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsProto<D2>) {}
+  @objc func test(_: NeedsProto<D2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @protocol D2 <Proto>
 @objc protocol D2: Proto {
@@ -70,7 +70,7 @@ class D1: ProtoImpl {
 } // CHECK: @end
 // Moved ahead.
 class D4: ProtoImpl {
-  func test(_: NeedsProto<D3>) {}
+  @objc func test(_: NeedsProto<D3>) {}
 }
 
 // CHECK-LABEL: @interface E2 : ProtoImpl
@@ -91,7 +91,7 @@ class F1: ProtoImpl {
 // CHECK-LABEL: @interface F1 (SWIFT_EXTENSION(circularity))
 extension F1 {
   // CHECK: - (void)test:
-  func test(_: NeedsProto<F2>) {}
+  @objc func test(_: NeedsProto<F2>) {}
 } // CHECK: @end
 // Moved ahead.
 class F2: ProtoImpl {}
@@ -104,7 +104,7 @@ class G1: ProtoImpl {
 // CHECK-LABEL: @interface G1 (SWIFT_EXTENSION(circularity))
 extension G1 {
   // CHECK: - (void)test:
-  func test(_: NeedsProto<G2>) {}
+  @objc func test(_: NeedsProto<G2>) {}
 } // CHECK: @end
 // Moved ahead.
 @objc protocol G2: Proto {}
@@ -112,56 +112,56 @@ extension G1 {
 // CHECK-LABEL: @interface H1 : ProtoImpl
 class H1: ProtoImpl {
   // CHECK: 'test(_:)' below
-  func test(_: NeedsProto<H2>) {}
+  @objc func test(_: NeedsProto<H2>) {}
   // CHECK: 'anotherTest(_:)' below
-  func anotherTest(_: NeedsProto<H3>) {}
+  @objc func anotherTest(_: NeedsProto<H3>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface H2 : ProtoImpl
 class H2: ProtoImpl {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsProto<H3>) {}
+  @objc func test(_: NeedsProto<H3>) {}
   // CHECK: - (void)anotherTest:
-  func anotherTest(_: NeedsProto<H1>) {}
+  @objc func anotherTest(_: NeedsProto<H1>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface H3 : ProtoImpl
 class H3: ProtoImpl {
   // CHECK: - (void)test:
-  func test(_: NeedsProto<H1>) {}
+  @objc func test(_: NeedsProto<H1>) {}
   // CHECK: - (void)anotherTest:
-  func anotherTest(_: NeedsProto<H2>) {}
+  @objc func anotherTest(_: NeedsProto<H2>) {}
 } // CHECK: @end
 
 // CHECK-LABEL: @interface I1 : Parent
 class I1 : Parent {
   // CHECK: // 'test(_:)' below
-  func test(_: NeedsParent<I2>) {}
+  @objc func test(_: NeedsParent<I2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface I2 : Parent
 class I2 : Parent {
   // CHECK: - (void)test:
-  func test(_: NeedsParent<I1>) {}
+  @objc func test(_: NeedsParent<I1>) {}
 } // CHECK: @end
 
 // CHECK-LABEL: @interface J1 : Parent
 class J1 : Parent {
   // CHECK: - (void)test:
-  func test(_: Unconstrained<J2>) {}
+  @objc func test(_: Unconstrained<J2>) {}
 } // CHECK: @end
 // CHECK-LABEL: @interface J2 : Parent
 class J2 : Parent {
   // CHECK: - (void)test:
-  func test(_: Unconstrained<J1>) {}
+  @objc func test(_: Unconstrained<J1>) {}
 } // CHECK: @end
 
 // CHECK-LABEL: @protocol K1 <Proto>
 @objc protocol K1 : Proto {
   // CHECK: - (void)test:
-  func test(_: Unconstrained<K2>)
+  @objc func test(_: Unconstrained<K2>)
 } // CHECK: @end
 // CHECK-LABEL: @protocol K2 <Proto>
 @objc protocol K2 : Proto {
   // CHECK: - (void)test:
-  func test(_: Unconstrained<K1>)
+  @objc func test(_: Unconstrained<K1>)
 } // CHECK: @end
 
 

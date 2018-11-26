@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -31,37 +31,37 @@ import gizmo
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$S13generic_casts8allToIntySixlF"(%swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8allToIntySixlF"(%swift.opaque* noalias nocapture, %swift.type* %T)
 func allToInt<T>(_ x: T) -> Int {
   return x as! Int
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
 	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
   // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
   // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
   // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
   // CHECK: [[T_TMP:%.*]] = bitcast i8* [[T_ALLOCA]] to %swift.opaque*
   // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}(%swift.opaque* noalias [[T_TMP]], %swift.opaque* noalias %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @"$SSiN", i64 7)
+  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[T_TMP]], %swift.type* %T, %swift.type* @"$sSiN", i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
-// CHECK: define hidden swiftcc void @"$S13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
 func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, i64* [[T0]],
   // CHECK: [[T0:%.*]] = bitcast %TSi* [[INT_TEMP]] to %swift.opaque*
-  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @"$SSiN", %swift.type* %T, i64 7)
+  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* @"$sSiN", %swift.type* %T, i64 7)
   return x as! T
 }
 
-// CHECK: define hidden swiftcc i64 @"$S13generic_casts8anyToIntySiypF"(%Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(%Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
@@ -77,7 +77,7 @@ func anyToInt(_ x: Any) -> Int {
 
 @objc class ObjCClass {}
 
-// CHECK: define hidden swiftcc %objc_object* @"$S13generic_casts9protoCastyAA10ObjCProto1_So9NSRuncingpAA0E6CClassCF"(%T13generic_casts9ObjCClassC*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @"$s13generic_casts9protoCastyAA10ObjCProto1_So9NSRuncingpAA0E6CClassCF"(%T13generic_casts9ObjCClassC*) {{.*}} {
 func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
@@ -94,13 +94,14 @@ func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
 
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
-// CHECK: define hidden swiftcc void @"$S13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
+// CHECK: define hidden swiftcc void @"$s13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
 func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   var x = x
   // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %T13generic_casts10ObjCProto1P* [[LOCAL]] to %swift.opaque*
-  // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @"$S13generic_casts10ObjCProto1_pMa"()
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s13generic_casts10ObjCProto1_pMa"(i64 0)
+  // CHECK: [[PROTO_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
 }
@@ -108,7 +109,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @"$S13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

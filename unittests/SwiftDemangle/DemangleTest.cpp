@@ -41,12 +41,19 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 TEST(FunctionNameDemangleTests, NewManglingPrefix) {
   char OutputBuffer[128];
 
-  const char *FunctionName = "$S1a10run_MatMulyySiF";
+  const char *FunctionName = "$s1a10run_MatMulyySiF";
+  const char *FunctionNameNew = "$s1a10run_MatMulyySiF";
   const char *DemangledName = "a.run_MatMul(Swift.Int) -> ()";
   const char *SimplifiedName = "run_MatMul(_:)";
 
   size_t Result = swift_demangle_getDemangledName(FunctionName, OutputBuffer,
                                                   sizeof(OutputBuffer));
+
+  EXPECT_STREQ(DemangledName, OutputBuffer);
+  EXPECT_EQ(Result, strlen(DemangledName));
+
+  Result = swift_demangle_getDemangledName(FunctionNameNew, OutputBuffer,
+                                           sizeof(OutputBuffer));
 
   EXPECT_STREQ(DemangledName, OutputBuffer);
   EXPECT_EQ(Result, strlen(DemangledName));

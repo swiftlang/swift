@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-anon.h -DDIAGS -verify
-// RUN: %target-swift-frontend -emit-ir %s -import-objc-header %S/Inputs/enum-anon.h | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h -DDIAGS -verify
+// RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
 
 #if DIAGS
 func testDiags() {
@@ -30,7 +30,7 @@ func testDiags() {
 #endif
 
 // CHECK-LABEL: %TSo6SR2511V = type <{ %Ts5Int32V, %Ts6UInt32V, %Ts5Int32V }>
-// CHECK-LABEL: define{{.*}} i32 @"$S4main6testIR1xs5Int32VSPySo6SR2511VG_tF"(
+// CHECK-LABEL: define{{.*}} i32 @"$s4main6testIR1xs5Int32VSPySo6SR2511VG_tF"(
 public func testIR(x: UnsafePointer<SR2511>) -> CInt {
   // CHECK: store i32 1, i32* getelementptr inbounds (%Ts6UInt32V, %Ts6UInt32V* bitcast (i32* @global to %Ts6UInt32V*), i32 0, i32 0), align 4
   global = VarConstant2

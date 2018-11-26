@@ -6,5 +6,5 @@ protocol Fooable {
   associatedtype Foo
 }
 
-// CHECK: define hidden swiftcc void @"$S18infinite_archetype3foo{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Fooable)
-func foo<T: Fooable where T == T.Foo>(x: T) -> T { return x }
+// CHECK: define hidden swiftcc void @"$s18infinite_archetype3foo{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Fooable)
+func foo<T: Fooable>(x: T) -> T where T == T.Foo { return x }

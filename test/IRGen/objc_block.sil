@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
-// REQUIRES: objc_interop
-
 sil_stage canonical
 
 import Swift
@@ -9,14 +7,14 @@ import Swift
 class Foo {}
 sil_vtable Foo {}
 
-sil @$S10objc_block3FooCfD : $Foo -> ()
+sil @$s10objc_block3FooCfD : $(Foo) -> ()
 
-sil @call_block : $@convention(thin) (@convention(block) Foo -> Foo, Foo) -> Foo {
-entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
-  %y = apply %b(%x) : $@convention(block) Foo -> Foo
+sil @call_block : $@convention(thin) (@convention(block) (Foo) -> Foo, Foo) -> Foo {
+entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
+  %y = apply %b(%x) : $@convention(block) (Foo) -> Foo
   return %y : $Foo
 }
-// CHECK-LABEL: define{{( protected)?}} swiftcc %T10objc_block3FooC* @call_block(%objc_block*, %T10objc_block3FooC*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T10objc_block3FooC* @call_block(%objc_block*, %T10objc_block3FooC*) {{.*}} {
 // CHECK:       entry:
 // CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
 // CHECK:         [[T1:%.*]] = load i8*, i8** [[T0]]
@@ -36,6 +34,6 @@ entry(%b : $*@convention(block) () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
 // --                                                                               0x100_0001 = block convention, 1 arg
-// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$SytN", i32 0, i32 1))
+// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))

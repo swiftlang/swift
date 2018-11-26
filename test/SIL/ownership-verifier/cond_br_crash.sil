@@ -61,7 +61,7 @@ bb2:
 // CHECK: Found use after free?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-// CHECK: Non Consuming User:   end_borrow %3 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
 // CHECK: Block: bb1
 sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -69,7 +69,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 bb1(%1 : @owned $Builtin.NativeObject):
   %2 = begin_borrow %0 : $Builtin.NativeObject
-  end_borrow %2 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   br bb2
 

@@ -21,152 +21,124 @@
 import SwiftShims
 
 @_fixed_layout
-public // @testable
-struct _BridgeStorage<
-  NativeClass: AnyObject, ObjCClass: AnyObject
+@usableFromInline
+internal struct _BridgeStorage<
+  NativeClass: AnyObject,
+  ObjCClass: AnyObject
 > {
-  public // @testable
-  typealias Native = NativeClass
-  
-  public // @testable
-  typealias ObjC = ObjCClass
-  
-  @_inlineable // FIXME(sil-serialize-all)
+  @usableFromInline
+  internal typealias Native = NativeClass
+
+  @usableFromInline
+  internal typealias ObjC = ObjCClass
+
+  // rawValue is passed inout to _isUnique.  Although its value
+  // is unchanged, it must appear mutable to the optimizer.
+  @usableFromInline
+  internal var rawValue: Builtin.BridgeObject
+
+  @inlinable
   @inline(__always)
-  public // @testable
-  init(native: Native, bits: Int) {
+  internal init(native: Native, isFlagged flag: Bool) {
+    // Note: Some platforms provide more than one spare bit, but the minimum is
+    // a single bit.
+
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
-    
-    // More bits are available on some platforms, but it's not portable
-    _sanityCheck(0...1 ~= bits,
-        "BridgeStorage can't store bits outside the range 0...1")
 
     rawValue = _makeNativeBridgeObject(
-      native, UInt(bits) << _objectPointerLowSpareBitShift)
+      native,
+      flag ? (1 as UInt) << _objectPointerLowSpareBitShift : 0)
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+
+  @inlinable
   @inline(__always)
-  public // @testable
-  init(objC: ObjC) {
+  internal init(objC: ObjC) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+
+  @inlinable
   @inline(__always)
-  public // @testable
-  init(native: Native) {
+  internal init(native: Native) {
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var spareBits: Int {
-  @inline(__always) get {
-    _sanityCheck(isNative)
-    return Int(
-      _nonPointerBits(rawValue) >> _objectPointerLowSpareBitShift)
-    }
-  }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+
+#if !(arch(i386) || arch(arm))
+  @inlinable
   @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedNative() -> Bool {
+  internal init(taggedPayload: UInt) {
+    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+  }
+#endif
+
+  @inlinable
+  @inline(__always)
+  internal mutating func isUniquelyReferencedNative() -> Bool {
     return _isUnique(&rawValue)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
-    return _isUniqueOrPinned(&rawValue)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var isNative: Bool {
+  @inlinable
+  internal var isNative: Bool {
     @inline(__always) get {
       let result = Builtin.classifyBridgeObject(rawValue)
       return !Bool(Builtin.or_Int1(result.isObjCObject,
                                    result.isObjCTaggedPointer))
     }
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
-    return (_bitPattern(rawValue) &
-            (_objCTaggedPointerBits | _objectPointerIsObjCBit |
-             (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
+
+  @inlinable
+  static var flagMask: UInt {
+    @inline(__always) get {
+      return (1 as UInt) << _objectPointerLowSpareBitShift
+    }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var isObjC: Bool {
+  @inlinable
+  internal var isUnflaggedNative: Bool {
+    @inline(__always) get {
+      return (_bitPattern(rawValue) &
+        (_bridgeObjectTaggedPointerBits | _objCTaggedPointerBits |
+          _objectPointerIsObjCBit | _BridgeStorage.flagMask)) == 0
+    }
+  }
+
+  @inlinable
+  internal var isObjC: Bool {
     @inline(__always) get {
       return !isNative
     }
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var nativeInstance: Native {
+
+  @inlinable
+  internal var nativeInstance: Native {
     @inline(__always) get {
       _sanityCheck(isNative)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var nativeInstance_noSpareBits: Native {
+
+  @inlinable
+  internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
       _sanityCheck(isNative)
       _sanityCheck(_nonPointerBits(rawValue) == 0)
       return Builtin.reinterpretCast(rawValue)
     }
   }
-  
-  @_inlineable // FIXME(sil-serialize-all)
+
+  @inlinable
   @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
+  internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
     _sanityCheck(isNative)
     return _isUnique_native(&rawValue)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
-    _sanityCheck(isNative)
-    return _isUniqueOrPinned_native(&rawValue)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  var objCInstance: ObjC {
+  @inlinable
+  internal var objCInstance: ObjC {
     @inline(__always) get {
       _sanityCheck(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
-  
-  //===--- private --------------------------------------------------------===//
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
-  internal var _isTagged: Bool {
-    @inline(__always) get {
-      return Bool(Builtin.classifyBridgeObject(rawValue).isObjCTaggedPointer)
-    }
-  }
-
-  // rawValue is passed inout to _isUnique.  Although its value
-  // is unchanged, it must appear mutable to the optimizer.
-  @_versioned
-  internal var rawValue: Builtin.BridgeObject
 }

@@ -1,0 +1,38 @@
+
+/* Generic Signature Changes */
+
+/* RawRepresentable Changes */
+
+/* Removed Decls */
+Func Collection.prefix(through:) has been removed
+Func Collection.prefix(upTo:) has been removed
+Func Collection.suffix(from:) has been removed
+Func Sequence.filter(_:) has been removed
+Func Sequence.forEach(_:) has been removed
+Func Sequence.map(_:) has been removed
+Func _SequenceWrapper.filter(_:) has been removed
+Func _SequenceWrapper.forEach(_:) has been removed
+Func _SequenceWrapper.map(_:) has been removed
+Var AnyBidirectionalCollection.first has been removed
+Var AnyBidirectionalCollection.last has been removed
+Var AnyCollection.first has been removed
+Var AnyRandomAccessCollection.first has been removed
+Var AnyRandomAccessCollection.last has been removed
+Var BidirectionalCollection.last has been removed
+Var Collection.first has been removed
+Var Dictionary.first has been removed
+Var LazyCollection.first has been removed
+Var LazyCollection.last has been removed
+Var LazyMapCollection.first has been removed
+Var LazyMapCollection.last has been removed
+Var Set.first has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+
+/* Type Changes */
+
+/* Decl Attribute changes */
+
+/* Protocol Requirement Changes */

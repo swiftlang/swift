@@ -33,6 +33,55 @@ STATISTIC(EnumInfoNumCacheMisses, "# of times the enum info cache was missed");
 using namespace swift;
 using namespace importer;
 
+static void rememberToChangeThisBehaviorInSwift5() {
+  // Note: Once the compiler starts advertising itself as Swift 5, even
+  // Swift 4 mode is supposed to treat C enums as non-exhaustive. Because
+  // it's Swift 4 mode, failing to switch over the whole enum will only
+  // produce a warning, not an error.
+  //
+  // This is an assertion rather than a condition because we /want/ to be
+  // reminded to take it out when we're ready for the Swift 5 release.
+  assert(version::getSwiftNumericVersion().first < 5 &&
+         "When the compiler starts advertising itself as Swift 5, even "
+         "Swift 4 mode is supposed to treat C enums as non-exhaustive.");
+}
+
+/// Find the last extensibility attribute on \p decl as arranged by source
+/// location...unless there's an API note, in which case that one wins.
+///
+/// This is not what Clang will do, but it's more useful for us since CF_ENUM
+/// already has enum_extensibility(open) in it.
+static clang::EnumExtensibilityAttr *
+getBestExtensibilityAttr(clang::Preprocessor &pp, const clang::EnumDecl *decl) {
+  clang::EnumExtensibilityAttr *bestSoFar = nullptr;
+  const clang::SourceManager &sourceMgr = pp.getSourceManager();
+  for (auto *next : decl->specific_attrs<clang::EnumExtensibilityAttr>()) {
+    if (next->getLocation().isInvalid()) {
+      // This is from API notes -- use it!
+      return next;
+    }
+
+    // Temporarily ignore enum_extensibility attributes inside CF_ENUM and
+    // similar. In the Swift 5 release we can start respecting this annotation,
+    // meaning this entire block can be dropped.
+    {
+      rememberToChangeThisBehaviorInSwift5();
+      auto loc = next->getLocation();
+      if (loc.isMacroID() &&
+          pp.getImmediateMacroName(loc) == "__CF_ENUM_ATTRIBUTES") {
+        continue;
+      }
+    }
+
+    if (!bestSoFar ||
+        sourceMgr.isBeforeInTranslationUnit(bestSoFar->getLocation(),
+                                            next->getLocation())) {
+      bestSoFar = next;
+    }
+  }
+  return bestSoFar;
+}
+
 /// Classify the given Clang enumeration to describe how to import it.
 void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
                             clang::Preprocessor &pp) {
@@ -49,21 +98,24 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     return;
   }
 
-  // First, check for attributes that denote the classification
+  // First, check for attributes that denote the classification.
   if (auto domainAttr = decl->getAttr<clang::NSErrorDomainAttr>()) {
-    kind = EnumKind::Enum;
+    kind = EnumKind::NonFrozenEnum;
     nsErrorDomain = domainAttr->getErrorDomain()->getName();
-    return;
   }
   if (decl->hasAttr<clang::FlagEnumAttr>()) {
     kind = EnumKind::Options;
     return;
   }
-  if (decl->hasAttr<clang::EnumExtensibilityAttr>()) {
-    // FIXME: Distinguish between open and closed enums.
-    kind = EnumKind::Enum;
+  if (auto *attr = getBestExtensibilityAttr(pp, decl)) {
+    if (attr->getExtensibility() == clang::EnumExtensibilityAttr::Closed)
+      kind = EnumKind::FrozenEnum;
+    else
+      kind = EnumKind::NonFrozenEnum;
     return;
   }
+  if (!nsErrorDomain.empty())
+    return;
 
   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
   // then we don't need to check the macros.
@@ -79,15 +131,15 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // Was the enum declared using *_ENUM or *_OPTIONS?
   // FIXME: Stop using these once flag_enum and enum_extensibility
-  // have been adopted everywhere, or at least relegate them to Swift 3 mode
+  // have been adopted everywhere, or at least relegate them to Swift 4 mode
   // only.
-  auto loc = decl->getLocStart();
+  auto loc = decl->getBeginLoc();
   if (loc.isMacroID()) {
     StringRef MacroName = pp.getImmediateMacroName(loc);
     if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
         MacroName == "OBJC_ENUM" || MacroName == "SWIFT_ENUM" ||
         MacroName == "SWIFT_ENUM_NAMED") {
-      kind = EnumKind::Enum;
+      kind = EnumKind::NonFrozenEnum;
       return;
     }
     if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
@@ -99,7 +151,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
 
   // Hardcode a particular annoying case in the OS X headers.
   if (decl->getName() == "DYLD_BOOL") {
-    kind = EnumKind::Enum;
+    kind = EnumKind::FrozenEnum;
     return;
   }
 
@@ -205,7 +257,8 @@ StringRef importer::getCommonPluralPrefix(StringRef singular,
 /// within the given enum.
 void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
   switch (getKind()) {
-  case EnumKind::Enum:
+  case EnumKind::NonFrozenEnum:
+  case EnumKind::FrozenEnum:
   case EnumKind::Options:
     // Enums are mapped to Swift enums, Options to Swift option sets, both
     // of which attempt prefix-stripping.
@@ -229,7 +282,7 @@ void EnumInfo::determineConstantNamePrefix(const clang::EnumDecl *decl) {
     if (elem->hasAttr<clang::SwiftNameAttr>())
       return false;
 
-    clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
+    llvm::VersionTuple maxVersion{~0U, ~0U, ~0U};
     switch (elem->getAvailability(nullptr, maxVersion)) {
     case clang::AR_Available:
     case clang::AR_NotYetIntroduced:

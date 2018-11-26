@@ -40,7 +40,7 @@ class RefArray<T> {
 // elements should be a nop.
 @inline(never)
 func genEnumArray() {
-  _ = RefArray<Int?>(3)
+  blackHole(RefArray<Int?>(3))
   // should be a nop
 }
 
@@ -53,13 +53,13 @@ struct S<T> {
 }
 @inline(never)
 func genStructArray() {
-  _ = RefArray<S<Int>>(S(x:3, y:4))
+  blackHole(RefArray<S<Int>>(S(x:3, y:4)))
   // should be a nop
 }
 
 @inline(never)
 public func run_ArrayOfGenericPOD(_ N: Int) {
-  for _ in 0...N {
+  for _ in 0..<N {
     genEnumArray()
     genStructArray()
   }

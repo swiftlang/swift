@@ -58,7 +58,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
         }
     }
     
-    fileprivate static func ==(_ lhs : _CharacterSetStorage, _ rhs : _CharacterSetStorage) -> Bool {
+    fileprivate static func ==(lhs : _CharacterSetStorage, rhs : _CharacterSetStorage) -> Bool {
         switch (lhs._backing, rhs._backing) {
         case (.immutable(let cs1), .immutable(let cs2)):
             return CFEqual(cs1, cs2)
@@ -390,7 +390,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     /// Initialize with the characters in the given string.
     ///
     /// - parameter string: The string content to inspect for characters.
-    public init(charactersIn string: String) {
+    public init(charactersIn string: __shared String) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInString(nil, string as CFString))
     }
     
@@ -398,7 +398,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// This method is useful for creating a character set object with data from a file or other external data source.
     /// - parameter data: The bitmap representation.
-    public init(bitmapRepresentation data: Data) {
+    public init(bitmapRepresentation data: __shared Data) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
     }
     
@@ -406,7 +406,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// Returns `nil` if there was an error reading the file.
     /// - parameter file: The file to read.
-    public init?(contentsOfFile file: String) {
+    public init?(contentsOfFile file: __shared String) {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
             _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
@@ -415,7 +415,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         }
     }
 
-    fileprivate init(_bridged characterSet: NSCharacterSet) {
+    fileprivate init(_bridged characterSet: __shared NSCharacterSet) {
         _storage = _CharacterSetStorage(immutableReference: characterSet.copy() as! CFCharacterSet)
     }
     
@@ -427,7 +427,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         _storage = _uncopiedStorage
     }
 
-    fileprivate init(_builtIn: CFCharacterSetPredefinedSet) {
+    fileprivate init(_builtIn: __shared CFCharacterSetPredefinedSet) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetGetPredefined(_builtIn))
     }
     
@@ -517,7 +517,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     /// Returns the character set for characters allowed in a user URL subcomponent.
     public static var urlUserAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLUserAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLUserAllowedCharacterSet() as! NSCharacterSet)
@@ -526,7 +526,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns the character set for characters allowed in a password URL subcomponent.
     public static var urlPasswordAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLPasswordAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLPasswordAllowedCharacterSet() as! NSCharacterSet)
@@ -535,7 +535,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns the character set for characters allowed in a host URL subcomponent.
     public static var urlHostAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLHostAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLHostAllowedCharacterSet() as! NSCharacterSet)
@@ -544,7 +544,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns the character set for characters allowed in a path URL component.
     public static var urlPathAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLPathAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLPathAllowedCharacterSet() as! NSCharacterSet)
@@ -553,7 +553,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns the character set for characters allowed in a query URL component.
     public static var urlQueryAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLQueryAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLQueryAllowedCharacterSet() as! NSCharacterSet)
@@ -562,7 +562,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns the character set for characters allowed in a fragment URL component.
     public static var urlFragmentAllowed : CharacterSet {
-        if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+        if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
             return CharacterSet(_uncopiedImmutableReference: _CFURLComponentsGetURLFragmentAllowedCharacterSet() as NSCharacterSet)
         } else {
             return CharacterSet(_uncopiedImmutableReference: _NSURLComponentsGetURLFragmentAllowedCharacterSet() as! NSCharacterSet)
@@ -782,6 +782,7 @@ extension CharacterSet : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCharacterSet?) -> CharacterSet {
         guard let src = source else { return CharacterSet() }
         return CharacterSet(_bridged: src)

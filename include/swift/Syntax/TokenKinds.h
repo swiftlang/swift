@@ -24,6 +24,13 @@ enum class tok {
 
   NUM_TOKENS
 };
+
+/// Check whether a token kind is known to have any specific text content.
+/// e.g., tol::l_paren has determined text however tok::identifier doesn't.
+bool isTokenTextDetermined(tok kind);
+
+/// If a token kind has determined text, return the text; otherwise assert.
+StringRef getTokenText(tok kind);
 } // end namespace swift
 
 #endif // SWIFT_TOKENKINDS_H

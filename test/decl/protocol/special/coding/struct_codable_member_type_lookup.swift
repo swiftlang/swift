@@ -15,7 +15,7 @@ struct SynthesizedStruct : Codable {
   // Qualified type lookup should always be unambiguous.
   public func qualifiedFoo(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
   internal func qualifiedBar(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-  fileprivate func qualfiedBaz(_ key: SynthesizedStruct.CodingKeys) {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func qualfiedBaz(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
   private func qualifiedQux(_ key: SynthesizedStruct.CodingKeys) {}
 
   // Unqualified lookups should find the synthesized CodingKeys type instead
@@ -28,7 +28,7 @@ struct SynthesizedStruct : Codable {
     print(CodingKeys.value) // Not found on top-level.
   }
 
-  fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     print(CodingKeys.value) // Not found on top-level.
   }
 
@@ -63,7 +63,7 @@ struct SynthesizedStruct : Codable {
     bar(CodingKeys.nested)
   }
 
-  fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+  fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     enum CodingKeys : String, CodingKey {
       case nested
     }
@@ -94,7 +94,7 @@ struct SynthesizedStruct : Codable {
     // Qualified lookup should remain as-is.
     public func qualifiedFoo(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
     internal func qualifiedBar(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared internal because its parameter uses a private type}}
-    fileprivate func qualfiedBaz(_ key: SynthesizedStruct.CodingKeys) {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func qualfiedBaz(_ key: SynthesizedStruct.CodingKeys) {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
     private func qualifiedQux(_ key: SynthesizedStruct.CodingKeys) {}
 
     // Unqualified lookups should find the SynthesizedStruct's synthesized
@@ -107,7 +107,7 @@ struct SynthesizedStruct : Codable {
       print(CodingKeys.value) // Not found on top-level.
     }
 
-    fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func unqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
       print(CodingKeys.value) // Not found on top-level.
     }
 
@@ -142,7 +142,7 @@ struct SynthesizedStruct : Codable {
       bar(CodingKeys.nested)
     }
 
-    fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}}
+    fileprivate func nestedUnqualifiedBaz(_ key: CodingKeys) { // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}}
       enum CodingKeys : String, CodingKey {
         case nested
       }
@@ -653,4 +653,11 @@ func foo(_: GenericCodableStruct<Int>.CodingKeys) // expected-error {{'CodingKey
 struct sr6886 {
   struct Nested : Codable {}
   let Nested: Nested // Don't crash with a coding key that is the same as a nested type name
+}
+
+// Don't crash if we have a static property with the same name as an ivar that
+// we will encode. We check the actual codegen in a SILGen test.
+struct StaticInstanceNameDisambiguation : Codable {
+  static let version: Float = 0.42
+  let version: Int = 42
 }

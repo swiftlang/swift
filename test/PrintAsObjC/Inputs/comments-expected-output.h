@@ -1,6 +1,5 @@
 SWIFT_CLASS("_TtC8comments4A000")
 @interface A000
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -30,7 +29,6 @@ SWIFT_CLASS("_TtC8comments10ATXHeaders")
 /// <h1>LEVEL ONE</h1>
 /// <h2>LEVEL TWO</h2>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -39,7 +37,6 @@ SWIFT_CLASS("_TtC8comments13AutomaticLink")
 /// And now for a URL.
 /// <a href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</a>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -55,7 +52,6 @@ SWIFT_CLASS("_TtC8comments10BlockQuote")
 ///
 /// </blockquote>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -75,7 +71,6 @@ SWIFT_CLASS("_TtC8comments5Brief")
 /// Aaa.
 /// Bbb.
 - (void)f3;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -83,7 +78,6 @@ SWIFT_CLASS("_TtC8comments15ClosingComments")
 @interface ClosingComments
 /// Some comment. */
 - (void)closingComment;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -152,7 +146,6 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
 /// \a combine error: Nothing.
 ///
 - (void)closureParameterOutlineOutlineWithA:(NSInteger)a combine:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger, NSInteger))combine;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -166,7 +159,6 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 ///
 /// \endcode
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -175,7 +167,6 @@ SWIFT_CLASS("_TtC8comments8Emphasis")
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -191,7 +182,6 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 - (void)f3;
 /// Aaa.
 - (void)f4;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -204,7 +194,6 @@ SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
 /// throws:
 /// An error if <code>x == 0</code>
 - (void)f1:(NSInteger)x;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -214,7 +203,6 @@ SWIFT_CLASS("_TtC8comments15HorizontalRules")
 /// <hr/>
 /// The end.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -222,7 +210,6 @@ SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
 @interface ImplicitNameLink
 /// <a href="https://www.apple.com/">Apple</a>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -250,7 +237,6 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 ///
 /// \endcode
 - (void)f2;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -258,7 +244,6 @@ SWIFT_CLASS("_TtC8comments10InlineCode")
 @interface InlineCode
 /// Aaa <code>bbb</code> ccc.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -266,7 +251,6 @@ SWIFT_CLASS("_TtC8comments10InlineLink")
 @interface InlineLink
 /// Aaa <a href="/path/to/something">bbb</a> ccc.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -276,7 +260,6 @@ SWIFT_CLASS("_TtC8comments14MultiLineBrief")
 /// Brief after softbreak.
 /// Some paragraph text.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -292,7 +275,6 @@ SWIFT_CLASS("_TtC8comments11OrderedList")
 ///   </li>
 /// </ol>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -338,7 +320,6 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 /// Eee.
 /// Fff.
 - (void)f4;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -351,7 +332,6 @@ SWIFT_CLASS("_TtC8comments16ParameterOutline")
 /// \param z A number
 ///
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -372,13 +352,11 @@ SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
 /// \param z A number
 ///
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
 SWIFT_CLASS("_TtC8comments13ReferenceLink")
 @interface ReferenceLink
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -388,7 +366,6 @@ SWIFT_CLASS("_TtC8comments7Returns")
 /// returns:
 /// A number
 - (NSInteger)f0 SWIFT_WARN_UNUSED_RESULT;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -397,7 +374,6 @@ SWIFT_CLASS("_TtC8comments18SeparateParameters")
 /// \param x A number
 ///
 - (void)f0:(NSInteger)x y:(NSInteger)y;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -410,7 +386,6 @@ SWIFT_CLASS("_TtC8comments13SetextHeaders")
 /// <h5>LEVEL FIVE</h5>
 /// <h5>LEVEL SIX</h5>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -419,7 +394,6 @@ SWIFT_CLASS("_TtC8comments14StrongEmphasis")
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -448,7 +422,6 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 ///   </li>
 /// </ul>
 - (void)f0;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 #if __has_attribute(external_source_symbol)

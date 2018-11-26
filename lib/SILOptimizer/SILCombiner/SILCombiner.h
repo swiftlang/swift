@@ -25,7 +25,10 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -117,6 +120,14 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
+  // Determine the set of types a protocol conforms to in whole-module
+  // compilation mode.
+  ProtocolConformanceAnalysis *PCA;
+
+  // Class hierarchy analysis needed to confirm no derived classes of a sole
+  // conforming class.
+  ClassHierarchyAnalysis *CHA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -136,11 +147,14 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+  SILCombiner(SILOptFunctionBuilder &FuncBuilder,
+              SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+              ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), Worklist(), MadeChange(false),
+      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(/* ReplaceInstUsesAction */
+        CastOpt(FuncBuilder,
+                /* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
                 },
@@ -198,12 +212,15 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitTryApplyInst(TryApplyInst *AI);
+  SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
@@ -276,24 +293,30 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  SILInstruction * createApplyWithConcreteType(FullApplySite AI,
-                                               SILValue NewSelf,
-                                               SILValue Self,
-                                               CanType ConcreteType,
-                                               SILValue ConcreteTypeDef,
-                                               ProtocolConformanceRef Conformance,
-                                               ArchetypeType *OpenedArchetype);
-
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
-  SILInstruction *
-  propagateConcreteTypeOfInitExistential(FullApplySite AI,
-      ProtocolDecl *Protocol,
-      llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate);
+  bool canReplaceArg(FullApplySite Apply, const ConcreteExistentialInfo &CEI,
+                     unsigned ArgIdx);
+  SILInstruction *createApplyWithConcreteType(
+      FullApplySite Apply,
+      const llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> &CEIs,
+      SILBuilderContext &BuilderCtx);
 
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
-                                                         WitnessMethodInst *WMI);
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+  // Common utility function to replace the WitnessMethodInst using a
+  // BuilderCtx.
+  void replaceWitnessMethodInst(WitnessMethodInst *WMI,
+                                SILBuilderContext &BuilderCtx,
+                                CanType ConcreteType,
+                                const ProtocolConformanceRef ConformanceRef);
+
+  SILInstruction *
+  propagateConcreteTypeOfInitExistential(FullApplySite Apply,
+                                         WitnessMethodInst *WMI);
+  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
+
+  /// Propagate concrete types from ProtocolConformanceAnalysis.
+  SILInstruction *propagateSoleConformingType(FullApplySite Apply,
+                                              WitnessMethodInst *WMI);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);

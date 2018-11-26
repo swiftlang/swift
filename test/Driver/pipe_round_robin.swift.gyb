@@ -1,0 +1,33 @@
+// RUN: %empty-directory(%t/manyfuncs)
+// RUN: %empty-directory(%t/stats)
+//
+// This test is looking at behaviour of the driver's task queue, checking
+// to make sure that it drains the output streams of multiple subprocesses
+// evenly, rather than one subprocess all-at-once before the next
+// all-at-once. This isn't batch-mode specific but it emerges somewhat
+// vividly there when combined with lots of files that do
+// -debug-time-function-bodies.
+//
+// Here we do a non-batch-mode variant that has lots of functions in each
+// of 4 files.
+//
+// RUN: %gyb -D N=1 %s -o %t/manyfuncs/file1.swift
+// RUN: %gyb -D N=2 %s -o %t/manyfuncs/file2.swift
+// RUN: %gyb -D N=3 %s -o %t/manyfuncs/file3.swift
+// RUN: %gyb -D N=4 %s -o %t/manyfuncs/file4.swift
+//
+// We calculate the ratio of poll() calls to read() calls; these should be
+// nearly equal (we test abs(read/poll) < 3.0) if we're doing interleaved
+// reading. If we're doing non-interleaved reading, they become radically
+// different (eg. thousands of reads per poll).
+//
+// RUN: %target-build-swift -j 4 -module-name manyfuncs -typecheck -stats-output-dir %t/stats -Xfrontend -debug-time-function-bodies %t/manyfuncs/*.swift
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'abs(float(NumDriverPipeReads) / float(NumDriverPipePolls)) < 3.0' %t/stats
+
+% for i in range(1,1000):
+func process_${N}_function_${i}(_ x: Int) -> Int {
+  let v = (1 + 2 * 3 + x * 5 + x + 6)
+  let a = [v, 1, ${i}, 3, ${N}, 4]
+  return a.reduce(0, {$0 + $1})
+}
+% end

@@ -12,8 +12,8 @@
 
 @_exported import Foundation // Clang module
 
-public extension Progress {
-    @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+extension Progress {
+    @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var estimatedTimeRemaining: TimeInterval? {
         get {
             guard let v = self.__estimatedTimeRemaining else { return nil }
@@ -29,7 +29,7 @@ public extension Progress {
         }
     }
     
-    @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+    @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var throughput: Int? {
         get {
             guard let v = self.__throughput else { return nil }
@@ -45,7 +45,7 @@ public extension Progress {
         }
     }
     
-    @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+    @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var fileTotalCount: Int? {
         get {
             guard let v = self.__fileTotalCount else { return nil }
@@ -61,7 +61,7 @@ public extension Progress {
         }
     }
     
-    @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+    @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var fileCompletedCount: Int? {
         get {
             guard let v = self.__fileCompletedCount else { return nil }

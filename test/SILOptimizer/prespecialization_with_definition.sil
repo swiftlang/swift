@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -module-name main -assume-parsing-unqualified-ownership-sil | %FileCheck %s
 
 sil_stage canonical
 
@@ -11,7 +11,7 @@ struct Box<T> {
 sil @test : $@convention(thin) () -> () {
 bb0:
   // function_ref static Box.foo() -> ()
-  %0 = function_ref @$S4main3BoxV3fooyyFZ : $@convention(thin) <τ_0_0> (@thin Box<τ_0_0>.Type) -> () // user: %2
+  %0 = function_ref @$s4main3BoxV3fooyyFZ : $@convention(thin) <τ_0_0> (@thin Box<τ_0_0>.Type) -> () // user: %2
   %1 = metatype $@thin Box<()>.Type               // user: %2
   %2 = apply %0<()>(%1) : $@convention(thin) <τ_0_0> (@thin Box<τ_0_0>.Type) -> ()
   %3 = tuple ()                                   // user: %4
@@ -19,7 +19,7 @@ bb0:
 }
 
 // This is the unspecialized form.
-sil hidden @$S4main3BoxV3fooyyFZ : $@convention(thin) <T> (@thin Box<T>.Type) -> () {
+sil hidden @$s4main3BoxV3fooyyFZ : $@convention(thin) <T> (@thin Box<T>.Type) -> () {
 bb0(%0 : $@thin Box<T>.Type):
   %1 = tuple ()
   return %1 : $()
@@ -28,11 +28,11 @@ bb0(%0 : $@thin Box<T>.Type):
 // generic specialization <()> of static main.Box.foo () -> ()
 // This specialization is one that would be matched by the prespecialization
 // pass.
-sil shared @$S4main3BoxV3fooyyFZyt_Tg5 : $@convention(thin) (@thin Box<()>.Type) -> () {
+sil shared @$s4main3BoxV3fooyyFZyt_Tg5 : $@convention(thin) (@thin Box<()>.Type) -> () {
 bb0(%0 : $@thin Box<()>.Type):
   %1 = tuple ()
   return %1 : $()
 }
 
-// CHECK-DAG: define linkonce_odr hidden swiftcc void @"$S4main3BoxV3fooyyFZyt_Tg5"() {{.*}}{
-// CHECK-DAG: call swiftcc void @"$S4main3BoxV3fooyyFZyt_Tg5"()
+// CHECK-DAG: define linkonce_odr hidden swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"() {{.*}}{
+// CHECK-DAG: call swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"()

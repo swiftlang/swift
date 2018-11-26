@@ -54,10 +54,20 @@ PASS(AADumper, "aa-dump",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
+PASS(AccessEnforcementDom, "access-enforcement-dom",
+     "Remove dominated access checks with no nested conflict")
+PASS(AccessEnforcementOpts, "access-enforcement-opts",
+     "Access Enforcement Optimization")
+PASS(AccessEnforcementReleaseSinking, "access-enforcement-release",
+     "Access Enforcement Release Sinking")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
+PASS(AccessEnforcementWMO, "access-enforcement-wmo",
+     "Access Enforcement Whole Module Optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
+PASS(AccessedStorageDumper, "accessed-storage-dump",
+     "Dump Accessed Storage Summary")
 PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
@@ -90,6 +100,8 @@ PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
+PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
+     "Closure Lifetime Fixup")
 PASS(CodeSinking, "code-sinking",
      "Code Sinking")
 PASS(ComputeDominanceInfo, "compute-dominance-info",
@@ -100,6 +112,8 @@ PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
+PASS(CopyPropagation, "copy-propagation",
+     "Copy propagation to Remove Redundant SSA Copies")
 PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
      "Print Epilogue retains of Returned Values and Argument releases")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
@@ -144,12 +158,16 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
+PASS(EarlyRedundantLoadElimination, "early-redundant-load-elim",
+     "Early Redundant Load Elimination")
 PASS(RedundantLoadElimination, "redundant-load-elim",
      "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
      "Dead Store Elimination")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
+PASS(ExistentialSpecializer, "existential-specializer",
+     "Existential Specializer")
 PASS(GlobalOpt, "global-opt",
      "SIL Global Optimization")
 PASS(GlobalPropertyOpt, "global-property-opt",
@@ -226,27 +244,29 @@ PASS(LateReleaseHoisting, "late-release-hoisting",
      "Late SIL release Hoisting Preserving Epilogues")
 IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
-PASS(RemovePins, "remove-pins",
-     "Remove SIL pin/unpin pairs")
+PASS(MandatorySILLinker, "mandatory-linker",
+     "Deserialize all referenced SIL functions that are shared or transparent")
+PASS(PerformanceSILLinker, "performance-linker",
+     "Deserialize all referenced SIL functions")
+PASS(RawSILInstLowering, "raw-sil-inst-lowering",
+     "Lower all raw SIL instructions to canonical equivalents.")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
-PASS(SILCleanup, "cleanup",
-     "SIL Cleanup Preparation for IRGen")
+PASS(IRGenPrepare, "irgen-prepare",
+     "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
-PASS(SILLinker, "linker",
-     "Link all SIL Referenced within the Module via Deserialization")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
-PASS(SimplifyCFG, "-simplify-cfg",
+PASS(SimplifyCFG, "simplify-cfg",
      "SIL CFG Simplification")
 PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")

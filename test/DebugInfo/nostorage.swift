@@ -15,7 +15,7 @@ public class Foo {
       // CHECK1-SAME:                         type: ![[METAFOO:[0-9]+]]
       // CHECK1: ![[METAFOO]] = !DICompositeType(tag: DW_TAG_structure_type,
       // CHECK1-SAME:                            flags:
-            let type = type(of: self)
+            let type = Swift.type(of: self)
             used(type)
         }()
     }

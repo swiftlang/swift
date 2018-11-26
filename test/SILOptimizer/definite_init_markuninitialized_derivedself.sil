@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
 
 // This test only tests mark_uninitialized [derivedself]
 
@@ -75,7 +75,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %7 to %9 : $*Int
-  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+  end_borrow %8 : $DerivedClassWithIVars
 
   // Then perform the self.init call.
   %11 = load [take] %3 : $*DerivedClassWithIVars
@@ -190,13 +190,13 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // CHECK: [[SELF:%[0-9]+]] = load_borrow [[SELFBOX]]
 // CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[SELF]]
 // CHECK: store [[FIELD_VAL]] to [init] [[SELF_FIELD]]
-// CHECK: end_borrow [[SELF]] from [[SELFBOX]]
+// CHECK: end_borrow [[SELF]]
 //
 // Now we destroy the stored value.
 // CHECK: [[SELF:%[0-9]+]] = load_borrow [[SELFBOX]]
 // CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[SELF]]
 // CHECK: destroy_addr [[SELF_FIELD]]
-// CHECK: end_borrow [[SELF]] from [[SELFBOX]]
+// CHECK: end_borrow [[SELF]]
 //
 // And then perform dealloc_partial_ref.
 // CHECK: [[SELF:%[0-9]+]] = load [take] [[SELFBOX]]
@@ -214,7 +214,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %9 = load_borrow %4 : $*DerivedClassWithNontrivialStoredProperties
   %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
   assign %8 to %10 : $*SomeClass
-  end_borrow %9 from %4 : $DerivedClassWithNontrivialStoredProperties, $*DerivedClassWithNontrivialStoredProperties
+  end_borrow %9 : $DerivedClassWithNontrivialStoredProperties
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -254,7 +254,7 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
   %8 = load_borrow %3 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %i to %9 : $*Int
-  end_borrow %8 from %3 : $DerivedClassWithIVars, $*DerivedClassWithIVars
+  end_borrow %8 : $DerivedClassWithIVars
 
   // Get the super.init function information, but don't apply it.
   %11 = load [take] %3 : $*DerivedClassWithIVars
@@ -267,7 +267,7 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
   %13c = upcast %13b : $DerivedClassWithIVars to $RootClassWithIVars
   %13d = ref_element_addr %13c : $RootClassWithIVars, #RootClassWithIVars.x  // expected-error {{'self' used in property access 'x' before 'super.init' call}}
   load [trivial] %13d : $*Int
-  end_borrow %13a from %13 : $RootClassWithIVars, $RootClassWithIVars
+  end_borrow %13a : $RootClassWithIVars
 
   // Call super.init.
   %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars

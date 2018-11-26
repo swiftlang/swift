@@ -33,6 +33,8 @@ using llvm::MapVector;
 namespace {
 
 /// Clone the basic blocks in a loop.
+///
+/// Currently invalidates the DomTree.
 class LoopCloner : public SILCloner<LoopCloner> {
   SILLoop *Loop;
 
@@ -46,19 +48,20 @@ public:
   /// Clone the basic blocks in the loop.
   void cloneLoop();
 
-  /// Get a map from basic blocks or the original loop to the cloned loop.
-  MapVector<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
-
-  DenseMap<SILValue, SILValue> &getValueMap() { return ValueMap; }
+  // Update SSA helper.
+  void collectLoopLiveOutValues(
+      DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues);
 
 protected:
-  SILValue remapValue(SILValue V) {
+  // SILCloner CRTP override.
+  SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
       if (!Loop->contains(BB))
         return V;
     }
-    return SILCloner<LoopCloner>::remapValue(V);
+    return SILCloner<LoopCloner>::getMappedValue(V);
   }
+  // SILCloner CRTP override.
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     SILCloner<LoopCloner>::postProcess(Orig, Cloned);
   }
@@ -67,34 +70,11 @@ protected:
 } // end anonymous namespace
 
 void LoopCloner::cloneLoop() {
-  auto *Header = Loop->getHeader();
-  auto *CurFun = Loop->getHeader()->getParent();
-
   SmallVector<SILBasicBlock *, 16> ExitBlocks;
   Loop->getExitBlocks(ExitBlocks);
-  for (auto *ExitBB : ExitBlocks)
-    BBMap[ExitBB] = ExitBB;
 
-  auto *ClonedHeader = CurFun->createBasicBlock();
-  BBMap[Header] = ClonedHeader;
-
-  // Clone the arguments.
-  for (auto *Arg : Header->getArguments()) {
-    SILValue MappedArg = ClonedHeader->createPHIArgument(
-        getOpType(Arg->getType()), ValueOwnershipKind::Owned);
-    ValueMap.insert(std::make_pair(Arg, MappedArg));
-  }
-
-  // Clone the instructions in this basic block and recursively clone
-  // successor blocks.
-  getBuilder().setInsertionPoint(ClonedHeader);
-  visitSILBasicBlock(Header);
-  // Fix-up terminators.
-  for (auto BBPair : BBMap)
-    if (BBPair.first != BBPair.second) {
-      getBuilder().setInsertionPoint(BBPair.second);
-      visit(BBPair.first->getTerminator());
-    }
+  // Clone the entire loop.
+  cloneReachableBlocks(Loop->getHeader(), ExitBlocks);
 }
 
 /// Determine the number of iterations the loop is at most executed. The loop
@@ -119,7 +99,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILPHIArgument *RecArg;
+  SILPhiArgument *RecArg;
   IntegerLiteralInst *End;
   SILValue RecNext;
 
@@ -142,7 +122,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILPHIArgument(RecArg), m_One()),
+                                            m_SILPhiArgument(RecArg), m_One()),
                                 0)))
     return None;
 
@@ -150,11 +130,11 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
-      RecArg->getIncomingValue(Preheader));
+      RecArg->getIncomingPhiValue(Preheader));
   if (!Start)
     return None;
 
-  if (RecNext != RecArg->getIncomingValue(OrigLatch))
+  if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
     return None;
 
   auto StartVal = Start->getValue();
@@ -198,7 +178,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
         if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
-          // If callee is rather big and potentialy inlineable, it may be better
+          // If callee is rather big and potentialy inlinable, it may be better
           // not to unroll, so that the body of the calle can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
         }
@@ -290,9 +270,8 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
 
 /// Collect all the loop live out values in the map that maps original live out
 /// value to live out value in the cloned loop.
-static void collectLoopLiveOutValues(
-    DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues,
-    SILLoop *Loop, DenseMap<SILValue, SILValue> &ClonedValues) {
+void LoopCloner::collectLoopLiveOutValues(
+    DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
   for (auto *Block : Loop->getBlocks()) {
     // Look at block arguments.
     for (auto *Arg : Block->getArguments()) {
@@ -300,11 +279,9 @@ static void collectLoopLiveOutValues(
         // Is this use outside the loop?
         if (!Loop->contains(Op->getUser())) {
           auto ArgumentValue = SILValue(Arg);
-          assert(ClonedValues.count(ArgumentValue) && "Unmapped Argument!");
-
           if (!LoopLiveOutValues.count(ArgumentValue))
             LoopLiveOutValues[ArgumentValue].push_back(
-              ClonedValues[ArgumentValue]);
+                getMappedValue(ArgumentValue));
         }
       }
     }
@@ -320,7 +297,7 @@ static void collectLoopLiveOutValues(
           assert(UsedValue == result && "Instructions must match");
 
           if (!LoopLiveOutValues.count(UsedValue))
-            LoopLiveOutValues[UsedValue].push_back(ClonedValues[result]);
+            LoopLiveOutValues[UsedValue].push_back(getMappedValue(result));
         }
       }
     }
@@ -381,8 +358,9 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     if (!isa<CondBranchInst>(Exit->getTerminator()))
       return false;
 
-  DEBUG(llvm::dbgs() << "Unrolling loop in " << Header->getParent()->getName()
-                     << " " << *Loop << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
+                          << Header->getParent()->getName()
+                          << " " << *Loop << "\n");
 
   SmallVector<SILBasicBlock *, 16> Headers;
   Headers.push_back(Header);
@@ -395,21 +373,21 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   // Copy the body MaxTripCount-1 times.
   for (uint64_t Cnt = 1; Cnt < *MaxTripCount; ++Cnt) {
     // Clone the blocks in the loop.
-    LoopCloner Cloner(Loop);
-    Cloner.cloneLoop();
-    Headers.push_back(Cloner.getBBMap()[Header]);
-    Latches.push_back(Cloner.getBBMap()[Latch]);
+    LoopCloner cloner(Loop);
+    cloner.cloneLoop();
+    Headers.push_back(cloner.getOpBasicBlock(Header));
+    Latches.push_back(cloner.getOpBasicBlock(Latch));
 
     // Collect values defined in the loop but used outside. On the first
     // iteration we populate the map from original loop to cloned loop. On
     // subsequent iterations we only need to update this map with the values
     // from the new iteration's clone.
     if (Cnt == 1)
-      collectLoopLiveOutValues(LoopLiveOutValues, Loop, Cloner.getValueMap());
+      cloner.collectLoopLiveOutValues(LoopLiveOutValues);
     else {
       for (auto &MapEntry : LoopLiveOutValues) {
         // Look it up in the value map.
-        SILValue MappedValue = Cloner.getValueMap()[MapEntry.first];
+        SILValue MappedValue = cloner.getOpValue(MapEntry.first);
         MapEntry.second.push_back(MappedValue);
         assert(MapEntry.second.size() == Cnt);
       }

@@ -47,6 +47,10 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option should be written into a .swiftinterface parseable interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+def ParseableInterfaceOption : OptionFlag;
+
 /////////
 // Options
 
@@ -102,13 +106,32 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   HelpText<"Show every step in the lifecycle of driver jobs">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
+def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
+  InternalDebugOpt, HelpText<"Pass input or output file names as filelists if there are more than <n>">,
+  MetaVarName<"<n>">;
+def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
+  Alias<driver_filelist_threshold>;
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
+def driver_batch_count : Separate<["-"], "driver-batch-count">,
+  InternalDebugOpt,
+  HelpText<"Use the given number of batch-mode partitions, rather than partitioning dynamically">;
+def driver_batch_size_limit : Separate<["-"], "driver-batch-size-limit">,
+  InternalDebugOpt,
+  HelpText<"Use the given number as the upper limit on dynamic batch-mode partition size">;
+
+def driver_force_response_files : Flag<["-"], "driver-force-response-files">,
+  InternalDebugOpt,
+  HelpText<"Force the use of response files for testing">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
+
+def enable_experimental_dependencies :
+Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
@@ -145,7 +168,7 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption]>,
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -221,6 +244,9 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
+def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -252,13 +278,13 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
-def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
+def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def module_link_name : Separate<["-"], "module-link-name">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Library to link against when using this module">;
 def module_link_name_EQ : Joined<["-"], "module-link-name=">,
   Flags<[FrontendOption]>, Alias<module_link_name>;
@@ -278,6 +304,21 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   Alias<emit_module_path>;
+
+def emit_parseable_module_interface :
+  Flag<["-"], "emit-parseable-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Output parseable interface file">;
+def emit_parseable_module_interface_path :
+  Separate<["-"], "emit-parseable-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
+def enable_parseable_module_interface :
+  Flag<["-"], "enable-parseable-module-interface">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption,
+         DoesNotAffectIncrementalBuild]>,
+  HelpText<"Accept parseable .swiftinterface form of modules">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -337,6 +378,11 @@ def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def warn_implicit_overrides :
+  Flag<["-"], "warn-implicit-overrides">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about implicit overrides of protocol members">;
 
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -454,11 +500,22 @@ def gline_tables_only : Flag<["-"], "gline-tables-only">,
 def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
+def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
+    Flags<[FrontendOption]>,
+    HelpText<"Remap source paths in debug info">;
+
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Verify the binary representation of debug output.">;
+
+def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit the compiler invocation in the debug info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
@@ -532,6 +589,13 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   HelpText<"API migration data is from <path>">,
   MetaVarName<"<path>">;
 
+def api_diff_data_dir: Separate<["-"], "api-diff-data-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  HelpText<"Load platform and version specific API migration data files from <path>. "
+      "Ignored if -api-diff-data-file is specified.">,
+  MetaVarName<"<path>">;
+
 def dump_usr: Flag<["-"], "dump-usr">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Dump USR for each declaration reference">;
@@ -556,7 +620,7 @@ def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -611,6 +675,9 @@ def fixit_all : Flag<["-"], "fixit-all">,
 def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def resolve_imports : Flag<["-"], "resolve-imports">,
+  HelpText<"Parse and resolve imports in input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def typecheck : Flag<["-"], "typecheck">,
   HelpText<"Parse and type-check input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -628,6 +695,10 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
 def dump_type_refinement_contexts :
   Flag<["-"], "dump-type-refinement-contexts">,
   HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_type_info : Flag<["-"], "dump-type-info">,
+  HelpText<"Output YAML dump of fixed-size types from all imported modules">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
@@ -687,12 +758,12 @@ def resource_dir : Separate<["-"], "resource-dir">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
-def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
+def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
 def profile_generate : Flag<["-"], "profile-generate">,
@@ -742,6 +813,10 @@ def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
 
+def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Avoid indexing system modules">;
+
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
   HelpText<"Enforce law of exclusivity">;
@@ -751,5 +826,13 @@ def working_directory : Separate<["-"], "working-directory">,
   MetaVarName<"<path>">;
 def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
+
+// VFS
+
+def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Add directory to VFS overlay file">;
+def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
+  Alias<vfsoverlay>;
 
 include "FrontendOptions.td"

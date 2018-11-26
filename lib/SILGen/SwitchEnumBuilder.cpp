@@ -21,23 +21,44 @@ using namespace Lowering;
 //                     SwitchCaseFullExpr Implementation
 //===----------------------------------------------------------------------===//
 
+SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc)
+    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest() {}
+
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
-                                       SILBasicBlock *contBlock)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), contBlock(contBlock) {}
+                                       SwitchCaseBranchDest branchDest)
+    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), branchDest(branchDest) {}
 
 void SwitchCaseFullExpr::exitAndBranch(SILLocation loc,
                                        ArrayRef<SILValue> branchArgs) {
-  assert(contBlock &&
-         "Should not call this if we do not have a continuation block");
+  assert(bool(branchDest) && "Must have a branch destination!");
   assert(SGF.B.hasValidInsertionPoint());
   scope.pop();
-  SGF.B.createBranch(loc, contBlock.get(), branchArgs);
+
+  // Then either do a direct branch or a branch + cleanups.
+  if (SILBasicBlock *block = branchDest.getBlock()) {
+    SGF.B.createBranch(loc, block, branchArgs);
+    return;
+  }
+
+  SGF.Cleanups.emitBranchAndCleanups(branchDest.getJumpDest(), loc, branchArgs);
 }
 
 void SwitchCaseFullExpr::exit() {
-  assert(!contBlock &&
+  assert(!bool(branchDest) &&
          "Should not call this if we do have a continuation block");
   assert(SGF.B.hasValidInsertionPoint());
+  scope.pop();
+}
+
+SwitchCaseFullExpr::~SwitchCaseFullExpr() {
+  assert(!scope.isValid() && "Did not pop scope?!");
+}
+
+void SwitchCaseFullExpr::unreachableExit() {
+  // This is important to ensure that we do not actually emit any cleanups since
+  // we already know that an unreachable was emitted.
+  assert(!SGF.B.hasValidInsertionPoint() && "Expected to pop scope without a "
+                                            "valid insertion point!");
   scope.pop();
 }
 
@@ -93,32 +114,30 @@ void SwitchEnumBuilder::emit() && {
       defaultBlockData->dispatchTime ==
           DefaultDispatchTime::BeforeNormalCases) {
     SILBasicBlock *defaultBlock = defaultBlockData->block;
-    NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
+    SwitchCaseBranchDest branchDest = defaultBlockData->branchDest;
     DefaultCaseHandler handler = defaultBlockData->handler;
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc),
-                                    contBB.getPtrOrNull());
+                                    CleanupLocation::get(loc), branchDest);
     builder.emitBlock(defaultBlock);
     ManagedValue input = optional;
     if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(optional.getType());
     }
-    handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    handler(input, std::move(presentScope));
+    builder.clearInsertionPoint();
   }
 
   for (NormalCaseData &caseData : caseDataArray) {
     EnumElementDecl *decl = caseData.decl;
     SILBasicBlock *caseBlock = caseData.block;
-    NullablePtr<SILBasicBlock> contBlock = caseData.contBlock;
+    SwitchCaseBranchDest branchDest = caseData.branchDest;
     NormalCaseHandler handler = caseData.handler;
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc),
-                                    contBlock.getPtrOrNull());
+                                    CleanupLocation::get(loc), branchDest);
 
     builder.emitBlock(caseBlock);
 
@@ -129,11 +148,11 @@ void SwitchEnumBuilder::emit() && {
           optional.getType().getEnumElementType(decl, builder.getModule());
       input = optional;
       if (!isAddressOnly) {
-        input = builder.createOwnedPHIArgument(inputType);
+        input = builder.createOwnedPhiArgument(inputType);
       }
     }
-    handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    handler(input, std::move(presentScope));
+    builder.clearInsertionPoint();
   }
 
   // If we are asked to create a default block and it is specified that the
@@ -141,19 +160,18 @@ void SwitchEnumBuilder::emit() && {
   if (defaultBlockData &&
       defaultBlockData->dispatchTime == DefaultDispatchTime::AfterNormalCases) {
     SILBasicBlock *defaultBlock = defaultBlockData->block;
-    NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
+    auto branchDest = defaultBlockData->branchDest;
     DefaultCaseHandler handler = defaultBlockData->handler;
 
     // Don't allow cleanups to escape the conditional block.
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
-                                    CleanupLocation::get(loc),
-                                    contBB.getPtrOrNull());
+                                    CleanupLocation::get(loc), branchDest);
     builder.emitBlock(defaultBlock);
     ManagedValue input = optional;
     if (!isAddressOnly) {
-      input = builder.createOwnedPHIArgument(optional.getType());
+      input = builder.createOwnedPhiArgument(optional.getType());
     }
-    handler(input, presentScope);
-    assert(!builder.hasValidInsertionPoint());
+    handler(input, std::move(presentScope));
+    builder.clearInsertionPoint();
   }
 }

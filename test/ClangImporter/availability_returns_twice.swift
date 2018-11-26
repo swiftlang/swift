@@ -1,10 +1,13 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
   typealias JumpBuffer = Int32
-#else
+#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
   import Glibc
+  typealias JumpBuffer = jmp_buf
+#elseif os(Windows)
+  import MSVCRT
   typealias JumpBuffer = jmp_buf
 #endif
 

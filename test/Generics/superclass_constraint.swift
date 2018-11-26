@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 class A {
@@ -45,7 +45,7 @@ func f10<T : GB<A>>(_: T) where T : GA<A> {}
 
 func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'T' : 'GA<T>' is recursive}}
 func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error{{superclass constraint 'T' : 'GA<U>' is recursive}}
-func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
+func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{type 'T' constrained to non-protocol, non-class type 'U'}}
 
 // rdar://problem/24730536
 // Superclass constraints can be used to resolve nested types to concrete types.
@@ -92,12 +92,11 @@ func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-3{{redundant conformance constraint 'T': 'P4'}}
 // expected-note@-4{{conformance constraint 'T': 'P4' implied here}}
 
-protocol P5: A { } // expected-error{{non-class type 'P5' cannot inherit from class 'A'}}
+protocol P5: A { }
 
 protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
-// expected-error@-1{{non-class type 'P6' cannot inherit from class 'A'}}
-// expected-error@-2{{non-class type 'P6' cannot inherit from class 'Other'}}
-// expected-note@-3{{superclass constraint 'Self' : 'A' written here}}
+// expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
+// expected-note@-2 {{superclass constraint 'Self' : 'A' written here}}
 
 func takeA(_: A) { }
 func takeP5<T: P5>(_ t: T) {
@@ -188,3 +187,30 @@ protocol X {
 // CHECK-DAG: .noRedundancyWarning@
 // CHECK: Generic signature: <C where C : X, C.Y == B>
 func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}
+
+// Qualified lookup bug -- <https://bugs.swift.org/browse/SR-2190>
+
+protocol Init {
+  init(x: ())
+}
+
+class Base {
+  required init(y: ()) {}
+}
+
+class Derived : Base {}
+
+func g<T : Init & Derived>(_: T.Type) {
+  _ = T(x: ())
+  _ = T(y: ())
+}
+
+// Binding a class-constrained generic parameter to a subclass existential is
+// not sound.
+struct G<T : Base> {}
+// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
+
+_ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 'Base'}}
+
+func badClassConstrainedType(_: G<Base & P>) {}
+// expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}

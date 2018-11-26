@@ -28,7 +28,7 @@ internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 ///
 /// - Note: When SourceElement and TargetElement are both bridged verbatim, type
 ///   checking is deferred until elements are actually accessed.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _arrayForceCast<SourceElement, TargetElement>(
   _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
@@ -52,17 +52,15 @@ public func _arrayForceCast<SourceElement, TargetElement>(
   return source.map { $0 as! TargetElement }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 internal struct _UnwrappingFailed : Error {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable
   internal init() {}
 }
 
 extension Optional {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func unwrappedOrError() throws -> Wrapped {
     if let x = self { return x }
     throw _UnwrappingFailed()
@@ -87,7 +85,7 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
 /// return `nil` if any element fails to convert.
 ///
 /// - Complexity: O(n), because each element must be checked.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {

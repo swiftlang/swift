@@ -28,8 +28,12 @@
 
 namespace swift {
 
+class SILOptFunctionBuilder;
+
 /// \brief This is a helper class used to optimize casts.
 class CastOptimizer {
+  SILOptFunctionBuilder &FunctionBuilder;
+
   // Callback to be called when uses of an instruction should be replaced.
   std::function<void(SingleValueInstruction *I, ValueBase *V)>
       ReplaceInstUsesAction;
@@ -64,12 +68,13 @@ class CastOptimizer {
                                           SILInstruction *TrapInst);
 
 public:
-  CastOptimizer(std::function<void(SingleValueInstruction *I, ValueBase *V)>
+  CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                std::function<void(SingleValueInstruction *I, ValueBase *V)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction,
                 std::function<void()> WillSucceedAction,
                 std::function<void()> WillFailAction = []() {})
-      : ReplaceInstUsesAction(ReplaceInstUsesAction),
+      : FunctionBuilder(FunctionBuilder), ReplaceInstUsesAction(ReplaceInstUsesAction),
         EraseInstAction(EraseAction), WillSucceedAction(WillSucceedAction),
         WillFailAction(WillFailAction) {}
 
@@ -78,11 +83,12 @@ public:
   // couldn't use the single constructor version which has three default
   // arguments. It seems the number of the default argument with lambda is
   // limited.
-  CastOptimizer(std::function<void(SingleValueInstruction *I, ValueBase *V)>
+  CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                std::function<void(SingleValueInstruction *I, ValueBase *V)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction =
                     [](SILInstruction *) {})
-      : CastOptimizer(ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
+      : CastOptimizer(FunctionBuilder, ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
 
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);

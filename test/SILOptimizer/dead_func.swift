@@ -4,7 +4,7 @@
 
 var a : [String] = ["foo"]
 
-_preconditionFailure("unreachable")
+preconditionFailure("unreachable")
 for i in 0...a.count {
   let x = 0
 }

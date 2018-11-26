@@ -22,7 +22,7 @@ var x: Int
 
 // CHECK-MUTATING-ATTR: mutating func
 
-// CHECK-HIDE-ATTR-NOT: @effects
+// CHECK-HIDE-ATTR-NOT: @_effects
 // CHECK-HIDE-ATTR-NOT: @semantics
 // CHECK-HIDE-ATTR-NOT: @inline
 
@@ -33,12 +33,12 @@ var x: Int
 // CHECK1-NEXT: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
-// CHECK1-NEXT: $S
+// CHECK1-NEXT: $s
 // CHECK1-NEXT: Swift{{$}}
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:s17FixedWidthIntegerP">FixedWidthInteger</Type>{{.*}}<Type usr="s:s13SignedIntegerP">SignedInteger</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:s17FixedWidthIntegerP">FixedWidthInteger</Type>{{.*}}<Type usr="s:SZ">SignedInteger</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | %FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>

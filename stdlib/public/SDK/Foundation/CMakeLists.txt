@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   AffineTransform.swift
   Boxing.swift
+  BundleLookup.mm
   Calendar.swift
   CharacterSet.swift
   Codable.swift
@@ -26,6 +27,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSCoder.swift
   NSDate.swift
   NSDictionary.swift
+  NSError.mm
   NSError.swift
   NSExpression.swift
   NSFastEnumeration.swift
@@ -57,7 +59,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   UUID.swift
   CheckClass.mm
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "-swift-version" "3"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "-swift-version" "5"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics Dispatch IOKit ObjectiveC # auto-updated

@@ -3,7 +3,7 @@
 // RUN: %target-build-swift-dylib(%t/libWithAssoc.%target-dylib-extension) %S/../Inputs/conditional_conformance_with_assoc.swift -module-name WithAssoc -emit-module -emit-module-path %t/WithAssoc.swiftmodule
 // RUN: %target-build-swift-dylib(%t/libSubclass.%target-dylib-extension) %S/../Inputs/conditional_conformance_subclass.swift -module-name Subclass -emit-module -emit-module-path %t/Subclass.swiftmodule
 // RUN: %target-build-swift -I%t -L%t -lBasic -lWithAssoc -lSubclass %s -o %t/conditional_conformances_modules -Xlinker -rpath -Xlinker %t
-// RUN: %target-run %t/conditional_conformances_modules %t/libBasic.%target-dylib-extension %t/libWithAssoc.%target-dylib-extension
+// RUN: %target-run %t/conditional_conformances_modules %t/libBasic.%target-dylib-extension %t/libWithAssoc.%target-dylib-extension %t/libSubclass.%target-dylib-extension
 
 // REQUIRES: executable_test
 // FIXME: seems to fail on 32-bit simulator?

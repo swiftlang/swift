@@ -23,7 +23,6 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Index/Index.h"
-#include "swift/Strings.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Index/IndexingAction.h"
@@ -357,18 +356,12 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
 // Used to get std::string pointers to pass as writer::OpaqueModule.
 namespace {
 class StringScratchSpace {
-  std::vector<const std::string *> StrsCreated;
+  std::vector<std::unique_ptr<std::string>> StrsCreated;
 
 public:
   const std::string *createString(StringRef str) {
-    auto *s = new std::string(str);
-    StrsCreated.push_back(s);
-    return s;
-  }
-
-  ~StringScratchSpace() {
-    for (auto *str : StrsCreated)
-      delete str;
+    StrsCreated.emplace_back(llvm::make_unique<std::string>(str));
+    return StrsCreated.back().get();
   }
 };
 }
@@ -402,7 +395,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
 
   for (auto &import : imports) {
     ModuleDecl *mod = import.second;
-    if (mod->getNameStr() == SWIFT_ONONE_SUPPORT)
+    if (mod->isOnoneSupportModule())
       continue; // ignore the Onone support library.
     if (mod->isSwiftShimsModule())
       continue;
@@ -410,7 +403,6 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
     for (auto *FU : mod->getFiles()) {
       switch (FU->getKind()) {
       case FileUnitKind::Source:
-      case FileUnitKind::Derived:
       case FileUnitKind::Builtin:
         break;
       case FileUnitKind::SerializedAST:

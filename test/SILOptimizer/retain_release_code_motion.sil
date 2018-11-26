@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 import Builtin
@@ -58,6 +59,10 @@ struct foo {
 enum Optional<T> {
   case none
   case some(T)
+}
+
+struct Unowned {
+  @sil_stored unowned let x: @sil_unowned Builtin.NativeObject
 }
 
 sil @createS : $@convention(thin) () -> @owned S
@@ -124,8 +129,8 @@ bb3:
 
 // Make sure that we do not move retains over unreachable terminator.
 // CHECK-LABEL: sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
-// CHECK: strong_retain
-// CHECK-NEXT: unreachable
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'no_return_stops_codemotion'
 sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $C
@@ -593,3 +598,123 @@ bb11:
   %26 = tuple ()
   return %26 : $()
 }
+
+// CHECK-LABEL: sil @detect_escape_of_bbarg
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   strong_release
+sil @detect_escape_of_bbarg : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @use_C2 : $@convention(thin) (C2) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %a = alloc_ref $C2
+  br bb3(%a: $C2, %a: $C2)
+
+bb2:
+  %b = alloc_ref $C2
+  br bb3(%b: $C2, %b: $C2)
+
+bb3(%p1: $C2, %p2: $C2):
+  strong_retain %p1: $C2 // This retain must not be moved over the apply
+  %c = apply %f(%p2) : $@convention(thin) (C2) -> ()
+  strong_release %p2: $C2
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @test_unowned
+// CHECK:      bb0(%0 : $Builtin.NativeObject):
+// CHECK-NEXT:   br bb1    
+// CHECK:      bb1:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @test_unowned : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  %5 = tuple()
+  return %5 : $()
+}
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @dont_eliminate_strong_retain_and_unowned_release_pair
+// CHECK-RELEASE-HOISTING:       = function_ref @blocker
+// CHECK-RELEASE-HOISTING-NEXT:  apply
+// CHECK-RELEASE-HOISTING-NEXT:  strong_retain %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING-NEXT:  unowned_release %1 : $@sil_unowned Builtin.NativeObject
+sil @dont_eliminate_strong_retain_and_unowned_release_pair : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  %b = function_ref @blocker : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
+  strong_retain %0: $Builtin.NativeObject
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  apply %b() : $@convention(thin) () -> ()
+  strong_release %0: $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) () -> Never
+
+// This should eliminate all retains except for the first one b/c of user.
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_single_bb'
+sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+}
+
+// We should eliminate all retains except for the one that we sink into the
+// return block.
+//
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_diamond'
+sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+
+bb4:
+  unreachable
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name access_marker_mandatory -enable-sil-ownership -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int
   var o: AnyObject
 }
 
-// CHECK-LABEL: sil [noinline] @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S {
+// CHECK-LABEL: sil [noinline] @$s23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S {
 // CHECK: bb0(%0 : $Int, %1 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
 // CHECK: cond_br %{{.*}}, bb1, bb2
@@ -24,7 +25,7 @@ public struct S {
 // CHECK: destroy_addr [[STK]]
 // CHECK: dealloc_stack [[STK]]
 // CHECK: return [[RET]] : $S
-// CHECK-LABEL: } // end sil function '$S23access_marker_mandatory5initSyAA1SVSi_yXltF'
+// CHECK-LABEL: } // end sil function '$s23access_marker_mandatory5initSyAA1SVSi_yXltF'
 @inline(never)
 public func initS(_ x: Int, _ o: AnyObject) -> S {
   var s: S
@@ -39,11 +40,11 @@ public func initS(_ x: Int, _ o: AnyObject) -> S {
 @inline(never)
 func takeS(_ s: S) {}
 
-// CHECK-LABEL: sil @$S23access_marker_mandatory14modifyAndReadS1oyyXl_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil @$s23access_marker_mandatory14modifyAndReadS1oyyXl_tF : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
-// CHECK: [[FINIT:%.*]] = function_ref @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S
-// CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @owned AnyObject) -> @owned S
+// CHECK: [[FINIT:%.*]] = function_ref @$s23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
+// CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
 // CHECK: store [[INITS]] to [[STK]] : $*S
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
 // CHECK: [[ADDRI:%.*]] = struct_element_addr [[WRITE]] : $*S, #S.i
@@ -51,9 +52,9 @@ func takeS(_ s: S) {}
 // CHECK: end_access [[WRITE]]
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
 // CHECK: end_access [[READ]]
-// CHECK: [[FTAKE:%.*]] = function_ref @$S23access_marker_mandatory5takeSyyAA1SVF : $@convention(thin) (@owned S) -> ()
-// CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@owned S) -> ()
-// CHECK-LABEL: } // end sil function '$S23access_marker_mandatory14modifyAndReadS1oyyXl_tF'
+// CHECK: [[FTAKE:%.*]] = function_ref @$s23access_marker_mandatory5takeSyyAA1SVF : $@convention(thin) (@guaranteed S) -> ()
+// CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@guaranteed S) -> ()
+// CHECK-LABEL: } // end sil function '$s23access_marker_mandatory14modifyAndReadS1oyyXl_tF'
 public func modifyAndReadS(o: AnyObject) {
   var s = initS(3, o)
   s.i = 42
@@ -66,17 +67,17 @@ public func modifyAndReadS(o: AnyObject) {
 // Otherwise, we may try to convert the access to [deinit] which
 // doesn't make sense dynamically.
 //
-// CHECK-LABEL: sil hidden @$S23access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
+// CHECK-LABEL: sil hidden @$s23access_marker_mandatory19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK-LABEL: bb0:
 // CHECK: [[STK:%.*]] = alloc_stack $Int, var, name "x"
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*Int
 // CHECK: store %{{.*}} to [[WRITE]] : $*Int
 // CHECK: end_access [[WRITE]] : $*Int
-// CHECK: [[F:%.*]] = function_ref @$S23access_marker_mandatory19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int
+// CHECK: [[F:%.*]] = function_ref @$s23access_marker_mandatory19captureStackPromoteSiycyFSiycfU_Tf2i_n : $@convention(thin) (Int) -> Int
 // CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[F]](%{{.*}}) : $@convention(thin) (Int) -> Int
 // CHECK: dealloc_stack [[STK]] : $*Int
 // CHECK: return [[C]] : $@callee_guaranteed () -> Int
-// CHECK-LABEL: } // end sil function '$S23access_marker_mandatory19captureStackPromoteSiycyF'
+// CHECK-LABEL: } // end sil function '$s23access_marker_mandatory19captureStackPromoteSiycyF'
 func captureStackPromote() -> () -> Int {
   var x = 1
   x = 2

@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -25,6 +26,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -88,7 +90,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
 
   // Lookup a function from the stdlib.
-  SILFunction *BridgedFunc = M.getOrCreateFunction(
+  SILFunction *BridgedFunc = FunctionBuilder.getOrCreateFunction(
       Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
 
   if (!BridgedFunc)
@@ -146,7 +148,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy,
+        CastSuccessBB->createPhiArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
@@ -156,7 +158,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
       NewI = CCBI;
@@ -206,7 +208,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
-    OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
+    OptionalTy = OptionalType::get(Dest->getType().getASTType())
                      ->getImplementationType()
                      ->getCanonicalType();
     Tmp = Builder.createAllocStack(Loc,
@@ -217,8 +219,8 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   (void)ParamTypes;
-  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
-         "Parameter should be @owned");
+  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed &&
+	 "Parameter should be @guaranteed");
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -227,10 +229,12 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   Args.push_back(SrcOp);
   Args.push_back(MetaTyVal);
 
-  SmallVector<Substitution, 4> Subs;
-  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
+  auto *AI = Builder.createApply(Loc, FuncRef, SubMap, Args, false);
 
-  auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
+  // If we have guaranteed normal arguments, insert the destroy.
+  //
+  // TODO: Is it safe to just eliminate the initial retain?
+  Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
 
   // If the source of a cast should be destroyed, emit a release.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -238,13 +242,19 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
-    if (CCABI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
+    switch (CCABI->getConsumptionKind()) {
+    case CastConsumptionKind::TakeAlways:
       Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
-    } else if (CCABI->getConsumptionKind() ==
-               CastConsumptionKind::TakeOnSuccess) {
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
       // Insert a release in the success BB.
       Builder.setInsertionPoint(SuccessBB->begin());
       Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::CopyOnSuccess:
+      break;
     }
   }
 
@@ -300,14 +310,14 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
     return true;
   }
   // check if it is a bridgeable CF type
-  if (ConvTy.getSwiftRValueType() ==
+  if (ConvTy.getASTType() ==
       getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 DestTy.getSwiftRValueType())) {
+                                 DestTy.getASTType())) {
     return true;
   }
-  if (DestTy.getSwiftRValueType() ==
+  if (DestTy.getASTType() ==
       getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 ConvTy.getSwiftRValueType())) {
+                                 ConvTy.getASTType())) {
     return true;
   }
   // All else failed - can't optimize this case
@@ -349,8 +359,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
   if (Members.empty()) {
     if (NTD->getDeclContext()->lookupQualified(
-            NTD->getDeclaredType(), M.getASTContext().Id_bridgeToObjectiveC,
-            NLOptions::NL_ProtocolMembers, nullptr, FoundMembers)) {
+            NTD, M.getASTContext().Id_bridgeToObjectiveC,
+            NLOptions::NL_ProtocolMembers, FoundMembers)) {
       Members = FoundMembers;
       // Returned members are starting with the most specialized ones.
       // Thus, the first element is what we are looking for.
@@ -383,8 +393,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 
   auto *resultDecl = Results.front();
   auto MemberDeclRef = SILDeclRef(resultDecl);
-  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
-                                            ForDefinition_t::NotForDefinition);
+  auto *BridgedFunc = FunctionBuilder.getOrCreateFunction(
+      Loc, MemberDeclRef, ForDefinition_t::NotForDefinition);
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!BridgedFunc)
@@ -438,6 +448,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     case CastConsumptionKind::TakeOnSuccess:
       needReleaseInSuccess = true;
       break;
+    case CastConsumptionKind::BorrowAlways:
     case CastConsumptionKind::CopyOnSuccess:
       // Conservatively insert a retain/release pair around the conversion
       // function because the conversion function could decrement the
@@ -502,12 +513,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     }
   }
 
-  SmallVector<Substitution, 4> Subs;
-  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
-    Sig->getSubstitutions(SubMap, Subs);
-
   // Generate a code to invoke the bridging function.
-  auto *NewAI = Builder.createApply(Loc, FnRef, Subs, Src, false);
+  auto *NewAI = Builder.createApply(Loc, FnRef, SubMap, Src, false);
 
   auto releaseSrc = [&](SILBuilder &Builder) {
     if (AddressOnlyType) {
@@ -563,8 +570,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
       if (isConditional) {
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlock(NewAI->getParent());
-        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
+        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
                                         CondBrSuccessBB, FailureBB);
@@ -574,12 +581,12 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
         CastedValue = SILValue(
             Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
       }
-    } else if (ConvTy.getSwiftRValueType() ==
+    } else if (ConvTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              DestTy.getSwiftRValueType()) ||
-               DestTy.getSwiftRValueType() ==
+                                              DestTy.getASTType()) ||
+               DestTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              ConvTy.getSwiftRValueType())) {
+                                              ConvTy.getASTType())) {
       // Handle NS <-> CF toll-free bridging here.
       CastedValue =
           SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
@@ -771,12 +778,21 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     if (!Src->getType().isAddress() || !Dest->getType().isAddress()) {
       return nullptr;
     }
+
     // For CopyOnSuccess casts, we could insert an explicit copy here, but this
     // case does not happen in practice.
+    //
     // Both TakeOnSuccess and TakeAlways can be reduced to an
     // UnconditionalCheckedCast, since the failure path is irrelevant.
-    if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+    switch (Inst->getConsumptionKind()) {
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::CopyOnSuccess:
       return nullptr;
+    case CastConsumptionKind::TakeAlways:
+    case CastConsumptionKind::TakeOnSuccess:
+      break;
+    }
 
     if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
                                                  Loc, Src, SourceType, Dest,
@@ -1050,14 +1066,14 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
       if (MI) {
         if (SuccessBB->getSinglePredecessorBlock() &&
             canUseScalarCheckedCastInstructions(
-                Inst->getModule(), MI->getType().getSwiftRValueType(),
+                Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
               Inst->getFalseBBCount());
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+          SuccessBB->createPhiArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
@@ -1160,7 +1176,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the metatype of this type.
         auto EMT = EmiTy.castTo<AnyMetatypeType>();
-        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
+        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getASTType(),
                                          EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
@@ -1286,8 +1302,8 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
   SILBuilderWithScope Builder(Inst);
 
   // Try to apply the bridged casts optimizations
-  auto SourceType = LoweredSourceType.getSwiftRValueType();
-  auto TargetType = LoweredTargetType.getSwiftRValueType();
+  auto SourceType = LoweredSourceType.getASTType();
+  auto TargetType = LoweredTargetType.getASTType();
   auto Src = Inst->getOperand();
   auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::CopyOnSuccess,
                                    false, Src, SILValue(), SourceType,
@@ -1314,8 +1330,8 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
 
   auto Result = emitSuccessfulScalarUnconditionalCast(
       Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-      LoweredSourceType.getSwiftRValueType(),
-      LoweredTargetType.getSwiftRValueType(), Inst);
+      LoweredSourceType.getASTType(),
+      LoweredTargetType.getASTType(), Inst);
 
   if (!Result) {
     // No optimization was possible.
@@ -1380,9 +1396,17 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
     if (Proto) {
       auto Conformance = SM->lookupConformance(SourceType, Proto);
-      if (Conformance.hasValue()) {
-        // SourceType is a non-existential type conforming to a
-        // protocol represented by the TargetType.
+      if (Conformance.hasValue() &&
+          Conformance->getConditionalRequirements().empty()) {
+        // SourceType is a non-existential type with a non-conditional
+        // conformance to a protocol represented by the TargetType.
+        //
+        // Conditional conformances are complicated: they may depend on
+        // information not known until runtime. For instance, if `X: P` where `T
+        // == Int` in `func foo<T>(_: T) { ... X<T>() as? P ... }`, the cast
+        // will succeed for `foo(0)` but not for `foo("string")`. There are many
+        // cases where everything is completely static (`X<Int>() as? P`), but
+        // we don't try to handle that at the moment.
         SILBuilder B(Inst);
         SmallVector<ProtocolConformanceRef, 1> NewConformances;
         NewConformances.push_back(Conformance.getValue());
@@ -1419,10 +1443,9 @@ static bool optimizeStaticallyKnownProtocolConformance(
                                                       SourceType, Conformances);
           auto Projection =
               B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
-          auto Value = B.createLoad(Loc, Src,
-                                    swift::LoadOwnershipQualifier::Unqualified);
-          B.createStore(Loc, Value, Projection,
-                        swift::StoreOwnershipQualifier::Unqualified);
+          // This needs to be a copy_addr (for now) because we must handle
+          // address-only types.
+          B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
           B.createStore(Loc, AllocBox, Dest,
                         swift::StoreOwnershipQualifier::Unqualified);
           break;

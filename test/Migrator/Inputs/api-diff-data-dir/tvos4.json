@@ -1,0 +1,13 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)BarForwardDeclaredClass(im)barInstanceFunc1:anotherValue:anotherValue1:anotherValue2:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "barNewSwift4InstanceFunc1(newlabel1:newlabel2:newlabel3:newlabel4:)",
+    "ModuleName": "bar"
+  }
+]

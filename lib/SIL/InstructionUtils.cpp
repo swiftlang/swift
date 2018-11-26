@@ -14,6 +14,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -181,24 +182,24 @@ SILValue swift::stripClassCasts(SILValue V) {
   }
 }
 
+SILValue swift::stripAddressAccess(SILValue V) {
+  while (true) {
+    switch (V->getKind()) {
+    default:
+      return V;
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::BeginAccessInst:
+      V = cast<SingleValueInstruction>(V)->getOperand(0);
+    }
+  }
+}
+
 SILValue swift::stripAddressProjections(SILValue V) {
   while (true) {
     V = stripSinglePredecessorArgs(V);
     if (!Projection::isAddressProjection(V))
       return V;
     V = cast<SingleValueInstruction>(V)->getOperand(0);
-  }
-}
-
-SILValue swift::stripUnaryAddressProjections(SILValue V) {
-  while (true) {
-    V = stripSinglePredecessorArgs(V);
-    if (!Projection::isAddressProjection(V))
-      return V;
-    auto *Inst = cast<SingleValueInstruction>(V);
-    if (Inst->getNumOperands() > 1)
-      return V;
-    V = Inst->getOperand(0);
   }
 }
 
@@ -234,6 +235,11 @@ SILValue swift::stripBorrow(SILValue V) {
   return V;
 }
 
+// All instructions handled here must propagate their first operand into their
+// single result.
+//
+// This is guaranteed to handle all function-type converstions: ThinToThick,
+// ConvertFunction, and ConvertEscapeToNoEscapeInst.
 SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
   if (auto *convert = dyn_cast<ConversionInst>(I))
     return convert;
@@ -243,23 +249,29 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
     return nullptr;
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginAccessInst:
+  case SILInstructionKind::MarkDependenceInst:
     return cast<SingleValueInstruction>(I);
   }
 }
 
-bool swift::isIncidentalUse(SILInstruction *user) {
+// Does this instruction terminate a SIL-level scope?
+bool swift::isEndOfScopeMarker(SILInstruction *user) {
   switch (user->getKind()) {
   default:
     return false;
-  case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndLifetimeInst:
-  case SILInstructionKind::FixLifetimeInst:
     return true;
   }
+}
+
+bool swift::isIncidentalUse(SILInstruction *user) {
+  return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
+         isa<FixLifetimeInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
@@ -275,10 +287,25 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::UnmanagedReleaseValueInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
-  case SILInstructionKind::UnownedRetainInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::Name##ReleaseInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     return true;
   }
+}
+
+bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
+  auto *BI = dyn_cast<BuiltinInst>(Instruction);
+  if (!BI)
+    return false;
+
+  Identifier Name = BI->getName();
+  if (Name == BI->getModule().getASTContext().getIdentifier("tsanInoutAccess"))
+    return true;
+
+  return false;
 }
 
 SILValue swift::stripConvertFunctions(SILValue V) {
@@ -296,171 +323,6 @@ SILValue swift::stripConvertFunctions(SILValue V) {
   return V;
 }
 
-// Return true if the given address is a 'let' lvalue.
-static bool isLetAccess(SILValue address) {
-  switch (address->getKind()) {
-  default:
-    return false;
-
-  case ValueKind::AllocStackInst: {
-    VarDecl *decl = cast<AllocStackInst>(address)->getDecl();
-    return decl && decl->isLet();
-  }
-  case ValueKind::AllocBoxInst: {
-    VarDecl *decl = cast<AllocBoxInst>(address)->getDecl();
-    return decl && decl->isLet();
-  }
-  case ValueKind::RefElementAddrInst: {
-    VarDecl *decl = cast<RefElementAddrInst>(address)->getField();
-    return decl && decl->isLet();
-  }
-  case ValueKind::GlobalAddrInst: {
-    SILGlobalVariable *global =
-        cast<GlobalAddrInst>(address)->getReferencedGlobal();
-    return global && global->isLet();
-  }
-  };
-}
-
-// An address base is a block argument. Verify that it is actually a box
-// projected from a switch_enum.
-static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
-  assert(!arg->getType().isAddress());
-  SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
-  if (!Pred || !isa<SwitchEnumInst>(Pred->getTerminator())) {
-    arg->dump();
-    llvm_unreachable("unexpected box source.");
-  }
-}
-
-SILValue swift::findAccessedAddressBase(SILValue sourceAddr) {
-  SILValue address = sourceAddr;
-  while (true) {
-    switch (address->getKind()) {
-    default:
-      address->dump();
-      llvm_unreachable("unexpected address source.");
-
-    // Base cases: these are always the base of a formal access.
-    case ValueKind::GlobalAddrInst:
-    case ValueKind::RefElementAddrInst:
-    // An AllocBox is a fully identified memory location.
-    case ValueKind::AllocBoxInst:
-    // An AllocStack is a fully identified memory location, which may occur
-    // after inlining code already subjected to stack promotion.
-    case ValueKind::AllocStackInst:
-    // View the outer begin_access as a separate location because nested
-    // accesses do not conflict with each other.
-    case ValueKind::BeginAccessInst:
-    // A function argument is effectively a nested access, enforced
-    // independently in the caller and callee.
-    case ValueKind::SILFunctionArgument:
-    // An addressor provides access to a global or class property via a
-    // RawPointer. Calling the addressor casts that raw pointer to an address.
-    case ValueKind::PointerToAddressInst:
-      return address;
-
-    // A block argument may be a box value projected out of
-    // switch_enum. Address-type block arguments are not allowed.
-    case ValueKind::SILPHIArgument:
-      checkSwitchEnumBlockArg(cast<SILPHIArgument>(address));
-      return address;
-
-    // Load a box from an indirect payload of an opaque enum.
-    // We must have peeked past the project_box earlier in this loop.
-    // (the indirectness makes it a box, the load is for address-only).
-    // 
-    // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
-    // %box = load [take] %payload_adr : $*{ var Enum }
-    //
-    // FIXME: this case should go away with opaque values.
-    case ValueKind::LoadInst: {
-      assert(address->getType().is<SILBoxType>());
-      address = cast<LoadInst>(address)->getOperand();
-      assert(isa<UncheckedTakeEnumDataAddrInst>(address));
-      continue;
-    }
-    // Inductive cases:
-    // Look through address casts to find the source address.
-    case ValueKind::MarkUninitializedInst:
-    case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::UncheckedAddrCastInst:
-    // Inductive cases that apply to any type.
-    case ValueKind::CopyValueInst:
-    case ValueKind::MarkDependenceInst:
-    // Look through a project_box to identify the underlying alloc_box as the
-    // accesed object. It must be possible to reach either the alloc_box or the
-    // containing enum in this loop, only looking through simple value
-    // propagation such as copy_value.
-    case ValueKind::ProjectBoxInst:
-    // Handle project_block_storage just like project_box.
-    case ValueKind::ProjectBlockStorageInst:
-    // Look through begin_borrow in case a local box is borrowed.
-    case ValueKind::BeginBorrowInst:
-      address = cast<SingleValueInstruction>(address)->getOperand(0);
-      continue;
-
-    // Subobject projections.
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::RefTailAddrInst:
-    case ValueKind::TailAddrInst:
-    case ValueKind::IndexAddrInst:
-      address = cast<SingleValueInstruction>(address)->getOperand(0);
-      continue;
-
-    // Value to address conversions: the operand is the non-address source
-    // value. These allow local mutation of the value but should never be used
-    // for formal access of an lvalue.
-    case ValueKind::OpenExistentialBoxInst:
-    case ValueKind::ProjectExistentialBoxInst:
-    case ValueKind::ProjectValueBufferInst:
-      return SILValue();
-
-    // Local initialization: these cases are skipped.
-    case ValueKind::InitEnumDataAddrInst:
-    case ValueKind::InitExistentialAddrInst:
-    case ValueKind::AllocExistentialBoxInst:
-    case ValueKind::AllocValueBufferInst:
-    case ValueKind::SILUndef:
-      return SILValue();
-    }
-  }
-}
-
-bool swift::isPossibleFormalAccessBase(SILValue baseAddress) {
-  // A begin_access is considered a separate base for the purpose of conflict
-  // checking. However, for the purpose of inserting unenforced markers and
-  // performaing verification, it needs to be ignored.
-  while (auto *beginAccess = dyn_cast<BeginAccessInst>(baseAddress))
-    baseAddress = beginAccess->getOperand();
-
-  // Function arguments are accessed by the caller.
-  if (isa<SILFunctionArgument>(baseAddress))
-    return false;
-
-  if (isa<SILPHIArgument>(baseAddress)) {
-    checkSwitchEnumBlockArg(cast<SILPHIArgument>(baseAddress));
-    return false;
-  }
-
-  // Pointer-to-address exclusivity cannot be enforced. `baseAddress` may be
-  // pointing anywhere within an object.
-  if (isa<PointerToAddressInst>(baseAddress))
-    return false;
-
-  // Immutable values are only accessed for initialization.
-  if (isLetAccess(baseAddress))
-    return false;
-
-  // Special case unsafe value buffer access.
-  if (isa<BuiltinUnsafeValueBufferType>(
-          baseAddress->getType().getSwiftRValueType())) {
-    return false;
-  }
-  return true;
-}
 
 SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   if (PAI->getNumArguments() != 1)
@@ -485,35 +347,31 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
-/// Given a block used as a noescape function argument, attempt to find
-/// the Swift closure that invoking the block will call.
+/// Given a block used as a noescape function argument, attempt to find all
+/// Swift closures that invoking the block will call. The StoredClosures may not
+/// actually be partial_apply instructions. They may be copied, block arguments,
+/// or conversions. The caller must continue searching up the use-def chain.
 static SILValue findClosureStoredIntoBlock(SILValue V) {
+
   auto FnType = V->getType().castTo<SILFunctionType>();
   assert(FnType->getRepresentation() == SILFunctionTypeRepresentation::Block);
+  (void)FnType;
 
   // Given a no escape block argument to a function,
   // pattern match to find the noescape closure that invoking the block
   // will call:
   //     %noescape_closure = ...
+  //     %wae_Thunk = function_ref @$withoutActuallyEscapingThunk
+  //     %sentinel =
+  //       partial_apply [callee_guaranteed] %wae_thunk(%noescape_closure)
+  //     %noescaped_wrapped = mark_dependence %sentinel on %noescape_closure
   //     %storage = alloc_stack
   //     %storage_address = project_block_storage %storage
-  //     store %noescape_closure to [init] %storage_address
+  //     store %noescaped_wrapped to [init] %storage_address
   //     %block = init_block_storage_header %storage invoke %thunk
   //     %arg = copy_block %block
 
-  InitBlockStorageHeaderInst *IBSHI = nullptr;
-
-  // Look through block copies to find the initialization of block storage.
-  while (true) {
-    if (auto *CBI = dyn_cast<CopyBlockInst>(V)) {
-      V = CBI->getOperand();
-      continue;
-    }
-
-    IBSHI = dyn_cast<InitBlockStorageHeaderInst>(V);
-    break;
-  }
-
+  InitBlockStorageHeaderInst *IBSHI = dyn_cast<InitBlockStorageHeaderInst>(V);
   if (!IBSHI)
     return nullptr;
 
@@ -524,254 +382,104 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   auto *SI = PBSI->getSingleUserOfType<StoreInst>();
   assert(SI && "Couldn't find single store of function into block storage");
 
-  return SI->getSrc();
+  auto *CV = dyn_cast<CopyValueInst>(SI->getSrc());
+  if (!CV)
+    return nullptr;
+  auto *WrappedNoEscape = dyn_cast<MarkDependenceInst>(CV->getOperand());
+  if (!WrappedNoEscape)
+    return nullptr;
+  auto Sentinel = dyn_cast<PartialApplyInst>(WrappedNoEscape->getValue());
+  if (!Sentinel)
+    return nullptr;
+  auto NoEscapeClosure = isPartialApplyOfReabstractionThunk(Sentinel);
+  if (WrappedNoEscape->getBase() != NoEscapeClosure)
+    return nullptr;
+
+  // This is the value of the closure to be invoked. To find the partial_apply
+  // itself, the caller must search the use-def chain.
+  return NoEscapeClosure;
 }
 
-/// Look through a value passed as a function argument to determine whether
-/// it is a closure.
+/// Find all closures that may be propagated into the given function-type value.
 ///
-/// Return the partial_apply and a flag set to true if the closure is
-/// indirectly captured by a reabstraction thunk.
-FindClosureResult swift::findClosureForAppliedArg(SILValue V) {
-  // Look through borrows.
-  if (auto *bbi = dyn_cast<BeginBorrowInst>(V))
-    V = bbi->getOperand();
+/// Searches the use-def chain from the given value upward until a partial_apply
+/// is reached. Populates `results` with the set of partial_apply instructions.
+///
+/// `funcVal` may be either a function type or an Optional function type. This
+/// might be called on a directly applied value or on a call argument, which may
+/// in turn be applied within the callee.
+void swift::findClosuresForFunctionValue(
+    SILValue funcVal, TinyPtrVector<PartialApplyInst *> &results) {
 
-  if (V->getType().getOptionalObjectType())
-    V = cast<EnumInst>(V)->getOperand();
+  SILType funcTy = funcVal->getType();
+  // Handle `Optional<@convention(block) @noescape (_)->(_)>`
+  if (auto optionalObjTy = funcTy.getOptionalObjectType())
+    funcTy = optionalObjTy;
+  assert(funcTy.is<SILFunctionType>());
 
-  auto fnType = V->getType().getAs<SILFunctionType>();
-  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Block) {
-    V = findClosureStoredIntoBlock(V);
-    if (!V)
-      return FindClosureResult(nullptr, false);
-  }
-  auto *PAI = dyn_cast<PartialApplyInst>(stripConvertFunctions(V));
-  if (!PAI)
-    return FindClosureResult(nullptr, false);
+  SmallVector<SILValue, 4> worklist;
+  // Avoid exponential path exploration and prevent duplicate results.
+  llvm::SmallDenseSet<SILValue, 8> visited;
+  auto worklistInsert = [&](SILValue V) {
+    if (visited.insert(V).second)
+      worklist.push_back(V);
+  };
+  worklistInsert(funcVal);
 
-  SILValue thunkArg = isPartialApplyOfReabstractionThunk(PAI);
-  if (thunkArg) {
-    // Handle reabstraction thunks recursively. This may reabstract over
-    // @convention(block).
-    auto result = findClosureForAppliedArg(thunkArg);
-    return FindClosureResult(result.PAI, true);
-  }
-  return FindClosureResult(PAI, false);
-}
+  while (!worklist.empty()) {
+    SILValue V = worklist.pop_back_val();
 
-/// Helper for visitApplyAccesses that visits address-type call arguments,
-/// including arguments to @noescape functions that are passed as closures to
-/// the current call.
-static void visitApplyAccesses(ApplySite apply,
-                               std::function<void(Operand *)> visitor) {
-  for (Operand &oper : apply.getArgumentOperands()) {
-    // Consider any address-type operand an access. Whether it is read or modify
-    // depends on the argument convention.
-    if (oper.get()->getType().isAddress()) {
-      visitor(&oper);
-      continue;
-    }
-    auto fnType = oper.get()->getType().getAs<SILFunctionType>();
-    if (!fnType || !fnType->isNoEscape())
-      continue;
-
-    // When @noescape function closures are passed as arguments, their
-    // arguments are considered accessed at the call site.
-    FindClosureResult result = findClosureForAppliedArg(oper.get());
-    if (!result.PAI)
-      continue;
-
-    // Recursively visit @noescape function closure arguments.
-    visitApplyAccesses(result.PAI, visitor);
-  }
-}
-
-void swift::visitAccessedAddress(SILInstruction *I,
-                                 std::function<void(Operand *)> visitor) {
-  assert(I->mayReadOrWriteMemory());
-
-  // Reference counting instructions do not access user visible memory.
-  if (isa<RefCountingInst>(I))
-    return;
-
-  if (isa<DeallocationInst>(I))
-    return;
-
-  if (auto apply = FullApplySite::isa(I)) {
-    visitApplyAccesses(apply, visitor);
-    return;
-  }
-
-  if (auto builtin = dyn_cast<BuiltinInst>(I)) {
-    if (auto Kind = builtin->getBuiltinKind()) {
-      switch (Kind.getValue()) {
-      default:
-        I->dump();
-        llvm_unreachable("unexpected bulitin memory access.");
-
-      // Buitins that affect memory but can't be formal accesses.
-      case BuiltinValueKind::UnexpectedError:
-      case BuiltinValueKind::ErrorInMain:
-      case BuiltinValueKind::IsOptionalType:
-      case BuiltinValueKind::AllocRaw:
-      case BuiltinValueKind::DeallocRaw:
-      case BuiltinValueKind::Fence:
-      case BuiltinValueKind::StaticReport:
-      case BuiltinValueKind::Once:
-      case BuiltinValueKind::OnceWithContext:
-      case BuiltinValueKind::Unreachable:
-      case BuiltinValueKind::CondUnreachable:
-      case BuiltinValueKind::DestroyArray:
-      case BuiltinValueKind::UnsafeGuaranteed:
-      case BuiltinValueKind::UnsafeGuaranteedEnd:
-      case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
-      case BuiltinValueKind::TSanInoutAccess:
-        return;
-
-      // General memory access to a pointer in first operand position.
-      case BuiltinValueKind::CmpXChg:
-      case BuiltinValueKind::AtomicLoad:
-      case BuiltinValueKind::AtomicStore:
-      case BuiltinValueKind::AtomicRMW:
-        // Currently ignored because the access is on a RawPointer, not a
-        // SIL address.
-        // visitor(&builtin->getAllOperands()[0]);
-        return;
-
-      // Arrays: (T.Type, Builtin.RawPointer, Builtin.RawPointer,
-      // Builtin.Word)
-      case BuiltinValueKind::CopyArray:
-      case BuiltinValueKind::TakeArrayNoAlias:
-      case BuiltinValueKind::TakeArrayFrontToBack:
-      case BuiltinValueKind::TakeArrayBackToFront:
-      case BuiltinValueKind::AssignCopyArrayNoAlias:
-      case BuiltinValueKind::AssignCopyArrayFrontToBack:
-      case BuiltinValueKind::AssignCopyArrayBackToFront:
-      case BuiltinValueKind::AssignTakeArray:
-        // Currently ignored because the access is on a RawPointer.
-        // visitor(&builtin->getAllOperands()[1]);
-        // visitor(&builtin->getAllOperands()[2]);
-        return;
+    if (auto *I = V->getDefiningInstruction()) {
+      // Look through copies, borrows, and conversions.
+      //
+      // Handle copy_block and copy_block_without_actually_escaping before
+      // calling findClosureStoredIntoBlock.
+      if (SingleValueInstruction *SVI = getSingleValueCopyOrCast(I)) {
+        worklistInsert(SVI->getOperand(0));
+        continue;
       }
     }
-    if (auto ID = builtin->getIntrinsicID()) {
-      switch (ID.getValue()) {
-      // Exhaustively verifying all LLVM instrinsics that access memory is
-      // impractical. Instead, we call out the few common cases and return in
-      // the default case.
-      default:
-        return;
-      case llvm::Intrinsic::memcpy:
-      case llvm::Intrinsic::memmove:
-        // Currently ignored because the access is on a RawPointer.
-        // visitor(&builtin->getAllOperands()[0]);
-        // visitor(&builtin->getAllOperands()[1]);
-        return;
-      case llvm::Intrinsic::memset:
-        // Currently ignored because the access is on a RawPointer.
-        // visitor(&builtin->getAllOperands()[0]);
-        return;
+    // Look through Optionals.
+    if (V->getType().getOptionalObjectType()) {
+      auto *EI = dyn_cast<EnumInst>(V);
+      if (EI && EI->hasOperand()) {
+        worklistInsert(EI->getOperand());
       }
+      // Ignore the .None case.
+      continue;
     }
-    llvm_unreachable("Must be either a builtin or intrinsic.");
-  }
+    // Look through Phis.
+    //
+    // This should be done before calling findClosureStoredIntoBlock.
+    if (auto *arg = dyn_cast<SILPhiArgument>(V)) {
+      SmallVector<std::pair<SILBasicBlock *, SILValue>, 2> blockArgs;
+      arg->getIncomingPhiValues(blockArgs);
+      for (auto &blockAndArg : blockArgs)
+        worklistInsert(blockAndArg.second);
 
-  switch (I->getKind()) {
-  default:
-    I->dump();
-    llvm_unreachable("unexpected memory access.");
+      continue;
+    }
+    // Look through ObjC closures.
+    auto fnType = V->getType().getAs<SILFunctionType>();
+    if (fnType
+        && fnType->getRepresentation() == SILFunctionTypeRepresentation::Block) {
+      if (SILValue storedClosure = findClosureStoredIntoBlock(V))
+        worklistInsert(storedClosure);
 
-  case SILInstructionKind::AssignInst:
-    visitor(&I->getAllOperands()[AssignInst::Dest]);
-    return;
-
-  case SILInstructionKind::CheckedCastAddrBranchInst:
-    visitor(&I->getAllOperands()[CheckedCastAddrBranchInst::Src]);
-    visitor(&I->getAllOperands()[CheckedCastAddrBranchInst::Dest]);
-    return;
-
-  case SILInstructionKind::CopyAddrInst:
-    visitor(&I->getAllOperands()[CopyAddrInst::Src]);
-    visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
-    return;
-
-  case SILInstructionKind::StoreInst:
-  case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst:
-    visitor(&I->getAllOperands()[StoreInst::Dest]);
-    return;
-
-  case SILInstructionKind::SelectEnumAddrInst:
-    visitor(&I->getAllOperands()[0]);
-    return;
-
-  case SILInstructionKind::InitExistentialAddrInst:
-  case SILInstructionKind::InjectEnumAddrInst:
-  case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst:
-  case SILInstructionKind::LoadWeakInst:
-  case SILInstructionKind::LoadUnownedInst:
-  case SILInstructionKind::OpenExistentialAddrInst:
-  case SILInstructionKind::SwitchEnumAddrInst:
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst: {
-    assert(I->getNumOperands() - I->getNumTypeDependentOperands() == 1);
-    Operand *singleOperand = &I->getAllOperands()[0];
-    if (singleOperand->get()->getType().isAddress())
-      visitor(singleOperand);
-    return;
-  }
-  // Non-access cases: these are marked with memory side effects, but, by
-  // themselves, do not access formal memory.
-  case SILInstructionKind::AbortApplyInst:
-  case SILInstructionKind::AllocBoxInst:
-  case SILInstructionKind::AllocExistentialBoxInst:
-  case SILInstructionKind::AllocGlobalInst:
-  case SILInstructionKind::BeginAccessInst:
-  case SILInstructionKind::BeginApplyInst:
-  case SILInstructionKind::BeginBorrowInst:
-  case SILInstructionKind::BeginUnpairedAccessInst:
-  case SILInstructionKind::BindMemoryInst:
-  case SILInstructionKind::CheckedCastValueBranchInst:
-  case SILInstructionKind::CondFailInst:
-  case SILInstructionKind::CopyBlockInst:
-  case SILInstructionKind::CopyValueInst:
-  case SILInstructionKind::CopyUnownedValueInst:
-  case SILInstructionKind::DeinitExistentialAddrInst:
-  case SILInstructionKind::DeinitExistentialValueInst:
-  case SILInstructionKind::DestroyAddrInst:
-  case SILInstructionKind::DestroyValueInst:
-  case SILInstructionKind::EndAccessInst:
-  case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
-  case SILInstructionKind::EndBorrowInst:
-  case SILInstructionKind::EndUnpairedAccessInst:
-  case SILInstructionKind::EndLifetimeInst:
-  case SILInstructionKind::ExistentialMetatypeInst:
-  case SILInstructionKind::FixLifetimeInst:
-  case SILInstructionKind::InitExistentialValueInst:
-  case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
-  case SILInstructionKind::KeyPathInst:
-  case SILInstructionKind::OpenExistentialBoxInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::PartialApplyInst:
-  case SILInstructionKind::ProjectValueBufferInst:
-  case SILInstructionKind::StrongPinInst:
-  case SILInstructionKind::YieldInst:
-  case SILInstructionKind::UnwindInst:
-  case SILInstructionKind::UncheckedOwnershipConversionInst:
-  case SILInstructionKind::UncheckedRefCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
-  case SILInstructionKind::UnownedRetainInst:
-  case SILInstructionKind::ValueMetatypeInst:
-    return;
+      continue;
+    }
+    if (auto *PAI = dyn_cast<PartialApplyInst>(V)) {
+      SILValue thunkArg = isPartialApplyOfReabstractionThunk(PAI);
+      if (thunkArg) {
+        // Handle reabstraction thunks recursively. This may reabstract over
+        // @convention(block).
+        worklistInsert(thunkArg);
+        continue;
+      }
+      results.push_back(PAI);
+      continue;
+    }
+    // Ignore other unrecognized values that feed this applied argument.
   }
 }
 
@@ -796,8 +504,10 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
   QUALIFIED_INST(EndBorrowInst)
   QUALIFIED_INST(LoadBorrowInst)
   QUALIFIED_INST(CopyValueInst)
-  QUALIFIED_INST(CopyUnownedValueInst)
   QUALIFIED_INST(DestroyValueInst)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  QUALIFIED_INST(Copy##Name##ValueInst)
+#include "swift/AST/ReferenceStorage.def"
 #undef QUALIFIED_INST
 
   OwnershipQualifiedKind visitLoadInst(LoadInst *LI) {

@@ -17,7 +17,7 @@ import _SwiftFoundationOverlayShims
 // NSCoder
 //===----------------------------------------------------------------------===//
 
-@available(OSX 10.11, iOS 9.0, *)
+@available(macOS 10.11, iOS 9.0, *)
 internal func resolveError(_ error: NSError?) throws {
   if let error = error, error.code != NSCoderValueNotFoundError {
     throw error
@@ -57,7 +57,7 @@ extension NSCoder {
   }
 
   @nonobjc
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelObject() throws -> Any? {
     var error: NSError?
     let result = __NSCoderDecodeObject(self, &error)
@@ -72,7 +72,7 @@ extension NSCoder {
 
   @nonobjc
   @available(swift, obsoleted: 4)
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(forKey key: String) throws -> AnyObject? {
     var error: NSError?
     let result = __NSCoderDecodeObjectForKey(self, key, &error)
@@ -82,7 +82,7 @@ extension NSCoder {
 
   @nonobjc
   @available(swift, introduced: 4)
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(forKey key: String) throws -> Any? {
     var error: NSError?
     let result = __NSCoderDecodeObjectForKey(self, key, &error)
@@ -98,7 +98,7 @@ extension NSCoder {
     fatalError("This API has been renamed")
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelObject<DecodedObjectType>(
     of cls: DecodedObjectType.Type, forKey key: String
   ) throws -> DecodedObjectType?
@@ -116,7 +116,7 @@ extension NSCoder {
   }
 
   @nonobjc
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
     var error: NSError?
     var classesAsNSObjects: NSSet?
@@ -135,7 +135,7 @@ extension NSCoder {
 
 extension NSKeyedArchiver {
   @nonobjc
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func encodeEncodable<T : Encodable>(_ value: T, forKey key: String) throws {
     let plistEncoder = PropertyListEncoder()
     let plist = try plistEncoder.encodeToTopLevelContainer(value)
@@ -150,7 +150,7 @@ extension NSKeyedArchiver {
 extension NSKeyedUnarchiver {
   @nonobjc
   @available(swift, obsoleted: 4)
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(_ data: NSData) throws -> AnyObject? {
     var error: NSError?
     let result = __NSKeyedUnarchiverUnarchiveObject(self, data, &error)
@@ -160,7 +160,7 @@ extension NSKeyedUnarchiver {
 
   @nonobjc
   @available(swift, introduced: 4)
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(_ data: Data) throws -> Any? {
     var error: NSError?
     let result = __NSKeyedUnarchiverUnarchiveObject(self, data as NSData, &error)
@@ -169,21 +169,21 @@ extension NSKeyedUnarchiver {
   }
 
   @nonobjc
-  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
-  public static func unarchivedObject<DecodedObjectType>(ofClass cls: DecodedObjectType.Type, from data: Data) throws -> DecodedObjectType? {
+  @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  public static func unarchivedObject<DecodedObjectType>(ofClass cls: DecodedObjectType.Type, from data: Data) throws -> DecodedObjectType? where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
-    let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClass(cls as! AnyClass, data, &error)
-    try resolveError(error)
+    let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClass(cls as AnyClass, data, &error)
+    if let error = error { throw error }
     return result as? DecodedObjectType
   }
 
   @nonobjc
-  @available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
+  @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
   public static func unarchivedObject(ofClasses classes: [AnyClass], from data: Data) throws -> Any? {
     var error: NSError?
     let classesAsNSObjects = NSSet(array: classes.map { $0 as AnyObject })
     let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClasses(classesAsNSObjects, data, &error)
-    try resolveError(error)
+    if let error = error { throw error }
     return result
   }
   
@@ -198,7 +198,7 @@ extension NSKeyedUnarchiver {
   ]
 
   @nonobjc
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeDecodable<T : Decodable>(_ type: T.Type, forKey key: String) -> T? {
       guard let value = self.decodeObject(of: NSKeyedUnarchiver.__plistClasses, forKey: key) else {
           return nil
@@ -214,7 +214,7 @@ extension NSKeyedUnarchiver {
   }
 
   @nonobjc
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func decodeTopLevelDecodable<T : Decodable>(_ type: T.Type, forKey key: String) throws  -> T? {
     guard let value = try self.decodeTopLevelObject(of: NSKeyedUnarchiver.__plistClasses, forKey: key) else {
       return nil
@@ -229,16 +229,3 @@ extension NSKeyedUnarchiver {
     }
   }
 }
-
-
-@available(*, deprecated, renamed:"NSCoding", message: "Please use NSCoding")
-typealias Coding = NSCoding
-
-@available(*, deprecated, renamed:"NSCoder", message: "Please use NSCoder")
-typealias Coder = NSCoder
-
-@available(*, deprecated, renamed:"NSKeyedUnarchiver", message: "Please use NSKeyedUnarchiver")
-typealias KeyedUnarchiver = NSKeyedUnarchiver
-
-@available(*, deprecated, renamed:"NSKeyedArchiver", message: "Please use NSKeyedArchiver")
-typealias KeyedArchiver = NSKeyedArchiver

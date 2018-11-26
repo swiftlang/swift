@@ -29,7 +29,7 @@
 using namespace swift;
 
 // FIXME: replace with std::string and StringRef as appropriate to each case.
-typedef const std::string ConstString;
+using ConstString = const std::string;
 
 static std::string stringWithFormat(const char *fmt_str, ...) {
   int final_n, n = ((int)strlen(fmt_str)) * 2;
@@ -76,7 +76,7 @@ GetClangTypeKindFromSwiftKind(DeclKind decl_kind) {
 
 class DeclsLookupSource {
 public:
-  typedef SmallVectorImpl<ValueDecl *> ValueDecls;
+  using ValueDecls = SmallVectorImpl<ValueDecl *>;
 
 private:
   class VisibleDeclsConsumer : public VisibleDeclConsumer {
@@ -100,8 +100,7 @@ private:
     if (!entry)
       return false;
     size_t decls_size = decls.size();
-    entry->lookupQualified(ModuleType::get(entry), name, options, typeResolver,
-                           decls);
+    entry->lookupQualified(entry, name, options, decls);
     return decls.size() > decls_size;
   }
 
@@ -124,14 +123,14 @@ public:
     Invalid
   };
 
-  typedef Optional<std::string> PrivateDeclIdentifier;
+  using PrivateDeclIdentifier = Optional<std::string>;
 
   static DeclsLookupSource
   GetDeclsLookupSource(ASTContext &ast, ConstString module_name,
                        bool allow_clang_importer = true) {
     assert(!module_name.empty());
     static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
-    static ConstString g_BuiltinModule("Builtin");
+    static ConstString g_BuiltinModule(BUILTIN_NAME);
     static ConstString g_CModule(MANGLING_MODULE_CLANG_IMPORTER);
     if (allow_clang_importer) {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
@@ -570,12 +569,10 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
             if (decl->hasInterfaceType()) {
               result._decls.push_back(decl);
               Type decl_type;
-              if (decl->hasInterfaceType()) {
-                decl_type = decl->getInterfaceType();
-                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
-                if (meta_type)
-                  decl_type = meta_type->getInstanceType();
-              }
+              decl_type = decl->getInterfaceType();
+              MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
+              if (meta_type)
+                decl_type = meta_type->getInstanceType();
               result._types.push_back(decl_type);
             }
           }
@@ -583,13 +580,20 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
         }
 
       } else if (auto FD = dyn_cast<AbstractFunctionDecl>(parent_decl)) {
+        // FIXME: We should not end up here at all. For some reason we're trying
+        // to look up members of a local type inside the parent context of the
+        // local type.
+        //
+        // This code path is broken and is about to be replaced.
+        if (name.isSpecial())
+          return result._decls.size();
 
         // Do a local lookup into the function, using the end loc to approximate
         // being able to see all the local variables.
         // FIXME: Need a more complete/robust lookup mechanism that can handle
         // declarations in sub-stmts, etc.
         UnqualifiedLookup lookup(name, FD, ast->getLazyResolver(),
-                                 /*IsKnownPrivate=*/false, FD->getEndLoc());
+                                 FD->getEndLoc());
         if (!lookup.isSuccess()) {
           result._error = "no decl found in function";
         } else {
@@ -626,15 +630,11 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
       for (auto decl : decls) {
         if (decl->hasInterfaceType()) {
           result._decls.push_back(decl);
-          if (decl->hasInterfaceType()) {
-            result._types.push_back(decl->getInterfaceType());
-            MetatypeType *meta_type =
-                result._types.back()->getAs<MetatypeType>();
-            if (meta_type)
-              result._types.back() = meta_type->getInstanceType();
-          } else {
-            result._types.push_back(Type());
-          }
+          result._types.push_back(decl->getInterfaceType());
+          MetatypeType *meta_type =
+            result._types.back()->getAs<MetatypeType>();
+          if (meta_type)
+            result._types.back() = meta_type->getInstanceType();
         }
       }
       return result._types.size();
@@ -661,9 +661,10 @@ static DeclKind GetKindAsDeclKind(Demangle::Node::Kind node_kind) {
     return DeclKind::Enum;
   case Demangle::Node::Kind::Protocol:
     return DeclKind::Protocol;
+  case Demangle::Node::Kind::Variable:
+    return DeclKind::Var;
   default:
     llvm_unreachable("Missing alias");
-    // FIXME: can we 'log' getNodeKindString(node_kind))
   }
 }
 
@@ -710,9 +711,7 @@ static void VisitNodeAddressor(
   // and they bear no connection to their original variable at the interface
   // level
   CanFunctionType swift_can_func_type =
-    CanFunctionType::get(AnyFunctionType::CanParamArrayRef(),
-                         ast->TheRawPointerType,
-                         AnyFunctionType::ExtInfo());
+    CanFunctionType::get({}, ast->TheRawPointerType);
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
@@ -746,6 +745,70 @@ static void VisitNodeAssociatedTypeRef(
   result._error = stringWithFormat(
       "unable to find associated type %s in context",
       ident->getText().str().c_str());
+}
+
+static void VisitNodeGenericTypealias(ASTContext *ast,
+                                      Demangle::NodePointer cur_node,
+                                      VisitNodeResult &result) {
+  VisitNodeResult generic_type_result;
+  VisitNodeResult template_types_result;
+
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    switch (child_node_kind) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, *pos, generic_type_result);
+      break;
+    case Demangle::Node::Kind::TypeList:
+      VisitNode(ast, *pos, template_types_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (generic_type_result._decls.size() != 1 ||
+      generic_type_result._types.size() != 1)
+    return;
+
+  auto *genericTypeAlias =
+      cast<TypeAliasDecl>(generic_type_result._decls.front());
+  GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  if (signature &&
+      template_types_result._types.size() !=
+        signature->getGenericParams().size()) {
+    result._error = stringWithFormat(
+        "wrong number of generic arguments (%d) for generic typealias %s; "
+        "expected %d",
+        template_types_result._types.size(),
+        genericTypeAlias->getBaseName().userFacingName(),
+        signature->getGenericParams().size());
+
+    return;
+  }
+
+  if (signature && signature->getNumConformanceRequirements() != 0) {
+    result._error =
+      "cannot handle generic typealias with conformance requirements";
+    return;
+  }
+
+  // FIXME: handle conformances.
+  SubstitutionMap subMap;
+  if (signature)
+    subMap = SubstitutionMap::get(signature, template_types_result._types,
+                                  ArrayRef<ProtocolConformanceRef>({}));
+  Type parentType;
+  if (auto nominal = genericTypeAlias->getDeclContext()
+                         ->getSelfNominalTypeDecl()) {
+    parentType = nominal->getDeclaredInterfaceType().subst(subMap);
+  }
+  NameAliasType *NAT = NameAliasType::get(
+      genericTypeAlias, parentType, subMap,
+      genericTypeAlias->getDeclaredInterfaceType().subst(subMap));
+  result._types.push_back(NAT);
+  result._decls.push_back(genericTypeAlias);
 }
 
 static void VisitNodeBoundGeneric(
@@ -792,13 +855,13 @@ static void VisitNodeBuiltinTypeName(
 
   StringRef builtin_name_ref(builtin_name);
 
-  if (builtin_name_ref.startswith("Builtin.")) {
+  if (builtin_name_ref.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
     StringRef stripped_name_ref =
-        builtin_name_ref.drop_front(strlen("Builtin."));
+        builtin_name_ref.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
     SmallVector<ValueDecl *, 1> builtin_decls;
 
     result._module =
-        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString("Builtin"));
+        DeclsLookupSource::GetDeclsLookupSource(*ast, ConstString(BUILTIN_NAME));
 
     if (!FindNamedDecls(ast, ast->getIdentifier(stripped_name_ref), result)) {
       result.Clear();
@@ -807,7 +870,7 @@ static void VisitNodeBuiltinTypeName(
     }
   } else {
     result._error = stringWithFormat(
-        "BuiltinTypeName %s doesn't start with Builtin.", builtin_name.c_str());
+        "BuiltinTypeName %s doesn't start with %s", builtin_name.c_str(), BUILTIN_TYPE_NAME_PREFIX);
   }
 }
 
@@ -847,7 +910,8 @@ static void VisitNodeConstructor(
 
   if (kind_type_result.HasSingleType() && type_result.HasSingleType()) {
     bool found = false;
-    const size_t n = FindNamedDecls(ast, ast->Id_init, kind_type_result);
+    const size_t n = FindNamedDecls(ast, DeclBaseName::createConstructor(),
+                                    kind_type_result);
     if (n == 1) {
       found = true;
       kind_type_result._types[0] = FixCallingConv(
@@ -870,7 +934,8 @@ static void VisitNodeConstructor(
 
             // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
             // assert that in case we're dealing with broken code.
-            if (identifier_func->getInput()->is<AnyMetatypeType>() &&
+            if (identifier_func->getParams().size() == 1 &&
+                identifier_func->getParams()[0].getOldType()->is<AnyMetatypeType>() &&
                 identifier_func->getResult()->is<AnyFunctionType>()) {
               identifier_func =
                   identifier_func->getResult()->getAs<AnyFunctionType>();
@@ -950,6 +1015,28 @@ static void VisitNodeDestructor(
     }
   }
 }
+
+static void VisitNodeDependentMember(ASTContext *ast,
+                                     Demangle::NodePointer cur_node,
+                                     VisitNodeResult &result) {
+  if (cur_node->getNumChildren() == 2) {
+    auto dep = cur_node->getChild(0);
+    auto assoc = cur_node->getChild(1);
+    VisitNodeResult dependency;
+    if (dep->getKind() == Demangle::Node::Kind::Type &&
+        assoc->getKind() == Demangle::Node::Kind::DependentAssociatedTypeRef) {
+      VisitNode(ast, dep, dependency);
+      if (dependency._types.size() == 1 && assoc->hasText()) {
+        Identifier name = ast->getIdentifier(assoc->getText());
+        result._types.push_back(
+            DependentMemberType::get(dependency._types[0], name));
+        return;
+      }
+    }
+  }
+  result._error = "bad dependent member type";
+}
+
 
 static Demangle::NodePointer DropGenericSignature(
     Demangle::NodePointer cur_node) {
@@ -1140,7 +1227,8 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
     auto label1 = getLabel(fLabels, param1, i);
     auto label2 = getLabel(gLabels, param2, i);
 
-    if (label1.equals(label2) && param1.getType()->isEqual(param2.getType()))
+    if (label1.equals(label2) &&
+        param1.getOldType()->isEqual(param2.getOldType()))
       continue;
 
     in_matches = false;
@@ -1157,7 +1245,59 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
   return (in_matches && out_matches);
 }
 
-// VisitNodeFunction gets used for Function, Variable and Allocator:
+static void VisitNodePrivateDeclName(
+    ASTContext *ast,
+    Demangle::NodePointer parent_node,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
+
+  if (cur_node->getNumChildren() != 2) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
+  Demangle::NodePointer id_node(cur_node->getChild(1));
+
+  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to retrieve content for Node::Kind::PrivateDeclName");
+    return;
+  }
+
+  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
+                                  decl_kind, result,
+                                  priv_decl_id_node->getText().str())) {
+    if (result._error.empty())
+      result._error = stringWithFormat(
+          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
+          id_node->getText().str().c_str(),
+          priv_decl_id_node->getText().str().c_str());
+  }
+}
+
+static void VisitLocalDeclVariableName(ASTContext *ast,
+                                       Demangle::NodePointer child,
+                                       VisitNodeResult &result) {
+  if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
+    if (result._error.empty())
+      result._error =
+          "unable to retrieve content for Node::Kind::LocalDeclName";
+    return;
+  }
+
+  auto name = child->getChild(1);
+  FindNamedDecls(ast, ast->getIdentifier(name->getText()), result);
+  if (result._decls.empty())
+    result._error = stringWithFormat(
+      "demangled identifier '%s' could not be found by name lookup",
+      name->getText());
+}
+
+// VisitNodeFunction gets used for Function and Variable.
 static void VisitNodeFunction(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1191,6 +1331,25 @@ static void VisitNodeFunction(
       VisitNode(ast, *pos, decl_scope_result);
       break;
 
+    case Demangle::Node::Kind::PrivateDeclName: {
+      VisitNodePrivateDeclName(ast, cur_node, child, decl_scope_result);
+
+      // No results found, giving up.
+      if (decl_scope_result._decls.empty())
+        break;
+
+      std::copy(decl_scope_result._decls.begin(),
+                decl_scope_result._decls.end(),
+                back_inserter(identifier_result._decls));
+      std::copy(decl_scope_result._types.begin(),
+                decl_scope_result._types.end(),
+                back_inserter(identifier_result._types));
+      identifier_result._module = decl_scope_result._module;
+      if (decl_scope_result._decls.size() == 1)
+        found_univocous = true;
+      break;
+    }
+
     case Demangle::Node::Kind::LabelList: {
       for (const auto &label : **pos) {
         if (label->getKind() == Demangle::Node::Kind::FirstElementMarker)
@@ -1203,22 +1362,9 @@ static void VisitNodeFunction(
     }
 
     case Demangle::Node::Kind::LocalDeclName: {
-      if (child->getNumChildren() != 2 || !child->getChild(1)->hasText()) {
-        if (result._error.empty())
-          result._error =
-              "unable to retrieve content for Node::Kind::LocalDeclName";
+      VisitLocalDeclVariableName(ast, child, decl_scope_result);
+      if (decl_scope_result._decls.empty())
         break;
-      }
-
-      auto name = child->getChild(1); // First child is number.
-      FindNamedDecls(ast, ast->getIdentifier(name->getText()),
-                     decl_scope_result);
-      if (decl_scope_result._decls.empty()) {
-        llvm::raw_string_ostream OS(result._error);
-        OS << "demangled identifier " << name->getText()
-           << " could not be found by name lookup";
-        break;
-      }
       std::copy(decl_scope_result._decls.begin(),
                 decl_scope_result._decls.end(),
                 back_inserter(identifier_result._decls));
@@ -1281,25 +1427,6 @@ static void VisitNodeFunction(
     }
   } while (0);
 
-  //                    if (node_kind == Demangle::Node::Kind::Allocator)
-  //                    {
-  //                        // For allocators we don't have an identifier for
-  //                        the name, we will
-  //                        // need to extract it from the class or struct in
-  //                        "identifier_result"
-  //                        //Find
-  //                        if (identifier_result.HasSingleType())
-  //                        {
-  //                            // This contains the class or struct
-  //                            StringRef init_name("init");
-  //
-  //                            if (FindFirstNamedDeclWithKind(ast, init_name,
-  //                            DeclKind::Constructor, identifier_result))
-  //                            {
-  //                            }
-  //                        }
-  //                    }
-
   if (identifier_result._types.size() == 1) {
     result._module = identifier_result._module;
     result._decls.push_back(identifier_result._decls[0]);
@@ -1340,15 +1467,15 @@ static void CreateFunctionType(ASTContext *ast,
                                bool escaping,
                                bool throws,
                                VisitNodeResult &result) {
-  Type arg_clang_type;
-  Type return_clang_type;
+  Type arg_type;
+  Type return_type;
 
   switch (arg_type_result._types.size()) {
   case 0:
-    arg_clang_type = TupleType::getEmpty(*ast);
+    arg_type = TupleType::getEmpty(*ast);
     break;
   case 1:
-    arg_clang_type = arg_type_result._types.front().getPointer();
+    arg_type = arg_type_result._types.front().getPointer();
     break;
   default:
     result._error = "too many argument types for a function type";
@@ -1357,21 +1484,28 @@ static void CreateFunctionType(ASTContext *ast,
 
   switch (return_type_result._types.size()) {
   case 0:
-    return_clang_type = TupleType::getEmpty(*ast);
+    return_type = TupleType::getEmpty(*ast);
     break;
   case 1:
-    return_clang_type = return_type_result._types.front().getPointer();
+    return_type = return_type_result._types.front().getPointer();
     break;
   default:
     result._error = "too many return types for a function type";
     break;
   }
 
-  if (arg_clang_type && return_clang_type) {
-    result._types.push_back(
-        FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withNoEscape(!escaping)
-                          .withThrows(throws)));
+  if (arg_type && return_type) {
+    // FIXME: We need to either refactor this code to build function parameters
+    // directly, or better yet, scrap TypeReconstruction altogether in favor of
+    // TypeDecoder which already does the right thing.
+    SmallVector<AnyFunctionType::Param, 8> params;
+    AnyFunctionType::decomposeInput(arg_type, params);
+
+    auto ext_info =
+      FunctionType::ExtInfo()
+        .withNoEscape(!escaping)
+        .withThrows(throws);
+    result._types.push_back(FunctionType::get(params, return_type, ext_info));
   }
 }
 
@@ -1670,40 +1804,6 @@ static void VisitNodeLocalDeclName(
   }
 }
 
-static void VisitNodePrivateDeclName(
-    ASTContext *ast,
-    Demangle::NodePointer parent_node,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  DeclKind decl_kind = GetKindAsDeclKind(parent_node->getKind());
-
-  if (cur_node->getNumChildren() != 2) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  Demangle::NodePointer priv_decl_id_node(cur_node->getChild(0));
-  Demangle::NodePointer id_node(cur_node->getChild(1));
-
-  if (!priv_decl_id_node->hasText() || !id_node->hasText()) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to retrieve content for Node::Kind::PrivateDeclName");
-    return;
-  }
-
-  if (!FindFirstNamedDeclWithKind(ast, ast->getIdentifier(id_node->getText()),
-                                  decl_kind, result,
-                                  priv_decl_id_node->getText().str())) {
-    if (result._error.empty())
-      result._error = stringWithFormat(
-          "unable to find Node::Kind::PrivateDeclName '%s' in '%s'",
-          id_node->getText().str().c_str(),
-          priv_decl_id_node->getText().str().c_str());
-  }
-}
-
 static void VisitNodeRelatedEntityDeclName(
     ASTContext *ast,
     Demangle::NodePointer parent_node,
@@ -1819,10 +1919,34 @@ static void VisitNodeInOut(
   VisitNodeResult type_result;
   VisitNode(ast, cur_node->getFirstChild(), type_result);
   if (type_result._types.size() == 1 && type_result._types[0]) {
-    result._types.push_back(Type(InOutType::get(type_result._types[0])));
+    result._types.push_back(InOutType::get(type_result._types[0]));
   } else {
     result._error = "couldn't resolve referent type";
   }
+}
+
+static void VisitNodeExistentialMetatype(ASTContext *ast,
+                                         Demangle::NodePointer cur_node,
+                                         VisitNodeResult &result) {
+  VisitNodeResult type_result;
+  Optional<MetatypeRepresentation> metatype_repr;
+
+  for (auto &child : *cur_node) {
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, child, type_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (type_result.HasSingleType())
+    result._types.push_back(
+        ExistentialMetatypeType::get(type_result._types[0], metatype_repr));
+  else
+    result._error = stringWithFormat(
+        "instance type for existential metatype cannot be uniquely resolved");
 }
 
 static void VisitNodeMetatype(
@@ -1973,49 +2097,6 @@ static void VisitNodeProtocolListWithAnyObject(
   }
 }
 
-static void VisitNodeQualifiedArchetype(
-    ASTContext *ast,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  if (cur_node->begin() != cur_node->end()) {
-    VisitNodeResult type_result;
-    uint64_t index = 0xFFFFFFFFFFFFFFFF;
-    for (Demangle::NodePointer ChildNd : *cur_node) {
-      switch (ChildNd->getKind()) {
-      case Demangle::Node::Kind::Number:
-        index = ChildNd->getIndex();
-        break;
-      case Demangle::Node::Kind::DeclContext:
-        VisitNode(ast, ChildNd, type_result);
-        break;
-      default:
-        break;
-      }
-    }
-    if (index != 0xFFFFFFFFFFFFFFFF) {
-      Decl *decl_ptr = nullptr;
-      if (type_result._decls.size() == 1) {
-        decl_ptr = type_result._decls[0];
-      } else if (type_result._module.IsExtension()) {
-        decl_ptr = type_result._module.GetExtendedDecl();
-      }
-
-      if (decl_ptr) {
-        auto *dc = decl_ptr->getInnermostDeclContext();
-        auto *sig = dc->getGenericSignatureOfContext();
-        if (sig) {
-          auto params = sig->getInnermostGenericParams();
-          if (index < params.size()) {
-            auto argTy = dc->mapTypeIntoContext(params[index])
-                ->getAs<ArchetypeType>();
-            if (argTy)
-              result._types.push_back(argTy);
-          }
-        }
-      }
-    }
-  }
-}
-
 static void VisitNodeTupleElement(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2036,16 +2117,17 @@ static void VisitNodeTupleElement(
     }
   }
 
-  if (tuple_type_result._error.empty() &&
-      tuple_type_result._types.size() == 1) {
-    if (!tuple_name.empty())
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer(),
-                       ast->getIdentifier(tuple_name));
-    else
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer());
-  }
+  if (!tuple_type_result._error.empty() || tuple_type_result._types.size() != 1)
+    return;
+
+  auto tupleType = tuple_type_result._types.front();
+  auto typeFlags = ParameterTypeFlags();
+  typeFlags = typeFlags.withInOut(tupleType->is<InOutType>());
+  if (auto *inOutTy = tupleType->getAs<InOutType>())
+    tupleType = inOutTy->getObjectType();
+  Identifier idName =
+      tuple_name.empty() ? Identifier() : ast->getIdentifier(tuple_name);
+  result._tuple_type_element = TupleTypeElt(tupleType, idName, typeFlags);
 }
 
 static void VisitNodeTypeList(
@@ -2143,10 +2225,28 @@ static void VisitAllChildNodes(
   }
 }
 
+static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
+                            VisitNodeResult &result) {
+  assert(result._error.empty());
+
+  for (const auto &child : *cur_node) {
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::Identifier:
+      result._error = "invalid global node";
+      break;
+    default:
+      VisitNode(ast, child, result);
+      break;
+    }
+  }
+}
+
 static void VisitNode(
     ASTContext *ast,
     Demangle::NodePointer node, VisitNodeResult &result) {
-  assert(result._error.empty());
+  // If we have an error, no point in going forward.
+  if (!result._error.empty())
+    return;
 
   const Demangle::Node::Kind nodeKind = node->getKind();
 
@@ -2173,6 +2273,18 @@ static void VisitNode(
     VisitNodeBoundGeneric(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::BoundGenericProtocol:
+    if (node->getNumChildren() < 2)
+      return;
+
+    // Only visit the conforming type.
+    VisitNode(ast, node->getChild(1), result);
+    break;
+
+  case Demangle::Node::Kind::BoundGenericTypeAlias:
+    VisitNodeGenericTypealias(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::BuiltinTypeName:
     VisitNodeBuiltinTypeName(ast, node, result);
     break;
@@ -2190,6 +2302,9 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Global:
+    VisitNodeGlobal(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::Static:
   case Demangle::Node::Kind::Type:
   case Demangle::Node::Kind::TypeMangling:
@@ -2197,8 +2312,13 @@ static void VisitNode(
     VisitAllChildNodes(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Constructor:
     VisitNodeConstructor(ast, node, result);
+    break;
+
+ case Demangle::Node::Kind::DependentMemberType:
+    VisitNodeDependentMember(ast, node, result);
     break;
 
   case Demangle::Node::Kind::Destructor:
@@ -2222,7 +2342,6 @@ static void VisitNode(
     break;
 
   case Demangle::Node::Kind::Function:
-  case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Variable:
   case Demangle::Node::Kind::Subscript: // Out of order on purpose
     VisitNodeFunction(ast, node, result);
@@ -2250,6 +2369,10 @@ static void VisitNode(
     VisitNodeInOut(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::ExistentialMetatype:
+    VisitNodeExistentialMetatype(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::Metatype:
     VisitNodeMetatype(ast, node, result);
     break;
@@ -2272,10 +2395,6 @@ static void VisitNode(
 
   case Demangle::Node::Kind::ProtocolListWithAnyObject:
     VisitNodeProtocolListWithAnyObject(ast, node, result);
-    break;
-
-  case Demangle::Node::Kind::QualifiedArchetype:
-    VisitNodeQualifiedArchetype(ast, node, result);
     break;
 
   case Demangle::Node::Kind::TupleElement:

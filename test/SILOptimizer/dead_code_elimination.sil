@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -dce %s | %FileCheck %s
 
-// REQUIRES: rdar34013900
-
 sil_stage canonical
 
 import Builtin
@@ -59,8 +57,6 @@ bb3:
   return %18 : $()
 }
 
-// We currently bail out on functions that have structurally infinite
-// loops.
 // CHECK-LABEL: sil @dead3
 sil @dead3 : $@convention(thin) () -> () {
 bb0:
@@ -68,8 +64,8 @@ bb0:
   br bb1
 // CHECK: bb1
 bb1:
-// CHECK: integer_literal $Builtin.Int32, 0
-// CHECK: br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   br bb1
   %0 = integer_literal $Builtin.Int32, 0
   br bb1
 }
@@ -247,3 +243,19 @@ bb0(%0 : $*Container):
   return %90 : $()
 }
 
+// Check that DCE does not crash with an infinite loop through a cond_br.
+// CHECK-LABEL: sil @deal_with_infinite_loop
+// CHECK: cond_br
+sil @deal_with_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  br bb1
+}

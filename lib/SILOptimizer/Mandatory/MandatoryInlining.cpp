@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -20,6 +21,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -39,44 +41,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
-
-namespace {
-
-/// A helper class to update an instruction iterator if
-/// removal of instructions would invalidate it.
-class DeleteInstructionsHandler : public DeleteNotificationHandler {
-  SILBasicBlock::iterator &CurrentI;
-  SILModule &Module;
-
-public:
-  DeleteInstructionsHandler(SILBasicBlock::iterator &I)
-      : CurrentI(I), Module(I->getModule()) {
-    Module.registerDeleteNotificationHandler(this);
-  }
-
-  ~DeleteInstructionsHandler() override {
-     // Unregister the handler.
-    Module.removeDeleteNotificationHandler(this);
-  }
-
-  // Handling of instruction removal notifications.
-  bool needsNotifications() override { return true; }
-
-  // Handle notifications about removals of instructions.
-  void handleDeleteNotification(SILNode *node) override {
-    if (auto DeletedI = dyn_cast<SILInstruction>(node)) {
-      if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
-        if (CurrentI != CurrentI->getParent()->begin()) {
-          --CurrentI;
-        } else {
-          ++CurrentI;
-        }
-      }
-    }
-  }
-};
-
-} // end of namespace
 
 /// \brief Fixup reference counts after inlining a function call (which is a
 /// no-op unless the function is a thick function). Note that this function
@@ -171,18 +135,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
 
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void cleanupCalleeValue(
-    SILValue CalleeValue,
-    ArrayRef<SILValue> FullArgs) {
-  SmallVector<SILInstruction*, 16> InstsToDelete;
-  for (SILValue V : FullArgs) {
-    if (V != CalleeValue)
-      if (auto *I = V->getDefiningInstruction())
-        if (isInstructionTriviallyDead(I))
-          InstsToDelete.push_back(I);
-  }
-  recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
-
+static void cleanupCalleeValue(SILValue CalleeValue) {
   // Handle the case where the callee of the apply is a load instruction. If we
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
@@ -232,6 +185,95 @@ static void cleanupCalleeValue(
   }
 }
 
+namespace {
+/// Cleanup dead closures after inlining.
+class ClosureCleanup {
+  using DeadInstSet = SmallBlotSetVector<SILInstruction *, 4>;
+
+  /// A helper class to update an instruction iterator if
+  /// removal of instructions would invalidate it.
+  ///
+  /// Since this is called by the SILModule callback, the instruction may longer
+  /// be well-formed. Do not visit its operands. However, it's position in the
+  /// basic block is still valid.
+  ///
+  /// FIXME: Using the Module's callback mechanism is undesirable. Instead,
+  /// cleanupCalleeValue could be easily rewritten to use its own instruction
+  /// deletion helper and pass a callback to tryDeleteDeadClosure and
+  /// recursivelyDeleteTriviallyDeadInstructions.
+  class IteratorUpdateHandler : public DeleteNotificationHandler {
+    SILModule &Module;
+    SILBasicBlock::iterator CurrentI;
+    DeadInstSet &DeadInsts;
+
+  public:
+    IteratorUpdateHandler(SILBasicBlock::iterator I, DeadInstSet &DeadInsts)
+        : Module(I->getModule()), CurrentI(I), DeadInsts(DeadInsts) {
+      Module.registerDeleteNotificationHandler(this);
+    }
+
+    ~IteratorUpdateHandler() override {
+      // Unregister the handler.
+      Module.removeDeleteNotificationHandler(this);
+    }
+
+    SILBasicBlock::iterator getIterator() const { return CurrentI; }
+
+    // Handling of instruction removal notifications.
+    bool needsNotifications() override { return true; }
+
+    // Handle notifications about removals of instructions.
+    void handleDeleteNotification(SILNode *node) override {
+      auto deletedI = dyn_cast<SILInstruction>(node);
+      if (!deletedI)
+        return;
+
+      DeadInsts.erase(deletedI);
+
+      if (CurrentI == SILBasicBlock::iterator(deletedI))
+        ++CurrentI;
+    }
+  };
+
+  SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
+
+public:
+  /// This regular instruction deletion callback checks for any function-type
+  /// values that may be unused after deleting the given instruction.
+  void recordDeadFunction(SILInstruction *deletedInst) {
+    // If the deleted instruction was already recorded as a function producer,
+    // delete it from the map and record its operands instead.
+    deadFunctionVals.erase(deletedInst);
+    for (auto &operand : deletedInst->getAllOperands()) {
+      SILValue operandVal = operand.get();
+      if (!operandVal->getType().is<SILFunctionType>())
+        continue;
+
+      // Simply record all function-producing instructions used by dead
+      // code. Checking for a single use would not be precise because
+      // `deletedInst` could itself use `deadInst` multiple times.
+      if (auto *deadInst = operandVal->getDefiningInstruction())
+        deadFunctionVals.insert(deadInst);
+    }
+  }
+
+  // Note: instructions in the `deadFunctionVals` set may use each other, so the
+  // set needs to continue to be updated (by this handler) when deleting
+  // instructions. This assumes that DeadFunctionValSet::erase() is stable.
+  SILBasicBlock::iterator cleanupDeadClosures(SILBasicBlock::iterator II) {
+    IteratorUpdateHandler iteratorUpdate(II, deadFunctionVals);
+    for (Optional<SILInstruction *> I : deadFunctionVals) {
+      if (!I.hasValue())
+        continue;
+
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
+        cleanupCalleeValue(SVI);
+    }
+    return iteratorUpdate.getIterator();
+  }
+};
+} // end of namespace
+
 static void collectPartiallyAppliedArguments(
     PartialApplyInst *PAI,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CapturedArgs,
@@ -259,8 +301,7 @@ static void collectPartiallyAppliedArguments(
 static SILFunction *getCalleeFunction(
     SILFunction *F, FullApplySite AI, bool &IsThick,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
-    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply,
-    SILModule::LinkingMode Mode) {
+    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -404,15 +445,17 @@ static SILFunction *getCalleeFunction(
     return nullptr;
   }
 
-  // If CalleeFunction is a declaration, see if we can load it. If we fail to
-  // load it, bail.
-  if (CalleeFunction->empty()
-      && !AI.getModule().linkFunction(CalleeFunction, Mode))
-    return nullptr;
-
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
   if (CalleeFunction->isTransparent() == IsNotTransparent)
+    return nullptr;
+
+  // If CalleeFunction is a declaration, see if we can load it.
+  if (CalleeFunction->empty())
+    AI.getModule().loadFunction(CalleeFunction);
+
+  // If we fail to load it, bail.
+  if (CalleeFunction->empty())
     return nullptr;
 
   if (F->isSerialized() &&
@@ -432,23 +475,18 @@ static SILFunction *getCalleeFunction(
 static std::tuple<FullApplySite, SILBasicBlock::iterator>
 tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
                            ClassHierarchyAnalysis *CHA) {
-  auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
-  auto *NewInst = NewInstPair.first;
-  if (!NewInst)
+  auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
+  if (!NewInst) {
     return std::make_tuple(InnerAI, I);
+  }
 
-  replaceDeadApply(InnerAI, NewInst);
+  deleteDevirtualizedApply(InnerAI);
 
-  auto newApplyAI = NewInstPair.second.getInstruction();
+  auto newApplyAI = NewInst.getInstruction();
   assert(newApplyAI && "devirtualized but removed apply site?");
-  I = newApplyAI->getIterator();
-  auto NewAI = FullApplySite::isa(newApplyAI);
-  // *NOTE*, it is important that we return I here since we may have
-  // devirtualized but not have a full apply site anymore.
-  if (!NewAI)
-    return std::make_tuple(FullApplySite(), I);
 
-  return std::make_tuple(NewAI, I);
+  return std::make_tuple(FullApplySite::isa(newApplyAI),
+                         newApplyAI->getIterator());
 }
 
 /// \brief Inlines all mandatory inlined functions into the body of a function,
@@ -466,8 +504,8 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
-                         SILModule::LinkingMode Mode,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
+			 SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -495,7 +533,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
   SmallVector<SILValue, 32> FullArgs;
 
   for (auto BI = F->begin(), BE = F->end(); BI != BE; ++BI) {
-    for (auto II = BI->begin(), IE = BI->end(); II != IE; ++II) {
+    // While iterating over this block, instructions are inserted and deleted.
+    for (auto II = BI->begin(), nextI = II; II != BI->end(); II = nextI) {
+      nextI = std::next(II);
+
       FullApplySite InnerAI = FullApplySite::isa(&*II);
 
       if (!InnerAI)
@@ -515,13 +556,13 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI, Mode);
+          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI);
 
       if (!CalleeFunction)
         continue;
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
+      if (!runOnFunctionRecursively(FuncBuilder, CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA)) {
         // If we failed due to circular inlining, then emit some notes to
@@ -538,15 +579,10 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         return false;
       }
 
-      // Create our initial list of substitutions.
-      llvm::SmallVector<Substitution, 16> ApplySubs(InnerAI.subs_begin(),
-                                                    InnerAI.subs_end());
-
-      // Then if we have a partial_apply, add any additional subsitutions that
-      // we may require to the end of the list.
-      if (PAI) {
-        copy(PAI->getSubstitutions(), std::back_inserter(ApplySubs));
-      }
+      // Get our list of substitutions.
+      auto Subs = (PAI
+                   ? PAI->getSubstitutionMap()
+                   : InnerAI.getSubstitutionMap());
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(
@@ -559,10 +595,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
       }
 
-      SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline, ApplySubs,
-                         OpenedArchetypesTracker);
-      if (!Inliner.canInlineFunction(InnerAI)) {
+      SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
+                         Subs, OpenedArchetypesTracker);
+      if (!Inliner.canInlineApplySite(InnerAI)) {
         // See comment above about casting when devirtualizing and how this
         // sometimes causes II and InnerAI to be different and even in different
         // blocks.
@@ -575,9 +610,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
-      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI.getFunction()->getName()
-                         << "\n");
+      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+                              << " into @" << InnerAI.getFunction()->getName()
+                              << "\n");
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
@@ -588,33 +623,26 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         fixupReferenceCounts(II, CalleeValue, CaptureArgs, IsCalleeGuaranteed);
       }
 
-      // Decrement our iterator (carefully, to avoid going off the front) so it
-      // is valid after inlining is done.  Inlining deletes the apply, and can
-      // introduce multiple new basic blocks.
-      II = prev_or_default(II, ApplyBlock->begin(), ApplyBlock->end());
+      // Register a callback to record potentially unused function values after
+      // inlining.
+      ClosureCleanup closureCleanup;
+      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
+        closureCleanup.recordDeadFunction(I);
+      });
 
-      Inliner.inlineFunction(InnerAI, FullArgs);
-
-      // We were able to inline successfully. Remove the apply.
-      InnerAI.getInstruction()->eraseFromParent();
-
-      // Reestablish our iterator if it wrapped.
-      if (II == ApplyBlock->end())
-        II = ApplyBlock->begin();
-
-      // Update the iterator when instructions are removed.
-      DeleteInstructionsHandler DeletionHandler(II);
-
-      // Now that the IR is correct, see if we can remove dead callee
-      // computations (e.g. dead partial_apply closures).
-      cleanupCalleeValue(CalleeValue, FullArgs);
-
-      // Reposition iterators possibly invalidated by mutation.
-      BI = SILFunction::iterator(ApplyBlock);
-      IE = ApplyBlock->end();
-      assert(BI == SILFunction::iterator(II->getParent()) &&
-             "Mismatch between the instruction and basic block");
+      // Inlining deletes the apply, and can introduce multiple new basic
+      // blocks. After this, CalleeValue and other instructions may be invalid.
+      nextI = Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
       ++NumMandatoryInlines;
+
+      // The IR is now valid, and trivial dead arguments are removed. However,
+      // we may be able to remove dead callee computations (e.g. dead
+      // partial_apply closures).
+      nextI = closureCleanup.cleanupDeadClosures(nextI);
+
+      assert(nextI == ApplyBlock->end()
+             || nextI->getParent() == ApplyBlock
+                    && "Mismatch between the instruction and basic block");
     }
   }
 
@@ -629,49 +657,31 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// MandatoryInlining reruns on deserialized functions for two reasons, both
-/// unrelated to mandatory inlining:
-///
-/// 1. It recursively visits the entire call tree rooted at transparent
-/// functions. This has the effect of linking all reachable functions. If they
-/// aren't linked until the explicit SILLinker pass, then they don't benefit
-/// from rerunning optimizations like PredictableMemOps. Ideally we wouldn't
-/// need to rerun PredictableMemOps and wouldn't need to eagerly link anything
-/// in the mandatory pipeline.
-///
-/// 2. It may devirtualize non-transparent methods. It's not clear whether we
-/// really need to devirtualize this early without actually inlining, but it can
-/// unblock other optimizations in the mandatory pipeline.
+
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
-    SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
         continue;
 
-      runOnFunctionRecursively(&F,
-                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
-                               Mode, FullyInlinedSet,
-                               SetFactory, SetFactory.getEmptySet(), CHA);
+      // Skip deserialized functions.
+      if (F.wasDeserializedCanonical())
+        continue;
+
+      runOnFunctionRecursively(FuncBuilder, &F,
+                               FullApplySite(), FullyInlinedSet, SetFactory,
+                               SetFactory.getEmptySet(), CHA);
     }
 
-    // Make sure that we de-serialize all transparent functions,
-    // even if we didn't inline them for some reason.
-    // Transparent functions are not available externally, so we
-    // have to generate code for them.
-    for (auto &F : *M) {
-      if (F.isTransparent())
-        M->linkFunction(&F, Mode);
-    }
-    
     if (!ShouldCleanup)
       return;
 
@@ -702,10 +712,8 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
 
-      notifyDeleteFunction(&F);
-
       // Okay, just erase the function from the module.
-      M->eraseFunction(&F);
+      FuncBuilder.eraseFunction(&F);
     }
   }
 

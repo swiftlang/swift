@@ -33,6 +33,8 @@ namespace llvm {
 namespace swift {
 namespace Demangle {
 
+enum class SymbolicReferenceKind : uint8_t;
+
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayDebuggerGeneratedModule = true;
@@ -75,7 +77,7 @@ struct DemangleOptions {
 };
 
 class Node;
-typedef Node *NodePointer;
+using NodePointer = Node *;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -94,6 +96,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   Dead = 1 << 6,
   OwnedToGuaranteed = 1 << 7,
   SROA = 1 << 8,
+  GuaranteedToOwned = 1 << 9,
+  ExistentialToGeneric = 1 << 10,
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure
@@ -133,7 +137,7 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
   };
 
-  typedef uint64_t IndexType;
+  using IndexType = uint64_t;
 
   friend class NodeFactory;
   
@@ -182,10 +186,10 @@ public:
     assert(hasIndex());
     return IndexPayload;
   }
-  
-  typedef NodePointer *iterator;
-  typedef const NodePointer *const_iterator;
-  typedef size_t size_type;
+
+  using iterator = NodePointer *;
+  using const_iterator = const NodePointer *;
+  using size_type = size_t;
 
   bool hasChildren() const { return NumChildren != 0; }
   size_t getNumChildren() const { return NumChildren; }
@@ -272,6 +276,11 @@ bool isProtocol(llvm::StringRef mangledName);
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isStruct(llvm::StringRef mangledName);
 
+/// Returns true if the mangled name is an Objective-C symbol.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isObjCSymbol(llvm::StringRef mangledName);
+
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///
@@ -350,7 +359,7 @@ public:
   /// Returns true if the mangledName refers to a thunk function.
   ///
   /// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC
-  /// or ObjC-as-swift thunks.
+  /// or ObjC-as-swift thunks or allocating init functions.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
   /// Returns the mangled name of the target of a thunk.
@@ -466,6 +475,16 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+using SymbolicResolver =
+  llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
+                                            const void *)>;
+
+/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
+
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names and should be removed as soon as
@@ -522,6 +541,8 @@ public:
     return std::move(*this << std::forward<T>(x));
   }
   
+  DemanglerPrinter &writeHex(unsigned long long n) &;
+ 
   std::string &&str() && { return std::move(Stream); }
 
   llvm::StringRef getStringRef() const { return Stream; }

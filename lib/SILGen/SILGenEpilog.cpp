@@ -32,7 +32,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     for (auto directResult : fnConv.getDirectSILResults()) {
       SILType resultType =
           F.mapTypeIntoContext(fnConv.getSILType(directResult));
-      epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+      epilogBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     }
   }
 
@@ -41,13 +41,22 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
   if (isThrowing) {
     prepareRethrowEpilog(CleanupL);
   }
+
+  if (F.getLoweredFunctionType()->isCoroutine()) {
+    prepareCoroutineUnwindEpilog(CleanupL);
+  }
 }
 
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPHIArgument(exnType, ValueOwnershipKind::Owned);
+  rethrowBB->createPhiArgument(exnType, ValueOwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
+}
+
+void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
+  SILBasicBlock *unwindBB = createBasicBlock(FunctionSection::Postmatter);
+  CoroutineUnwindDest = JumpDest(unwindBB, getCleanupsDepth(), cleanupLoc);
 }
 
 /// Given a list of direct results, form the direct result value.
@@ -61,7 +70,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
 
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : directResults)
-    eltTypes.push_back(elt->getType().getSwiftRValueType());
+    eltTypes.push_back(elt->getType().getASTType());
   auto resultType = SILType::getPrimitiveObjectType(
     CanType(TupleType::get(eltTypes, SGF.getASTContext())));
   return SGF.B.createTuple(loc, resultType, directResults);
@@ -177,7 +186,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
          "emitting epilog in wrong scope");
 
   auto cleanupLoc = CleanupLocation::get(topLevel);
-  Cleanups.emitCleanupsForReturn(cleanupLoc);
+  Cleanups.emitCleanupsForReturn(cleanupLoc, NotForUnwind);
 
   // Build the return value.  We don't do this if there are no direct
   // results; this can happen for void functions, but also happens when
@@ -220,6 +229,7 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   }
   
   emitRethrowEpilog(TopLevel);
+  emitCoroutineUnwindEpilog(TopLevel);
   
   if (ResultBB)
     B.setInsertionPoint(ResultBB);
@@ -227,55 +237,82 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   return returnLoc;
 }
 
-void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
-  assert(!B.hasValidInsertionPoint());
+static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
+                               SILLocation &loc, SILValue *arg) {
+  assert(!SGF.B.hasValidInsertionPoint());
 
-  // If we don't have a rethrow destination, we're done.
-  if (!ThrowDest.isValid())
-    return;
+  // If we don't have a destination, we don't need to emit the epilog.
+  if (!dest.isValid())
+    return false;
 
-  // If the rethrow destination isn't used, we're done.
-  SILBasicBlock *rethrowBB = ThrowDest.getBlock();
-  if (rethrowBB->pred_empty()) {
-    ThrowDest = JumpDest::invalid();
-    eraseBasicBlock(rethrowBB);
-    return;
+  // If the destination isn't used, we don't need to emit the epilog.
+  SILBasicBlock *epilogBB = dest.getBlock();
+  auto pi = epilogBB->pred_begin(), pe = epilogBB->pred_end();
+  if (pi == pe) {
+    dest = JumpDest::invalid();
+    SGF.eraseBasicBlock(epilogBB);
+    return false;
   }
 
-  SILLocation throwLoc = topLevel;
-  SILValue exn = rethrowBB->args_begin()[0];
+  assert(epilogBB->getNumArguments() <= 1);
+  assert((epilogBB->getNumArguments() == 1) == (arg != nullptr));
+  if (arg) *arg = epilogBB->args_begin()[0];
+
   bool reposition = true;
 
-  // If the rethrow destination has a single branch predecessor,
-  // consider emitting the rethrow into it.
-  SILBasicBlock *predBB = *rethrowBB->pred_begin();
-  if (std::next(rethrowBB->pred_begin()) == rethrowBB->pred_end()) {
+  // If the destination has a single branch predecessor,
+  // consider emitting the epilog into it.
+  SILBasicBlock *predBB = *pi;
+  if (++pi == pe) {
     if (auto branch = dyn_cast<BranchInst>(predBB->getTerminator())) {
-      assert(branch->getArgs().size() == 1);
+      assert(branch->getArgs().size() == epilogBB->getNumArguments());
 
       // Save the location and operand information from the branch,
       // then destroy it.
-      throwLoc = branch->getLoc();
-      exn = branch->getArgs()[0];
+      loc = branch->getLoc();
+      if (arg) *arg = branch->getArgs()[0];
       predBB->erase(branch);
 
       // Erase the rethrow block.
-      eraseBasicBlock(rethrowBB);
-      rethrowBB = predBB;
+      SGF.eraseBasicBlock(epilogBB);
+      epilogBB = predBB;
       reposition = false;
     }
   }
 
-  // Reposition the rethrow block to the end of the postmatter section
+  // Reposition the block to the end of the postmatter section
   // unless we're emitting into a single predecessor.
   if (reposition) {
-    B.moveBlockTo(rethrowBB, F.end());
+    SGF.B.moveBlockTo(epilogBB, SGF.F.end());
   }
 
-  B.setInsertionPoint(rethrowBB);
-  Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation());
+  SGF.B.setInsertionPoint(epilogBB);
+
+  return true;
+}
+
+void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
+  SILValue exn;
+  SILLocation throwLoc = topLevel;
+  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc, &exn))
+    return;
+
+  Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
   B.createThrow(throwLoc, exn);
 
   ThrowDest = JumpDest::invalid();
+}
+
+void SILGenFunction::emitCoroutineUnwindEpilog(SILLocation topLevel) {
+  SILLocation unwindLoc = topLevel;
+  if (!prepareExtraEpilog(*this, CoroutineUnwindDest, unwindLoc, nullptr))
+    return;
+
+  Cleanups.emitCleanupsForReturn(CoroutineUnwindDest.getCleanupLocation(),
+                                 IsForUnwind);
+
+  B.createUnwind(unwindLoc);
+
+  CoroutineUnwindDest = JumpDest::invalid();
 }

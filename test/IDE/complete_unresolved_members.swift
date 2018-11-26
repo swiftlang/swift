@@ -11,6 +11,9 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_8 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_9 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_2 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_3 | %FileCheck %s -check-prefix=UNRESOLVED_3_OPTOPTOPT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_12 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_13 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -34,6 +37,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_28 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | %FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | %FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_31 | %FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_32 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_33 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_34 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_35 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_36 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | %FileCheck %s -check-prefix=ENUM_AVAIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | %FileCheck %s -check-prefix=OPTIONS_AVAIL_1
@@ -49,6 +60,23 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_1 | %FileCheck %s -check-prefix=NON_OPT_SET_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_2 | %FileCheck %s -check-prefix=NON_OPT_SET_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_3 | %FileCheck %s -check-prefix=NON_OPT_SET_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERPOLATION_1 | %FileCheck %s -check-prefix=STRING_INTERPOLATION_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERPOLATION_INVALID
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBTYPE_1 | %FileCheck %s -check-prefix=SUBTYPE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBTYPE_2 | %FileCheck %s -check-prefix=SUBTYPE_2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_U
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_METHOD_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_2 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 
 enum SomeEnum1 {
   case South
@@ -97,27 +125,28 @@ struct OptionsAvail1 : OptionSet {
   @available(*, deprecated) static let BBB = OptionsAvail1(rawValue: 1 << 1)
 }
 
-func OptionSetTaker1(Op : SomeOptions1) {}
+func OptionSetTaker1(_ Op : SomeOptions1) {}
 
-func OptionSetTaker2(Op : SomeOptions2) {}
+func OptionSetTaker2(_ Op : SomeOptions2) {}
 
-func OptionSetTaker3(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker3(_ Op1: SomeOptions1, _ Op2: SomeOptions2) {}
 
-func OptionSetTaker4(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker4(_ Op1: SomeOptions2, _ Op2: SomeOptions1) {}
 
-func OptionSetTaker5(Op1: SomeOptions1, Op2: SomeOptions2, En1 : SomeEnum1, En2: SomeEnum2) {}
+func OptionSetTaker5(_ Op1: SomeOptions1, _ Op2: SomeOptions2, _ En1 : SomeEnum1, _ En2: SomeEnum2) {}
 
-func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
+func OptionSetTaker6(_ Op1: SomeOptions1, _ Op2: SomeOptions2) {}
 
-func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
+func OptionSetTaker6(_ Op1: SomeOptions2, _ Op2: SomeOptions1) {}
 
-func OptionSetTaker7(Op1: SomeOptions1, Op2: SomeOptions2) -> Int {return 0}
+func OptionSetTaker7(_ Op1: SomeOptions1, _ Op2: SomeOptions2) -> Int {return 0}
 
-func EnumTaker1(E : SomeEnum1) {}
+func EnumTaker1(_ E : SomeEnum1) {}
+func optionalEnumTaker1(_ : SomeEnum1?) {}
 
 class OptionTakerContainer1 {
-  func OptionSetTaker1(op : SomeOptions1) {}
-  func EnumTaker1(E : SomeEnum1) {}
+  func OptionSetTaker1(_ op : SomeOptions1) {}
+  func EnumTaker1(_ E : SomeEnum1) {}
 }
 
 class C1 {
@@ -144,9 +173,9 @@ class C2 {
 // UNRESOLVED_1:  Begin completions
 // UNRESOLVED_1-NOT:  SomeEnum1
 // UNRESOLVED_1-NOT:  SomeEnum2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_1-NOT:  Not
 }
 
@@ -160,9 +189,9 @@ class C3 {
 // UNRESOLVED_2:  Begin completions
 // UNRESOLVED_2-NOT:  SomeEnum1
 // UNRESOLVED_2-NOT:  SomeEnum2
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
 // UNRESOLVED_2-NOT:  Not
 }
 
@@ -177,12 +206,39 @@ class C4 {
   func f3() {
     OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_12^#, .West)
   }
+  func f4() {
+    var _: SomeEnum1? = .#^UNRESOLVED_OPT_1^#
+  }
+  func f5() {
+    optionalEnumTaker1(.#^UNRESOLVED_OPT_2^#)
+  }
+  func f6() {
+    var _: SomeEnum1??? = .#^UNRESOLVED_OPT_3^#
+  }
 }
 // UNRESOLVED_3: Begin completions
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
+// UNRESOLVED_3-NOT: none
+// UNRESOLVED_3-NOT: some(
+
+// UNRESOLVED_3_OPT: Begin completions
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Wrapped>#]; name=none
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#Wrapped#})[#(Wrapped) -> Optional<Wrapped>#];
+// UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1#})[#Optional<SomeEnum1>#];
+// UNRESOLVED_3_OPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1>#];
+
+// UNRESOLVED_3_OPTOPTOPT: Begin completions
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     none[#Optional<Wrapped>#]; name=none
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific:     some({#Wrapped#})[#(Wrapped) -> Optional<Wrapped>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#(some): SomeEnum1??#})[#Optional<SomeEnum1??>#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[Constructor]/CurrNominal:      init({#nilLiteral: ()#})[#Optional<SomeEnum1??>#];
 
 class C5 {
   func f1() {
@@ -197,7 +253,6 @@ OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_13^#, .West)
 OptionSetTaker5(.#^UNRESOLVED_14^#, .Option4, .South, .West)
 OptionSetTaker5([.#^UNRESOLVED_15^#], .Option4, .South, .West)
 
-// FIXME: Overload needs to be handled.
 OptionSetTaker6(.#^UNRESOLVED_16^#, .Option4)
 OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
 
@@ -205,18 +260,18 @@ var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
 var Container = OptionTakerContainer1()
-Container.OptionSetTaker1(.#^UNRESOLVED_19^#
+Container.OptionSetTaker1(.#^UNRESOLVED_19^#)
 Container.EnumTaker1(.#^UNRESOLVED_20^#
 
 func parserSync() {}
 
 // UNRESOLVED_4: Begin completions
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option3[#SomeOptions1#]; name=Option3
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_4-NOT: Option4
+// UNRESOLVED_4-NOT: Option5
+// UNRESOLVED_4-NOT: Option6
 
 var OpIns1 : SomeOptions1 = .#^UNRESOLVED_21^#
 
@@ -228,7 +283,7 @@ class C6 {
   func f1() -> SomeOptions1 {
     return .#^UNRESOLVED_23^#
   }
-  func f2(P : SomeEnum3) {
+  func f2(p : SomeEnum3) {
   switch p {
   case .Payload(.#^UNRESOLVED_24^#)
   }
@@ -242,7 +297,7 @@ class C6 {
 }
 class C7 {}
 extension C7 {
-  func extendedf1(e :SomeEnum1) {}
+  func extendedf1(_ e :SomeEnum1) {}
 }
 
 var cInst1 = C7()
@@ -263,8 +318,18 @@ let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
 let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
+let TopLevelVar4 = OptionSetTaker7([.Option1], Op2: [.Option4, .#^UNRESOLVED_31^#])
 
-func testAvail1(x: EnumAvail1) {
+let _: [SomeEnum1] = [.#^UNRESOLVED_32^#]
+let _: [SomeEnum1] = [.South, .#^UNRESOLVED_33^#]
+let _: [SomeEnum1] = [.South, .#^UNRESOLVED_34^# .South]
+
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .South:.#^UNRESOLVED_35^#]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_36^#:.Option1]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_37^#]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_38^#:]
+
+func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
 }
 // ENUM_AVAIL_1: Begin completions, 2 items
@@ -274,14 +339,14 @@ func testAvail1(x: EnumAvail1) {
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
 
-func testAvail2(x: OptionsAvail1) {
+func testAvail2(_ x: OptionsAvail1) {
   testAvail2(.#^OPTIONS_AVAIL_1^#)
 }
-// OPTIONS_AVAIL_1: Begin completions, 3 items
+// OPTIONS_AVAIL_1: Begin completions
 // ENUM_AVAIL_1-NOT: AAA
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal:      init({#rawValue: Int#})[#OptionsAvail1#]
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]: aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#rawValue: Int#})[#OptionsAvail1#]
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
 
@@ -353,10 +418,10 @@ func testNonOptSet() {
   x = .#^NON_OPT_SET_1^#
 }
 // NON_OPT_SET_1: Begin completions, 4 items
-// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal:        a[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#}, {#y: Int#})[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init()[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal:     b()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Identical]:    a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init({#x: Int#}, {#y: Int#})[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Identical]: b()[#NonOptSet#]
 // NON_OPT_SET_1: End completions
 
 func testNonOptSet() {
@@ -365,4 +430,108 @@ func testNonOptSet() {
 
 func testNonOptSet() -> NonOptSet {
   return .#^NON_OPT_SET_3^#
+}
+
+func testInStringInterpolation() {
+  enum MyEnum { case foo, bar }
+  func takeEnum(_ e: MyEnum) -> MyEnum { return e }
+  let x = "enum: \(takeEnum(.#^STRING_INTERPOLATION_1^#))"
+  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID^#)" // Dont'crash.
+}
+// STRING_INTERPOLATION_1: Begin completions
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     foo[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     bar[#MyEnum#];
+// STRING_INTERPOLATION_1: End completions
+
+class BaseClass {
+  class SubClass : BaseClass { init() {} }
+  static var subInstance: SubClass = SubClass()
+  init() {}
+  init?(failable: Void) {}
+}
+protocol MyProtocol {
+  typealias Concrete1 = BaseClass
+  typealias Concrete2 = AnotherTy
+}
+extension BaseClass : MyProtocol {}
+struct AnotherTy: MyProtocol {}
+func testSubType() {
+  var _: BaseClass = .#^SUBTYPE_1^#
+}
+// SUBTYPE_1: Begin completions, 3 items
+// SUBTYPE_1-NOT: init(failable:
+// SUBTYPE_1-NOT: Concrete1(
+// SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#BaseClass#];
+// SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: SubClass()[#BaseClass.SubClass#];
+// SUBTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: subInstance[#BaseClass.SubClass#];
+// SUBTYPE_1: End completions
+
+func testMemberTypealias() {
+  var _: MyProtocol = .#^SUBTYPE_2^#
+}
+// SUBTYPE_2: Begin completions, 2 items
+// SUBTYPE_1-NOT: Concrete1(failable:
+// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete1()[#BaseClass#];
+// SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete2()[#AnotherTy#];
+// SUBTYPE_2: End completions
+
+enum Generic<T> {
+  case contains(content: T)
+  case empty
+  static func create(_: T) -> Generic<T> { fatalError() }
+}
+func takeGenericInt(_: Generic<Int>) { }
+func takeGenericU<U>(_: Generic<U>) { }
+func testGeneric() {
+  do {
+    let _: Generic<Int> = .#^GENERIC_1^#
+  }
+  takeGenericInt(.#^GENERIC_2^#)
+  takeGenericU(.#^GENERIC_3^#)
+}
+
+switch Generic<Int>.empty {
+case let .#^GENERIC_4^#
+}
+// GENERIC_1: Begin completions
+// GENERIC_1:     Decl[EnumElement]/ExprSpecific:     contains({#content: T#})[#(T) -> Generic<T>#];
+// GENERIC_1:     Decl[EnumElement]/ExprSpecific:     empty[#Generic<T>#];
+// GENERIC_1_INT: Decl[StaticMethod]/CurrNominal:     create({#Int#})[#Generic<Int>#];
+// GENERIC_1_U:   Decl[StaticMethod]/CurrNominal:     create({#U#})[#Generic<U>#];
+// GENERIC_1: End completions
+
+struct HasCreator {
+  static var create: () -> HasCreator = { fatalError() }
+  static var create_curried: () -> () -> HasCreator = { fatalError() }
+}
+func testHasStaticClosure() {
+  let _: HasCreator = .#^STATIC_CLOSURE_1^#
+}
+// STATIC_CLOSURE_1: Begin completions, 2 items
+// STATIC_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#HasCreator#];
+// FIXME: Suggest 'create()[#HasCreateor#]', not 'create'.
+// STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
+// STATIC_CLOSURE_1-NOT: create_curried
+// STATIC_CLOSURE_1: End completions
+
+struct HasOverloaded {
+  init(e: SomeEnum1) {}
+  init(e: SomeEnum2) {}
+  func takeEnum(_ e: SomeEnum1) -> Int { return 0 }
+  func takeEnum(_ e: SomeEnum2) -> Int { return 0 }
+}
+func testOverload(val: HasOverloaded) {
+  let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
+// OVERLOADED_METHOD_1: Begin completions, 4 items
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1: End completions
+
+  let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
+// Same as OVERLOADED_METHOD_1.
+
+  let _ = HasOverloaded(e: .#^OVERLOADED_INIT_2^#)
+// Same as OVERLOADED_METHOD_1.
 }

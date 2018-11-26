@@ -35,5 +35,27 @@ extension INGetCarPowerLevelStatusIntentResponse {
             __chargePercentRemaining = newPercent.map { NSNumber(value: $0) }
         }
     }
+
+    @nonobjc
+    @available(iOS 12.0, watchOS 5.0, *)
+    public final var charging: Bool? {
+        get {
+            return __charging?.boolValue
+        }
+        set(newCharging) {
+            __charging = newCharging.map { NSNumber(value: $0) }
+        }
+    }
+
+    @nonobjc
+    @available(iOS 12.0, watchOS 5.0, *)
+    public final var minutesToFull: Int? {
+        get {
+            return __minutesToFull?.intValue
+        }
+        set(newMinutesToFull) {
+            __minutesToFull = newMinutesToFull.map { NSNumber(value: $0) }
+        }
+    }
 }
 #endif

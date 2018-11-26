@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -typecheck -verify
 // RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
@@ -7,10 +7,7 @@ protocol P2 {}
 protocol P3 {}
 protocol P4: P1 {}
 protocol P5: P2 {}
-// expected-note@-1{{type 'InheritImplicitGood<T>' does not conform to inherited protocol 'P2'}}
-// expected-note@-2{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
 protocol P6: P2 {}
-// expected-note@-1{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
 
 protocol Assoc { associatedtype AT }
 
@@ -93,7 +90,7 @@ func overlapping_sub_bad<U: P1>(_: U) {
 
 
 struct SameType<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType<Int>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType<T>
 // CHECK-NEXT: (normal_conformance type=SameType<T> protocol=P2
 // CHECK-NEXT:   same_type: T Int)
 extension SameType: P2 where T == Int {}
@@ -107,7 +104,7 @@ func same_type_bad<U>(_: U) {
 
 
 struct SameTypeGeneric<T, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric<T, T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric<T, U>
 // CHECK-NEXT: (normal_conformance type=SameTypeGeneric<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension SameTypeGeneric: P2 where T == U {}
@@ -129,7 +126,7 @@ func same_type_bad<U, V>(_: U, _: V) {
 
 
 struct Infer<T, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer<Constrained<U>, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer<T, U>
 // CHECK-NEXT: (normal_conformance type=Infer<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T Constrained<U>
 // CHECK-NEXT:   conforms_to:  U P1)
@@ -145,7 +142,7 @@ func infer_bad<U: P1, V>(_: U, _: V) {
 }
 
 struct InferRedundant<T, U: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant<Constrained<U>, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant<T, U>
 // CHECK-NEXT: (normal_conformance type=InferRedundant<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T Constrained<U>)
 extension InferRedundant: P2 where T == Constrained<U> {}
@@ -220,6 +217,8 @@ struct InheritEqual<T> {}
 extension InheritEqual: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritEqual<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P5 where T: P1 {}
 func inheritequal_good<U: P1>(_: U) {
@@ -252,6 +251,8 @@ struct InheritMore<T> {}
 extension InheritMore: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritMore<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P4)
 extension InheritMore: P5 where T: P4 {}
 func inheritequal_good_good<U: P4>(_: U) {
@@ -276,35 +277,62 @@ func inheritequal_bad_bad<U>(_: U) {
   // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
 }
 
-struct InheritImplicitGood<T> {}
-// FIXME: per SE-0143, this should result in an implicit conformance
-// InheritImplicitGood: P2.
-extension InheritImplicitGood: P5 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitGood<T>' does not conform to protocol 'P2'}}
+struct InheritImplicitOne<T> {}
+// This shouldn't give anything implicit since we disallow implication for
+// conditional conformances (in many cases, the implied bounds are
+// incorrect/insufficiently general).
+extension InheritImplicitOne: P5 where T: P1 {}
+// expected-error@-1{{conditional conformance of type 'InheritImplicitOne<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitOne: P2 where ...'?}}
 
-struct InheritImplicitBad<T> {}
-// This shouldn't give anything implicit since either conformance could imply
-// InheritImplicitBad: P2.
-extension InheritImplicitBad: P5 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
-extension InheritImplicitBad: P6 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
+struct InheritImplicitTwo<T> {}
+// Even if we relax the rule about implication, this double-up should still be
+// an error, because either conformance could imply InheritImplicitTwo: P2.
+extension InheritImplicitTwo: P5 where T: P1 {}
+// expected-error@-1{{conditional conformance of type 'InheritImplicitTwo<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitTwo: P2 where ...'?}}
+extension InheritImplicitTwo: P6 where T: P1 {}
 
+// However, if there's a non-conditional conformance that implies something, we
+// can imply from that one.
+struct InheritImplicitGood1<T> {}
+extension InheritImplicitGood1: P5 {}
+extension InheritImplicitGood1: P6 where T: P1 {}
 
+func inheritimplicitgood1<T>(_ : T) {
+    takes_P2(InheritImplicitGood1<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood1<Int>())
+}
+struct InheritImplicitGood2<T> {}
+extension InheritImplicitGood2: P6 where T: P1 {}
+extension InheritImplicitGood2: P5 {}
+
+func inheritimplicitgood2<T>(_: T) {
+    takes_P2(InheritImplicitGood2<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood2<Int>())
+
+}
+struct InheritImplicitGood3<T>: P5 {}
+extension InheritImplicitGood3: P6 where T: P1 {}
+
+func inheritimplicitgood3<T>(_: T) {
+    takes_P2(InheritImplicitGood3<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood3<Int>())
+}
 
 // "Multiple conformances" from SE0143
 
 struct TwoConformances<T> {}
 extension TwoConformances: P2 where T: P1 {}
-// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
-extension TwoConformances: P2 where T: P3 {}
 // expected-note@-1{{'TwoConformances<T>' declares conformance to protocol 'P2' here}}
+extension TwoConformances: P2 where T: P3 {}
+// expected-error@-1{{conflicting conformance of 'TwoConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 struct TwoDisjointConformances<T> {}
 extension TwoDisjointConformances: P2 where T == Int {}
-// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
-extension TwoDisjointConformances: P2 where T == String {}
 // expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
+extension TwoDisjointConformances: P2 where T == String {}
+// expected-error@-1{{conflicting conformance of 'TwoDisjointConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the
@@ -313,12 +341,12 @@ extension TwoDisjointConformances: P2 where T == String {}
 // signature, meaning the stored conditional requirement is T: P1, which isn't
 // true in the original type's generic signature.
 struct RedundancyOrderDependenceGood<T: P1, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, U>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 struct RedundancyOrderDependenceBad<T, U: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, U>
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, U> protocol=P2
 // CHECK-NEXT:   conforms_to: T P1
 // CHECK-NEXT:   same_type: T U)
@@ -367,4 +395,33 @@ extension SR6990: Sequence where T == Int {
     public typealias Element = Float
     public typealias Iterator = IndexingIterator<[Float]>
     public func makeIterator() -> Iterator { fatalError() }
+}
+
+// SR-8324
+protocol ElementProtocol {
+  associatedtype BaseElement: BaseElementProtocol = Self
+}
+protocol BaseElementProtocol: ElementProtocol where BaseElement == Self {}
+protocol ArrayProtocol {
+  associatedtype Element: ElementProtocol
+}
+protocol NestedArrayProtocol: ArrayProtocol where Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  associatedtype BaseElement = Element.BaseElement
+}
+extension Array: ArrayProtocol where Element: ElementProtocol {}
+extension Array: NestedArrayProtocol where Element: ElementProtocol, Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  // with the typealias uncommented you do not get a crash.
+  // typealias BaseElement = Element.BaseElement
+}
+
+// SR-8337
+struct Foo<Bar> {}
+
+protocol P {
+  associatedtype A
+  var foo: Foo<A> { get }
+}
+
+extension Foo: P where Bar: P {
+  var foo: Foo { return self }
 }

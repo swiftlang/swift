@@ -112,11 +112,11 @@ public struct Selector : ExpressibleByStringLiteral {
   }
 }
 
-public func ==(lhs: Selector, rhs: Selector) -> Bool {
-  return sel_isEqual(lhs, rhs)
-}
-
 extension Selector : Equatable, Hashable {
+  public static func ==(lhs: Selector, rhs: Selector) -> Bool {
+    return sel_isEqual(lhs, rhs)
+  }
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -195,25 +195,56 @@ public var NO: ObjCBool {
 //===----------------------------------------------------------------------===//
 
 // NSObject implements Equatable's == as -[NSObject isEqual:]
-// NSObject implements Hashable's hashValue() as -[NSObject hash]
+// NSObject implements Hashable's hashValue as -[NSObject hash]
 // FIXME: what about NSObjectProtocol?
 
 extension NSObject : Equatable, Hashable {
+  /// Returns a Boolean value indicating whether two values are
+  /// equal. `NSObject` implements this by calling `lhs.isEqual(rhs)`.
+  ///
+  /// Subclasses of `NSObject` can customize Equatable conformance by overriding
+  /// `isEqual(_:)`. If two objects are equal, they must have the same hash
+  /// value, so if you override `isEqual(_:)`, make sure you also override the
+  /// `hash` property.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to compare.
+  ///   - rhs: Another value to compare.
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
   /// The hash value.
+  ///
+  /// `NSObject` implements this by returning `self.hash`.
+  ///
+  /// `NSObject.hashValue` is not overridable; subclasses can customize hashing
+  /// by overriding the `hash` property.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
-  @objc
-  open var hashValue: Int {
+  @nonobjc
+  public var hashValue: Int {
     return hash
   }
-}
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// NSObject implements this by feeding `self.hash` to the hasher.
+  ///
+  /// `NSObject.hash(into:)` is not overridable; subclasses can customize
+  /// hashing by overriding the `hash` property.
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.hash)
+  }
+
+  public func _rawHashValue(seed: Int) -> Int {
+    return self.hash._rawHashValue(seed: seed)
+  }
 }
 
 extension NSObject : CVarArg {

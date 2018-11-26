@@ -90,8 +90,8 @@ void Mangle::printManglingStats() {
   }
   
   llvm::outs() << "Mangling operator stats:\n";
-  
-  typedef llvm::StringMapEntry<OpStatEntry> MapEntry;
+
+  using MapEntry = llvm::StringMapEntry<OpStatEntry>;
   std::vector<const MapEntry *> SortedOpStats;
   for (const MapEntry &ME : OpStats) {
     SortedOpStats.push_back(&ME);
@@ -144,7 +144,7 @@ void Mangler::finalize(llvm::raw_ostream &stream) {
   stream.write(result.data(), result.size());
 }
 
-
+LLVM_ATTRIBUTE_UNUSED
 static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
   if (Nd->getKind() == Kind)
     return true;

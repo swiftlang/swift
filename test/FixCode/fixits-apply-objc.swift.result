@@ -4,15 +4,6 @@ import ObjectiveC
 
 // REQUIRES: objc_interop
 
-@objc class Selectors {
-  func takeSel(_: Selector) {}
-  func mySel() {}
-  func test() {
-    takeSel(#selector(Selectors.mySel))
-    takeSel(#selector(Selectors.mySel))
-  }
-}
-
 func foo(an : Any) {
   let a1 : AnyObject
   a1 = an as AnyObject
@@ -27,5 +18,5 @@ func foo1(_ an : Any) {
 }
 
 func foo2(_ messageData: Any?) -> AnyObject? {
-  return messageData as AnyObject
+  return messageData as AnyObject?
 }

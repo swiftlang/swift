@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 4 %S/Inputs/mixed_mode/UsingObjCStuff.swift
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 3 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize  -DWORD=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-V5 --check-prefix=CHECK-V5-%target-ptrsize -DWORD=i%target-ptrsize
 
 // REQUIRES: objc_interop
 
@@ -24,21 +24,45 @@ sil_vtable SubSubButtHolder {}
 // CHECK-LABEL: define {{.*}} @getHolder
 sil @getHolder: $@convention(thin) () -> @owned ButtHolder {
 entry:
-  // We should load the dimensions of the class instance from metadata, not try
-  // to hardcode constants.
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @"$S14UsingObjCStuff10ButtHolderCMa"()
-  // CHECK-64: [[SIZE32:%.*]] = load i32
-  // CHECK-64: [[SIZE:%.*]] = zext i32 [[SIZE32]] to
-  // CHECK-32: [[SIZE:%.*]] = load i32
-  // CHECK: [[ALIGN16:%.*]] = load i16
-  // CHECK: [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to [[WORD:i32|i64]]
-  // CHECK: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] [[SIZE]], [[WORD]] [[ALIGN]])
+
+  // In Swift 4 mode, we don't know the size or alignment of ButtHolder
+  // instances, so we should load the dimensions of the class instance
+  // from metadata.
+  //
+  // In Swift 5 mode, it's okay to hardcode constants.
+
+  // CHECK-V4: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14UsingObjCStuff10ButtHolderCMa"([[WORD]] 0)
+  // CHECK-V4: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V4-64: [[SIZE32:%.*]] = load i32
+  // CHECK-V4-64: [[SIZE:%.*]] = zext i32 [[SIZE32]] to
+  // CHECK-V4-32: [[SIZE:%.*]] = load i32
+  // CHECK-V4: [[ALIGN16:%.*]] = load i16
+  // CHECK-V4: [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to [[WORD]]
+  // CHECK-V4: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] [[SIZE]], [[WORD]] [[ALIGN]])
+
+  // CHECK-V5: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14UsingObjCStuff10ButtHolderCMa"([[WORD]] 0)
+  // CHECK-V5: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V5-32: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 28, [[WORD]] 3)
+  // CHECK-V5-64: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 48, [[WORD]] 7)
+
   %x = alloc_ref $ButtHolder
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @"$S4main13SubButtHolderCMa"()
-  // CHECK: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+  // CHECK-V4: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s4main13SubButtHolderCMa"([[WORD]] 0)
+  // CHECK-V4: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V4: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+
+  // CHECK-V5: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s4main13SubButtHolderCMa"([[WORD]] 0)
+  // CHECK-V5: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V5-32: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 40, [[WORD]] 7)
+  // CHECK-V5-64: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 56, [[WORD]] 7)
   %y = alloc_ref $SubButtHolder
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @"$S4main03SubB10ButtHolderCMa"()
-  // CHECK: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+  // CHECK-V4: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s4main03SubB10ButtHolderCMa"([[WORD]] 0)
+  // CHECK-V4: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V4: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] %{{.*}}, [[WORD]] %{{.*}})
+
+  // CHECK-V5: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s4main03SubB10ButtHolderCMa"([[WORD]] 0)
+  // CHECK-V5: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK-V5-32: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 48, [[WORD]] 7)
+  // CHECK-V5-64: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[METADATA]], [[WORD]] 64, [[WORD]] 7)
   %z = alloc_ref $SubSubButtHolder
   return %x : $ButtHolder
 }

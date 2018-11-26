@@ -1,0 +1,108 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+
+// Other module is not resilient:
+// RUN: %empty-directory(%t/types)
+// RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule
+// This module is both not resilient:
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -O
+// ... and resilient:
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -O
+// The same, but with -enable-testing:
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/not_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/not_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=all -I %t/types %t/main.swift -enable-resilience -enable-testing -O
+
+// Other module is resilient:
+// RUN: %empty-directory(%t/types)
+// RUN: %target-build-swift %S/Inputs/extension_types.swift -module-name ExtensionTypes -emit-module -emit-module-path %t/types/ExtensionTypes.swiftmodule -Xfrontend -enable-resilience
+// This module is both not resilient:
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -O
+// ... and resilient:
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -O
+// The same but with -enable-testing:
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_not.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o%t/resilient_resilient.ll -parse-as-library -module-name test -validate-tbd-against-ir=missing -I %t/types %t/main.swift -enable-resilience -enable-testing -O
+
+
+import ExtensionTypes
+
+// This generates all combinations of a public/internal/private struct
+// (plus a public one from another module) being extended to conform
+// to a public/internal/private protocol (plus a public one from
+// another module), both with and without inheritance/defaulting.
+
+%{
+local_decl_names = ["Public", "Internal", "Private"]
+all_decl_names = ["Foreign"] + local_decl_names
+decl_name_to_access = {
+    "Foreign": "public",
+    "Public": "public",
+    "Internal": "internal",
+    "Private": "fileprivate"
+}
+def conformanceBody(protocol):
+    return """
+    {access} func {name}Method() {{}}
+    {access} var {name}Get: Int {{ return 0 }}
+    {access} var {name}GetSet: Int {{
+        get {{ return 0 }}
+        set {{}}
+    }}
+    """.format(access = decl_name_to_access[protocol],
+               name = protocol.lower())
+}%
+
+% for name in local_decl_names:
+% access = name.lower()
+
+${access} protocol Extension${name} {
+    func ${access}Method()
+    var ${access}Get: Int { get }
+    var ${access}GetSet: Int { get set }
+}
+
+// Defaulted methods:
+${access} protocol Extension${name}Inherit: ExtensionForeign {}
+extension Extension${name}Inherit {
+    ${conformanceBody(name)}
+}
+
+${access} struct ${name}Struct {}
+${access} struct ${name}StructInherit {}
+${access} struct ${name}StructInheritNoDefault {}
+${access} struct ${name}StructOneExtension {}
+% end
+
+% for sname in all_decl_names:
+% access = sname.lower()
+
+% for pname in all_decl_names:
+// e.g. extension PublicStruct: Private { ... }
+extension ${sname}Struct: Extension${pname} {
+    ${conformanceBody(pname)}
+}
+
+// e.g. extension PublicStructInherit: PrivateInherit {}
+extension ${sname}StructInherit: Extension${pname}Inherit {}
+
+// e.g. extension PublicStructInheritNoDefault: PrivateInherit { ... }
+extension ${sname}StructInheritNoDefault: Extension${pname}Inherit {
+    ${conformanceBody(pname)}
+}
+% end
+
+// e.g. extension PublicStructOneExtension: ExtensionForeign, ExtensionPublic, ExtensionInternal, ExtensionPrivate { ... }
+extension ${sname}StructOneExtension: ${", ".join("Extension" + p for p in all_decl_names)} {
+% for pname in all_decl_names:
+    ${conformanceBody(pname)}
+% end
+}
+% end

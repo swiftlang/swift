@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$S27lying_about_optional_return0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s27lying_about_optional_return0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
 func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   let _: ()? = voidReturning()

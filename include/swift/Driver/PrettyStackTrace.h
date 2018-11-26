@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_PRETTYSTACKTRACE_H
 #define SWIFT_DRIVER_PRETTYSTACKTRACE_H
 
+#include "swift/Basic/FileTypes.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "swift/Driver/Types.h"
 
 namespace swift {
 namespace driver {
@@ -57,14 +57,15 @@ class PrettyStackTraceDriverCommandOutputAddition
     : public llvm::PrettyStackTraceEntry {
   const CommandOutput *TheCommandOutput;
   StringRef PrimaryInput;
-  types::ID NewOutputType;
+  file_types::ID NewOutputType;
   StringRef NewOutputName;
   const char *Description;
 
 public:
   PrettyStackTraceDriverCommandOutputAddition(const char *desc,
                                               const CommandOutput *A,
-                                              StringRef Primary, types::ID type,
+                                              StringRef Primary,
+                                              file_types::ID type,
                                               StringRef New)
       : TheCommandOutput(A), PrimaryInput(Primary), NewOutputType(type),
         NewOutputName(New), Description(desc) {}

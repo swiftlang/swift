@@ -88,11 +88,12 @@ public func ~=(x: NSObject, y: NSObject) -> Bool {
 }
 
 extension NSObject : Equatable, Hashable {
-  public var hashValue: Int {
+  @objc open var hashValue: Int {
     return hash
+  }
+
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
   }
 }
 
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}

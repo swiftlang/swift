@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/guaranteed-normal-args.swift -o %t/TestModule.swiftmodule -emit-module -module-name TestModule
-// RUN: not --crash %target-sil-opt %s -I=%t -enable-guaranteed-normal-arguments
+// RUN: %target-swift-frontend %S/Inputs/guaranteed-normal-args.swift -o %t/TestModule.swiftmodule -emit-module -disable-guaranteed-normal-arguments -module-name TestModule
+// RUN: not --crash %target-sil-opt %s -disable-guaranteed-normal-arguments -I=%t
 
 // This is a negative test
 
@@ -9,7 +9,7 @@ sil_stage canonical
 import TestModule
 
 sil @callFoo : $@convention(thin) (@owned Foo) -> () {
-bb0(%0 : $Foo):
+bb0(%0 : @owned $Foo):
   %1 = class_method %0 : $Foo, #Foo.doSomething!1 : (Foo) -> (Foo) -> (), $@convention(method) (@guaranteed Foo, @owned Foo) -> ()
   destroy_value %0 : $Foo
   %9999 = tuple()

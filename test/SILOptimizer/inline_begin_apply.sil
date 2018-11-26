@@ -1,0 +1,438 @@
+// RUN: %target-sil-opt -inline -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -mandatory-inlining -verify %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil @marker : $(Builtin.Int32) -> ()
+
+class SomeClass {}
+sil_vtable SomeClass {}
+
+class SomeSubclass : SomeClass {}
+sil_vtable SomeSubclass {}
+
+// This is designed to be formally indirect.
+struct Indirect<T: AnyObject> {
+  var x: Any
+  var y: T
+}
+
+sil @make_indirect : $<T: SomeClass> () -> (@out Indirect<T>)
+
+sil [transparent] @test_one_yield : $@yield_once <C: SomeClass> () -> (@yields @in Indirect<C>) {
+entry:
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
+  %temp = alloc_stack $Indirect<C>
+  %make = function_ref @make_indirect : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
+  apply %make<C>(%temp) : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
+  yield %temp : $*Indirect<C>, resume resume, unwind unwind
+
+resume:
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %temp : $*Indirect<C>
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %temp : $*Indirect<C>
+  unwind
+}
+
+// CHECK-LABEL: sil @test_simple_call
+// CHECK: bb0(%0 : @trivial $Builtin.Int1):
+// CHECK:  [[MARKER:%.*]] = function_ref @marker
+// CHECK:  [[MARKER2:%.*]] = function_ref @marker
+// CHECK:  [[I:%.*]] = integer_literal $Builtin.Int32, 1000
+// CHECK:  apply [[MARKER2]]([[I]]) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK:  [[TEMP:%.*]] = alloc_stack $Indirect<SomeSubclass>
+// CHECK:  [[MK_IND:%.*]] = function_ref @make_indirect
+// CHECK:  apply [[MK_IND]]<SomeSubclass>([[TEMP]])
+// CHECK:  destroy_addr [[TEMP]] : $*Indirect<SomeSubclass>
+// CHECK:  cond_br %0, bb3, bb5
+
+// CHECK:bb1:
+// CHECK:  [[I2:%.*]] = integer_literal $Builtin.Int32, 2000
+// CHECK:  apply [[MARKER2]]([[I2]])
+// CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
+// CHECK:  br bb4
+
+// CHECK: bb2:
+// CHECK:  [[I3:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK:  apply [[MARKER2]]([[I3]])
+// CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
+// CHECK:  br bb6
+
+// CHECK: bb3:
+// CHECK:   [[I4:%.*]] = integer_literal $Builtin.Int32, 10
+// CHECK:   apply [[MARKER]]([[I4]])
+// CHECK:   br bb1
+
+// CHECK: bb4:
+// CHECK:   [[I5:%.*]] = integer_literal $Builtin.Int32, 20
+// CHECK:   apply [[MARKER]]([[I5]])
+// CHECK:  br bb7
+
+// CHECK: bb5:
+// CHECK:   [[I6:%.*]] = integer_literal $Builtin.Int32, 11
+// CHECK:   apply [[MARKER]]([[I6]])
+// CHECK:   br bb2
+
+// CHECK: bb6:
+// CHECK:   [[I7:%.*]] = integer_literal $Builtin.Int32, 21
+// CHECK:   [[MARKER]]([[I7]])
+// CHECK:  br bb7
+
+// CHECK:bb7:
+// CHECK:  return
+// CHECK:}
+
+sil @test_simple_call : $(Builtin.Int1) -> () {
+entry(%flag : @trivial $Builtin.Int1):
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %0 = function_ref @test_one_yield : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
+  (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @in Indirect<T>)
+  destroy_addr %value : $*Indirect<SomeSubclass>
+  cond_br %flag, yes, no
+
+yes:
+  %10 = integer_literal $Builtin.Int32, 10
+  apply %marker(%10) : $@convention(thin) (Builtin.Int32) -> ()
+  end_apply %token
+  %20 = integer_literal $Builtin.Int32, 20
+  apply %marker(%20) : $@convention(thin) (Builtin.Int32) -> ()
+  br cont
+
+no:
+  %11 = integer_literal $Builtin.Int32, 11
+  apply %marker(%11) : $@convention(thin) (Builtin.Int32) -> ()
+  abort_apply %token
+  %21 = integer_literal $Builtin.Int32, 21
+  apply %marker(%21) : $@convention(thin) (Builtin.Int32) -> ()
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [transparent] @test_two_yield : $@yield_once <C: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<C>, @yields Builtin.Int64) {
+entry(%0 : @trivial $Builtin.Int1):
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
+  %temp = alloc_stack $Indirect<C>
+  %make = function_ref @make_indirect : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
+  cond_br %0, yield1, yield2
+
+yield1:
+  apply %make<C>(%temp) : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
+  %res = integer_literal $Builtin.Int64, 31
+  yield (%temp : $*Indirect<C>, %res: $Builtin.Int64), resume resume1, unwind unwind1
+
+yield2:
+  apply %make<C>(%temp) : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
+  %res2 = integer_literal $Builtin.Int64, 32
+  yield (%temp : $*Indirect<C>, %res2: $Builtin.Int64), resume resume2, unwind unwind2
+
+resume1:
+  br resume
+resume2:
+  br resume
+
+resume:
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %temp : $*Indirect<C>
+  %ret = tuple ()
+  return %ret : $()
+
+unwind1:
+ br unwind
+unwind2:
+ br unwind
+
+unwind:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %temp : $*Indirect<C>
+  unwind
+}
+
+// We don't support inlining functions with multiple yields yet.
+// CHECK-LABEL: sil @test_simple_call_two_yields : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+// CHECK: bb0(%0 : @trivial $Builtin.Int1, %1 : @trivial $Builtin.Int1):
+// CHECK:   begin_apply
+// CHECK:   return
+
+sil @test_simple_call_two_yields : $(Builtin.Int1, Builtin.Int1) -> () {
+entry(%flag : @trivial $Builtin.Int1, %flag2 : @trivial $Builtin.Int1):
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %0 = function_ref @test_two_yield : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
+  (%value, %value2, %token) = begin_apply %0<SomeSubclass>(%flag) : $@convention(thin) @yield_once <T: SomeClass> (Builtin.Int1) -> (@yields @in Indirect<T>, @yields Builtin.Int64)
+  destroy_addr %value : $*Indirect<SomeSubclass>
+  cond_br %flag2, yes, no
+
+yes:
+  end_apply %token
+  br cont
+
+no:
+  abort_apply %token
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_simple_call_yield_owned : $@convention(thin) (Builtin.Int1, @owned SomeClass) -> () {
+// CHECK:      bb0(%0 : @trivial $Builtin.Int1, %1 : @owned $SomeClass):
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   %2 = function_ref @marker
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int32, 1000
+// CHECK-NEXT:   %4 = apply %2(%3)
+// CHECK-NEXT:   cond_br %0, bb3, bb5
+
+// CHECK:      bb1:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 2000
+// CHECK-NEXT:   apply %2([[T0]])
+// CHECK-NEXT:   destroy_value %1 : $SomeClass
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   br bb4
+
+// CHECK:      bb2:
+// CHECK-NEXT:   [[T1:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:   apply %2([[T1]])
+// CHECK-NEXT:   destroy_value %1 : $SomeClass
+// CHECK-NEXT:   br bb6
+
+// CHECK:      bb3:
+// CHECK-NEXT:   br bb1
+
+// CHECK:      bb4:
+// CHECK-NEXT:   br bb7
+
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb2
+
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb7
+
+// CHECK:      bb7:
+// CHECK-NEXT:   [[T0:%.*]] = tuple ()
+// CHECK-NEXT:   return [[T0]] : $()
+
+sil [transparent] @yield_owned : $@yield_once(@owned SomeClass) -> (@yields @owned SomeClass) {
+entry(%0 : @owned $SomeClass):
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
+  yield %0 : $SomeClass, resume resume, unwind unwind
+
+resume:
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  destroy_value %0: $SomeClass
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  destroy_value %0: $SomeClass
+  unwind
+}
+
+sil @test_simple_call_yield_owned : $(Builtin.Int1, @owned SomeClass) -> () {
+entry(%flag : @trivial $Builtin.Int1, %c: @owned $SomeClass):
+  %0 = function_ref @yield_owned : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
+  (%value, %token) = begin_apply %0(%c) : $@convention(thin) @yield_once(@owned SomeClass) -> (@yields @owned SomeClass)
+  cond_br %flag, yes, no
+
+yes:
+  end_apply %token
+  br cont
+
+no:
+  abort_apply %token
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @use : $@convention(thin) (@in Builtin.Int8) -> ()
+
+sil [transparent] @yield_inout : $@yield_once() -> (@yields @inout Builtin.Int8) {
+entry:
+  %addr = alloc_stack $Builtin.Int8
+  %8 = integer_literal $Builtin.Int8, 8
+  store %8 to [trivial] %addr : $*Builtin.Int8
+  yield %addr : $*Builtin.Int8, resume resume, unwind unwind
+
+resume:
+  %use = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+  apply %use(%addr) : $@convention(thin) (@in Builtin.Int8) -> ()
+  dealloc_stack %addr: $*Builtin.Int8
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %addr: $*Builtin.Int8
+  unwind
+}
+
+
+// CHECK-LABEL: sil @test_simple_call_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK:      bb0(%0 : @trivial $Builtin.Int1):
+// CHECK-NEXT:   %1 = alloc_stack $Builtin.Int8
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT:   store %2 to [trivial] %1 : $*Builtin.Int8
+// CHECK-NEXT:   cond_br %0, bb3, bb5
+
+// CHECK:      bb1:
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   apply [[USE]](%1) : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   br bb4
+
+// CHECK:      bb2:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
+// CHECK-NEXT:   br bb6
+
+// CHECK:      bb3:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int8, 8
+// CHECK-NEXT:   store [[T0]] to [trivial] %1 : $*Builtin.Int8
+// CHECK-NEXT:   br bb1
+
+// CHECK:      bb4:
+// CHECK-NEXT:   br bb7
+
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb2
+
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb7
+
+// CHECK:      bb7:
+// CHECK-NEXT:   [[T0:%.*]] = tuple ()
+// CHECK-NEXT:   return [[T0]] : $()
+// CHECK:      }
+
+sil @test_simple_call_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : @trivial $Builtin.Int1):
+  %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  cond_br %flag, yes, no
+
+yes:
+  %8 = integer_literal $Builtin.Int8, 8
+  store %8 to [trivial] %addr : $*Builtin.Int8
+  end_apply %token
+  br cont
+
+no:
+  abort_apply %token
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//   We can't inline yet if there are multiple ends.
+// CHECK-LABEL: sil @test_multi_end_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK:       [[T0:%.*]] = function_ref @yield_inout
+// CHECK:       begin_apply [[T0]]
+sil @test_multi_end_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : @trivial $Builtin.Int1):
+  %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  cond_br %flag, yes, no
+
+yes:
+  end_apply %token
+  br cont
+
+no:
+  end_apply %token
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//   We can't inline yet if there are multiple aborts.
+// CHECK-LABEL: sil @test_multi_abort_yield_inout : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK:       [[T0:%.*]] = function_ref @yield_inout
+// CHECK:       begin_apply [[T0]]
+sil @test_multi_abort_yield_inout : $(Builtin.Int1) -> () {
+entry(%flag : @trivial $Builtin.Int1):
+  %0 = function_ref @yield_inout : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once() -> (@yields @inout Builtin.Int8)
+  cond_br %flag, yes, no
+
+yes:
+  abort_apply %token
+  br cont
+
+no:
+  abort_apply %token
+  br cont
+
+cont:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [transparent] @no_yields : $@yield_once () -> (@yields @inout Builtin.Int8) {
+entry:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil @test_simple_call_no_yields : $@convention(thin) () -> () {
+// CHECK:      bb0:
+// CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
+// CHECK-NEXT:   unreachable
+// CHECK:      bb1:
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[USE:%.*]] = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   apply [[USE]](undef) : $@convention(thin) (@in Builtin.Int8) -> ()
+// CHECK-NEXT:   unreachable
+// CHECK:      bb2:
+// CHECK-NEXT:   [[T0:%.*]] = tuple ()
+// CHECK-NEXT:   return [[T0]] : $()
+// CHECK:      }
+sil @test_simple_call_no_yields : $() -> () {
+entry:
+  %0 = function_ref @no_yields : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int8)
+  (%addr, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int8)
+  %use = function_ref @use : $@convention(thin) (@in Builtin.Int8) -> ()
+  apply %use(%addr) : $@convention(thin) (@in Builtin.Int8) -> ()
+  end_apply %token
+  %ret = tuple ()
+  return %ret : $()
+}

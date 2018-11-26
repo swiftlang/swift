@@ -657,6 +657,11 @@ static llvm::cl::opt<bool>
     DisableObjCInterop("disable-objc-interop",
                        llvm::cl::desc("Disable ObjC interop."),
                        llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+GraphVisPath("output-request-graphviz",
+             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
+             llvm::cl::cat(Category));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -761,7 +766,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
     BufferText = BufferText.drop_back(1);
 
   CompilerInvocation Invocation(InitInvok);
-  Invocation.setInputKind(InputFileKind::IFK_Swift_REPL);
+  Invocation.setInputKind(InputFileKind::SwiftREPL);
 
   CompilerInstance CI;
 
@@ -984,6 +989,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
+
   ide::SyntaxModelContext ColorContext(*SF);
   PrintSyntaxColorWalker ColorWalker(CI.getSourceMgr(), BufID, llvm::outs(),
                                      TerminalOutput);
@@ -1469,7 +1475,8 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBufOrErr.get())).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBufOrErr.get()),
+                            SourceFileKind::REPL).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -1490,11 +1497,18 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
     AccessPath.push_back(
         { Context.getIdentifier(SubModuleName), SourceLoc() });
   }
-  return Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModule(AccessPath);
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+  ModuleDecl *Result = Context.getModule(std::make_pair(ModuleName,
+                                                        SourceLoc()));
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static int doPrintAST(const CompilerInvocation &InitInvok,
@@ -1614,6 +1628,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::OtherNominalType:
+      case NodeKind::TypeAlias:
         break;
 
       case NodeKind::BoundGenericStructure:
@@ -1847,6 +1862,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     // Get the (sub)module to print.
     auto *M = getModuleByFullName(Context, ModuleToPrint);
     if (!M) {
+      llvm::errs() << "error: could not find module '" << ModuleToPrint
+                   << "'\n";
       ExitCode = 1;
       continue;
     }
@@ -1866,6 +1883,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     if (ModuleName.size() > 1) {
       M = getModuleByFullName(Context, ModuleName[0]);
       if (!M) {
+        llvm::errs() << "error: could not find module '" << ModuleName[0]
+                     << "'\n";
         ExitCode = 1;
         continue;
       }
@@ -2130,11 +2149,6 @@ public:
   ASTCommentPrinter(SourceManager &SM, XMLValidator &TheXMLValidator)
       : OS(llvm::outs()), SM(SM), TheXMLValidator(TheXMLValidator) {}
 
-  StringRef getBufferIdentifier(SourceLoc Loc) {
-    unsigned BufferID = SM.findBufferContainingLoc(Loc);
-    return SM.getIdentifierForBuffer(BufferID);
-  }
-
   void printWithEscaping(StringRef Str) {
     for (char C : Str) {
       switch (C) {
@@ -2162,26 +2176,29 @@ public:
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
       auto *storage = accessor->getStorage();
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         OS << "<getter for ";
         break;
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         OS << "<setter for ";
         break;
-      case AccessorKind::IsWillSet:
+      case AccessorKind::WillSet:
         OS << "<willSet for ";
         break;
-      case AccessorKind::IsDidSet:
+      case AccessorKind::DidSet:
         OS << "<didSet for ";
         break;
-      case AccessorKind::IsAddressor:
+      case AccessorKind::Address:
         OS << "<addressor for ";
         break;
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
         break;
-      case AccessorKind::IsMaterializeForSet:
-        OS << "<materializeForSet for ";
+      case AccessorKind::Read:
+        OS << "<read accessor for ";
+        break;
+      case AccessorKind::Modify:
+        OS << "<modify accessor for ";
         break;
       }
       printDeclName(storage);
@@ -2270,7 +2287,7 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << getBufferIdentifier(VD->getLoc())
+        OS << SM.getDisplayNameForLoc(VD->getLoc())
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
@@ -2287,7 +2304,7 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << getBufferIdentifier(D->getLoc())
+        OS << SM.getDisplayNameForLoc(D->getLoc())
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
       OS << Decl::getKindName(D->getKind()) << "/";
@@ -2416,17 +2433,10 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    auto isClangModule = [](const ModuleDecl *M) -> bool {
-      if (!M->getFiles().empty())
-        if (M->getFiles().front()->getKind() == FileUnitKind::ClangModule)
-          return true;
-      return false;
-    };
-
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
       llvm::outs() << next.second->getName();
-      if (isClangModule(next.second))
+      if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
@@ -2438,7 +2448,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << "." << accessPathPiece.first;
         }
 
-        if (isClangModule(import.second))
+        if (import.second->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
@@ -2622,10 +2632,11 @@ private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
     std::string mangledName(Mangler.mangleTypeForDebugger(
-        T, DC, DC->getGenericEnvironmentOfContext()));
+                              T->mapTypeOutOfContext(), DC,
+        DC->getGenericEnvironmentOfContext()));
     std::string Error;
-    Type ReconstructedType =
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Type ReconstructedType = DC->mapTypeIntoContext(
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);
@@ -2893,10 +2904,13 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::unique_ptr<CompilerInvocation> CI =
-    driver::createCompilerInvocation(Args, Diags);
+  CompilerInvocation CI;
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return CI.parseArgs(FrontendArgs, Diags);
+  });
 
-  if (!CI) {
+  if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
     return 1;
   }
@@ -3018,7 +3032,7 @@ int main(int argc, char *argv[]) {
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
   if (!options::InputFilenames.empty())
-    InitInvok.setInputKind(InputFileKind::IFK_Swift_Library);
+    InitInvok.setInputKind(InputFileKind::SwiftLibrary);
 
   InitInvok.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
@@ -3028,6 +3042,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
+  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
+    options::GraphVisPath;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {
@@ -3077,8 +3093,7 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference ||
-    InitInvok.getLangOptions().isSwiftVersion3();
+    options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

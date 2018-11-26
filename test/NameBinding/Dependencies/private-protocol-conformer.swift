@@ -6,8 +6,8 @@
 
 private struct Test : InterestingProto {}
 
-// CHECK-OLD: sil_global @$S4main1x{{[^ ]+}} : $Int
-// CHECK-NEW: sil_global @$S4main1x{{[^ ]+}} : $Double
+// CHECK-OLD: sil_global @$s4main1x{{[^ ]+}} : $Int
+// CHECK-NEW: sil_global @$s4main1x{{[^ ]+}} : $Double
 public var x = Test().make() + 0
 
 // CHECK-DEPS-LABEL: depends-top-level:

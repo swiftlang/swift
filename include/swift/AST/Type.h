@@ -88,19 +88,11 @@ struct QueryTypeSubstitutionMapOrIdentity {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c SubstitutionMap.
-struct QuerySubstitutionMap {
-  const SubstitutionMap &subMap;
-
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
-  Type conformingReplacementType,
-  ProtocolType *conformedProtocol)
-  ->Optional<ProtocolConformanceRef>;
+                             Type conformingReplacementType,
+                             ProtocolDecl *conformedProtocol)
+  -> Optional<ProtocolConformanceRef>;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -114,21 +106,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn to look up a
-/// conformance in a \c SubstitutionMap.
-class LookUpConformanceInSubstitutionMap {
-  const SubstitutionMap &Subs;
-public:
-  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
-    : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -139,7 +117,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
@@ -153,7 +131,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.
@@ -314,7 +292,7 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(const SubstitutionMap &substitutions,
+  Type subst(SubstitutionMap substitutions,
              SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and
@@ -398,7 +376,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getOptionalObjectTypeImpl(CanType type, bool &isOptional);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -417,6 +395,12 @@ public:
         fn(CanType(t));
         return false;
       });
+  }
+
+  bool findIf(llvm::function_ref<bool (CanType)> fn) const {
+    return Type::findIf([&fn](Type t) {
+      return fn(CanType(t));
+    });
   }
 
   // Provide a few optimized accessors that are really type-class queries.
@@ -466,12 +450,7 @@ public:
   GenericTypeDecl *getAnyGeneric() const;
 
   CanType getOptionalObjectType() const {
-    bool isOptional;
-    return getOptionalObjectTypeImpl(*this, isOptional);
-  }
-
-  CanType getOptionalObjectType(bool &isOptional) const {
-    return getOptionalObjectTypeImpl(*this, isOptional);
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {
@@ -612,6 +591,10 @@ public:
   
   GenericSignature *getPointer() const {
     return Signature;
+  }
+
+  bool operator==(const swift::CanGenericSignature& other) {
+    return Signature == other.Signature;
   }
 };
 

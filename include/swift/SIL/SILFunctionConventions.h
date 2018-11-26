@@ -9,20 +9,22 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the SILModuleConventions and SILFunctionConventions
-// classes.  These interfaces are used to determine when SIL can represent
-// values of a given lowered type by value and when they must be represented by
-// address. This is influenced by a SILModule-wide "lowered address" convention,
-// which reflects whether the current SIL stage requires lowered addresses.
-//
-// The primary purpose of this API is mapping the formal SIL parameter and
-// result conventions onto the SIL argument types. The "formal" conventions are
-// immutably associated with a SILFunctionType--a SIL function's type
-// information never changes. The SIL conventions determine how those formal
-// conventions will be represented in the body of SIL functions and at call
-// sites.
-//
+///
+/// \file
+///
+/// This file defines the SILModuleConventions and SILFunctionConventions
+/// classes.  These interfaces are used to determine when SIL can represent
+/// values of a given lowered type by value and when they must be represented by
+/// address. This is influenced by a SILModule-wide "lowered address" convention,
+/// which reflects whether the current SIL stage requires lowered addresses.
+///
+/// The primary purpose of this API is mapping the formal SIL parameter and
+/// result conventions onto the SIL argument types. The "formal" conventions are
+/// immutably associated with a SILFunctionType--a SIL function's type
+/// information never changes. The SIL conventions determine how those formal
+/// conventions will be represented in the body of SIL functions and at call
+/// sites.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_FUNCTIONCONVENTIONS_H
@@ -325,7 +327,7 @@ public:
   //
   // The argument indices below relate to full applies in which the caller and
   // callee indices match. Partial apply indices are shifted on the caller
-  // side. See ApplySite::getCallArgIndexOfFirstAppliedArg().
+  // side. See ApplySite::getCalleeArgIndexOfFirstAppliedArg().
   //===--------------------------------------------------------------------===//
 
   unsigned getSILArgIndexOfFirstIndirectResult() const { return 0; }

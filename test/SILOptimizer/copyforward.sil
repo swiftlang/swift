@@ -776,3 +776,142 @@ bb0(%0 : $*T, %1 : $*T):
   %r1 = tuple ()
   return %r1 : $()
 }
+
+// Suppress NRVO when a guaranteed argument is stored into a local without
+// making a copy first. By eliminating the copy into the outgoing argument, NRVO
+// would be propagating an unowned (+0) local value into an owned (+1) result.
+// CHECK-LABEL: sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
+// CHECK: bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+// CHECK: [[LOCAL:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: copy_addr [[LOCAL]] to [initialization] %0 : $*Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'foo'
+sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = alloc_stack $Builtin.NativeObject
+  store %1 to %2 : $*Builtin.NativeObject
+  copy_addr %2 to [initialization] %0 : $*Builtin.NativeObject
+  dealloc_stack %2 : $*Builtin.NativeObject
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @testKnownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> @out AClass {
+// CHECK: [[ALLOC:%.*]] = alloc_stack $AClass
+// CHECK: copy_addr [[ALLOC]] to %0 : $*AClass
+// CHECK: strong_retain %1 : $AClass
+// CHECK: destroy_addr [[ALLOC]] : $*AClass
+// CHECK-LABEL: } // end sil function 'testKnownStoredValueUser'
+sil @testKnownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> (@out AClass) {
+bb0(%0 : $*AClass, %1 : $AClass):
+  %2 = alloc_stack $AClass
+  store %1 to %2 : $*AClass
+  copy_addr %2 to %0 : $*AClass
+  strong_retain %1 : $AClass
+  destroy_addr %2 : $*AClass
+  dealloc_stack %2 : $*AClass
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// CHECK-LABEL: sil @testExtractedStoredValueUser1 : $@convention(thin) (@guaranteed ObjWrapper) -> @out AnyObject {
+// CHECK: bb0(%0 : $*AnyObject, %1 : $ObjWrapper):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[EXTRACT:%.*]] = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
+// CHECK:   store [[EXTRACT]] to [[ALLOC]] : $*AnyObject
+// CHECK:   copy_addr [[ALLOC]] to %0 : $*AnyObject
+// CHECK:   strong_retain [[EXTRACT]] : $AnyObject
+// CHECK:   destroy_addr [[ALLOC]] : $*AnyObject
+// CHECK-LABEL: } // end sil function 'testExtractedStoredValueUser1'
+sil @testExtractedStoredValueUser1 : $@convention(thin) (@guaranteed ObjWrapper) -> (@out AnyObject) {
+bb0(%0 : $*AnyObject, %1 : $ObjWrapper):
+  %2 = alloc_stack $AnyObject
+  %3 = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
+  store %3 to %2 : $*AnyObject
+  copy_addr %2 to %0 : $*AnyObject
+  strong_retain %3 : $AnyObject
+  destroy_addr %2 : $*AnyObject
+  dealloc_stack %2 : $*AnyObject
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// CHECK-LABEL: sil @testExtractedStoredValueUser2 : $@convention(thin) (@guaranteed ObjWrapper) -> @out AnyObject {
+// CHECK: bb0(%0 : $*AnyObject, %1 : $ObjWrapper):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[EXTRACT:%.*]] = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
+// CHECK:   store [[EXTRACT]] to [[ALLOC]] : $*AnyObject
+// CHECK:   copy_addr [[ALLOC]] to %0 : $*AnyObject
+// CHECK:   retain_value %1 : $ObjWrapper
+// CHECK:   destroy_addr [[ALLOC]] : $*AnyObject
+// CHECK-LABEL: } // end sil function 'testExtractedStoredValueUser2'
+sil @testExtractedStoredValueUser2 : $@convention(thin) (@guaranteed ObjWrapper) -> (@out AnyObject) {
+bb0(%0 : $*AnyObject, %1 : $ObjWrapper):
+  %2 = alloc_stack $AnyObject
+  %3 = struct_extract %1 : $ObjWrapper, #ObjWrapper.obj
+  store %3 to %2 : $*AnyObject
+  copy_addr %2 to %0 : $*AnyObject
+  retain_value %1 : $ObjWrapper
+  destroy_addr %2 : $*AnyObject
+  dealloc_stack %2 : $*AnyObject
+  %999 = tuple ()
+  return %999 : $()
+}
+
+struct AClassWrapper {
+  var a: AClass
+  var b: AClass
+}
+
+// CHECK-LABEL: sil @testUnknownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> @out AClass {
+// CHECK: bb0(%0 : $*AClass, %1 : $AClass):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $AClass
+// CHECK:   store %1 to %2 : $*AClass
+// CHECK:   [[STRUCT:%.*]] = struct $AClassWrapper (%1 : $AClass, %1 : $AClass)
+// CHECK:   copy_addr [[ALLOC]] to %0 : $*AClass
+// CHECK:   retain_value [[STRUCT]] : $AClassWrapper
+// CHECK:   destroy_addr [[ALLOC]] : $*AClass
+// CHECK-LABEL: } // end sil function 'testUnknownStoredValueUser'
+sil @testUnknownStoredValueUser : $@convention(thin) (@guaranteed AClass) -> (@out AClass) {
+bb0(%0 : $*AClass, %1 : $AClass):
+  %2 = alloc_stack $AClass
+  store %1 to %2 : $*AClass
+  %3 = struct $AClassWrapper (%1 : $AClass, %1 : $AClass)
+  copy_addr %2 to %0 : $*AClass
+  retain_value %3 : $AClassWrapper
+  destroy_addr %2 : $*AClass
+  dealloc_stack %2 : $*AClass
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// <rdar://problem/43888666> [SR-8526]: Memory leak after switch in release configuration
+// CHECK-LABEL: sil @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
+// CHECK: bb0(%0 : $AClass, %1 : $*AClass):
+// CHECK-NEXT:   [[LOCAL:%.*]] = alloc_stack $AClass
+// CHECK-NEXT:   store %0 to [[LOCAL]] : $*AClass
+// CHECK-NEXT:   copy_addr [[LOCAL]] to %1 : $*AClass
+// CHECK-NEXT:   retain_value %0 : $AClass
+// CHECK-NEXT:   store %0 to %1 : $*AClass
+// CHECK-NEXT:   destroy_addr [[LOCAL]] : $*AClass
+// CHECK-NEXT:   br bb1
+// CHECK: bb1:
+// CHECK-NEXT:   dealloc_stack [[LOCAL]] : $*AClass
+// CHECK-NEXT:   release_value %0 : $AClass
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function 'testGlobalHoistToStoredValue'
+sil @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
+bb0(%obj : $AClass, %ptr : $*AClass ):
+  %local = alloc_stack $AClass
+  store %obj to %local : $*AClass
+  copy_addr %local to %ptr : $*AClass
+  retain_value %obj : $AClass
+  store %obj to %ptr : $*AClass
+  br bb1
+bb1:
+  destroy_addr %local : $*AClass
+  dealloc_stack %local : $*AClass
+  release_value %obj : $AClass
+  %v = tuple ()
+  return %v : $()
+}

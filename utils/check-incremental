@@ -74,6 +74,11 @@ def main():
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
 
+    # As a workaround for rdar://problem/43442957 and rdar://problem/43439465
+    # we have to "warm-up" the clang module cache. Without that in some cases
+    # we end up with small differences in the debug info.
+    compile_and_stat(new_args, output_file)
+
     reference_md5, reference_time = compile_and_stat(new_args, output_file)
 
     subprocess.check_call(["cp", output_file, output_file + ".ref.o"])

@@ -20,6 +20,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "../../../stdlib/public/SwiftShims/Target.h"
 
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
@@ -78,16 +79,19 @@ class WeakReferenceBits {
 #if !SWIFT_OBJC_INTEROP
     NativeMarkerMask  = 0,
     NativeMarkerValue = 0
-#elif __x86_64__
+#elif defined(__x86_64__) && SWIFT_TARGET_OS_SIMULATOR
+    NativeMarkerMask  = SWIFT_ABI_X86_64_SIMULATOR_OBJC_WEAK_REFERENCE_MARKER_MASK,
+    NativeMarkerValue = SWIFT_ABI_X86_64_SIMULATOR_OBJC_WEAK_REFERENCE_MARKER_VALUE
+#elif defined(__x86_64__)
     NativeMarkerMask  = SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_MASK,
     NativeMarkerValue = SWIFT_ABI_X86_64_OBJC_WEAK_REFERENCE_MARKER_VALUE
-#elif __i386__
+#elif defined(__i386__)
     NativeMarkerMask  = SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_MASK,
     NativeMarkerValue = SWIFT_ABI_I386_OBJC_WEAK_REFERENCE_MARKER_VALUE
-#elif __arm__
+#elif defined(__arm__) || defined(_M_ARM)
     NativeMarkerMask  = SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_MASK,
     NativeMarkerValue = SWIFT_ABI_ARM_OBJC_WEAK_REFERENCE_MARKER_VALUE
-#elif __arm64__
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
     NativeMarkerMask  = SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_MASK,
     NativeMarkerValue = SWIFT_ABI_ARM64_OBJC_WEAK_REFERENCE_MARKER_VALUE
 #else

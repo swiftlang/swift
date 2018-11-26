@@ -335,8 +335,7 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 94,
-    key.length: 6,
-    key.is_system: 1
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.ref.struct,

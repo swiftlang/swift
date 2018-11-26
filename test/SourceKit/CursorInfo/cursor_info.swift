@@ -220,6 +220,13 @@ func funcWithNestedEscaping(a : (@escaping () -> ()) -> ()) {}
 /// doc
 typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 
+typealias GenericAlias<T, U> = MyAlias<T, U> where T: P1
+
+enum E7: String {
+    case a = "\u{001B}"
+    case b = "\u{66}"
+}
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -235,7 +242,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // XCHECK2-NEXT: +
 // XCHECK2-NEXT: s:s1poiyS2i_SitF
 // XCHECK2-NEXT: (Int, Int) -> Int{{$}}
-// XCHECK2-NEXT: $SS2i_SitcD
+// XCHECK2-NEXT: $sS2i_SitcD
 // XCHECK2-NEXT: Swift{{$}}
 // XCHECK2-NEXT: <Group>Math/Integers</Group>
 // XCHECK2-NEXT: SYSTEM
@@ -247,7 +254,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:11cursor_info3gooyySiF1xL_Sivp{{$}}
 // CHECK3-NEXT: Int{{$}}
-// CHECK3-NEXT: $SSiD
+// CHECK3-NEXT: $sSiD
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK3-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
@@ -256,7 +263,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK4-NEXT: fooIntVar{{$}}
 // CHECK4-NEXT: c:@fooIntVar{{$}}
 // CHECK4-NEXT: Int32{{$}}
-// CHECK4-NEXT: $Ss5Int32VD
+// CHECK4-NEXT: $ss5Int32VD
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
@@ -273,7 +280,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:14FooSwiftModule03fooB4FuncSiyF
 // CHECK6-NEXT: () -> Int
-// CHECK6-NEXT: $SSiycD
+// CHECK6-NEXT: $sSiycD
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
@@ -284,7 +291,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK7-NEXT: S1
 // CHECK7-NEXT: s:11cursor_info2S1V
 // CHECK7-NEXT: S1.Type
-// CHECK7-NEXT: $S
+// CHECK7-NEXT: $s
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><CommentParts><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></CommentParts></Class>
@@ -294,8 +301,8 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:11cursor_info2CCC1xACSi_tcfc
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
-// CHECK8-NEXT: $S1x11cursor_info2CCCSi_tcD
-// CHECK8-NEXT: <Container>$S11cursor_info2CCCD</Container>
+// CHECK8-NEXT: $s1x11cursor_info2CCCSi_tcD
+// CHECK8-NEXT: <Container>$s11cursor_info2CCCD</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -321,8 +328,8 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)
-// CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
-// CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>arg1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = <syntaxtype.keyword>default</syntaxtype.keyword></decl.var.parameter>)</decl.function.free>
+// CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = 0)</Declaration>
+// CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>arg1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = 0</decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
 // CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
@@ -400,7 +407,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:11cursor_info2C3Cfd
 // CHECK29-NEXT: (C3) -> ()
-// CHECK29-NEXT: $SyycD
+// CHECK29-NEXT: $syycD
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -409,7 +416,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:11cursor_info2C3C1xACSgSi_tcfc
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3?
-// CHECK30-NEXT: $S1x11cursor_info2C3CSgSi_tcD
+// CHECK30-NEXT: $s1x11cursor_info2C3CSgSi_tcD
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -418,7 +425,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:11cursor_info2C3C1yACSgSi_tcfc
 // CHECK31-NEXT: (C3.Type) -> (Int) -> C3?
-// CHECK31-NEXT: $S1y11cursor_info2C3CSgSi_tcD
+// CHECK31-NEXT: $s1y11cursor_info2C3CSgSi_tcD
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -427,7 +434,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:11cursor_info2C3C1zACSi_tKcfc
 // CHECK32-NEXT: (C3.Type) -> (Int) throws -> C3
-// CHECK32-NEXT: $S1z11cursor_info2C3CSi_tKcD
+// CHECK32-NEXT: $s1z11cursor_info2C3CSi_tKcD
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -488,7 +495,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi_SStcACmF
 // CHECK40-NEXT: (E2.Type) -> (Int, String) -> E2
 // CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.enumelement>
+// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=92:31 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK41
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
@@ -496,8 +503,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK41-NEXT: s:11cursor_info2E2O2C3yACSicACmF
 // CHECK41-NEXT: (E2.Type) -> (Int) -> E2
 // CHECK41: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
-// FIXME: Wrap parameters in <decl.var.parameter>
+// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<decl.var.parameter><decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=96:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK42
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
@@ -517,13 +523,13 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK44: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK44-NEXT: C2
 // CHECK44: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref
+// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref
 
 // RUN: %sourcekitd-test -req=cursor -pos=102:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK45
 // CHECK45: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK45-NEXT: C2
 // CHECK45: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x
+// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x
 
 // RUN: %sourcekitd-test -req=cursor -pos=103:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK46
 // CHECK46: source.lang.swift.ref.enumelement (96:8-96:9)
@@ -646,13 +652,11 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK73-SAME: = <syntaxtype.keyword>#file</syntaxtype.keyword>
 // CHECK73-SAME: = <syntaxtype.keyword>#line</syntaxtype.keyword>
 // CHECK73-SAME: = <syntaxtype.keyword>#column</syntaxtype.keyword>
-// FIXME: []
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// FIXME: [:]
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// FIXME: keyword nil
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// CHECK73-SAME: = []
+// CHECK73-SAME: = [:]
+// FIXME: should be <syntaxtype.keyword>nil</syntaxtype.keyword>
+// CHECK73-SAME: = nil
+// CHECK73-SAME: = 1
 
 // RUN: %sourcekitd-test -req=cursor -pos=162:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK74
 // CHECK74: source.lang.swift.decl.function.method.instance (162:8-162:20)
@@ -723,7 +727,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK87-NEXT: HasLocalizationKey
 // CHECK87-NEXT: s:11cursor_info18HasLocalizationKeyV
 // CHECK87-NEXT: HasLocalizationKey.Type
-// CHECK87-NEXT: $S
+// CHECK87-NEXT: $s
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="212" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
@@ -734,7 +738,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK88-NEXT: hasLocalizationKey2
 // CHECK88-NEXT: s:11cursor_info19hasLocalizationKey2yyF
 // CHECK88-NEXT: () -> ()
-// CHECK88-NEXT: $S
+// CHECK88-NEXT: $s
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function
@@ -747,3 +751,15 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // RUN: %sourcekitd-test -req=cursor -pos=221:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK90 %s
 // CHECK90: <Declaration>typealias typeWithNestedAutoclosure = (@autoclosure () -&gt; ()) -&gt; ()</Declaration>
 // CHECK90-NEXT: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
+
+// RUN: %sourcekitd-test -req=cursor -pos=223:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK91 %s
+// CHECK91: <Declaration>typealias GenericAlias&lt;T, U&gt; = <Type usr="s:11cursor_info7MyAliasa">MyAlias</Type>&lt;<Type usr="s:11cursor_info12GenericAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</Type>&gt; where T : <Type usr="s:11cursor_info2P1P">P1</Type></Declaration>
+// CHECK91-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>GenericAlias</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <ref.typealias usr="s:11cursor_info7MyAliasa">MyAlias</ref.typealias>&lt;<ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp">T</ref.generic_type_param>, <ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</ref.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T : <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.generic_type_requirement></decl.typealias>
+
+// RUN: %sourcekitd-test -req=cursor -pos=226:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK92 %s
+// CHECK92: <Declaration>case a = &quot;\u{1B}&quot;</Declaration>
+// CHECK92-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>a</decl.name> = <syntaxtype.string>&quot;\u{1B}&quot;</syntaxtype.string></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=227:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK93 %s
+// CHECK93: <Declaration>case b = &quot;f&quot;</Declaration>
+// CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>
