@@ -47,11 +47,11 @@ class Outer3
 }
 
 // CHECK: ===CYCLE DETECTED===
-// CHECK-NEXT: `--{{.*}}SuperclassTypeRequest({{.*Left}}
-// CHECK:      `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Left@
-// CHECK:          `--{{.*}}SuperclassTypeRequest
-// CHECK:              `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Right@
-// CHECK:                  `--{{.*}}SuperclassTypeRequest{{.*(cyclic dependency)}}
+// CHECK-NEXT: `--{{.*}}SuperclassDeclRequest({{.*Left}}
+// CHECK:      `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
+// CHECK:          `--{{.*}}SuperclassDeclRequest
+// CHECK:              `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
+// CHECK:                  `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
 // CHECK-DOT: label="InheritedTypeRequest

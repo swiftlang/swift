@@ -379,7 +379,7 @@ private:
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
-  DeclIDVector EagerDeserializationDecls;
+  DeclIDVector OrderedTopLevelDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =

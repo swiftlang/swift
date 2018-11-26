@@ -60,6 +60,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -630,7 +631,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   // We make this function bare so we don't have to worry about decls in the
   // SILArgument.
-  auto *Fn = M.createFunction(
+  SILFunctionBuilder builder(M);
+  auto *Fn = builder.createFunction(
       // It's important to use a shared linkage for the specialized function
       // and not the original linkage.
       // Otherwise the new function could have an external linkage (in case the

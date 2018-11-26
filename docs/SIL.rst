@@ -28,6 +28,9 @@ In contrast to LLVM IR, SIL is a generally target-independent format
 representation that can be used for code distribution, but it can also express
 target-specific concepts as well as LLVM can.
 
+For more information on developing the implementation of SIL and SIL passes, see
+SILProgrammersManual.md.
+
 SIL in the Swift Compiler
 -------------------------
 

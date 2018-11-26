@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/Inputs/abi %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 sil_stage canonical
 import c_layout
@@ -15,8 +15,7 @@ import c_layout
 // CHECK-SAME: [[AMAZING_COLOR_NAME]]
 // CHECK-SAME: @"$SSo12AmazingColorVMa"
 
-// CHECK-LABEL: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden global
-// CHECK-SAME:  [[INT:i[0-9]+]] 0,
+// CHECK-LABEL: @"$SSo14HasNestedUnionV18__Unnamed_struct_sVN" = linkonce_odr hidden constant
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVWV"
 // CHECK-SAME:  [[INT]] 1,
 // CHECK-SAME:  @"$SSo14HasNestedUnionV18__Unnamed_struct_sVMn"
@@ -38,7 +37,7 @@ bb0:
 }
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo14HasNestedUnionVMa"(
-// CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}$SSo14HasNestedUnionVN
+// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}$SSo14HasNestedUnionVN
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12AmazingColorVMa"(
-// CHECK: call %swift.type* @swift_getForeignTypeMetadata{{.*}}@"$SSo12AmazingColorVN"
+// CHECK: call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}}@"$SSo12AmazingColorVN"

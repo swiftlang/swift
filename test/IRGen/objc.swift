@@ -23,7 +23,7 @@ import gizmo
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
 // CHECK: @"$SSo4RectVMn" = linkonce_odr hidden constant
-// CHECK: @"$SSo4RectVN" = linkonce_odr hidden global
+// CHECK: @"$SSo4RectVN" = linkonce_odr hidden constant
 
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
@@ -130,7 +130,7 @@ func test10(_ g: Gizmo, r: Rect) {
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
 // CHECK-LABEL: define hidden swiftcc void @"$S4objc6test11yySo4RectVF"
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @"$SSo4RectVN"
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$SSo4RectVN"
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {

@@ -177,7 +177,7 @@ static SwiftObject *_allocHelper(Class cls) {
     class_getInstanceSize(cls), mask));
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NSString *swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 

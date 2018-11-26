@@ -241,11 +241,7 @@ void verifyKeyPathComponent(SILModule &M,
               "component for subscript should have indices");
     }
     
-    ParameterConvention normalArgConvention;
-    if (M.getOptions().EnableGuaranteedNormalArguments)
-      normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
-    else
-      normalArgConvention = ParameterConvention::Indirect_In;
+    auto normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
   
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
@@ -2259,7 +2255,7 @@ public:
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
     while (class1 != class2) {
-      class1 = class1->getSuperclass()->getClassOrBoundGenericClass();
+      class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
     }
   }
@@ -3687,8 +3683,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     eDecl->getAllElements(unswitchedElts);
 
@@ -3711,7 +3705,10 @@ public:
     }
 
     // If the select is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || I->hasDefault(),
+    bool isExhaustive =
+        eDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
       requireSameType(I->getDefaultResult()->getType(),
@@ -3879,7 +3876,10 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || SOI->hasDefault(),
+    bool isExhaustive =
+        uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
     if (SOI->hasDefault()) {
       // When SIL ownership is enabled, we require all default branches to take
@@ -4787,8 +4787,7 @@ void SILProperty::verify(const SILModule &M) const {
   auto sig = dc->getGenericSignatureOfContext();
   auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
                   ->getCanonicalType(sig);
-  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
-                    ->getCanonicalType(sig);
+  auto leafTy = decl->getValueInterfaceType()->getCanonicalType(sig);
   SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
@@ -4859,10 +4858,7 @@ void SILVTable::verify(const SILModule &M) const {
     do {
       if (c == theClass)
         break;
-      if (auto ty = c->getSuperclass())
-        c = ty->getClassOrBoundGenericClass();
-      else
-        c = nullptr;
+      c = c->getSuperclassDecl();
     } while (c);
     assert(c && "vtable entry must refer to a member of the vtable's class");
 

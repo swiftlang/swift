@@ -1920,7 +1920,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {
   while (theClass->hasSuperclass()) {
-    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
+    theClass = theClass->getSuperclassDecl();
     assert(theClass && "base type of class not a class?");
   }
   return theClass;

@@ -47,7 +47,9 @@ public let DropLast = [
   BenchmarkInfo(
     name: "DropLast${Name}",
     runFunction: run_DropLast${Name},
-    tags: [.validation, .api${', .Array, .unstable' if Name == 'Array' or Name == 'ArrayLazy' else ''}]),
+    tags: [.validation, .api${
+      ', .Array, .unstable' if Name == 'Array' or Name == 'ArrayLazy' else
+        ', .unstable' if 'CountableRange' in Name else ''}]),
 % end
 ]
 

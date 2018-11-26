@@ -13,3 +13,7 @@ public struct External<A> {
 public struct ExternalEmptySubscript {
   public subscript() -> Int { return 0 }
 }
+
+public protocol ExternalProto {
+  var protoReqt: Int { get set }
+}

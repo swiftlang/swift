@@ -142,9 +142,9 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(ModuleType::get(mod), C.getIdentifier(typeName),
+      mod->lookupQualified(mod, C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                           /*typeResolver=*/nullptr, decls);
+                           decls);
       if (decls.size() != 1)
         return CanType();
 
@@ -1306,9 +1306,7 @@ getSILFunctionTypeForAbstractCFunction(SILModule &M,
 /// If EnableGuaranteedNormalArguments is set, return a default convention that
 /// uses guaranteed.
 static DefaultConventions getNormalArgumentConvention(SILModule &M) {
-  if (M.getOptions().EnableGuaranteedNormalArguments)
-    return DefaultConventions(NormalParameterConvention::Guaranteed);
-  return DefaultConventions(NormalParameterConvention::Owned);
+  return DefaultConventions(NormalParameterConvention::Guaranteed);
 }
 
 static CanSILFunctionType getNativeSILFunctionType(

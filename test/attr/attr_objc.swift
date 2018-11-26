@@ -1715,7 +1715,7 @@ class HasNSManaged {
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
-  // expected-error@-3{{'dynamic' var 'badManaged' must also be '@objc'}}
+  // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
   // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
 }
 
@@ -1807,7 +1807,7 @@ class BadClass2 {
   @objc(realDealloc) // expected-error{{'@objc' deinitializer cannot have a name}}
   deinit { }
 
-  @objc(badprop:foo:wibble:) // expected-error{{'@objc' var must have a simple name}}{{16-28=}}
+  @objc(badprop:foo:wibble:) // expected-error{{'@objc' property must have a simple name}}{{16-28=}}
   var badprop: Int = 5
 
   @objc(foo) // expected-error{{'@objc' subscript cannot have a name; did you mean to put the name on the getter or setter?}}

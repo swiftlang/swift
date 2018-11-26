@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 class A1 {
   func foo1() {}
@@ -11,7 +11,7 @@ class A2 {
   var foo1 = 2
   func foo2() {
     // FIXME: "the var" doesn't sound right.
-    var foo1 = foo1 // expected-error {{variable used within its own initial value; use 'self.' to refer to the var}}{{16-16=self.}}
+    var foo1 = foo1 // expected-error {{variable used within its own initial value; use 'self.' to refer to the property}}{{16-16=self.}}
   }
 }
 

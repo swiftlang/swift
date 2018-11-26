@@ -20,13 +20,13 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend", runFunction: run_ObjectiveCBridgeStubDataAppend, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess", runFunction: run_ObjectiveCBridgeStubDateAccess, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubDateMutation", runFunction: run_ObjectiveCBridgeStubDateMutation, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString", runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate", runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString2", runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate", runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSString", runFunction: run_ObjectiveCBridgeStubFromNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToArrayOfNSString", runFunction: run_ObjectiveCBridgeStubToArrayOfNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate", runFunction: run_ObjectiveCBridgeStubToNSDate, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToArrayOfNSString2", runFunction: run_ObjectiveCBridgeStubToArrayOfNSString, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate2", runFunction: run_ObjectiveCBridgeStubToNSDate, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubToNSString", runFunction: run_ObjectiveCBridgeStubToNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath", runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath2", runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: [.validation, .bridging]),
 ]
 
 #if _runtime(_ObjC)
@@ -80,7 +80,7 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
    let b = BridgeTester()
    var arr : [String] = []
    var str = ""
-   for _ in 0 ..< 10_000 {
+   for _ in 0 ..< 1_000 {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
@@ -104,7 +104,7 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
    let b = BridgeTester()
    let str = "hello world"
    let arr = [str, str, str, str, str, str, str, str, str, str]
-   for _ in 0 ..< 10_000 {
+   for _ in 0 ..< 1_000 {
      b.test(fromArrayOf: arr)
    }
 }
@@ -150,7 +150,7 @@ public func run_ObjectiveCBridgeStubFromNSDate(N: Int) {
 public func testObjectiveCBridgeStubToNSDate() {
   let b = BridgeTester()
   let d = Date()
-  for _ in 0 ..< 100_000 {
+  for _ in 0 ..< 1_000 {
     b.use(d)
   }
 }
@@ -159,7 +159,7 @@ public func testObjectiveCBridgeStubToNSDate() {
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDate(N: Int) {
 #if _runtime(_ObjC)
-  for _ in 0 ..< N {
+  for _ in 0 ..< 10 * N {
     autoreleasepool {
       testObjectiveCBridgeStubToNSDate()
     }
@@ -214,7 +214,7 @@ public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPath() {
   let startUrl = URL(string: "/")!
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 100 {
     var url = startUrl
     for _ in 0 ..< 10 {
       url.appendPathComponent("foo")

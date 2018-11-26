@@ -350,7 +350,7 @@ enum : unsigned {
 };
 
 /// Kinds of type metadata/protocol conformance records.
-enum class TypeMetadataRecordKind : unsigned {
+enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   DirectNominalTypeDescriptor = 0x00,
@@ -359,9 +359,10 @@ enum class TypeMetadataRecordKind : unsigned {
   /// getNominalTypeDescriptor() points to the nominal type descriptor.
   IndirectNominalTypeDescriptor = 0x01,
 
-  /// Reserved for future use.
-  Reserved = 0x02,
-  
+  /// The conformance is for an Objective-C class that should be looked up
+  /// by class name.
+  DirectObjCClassName = 0x02,
+
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
   /// getIndirectObjCClass() points to a variable that contains the pointer to
@@ -370,6 +371,8 @@ enum class TypeMetadataRecordKind : unsigned {
   /// On platforms without Objective-C interoperability, this case is
   /// unused.
   IndirectObjCClass = 0x03,
+
+  // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectNominalTypeDescriptor,
   Last_Kind = IndirectObjCClass,
@@ -593,7 +596,7 @@ public:
     return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
   }
 
-  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+  ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
                             | (int_type(kind) << TypeMetadataKindShift));
   }
@@ -621,8 +624,8 @@ public:
   }
 
   /// Retrieve the type reference kind kind.
-  TypeMetadataRecordKind getTypeReferenceKind() const {
-    return TypeMetadataRecordKind(
+  TypeReferenceKind getTypeReferenceKind() const {
+    return TypeReferenceKind(
                       (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
   }
 
@@ -1237,16 +1240,16 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Only meaningful for class descriptors.
     Class_HasResilientSuperclass = 14,
 
-    /// The kind of reference that this class makes to its superclass
-    /// descriptor.  A TypeMetadataRecordKind.
-    ///
-    /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 12,
-    Class_SuperclassReferenceKind_width = 2,
-
     /// Whether the immediate class members in this metadata are allocated
     /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 11,
+    Class_AreImmediateMembersNegative = 13,
+
+    /// The kind of reference that this class makes to its superclass
+    /// descriptor.  A TypeReferenceKind.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_SuperclassReferenceKind = 10,
+    Class_SuperclassReferenceKind_width = 3,
   };
 
 public:
@@ -1265,6 +1268,10 @@ public:
     /// "in-place" code pattern.
     InPlaceMetadataInitialization = 1,
 
+    /// The type requires non-trivial singleton initialization using the
+    /// "foreign" code pattern.
+    ForeignMetadataInitialization = 2,
+
     // We only have two bits here, so if you add a third special kind,
     // include more flag bits in its out-of-line storage.
   };
@@ -1277,6 +1284,10 @@ public:
 
   bool hasInPlaceMetadataInitialization() const {
     return getMetadataInitialization() == InPlaceMetadataInitialization;
+  }
+
+  bool hasForeignMetadataInitialization() const {
+    return getMetadataInitialization() == ForeignMetadataInitialization;
   }
 
   enum ImportNamespaceKind {
@@ -1310,9 +1321,6 @@ public:
                                  getImportNamespace,
                                  setImportNamespace)
 
-  bool isCTag() const {
-    return getImportNamespace() == CTag;
-  }
   bool isCTypedef() const {
     return getImportNamespace() == CTypedef;
   }
@@ -1333,7 +1341,7 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
                                  Class_SuperclassReferenceKind_width,
-                                 TypeMetadataRecordKind,
+                                 TypeReferenceKind,
                                  class_getSuperclassReferenceKind,
                                  class_setSuperclassReferenceKind)
 };

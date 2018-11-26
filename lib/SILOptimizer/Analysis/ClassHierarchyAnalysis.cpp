@@ -28,7 +28,7 @@ void ClassHierarchyAnalysis::init() {
       continue;
 
     // Add the superclass to the list of inherited classes.
-    ClassDecl *Super = C->getSuperclass()->getClassOrBoundGenericClass();
+    ClassDecl *Super = C->getSuperclassDecl();
     auto &K = DirectSubclassesCache[Super];
     assert(std::find(K.begin(), K.end(), C) == K.end() &&
            "Class vector must be unique");

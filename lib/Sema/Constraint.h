@@ -297,6 +297,9 @@ public:
   /// If this fix is an argument re-labeling, retrieve new labels.
   ArrayRef<Identifier> getArgumentLabels(ConstraintSystem &cs) const;
 
+  /// If this fix has optional result info, retrieve it.
+  bool isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const;
+
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);
 

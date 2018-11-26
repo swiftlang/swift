@@ -49,7 +49,6 @@ UID_KEYS = [
     KEY('SerializedSyntaxTree', 'key.serialized_syntax_tree'),
     KEY('SyntaxReuseRegions', 'key.syntaxreuseregions'),
     KEY('SourceText', 'key.sourcetext'),
-    KEY('ForceLibSyntaxBasedProcessing', 'key.forcelibsyntaxbasedprocessing'),
     KEY('EnableSyntaxReuseRegions', 'key.enablesyntaxreuseregions'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),

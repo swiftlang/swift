@@ -26,9 +26,11 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
-#include "swift/Demangling/ManglingMacros.h"
-#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+#include "swift/Syntax/SyntaxNodes.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
@@ -76,9 +78,6 @@ struct SKEditorConsumerOptions {
   SyntaxTreeTransferMode SyntaxTransferMode = SyntaxTreeTransferMode::Off;
   bool SyntacticOnly = false;
   bool EnableSyntaxReuseInfo = false;
-  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
-  // Remove it once when we are able to incrementally transfer the syntax tree
-  bool ForceLibSyntaxBasedProcessing = false;
 };
 
 } // anonymous namespace
@@ -453,9 +452,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    int64_t ForceLibSyntaxBasedProcessing = false;
-    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
-                 ForceLibSyntaxBasedProcessing, /*isOptional=*/true);
     int64_t EnableSyntaxReuseInfo = false;
     Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
                  /*isOptional=*/true);
@@ -467,7 +463,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.SyntaxTransferMode = syntaxTransferModeFromUID(TransferModeUID);
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
-    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
     return Rec(editorOpen(*Name, InputBuf.get(), Opts, Args));
   }
   if (ReqUID == RequestEditorClose) {
@@ -501,10 +496,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     auto TransferModeUID = Req.getUID(KeySyntaxTreeTransferMode);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    int64_t ForceLibSyntaxBasedProcessing = false;
-    Req.getInt64(KeyForceLibSyntaxBasedProcessing,
-                 ForceLibSyntaxBasedProcessing,
-                 /*isOptional=*/true);
     int64_t EnableSyntaxReuseInfo = false;
     Req.getInt64(KeyEnableSyntaxReuseRegions, EnableSyntaxReuseInfo,
                  /*isOptional=*/true);
@@ -517,7 +508,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
     Opts.SyntacticOnly = SyntacticOnly;
     Opts.EnableSyntaxReuseInfo = EnableSyntaxReuseInfo;
-    Opts.ForceLibSyntaxBasedProcessing = ForceLibSyntaxBasedProcessing;
 
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length, Opts));
   }
@@ -2055,10 +2045,14 @@ public:
 
   void handleRequestError(const char *Description) override;
 
+  bool syntaxMapEnabled() override { return Opts.EnableSyntaxMap; }
+
   bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override;
 
   bool handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
+
+  bool documentStructureEnabled() override { return Opts.EnableStructure; }
 
   bool beginDocumentSubStructure(unsigned Offset, unsigned Length, UIdent Kind,
                                  UIdent AccessLevel,
@@ -2093,7 +2087,9 @@ public:
                         UIdent DiagStage) override;
 
   bool handleSourceText(StringRef Text) override;
-  bool handleSerializedSyntaxTree(StringRef Text) override;
+
+  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> ReusedNodeIds) override;
 
   bool syntaxReuseInfoEnabled() override { return Opts.EnableSyntaxReuseInfo; }
   bool handleSyntaxReuseRegions(
@@ -2106,10 +2102,6 @@ public:
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
-  }
-
-  virtual bool forceLibSyntaxBasedProcessing() override {
-    return Opts.ForceLibSyntaxBasedProcessing;
   }
 };
 
@@ -2442,9 +2434,22 @@ bool SKEditorConsumer::handleSourceText(StringRef Text) {
   return true;
 }
 
-bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
-  if (syntaxTreeEnabled())
-    Dict.set(KeySerializedSyntaxTree, Text);
+bool SKEditorConsumer::handleSyntaxTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> ReusedNodeIds) {
+  if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
+    return true;
+
+  std::string SyntaxTreeString;
+  {
+    llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+    swift::json::Output::UserInfoMap JsonUserInfo;
+    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+    swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
+                                         /*PrettyPrint=*/false);
+    SyntaxTreeOutput << *SyntaxTree.getRaw();
+  }
+  Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
   return true;
 }
 

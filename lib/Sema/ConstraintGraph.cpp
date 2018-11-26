@@ -19,6 +19,7 @@
 #include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -467,9 +468,9 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
 }
 
 void ConstraintGraph::gatherConstraints(
-       TypeVariableType *typeVar,
-       SmallVectorImpl<Constraint *> &constraints,
-       GatheringKind kind) {
+    TypeVariableType *typeVar, llvm::SetVector<Constraint *> &constraints,
+    GatheringKind kind,
+    llvm::function_ref<bool(Constraint *)> acceptConstraint) {
   auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
   auto equivClass = reprNode.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
@@ -477,8 +478,10 @@ void ConstraintGraph::gatherConstraints(
     if (!typeVars.insert(typeVar).second)
       continue;
 
-    for (auto constraint : (*this)[typeVar].getConstraints())
-      constraints.push_back(constraint);
+    for (auto constraint : (*this)[typeVar].getConstraints()) {
+      if (acceptConstraint(constraint))
+        constraints.insert(constraint);
+    }
 
     auto &node = (*this)[typeVar];
 
@@ -510,8 +513,10 @@ void ConstraintGraph::gatherConstraints(
         if (!typeVars.insert(adjTypeVarEquiv).second)
           continue;
 
-        for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints())
-          constraints.push_back(constraint);
+        for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
+          if (acceptConstraint(constraint))
+            constraints.insert(constraint);
+        }
       }
     }
   }

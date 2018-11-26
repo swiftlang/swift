@@ -40,6 +40,7 @@
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/STLExtras.h"
@@ -2851,14 +2852,8 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (!storage->getDeclContext()->isTypeContext())
     return ManagedValue();
   
-  ManagedValue paramOrigValue;
-  
-  if (subSGF.SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    paramOrigValue =
+  auto paramOrigValue =
       ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
-  } else {
-    paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
-  }
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
@@ -2968,11 +2963,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                              propertyType);
   }
   
-  ParameterConvention paramConvention;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
-  else
-    paramConvention = ParameterConvention::Indirect_In;
+  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 2> params;
   params.push_back({loweredBaseTy.getASTType(),
@@ -3003,7 +2994,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
-  auto thunk = SGM.M.getOrCreateSharedFunction(
+  SILFunctionBuilder builder(SGM.M);
+  auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3087,11 +3079,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   
   auto &C = SGM.getASTContext();
   
-  ParameterConvention paramConvention;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
-  else
-    paramConvention = ParameterConvention::Indirect_In;
+  auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 3> params;
   // property value
@@ -3128,7 +3116,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                                 genericSig,
                                                                 baseType,
                                                                 interfaceSubs);
-  auto thunk = SGM.M.getOrCreateSharedFunction(
+
+  SILFunctionBuilder builder(SGM.M);
+  auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3166,12 +3156,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                          indexes,
                                                          indexPtrArg);
   
-  ManagedValue valueOrig;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
-    valueOrig = ManagedValue::forBorrowedRValue(valueArg)
+  auto valueOrig = ManagedValue::forBorrowedRValue(valueArg)
       .copy(subSGF, loc);
-  else
-    valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
@@ -3287,9 +3273,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
                                                                genericSig);
-    equals = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
-                                             IsNotTransparent, IsNotSerialized,
-                                             ProfileCounter(), IsThunk);
+    SILFunctionBuilder builder(SGM.M);
+    equals = builder.getOrCreateSharedFunction(
+        loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+        ProfileCounter(), IsThunk);
     if (!equals->empty()) {
       return;
     }
@@ -3451,9 +3438,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
-    hash = SGM.M.getOrCreateSharedFunction(loc, name, signature, IsBare,
-                                           IsNotTransparent, IsNotSerialized,
-                                           ProfileCounter(), IsThunk);
+    SILFunctionBuilder builder(SGM.M);
+    hash = builder.getOrCreateSharedFunction(loc, name, signature, IsBare,
+                                             IsNotTransparent, IsNotSerialized,
+                                             ProfileCounter(), IsThunk);
     if (!hash->empty()) {
       return;
     }
@@ -3653,7 +3641,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     [&]() -> bool {
       return getASTContext().LangOpts.EnableKeyPathResilience
         && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule;
+        && storage->getModuleContext() != SwiftModule
+        // Protocol requirements don't have nor need property descriptors.
+        && !isa<ProtocolDecl>(storage->getDeclContext())
+        // Properties that only dispatch via ObjC lookup do not have nor need
+        // property descriptors, since the selector identifies the storage.
+        && (!storage->hasAnyAccessors()
+            || !getGetterDeclRef(storage).isForeign);
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
@@ -3693,7 +3687,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
-      componentTy = storage->getStorageInterfaceType()->getCanonicalType();
+      componentTy = var->getInterfaceType()->getCanonicalType();
     } else {
       componentTy =
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)

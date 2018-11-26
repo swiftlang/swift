@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -10,7 +10,7 @@ import gizmo
 
 // CHECK: @"$SSo16NSRuncingOptionsVWV" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
-// CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden global
+// CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVSQSCMc" = linkonce_odr hidden constant %swift.protocol_conformance_descriptor { {{.*}}@"$SSo16NSRuncingOptionsVSQSCWa
 // CHECK: @"$SSo28NeverActuallyMentionedByNameVSQSCWp" = linkonce_odr hidden constant
 
@@ -87,11 +87,11 @@ func use_metadata<T: Equatable>(_ t:T){}
 use_metadata(NSRuncingOptions.mince)
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo16NSRuncingOptionsVMa"(i64)
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @"$SSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}} @"$SSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK-LABEL: define linkonce_odr hidden i8** @"$SSo16NSRuncingOptionsVSQSCWa"()
 // CHECK:  [[NONUNIQUE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$SSo16NSRuncingOptionsVSQSCWG", %swift.type* null, i8*** null)
-// CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32 }>* @"$SSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$SSQMp")
+// CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32 }>* @"$SSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$SSQMp")
 // CHECK:  ret i8** [[UNIQUE]]
 
 @objc enum ExportedToObjC: Int {

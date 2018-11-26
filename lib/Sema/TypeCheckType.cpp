@@ -961,10 +961,9 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
           comp->getIdLoc())) {
     auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     SmallVector<ValueDecl *, 4> decls;
-    if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
+    if (DC->lookupQualified(nominal,
                             comp->getIdentifier(),
                             NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
-                            &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.

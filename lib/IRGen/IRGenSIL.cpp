@@ -79,6 +79,11 @@
 using namespace swift;
 using namespace irgen;
 
+// FIXME: Remove this option entirely and turn this on by default.
+llvm::cl::opt<bool> DebugInfoInlinedGenerics(
+    "debug-info-inlined-generics", llvm::cl::init(false),
+    llvm::cl::desc("Emit variable debug info for inlined generic functions"));
+
 namespace {
 
 class LoweredValue;
@@ -855,6 +860,8 @@ public:
 
   /// Determine whether a generic variable has been inlined.
   static bool isInlinedGeneric(VarDecl *VarDecl, const SILDebugScope *DS) {
+    if (DebugInfoInlinedGenerics)
+      return false;
     if (!DS->InlinedCallSite)
       return false;
     if (VarDecl->hasType())

@@ -80,6 +80,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TypeParameterRequirement:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
+    case ContextualType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -257,6 +258,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case DynamicLookupResult:
       out << "dynamic lookup result";
+      break;
+
+    case ContextualType:
+      out << "contextual type";
       break;
     }
   }

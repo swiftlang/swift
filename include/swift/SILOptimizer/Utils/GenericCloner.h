@@ -34,6 +34,8 @@ class GenericCloner : public TypeSubstCloner<GenericCloner> {
   IsSerialized_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
+  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
+      RemappedScopeCache;
 
 public:
   friend class SILCloner<GenericCloner>;
@@ -90,6 +92,9 @@ private:
   /// by initCloned.
   void populateCloned();
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS);
+
 };
 
 } // end namespace swift

@@ -23,89 +23,6 @@
     },
     {
       "kind": "TypeDecl",
-      "name": "C0",
-      "printedName": "C0",
-      "declKind": "Class",
-      "usr": "s:4cake2C0C",
-      "location": "",
-      "moduleName": "cake",
-      "children": [
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "declKind": "Constructor",
-          "usr": "s:4cake2C0CACyxq_q0_Gycfc",
-          "location": "",
-          "moduleName": "cake",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "C0",
-              "printedName": "C0<T1, T2, T3>",
-              "usr": "s:4cake2C0C",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "T1"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "T2"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "T3"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "Function",
-          "name": "conditionalFooExt",
-          "printedName": "conditionalFooExt()",
-          "declKind": "Func",
-          "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
-          "location": "",
-          "moduleName": "cake",
-          "parentExtensionReqs": [
-            "T1 == cake.S1",
-            "T2 == cake.S1",
-            "T3 == cake.S1"
-          ],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Void",
-              "printedName": "()"
-            }
-          ]
-        },
-        {
-          "kind": "Function",
-          "name": "unconditionalFooExt",
-          "printedName": "unconditionalFooExt()",
-          "declKind": "Func",
-          "usr": "s:4cake2C0C19unconditionalFooExtyyF",
-          "location": "",
-          "moduleName": "cake",
-          "parentExtensionReqs": [],
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Void",
-              "printedName": "()"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "TypeDecl",
       "name": "S1",
       "printedName": "S1",
       "declKind": "Struct",
@@ -191,6 +108,89 @@
               "name": "S1",
               "printedName": "S1",
               "usr": "s:4cake2S1V"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "C0",
+      "printedName": "C0",
+      "declKind": "Class",
+      "usr": "s:4cake2C0C",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:4cake2C0CACyxq_q0_Gycfc",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "C0",
+              "printedName": "C0<T1, T2, T3>",
+              "usr": "s:4cake2C0C",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "T1"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "T2"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "GenericTypeParam",
+                  "printedName": "T3"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "conditionalFooExt",
+          "printedName": "conditionalFooExt()",
+          "declKind": "Func",
+          "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
+          "location": "",
+          "moduleName": "cake",
+          "parentExtensionReqs": [
+            "T1 == cake.S1",
+            "T2 == cake.S1",
+            "T3 == cake.S1"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "unconditionalFooExt",
+          "printedName": "unconditionalFooExt()",
+          "declKind": "Func",
+          "usr": "s:4cake2C0C19unconditionalFooExtyyF",
+          "location": "",
+          "moduleName": "cake",
+          "parentExtensionReqs": [],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
             }
           ]
         }
@@ -429,42 +429,6 @@
       ]
     },
     {
-      "kind": "Function",
-      "name": "foo3",
-      "printedName": "foo3(_:)",
-      "declKind": "Func",
-      "usr": "s:4cake4foo3yySDySiSSGF",
-      "location": "",
-      "moduleName": "cake",
-      "children": [
-        {
-          "kind": "TypeNominal",
-          "name": "Void",
-          "printedName": "()"
-        },
-        {
-          "kind": "TypeNominal",
-          "name": "Dictionary",
-          "printedName": "[Int : String]",
-          "usr": "s:SD",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "String",
-              "printedName": "String",
-              "usr": "s:SS"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "kind": "TypeDecl",
       "name": "Number",
       "printedName": "Number",
@@ -651,6 +615,42 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo3",
+      "printedName": "foo3(_:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo3yySDySiSSGF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Dictionary",
+          "printedName": "[Int : String]",
+          "usr": "s:SD",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
             }
           ]
         }

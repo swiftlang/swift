@@ -1,0 +1,127 @@
+// REQUIRES: OS=macosx
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -c -update-code -swift-version 4 -disable-migrator-fixits -primary-file %s -emit-migrated-file-path %t/remove_override.result.swift -o %t/rename-func-decl.swift.remap
+// RUN: diff -u %S/remove_override.swift.expected %t/remove_override.result.swift
+
+import AppKit
+
+class AppDelegate: NSObject {
+  class func application(_ sender: NSApplication, delegateHandlesKey key: String) -> Bool {
+    
+    return false
+  }
+  func application(_ sender: NSApplication, delegateHandlesKey key: String) -> Bool {
+    return super.application(sender, delegateHandlesKey: key)
+  }
+  class func changeColor(_ sender: Any?) {
+    
+  }
+  func changeColor(_ sender: Any?) {
+  
+  }
+  class func controlTextDidBeginEditing(_ obj: Notification) {
+  
+  }
+  func controlTextDidBeginEditing(_ obj: Notification) {
+  
+  }
+  class func controlTextDidEndEditing(_ obj: Notification) {
+  
+  }
+  func controlTextDidEndEditing(_ obj: Notification) {
+  
+  }
+  class func controlTextDidChange(_ obj: Notification) {
+  
+  }
+  func controlTextDidChange(_ obj: Notification) {
+  
+  }
+  class func changeFont(_ sender: Any?) {
+  
+  }
+  func changeFont(_ sender: Any?) {
+  
+  }
+  class func validModesForFontPanel(_ fontPanel: NSFontPanel) -> NSFontPanel.ModeMask {
+    return []
+  }
+  func validModesForFontPanel(_ fontPanel: NSFontPanel) -> NSFontPanel.ModeMask {
+    return []
+  }
+  class func discardEditing() {
+  
+  }
+  func discardEditing() {
+  
+  }
+  class func commitEditing() -> Bool {
+    return false
+  }
+  func commitEditing() -> Bool {
+    return false
+  }
+  class func commitEditing(withDelegate delegate: Any?, didCommit didCommitSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
+  
+  }
+  func commitEditing(withDelegate delegate: Any?, didCommit didCommitSelector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
+  
+  }
+  class func commitEditingAndReturnError() throws {
+  
+  }
+  func commitEditingAndReturnError() throws {
+  
+  }
+  class func objectDidBeginEditing(_ editor: Any) {
+  
+  }
+  func objectDidBeginEditing(_ editor: Any) {
+  
+  }
+  class func objectDidEndEditing(_ editor: Any) {
+  
+  }
+  func objectDidEndEditing(_ editor: Any) {
+  
+  }
+  class func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    return false
+  }
+  func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    return false
+  }
+  class func pasteboard(_ sender: NSPasteboard, provideDataForType type: NSPasteboard.PasteboardType) {
+  
+  }
+  func pasteboard(_ sender: NSPasteboard, provideDataForType type: NSPasteboard.PasteboardType) {
+  
+  }
+  class func pasteboardChangedOwner(_ sender: NSPasteboard) {
+  
+  }
+  func pasteboardChangedOwner(_ sender: NSPasteboard) {
+  
+  }
+  class func layer(_ layer: CALayer, shouldInheritContentsScale newScale: CGFloat, from window: NSWindow) -> Bool {
+    return false
+  }
+  func layer(_ layer: CALayer, shouldInheritContentsScale newScale: CGFloat, from window: NSWindow) -> Bool {
+    return false
+  }
+  class func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+    return ""
+  }
+  func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+    return ""
+  }
+}
+
+// We shouldn't migrate further sub-class.
+class MyAppDelegate: AppDelegate {
+  override func commitEditing() -> Bool {
+    super.commitEditing()
+    return false
+  }
+}
+

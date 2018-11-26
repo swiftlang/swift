@@ -1495,8 +1495,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // FIXME: Customize message to the kind of thing.
     auto baseKind = base->getDescriptiveKind();
     switch (baseKind) {
-    case DescriptiveDeclKind::StaticLet:
-    case DescriptiveDeclKind::StaticVar:
+    case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
       override->diagnose(diag::override_static, baseKind);
       break;
@@ -1518,6 +1517,18 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
     diagnoseOverrideForAvailability(override, base);
+  }
+
+  // Overrides of NSObject.hashValue are deprecated; one should override
+  // NSObject.hash instead.
+  if (auto baseVar = dyn_cast<VarDecl>(base)) {
+    if (auto classDecl =
+          baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (classDecl->getBaseName().userFacingName() == "NSObject" &&
+          baseVar->getBaseName().userFacingName() == "hashValue") {
+        override->diagnose(diag::override_nsobject_hashvalue);
+      }
+    }
   }
 
   /// Check attributes associated with the base; some may need to merged with

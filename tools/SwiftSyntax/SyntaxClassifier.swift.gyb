@@ -1,0 +1,124 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: Swift -*-
+  # Ignore the following admonition it applies to the resulting .swift file only
+}%
+//// Automatically Generated From SyntaxClassifier.swift.gyb.
+//// Do Not Edit Directly!
+//===------------ SyntaxClassifier.swift.gyb - Syntax Collection ----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+public enum SyntaxClassification {
+% for classification in SYNTAX_CLASSIFICATIONS:
+%   for line in dedented_lines(classification.description):
+%     if line: 
+  /// ${line} 
+%     end 
+%   end
+  case ${classification.swift_name}
+% end
+}
+
+class _SyntaxClassifier: SyntaxVisitor {
+
+  private var contextStack: [(classification: SyntaxClassification, force: Bool)] = 
+      [(classification: .none, force: false)]
+
+  var classifications: [TokenSyntax: SyntaxClassification] = [:]
+
+  private func visit(
+    _ node: Syntax, 
+    classification: SyntaxClassification, 
+    force: Bool = false
+  ) {
+    contextStack.append((classification: classification, force: force))
+    visit(node)
+    contextStack.removeLast()
+  }
+
+  private func getContextFreeClassificationForTokenKind(_ tokenKind: TokenKind) 
+      -> SyntaxClassification? {
+    switch (tokenKind) {
+% for token in SYNTAX_TOKENS:
+    case .${token.swift_kind()}:
+%   if token.classification:
+      return SyntaxClassification.${token.classification.swift_name}
+%   else:
+      return nil
+%   end
+% end
+    case .eof:
+      return SyntaxClassification.none
+    }
+  }
+
+  override func visit(_ token: TokenSyntax) {
+    var classification = contextStack.last!.classification
+    if !contextStack.last!.force {
+      if let contextFreeClassification = 
+          getContextFreeClassificationForTokenKind(token.tokenKind) {
+        classification = contextFreeClassification
+      }
+      if case .unknown = token.tokenKind, token.text.starts(with: "\"") {
+        classification = .stringLiteral
+      } else if case .identifier = token.tokenKind, 
+          token.text.starts(with: "<#") && token.text.hasSuffix("#>") {
+        classification = .editorPlaceholder
+      }
+    }
+    assert(classifications[token] == nil)
+    classifications[token] = classification
+  }
+
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+  override func visit(_ node: ${node.name}) {
+%     if node.is_unknown() or node.is_syntax_collection():
+    super.visit(node)
+%     else:
+%       for child in node.children:
+%         if child.is_optional:
+    if let ${child.swift_name} = node.${child.swift_name} { 
+%           if child.classification:
+      visit(${child.swift_name}, 
+            classification: .${child.classification.swift_name}, 
+            force: ${"true" if child.force_classification else "false"})
+%           else:
+      visit(${child.swift_name})
+%           end
+    }
+%         else:
+%           if child.classification:
+    visit(node.${child.swift_name}, 
+          classification: .${child.classification.swift_name}, 
+          force: ${"true" if child.force_classification else "false"})
+%           else:
+    visit(node.${child.swift_name})
+%           end
+%         end
+%       end
+%     end
+
+  }
+%   end
+% end
+}
+
+public enum SyntaxClassifier {
+  /// Classify all tokens in the given syntax tree for syntax highlighting
+  public static func classifyTokensInTree(_ syntaxTree: SourceFileSyntax) 
+      -> [TokenSyntax: SyntaxClassification] {
+    let classifier = _SyntaxClassifier()
+    classifier.visit(syntaxTree)
+    return classifier.classifications
+  }
+}

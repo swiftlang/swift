@@ -60,7 +60,9 @@ extension Unicode.UTF16 : Unicode.Encoding {
       return Unicode.Scalar(_unchecked: bits & 0xffff)
     }
     _sanityCheck(source._bitCount == 32)
-    let value = 0x10000 + (bits >> 16 & 0x03ff | (bits & 0x03ff) << 10)
+    let lower: UInt32 = bits >> 16 & 0x03ff
+    let upper: UInt32 = (bits & 0x03ff) << 10
+    let value = 0x10000 + (lower | upper)
     return Unicode.Scalar(_unchecked: value)
   }
 

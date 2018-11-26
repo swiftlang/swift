@@ -512,12 +512,11 @@ static void visitApplyAccesses(ApplySite apply,
 
     // When @noescape function closures are passed as arguments, their
     // arguments are considered accessed at the call site.
-    FindClosureResult result = findClosureForAppliedArg(oper.get());
-    if (!result.PAI)
-      continue;
-
+    TinyPtrVector<PartialApplyInst *> partialApplies;
+    findClosuresForFunctionValue(oper.get(), partialApplies);
     // Recursively visit @noescape function closure arguments.
-    visitApplyAccesses(result.PAI, visitor);
+    for (auto *PAI : partialApplies)
+      visitApplyAccesses(PAI, visitor);
   }
 }
 

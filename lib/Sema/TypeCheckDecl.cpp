@@ -2620,6 +2620,12 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     TC.validateDecl(SD);
+
+    if (!SD->isInvalid()) {
+      TC.checkReferencedGenericParams(SD);
+      TC.checkProtocolSelfRequirements(SD);
+    }
+
     TC.checkDeclAttributes(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
@@ -2793,7 +2799,7 @@ public:
       if (!classDecl->hasSuperclass())
         return false;
 
-      classDecl = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+      classDecl = classDecl->getSuperclassDecl();
     }
 
     // If all of the variables are @objc, we can use @NSManaged.
@@ -2865,8 +2871,7 @@ public:
           // If the superclass doesn't require in-class initial
           // values, the requirement was introduced at this point, so
           // stop here.
-          auto superclass = cast<ClassDecl>(
-                              source->getSuperclass()->getAnyNominal());
+          auto superclass = source->getSuperclassDecl();
           if (!superclass->requiresStoredPropertyInits())
             break;
 
@@ -3121,6 +3126,15 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
+    // We get bogus errors here with generic subscript materializeForSet.
+    if (!FD->isInvalid()) {
+      if (!isa<AccessorDecl>(FD) ||
+          !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
+        TC.checkReferencedGenericParams(FD);
+        TC.checkProtocolSelfRequirements(FD);
+      }
+    }
+
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
@@ -3264,6 +3278,11 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     TC.validateDecl(CD);
+
+    if (!CD->isInvalid()) {
+      TC.checkReferencedGenericParams(CD);
+      TC.checkProtocolSelfRequirements(CD);
+    }
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -3609,13 +3628,13 @@ void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
               isProtocol, FD->getFullName());
 }
 
-bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
+bool checkDynamicSelfReturn(FuncDecl *func,
                             TypeRepr *typeRepr,
                             unsigned optionalDepth) {
   // Look through parentheses.
   if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
     if (!parenRepr->isParenType()) return false;
-    return checkDynamicSelfReturn(TC, func, parenRepr->getElementType(0),
+    return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
                                   optionalDepth);
   }
 
@@ -3624,8 +3643,9 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
     TypeAttributes attrs = attrRepr->getAttrs();
     if (!attrs.empty())
       return false;
-    return checkDynamicSelfReturn(TC, func, attrRepr->getTypeRepr(),
+    return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
                                   optionalDepth);
+
   }
 
   // Look through optional types.
@@ -3639,7 +3659,7 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
   if (base) {
     // But only one level.
     if (optionalDepth != 0) return false;
-    return checkDynamicSelfReturn(TC, func, base, optionalDepth + 1);
+    return checkDynamicSelfReturn(func, base, optionalDepth + 1);
   }
 
   // Check whether we have a simple identifier type.
@@ -3648,17 +3668,16 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func,
     return false;
 
   // Check whether it is 'Self'.
-  if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
+  if (simpleRepr->getIdentifier() != func->getASTContext().Id_Self)
     return false;
 
   // Note that the function has a dynamic Self return type and set
   // the return type component to the dynamic self type.
-  func->setDynamicSelf(true);
-  return false;
+  return true;
 }
 
 /// Check for methods that return 'DynamicResult'.
-bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
+bool checkDynamicSelfReturn(FuncDecl *func) {
   // Check whether we have a specified result type.
   auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
   if (!typeRepr)
@@ -3674,7 +3693,7 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
   if (isa<AccessorDecl>(func))
     return false;
 
-  return checkDynamicSelfReturn(TC, func, typeRepr, 0);
+  return checkDynamicSelfReturn(func, typeRepr, 0);
 }
 
 Type buildAddressorResultType(TypeChecker &TC,
@@ -3885,8 +3904,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
           (CD->hasSuperclass() &&
-           CD->getSuperclass()->getClassOrBoundGenericClass()
-             ->requiresStoredPropertyInits()))
+           CD->getSuperclassDecl()->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
 
       // Inherit @objcMembers.
@@ -3968,18 +3986,16 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Param: {
-    // FIXME: This case is hit when code completion occurs in a function
-    // parameter list. Previous parameters are definitely in scope, but
-    // we don't really know how to type-check them.
-    // We can also hit this when code-completing in a closure body.
-    //
-    // FIXME: Also, note that we don't call setValidationToChecked() here,
-    // because the ExprCleanser clears the type of ParamDecls, so we
-    // can end up here multiple times for the same ParamDecl.
     auto *PD = cast<ParamDecl>(D);
-    if (!PD->hasInterfaceType())
-      PD->markInvalid();
+    if (!PD->hasInterfaceType()) {
+      // Can't fallthough because parameter without a type doesn't have
+      // valid signature, but that shouldn't matter anyway.
+      return;
+    }
 
+    auto type = PD->getInterfaceType();
+    if (type->hasError())
+      PD->markInvalid();
     break;
   }
 
@@ -4099,8 +4115,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateSelfAccessKind(*this, FD);
 
     // Check whether the return type is dynamic 'Self'.
-    if (checkDynamicSelfReturn(*this, FD))
-      FD->setInvalid();
+    FD->setDynamicSelf(checkDynamicSelfReturn(FD));
 
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.
@@ -4650,9 +4665,7 @@ void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
 }
 
 void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
-  auto superclassTy = classDecl->getSuperclass();
-  if (superclassTy) {
-    auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
+  if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     if (superclassDecl)
       requestNominalLayout(superclassDecl);
   }
@@ -5456,7 +5469,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
-  if (classDecl->hasSuperclass()) {
+  if (Type superclassTy = classDecl->getSuperclass()) {
     bool canInheritInitializers = (!SuppressDefaultInitializer &&
                                    !FoundDesignatedInit);
 
@@ -5467,7 +5480,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       return;
     }
 
-    auto superclassTy = classDecl->getSuperclass();
     auto *superclassDecl = superclassTy->getClassOrBoundGenericClass();
     assert(superclassDecl && "Superclass of class is not a class?");
     if (!superclassDecl->addedImplicitInitializers())

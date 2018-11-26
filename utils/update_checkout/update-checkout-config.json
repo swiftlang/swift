@@ -267,14 +267,14 @@
         "swift-5.0-branch" : {
             "aliases": ["swift-5.0-branch"],
             "repos": {
-                "llvm": "swift-4.1-branch",
-                "clang": "swift-4.1-branch",
+                "llvm": "swift-4.2-branch",
+                "clang": "swift-4.2-branch",
+                "compiler-rt": "swift-4.2-branch",
                 "swift": "swift-5.0-branch",
                 "lldb": "swift-5.0-branch",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
-                "compiler-rt": "swift-4.1-branch",
                 "swift-corelibs-xctest": "master",
                 "swift-corelibs-foundation": "master",
                 "swift-corelibs-libdispatch": "master",

@@ -813,7 +813,9 @@ public:
                                            StringRef Text, TokenInfo ToInfo) {
 
     // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
+    auto isClosingSquare =
+      ToInfo && ToInfo.StartOfLineTarget->getKind() == tok::r_square;
+    if (!isClosingSquare && FC.HasSibling()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder, FmtOptions);

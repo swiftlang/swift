@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -module-name=cgtest -emit-ir -O %s | %FileCheck %s
 
+// REQUIRES: rdar42775178
+
 // Test some imported CG APIs
 import CoreGraphics
 

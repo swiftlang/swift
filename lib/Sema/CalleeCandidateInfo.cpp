@@ -58,10 +58,13 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
 
 UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
 : declOrExpr(decl), level(level), substituted(false) {
-  
-  if (auto *PD = dyn_cast<ParamDecl>(decl))
-    entityType = PD->getType();
-  else {
+
+  if (auto *PD = dyn_cast<ParamDecl>(decl)) {
+    if (PD->hasValidSignature())
+      entityType = PD->getType();
+    else
+      entityType = PD->getASTContext().TheUnresolvedType;
+  } else {
     entityType = decl->getInterfaceType();
     auto *DC = decl->getInnermostDeclContext();
     if (auto *GFT = entityType->getAs<GenericFunctionType>()) {

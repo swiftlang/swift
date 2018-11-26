@@ -26,6 +26,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -89,7 +90,8 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILDeclRef FuncDeclRef(BridgeFuncDecl, SILDeclRef::Kind::Func);
 
   // Lookup a function from the stdlib.
-  SILFunction *BridgedFunc = M.getOrCreateFunction(
+  SILFunctionBuilder builder(M);
+  SILFunction *BridgedFunc = builder.getOrCreateFunction(
       Loc, FuncDeclRef, ForDefinition_t::NotForDefinition);
 
   if (!BridgedFunc)
@@ -218,14 +220,8 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   (void)ParamTypes;
-  if (M.getOptions().EnableGuaranteedNormalArguments) {
-    assert(ParamTypes[0].getConvention() ==
-               ParameterConvention::Direct_Guaranteed &&
-           "Parameter should be @owned");
-  } else {
-    assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
-           "Parameter should be @owned");
-  }
+  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed &&
+	 "Parameter should be @guaranteed");
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -239,9 +235,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // If we have guaranteed normal arguments, insert the destroy.
   //
   // TODO: Is it safe to just eliminate the initial retain?
-  if (M.getOptions().EnableGuaranteedNormalArguments) {
-    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
-  }
+  Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
 
   // If the source of a cast should be destroyed, emit a release.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -394,8 +388,9 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
 
   auto *resultDecl = Results.front();
   auto MemberDeclRef = SILDeclRef(resultDecl);
-  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
-                                            ForDefinition_t::NotForDefinition);
+  SILFunctionBuilder builder(M);
+  auto *BridgedFunc = builder.getOrCreateFunction(
+      Loc, MemberDeclRef, ForDefinition_t::NotForDefinition);
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!BridgedFunc)

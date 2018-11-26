@@ -247,9 +247,9 @@ namespace {
 
     using super::asDerived;
     using super::emitCopyOfTables;
-    using super::getNumStoredProtocols;
 
   protected:
+    using super::getNumStoredProtocols;
     const ReferenceCounting Refcounting;
 
     template <class... As>
@@ -618,13 +618,13 @@ namespace {
   };
 
 /// A type implementation for existential types.
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
+#define REF_STORAGE_HELPER(Name, Super) \
   private: \
     bool shouldStoreExtraInhabitantsInRef(IRGenModule &IGM) const { \
-      if (getNumStoredProtocols() == 0) \
+      if (IGM.getReferenceStorageExtraInhabitantCount( \
+                                   ReferenceOwnership::Name, Refcounting) > 1) \
         return true; \
-      return IGM.getReferenceStorageExtraInhabitantCount( \
-                                   ReferenceOwnership::Name, Refcounting) > 1; \
+      return getNumStoredProtocols() == 0; \
     } \
   public: \
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override { \
@@ -635,7 +635,7 @@ namespace {
         return IGM.getReferenceStorageExtraInhabitantCount( \
                           ReferenceOwnership::Name, Refcounting) - IsOptional; \
       } else { \
-        return LoadableTypeInfo::getFixedExtraInhabitantCount(IGM); \
+        return Super::getFixedExtraInhabitantCount(IGM); \
       } \
     } \
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
@@ -647,8 +647,7 @@ namespace {
                                                      ReferenceOwnership::Name, \
                                                      Refcounting); \
       } else { \
-        return LoadableTypeInfo::getFixedExtraInhabitantValue(IGM, \
-                                                              bits, index); \
+        return Super::getFixedExtraInhabitantValue(IGM, bits, index); \
       } \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
@@ -658,7 +657,7 @@ namespace {
         return IGF.getReferenceStorageExtraInhabitantIndex(valueSrc, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return LoadableTypeInfo::getExtraInhabitantIndex(IGF, src, T); \
+        return Super::getExtraInhabitantIndex(IGF, src, T); \
       } \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
@@ -668,7 +667,7 @@ namespace {
         return IGF.storeReferenceStorageExtraInhabitant(index, valueDest, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return LoadableTypeInfo::storeExtraInhabitant(IGF, index, dest, T); \
+        return Super::storeExtraInhabitant(IGF, index, dest, T); \
       } \
     } \
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
@@ -680,7 +679,7 @@ namespace {
         bits = bits.zextOrTrunc(getFixedSize().getValueInBits()); \
         return bits; \
       } else { \
-        return LoadableTypeInfo::getFixedExtraInhabitantMask(IGM); \
+        return Super::getFixedExtraInhabitantMask(IGM); \
       } \
     }
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -688,6 +687,7 @@ namespace {
       public AddressOnlyClassExistentialTypeInfoBase< \
                                   AddressOnly##Name##ClassExistentialTypeInfo, \
                                   FixedTypeInfo> { \
+    bool IsOptional; \
   public: \
     AddressOnly##Name##ClassExistentialTypeInfo( \
                                             ArrayRef<ProtocolEntry> protocols, \
@@ -700,7 +700,8 @@ namespace {
                                                 ty, size, std::move(spareBits), \
                                                 align, IsNotPOD, \
                                                 IsNotBitwiseTakable, \
-                                                IsFixedSize) {} \
+                                                IsFixedSize), \
+        IsOptional(isOptional) {} \
     void emitValueAssignWithCopy(IRGenFunction &IGF, \
                                  Address dest, Address src) const { \
       IGF.emit##Name##CopyAssign(dest, src, Refcounting); \
@@ -721,6 +722,7 @@ namespace {
       IGF.emit##Name##Destroy(addr, Refcounting); \
     } \
     StringRef getStructNameSuffix() const { return "." #name "ref"; } \
+    REF_STORAGE_HELPER(Name, FixedTypeInfo) \
   };
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##ClassExistentialTypeInfo final \
@@ -767,7 +769,7 @@ namespace {
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       llvm_unreachable("should have overridden all actual uses of this"); \
     } \
-    LOADABLE_REF_STORAGE_HELPER(Name) \
+    REF_STORAGE_HELPER(Name, LoadableTypeInfo) \
   };
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
@@ -794,8 +796,8 @@ namespace {
       else \
         return IGM.getUnknownObjectTypeInfo(); \
     } \
-    /* FIXME -- Use LOADABLE_REF_STORAGE_HELPER and make */ \
-    /* getValueTypeInfoForExtraInhabitantsThis call llvm_unreachable() */ \
+    /* FIXME -- Use REF_STORAGE_HELPER and make */ \
+    /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
     void emitValueRetain(IRGenFunction &IGF, llvm::Value *value, \
                          Atomicity atomicity) const {} \
     void emitValueRelease(IRGenFunction &IGF, llvm::Value *value, \
@@ -803,7 +805,7 @@ namespace {
     void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {} \
   };
 #include "swift/AST/ReferenceStorage.def"
-#undef LOADABLE_REF_STORAGE_HELPER
+#undef REF_STORAGE_HELPER
 } // end anonymous namespace
 
 

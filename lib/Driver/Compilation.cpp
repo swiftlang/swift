@@ -114,6 +114,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
                          Optional<unsigned> BatchCount,
+                         Optional<unsigned> BatchSizeLimit,
                          bool ForceOneBatchRepartition,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
@@ -134,6 +135,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
     BatchCount(BatchCount),
+    BatchSizeLimit(BatchSizeLimit),
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
@@ -920,6 +922,117 @@ namespace driver {
       return false;
     }
 
+    // Selects the number of partitions based on the user-provided batch
+    // count and/or the number of parallel tasks we can run, subject to a
+    // fixed per-batch safety cap, to avoid overcommitting memory.
+    size_t pickNumberOfPartitions() {
+
+      // If the user asked for something, use that.
+      if (Comp.getBatchCount().hasValue())
+        return Comp.getBatchCount().getValue();
+
+      // This is a long comment to justify a simple calculation.
+      //
+      // Because there is a secondary "outer" build system potentially also
+      // scheduling multiple drivers in parallel on separate build targets
+      // -- while we, the driver, schedule our own subprocesses -- we might
+      // be creating up to $NCPU^2 worth of _memory pressure_.
+      //
+      // Oversubscribing CPU is typically no problem these days, but
+      // oversubscribing memory can lead to paging, which on modern systems
+      // is quite bad.
+      //
+      // In practice, $NCPU^2 processes doesn't _quite_ happen: as core
+      // count rises, it usually exceeds the number of large targets
+      // without any dependencies between them (which are the only thing we
+      // have to worry about): you might have (say) 2 large independent
+      // modules * 2 architectures, but that's only an $NTARGET value of 4,
+      // which is much less than $NCPU if you're on a 24 or 36-way machine.
+      //
+      //  So the actual number of concurrent processes is:
+      //
+      //     NCONCUR := $NCPU * min($NCPU, $NTARGET)
+      //
+      // Empirically, a frontend uses about 512kb RAM per non-primary file
+      // and about 10mb per primary. The number of non-primaries per
+      // process is a constant in a given module, but the number of
+      // primaries -- the "batch size" -- is inversely proportional to the
+      // batch count (default: $NCPU). As a result, the memory pressure
+      // we can expect is:
+      //
+      //  $NCONCUR * (($NONPRIMARYMEM * $NFILE) +
+      //              ($PRIMARYMEM * ($NFILE/$NCPU)))
+      //
+      // If we tabulate this across some plausible values, we see
+      // unfortunate memory-pressure results:
+      //
+      //                          $NFILE
+      //                  +---------------------
+      //  $NTARGET $NCPU  |  100    500    1000
+      //  ----------------+---------------------
+      //     2        2   |  2gb   11gb    22gb
+      //     4        4   |  4gb   24gb    48gb
+      //     4        8   |  5gb   28gb    56gb
+      //     4       16   |  7gb   36gb    72gb
+      //     4       36   | 11gb   56gb   112gb
+      //
+      // As it happens, the lower parts of the table are dominated by
+      // number of processes rather than the files-per-batch (the batches
+      // are already quite small due to the high core count) and the left
+      // side of the table is dealing with modules too small to worry
+      // about. But the middle and upper-right quadrant is problematic: 4
+      // and 8 core machines do not typically have 24-48gb of RAM, it'd be
+      // nice not to page on them when building a 4-target project with
+      // 500-file modules.
+      //
+      // Turns we can do that if we just cap the batch size statically at,
+      // say, 25 files per batch, we get a better formula:
+      //
+      //  $NCONCUR * (($NONPRIMARYMEM * $NFILE) +
+      //              ($PRIMARYMEM * min(25, ($NFILE/$NCPU))))
+      //
+      //                          $NFILE
+      //                  +---------------------
+      //  $NTARGET $NCPU  |  100    500    1000
+      //  ----------------+---------------------
+      //     2        2   |  1gb    2gb     3gb
+      //     4        4   |  4gb    8gb    12gb
+      //     4        8   |  5gb   16gb    24gb
+      //     4       16   |  7gb   32gb    48gb
+      //     4       36   | 11gb   56gb   108gb
+      //
+      // This means that the "performance win" of batch mode diminishes
+      // slightly: the batching factor in the equation drops from
+      // ($NFILE/$NCPU) to min(25, $NFILE/$NCPU). In practice this seems to
+      // not cost too much: the additional factor in number of subprocesses
+      // run is the following:
+      //
+      //                          $NFILE
+      //                  +---------------------
+      //  $NTARGET $NCPU  |  100    500    1000
+      //  ----------------+---------------------
+      //     2        2   |  2x    10x      20x
+      //     4        4   |   -     5x      10x
+      //     4        8   |   -   2.5x       5x
+      //     4       16   |   -  1.25x     2.5x
+      //     4       36   |   -      -     1.1x
+      //
+      // Where - means "no difference" because the batches were already
+      // smaller than 25.
+      //
+      // Even in the worst case here, the 1000-file module on 2-core
+      // machine is being built with only 40 subprocesses, rather than the
+      // pre-batch-mode 1000. I.e. it's still running 96% fewer
+      // subprocesses than before. And significantly: it's doing so while
+      // not exceeding the RAM of a typical 2-core laptop.
+
+      size_t DefaultSizeLimit = 25;
+      size_t NumTasks = TQ->getNumberOfParallelTasks();
+      size_t NumFiles = PendingExecution.size();
+      size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
+      return std::max(NumTasks, NumFiles / SizeLimit);
+    }
+
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
     /// them together into \p BatchJob instances (also inserted into \p
     /// BatchJobs), and enqueue all \c PendingExecution jobs (whether batched or
@@ -933,9 +1046,7 @@ namespace driver {
         return;
       }
 
-      size_t NumPartitions = (Comp.getBatchCount().hasValue() ?
-                              Comp.getBatchCount().getValue() :
-                              TQ->getNumberOfParallelTasks());
+      size_t NumPartitions = pickNumberOfPartitions();
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
       bool PretendTheCommandLineIsTooLongOnce =

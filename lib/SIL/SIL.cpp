@@ -19,7 +19,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Attr.h"
@@ -218,6 +220,10 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   if (!getDeclContext()->isTypeContext() || isStatic())
     return false;
   
+  // Protocol requirements do not need property descriptors.
+  if (isa<ProtocolDecl>(getDeclContext()))
+    return false;
+  
   // Any property that's potentially resilient should have accessors
   // synthesized.
   if (!getGetter())
@@ -230,6 +236,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
 
+  // Check the linkage of the declaration.
   auto getter = SILDeclRef(getGetter());
   auto getterLinkage = getter.getLinkage(ForDefinition);
   
@@ -250,6 +257,34 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   case SILLinkage::PublicExternal:
   case SILLinkage::SharedExternal:
     llvm_unreachable("should be definition linkage?");
+  }
+
+  // Subscripts with inout arguments (FIXME)and reabstracted arguments(/FIXME)
+  // don't have descriptors either.
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    for (auto *index : *sub->getIndices()) {
+      // Keypaths can't capture inout indices.
+      if (index->isInOut())
+        return false;
+      
+      auto indexTy = index->getInterfaceType()
+                        ->getCanonicalType(sub->getGenericSignatureOfContext());
+      
+      // TODO: Handle reabstraction and tuple explosion in thunk generation.
+      // This wasn't previously a concern because anything that was Hashable
+      // had only one abstraction level and no explosion.
+      
+      if (isa<TupleType>(indexTy))
+        return false;
+      
+      auto indexObjTy = indexTy;
+      if (auto objTy = indexObjTy.getOptionalObjectType())
+        indexObjTy = objTy;
+      
+      if (isa<AnyFunctionType>(indexObjTy)
+          || isa<AnyMetatypeType>(indexObjTy))
+        return false;
+    }
   }
 
   return true;

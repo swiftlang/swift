@@ -8003,9 +8003,25 @@ bool ConstraintSystem::applySolutionFix(
   case FixKind::UnwrapOptionalBase: {
     auto type = solution.simplifyType(getType(affected))
                 ->getRValueObjectType();
+    bool resultOptional = fix.first.isUnwrapOptionalBaseByOptionalChaining(*this);
+
+    // If we've resolved the member overload to one that returns an optional
+    // type, then the result of the expression is optional (and we want to offer
+    // only a '?' fixit) even though the constraint system didn't need to add any
+    // additional optionality.
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == fix.second) {
+        if (resolvedOverload->ImpliedType->getOptionalObjectType())
+          resultOptional = true;
+        break;
+      }
+      resolvedOverload = resolvedOverload->Previous;
+    }
+
     DeclName memberName = fix.first.getDeclNameArgument(*this);
     return diagnoseBaseUnwrapForMemberAccess(affected, type, memberName,
-                                             SourceRange());
+                                             resultOptional, SourceRange());
   }
 
   case FixKind::ForceDowncast: {

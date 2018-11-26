@@ -50,7 +50,7 @@ extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
 using namespace swift;
 
 % for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
  @private
@@ -109,7 +109,7 @@ swift_stdlib_NSObject_isEqual(NSObject *lhs,
   return (lhs == rhs) || [lhs isEqual:rhs];
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
     NSString *lhs, NSString *rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
@@ -117,7 +117,7 @@ int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
                          (__bridge CFStringRef)rhs, kCFCompareNonliteral);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 int32_t
 swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
                                                              void *Rhs) {
@@ -130,7 +130,7 @@ swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
   return Result;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 size_t
 swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
   CFHashCode Result = CFStringHashCString(bytes, len);

@@ -1318,7 +1318,7 @@
   },
   {
     "DiffItemKind": "SpecialCaseDiffItem",
-    "Usr": "c:@F@UIApplicationMain",
+    "Usr": "s:5UIKit17UIApplicationMainys5Int32VAD_SpySpys4Int8VGGSgSSSgAJtF",
     "SpecialCaseId": "UIApplicationMain"
   }
 ]

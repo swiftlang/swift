@@ -69,7 +69,7 @@ class SubClass : ExternalOpenClass {
   }
 
   override func nonOpenMethod() {} // expected-error {{overriding non-open instance method outside of its defining module}}
-  override var nonOpenProperty: Int { get{return 0} set{} } // expected-error {{overriding non-open var outside of its defining module}}
+  override var nonOpenProperty: Int { get{return 0} set{} } // expected-error {{overriding non-open property outside of its defining module}}
   override subscript(index: MarkerForNonOpenSubscripts) -> Int { // expected-error {{overriding non-open subscript outside of its defining module}}
     get { return 0 }
     set {}
@@ -78,7 +78,7 @@ class SubClass : ExternalOpenClass {
 
 open class InvalidOpenSubClass : ExternalOpenClass {
   public override func openMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{3-9=open}}
-  public override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{3-9=open}}
+  public override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{3-9=open}}
   public override subscript(index: MarkerForOpenSubscripts) -> Int { // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{3-9=open}}
     get { return 0 }
     set {}
@@ -87,7 +87,7 @@ open class InvalidOpenSubClass : ExternalOpenClass {
 
 open class InvalidOpenSubClass2 : ExternalOpenClass {
   internal override func openMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{3-11=open}}
-  internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{3-11=open}}
+  internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{3-11=open}}
   internal override subscript(index: MarkerForOpenSubscripts) -> Int { // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{3-11=open}}
     get { return 0 }
     set {}
@@ -105,7 +105,7 @@ open class OpenSubClassFinalMembers : ExternalOpenClass {
 
 open class InvalidOpenSubClassFinalMembers : ExternalOpenClass {
   final internal override func openMethod() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{9-17=public}}
-  final internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding var must be as accessible as its enclosing type}} {{9-17=public}}
+  final internal override var openProperty: Int { get{return 0} set{} } // expected-error {{overriding property must be as accessible as its enclosing type}} {{9-17=public}}
   final internal override subscript(index: MarkerForOpenSubscripts) -> Int { // expected-error {{overriding subscript must be as accessible as its enclosing type}} {{9-17=public}}
     get { return 0 }
     set {}

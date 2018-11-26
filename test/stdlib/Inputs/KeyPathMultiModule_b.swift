@@ -193,6 +193,104 @@ public func B_Int_storedB_keypath() -> KeyPath<B<Int>, Int> {
   return \B<Int>.storedB
 }
 
+open class ResilientRoot {
+  open var storedA = "a"
+  open var storedB = "b"
+
+  open var virtual: String {
+    get { return "foo" }
+    set { }
+  }
+
+  open var virtualRO: String {
+    get { return "foo" }
+  }
+
+  final public var final: String {
+    get { return "foo" }
+    set { }
+  }
+}
+
+open class ResilientSub: ResilientRoot {
+  open var storedC = "c"
+
+  override open var virtual: String {
+    get { return "bar" }
+    set { }
+  }
+
+  open var sub: String {
+    get { return "bar" }
+    set { }
+  }
+
+  open var subRO: String {
+    get { return "foo" }
+  }
+
+}
+
+public func ResilientRoot_storedA_keypath() -> KeyPath<ResilientRoot, String> {
+  return \ResilientRoot.storedA
+}
+public func ResilientRoot_storedB_keypath() -> KeyPath<ResilientRoot, String> {
+  return \ResilientRoot.storedB
+}
+public func ResilientRoot_virtual_keypath() -> KeyPath<ResilientRoot, String> {
+  return \ResilientRoot.virtual
+}
+public func ResilientRoot_virtualRO_keypath() -> KeyPath<ResilientRoot, String> {
+  return \ResilientRoot.virtualRO
+}
+public func ResilientRoot_final_keypath() -> KeyPath<ResilientRoot, String> {
+  return \ResilientRoot.final
+}
+public func ResilientSub_storedA_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.storedA
+}
+public func ResilientSub_storedB_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.storedB
+}
+public func ResilientSub_storedC_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.storedC
+}
+public func ResilientSub_virtual_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.virtual
+}
+public func ResilientSub_virtualRO_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.virtualRO
+}
+public func ResilientSub_final_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.final
+}
+public func ResilientSub_sub_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.sub
+}
+public func ResilientSub_subRO_keypath() -> KeyPath<ResilientSub, String> {
+  return \ResilientSub.subRO
+}
+
+public protocol ResilientRootProto {
+  var root: String { get }
+}
+
+public protocol ResilientSubProto: ResilientRootProto {
+  var sub: String { get }
+}
+
+extension Int: ResilientSubProto {
+  public var root: String { return "root" }
+  public var sub: String { return "sub" }
+}
+
+public func ResilientRootProto_root_keypath<T: ResilientRootProto>(_: T.Type) -> KeyPath<T, String> {
+  return \T.root
+}
+public func ResilientSubProto_sub_keypath<T: ResilientSubProto>(_: T.Type) -> KeyPath<T, String> {
+  return \T.sub
+}
+
 extension Int {
   public var appendTest: Int { return self }
 }
@@ -202,3 +300,4 @@ extension String {
 extension LifetimeTracked {
   public var appendTest: LifetimeTracked { return self }
 }
+

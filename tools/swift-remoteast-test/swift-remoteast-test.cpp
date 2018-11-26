@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 
@@ -139,6 +140,39 @@ LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
 extern "C" void printTypeMetadataMemberOffset(const Metadata *typeMetadata,
                                               const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
+}
+
+// FIXME: swiftcall
+/// func printDynamicTypeAndAddressForExistential<T>(_: T)
+LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI extern "C" void
+printDynamicTypeAndAddressForExistential(void *object,
+                                         const Metadata *typeMetadata) {
+  assert(Context && "context was not set");
+  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
+  RemoteASTContext remoteAST(*Context, std::move(reader));
+
+  auto &out = llvm::outs();
+
+  // First, retrieve the static type of the existential, so we can understand
+  // which kind of existential this is.
+  auto staticTypeResult =
+      remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  if (!staticTypeResult) {
+    out << "failed to resolve static type: "
+        << staticTypeResult.getFailure().render() << '\n';
+    return;
+  }
+
+  // OK, we can reconstruct the dynamic type and the address now.
+  auto result = remoteAST.getDynamicTypeAndAddressForExistential(
+      RemoteAddress(object), staticTypeResult.getValue());
+  if (result) {
+    out << "found type: ";
+    result.getValue().first.print(out);
+    out << "\n";
+  } else {
+    out << result.getFailure().render() << '\n';
+  }
 }
 
 namespace {

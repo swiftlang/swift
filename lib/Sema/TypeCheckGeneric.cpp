@@ -602,13 +602,12 @@ static bool isSelfDerivedOrConcrete(Type protoSelf, Type type) {
 
 // For a generic requirement in a protocol, make sure that the requirement
 // set didn't add any requirements to Self or its associated types.
-static bool checkProtocolSelfRequirements(GenericSignature *sig,
-                                          ValueDecl *decl,
-                                          TypeChecker &TC) {
+void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   // For a generic requirement in a protocol, make sure that the requirement
   // set didn't add any requirements to Self or its associated types.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
     auto protoSelf = proto->getSelfInterfaceType();
+    auto *sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
     for (auto req : sig->getRequirements()) {
       // If one of the types in the requirement is dependent on a non-Self
       // type parameter, this requirement is okay.
@@ -622,27 +621,21 @@ static bool checkProtocolSelfRequirements(GenericSignature *sig,
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      TC.diagnose(decl,
-                  TC.Context.LangOpts.EffectiveLanguageVersion[0] >= 4
-                    ? diag::requirement_restricts_self
-                    : diag::requirement_restricts_self_swift3,
-                  decl->getDescriptiveKind(), decl->getFullName(),
-                  req.getFirstType().getString(),
-                  static_cast<unsigned>(req.getKind()),
-                  req.getSecondType().getString());
-
-      if (TC.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
-        return true;
+      diagnose(decl,
+               Context.isSwiftVersion3()
+                 ? diag::requirement_restricts_self_swift3
+                 : diag::requirement_restricts_self,
+               decl->getDescriptiveKind(), decl->getFullName(),
+               req.getFirstType().getString(),
+               static_cast<unsigned>(req.getKind()),
+               req.getSecondType().getString());
     }
   }
-
-  return false;
 }
 
 /// All generic parameters of a generic function must be referenced in the
 /// declaration's type, otherwise we have no way to infer them.
-static void checkReferencedGenericParams(GenericContext *dc,
-                                         TypeChecker &TC) {
+void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   auto *genericParams = dc->getGenericParams();
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (!genericParams)
@@ -798,9 +791,9 @@ static void checkReferencedGenericParams(GenericContext *dc,
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      TC.diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
-                  paramDecl->getNameStr());
-      decl->setInterfaceType(ErrorType::get(TC.Context));
+      diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
+               paramDecl->getNameStr());
+      decl->setInterfaceType(ErrorType::get(Context));
       decl->setInvalid();
     }
   }
@@ -868,9 +861,6 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver))
     invalid = true;
 
-  if (!invalid)
-    invalid = checkProtocolSelfRequirements(sig, func, *this);
-
   if (invalid) {
     func->setInterfaceType(ErrorType::get(Context));
     func->setInvalid();
@@ -879,15 +869,9 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   func->computeType();
 
-  // We get bogus errors here with generic subscript materializeForSet.
-  if (!isa<AccessorDecl>(func) ||
-      !cast<AccessorDecl>(func)->isMaterializeForSet())
-    checkReferencedGenericParams(func, *this);
-
-  // Make sure that there are no unresolved
-  // dependent types in the generic signature.
-  assert(func->getInterfaceType()->hasError() ||
-         !func->getInterfaceType()->findUnresolvedDependentMemberType());
+  // Make sure that there are no unresolved dependent types in the
+  // generic signature.
+  assert(!func->getInterfaceType()->findUnresolvedDependentMemberType());
 }
 
 ///
@@ -1010,10 +994,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   CompleteGenericTypeResolver completeResolver(*this, sig);
   if (checkGenericSubscriptSignature(*this, nullptr, subscript, completeResolver))
     invalid = true;
-
-  if (!invalid)
-    invalid = checkProtocolSelfRequirements(sig, subscript, *this);
-
   if (invalid) {
     subscript->setInterfaceType(ErrorType::get(Context));
     subscript->setInvalid();
@@ -1022,8 +1002,6 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   }
 
   subscript->computeType();
-
-  checkReferencedGenericParams(subscript, *this);
 }
 
 ///
@@ -1210,7 +1188,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   pendingReqs.push_back({requirements, {}});
 
   auto *env = dc->getGenericEnvironmentOfContext();
-
+  ASTContext &ctx = dc->getASTContext();
   while (!pendingReqs.empty()) {
     auto current = pendingReqs.pop_back_val();
 
@@ -1342,7 +1320,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
       if (loc.isValid()) {
         // FIXME: Poor source-location information.
-        diagnose(loc, diagnostic, owner, firstType, secondType);
+        ctx.Diags.diagnose(loc, diagnostic, owner, firstType, secondType);
 
         std::string genericParamBindingsText;
         if (!genericParams.empty()) {
@@ -1350,11 +1328,11 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
             gatherGenericParamBindingsText(
               {rawFirstType, rawSecondType}, genericParams, substitutions);
         }
-        diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
-                 genericParamBindingsText);
+        ctx.Diags.diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+                           genericParamBindingsText);
 
-        ParentConditionalConformance::diagnoseConformanceStack(Diags, noteLoc,
-                                                               current.Parents);
+        ParentConditionalConformance::diagnoseConformanceStack(
+            ctx.Diags, noteLoc, current.Parents);
       }
 
       return RequirementCheckResult::Failure;

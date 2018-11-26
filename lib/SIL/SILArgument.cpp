@@ -188,6 +188,28 @@ SILValue SILPHIArgument::getIncomingValue(SILBasicBlock *BB) {
   return getIncomingValueForPred(Parent, BB, Index);
 }
 
+const SILPHIArgument *BranchInst::getArgForOperand(const Operand *oper) const {
+  assert(oper->getUser() == this);
+  return cast<SILPHIArgument>(
+      getDestBB()->getArgument(oper->getOperandNumber()));
+}
+
+const SILPHIArgument *
+CondBranchInst::getArgForOperand(const Operand *oper) const {
+  assert(oper->getUser() == this);
+
+  unsigned operIdx = oper->getOperandNumber();
+  if (isTrueOperandIndex(operIdx)) {
+    return cast<SILPHIArgument>(getTrueBB()->getArgument(
+        operIdx - getTrueOperands().front().getOperandNumber()));
+  }
+  if (isFalseOperandIndex(operIdx)) {
+    return cast<SILPHIArgument>(getFalseBB()->getArgument(
+        operIdx - getFalseOperands().front().getOperandNumber()));
+  }
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                            SILFunctionArgument
 //===----------------------------------------------------------------------===//

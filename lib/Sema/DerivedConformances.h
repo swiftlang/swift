@@ -137,7 +137,7 @@ public:
   /// associated values, and for structs with all-Hashable stored properties.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveHashable(TypeChecker &tc, NominalTypeDecl *type);
+  static bool canDeriveHashable(NominalTypeDecl *type);
 
   /// Derive a Hashable requirement for a type.
   ///

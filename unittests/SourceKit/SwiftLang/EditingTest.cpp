@@ -41,6 +41,8 @@ private:
     llvm_unreachable("unexpected error");
   }
 
+  bool syntaxMapEnabled() override { return true; }
+
   bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
     return false;
   }
@@ -49,6 +51,8 @@ private:
                                 UIdent Kind, bool isSystem) override {
     return false;
   }
+  
+  bool documentStructureEnabled() override { return false; }
 
   bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
@@ -97,7 +101,10 @@ private:
   }
 
   bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
+  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> ReusedNodeIds) override {
+    return false;
+  }
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
@@ -109,8 +116,6 @@ private:
       std::vector<SourceFileRange> ReuseRegions) override {
     return false;
   }
-
-  bool forceLibSyntaxBasedProcessing() override { return false; }
 };
 
 struct DocUpdateMutexState {
@@ -282,7 +287,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
 }
 
-TEST_F(EditTest, DiagsAfterCloseAndReopen) {
+// This test is failing occassionally in CI: rdar://42483323
+TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:
   // * the 2nd open happens before the first AST starts building

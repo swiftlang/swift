@@ -153,7 +153,7 @@ public:
   /// existential.
   bool hasOpenedExistential() const;
 
-  /// Query whether any replacement type sin the map contain dynamic Self.
+  /// Query whether any replacement types in the map contain dynamic Self.
   bool hasDynamicSelf() const;
 
   /// Whether the replacement types are all canonical.

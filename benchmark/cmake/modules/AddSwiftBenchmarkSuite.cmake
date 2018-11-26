@@ -40,6 +40,19 @@ macro(configure_build)
     message(FATAL_ERROR "Unsupported platform?!")
   endif()
 
+  set(PAGE_ALIGNMENT_OPTION "-Xllvm" "-align-module-to-page-size")
+  execute_process(
+      COMMAND "touch" "empty.swift"
+      RESULT_VARIABLE result
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+      COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
+      RESULT_VARIABLE result
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT "${result}" MATCHES "0")
+    set(PAGE_ALIGNMENT_OPTION "")
+  endif()
+
   # We always infer the SWIFT_LIBRARY_PATH from SWIFT_EXEC unless
   # SWIFT_LIBRARY_PATH is specified explicitly.
   if(NOT SWIFT_LIBRARY_PATH)
@@ -293,7 +306,7 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
-      "-${BENCH_COMPILE_ARCHOPTS_OPT}")
+      "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
 
   if (is_darwin)
     list(APPEND common_options

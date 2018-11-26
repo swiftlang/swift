@@ -1144,16 +1144,9 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
          == ResultConvention::Owned);
   auto nativeErrorType = bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
 
-  SILValue arg;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Guaranteed);
-    arg = bridgedError.getValue();
-  } else {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Owned);
-    arg = bridgedError.forward(*this);
-  }
+  assert(bridgeFnType->getParameters()[0].getConvention() ==
+	 ParameterConvention::Direct_Guaranteed);
+  SILValue arg = bridgedError.getValue();
 
   SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                        nativeErrorType, {}, arg);
@@ -1200,16 +1193,9 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
   auto loweredBridgedErrorType =
     bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
 
-  SILValue arg;
-  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Guaranteed);
-    arg = nativeError.getValue();
-  } else {
-    assert(bridgeFnType->getParameters()[0].getConvention() ==
-           ParameterConvention::Direct_Owned);
-    arg = nativeError.forward(*this);
-  }
+  assert(bridgeFnType->getParameters()[0].getConvention() ==
+	 ParameterConvention::Direct_Guaranteed);
+  SILValue arg = nativeError.getValue();
 
   SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
                                         loweredBridgedErrorType, {}, arg);

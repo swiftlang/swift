@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -308,9 +309,10 @@ BridgedProperty::outline(SILModule &M) {
 
   std::string name = getOutlinedFunctionName();
 
-  auto *Fun = M.getOrCreateFunction(ObjCMethod->getLoc(), name,
-                                    SILLinkage::Shared, FunctionType, IsNotBare,
-                                    IsNotTransparent, IsSerializable);
+  SILFunctionBuilder builder(M);
+  auto *Fun = builder.getOrCreateFunction(
+      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
+      IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
 
   if (Release) {
@@ -916,9 +918,10 @@ ObjCMethodCall::outline(SILModule &M) {
   auto FunctionType = getOutlinedFunctionType(M);
   std::string name = getOutlinedFunctionName();
 
-  auto *Fun = M.getOrCreateFunction(ObjCMethod->getLoc(), name,
-                                    SILLinkage::Shared, FunctionType, IsNotBare,
-                                    IsNotTransparent, IsSerializable);
+  SILFunctionBuilder builder(M);
+  auto *Fun = builder.getOrCreateFunction(
+      ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
+      IsNotTransparent, IsSerializable);
   bool NeedsDefinition = Fun->empty();
 
   // Call the outlined function.

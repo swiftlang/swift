@@ -40,7 +40,8 @@ SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx,
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 static std::error_code
-openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+openModuleFiles(clang::vfs::FileSystem &FS,
+                StringRef DirName, StringRef ModuleFilename,
                 StringRef ModuleDocFilename,
                 std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                 std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -60,7 +61,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
-  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
@@ -69,7 +70,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-      llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+      FS.getBufferForFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleDocOrErr &&
       ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
     return ModuleDocOrErr.getError();
@@ -150,14 +151,14 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   llvm::SmallString<128> currPath;
   isFramework = false;
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
-    auto err = openModuleFiles(path,
+    auto err = openModuleFiles(*ctx.SourceMgr.getFileSystem(), path,
                                moduleFilename.str(), moduleDocFilename.str(),
                                moduleBuffer, moduleDocBuffer,
                                scratch);
     if (err == std::errc::is_a_directory) {
       currPath = path;
       llvm::sys::path::append(currPath, moduleFilename.str());
-      err = openModuleFiles(currPath,
+      err = openModuleFiles(*ctx.SourceMgr.getFileSystem(), currPath,
                             archFile.str(), archDocFile.str(),
                             moduleBuffer, moduleDocBuffer,
                             scratch);
@@ -186,7 +187,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
       }
 
       llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
+      auto err = openModuleFiles(*ctx.SourceMgr.getFileSystem(),
+                                 currPath, archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer, scratch);
 
       if (err == std::errc::no_such_file_or_directory) {
@@ -224,7 +226,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // Search the runtime import path.
   isFramework = false;
-  return !openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
+  return !openModuleFiles(*ctx.SourceMgr.getFileSystem(),
+                          ctx.SearchPathOpts.RuntimeLibraryImportPath,
                           moduleFilename.str(), moduleDocFilename.str(),
                           moduleBuffer, moduleDocBuffer, scratch);
 }

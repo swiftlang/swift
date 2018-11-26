@@ -12,17 +12,18 @@
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -256,7 +257,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   GenericEnvironment *GenericEnv = nullptr;
   if (NewFTy->getGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
-  SILFunction *NewF = OrigF->getModule().createFunction(
+  SILFunctionBuilder builder(OrigF->getModule());
+  SILFunction *NewF = builder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),

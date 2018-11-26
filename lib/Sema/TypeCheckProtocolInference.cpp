@@ -176,6 +176,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   InferredAssociatedTypesByWitnesses result;
 
   auto isExtensionUsableForInference = [&](ExtensionDecl *extension) -> bool {
+
+    // The extension where the conformance being checked is declared.
+    auto conformanceExtension = checker.Conformance->
+      getDeclContext()->getAsDeclOrDeclExtensionContext();
+    if (extension == conformanceExtension)
+      return true;
+
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
     if (!extension->getExtendedType()->isAnyExistentialType()) {

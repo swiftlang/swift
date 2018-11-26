@@ -103,7 +103,7 @@
 // RUN: touch  %t/f_100_1.swift %t/f_100_2.swift %t/f_100_3.swift %t/f_100_4.swift %t/f_100_5.swift %t/f_100_6.swift %t/f_100_7.swift %t/f_100_8.swift %t/f_100_9.swift %t/f_100_10.swift
 // RUN: mkdir -p %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/
 // Force the repartitioning:
-// RUN: %swiftc_driver -driver-show-job-lifecycle -driver-force-one-batch-repartition -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
+// RUN: %swiftc_driver -driver-show-job-lifecycle -driver-batch-size-limit 10000 -driver-force-one-batch-repartition -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
 // RUN: %FileCheck %s <%t/out.txt
 // CHECK-NOT: unable to execute command
 // CHECK: Forming into 1 batches
@@ -113,7 +113,7 @@
 // CHECK: Forming batch job from 500 constituents
 //
 // Try it without the force; supplementary output file maps should obviate the repartition:
-// RUN: %swiftc_driver -driver-show-job-lifecycle -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out2.txt 2>&1
+// RUN: %swiftc_driver -driver-show-job-lifecycle -driver-batch-size-limit 10000 -v -c -module-name foo -o %t/additional/path/elements/often/make/filenames/longer/than/one/might/expect/especially/given/output/directories/deep/within/a/derived/data/folder/of/a/CI/machine/foo.o -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out2.txt 2>&1
 // RUN: %FileCheck %s <%t/out2.txt -check-prefix=NO-REPARTITION
 // CHECK-NOT: unable to execute command
 // NO-REPARTITION: Forming into 1 batches

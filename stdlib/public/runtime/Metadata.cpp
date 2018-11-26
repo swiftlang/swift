@@ -83,11 +83,19 @@ static void installGenericArguments(Metadata *metadata,
          generics.Base.getNumArguments() * sizeof(void*));
 }
 
+#if SWIFT_OBJC_INTEROP
+static ClassMetadataBounds computeMetadataBoundsForObjCClass(Class cls) {
+  cls = swift_getInitializedObjCClass(cls);
+  auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
+  return metadata->getClassBoundsAsSwiftSuperclass();
+}
+#endif
+
 static ClassMetadataBounds
 computeMetadataBoundsForSuperclass(const void *ref,
-                                   TypeMetadataRecordKind refKind) {
+                                   TypeReferenceKind refKind) {
   switch (refKind) {
-  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor: {
+  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
     auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
     if (!description) {
       swift::fatalError(0, "instantiating class metadata for class with "
@@ -96,25 +104,28 @@ computeMetadataBoundsForSuperclass(const void *ref,
     return description->getMetadataBounds();
   }
 
-  case TypeMetadataRecordKind::DirectNominalTypeDescriptor: {
+  case TypeReferenceKind::DirectNominalTypeDescriptor: {
     auto description = reinterpret_cast<const ClassDescriptor *>(ref);
     return description->getMetadataBounds();
   }
 
-  case TypeMetadataRecordKind::IndirectObjCClass:
+  case TypeReferenceKind::DirectObjCClassName: {
 #if SWIFT_OBJC_INTEROP
-    {
-      auto cls = *reinterpret_cast<const Class *>(ref);
-      cls = swift_getInitializedObjCClass(cls);
-      auto metadata = reinterpret_cast<const ClassMetadata *>(cls);
-      return metadata->getClassBoundsAsSwiftSuperclass();
-    }
+    auto cls = objc_lookUpClass(reinterpret_cast<const char *>(ref));
+    return computeMetadataBoundsForObjCClass(cls);
 #else
-    // fallthrough
-#endif
-
-  case TypeMetadataRecordKind::Reserved:
     break;
+#endif
+  }
+
+  case TypeReferenceKind::IndirectObjCClass: {
+#if SWIFT_OBJC_INTEROP
+    auto cls = *reinterpret_cast<const Class *>(ref);
+    return computeMetadataBoundsForObjCClass(cls);
+#else
+    break;
+#endif
+  }
   }
   swift_runtime_unreachable("unsupported superclass reference kind");
 }
@@ -220,13 +231,6 @@ namespace {
       return { metadata, state };
     }
 
-    static const TypeContextDescriptor *getDescription(Metadata *type) {
-      if (auto classType = dyn_cast<ClassMetadata>(type))
-        return classType->getDescription();
-      else
-        return cast<ValueMetadata>(type)->getDescription();
-    }
-
     TryInitializeResult tryInitialize(Metadata *metadata,
                                       PrivateMetadataState state,
                                PrivateMetadataCompletionContext *context) {
@@ -235,7 +239,8 @@ namespace {
       // Finish the completion function.
       if (state < PrivateMetadataState::NonTransitiveComplete) {
         // Find a pattern.  Currently we always use the default pattern.
-        auto &generics = getDescription(metadata)->getFullGenericContextHeader();
+        auto &generics = metadata->getTypeContextDescriptor()
+                                 ->getFullGenericContextHeader();
         auto pattern = generics.DefaultInstantiationPattern.get();
 
         // Complete the metadata's instantiation.
@@ -569,10 +574,6 @@ namespace {
 
       auto state = inferStateForMetadata(metadata);
       return { metadata, state };
-    }
-
-    static const TypeContextDescriptor *getDescription(Metadata *type) {
-      return cast<ValueMetadata>(type)->getDescription();
     }
 
     TryInitializeResult tryInitialize(Metadata *metadata,
@@ -1377,6 +1378,43 @@ static void performBasicLayout(TypeLayout &layout,
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 
+
+size_t swift::swift_getTupleTypeLayout2(TypeLayout *result,
+                                        const TypeLayout *elt0,
+                                        const TypeLayout *elt1) {
+  const TypeLayout *elts[] = { elt0, elt1 };
+  uint32_t offsets[2];
+  swift_getTupleTypeLayout(result, offsets,
+                           TupleTypeFlags().withNumElements(2), elts);
+  assert(offsets[0] == 0);
+  return offsets[1];
+}
+
+OffsetPair swift::swift_getTupleTypeLayout3(TypeLayout *result,
+                                            const TypeLayout *elt0,
+                                            const TypeLayout *elt1,
+                                            const TypeLayout *elt2) {
+  const TypeLayout *elts[] = { elt0, elt1, elt2 };
+  uint32_t offsets[3];
+  swift_getTupleTypeLayout(result, offsets,
+                           TupleTypeFlags().withNumElements(3), elts);
+  assert(offsets[0] == 0);
+  return {offsets[1], offsets[2]};
+}
+
+void swift::swift_getTupleTypeLayout(TypeLayout *result,
+                                     uint32_t *elementOffsets,
+                                     TupleTypeFlags flags,
+                                     const TypeLayout * const *elements) {
+  *result = TypeLayout();
+  performBasicLayout(*result, elements, flags.getNumElements(),
+    [](const TypeLayout *elt) { return elt; },
+    [elementOffsets](size_t i, const TypeLayout *elt, size_t offset) {
+      if (elementOffsets)
+        elementOffsets[i] = uint32_t(offset);
+    });
+}
+
 MetadataResponse
 swift::swift_getTupleTypeMetadata(MetadataRequest request,
                                   TupleTypeFlags flags,
@@ -1600,6 +1638,37 @@ swift::swift_getTupleTypeMetadata3(MetadataRequest request,
 /***************************************************************************/
 /*** Nominal type descriptors **********************************************/
 /***************************************************************************/
+
+namespace {
+  /// A class encapsulating everything interesting about the identity of
+  /// a type context *except* the identity of the parent context.
+  class TypeContextIdentity {
+    StringRef Name;
+  public:
+    explicit TypeContextIdentity(const TypeContextDescriptor *type) {
+      // Use the name of the type context.
+      Name = type->Name.get();
+
+      // If this is a synthesized entity, include the related entity tag.
+      if (type->isSynthesizedRelatedEntity()) {
+        auto tag = type->getSynthesizedDeclRelatedEntityTag();
+        assert(Name.end() + 1 == tag.begin());
+
+        // The length computation needs to include the \0 at the
+        // end of the name.
+        Name = StringRef(Name.begin(), Name.size() + tag.size() + 1);
+      }
+    }
+
+    bool operator==(const TypeContextIdentity &other) const {
+      return Name == other.Name;
+    }
+    int compare(const TypeContextIdentity &other) const {
+      return Name.compare(other.Name);
+    }
+  };
+}
+
 bool swift::equalContexts(const ContextDescriptor *a,
                           const ContextDescriptor *b)
 {
@@ -1640,20 +1709,7 @@ bool swift::equalContexts(const ContextDescriptor *a,
         && kind <= ContextDescriptorKind::Type_Last) {
       auto typeA = cast<TypeContextDescriptor>(a);
       auto typeB = cast<TypeContextDescriptor>(b);
-      if (strcmp(typeA->Name.get(), typeB->Name.get()) != 0)
-        return false;
-      
-      // A synthesized entity has to match the related entity tag too.
-      if (typeA->isSynthesizedRelatedEntity()) {
-        if (!typeB->isSynthesizedRelatedEntity())
-          return false;
-        
-        if (typeA->getSynthesizedDeclRelatedEntityTag()
-            != typeB->getSynthesizedDeclRelatedEntityTag())
-          return false;
-      }
-      
-      return true;
+      return TypeContextIdentity(typeA) == TypeContextIdentity(typeB);
     }
     
     // Otherwise, this runtime doesn't know anything about this context kind.
@@ -3097,147 +3153,122 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
 /*** Foreign types *********************************************************/
 /***************************************************************************/
 
-namespace {
-  /// A reference to a context descriptor, used as a uniquing key.
-  struct ContextDescriptorKey {
-    const TypeContextDescriptor *Data;
-  };
-} // end anonymous namespace
-
-template <>
-struct llvm::DenseMapInfo<ContextDescriptorKey> {
-  static ContextDescriptorKey getEmptyKey() {
-    return ContextDescriptorKey{(const TypeContextDescriptor*) 0};
-  }
-  static ContextDescriptorKey getTombstoneKey() {
-    return ContextDescriptorKey{(const TypeContextDescriptor*) 1};
-  }
-  static unsigned getHashValue(ContextDescriptorKey val) {
-    if ((uintptr_t)val.Data <= 1) {
-      return llvm::hash_value(val.Data);
-    }
-
-    // Hash by name.
-    // In full generality, we'd get a better hash by walking up the entire
-    // descriptor tree and hashing names all along the way, and we'd be faster
-    // if we special cased unique keys by hashing pointers. In practice, this
-    // is only used to unique foreign metadata records, which only ever appear
-    // in the "C" or "ObjC" special context, and are never unique.
-    
-    // llvm::hash_value(StringRef) is, unfortunately, defined out of
-    // line in a library we otherwise would not need to link against.
-    StringRef name(val.Data->Name.get());
-    return llvm::hash_combine_range(name.begin(), name.end());
-  }
-  static bool isEqual(ContextDescriptorKey lhs, ContextDescriptorKey rhs) {
-    if ((uintptr_t)lhs.Data <= 1 || (uintptr_t)rhs.Data <= 1) {
-      return lhs.Data == rhs.Data;
-    }
-    return equalContexts(lhs.Data, rhs.Data);
-  }
-};
-
 // We use a DenseMap over what are essentially StringRefs instead of a
 // StringMap because we don't need to actually copy the string.
 namespace {
-struct ForeignTypeState {
-  Mutex Lock;
-  ConditionVariable InitializationWaiters;
-  llvm::DenseMap<ContextDescriptorKey, const ForeignTypeMetadata *> Types;
-};
-} // end anonymous namespace
 
-static Lazy<ForeignTypeState> ForeignTypes;
+static const TypeContextDescriptor *
+getForeignTypeDescription(Metadata *metadata) {
+  if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata))
+    return foreignClass->getDescription();
+  return cast<ValueMetadata>(metadata)->getDescription();
+}
 
-const ForeignTypeMetadata *
-swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
-  // Fast path: check the invasive cache.
-  auto cache = nonUnique->getCacheValue();
-  if (cache.isInitialized()) {
-    return cache.getCachedUniqueMetadata();
+class ForeignMetadataCacheEntry
+  : public MetadataCacheEntryBase<ForeignMetadataCacheEntry, /*spurious*/ int> {
+
+  Metadata *Value;
+
+  friend MetadataCacheEntryBase;
+  ValueType getValue() {
+    return Value;
+  }
+  void setValue(ValueType value) {
+    swift_runtime_unreachable("should never be called");
   }
 
-  // Okay, check the global map.
-  auto &foreignTypes = ForeignTypes.get();
-  ContextDescriptorKey key{nonUnique->getTypeContextDescriptor()};
-  assert(key.Data
-         && "all foreign metadata should have a type context descriptor");
-  bool hasInit = cache.hasInitializationFunction();
+public:
+  static const char *getName() { return "ForeignMetadataCache"; }
 
-  const ForeignTypeMetadata *uniqueMetadata;
-  bool inserted;
+  template <class... Args>
+  ForeignMetadataCacheEntry(const TypeContextDescriptor *description,
+                            MetadataRequest request, Metadata *candidate)
+      : Value(candidate) {
+    // Remember that the metadata is still just a candidate until this
+    // is actually successfully installed in the concurrent map.
 
-  // A helper function to find the current entry for the key using the
-  // saved iterator if it's still valid.  This should only be called
-  // while the lock is held.
-  decltype(foreignTypes.Types.begin()) savedIterator;
-  size_t savedSize = 0;
-  auto getCurrentEntry = [&]() -> const ForeignTypeMetadata *& {
-    // The iterator may have been invalidated if the size of the map
-    // has changed since the last lookup.
-    if (foreignTypes.Types.size() != savedSize) {
-      savedSize = foreignTypes.Types.size();
-      savedIterator = foreignTypes.Types.find(key);
-      assert(savedIterator != foreignTypes.Types.end() &&
-             "entries cannot be removed from foreign types metadata map");
-    }
-    return savedIterator->second;
-  };
+    auto &init = description->getForeignMetadataInitialization();
 
-  {
-    ScopedLock guard(foreignTypes.Lock);
-
-    // Try to create an entry in the map.  The initial value of the entry
-    // is our copy of the metadata unless it has an initialization function,
-    // in which case we have to insert null as a placeholder to tell others
-    // to wait while we call the initializer.
-    auto valueToInsert = (hasInit ? nullptr : nonUnique);
-    auto insertResult = foreignTypes.Types.insert({key, valueToInsert});
-    inserted = insertResult.second;
-    savedIterator = insertResult.first;
-    savedSize = foreignTypes.Types.size();
-    uniqueMetadata = savedIterator->second;
-
-    // If we created the entry, then the unique metadata is our copy.
-    if (inserted) {
-      uniqueMetadata = nonUnique;
-
-    // If we didn't create the entry, but it's null, then we have to wait
-    // until it becomes non-null.
+    PrivateMetadataState state;
+    if (!init.CompletionFunction) {
+      if (areAllTransitiveMetadataComplete_cheap(candidate)) {
+        state = PrivateMetadataState::Complete;
+      } else {
+        state = PrivateMetadataState::NonTransitiveComplete;
+      }
     } else {
-      while (uniqueMetadata == nullptr) {
-        foreignTypes.Lock.wait(foreignTypes.InitializationWaiters);
-        uniqueMetadata = getCurrentEntry();
+      state = inferStateForMetadata(candidate);
+    }
+
+    flagAllocatedDuringConstruction(state);
+  }
+
+  enum : bool { MayFlagAllocatedDuringConstruction = true };
+
+  const TypeContextDescriptor *getDescription() const {
+    return getForeignTypeDescription(Value);
+  }
+
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<int>, Args &&...) {
+    return 0;
+  }
+
+  intptr_t getKeyIntValueForDump() const {
+    return reinterpret_cast<intptr_t>(getDescription()->Name.get());
+  }
+
+  int compareWithKey(const TypeContextDescriptor *key) const {
+    // We can just compare unparented type-context identities because
+    // we assume that foreign types don't have interesting parenting
+    // structure.
+    return TypeContextIdentity(key)
+             .compare(TypeContextIdentity(getDescription()));
+  }
+
+  AllocationResult allocate(Metadata *candidate) {
+    swift_runtime_unreachable(
+                        "always flags allocation complete during construction");
+  }
+
+  TryInitializeResult tryInitialize(Metadata *metadata,
+                                    PrivateMetadataState state,
+                                    PrivateMetadataCompletionContext *ctxt) {
+    assert(state != PrivateMetadataState::Complete);
+
+    // Finish the completion function.
+    auto &init = getDescription()->getForeignMetadataInitialization();
+    if (init.CompletionFunction) {
+      // Try to complete the metadata's instantiation.
+      auto dependency =
+        init.CompletionFunction(metadata, &ctxt->Public, nullptr);
+
+      // If this failed with a dependency, infer the current metadata state
+      // and return.
+      if (dependency) {
+        return { inferStateForMetadata(metadata), dependency };
       }
     }
+
+    // Check for transitive completeness.
+    if (auto dependency = checkTransitiveCompleteness(metadata)) {
+      return { PrivateMetadataState::NonTransitiveComplete, dependency };
+    }
+
+    // We're done.
+    return { PrivateMetadataState::Complete, MetadataDependency() };
   }
+};
 
-  // If we inserted the entry and there's an initialization function,
-  // call it.  This has to be done with the lock dropped.
-  if (inserted && hasInit) {
-    nonUnique->getInitializationFunction()(nonUnique);
+} // end anonymous namespace
 
-    // Update the cache entry:
+static Lazy<MetadataCache<ForeignMetadataCacheEntry, false>> ForeignMetadata;
 
-    //   - Reacquire the lock.
-    ScopedLock guard(foreignTypes.Lock);
-
-    //   - Change the entry.
-    auto &entry = getCurrentEntry();
-    assert(entry == nullptr);
-    entry = nonUnique;
-
-    //   - Notify waiters.
-    foreignTypes.InitializationWaiters.notifyAll();
-  }
-
-  // Remember the unique result in the invasive cache.  We don't want
-  // to do this until after the initialization completes; otherwise,
-  // it will be possible for code to fast-path through this function
-  // too soon.
-  nonUnique->setCachedUniqueMetadata(uniqueMetadata);
-
-  return uniqueMetadata;
+MetadataResponse
+swift::swift_getForeignTypeMetadata(MetadataRequest request,
+                                    ForeignTypeMetadata *candidate) {
+  auto description = getForeignTypeDescription(candidate);
+  return ForeignMetadata->getOrInsert(description, request, candidate).second;
 }
 
 /// Unique-ing of foreign types' witness tables.
@@ -3628,16 +3659,25 @@ static Result performOnMetadataCache(const Metadata *metadata,
     if (tupleMetadata->NumElements == 0)
       return std::move(callbacks).forOtherMetadata(tupleMetadata);
     return std::move(callbacks).forTupleMetadata(tupleMetadata);
+  } else if (auto foreignClass = dyn_cast<ForeignClassMetadata>(metadata)) {
+    return std::move(callbacks).forForeignMetadata(foreignClass,
+                                                foreignClass->getDescription());
   } else {
     return std::move(callbacks).forOtherMetadata(metadata);
   }
 
   if (!description->isGeneric()) {
-    if (description->hasInPlaceMetadataInitialization()) {
+    switch (description->getMetadataInitialization()) {
+    case TypeContextDescriptorFlags::NoMetadataInitialization:
+      return std::move(callbacks).forOtherMetadata(metadata);
+
+    case TypeContextDescriptorFlags::ForeignMetadataInitialization:
+      return std::move(callbacks).forForeignMetadata(metadata, description);
+
+    case TypeContextDescriptorFlags::InPlaceMetadataInitialization:
       return std::move(callbacks).forInPlaceMetadata(description);
     }
-
-    return std::move(callbacks).forOtherMetadata(metadata);
+    swift_runtime_unreachable("bad metadata initialization kind");
   }
 
   auto &generics = description->getFullGenericContextHeader();
@@ -3665,6 +3705,11 @@ bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
       return cache.enqueue(key, QueueEntry, Dependency);
     }
 
+    bool forForeignMetadata(const Metadata *metadata,
+                            const TypeContextDescriptor *description) {
+      return ForeignMetadata.get().enqueue(description, QueueEntry, Dependency);
+    }
+
     bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
       return InPlaceMetadata.get().enqueue(description, QueueEntry, Dependency);
     }
@@ -3690,6 +3735,11 @@ void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
       cache.resumeInitialization(key, QueueEntry);
+    }
+
+    void forForeignMetadata(const Metadata *metadata,
+                            const TypeContextDescriptor *description) {
+      ForeignMetadata.get().resumeInitialization(description, QueueEntry);
     }
 
     void forInPlaceMetadata(const TypeContextDescriptor *description) && {
@@ -3720,6 +3770,11 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
                                       GenericMetadataCache &cache,
                                       MetadataCacheKey key) && {
       return cache.await(key, Request);
+    }
+
+    MetadataResponse forForeignMetadata(const Metadata *metadata,
+                            const TypeContextDescriptor *description) {
+      return ForeignMetadata.get().await(description, Request);
     }
 
     MetadataResponse forInPlaceMetadata(
@@ -3767,6 +3822,14 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
 
     return false;
 
+  // Foreign classes require their superclass to be transitively complete.
+  } else if (auto foreignClassType = dyn_cast<ForeignClassMetadata>(type)) {
+    if (auto super = foreignClassType->Superclass) {
+      if (predicate(super))
+        return true;
+    }
+    return false;
+
   // Other types do not have transitive completeness requirements.
   } else {
     return false;
@@ -3798,7 +3861,7 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
 /// Do a quick check to see if all the transitive type metadata are complete.
 static bool
 areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
-  // Look for any transitive metadata that's incomplete.
+  // Look for any transitive metadata that's *incomplete*.
   return !findAnyTransitiveMetadata(type, [](const Metadata *type) {
     struct IsIncompleteCallbacks {
       bool forGenericMetadata(const Metadata *type,
@@ -3808,6 +3871,17 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
         // Metadata cache lookups aren't really cheap enough for this
         // optimization.
         return true;
+      }
+
+      bool forForeignMetadata(const Metadata *metadata,
+                              const TypeContextDescriptor *description) {
+        // If the type doesn't have a completion function, we can assume
+        // it's transitively complete by construction.
+        if (!description->getForeignMetadataInitialization().CompletionFunction)
+          return false;
+
+        // TODO: it might be worth doing a quick check against the cache here.
+        return false;
       }
 
       bool forInPlaceMetadata(const TypeContextDescriptor *description) && {
@@ -3970,6 +4044,11 @@ checkMetadataDependency(MetadataDependency dependency) {
                                           GenericMetadataCache &cache,
                                           MetadataCacheKey key) && {
       return cache.checkDependency(key, Requirement);
+    }
+
+    MetadataDependency forForeignMetadata(const Metadata *metadata,
+                                    const TypeContextDescriptor *description) {
+      return ForeignMetadata.get().checkDependency(description, Requirement);
     }
 
     MetadataDependency forInPlaceMetadata(

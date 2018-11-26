@@ -4945,9 +4945,9 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
-      StringRef value = "";
+      std::string value;
       if (loc.isValid())
-        value = ctx.SourceMgr.getBufferIdentifierForLoc(loc);
+        value = ctx.SourceMgr.getDisplayNameForLoc(loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();

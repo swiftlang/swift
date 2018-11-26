@@ -46,7 +46,9 @@ public let Suffix = [
   BenchmarkInfo(
     name: "Suffix${Name}",
     runFunction: run_Suffix${Name},
-    tags: [.validation, .api${', .Array, .unstable' if Name == 'Array' or Name == 'ArrayLazy' else ''}]),
+    tags: [.validation, .api${
+      ', .Array, .unstable' if Name == 'Array' or Name == 'ArrayLazy' else
+        ', .unstable' if 'CountableRange' in Name else ''}]),
 % end
 ]
 

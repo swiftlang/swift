@@ -65,7 +65,7 @@ extension first_decl_class_1 : P1 {}
 // FIRST: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
 // FIRST: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
-// SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
 // SECOND: Extension/ RawComment=[/// Comment for bar1\n] BriefComment=[Comment for bar1]
 // SECOND: Extension/ RawComment=[/// Comment for bar2\n] BriefComment=[Comment for bar2]
 // SECOND: Extension/ RawComment=[/// Comment for no member extension\n] BriefComment=[Comment for no member extension]
+// SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]

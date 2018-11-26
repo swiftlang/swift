@@ -400,12 +400,9 @@ ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
   return MethodInfo(offset);
 }
 
-Size ClassMetadataLayout::getStaticMethodOffset(SILDeclRef method) const{
-  auto &stored = getStoredMethodInfo(method);
-
-  assert(stored.TheOffset.isStatic() &&
-         "resilient class metadata layout unsupported!");
-  return stored.TheOffset.getStaticOffset();
+MetadataLayout::StoredOffset
+ClassMetadataLayout::getMethodOffsetInfo(SILDeclRef method) const {
+  return getStoredMethodInfo(method).TheOffset;
 }
 
 Offset
@@ -613,8 +610,9 @@ ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
             ForeignClassMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
-    void noteStartOfSuperClass() {
+    void addSuperclass() {
       Layout.SuperClassOffset = getNextOffset();
+      super::addSuperclass();
     }
 
     void layout() {

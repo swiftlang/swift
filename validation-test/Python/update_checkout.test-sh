@@ -1,1 +1,10 @@
-// RUN: %{python} -m unittest discover -s %swift_src_root/utils/update_checkout
+# RUN: %{python} -m unittest discover -s %swift_src_root/utils/update_checkout
+
+# Do not run this when doing simulator or device testing on darwin.
+#
+# Otherwise, we are running these unittests multiple times without providing
+# value. We want to still run this on linux though.
+#
+# UNSUPPORTED: OS=ios
+# UNSUPPORTED: OS=watchos
+# UNSUPPORTED: OS=tvos

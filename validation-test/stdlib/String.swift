@@ -2,15 +2,14 @@
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
 // RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
 // RUN: fi
 
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret
-// <rdar://problem/41372546> Migrate validation-test/stdlib/String.swift off Swift 3
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -227,10 +226,6 @@ StringTests.test("ForeignIndexes/Valid") {
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
     expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
-    expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
-    expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 2)..<donor.index(_nth: 5)])
   }
 }
 
@@ -485,7 +480,7 @@ StringTests.test("substringDoesNotCopy/Swift3")
       }
       var s0 = String(repeating: "x", count: size)
       let originalIdentity = s0.bufferID
-      s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+      s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
       expectEqual(originalIdentity, s0.bufferID)
     }
   }
@@ -538,18 +533,20 @@ StringTests.test("appendToEmptyString") {
 }
 
 StringTests.test("Swift3Slice/Empty") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
+  expectNotNil(s.bufferID)
   for i in 0 ... size {
     let slice = s[s.index(_nth: i)..<s.index(_nth: i)]
-    // Most Swift 3 substrings are extracted into their own buffer,
-    // but empty substrings get turned into the empty string singleton
-    expectNil(slice.bufferID)
+    // Empty substrings still have indices relative to their base and can refer
+    // to the whole string. If the whole string has storage, so should its
+    // substring.
+    expectNotNil(slice.bufferID)
   }
 }
 
 StringTests.test("Swift3Slice/Full") {
-  let size = 5
+  let size = 16
   let s = String(repeating: "x", count: size)
   let slice = s[s.startIndex..<s.endIndex]
   // Most Swift 3 substrings are extracted into their own buffer,
@@ -566,7 +563,7 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(repeating: "x", count: initialSize)
-        s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+        s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
         s0 += "x"
         expectEqual(
           String(
@@ -604,7 +601,7 @@ StringTests.test("appendToSubstringBug")
     
     // This sorta checks for the original bug
     expectEqual(
-      cap, s0[s0.index(_nth: 1)..<s0.endIndex].unusedCapacity)
+      cap, String(s0[s0.index(_nth: 1)..<s0.endIndex]).unusedCapacity)
     
     return (s0, cap)
   }
@@ -612,7 +609,7 @@ StringTests.test("appendToSubstringBug")
   do {
     var (s, _) = { ()->(String, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
-      return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
+      return (String(s0[s0.index(_nth: 5)..<s0.endIndex]), unused)
     }()
     let originalID = s.bufferID
     // Appending to a String always results in storage that 
@@ -1327,7 +1324,7 @@ StringTests.test("indexConversion")
   ) {
     result, flags, stop
   in
-    let r = result!.rangeAt(1)
+    let r = result!.range(at: 1)
     let start = String.UTF16Index(encodedOffset: r.location)
     let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)

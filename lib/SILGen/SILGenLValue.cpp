@@ -1982,6 +1982,38 @@ namespace {
       // Mark the projected address's dependence on the owner.
       projectedAddr = SGF.B.createMarkDependence(loc, projectedAddr,
                                                  projectedOwner.getValue());
+      
+      // Push a cleanup to destroy the owner object. We don't want to leave
+      // it to release whenever because the key path implementation hangs
+      // the writeback operations specific to the traversal onto the destruction
+      // of the owner.
+      struct DestroyOwnerPseudoComponent : WritebackPseudoComponent {
+        ManagedValue owner;
+        
+        DestroyOwnerPseudoComponent(const LValueTypeData &typeData,
+                                    ManagedValue owner)
+          : WritebackPseudoComponent(typeData), owner(owner)
+        {}
+        
+        void writeback(SILGenFunction &SGF, SILLocation loc,
+                       ManagedValue base,
+                       MaterializedLValue materialized,
+                       bool isFinal) override {
+          SGF.Cleanups.popAndEmitCleanup(owner.getCleanup(),
+                                         CleanupLocation::get(loc),
+                                         NotForUnwind);
+        }
+        
+        void dump(raw_ostream &OS, unsigned indent) const override {
+          OS << "DestroyOwnerPseudoComponent";
+        }
+      };
+      
+      std::unique_ptr<LogicalPathComponent> component(
+        new DestroyOwnerPseudoComponent(getTypeData(), projectedOwner));
+      
+      pushWriteback(SGF, loc, std::move(component), base, MaterializedLValue());
+
       return ManagedValue::forLValue(projectedAddr);
     }
 

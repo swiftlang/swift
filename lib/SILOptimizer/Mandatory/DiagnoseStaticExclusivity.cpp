@@ -791,19 +791,18 @@ static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
 
   // Next, recursively check any noescape closures passed as arguments at this
   // apply site.
+  TinyPtrVector<PartialApplyInst *> partialApplies;
   for (SILValue Argument : Apply.getArguments()) {
     auto FnType = getSILFunctionTypeForValue(Argument);
     if (!FnType || !FnType->isNoEscape())
       continue;
 
-    FindClosureResult result = findClosureForAppliedArg(Argument);
-    if (!result.PAI)
-      continue;
-
-    checkForViolationAtApply(ApplySite(result.PAI), State);
+    findClosuresForFunctionValue(Argument, partialApplies);
   }
-  // Finally, continue recursively walking up the chain of applies.
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Apply.getCalleeOrigin()))
+  // Continue recursively walking up the chain of applies if necessary.
+  findClosuresForFunctionValue(Apply.getCallee(), partialApplies);
+
+  for (auto *PAI : partialApplies)
     checkForViolationAtApply(ApplySite(PAI), State);
 }
 
@@ -961,91 +960,136 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
 // Verification
 
 #ifndef NDEBUG
-// If a partial apply has @inout_aliasable arguments, it may only be used as
-// a @noescape function type in a way that is recognized by
-// DiagnoseStaticExclusivity.
-static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
-  SmallVector<Operand *, 8> uses(PAI->getUses());
-  while (!uses.empty()) {
-    Operand *oper = uses.pop_back_val();
-    SILInstruction *user = oper->getUser();
+// This must handle exactly the same SIL patterns as
+// swift::funcClosureForAppliedArg but in forward order.
+template <typename FollowUse>
+static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
+  SILInstruction *user = oper->getUser();
 
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
-      continue;
+  // Ignore uses that are totally uninteresting.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+    return;
 
-    if (auto *MD = dyn_cast<MarkDependenceInst>(user)) {
-      if (oper->getOperandNumber() == MarkDependenceInst::Base)
-        continue;
-      uses.append(MD->getUses().begin(), MD->getUses().end());
-      continue;
-    }
+  // Look through copies, borrows, and conversions.
+  //
+  // Note: This handles ConversionInst, which already includes everything in
+  // swift::stripConvertFunctions.
+  if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
+    followUses(copy);
+    return;
+  }
 
-    if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
-      uses.append(copy->getUses().begin(), copy->getUses().end());
-      continue;
-    }
-    if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(user)) {
-       uses.append(cvt->getUses().begin(), cvt->getUses().end());
-      continue;
-    }
+  switch (user->getKind()) {
+  default:
+    break;
+
+  // Look through Optionals.
+  case SILInstructionKind::EnumInst:
     // @noescape block storage can be passed as an Optional (Nullable).
-    if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
-      uses.append(EI->getUses().begin(), EI->getUses().end());
-      continue;
-    }
-    // Recurse through partial_apply to handle special cases before handling
-    // ApplySites in general below.
-    if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(user)) {
-      // Use the same logic as checkForViolationAtApply applied to a def-use
-      // traversal.
-      //
-      // checkForViolationAtApply recurses through partial_apply chains.
-      if (oper->get() == PAI->getCallee()) {
-        uses.append(PAI->getUses().begin(), PAI->getUses().end());
-        continue;
-      }
-      // checkForViolationAtApply also uses findClosureForAppliedArg which in
-      // turn checks isPartialApplyOfReabstractionThunk.
-      //
-      // A closure with @inout_aliasable arguments may be applied to a
-      // thunk as "escaping", but as long as the thunk is only used as a
-      // '@noescape" type then it is safe.
-      if (isPartialApplyOfReabstractionThunk(PAI)) {
-        uses.append(PAI->getUses().begin(), PAI->getUses().end());
-        continue;
-      }
-    }
-    if (isa<ApplySite>(user)) {
-      SILValue arg = oper->get();
-      auto ArgumentFnType = getSILFunctionTypeForValue(arg);
-      if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
-        // Verify that the inverse operation, finding a partial_apply from a
-        // @noescape argument, is consistent.
-        assert(findClosureForAppliedArg(arg).PAI &&
-               "cannot find partial_apply from @noescape function argument");
-        continue;
-      }
-      llvm::dbgs() << "Argument must be @noescape function type: " << *arg;
-      llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                       "used as a @noescape function type argument.");
-    }
-    auto *store = dyn_cast<StoreInst>(user);
-    if (store && oper->getOperandNumber() == StoreInst::Src) {
-      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(store->getDest())) {
+    followUses(cast<EnumInst>(user));
+    return;
+
+  // Look through Phis.
+  case SILInstructionKind::BranchInst: {
+    const SILPHIArgument *arg = cast<BranchInst>(user)->getArgForOperand(oper);
+    followUses(arg);
+    return;
+  }
+  case SILInstructionKind::CondBranchInst: {
+    const SILPHIArgument *arg =
+        cast<CondBranchInst>(user)->getArgForOperand(oper);
+    if (arg) // If the use isn't the branch condition, follow it.
+      followUses(arg);
+    return;
+  }
+  // Look through ObjC closures.
+  case SILInstructionKind::StoreInst:
+    if (oper->getOperandNumber() == StoreInst::Src) {
+      if (auto *PBSI = dyn_cast<ProjectBlockStorageInst>(
+            cast<StoreInst>(user)->getDest())) {
         SILValue storageAddr = PBSI->getOperand();
         // The closure is stored to block storage. Recursively visit all
         // uses of any initialized block storage values derived from this
         // storage address..
         for (Operand *oper : storageAddr->getUses()) {
           if (auto *IBS = dyn_cast<InitBlockStorageHeaderInst>(oper->getUser()))
-            uses.append(IBS->getUses().begin(), IBS->getUses().end());
+            followUses(IBS);
         }
-        continue;
+        return;
       }
     }
+    break;
+
+  case SILInstructionKind::PartialApplyInst: {
+    // Recurse through partial_apply to handle special cases before handling
+    // ApplySites in general below.
+    PartialApplyInst *PAI = cast<PartialApplyInst>(user);
+    // Use the same logic as checkForViolationAtApply applied to a def-use
+    // traversal.
+    //
+    // checkForViolationAtApply recurses through partial_apply chains.
+    if (oper->get() == PAI->getCallee()) {
+      followUses(PAI);
+      return;
+    }
+    // checkForViolationAtApply also uses findClosuresForAppliedArg which in
+    // turn checks isPartialApplyOfReabstractionThunk.
+    //
+    // A closure with @inout_aliasable arguments may be applied to a
+    // thunk as "escaping", but as long as the thunk is only used as a
+    // '@noescape" type then it is safe.
+    if (isPartialApplyOfReabstractionThunk(PAI)) {
+      followUses(PAI);
+      return;
+    }
+    // Handle this use like a normal applied argument.
+    break;
+  }
+  };
+
+  // Handle ApplySites in general after checking PartialApply above.
+  if (isa<ApplySite>(user)) {
+    SILValue arg = oper->get();
+    auto argumentFnType = getSILFunctionTypeForValue(arg);
+    if (argumentFnType && argumentFnType->isNoEscape()) {
+      // Verify that the inverse operation, finding a partial_apply from a
+      // @noescape argument, is consistent.
+      TinyPtrVector<PartialApplyInst *> partialApplies;
+      findClosuresForFunctionValue(arg, partialApplies);
+      assert(!partialApplies.empty()
+             && "cannot find partial_apply from @noescape function argument");
+      return;
+    }
+    llvm::dbgs() << "Applied argument must be @noescape function type: " << *arg;
+  }
+  else
     llvm::dbgs() << "Unexpected partial_apply use: " << *user;
-    llvm_unreachable("A partial_apply with @inout_aliasable may only be "
-                     "used as a @noescape function type argument.");
+
+  llvm_unreachable("A partial_apply with @inout_aliasable may only be "
+                   "used as a @noescape function type argument.");
+}
+
+// If a partial apply has @inout_aliasable arguments, it may only be used as
+// a @noescape function type in a way that is recognized by
+// DiagnoseStaticExclusivity.
+static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
+  SmallVector<Operand *, 8> uses;
+  // Avoid exponential path exploration.
+  llvm::SmallDenseSet<Operand *, 8> visited;
+  auto uselistInsert = [&](Operand *operand) {
+    if (visited.insert(operand).second)
+      uses.push_back(operand);
+  };
+
+  for (Operand *use : PAI->getUses())
+    uselistInsert(use);
+
+  while (!uses.empty()) {
+    Operand *oper = uses.pop_back_val();
+    checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+      for (Operand *use : V->getUses())
+        uselistInsert(use);
+    });
   }
 }
 #endif

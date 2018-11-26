@@ -198,6 +198,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 /// All type check requests go into the Sema area.
 #define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
 #include "swift/AST/AccessTypeIDZone.def"
+#include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #undef SWIFT_TYPEID
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // Ensure that key path exprs can tolerate being re-type-checked when necessary
 // to diagnose other errors in adjacent exprs.

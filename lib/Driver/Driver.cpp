@@ -618,6 +618,12 @@ static void validateEmbedBitcode(DerivedArgList &Args, const OutputInfo &OI,
     Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
     Args.eraseArg(options::OPT_embed_bitcode);
   }
+
+  if (Args.hasArg(options::OPT_embed_bitcode_marker) &&
+      OI.CompilerOutputType != file_types::TY_Object) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode_marker);
+    Args.eraseArg(options::OPT_embed_bitcode_marker);
+  }
 }
 
 /// Gets the filelist threshold to use. Diagnoses and returns true on error.
@@ -754,6 +760,22 @@ computeContinueBuildingAfterErrors(const bool BatchMode,
 
 }
 
+static Optional<unsigned>
+getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
+                        DiagnosticEngine &Diags)
+{
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_size_limit)) {
+    unsigned Limit = 0;
+    if (StringRef(A->getValue()).getAsInteger(10, Limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    } else {
+      return Limit;
+    }
+  }
+  return None;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -880,6 +902,8 @@ Driver::buildCompilation(const ToolChain &TC,
   {
     const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
     const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+    const Optional<unsigned> DriverBatchSizeLimit =
+      getDriverBatchSizeLimit(*ArgList, Diags);
     const bool DriverForceOneBatchRepartition =
     ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
@@ -903,6 +927,7 @@ Driver::buildCompilation(const ToolChain &TC,
         BatchMode,
         DriverBatchSeed,
         DriverBatchCount,
+        DriverBatchSizeLimit,
         DriverForceOneBatchRepartition,
         SaveTemps,
         ShowDriverTimeCompilation,
@@ -1385,6 +1410,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
+    case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
       OI.CompilerOutputType = file_types::TY_Nothing;
       break;

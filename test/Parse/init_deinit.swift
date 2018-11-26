@@ -11,7 +11,6 @@ struct FooStructConstructorB {
 struct FooStructConstructorC {
   init {} // expected-error {{expected '('}}{{7-7=()}}
   init<T> {} // expected-error {{expected '('}} {{10-10=()}}
-	// expected-error@-1{{generic parameter 'T' is not used in function signature}}
   init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
 }
 

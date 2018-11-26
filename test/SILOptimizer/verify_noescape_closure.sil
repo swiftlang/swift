@@ -11,7 +11,7 @@
 import Builtin
 import Swift
 
-// CHECK: Argument must be @noescape function type: %{{.*}} = partial_apply
+// CHECK: Applied argument must be @noescape function type: %{{.*}} = partial_apply
 // CHECK: A partial_apply with @inout_aliasable may only be used as a @noescape function type argument.
 
 sil @takesEscapingClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()

@@ -48,7 +48,7 @@
 #define AUTORELEASEPOOL
 #endif
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 size_t swift_stdlib_NSStringHashValue(NSString *str,
                                       bool isASCII) {
   AUTORELEASEPOOL {
@@ -56,7 +56,7 @@ size_t swift_stdlib_NSStringHashValue(NSString *str,
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 size_t
 swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   NSString __unsafe_unretained *str =
@@ -66,7 +66,7 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringLowercaseString(NSString *str) {
   AUTORELEASEPOOL {
@@ -74,7 +74,7 @@ swift_stdlib_NSStringLowercaseString(NSString *str) {
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 NS_RETURNS_RETAINED NSString *
 swift_stdlib_NSStringUppercaseString(NSString *str) {
   AUTORELEASEPOOL {

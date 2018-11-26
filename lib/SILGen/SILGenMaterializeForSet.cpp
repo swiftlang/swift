@@ -155,24 +155,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "ASTVisitor.h"
 #include "ArgumentSource.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
-#include "Initialization.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
-#include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -716,7 +717,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callbackLinkage =
       F.isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
 
-  auto callback = SGM.M.createFunction(
+  SILFunctionBuilder builder(SGM.M);
+  auto callback = builder.createFunction(
       callbackLinkage, CallbackName, callbackType, genericEnv,
       SILLocation(Witness), IsBare, F.isTransparent(), F.isSerialized(),
       F.getEntryCount(), IsNotThunk, SubclassScope::NotApplicable,

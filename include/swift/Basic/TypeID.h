@@ -20,6 +20,7 @@
 #define SWIFT_BASIC_TYPEID_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <cstdint>
 #include <string>
 #include <vector>

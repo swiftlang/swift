@@ -758,6 +758,8 @@ extension Int {
 }
 
 
+func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
+
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
@@ -770,6 +772,9 @@ struct LetProperties {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
+
+  func methodTakesInOut(_ x: inout Int) {}
+  func throwingMethodTakesInOut(_ x: inout Int) throws {}
 
   // Let properties can be initialized naturally exactly once along any given
   // path through an initializer.
@@ -810,12 +815,13 @@ struct LetProperties {
   }  // expected-error {{return from initializer without initializing all stored properties}}
 
   // inout uses of let properties are an error.
-  init() {
+  init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     var variable = 42
     swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    
+    try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
+
     u.inspect()  // ok, non mutating.
     u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
@@ -823,6 +829,9 @@ struct LetProperties {
     arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
     arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
     arr[12] = 17   // expected-error {{mutating subscript 'subscript' may not be used on immutable value 'self.arr'}}
+
+    methodTakesInOut(&u)  // expected-error {{mutating method 'methodTakesInOut' may not be used on immutable value 'self.u'}}
+    try throwingMethodTakesInOut(&u)  // expected-error {{mutating method 'throwingMethodTakesInOut' may not be used on immutable value 'self.u'}}
   }
 }
 

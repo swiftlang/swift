@@ -57,6 +57,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
+  case ActionType::DumpTypeInfo:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -91,6 +92,7 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
+  case ActionType::DumpTypeInfo:
     return false;
   }
   llvm_unreachable("Unknown ActionType");
@@ -148,6 +150,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
     return TY_Nothing;
 
   case ActionType::EmitPCH:
@@ -202,6 +205,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -235,6 +239,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -268,6 +273,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -298,6 +304,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -333,6 +340,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -369,6 +377,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
   case ActionType::Immediate:
@@ -411,6 +420,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
   case ActionType::MergeModules:
+  case ActionType::DumpTypeInfo:
     return true;
 
   case ActionType::NoneAction:
@@ -450,9 +460,44 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitAssembly:
   case ActionType::EmitIR:
+  case ActionType::DumpTypeInfo:
     return true;
   }
 }
+
+bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitSyntax:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+    return false;
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::DumpTypeInfo:
+    return true;
+  }
+}
+
 
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {

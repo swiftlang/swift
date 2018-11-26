@@ -165,10 +165,11 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         // Override the node kind if this is a Clang-imported type so we give it
         // a stable mangling.
         auto typeFlags = type->getTypeContextDescriptorFlags();
-        if (typeFlags.isCTag()) {
-          nodeKind = Node::Kind::Structure;
-        } else if (typeFlags.isCTypedef()) {
+        if (typeFlags.isCTypedef()) {
           nodeKind = Node::Kind::TypeAlias;
+        } else if (nodeKind != Node::Kind::Structure &&
+                   isCImportedTagType(type)) {
+          nodeKind = Node::Kind::Structure;
         }
         
         auto typeNode = Dem.createNode(nodeKind);

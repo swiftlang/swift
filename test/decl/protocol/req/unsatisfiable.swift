@@ -5,13 +5,15 @@ protocol P {
   associatedtype B
 
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A == Self.B' on 'Self'}}
+  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'; do you want to add a stub?}}
 }
 
 extension P {
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B { }
+  // expected-note@-1 {{candidate has non-matching type '<Self, T> (T) -> ()'}}
 }
 
-struct X : P {
+struct X : P { // expected-error {{type 'X' does not conform to protocol 'P'}}
   typealias A = X
   typealias B = Int
 }

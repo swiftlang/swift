@@ -20,6 +20,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Strings.h"
@@ -2081,7 +2082,8 @@ protected:
 } // anonymous namespace
 
 SILFunction *ReabstractionThunkGenerator::createThunk() {
-  SILFunction *Thunk = M.getOrCreateSharedFunction(
+  SILFunctionBuilder builder(M);
+  SILFunction *Thunk = builder.getOrCreateSharedFunction(
       Loc, ThunkName, ReInfo.getSubstitutedType(), IsBare, IsTransparent,
       Serialized, ProfileCounter(), IsThunk);
   // Re-use an existing thunk.

@@ -38,20 +38,39 @@ static void *OmitNodesUserInfoKey = &OmitNodesUserInfoKey;
 
 /// Serialization traits for SourcePresence.
 template <>
-struct ScalarEnumerationTraits<syntax::SourcePresence> {
-  static void enumeration(json::Output &out, syntax::SourcePresence &value) {
-    out.enumCase(value, "Present", syntax::SourcePresence::Present);
-    out.enumCase(value, "Missing", syntax::SourcePresence::Missing);
+struct ScalarReferenceTraits<syntax::SourcePresence> {
+  static StringRef stringRef(const syntax::SourcePresence &value) {
+    switch (value) {
+    case syntax::SourcePresence::Present:
+      return "\"Present\"";
+    case syntax::SourcePresence::Missing:
+      return "\"Missing\"";
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 
 /// Serialization traits for swift::tok.
 template <>
-struct ScalarEnumerationTraits<tok> {
-  static void enumeration(Output &out, tok &value) {
+struct ScalarReferenceTraits<tok> {
+  static StringRef stringRef(const tok &value) {
+    switch (value) {
 #define TOKEN(name) \
-    out.enumCase(value, #name, tok::name);
+    case tok::name: return "\"" #name "\"";
 #include "swift/Syntax/TokenKinds.def"
+    default: llvm_unreachable("Unknown token kind");
+    }
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
   }
 };
 

@@ -36,6 +36,8 @@ class NullEditorConsumer : public EditorConsumer {
     llvm_unreachable("unexpected error");
   }
 
+  bool syntaxMapEnabled() override { return true; }
+
   bool handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
     return false;
   }
@@ -44,6 +46,8 @@ class NullEditorConsumer : public EditorConsumer {
                                 UIdent Kind, bool isSystem) override {
     return false;
   }
+  
+  bool documentStructureEnabled() override { return false; }
 
   bool beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                  UIdent Kind, UIdent AccessLevel,
@@ -88,7 +92,10 @@ class NullEditorConsumer : public EditorConsumer {
   }
 
   bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
+  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> ReusedNodeIds) override {
+    return false;
+  }
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
@@ -100,8 +107,6 @@ class NullEditorConsumer : public EditorConsumer {
       std::vector<SourceFileRange> ReuseRegions) override {
     return false;
   }
-
-  bool forceLibSyntaxBasedProcessing() override { return false; }
 public:
   bool needsSema = false;
 };

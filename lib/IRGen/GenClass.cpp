@@ -841,76 +841,6 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-/// Look for the instance method:
-///   func __getInstanceSizeAndAlignMask() -> (Int, Int)
-/// and use it to populate 'size' and 'alignMask' if it's present.
-static bool getInstanceSizeByMethod(IRGenFunction &IGF,
-                                    CanType selfType,
-                                    ClassDecl *selfClass,
-                                    llvm::Value *selfValue,
-                                    llvm::Value *&size,
-                                    llvm::Value *&alignMask) {
-  // Look for a single instance method with the magic name.
-  FuncDecl *fn; {
-    auto name = IGF.IGM.Context.getIdentifier("__getInstanceSizeAndAlignMask");
-    SmallVector<ValueDecl*, 4> results;
-    selfClass->lookupQualified(selfType, name, NL_KnownNonCascadingDependency,
-                               nullptr, results);
-    if (results.size() != 1)
-      return false;
-    fn = dyn_cast<FuncDecl>(results[0]);
-    if (!fn)
-      return false;
-  }
-
-  // Check whether the SIL module defines it.  (We need a type for it.)
-  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func);
-  SILFunction *silFn = IGF.getSILModule().lookUpFunction(fnRef);
-  if (!silFn)
-    return false;
-
-  // Check that it returns two size_t's and takes no other arguments.
-  auto fnType = silFn->getLoweredFunctionType();
-  auto fnConv = silFn->getConventions();
-  if (fnType->getParameters().size() != 1)
-    return false;
-  if (fnConv.getNumDirectSILResults() != 2
-      || fnConv.getNumIndirectSILResults() != 0)
-    return false;
-  if ((fnConv.getDirectSILResults().begin()->getConvention()
-       != ResultConvention::Unowned)
-      || (std::next(fnConv.getDirectSILResults().begin())->getConvention()
-          != ResultConvention::Unowned))
-    return false;
-  llvm::Function *llvmFn =
-    IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);
-  auto llvmFnTy = llvmFn->getFunctionType();
-  if (llvmFnTy->getNumParams() != 1) return false;
-  auto returnType = dyn_cast<llvm::StructType>(llvmFnTy->getReturnType());
-  if (!returnType ||
-      returnType->getNumElements() != 2 ||
-      returnType->getElementType(0) != IGF.IGM.SizeTy ||
-      returnType->getElementType(1) != IGF.IGM.SizeTy)
-    return false;
-
-  // Retain 'self' if necessary.
-  if (fnType->getParameters()[0].isConsumed()) {
-    IGF.emitNativeStrongRetain(selfValue, IGF.getDefaultAtomicity());
-  }
-
-  // Adjust down to the defining subclass type if necessary.
-  selfValue = IGF.Builder.CreateBitCast(selfValue, llvmFnTy->getParamType(0));
-
-  // Emit a direct call.
-  auto result = IGF.Builder.CreateCall(llvmFn, selfValue);
-  result->setCallingConv(llvmFn->getCallingConv());
-
-  // Extract the size and alignment.
-  size = IGF.Builder.CreateExtractValue(result, 0, "size");
-  alignMask = IGF.Builder.CreateExtractValue(result, 1, "alignMask");
-  return true;
-}
-
 /// Get the instance size and alignment mask for the given class
 /// instance.
 static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
@@ -919,12 +849,6 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         llvm::Value *selfValue,
                                         llvm::Value *&size,
                                         llvm::Value *&alignMask) {
-  // Use the magic __getInstanceSizeAndAlignMask method if we can
-  // see a declaration of it
-  if (getInstanceSizeByMethod(IGF, selfType.getASTType(),
-                              selfClass, selfValue, size, alignMask))
-    return;
-
   // Try to determine the size of the object we're deallocating.
   auto &info = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &layout = info.getLayout(IGF.IGM, selfType);
@@ -1287,7 +1211,7 @@ namespace {
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
       if (getClass()->hasSuperclass()) {
-        auto base = getClass()->getSuperclass()->getClassOrBoundGenericClass();
+        auto base = getClass()->getSuperclassDecl();
         superPtr = getMetaclassRefOrNull(base);
       } else {
         superPtr = getMetaclassRefOrNull(
@@ -2277,8 +2201,8 @@ IRGenModule::getObjCRuntimeBaseForSwiftRootClass(ClassDecl *theClass) {
 }
 
 ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
-  while (auto superclass = C->getSuperclass())
-    C = superclass->getClassOrBoundGenericClass();
+  while (auto superclass = C->getSuperclassDecl())
+    C = superclass;
 
   // If the formal root class is imported from Objective-C, then
   // we should use that.  For a class that's really implemented in

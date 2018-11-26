@@ -117,10 +117,9 @@ enum class DescriptiveDeclKind : uint8_t {
   Var,
   Param,
   Let,
-  StaticVar,
-  StaticLet,
-  ClassVar,
-  ClassLet,
+  Property,
+  StaticProperty,
+  ClassProperty,
   InfixOperator,
   PrefixOperator,
   PostfixOperator,
@@ -3267,45 +3266,6 @@ public:
     return std::distance(eltRange.begin(), eltRange.end());
   }
 
-  /// If this is an enum with two cases, return the other case. Otherwise,
-  /// return nullptr.
-  EnumElementDecl *getOppositeBinaryDecl(EnumElementDecl *decl) const {
-    ElementRange range = getAllElements();
-    auto iter = range.begin();
-    if (iter == range.end())
-      return nullptr;
-    bool seenDecl = false;
-    EnumElementDecl *result = nullptr;
-    if (*iter == decl) {
-      seenDecl = true;
-    } else {
-      result = *iter;
-    }
-
-    ++iter;
-    if (iter == range.end())
-      return nullptr;
-    if (seenDecl) {
-      assert(!result);
-      result = *iter;
-    } else {
-      if (decl != *iter)
-        return nullptr;
-      seenDecl = true;
-    }
-    ++iter;
-
-    // If we reach this point, we saw the decl we were looking for and one other
-    // case. If we have any additional cases, then we do not have a binary enum.
-    if (iter != range.end())
-      return nullptr;
-
-    // This is always true since we have already returned earlier nullptr if we
-    // did not see the decl at all.
-    assert(seenDecl);
-    return result;
-  }
-
   /// If this enum has a unique element, return it. A unique element can
   /// either hold a value or not, and the existence of one unique element does
   /// not imply the existence or non-existence of the opposite unique element.
@@ -3389,7 +3349,23 @@ public:
   /// Note that this property is \e not necessarily true for all children of
   /// \p useDC. In particular, an inlinable function does not get to switch
   /// exhaustively over a non-exhaustive enum declared in the same module.
-  bool isExhaustive(const DeclContext *useDC) const;
+  ///
+  /// This is the predicate used when deciding if a switch statement needs a
+  /// default case. It should not be used for optimization or code generation.
+  ///
+  /// \sa isEffectivelyExhaustive
+  bool isFormallyExhaustive(const DeclContext *useDC) const;
+
+  /// True if the enum can be exhaustively switched within a function defined
+  /// within \p M, with \p expansion specifying whether the function is
+  /// inlinable.
+  ///
+  /// This is the predicate used when making optimization and code generation
+  /// decisions. It should not be used at the AST or semantic level.
+  ///
+  /// \sa isFormallyExhaustive
+  bool isEffectivelyExhaustive(ModuleDecl *M,
+                               ResilienceExpansion expansion) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -3498,7 +3474,7 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
   Type getSuperclass() const;
@@ -3812,7 +3788,7 @@ public:
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
 
   /// Determine whether this protocol has a superclass.
-  bool hasSuperclass() const { return (bool)getSuperclass(); }
+  bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
   /// Retrieve the superclass of this protocol, or null if there is no superclass.
   Type getSuperclass() const;
@@ -4392,13 +4368,6 @@ public:
   /// \brief Do we need to use resilient access patterns when accessing this
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
-
-  /// Returns the interface type of elements of storage represented by this
-  /// declaration.
-  ///
-  /// For variables, this is the type of the variable itself.
-  /// For subscripts, this is the type of the subscript element.
-  Type getStorageInterfaceType() const;
 
   /// Does the storage use a behavior?
   bool hasBehavior() const {

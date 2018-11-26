@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -526,14 +526,16 @@ NSStringAPIs.test("enumerateLines(_:)") {
 }
 
 NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
-  let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
+  let s: String = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = s.index(s.startIndex, offsetBy: 5)
   let endIndex = s.index(s.startIndex, offsetBy: 62)
   var tags: [String] = []
   var tokens: [String] = []
   var sentences: [String] = []
-  s.enumerateLinguisticTags(in: startIndex..<endIndex,
-      scheme: NSLinguisticTagSchemeTokenType,
+  let range = startIndex..<endIndex
+  let scheme: NSLinguisticTagScheme = .tokenType
+  s.enumerateLinguisticTags(in: range,
+      scheme: scheme.rawValue,
       options: [],
       orthography: nil) {
     (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, stop: inout Bool)
@@ -545,11 +547,13 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
       stop = true
     }
   }
-  expectEqual(
-    [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
-    tags)
+  expectEqual([
+      NSLinguisticTag.word.rawValue,
+      NSLinguisticTag.whitespace.rawValue,
+      NSLinguisticTag.word.rawValue
+    ], tags)
   expectEqual(["Глокая", " ", "куздра"], tokens)
-  let sentence = s[startIndex..<endIndex]
+  let sentence = String(s[startIndex..<endIndex])
   expectEqual([sentence, sentence, sentence], sentences)
 }
 
@@ -581,7 +585,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
     in
       expectNil(substring_)
       let substring = s[substringRange]
-      substrings.append(substring)
+      substrings.append(String(substring))
       expectEqual(substring, s[enclosingRange])
     }
     expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
@@ -872,17 +876,20 @@ NSStringAPIs.test("lineRangeFor(_:)") {
 }
 
 NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)") {
-  let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
+  let s: String = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
   let startIndex = s.index(s.startIndex, offsetBy: 5)
   let endIndex = s.index(s.startIndex, offsetBy: 17)
   var tokenRanges: [Range<String.Index>] = []
+  let scheme = NSLinguisticTagScheme.tokenType
   let tags = s.linguisticTags(in: startIndex..<endIndex,
-      scheme: NSLinguisticTagSchemeTokenType,
+      scheme: scheme.rawValue,
       options: [],
       orthography: nil, tokenRanges: &tokenRanges)
-  expectEqual(
-    [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
-    tags)
+  expectEqual([
+      NSLinguisticTag.word.rawValue,
+      NSLinguisticTag.whitespace.rawValue,
+      NSLinguisticTag.word.rawValue
+    ], tags)
   expectEqual(["Глокая", " ", "куздра"],
       tokenRanges.map { String(s[$0]) } )
 }

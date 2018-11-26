@@ -4142,6 +4142,10 @@ NOTE(redundant_particular_literal_case_here,none,
 
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 
+WARNING(override_nsobject_hashvalue,none,
+        "override of 'NSObject.hashValue' is deprecated; "
+        "override 'NSObject.hash' to get consistent hashing behavior", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

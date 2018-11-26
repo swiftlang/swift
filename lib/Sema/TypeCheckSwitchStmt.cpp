@@ -818,7 +818,7 @@ namespace {
                                          constElemSpaces);
           });
 
-          if (!E->isExhaustive(DC)) {
+          if (!E->isFormallyExhaustive(DC)) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
           } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));

@@ -356,20 +356,22 @@ SILType::canUseExistentialRepresentation(SILModule &M,
 
     auto layout = getASTType().getExistentialLayout();
 
+    switch (layout.getKind()) {
+    // A class-constrained composition uses ClassReference representation;
+    // otherwise, we use a fixed-sized buffer.
+    case ExistentialLayout::Kind::Class:
+      return repr == ExistentialRepresentation::Class;
     // The (uncomposed) Error existential uses a special boxed
-    // representation. It can also adopt class references of bridged error types
-    // directly.
-    if (layout.isErrorExistential())
+    // representation. It can also adopt class references of bridged
+    // error types directly.
+    case ExistentialLayout::Kind::Error:
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
             && isBridgedErrorClass(M, containedType));
-    
-    // A class-constrained composition uses ClassReference representation;
-    // otherwise, we use a fixed-sized buffer.
-    if (layout.requiresClass())
-      return repr == ExistentialRepresentation::Class;
-
-    return repr == ExistentialRepresentation::Opaque;
+    case ExistentialLayout::Kind::Opaque:
+      return repr == ExistentialRepresentation::Opaque;
+    }
+    llvm_unreachable("unknown existential kind!");
   }
   case ExistentialRepresentation::Metatype:
     return is<ExistentialMetatypeType>();

@@ -155,7 +155,7 @@ public:
     return !(lhs == rhs);
   }
 
-  friend hash_code hash_value(const SimpleRequest &request) {
+  friend llvm::hash_code hash_value(const SimpleRequest &request) {
     using llvm::hash_combine;
 
     return hash_combine(TypeID<Derived>::value, request.storage);

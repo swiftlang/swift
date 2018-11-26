@@ -448,8 +448,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       Unhandled.push_back(Conf->getProtocol());
     }
     if (auto *CD = dyn_cast<ClassDecl>(Target)) {
-      if (auto Super = CD->getSuperclass())
-        Unhandled.push_back(Super->getAnyNominal());
+      if (auto Super = CD->getSuperclassDecl())
+        Unhandled.push_back(Super);
     }
     while (!Unhandled.empty()) {
       NominalTypeDecl* Back = Unhandled.back();

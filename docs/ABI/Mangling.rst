@@ -787,6 +787,7 @@ Function Specializations
 
   specialization ::= type '_' type* 'Tg' SPEC-INFO     // Generic re-abstracted specialization
   specialization ::= type '_' type* 'TG' SPEC-INFO     // Generic not re-abstracted specialization
+  specialization ::= type '_' type* 'Ti' SPEC-INFO     // Inlined function with generic substitutions.
 
 The types are the replacement types of the substitution list.
 

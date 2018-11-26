@@ -1087,14 +1087,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // Otherwise, we produce a generic error.
     FuncDecl *FD = nullptr;
     bool isAssignment = false;
-    
-    if (auto *Apply = dyn_cast<ApplyInst>(Use.Inst)) {
+
+    auto Apply = FullApplySite::isa(Use.Inst);
+    if (Apply) {
       // If this is a method application, produce a nice, specific, error.
-      if (auto *WMI = dyn_cast<MethodInst>(Apply->getOperand(0)))
+      if (auto *WMI = dyn_cast<MethodInst>(Apply.getCallee()))
         FD = dyn_cast<FuncDecl>(WMI->getMember().getDecl());
       
       // If this is a direct/devirt method application, check the location info.
-      if (auto *Fn = Apply->getReferencedFunction()) {
+      if (auto *Fn = Apply.getReferencedFunction()) {
         if (Fn->hasLocation()) {
           auto SILLoc = Fn->getLocation();
           FD = SILLoc.getAsASTNode<FuncDecl>();
@@ -1104,9 +1105,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       // If we failed to find the decl a clean and principled way, try hacks:
       // map back to the AST and look for some common patterns.
       if (!FD) {
-        if (Apply->getLoc().getAsASTNode<AssignExpr>())
+        if (Apply.getLoc().getAsASTNode<AssignExpr>())
           isAssignment = true;
-        else if (auto *CE = Apply->getLoc().getAsASTNode<ApplyExpr>()) {
+        else if (auto *CE = Apply.getLoc().getAsASTNode<ApplyExpr>()) {
           if (auto *DSCE = dyn_cast<SelfApplyExpr>(CE->getFn()))
             // Normal method calls are curried, so they are:
             // (call_expr (dot_syntax_call_expr (decl_ref_expr METHOD)))

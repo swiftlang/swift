@@ -77,6 +77,77 @@ public func UIFloatRangeIsEqualToRange(_ range: UIFloatRange, _ otherRange: UIFl
 }
 #endif
 
+extension UIEdgeInsets : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let top = try container.decode(CGFloat.self)
+    let left = try container.decode(CGFloat.self)
+    let bottom = try container.decode(CGFloat.self)
+    let right = try container.decode(CGFloat.self)
+    self.init(top: top, left: left, bottom: bottom, right: right)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(top)
+    try container.encode(left)
+    try container.encode(bottom)
+    try container.encode(right)
+  }
+}
+
+@available(iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+extension NSDirectionalEdgeInsets : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let top = try container.decode(CGFloat.self)
+    let leading = try container.decode(CGFloat.self)
+    let bottom = try container.decode(CGFloat.self)
+    let trailing = try container.decode(CGFloat.self)
+    self.init(top: top, leading: leading, bottom: bottom, trailing: trailing)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(top)
+    try container.encode(leading)
+    try container.encode(bottom)
+    try container.encode(trailing)
+  }
+}
+
+extension UIOffset : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let horizontal = try container.decode(CGFloat.self)
+    let vertical = try container.decode(CGFloat.self)
+    self.init(horizontal: horizontal, vertical: vertical)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(horizontal)
+    try container.encode(vertical)
+  }
+}
+
+#if os(iOS) || os(tvOS)
+extension UIFloatRange : Codable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let minimum = try container.decode(CGFloat.self)
+    let maximum = try container.decode(CGFloat.self)
+    self.init(minimum: minimum, maximum: maximum)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(minimum)
+    try container.encode(maximum)
+  }
+}
+#endif
+
 //===----------------------------------------------------------------------===//
 // Numeric backed types
 //===----------------------------------------------------------------------===//
@@ -119,6 +190,7 @@ extension UIFont.Weight : _UIKitNumericRawRepresentable {}
 
 #if !os(watchOS)
 extension UILayoutPriority : _UIKitNumericRawRepresentable {}
+extension UIWindow.Level : _UIKitNumericRawRepresentable {}
 #endif
 
 // These are un-imported macros in UIKit.
@@ -281,7 +353,7 @@ extension UIImage : _ExpressibleByImageLiteral {
 
 public typealias _ImageLiteralType = UIImage
 
-extension UIFontTextStyle {
+extension UIFont.TextStyle {
     @available(iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var metrics: UIFontMetrics {
         return UIFontMetrics(forTextStyle: self)
@@ -437,5 +509,44 @@ public let UIPrintUnknownImageFormatError = 3
 
 @available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.jobFailed.rawValue")
 public let UIPrintJobFailedError = 4
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIApplicationMain compatibility
+//===----------------------------------------------------------------------===//
+
+#if !os(watchOS)
+
+@available(swift, deprecated: 4.2, message: "Use the overload of UIApplicationMain where the type of the second parameter is UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>, which is the same as the type of CommandLine.unsafeArgv.")
+public func UIApplicationMain(_ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<Int8>>!, _ principalClassName: String?, _ delegateClassName: String?) -> Int32 {
+    let reboundArgv = UnsafeMutableRawPointer(argv).bindMemory(to: UnsafeMutablePointer<Int8>?.self, capacity: Int(argc))
+    return UIApplicationMain(argc, reboundArgv, principalClassName, delegateClassName)
+}
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIAccessibilityTraits
+//===----------------------------------------------------------------------===//
+
+extension UIAccessibilityTraits: OptionSet {}
+
+//===----------------------------------------------------------------------===//
+// UITextDirection
+//===----------------------------------------------------------------------===//
+
+#if !os(watchOS)
+
+extension UITextDirection {
+
+  public static func storage(_ direction: UITextStorageDirection) -> UITextDirection {
+    return UITextDirection(rawValue: direction.rawValue)
+  }
+
+  public static func layout(_ direction: UITextLayoutDirection) -> UITextDirection {
+    return UITextDirection(rawValue: direction.rawValue)
+  }
+}
 
 #endif

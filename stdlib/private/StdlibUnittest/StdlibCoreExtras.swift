@@ -257,3 +257,22 @@ public func _isStdlibDebugConfiguration() -> Bool {
   return false
 #endif
 }
+
+@_fixed_layout
+public struct LinearCongruentialGenerator: RandomNumberGenerator {
+
+  @usableFromInline
+  internal var _state: UInt64
+
+  @inlinable
+  public init(seed: UInt64) {
+    _state = seed
+    for _ in 0 ..< 10 { _ = next() }
+  }
+
+  @inlinable
+  public mutating func next() -> UInt64 {
+    _state = 2862933555777941757 &* _state &+ 3037000493
+    return _state
+  }
+}

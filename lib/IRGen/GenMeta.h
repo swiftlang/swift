@@ -47,6 +47,9 @@ namespace irgen {
   class StructLayout;
   struct ClassLayout;
 
+  bool requiresForeignTypeMetadata(CanType type);
+  bool requiresForeignTypeMetadata(NominalTypeDecl *decl);
+
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout,

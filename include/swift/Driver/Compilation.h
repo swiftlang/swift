@@ -172,8 +172,13 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   const unsigned BatchSeed;
 
-  /// Overrides parallelism level as count of batches, if in batch-mode.
+  /// Overrides parallelism level and \c BatchSizeLimit, sets exact
+  /// count of batches, if in batch-mode.
   const Optional<unsigned> BatchCount;
+
+  /// Overrides maximum batch size, if in batch-mode and not overridden
+  /// by \c BatchCount.
+  const Optional<unsigned> BatchSizeLimit;
 
   /// In order to test repartitioning, set to true if
   /// -driver-force-one-batch-repartition is present.
@@ -230,6 +235,7 @@ public:
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
               Optional<unsigned> BatchCount = None,
+              Optional<unsigned> BatchSizeLimit = None,
               bool ForceOneBatchRepartition = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
@@ -341,6 +347,10 @@ public:
 
   Optional<unsigned> getBatchCount() const {
     return BatchCount;
+  }
+
+  Optional<unsigned> getBatchSizeLimit() const {
+    return BatchSizeLimit;
   }
 
   /// Requests the path to a file containing all input source files. This can

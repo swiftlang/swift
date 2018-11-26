@@ -26,13 +26,13 @@ public let WordCount = [
   BenchmarkInfo(
     name: "WordSplitASCII",
     runFunction: run_WordSplitASCII,
-    tags: [.validation, .api, .String, .algorithm],
+    tags: [.validation, .api, .String, .algorithm, .unstable],
     setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(
     name: "WordSplitUTF16",
     runFunction: run_WordSplitUTF16,
-    tags: [.validation, .api, .String, .algorithm],
+    tags: [.validation, .api, .String, .algorithm, .unstable],
     setUpFunction: { buildWorkload() }
   ),
   BenchmarkInfo(

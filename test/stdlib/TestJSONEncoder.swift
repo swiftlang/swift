@@ -598,7 +598,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       // This converter removes the first 4 characters from the start of all string keys, if it has more than 4 characters
       let string = path.last!.stringValue
       guard string.count > 4 else { return path.last! }
-      let newString = string.substring(from: string.index(string.startIndex, offsetBy: 4, limitedBy: string.endIndex)!)
+      let newString = String(string.dropFirst(4))
       return _TestKey(stringValue: newString)!
     }
     decoder.keyDecodingStrategy = .custom(customKeyConversion)

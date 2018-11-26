@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -525,6 +525,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(rawTy), enumDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -604,6 +605,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      TypeLoc::withoutLoc(computedType), structDecl);
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -669,6 +671,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(getterType), importedDecl, clangNode);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -707,6 +710,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      /*GenericParams=*/nullptr, selfDecl, params,
                      TypeLoc::withoutLoc(voidTy), importedDecl, clangNode);
   setterDecl->setIsObjC(false);
+  setterDecl->setIsDynamic(false);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
 
   setterDecl->computeType();
@@ -1593,6 +1597,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));
   thunk->setIsObjC(getter->isObjC());
+  thunk->setIsDynamic(getter->isDynamic());
   // FIXME: Should we record thunks?
 
   return thunk;
@@ -1653,6 +1658,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->getAttrs().add(objcAttr->clone(C));
   thunk->setIsObjC(setter->isObjC());
+  thunk->setIsDynamic(setter->isDynamic());
 
   return thunk;
 }
@@ -1819,6 +1825,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
   getterDecl->setIsObjC(false);
+  getterDecl->setIsDynamic(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
@@ -1932,7 +1939,7 @@ static bool shouldAlsoImportAsClassMethod(FuncDecl *method) {
     return false;
 
   // The class must not have a superclass.
-  if (classDecl->getSuperclass())
+  if (classDecl->hasSuperclass())
     return false;
 
   // There must not already be a class method with the same
@@ -3382,6 +3389,7 @@ namespace {
                        name, dc->mapTypeIntoContext(type), dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3518,6 +3526,7 @@ namespace {
       result->setInterfaceType(type);
       result->setValidationToChecked();
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
@@ -3612,6 +3621,7 @@ namespace {
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc->mapTypeIntoContext(type), dc);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -3698,6 +3708,7 @@ namespace {
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc->mapTypeIntoContext(type), dc);
       result->setIsObjC(false);
+      result->setIsDynamic(false);
       result->setInterfaceType(type);
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
@@ -3760,6 +3771,7 @@ namespace {
                                               /*implicitName=*/true));
       }
       decl->setIsObjC(true);
+      decl->setIsDynamic(true);
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.
@@ -4749,52 +4761,56 @@ namespace {
       if (shouldImportPropertyAsAccessors(decl))
         return nullptr;
 
-      // Check whether there is a function with the same name as this
-      // property. If so, suppress the property; the user will have to use
-      // the methods directly, to avoid ambiguities.
-      Type containerTy = dc->getDeclaredInterfaceType();
-      Type lookupContextTy = containerTy;
-      if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
-        // If we're importing into the primary @interface for something, as
-        // opposed to an extension, make sure we don't try to load any
-        // categories...by just looking into the super type.
-        lookupContextTy = classDecl->getSuperclass();
-      }
-
       VarDecl *overridden = nullptr;
-      if (lookupContextTy) {
-        SmallVector<ValueDecl *, 2> lookup;
-        dc->lookupQualified(lookupContextTy, name,
-                            NL_QualifiedDefault | NL_KnownNoDependency,
-                            Impl.getTypeResolver(), lookup);
-        for (auto result : lookup) {
-          if (isa<FuncDecl>(result) &&
-              result->isInstanceMember() == decl->isInstanceProperty() &&
-              result->getFullName().getArgumentNames().empty())
-            return nullptr;
+      if (dc->getAsClassOrClassExtensionContext()) {
+        // Check whether there is a function with the same name as this
+        // property. If so, suppress the property; the user will have to use
+        // the methods directly, to avoid ambiguities.
+        NominalTypeDecl *lookupContext =
+          dc->getAsNominalTypeOrNominalTypeExtensionContext();
 
-          if (auto var = dyn_cast<VarDecl>(result)) {
-            // If the selectors of the getter match in Objective-C, we have an
-            // override.
-            if (var->isInstanceMember() == decl->isInstanceProperty() &&
-                var->getObjCGetterSelector() ==
-                  Impl.importSelector(decl->getGetterName()))
-              overridden = var;
+        if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
+          // If we're importing into the primary @interface for something, as
+          // opposed to an extension, make sure we don't try to load any
+          // categories...by just looking into the super type.
+          lookupContext = classDecl->getSuperclassDecl  ();
+        }
+
+        if (lookupContext) {
+          SmallVector<ValueDecl *, 2> lookup;
+          dc->lookupQualified(lookupContext, name,
+                              NL_QualifiedDefault | NL_KnownNoDependency,
+                              lookup);
+          for (auto result : lookup) {
+            if (isa<FuncDecl>(result) &&
+                result->isInstanceMember() == decl->isInstanceProperty() &&
+                result->getFullName().getArgumentNames().empty())
+              return nullptr;
+
+            if (auto var = dyn_cast<VarDecl>(result)) {
+              // If the selectors of the getter match in Objective-C, we have an
+              // override.
+              if (var->isInstanceMember() == decl->isInstanceProperty() &&
+                  var->getObjCGetterSelector() ==
+                    Impl.importSelector(decl->getGetterName()))
+                overridden = var;
+            }
           }
         }
-      }
 
-      if (overridden) {
-        const DeclContext *overrideContext = overridden->getDeclContext();
-        // It's okay to compare interface types directly because Objective-C
-        // does not have constrained extensions.
-        if (overrideContext != dc && overridden->hasClangNode() &&
-            overrideContext->getDeclaredInterfaceType()->isEqual(containerTy)) {
-          // We've encountered a redeclaration of the property.
-          // HACK: Just update the original declaration instead of importing a
-          // second property.
-          handlePropertyRedeclaration(overridden, decl);
-          return nullptr;
+        if (overridden) {
+          const DeclContext *overrideContext = overridden->getDeclContext();
+          // It's okay to compare interface types directly because Objective-C
+          // does not have constrained extensions.
+          if (overrideContext != dc && overridden->hasClangNode() &&
+              overrideContext->getAsNominalTypeOrNominalTypeExtensionContext()
+                == dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+            // We've encountered a redeclaration of the property.
+            // HACK: Just update the original declaration instead of importing a
+            // second property.
+            handlePropertyRedeclaration(overridden, decl);
+            return nullptr;
+          }
         }
       }
 
@@ -4859,6 +4875,7 @@ namespace {
                                       OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
+      // Only record overrides of class members.
       if (overridden) {
         result->setOverriddenDecl(overridden);
         getter->setOverriddenDecl(overridden->getGetter());
@@ -5596,6 +5613,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                    importedType.isImplicitlyUnwrapped());
   result->setOverriddenDecls({ });
   result->setIsObjC(false);
+  result->setIsDynamic(false);
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -5838,6 +5856,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       propertyName, dc->mapTypeIntoContext(swiftPropertyType), dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
+  property->setIsDynamic(false);
+
   Impl.recordImplicitUnwrapForDecl(property,
                                    importedType.isImplicitlyUnwrapped());
 
@@ -6110,7 +6130,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Look for other imported constructors that occur in this context with
   // the same name.
-  Type allocParamType = oldFnType->getInput();
+  auto allocParams = oldFnType->getParams();
   bool ignoreNewExtensions = isa<ClassDecl>(dc);
   for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
                                                ignoreNewExtensions)) {
@@ -6127,12 +6147,12 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
     // existing selector with a Swift-only signature.
-    Type ctorParamType = ctor->getInterfaceType()
-                             ->castTo<AnyFunctionType>()
-                             ->getResult()
-                             ->castTo<AnyFunctionType>()
-                             ->getInput();
-    if (!ctorParamType->isEqual(allocParamType)) {
+    auto ctorParams = ctor->getInterfaceType()
+                          ->castTo<AnyFunctionType>()
+                          ->getResult()
+                          ->castTo<AnyFunctionType>()
+                          ->getParams();
+    if (!AnyFunctionType::equalParams(ctorParams, allocParams)) {
       continue;
     }
 
@@ -6282,15 +6302,14 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return;
-  auto superTy = classDecl->getSuperclass();
-  if (!superTy)
+  auto superDecl = classDecl->getSuperclassDecl();
+  if (!superDecl)
     return;
   // Dig out the Objective-C superclass.
-  auto superDecl = superTy->getAnyNominal();
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superTy, decl->getFullName(),
+  superDecl->lookupQualified(superDecl, decl->getFullName(),
                              NL_QualifiedDefault | NL_KnownNoDependency,
-                             Impl.getTypeResolver(), results);
+                             results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
@@ -6333,17 +6352,16 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   if (!classTy)
     return;
 
-  auto superTy = classTy->getSuperclass();
-  if (!superTy)
+  auto superDecl = classTy->getSuperclassDecl();
+  if (!superDecl)
     return;
 
   // Determine whether this subscript operation overrides another subscript
   // operation.
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
-      superTy, subscript->getFullName(),
-      NL_QualifiedDefault | NL_KnownNoDependency, Impl.getTypeResolver(),
-      lookup);
+      superDecl, subscript->getFullName(),
+      NL_QualifiedDefault | NL_KnownNoDependency, lookup);
   Type unlabeledIndices;
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -7155,10 +7173,9 @@ void SwiftDeclConverter::importInheritedConstructors(
   if (hasDesignatedInitializers(curObjCClass))
     kind = CtorInitializerKind::Convenience;
 
-  auto superclass =
-      cast<ClassDecl>(classDecl->getSuperclass()->getAnyNominal());
 
   // If we have a superclass, import from it.
+  auto superclass = classDecl->getSuperclassDecl();
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
       inheritConstructors(superclass->lookupDirect(DeclBaseName::createConstructor()),
@@ -8194,6 +8211,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   var->setInterfaceType(type);
   var->setIsObjC(false);
+  var->setIsDynamic(false);
 
   // 'self'
   ParamDecl *selfDecl = nullptr;
@@ -8221,6 +8239,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setValidationToChecked();
   func->setImplicit();
   func->setIsObjC(false);
+  func->setIsDynamic(false);
 
   // If we're not done type checking, build the getter body.
   if (!hasFinishedTypeChecking()) {
@@ -8298,6 +8317,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, type, dc);
   var->setIsObjC(false);
+  var->setIsDynamic(false);
   var->setInterfaceType(type);
   markUnavailable(var, UnavailableMessage);
 

@@ -16,18 +16,19 @@
 #include "DeserializationErrors.h"
 #include "SILFormat.h"
 
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
-#include "swift/AST/GenericSignature.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/PrettyStackTrace.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Serialization/BCReadingExtras.h"
+#include "swift/Serialization/ModuleFile.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
@@ -330,7 +331,8 @@ static SILFunction *createBogusSILFunction(SILModule &M,
                                            StringRef name,
                                            SILType type) {
   SourceLoc loc;
-  return M.createFunction(
+  SILFunctionBuilder builder(M);
+  return builder.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
@@ -551,7 +553,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Otherwise, create a new function.
   } else {
-    fn = SILMod.createFunction(
+    SILFunctionBuilder builder(SILMod);
+    fn = builder.createFunction(
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
         IsSerialized_t(isSerialized), ProfileCounter(), IsThunk_t(isThunk),

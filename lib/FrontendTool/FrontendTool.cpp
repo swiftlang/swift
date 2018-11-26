@@ -585,9 +585,10 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
   assert(Invocation.getFrontendOptions().InputsAndOutputs.hasSingleInput() &&
          "We expect a single input for bitcode input!");
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFileOrSTDIN(
-          Invocation.getFrontendOptions()
-              .InputsAndOutputs.getFilenameOfFirstInput());
+      swift::vfs::getFileOrSTDIN(Instance.getFileSystem(),
+                                 Invocation.getFrontendOptions()
+                                   .InputsAndOutputs.getFilenameOfFirstInput());
+
   if (!FileBufOrErr) {
     Instance.getASTContext().Diags.diagnose(
         SourceLoc(), diag::error_open_input_file,
@@ -996,7 +997,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (writeTBDIfNeeded(Invocation, Instance))
     return true;
 
-  assert(Action >= FrontendOptions::ActionType::EmitSILGen &&
+  assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
   std::deque<PostSILGenInputs> PSGIs = generateSILModules(Invocation, Instance);
@@ -1359,6 +1360,9 @@ static bool performCompileStepsPostSILGen(
 
   runSILLoweringPasses(*SM);
 
+  if (Action == FrontendOptions::ActionType::DumpTypeInfo)
+    return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());
+
   // TODO: remove once the frontend understands what action it should perform
   IRGenOpts.OutputKind = getOutputKind(Action);
   if (Action == FrontendOptions::ActionType::Immediate)
@@ -1366,7 +1370,8 @@ static bool performCompileStepsPostSILGen(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
   StringRef OutputFilename = PSPs.OutputFilename;
-  std::vector<std::string> ParallelOutputFilenames = Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
+  std::vector<std::string> ParallelOutputFilenames =
+    Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
   std::unique_ptr<llvm::Module> IRModule;
   llvm::GlobalVariable *HashGlobal;
   generateIR(

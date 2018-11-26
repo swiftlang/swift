@@ -93,10 +93,10 @@ let testCharacters = [
 ]
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
-  let n = pickRandom((minSize + 1)..<maxSize)
-  var result = String(pickRandom(baseScalars))
+  let n = Int.random(in: (minSize + 1) ..< maxSize)
+  var result = String(baseScalars.randomElement()!)
   for _ in 0..<n {
-    result += String(pickRandom(continuingScalars))
+    result += String(continuingScalars.randomElement()!)
   }
   return result
 }

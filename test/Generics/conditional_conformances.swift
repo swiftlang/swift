@@ -413,3 +413,15 @@ extension Array: NestedArrayProtocol where Element: ElementProtocol, Element: Ar
   // with the typealias uncommented you do not get a crash.
   // typealias BaseElement = Element.BaseElement
 }
+
+// SR-8337
+struct Foo<Bar> {}
+
+protocol P {
+  associatedtype A
+  var foo: Foo<A> { get }
+}
+
+extension Foo: P where Bar: P {
+  var foo: Foo { return self }
+}

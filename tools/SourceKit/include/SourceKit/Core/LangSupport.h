@@ -22,10 +22,18 @@
 #include "swift/AST/Type.h"
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 namespace llvm {
   class MemoryBuffer;
 }
+
+namespace swift {
+namespace syntax {
+class SourceFileSyntax;
+} // namespace syntax
+} // namespace swift
+
 namespace SourceKit {
 
 struct EntityInfo {
@@ -213,8 +221,11 @@ public:
 
   virtual void handleRequestError(const char *Description) = 0;
 
+  virtual bool syntaxMapEnabled() = 0;
   virtual bool handleSyntaxMap(unsigned Offset, unsigned Length,
                                UIdent Kind) = 0;
+
+  virtual bool documentStructureEnabled() = 0;
 
   virtual bool handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
@@ -253,7 +264,9 @@ public:
 
   virtual bool handleSourceText(StringRef Text) = 0;
 
-  virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
+  virtual bool
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                   std::unordered_set<unsigned> ReusedNodeIds) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }
@@ -264,10 +277,6 @@ public:
       std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
-
-  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
-  // Remove it once when we are able to incrementally transfer the syntax tree
-  virtual bool forceLibSyntaxBasedProcessing() = 0;
 };
 
 class OptionsDictionary {

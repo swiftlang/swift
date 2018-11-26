@@ -86,13 +86,3 @@ public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 public func ~=(x: NSObject, y: NSObject) -> Bool {
   return true
 }
-
-extension NSObject : Equatable, Hashable {
-  public var hashValue: Int {
-    return hash
-  }
-}
-
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}

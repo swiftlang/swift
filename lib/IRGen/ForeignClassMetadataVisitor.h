@@ -37,16 +37,8 @@ public:
   void layout() {
     super::layout();
     asImpl().addNominalTypeDescriptor();
-    asImpl().noteStartOfSuperClass();
     asImpl().addSuperclass();
     asImpl().addReservedWord();
-    asImpl().addReservedWord();
-    asImpl().addReservedWord();
-  }
-
-  bool requiresInitializationFunction() {
-    return Target->getSuperclassDecl() &&
-           Target->getSuperclassDecl()->isForeign();
   }
 
   CanType getTargetType() const {
