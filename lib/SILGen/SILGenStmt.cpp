@@ -327,7 +327,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
               break;
             }
           }
-				}
+        }
       }
       return;
     }
