@@ -629,6 +629,9 @@ public:
       return;
     }
 
+    if (!isPublicOrUsableFromInline(nominal))
+      return;
+
     map[nominal].recordProtocols(directlyInherited);
 
     // Recurse to find any nested types.
@@ -647,6 +650,9 @@ public:
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
+    if (!isPublicOrUsableFromInline(nominal))
+      return;
+
     map[nominal].recordConditionalConformances(extension->getInherited());
     // No recursion here because extensions are never nested.
   }
