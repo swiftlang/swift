@@ -409,32 +409,16 @@ class MetadataCacheKey {
   }
 
 public:
-  MetadataCacheKey(const TypeContextDescriptor *description,
-                   const void * const *data, size_t size)
-      : Data(data), NumKeyParameters(0), NumWitnessTables(0) {
-    // Count up the # of key parameters and # of witness tables.
-    if (auto genericContext = description->getGenericContext()) {
-      // Find key generic parameters.
-      for (const auto &gp : genericContext->getGenericParams()) {
-        if (gp.hasKeyArgument())
-          ++NumKeyParameters;
-      }
+  MetadataCacheKey(uint16_t numKeyParams,
+                   uint16_t numWitnessTables,
+                   const void * const *data)
+      : Data(data), NumKeyParameters(numKeyParams),
+        NumWitnessTables(numWitnessTables), Hash(computeHash()) { }
 
-      // Find witness tables.
-      for (const auto &req : genericContext->getGenericRequirements()) {
-        if (req.Flags.hasKeyArgument() &&
-            req.getKind() == GenericRequirementKind::Protocol)
-          ++NumWitnessTables;
-      }
-    }
-
-    assert(size == NumKeyParameters + NumWitnessTables);
-
-    Hash = computeHash();
-  }
-
-  MetadataCacheKey(const void * const *data, uint16_t numKeyParams,
-                   uint16_t numWitnessTables, uint32_t hash)
+  MetadataCacheKey(uint16_t numKeyParams,
+                   uint16_t numWitnessTables,
+                   const void * const *data,
+                   uint32_t hash)
     : Data(data), NumKeyParameters(numKeyParams),
       NumWitnessTables(numWitnessTables), Hash(hash) {}
 
@@ -1390,8 +1374,9 @@ public:
   }
 
   MetadataCacheKey getKey() const {
-    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
-                            NumKeyParameters, NumWitnessTables, Hash);
+    return MetadataCacheKey(NumKeyParameters, NumWitnessTables,
+                            this->template getTrailingObjects<const void*>(),
+                            Hash);
   }
 
   intptr_t getKeyIntValueForDump() const {
