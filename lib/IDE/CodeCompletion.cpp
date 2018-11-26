@@ -5093,11 +5093,11 @@ namespace  {
 } // end anonymous namespace
 
 namespace {
-using FunctionParams = ArrayRef<AnyFunctionType::Param>;
+using FunctionTypeAndDecl = std::pair<AnyFunctionType *, ValueDecl *>;
 
-void collectPossibleParamListByQualifiedLookup(
+void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
@@ -5122,14 +5122,14 @@ void collectPossibleParamListByQualifiedLookup(
     if (!fnType || fnType->hasError())
       continue;
     if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
-      candidates.push_back(AFT->getParams());
+      candidates.emplace_back(AFT, VD);
     }
   }
 }
 
-void collectPossibleParamListByQualifiedLookup(
+void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
   auto baseTyOpt = getTypeOfCompletionContextExpr(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
@@ -5139,31 +5139,31 @@ void collectPossibleParamListByQualifiedLookup(
   if (!baseTy->mayHaveMembers())
     return;
 
-  collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
+  collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
 }
 
-bool collectPossibleParamListsApply(
+bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
     if (auto *funcType = type->getAs<AnyFunctionType>())
-      candidates.push_back(funcType->getParams());
+      candidates.emplace_back(funcType, fnExpr->getReferencedDecl().getDecl());
   } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
       auto declType = decl->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
       auto declType = decl->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-    collectPossibleParamListByQualifiedLookup(
+    collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
   }
 
@@ -5175,11 +5175,11 @@ bool collectPossibleParamListsApply(
       return false;
 
     if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
-      candidates.push_back(AFT->getParams());
+      candidates.emplace_back(AFT, ref.getDecl());
     } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
-        collectPossibleParamListByQualifiedLookup(
+        collectPossibleCalleesByQualifiedLookup(
             DC, baseTy, DeclBaseName::createConstructor(), candidates);
     }
   }
@@ -5187,19 +5187,19 @@ bool collectPossibleParamListsApply(
   return !candidates.empty();
 }
 
-bool collectPossibleParamListsSubscript(
+bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   if (subscriptExpr->hasDecl()) {
     if (auto SD = dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
       auto declType = SD->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, SD);
     }
   } else {
-    collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                              DeclBaseName::createSubscript(),
-                                              candidates);
+    collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
+                                            DeclBaseName::createSubscript(),
+                                            candidates);
   }
   return !candidates.empty();
 }
@@ -5288,14 +5288,14 @@ class CodeCompletionTypeContextAnalyzer {
 
   bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr) {
     // Collect parameter lists for possible func decls.
-    SmallVector<FunctionParams, 4> Candidates;
+    SmallVector<FunctionTypeAndDecl, 4> Candidates;
     Expr *Arg = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
-      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
+      if (!collectPossibleCalleesForApply(DC, applyExpr, Candidates))
         return false;
       Arg = applyExpr->getArg();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
-      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
+      if (!collectPossibleCalleesForSubscript(DC, subscriptExpr, Candidates))
         return false;
       Arg = subscriptExpr->getIndex();
     }
@@ -5314,7 +5314,8 @@ class CodeCompletionTypeContextAnalyzer {
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
-      for (auto Params : Candidates) {
+      for (auto &typeAndDecl : Candidates) {
+        auto Params = typeAndDecl.first->getParams();
         if (Position >= Params.size())
           continue;
         const auto &Param = Params[Position];
