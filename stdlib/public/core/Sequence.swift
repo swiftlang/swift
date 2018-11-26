@@ -889,10 +889,9 @@ extension Sequence {
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements into a ring buffer to save space. Once all
-    // elements are consumed, reorder the ring buffer into an `Array`
-    // and return it. This saves memory for sequences particularly longer
-    // than `maxLength`.
     var ringBuffer: [Element] = []
+    // elements are consumed, reorder the ring buffer and return it.
+    // This saves memory for sequences particularly longer than `maxLength`.
     ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = 0
@@ -907,15 +906,12 @@ extension Sequence {
       }
     }
 
-    if i != ringBuffer.startIndex {
-      var rotated: [Element] = []
-      rotated.reserveCapacity(ringBuffer.count)
-      rotated += ringBuffer[i..<ringBuffer.endIndex]
-      rotated += ringBuffer[0..<i]
-      return rotated
-    } else {      
-      return ringBuffer
+    if i != ringBuffer.startIndex { // Rotate the array in-place
+      ringBuffer[0..<i].reverse()
+      ringBuffer[i..<ringBuffer.endIndex].reverse()
+      ringBuffer[0..<ringBuffer.endIndex].reverse()
     }
+    return ringBuffer
   }
 
   /// Returns a sequence containing all but the given number of initial
