@@ -98,6 +98,8 @@ static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
+  case SILNodeKind::BranchInst:
+  case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
     return true;
@@ -611,21 +613,6 @@ OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
 }
 
 OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
-    EndBorrowArgumentInst *I) {
-  // If we are currently checking an end_borrow_argument as a subobject, then we
-  // treat this as just a use.
-  if (isCheckingSubObject())
-    return {true, UseLifetimeConstraint::MustBeLive};
-
-  // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
-  auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Guaranteed)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
-  return {true, lifetimeConstraint};
-}
-
-OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
   if (getValue() == I->getEnumOperand()) {
     return {true, UseLifetimeConstraint::MustBeLive};
@@ -810,6 +797,16 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
+  // If we are checking a subobject, make sure that we are from a guaranteed
+  // basic block argument.
+  if (isCheckingSubObject()) {
+    auto *phiArg = cast<SILPHIArgument>(Op.get());
+    (void)phiArg;
+    assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+           "Expected an end_borrow paired with an argument.");
+    return {true, UseLifetimeConstraint::MustBeLive};
+  }
+
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
   return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
@@ -1453,6 +1450,7 @@ void SILValueOwnershipChecker::gatherUsers(
   // users since we verify against our base.
   auto OwnershipKind = Value.getOwnershipKind();
   bool IsGuaranteed = OwnershipKind == ValueOwnershipKind::Guaranteed;
+  bool IsOwned = OwnershipKind == ValueOwnershipKind::Owned;
 
   if (IsGuaranteed && isGuaranteedForwardingValue(Value))
     return;
@@ -1500,26 +1498,36 @@ void SILValueOwnershipChecker::gatherUsers(
       }
     }
 
-    // If our base value is not guaranteed or our intermediate value is not an
-    // ownership forwarding inst, continue. We do not want to visit any
-    // subobjects recursively.
-    if (!IsGuaranteed || !isGuaranteedForwardingInst(User)) {
-      // Do a check if any of our users are begin_borrows. If we find such a
-      // use, then we want to include the end_borrow associated with the
-      // begin_borrow in our NonLifetimeEndingUser lists.
-      //
-      // For correctness reasons we use indices to make sure that we can append
-      // to NonLifetimeEndingUsers without needing to deal with iterator
-      // invalidation.
-      SmallVector<SILInstruction *, 4> endBorrowInsts;
-      for (unsigned i : indices(NonLifetimeEndingUsers)) {
-        if (auto *bbi = dyn_cast<BeginBorrowInst>(
-                NonLifetimeEndingUsers[i].getInst())) {
-          copy(bbi->getEndBorrows(), std::back_inserter(ImplicitRegularUsers));
+    // If our base value is not guaranteed, we do not to try to visit
+    // subobjects.
+    if (!IsGuaranteed) {
+      // But if we are owned, check if we have any end_borrows. We
+      // need to treat these as sub-scope users. We can rely on the
+      // end_borrow to prevent recursion.
+      if (IsOwned) {
+        // Do a check if any of our users are begin_borrows. If we find such a
+        // use, then we want to include the end_borrow associated with the
+        // begin_borrow in our NonLifetimeEndingUser lists.
+        //
+        // For correctness reasons we use indices to make sure that we can
+        // append to NonLifetimeEndingUsers without needing to deal with
+        // iterator invalidation.
+        SmallVector<SILInstruction *, 4> endBorrowInsts;
+        for (unsigned i : indices(NonLifetimeEndingUsers)) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(
+                  NonLifetimeEndingUsers[i].getInst())) {
+            copy(bbi->getEndBorrows(),
+                 std::back_inserter(ImplicitRegularUsers));
+          }
         }
       }
       continue;
     }
+
+    // If we are guaranteed, but are not a guaranteed forwarding inst,
+    // just continue. This user is just treated as a normal use.
+    if (!isGuaranteedForwardingInst(User))
+      continue;
 
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
@@ -1551,10 +1559,9 @@ void SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // Otherwise if we have a terminator, add any as uses any
-    // end_borrow_argument to ensure that the subscope is completely enclsed
-    // within the super scope. all of the arguments to the work list. We require
-    // all of our arguments to be either trivial or guaranteed.
+    // Otherwise if we have a terminator, add any as uses any end_borrow to
+    // ensure that the subscope is completely enclsed within the super scope. We
+    // require all of our arguments to be either trivial or guaranteed.
     for (auto &Succ : TI->getSuccessors()) {
       auto *BB = Succ.getBB();
 
@@ -1567,7 +1574,7 @@ void SILValueOwnershipChecker::gatherUsers(
       //
       // TODO: We could ignore this error and emit a more specific error on the
       // actual terminator.
-      for (auto *BBArg : BB->getArguments()) {
+      for (auto *BBArg : BB->getPHIArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.
         //
@@ -1584,8 +1591,16 @@ void SILValueOwnershipChecker::gatherUsers(
         if (BBArgOwnershipKind == ValueOwnershipKind::Trivial)
           continue;
 
-        // Otherwise,
-        copy(BBArg->getUses(), std::back_inserter(Users));
+        // Otherwise add all end_borrow users for this BBArg to the
+        // implicit regular user list. We know that BBArg must be
+        // completely joint post-dominated by these users, so we use
+        // them to ensure that all of BBArg's uses are completely
+        // enclosed within the end_borrow of this argument.
+        for (auto *op : BBArg->getUses()) {
+          if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
+            ImplicitRegularUsers.push_back(ebi);
+          }
+        }
       }
     }
   }

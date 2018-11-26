@@ -408,6 +408,7 @@ public:
     }
 
     ~BacktrackingScope();
+    bool willBacktrack() const { return Backtrack; }
 
     void cancelBacktrack() {
       Backtrack = false;
@@ -415,6 +416,7 @@ public:
       SynContext.reset();
       DT.commit();
     }
+
   };
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
@@ -765,6 +767,8 @@ public:
                                llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
+
+  void parseDeclListDelayed(IterableDeclContext *IDC);
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
@@ -1396,6 +1400,8 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<LanguageVersionConstraintAvailabilitySpec>
   parseLanguageVersionConstraintSpec();
+
+  bool canDelayBodyParsing();
 };
 
 /// Describes a parsed declaration name.

@@ -1,6 +1,6 @@
 
 /* Generic Signature Changes */
-
+Protocol BinaryInteger has generic signature change from <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : Sequence, Self.Words.Element == UInt> to <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : RandomAccessCollection, Self.Words.Element == UInt, Self.Words.Index == Int>
 /* RawRepresentable Changes */
 
 /* Removed Decls */

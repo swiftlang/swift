@@ -15,6 +15,7 @@ internal struct InternalStruct {
 
   public private(set) var publicVarPrivateSet = 0
 
+  // expected-warning@+1 {{'public(set)' modifier is redundant for a public property}} {{10-22=}}
   public public(set) var publicVarPublicSet = 0
 
   // CHECK-DAG: sil hidden @$S22accessibility_warnings14InternalStructV16publicVarGetOnlySivg
@@ -58,32 +59,33 @@ extension PrivateStruct {
 
 public extension PublicStruct {
   // CHECK-DAG: sil @$S22accessibility_warnings12PublicStructV09extMemberC0yyF
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPublic() {}
 }
+
 internal extension PublicStruct {
   // CHECK-DAG: sil hidden @$S22accessibility_warnings12PublicStructV17extMemberInternalyyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV15extImplInternal33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension PublicStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings12PublicStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
 
 internal extension InternalStruct {
   // CHECK-DAG: sil hidden @$S22accessibility_warnings14InternalStructV09extMemberC0yyF
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV07extImplC033_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplInternal() {}
 }
 private extension InternalStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV16extMemberPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings14InternalStructV14extImplPrivate33_5D2F2E026754A901C0FF90C404896D02LLyyF
   private func extImplPrivate() {}
 }
@@ -91,7 +93,7 @@ private extension InternalStruct {
 
 private extension PrivateStruct {
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV09extMemberC0yyF
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
   // CHECK-DAG: sil private @$S22accessibility_warnings13PrivateStruct33_5D2F2E026754A901C0FF90C404896D02LLV07extImplC0yyF
   private func extImplPrivate() {}
 }
@@ -126,6 +128,7 @@ internal class InternalClass {
   // CHECK-DAG: sil hidden [transparent] @$S22accessibility_warnings13InternalClassC19publicVarPrivateSetSivg
   public private(set) var publicVarPrivateSet = 0
 
+  // expected-warning@+1 {{'public(set)' modifier is redundant for a public property}} {{10-22=}}
   public public(set) var publicVarPublicSet = 0
 
   // CHECK-DAG: sil hidden @$S22accessibility_warnings13InternalClassC16publicVarGetOnlySivg

@@ -221,7 +221,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   // generate: var indexVar
   Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
   indexPat->setType(intType);
-  indexPat = new (C) TypedPattern(indexPat, TypeLoc::withoutLoc(intType));
+  indexPat = TypedPattern::createImplicit(C, indexPat, intType);
   indexPat->setType(intType);
   auto *indexBind = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
@@ -1105,9 +1105,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);
-  hashValuePat
-    = new (C) TypedPattern(hashValuePat, TypeLoc::withoutLoc(intType),
-                           /*implicit*/ true);
+  hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
   hashValuePat->setType(intType);
 
   auto *patDecl = PatternBindingDecl::createImplicit(

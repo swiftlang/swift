@@ -80,8 +80,8 @@ class SubMultiConf: BaseMultiConf,P2,P1,P3 { // CHECK: [[@LINE]]:7 | class/Swift
 }
 
 protocol InheritingP: P1 { // CHECK: [[@LINE]]:10 | protocol/Swift | InheritingP | [[InheritingP_USR:.*]] | Def
-  // FIXME: Should have override relation with P1.foo()
-  func foo() // CHECK: [[@LINE]]:8 | instance-method/Swift | foo() | [[InheritingP_foo_USR:.*]] | Def,Dyn,RelChild | rel: 1
+  func foo() // CHECK: [[@LINE]]:8 | instance-method/Swift | foo() | [[InheritingP_foo_USR:.*]] | Def,Dyn,RelChild,RelOver | rel: 2
+    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | s:14swift_ide_test2P1P3fooyyF
     // CHECK-NEXT: RelChild | protocol/Swift | InheritingP | [[InheritingP_USR]]
 }
 
@@ -94,9 +94,7 @@ struct DirectConf2: InheritingP { // CHECK: [[@LINE]]:8 | struct/Swift | DirectC
 }
 
 extension InheritingP { // CHECK: [[@LINE]]:11 | extension/ext-protocol/Swift | InheritingP | [[InheritingP_USR:.*]] | Def
-  // FIXME: Should only override InheritingP.foo()
-  func foo() {} // CHECK: [[@LINE]]:8 | instance-method/Swift | foo() | [[InheritingP_ext_foo_USR:.*]] | Def,Dyn,RelChild,RelOver | rel: 3
+  func foo() {} // CHECK: [[@LINE]]:8 | instance-method/Swift | foo() | [[InheritingP_ext_foo_USR:.*]] | Def,Dyn,RelChild,RelOver | rel: 2
     // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[InheritingP_foo_USR]]
-    // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[P1_foo_USR]]
     // CHECK-NEXT: RelChild | extension/ext-protocol/Swift | InheritingP | [[InheritingP_USR]]
 }

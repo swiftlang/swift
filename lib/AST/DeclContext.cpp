@@ -346,11 +346,6 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (AFD->getDeclContext()->isLocalContext())
         continue;
 
-      // FIXME: Make sure this method is never called on decls that have not
-      // been fully validated.
-      if (!AFD->hasAccess())
-        break;
-
       auto funcAccess =
         AFD->getFormalAccessScope(/*useDC=*/nullptr,
                                   /*treatUsableFromInlineAsPublic=*/true);
@@ -759,6 +754,8 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  // Lazily parse members.
+  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
   if (!hasLazyMembers())
     return;
 

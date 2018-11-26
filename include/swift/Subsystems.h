@@ -66,6 +66,7 @@ namespace swift {
   class TopLevelContext;
   struct TypeLoc;
   class UnifiedStatsReporter;
+  enum class SourceFileKind;
 
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
@@ -332,11 +333,11 @@ namespace swift {
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:
-    ParserUnit(SourceManager &SM, unsigned BufferID,
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
                SyntaxParsingCache *SyntaxCache = nullptr);
-    ParserUnit(SourceManager &SM, unsigned BufferID);
-    ParserUnit(SourceManager &SM, unsigned BufferID,
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();

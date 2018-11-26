@@ -109,7 +109,7 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
                 bool checkParent) {
   if (!(VD->isObjC() || VD->getAttrs().hasAttribute<CDeclAttr>()))
     return false;
-  if (VD->hasAccess() && VD->getFormalAccess() >= minRequiredAccess) {
+  if (VD->getFormalAccess() >= minRequiredAccess) {
     return true;
   } else if (checkParent) {
     if (auto ctor = dyn_cast<ConstructorDecl>(VD)) {

@@ -500,7 +500,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(lhs: Self, rhs: Self) -> Self
+  override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable,
   /// rounded to a representable value.
@@ -508,7 +508,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(lhs: inout Self, rhs: Self)
+  override static func +=(lhs: inout Self, rhs: Self)
 
   /// Calculates the additive inverse of a value.
   ///
@@ -520,7 +520,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     // y == -21.5
   ///
   /// - Parameter operand: The value to negate.
-  static prefix func - (_ operand: Self) -> Self
+  override static prefix func - (_ operand: Self) -> Self
 
   /// Replaces this value with its additive inverse.
   ///
@@ -530,7 +530,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     var x = 21.5
   ///     x.negate()
   ///     // x == -21.5
-  mutating func negate()
+  override mutating func negate()
 
   /// Subtracts one value from another and produces their difference, rounded
   /// to a representable value.
@@ -550,7 +550,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(lhs: Self, rhs: Self) -> Self
+  override static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in
   /// the left-hand-side variable, rounding to a representable value.
@@ -558,7 +558,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(lhs: inout Self, rhs: Self)
+  override static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product, rounding to a
   /// representable value.
@@ -578,7 +578,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable, rounding to a representable value.
@@ -586,7 +586,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the quotient of dividing the first value by the second, rounded
   /// to a representable value.

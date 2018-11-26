@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -720,9 +720,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     return;
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
-  bool isCascading = true;
-  if (current->hasAccess())
-    isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
+  bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
@@ -2063,6 +2061,33 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
   return group;
 }
 
+static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
+                                    SourceLoc loc, TypeChecker &tc,
+                                    ASTContext &ctx) {
+  auto *dc = OD->getDeclContext();
+  auto *TyR = new (ctx) SimpleIdentTypeRepr(loc, name);
+  TypeLoc typeLoc = TypeLoc(TyR);
+
+  TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
+  if (tc.validateType(typeLoc, TypeResolution::forContextual(dc), options)) {
+    typeLoc.setInvalidType(ctx);
+  }
+
+  if (!typeLoc.isError()) {
+    OD->setDesignatedProtocolTypeLoc(typeLoc);
+    auto *decl = typeLoc.getType()->getNominalOrBoundGenericNominal();
+    if (!decl || !isa<ProtocolDecl>(decl)) {
+      tc.diagnose(typeLoc.getLoc(),
+                  diag::operators_designated_protocol_not_a_protocol,
+                  typeLoc.getType());
+      OD->setInvalid();
+    } else {
+      // FIXME: verify this operator has a declaration within this
+      //        protocol with the same arity and fixity
+    }
+  }
+}
+
 /// Validate the given operator declaration.
 ///
 /// This establishes key invariants, such as an InfixOperatorDecl's
@@ -2072,38 +2097,65 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   checkDeclAttributesEarly(OD);
   checkDeclAttributes(OD);
 
-  if (auto IOD = dyn_cast<InfixOperatorDecl>(OD)) {
-    if (!IOD->getPrecedenceGroup()) {
-      PrecedenceGroupDecl *group = nullptr;
+  auto IOD = dyn_cast<InfixOperatorDecl>(OD);
 
-      // If a name was given, try to look it up.
-      Identifier name = IOD->getPrecedenceGroupName();
-      if (!name.empty()) {
-        auto loc = IOD->getPrecedenceGroupNameLoc();
-        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(), name, loc);
-        if (!group && !IOD->isInvalid()) {
-          diagnose(loc, diag::unknown_precedence_group, name);
-          IOD->setInvalid();
-        }
+  auto enableOperatorDesignatedProtocols =
+      getLangOpts().EnableOperatorDesignatedProtocols;
+
+  // Pre- or post-fix operator?
+  if (!IOD) {
+    auto typeLoc = OD->getDesignatedProtocolTypeLoc();
+    auto protocolId = OD->getDesignatedProtocolName();
+    if (typeLoc.isNull() && !protocolId.empty() &&
+        enableOperatorDesignatedProtocols) {
+      auto protocolIdLoc = OD->getDesignatedProtocolNameLoc();
+      checkDesignatedProtocol(OD, protocolId, protocolIdLoc, *this, Context);
+    }
+    return;
+  }
+
+  if (!IOD->getPrecedenceGroup()) {
+    PrecedenceGroupDecl *group = nullptr;
+
+    auto firstId = IOD->getFirstIdentifier();
+    auto firstIdLoc = IOD->getFirstIdentifierLoc();
+
+    // If a name was given, try to look it up.
+    if (!firstId.empty()) {
+      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(), firstId,
+                                             firstIdLoc);
+    }
+
+    auto secondId = IOD->getSecondIdentifier();
+    auto typeLoc = IOD->getDesignatedProtocolTypeLoc();
+    if (typeLoc.isNull() && enableOperatorDesignatedProtocols) {
+      auto secondIdLoc = IOD->getSecondIdentifierLoc();
+      assert(secondId.empty() || !firstId.empty());
+
+      auto protocolId = group ? secondId : firstId;
+      auto protocolIdLoc = group ? secondIdLoc : firstIdLoc;
+      if (!protocolId.empty())
+        checkDesignatedProtocol(IOD, protocolId, protocolIdLoc, *this, Context);
+    }
+
+    if (!group && !IOD->isInvalid()) {
+      if (!firstId.empty() &&
+          (!secondId.empty() || IOD->getDesignatedProtocolTypeLoc().isNull())) {
+        diagnose(firstIdLoc, diag::unknown_precedence_group, firstId);
+        IOD->setInvalid();
       }
 
-      // If that fails, or if a name was not given, use the default
-      // precedence group.
-      if (!group) {
-        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(),
-                                               Context.Id_DefaultPrecedence,
-                                               SourceLoc());
-        if (!group && name.empty() && !IOD->isInvalid()) {
-          diagnose(OD->getLoc(), diag::missing_builtin_precedence_group,
-                   Context.Id_DefaultPrecedence);
-        }
+      group = lookupPrecedenceGroupPrimitive(
+          IOD->getDeclContext(), Context.Id_DefaultPrecedence, SourceLoc());
+      if (!group && firstId.empty() && !IOD->isInvalid()) {
+        diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
+                 Context.Id_DefaultPrecedence);
       }
+    }
 
-      // Validate the precedence group.
-      if (group) {
-        validateDecl(group);
-        IOD->setPrecedenceGroup(group);
-      }
+    if (group) {
+      validateDecl(group);
+      IOD->setPrecedenceGroup(group);
     }
   }
 }
@@ -3265,7 +3317,8 @@ public:
           attr->setInvalid();
         } else if (attr->isImplicit()) {
           // Don't diagnose implicit attributes.
-        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
+        } else if (overrideRequiresKeyword(CD->getOverriddenDecl())
+                     == OverrideRequiresKeyword::Never) {
           // Special case: we are overriding a 'required' initializer, so we
           // need (only) the 'required' keyword.
           if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
@@ -3750,8 +3803,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
-
-  (void) D->getFormalAccess();
 
   // Validate the context.
   auto dc = D->getDeclContext();
@@ -4306,9 +4357,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     checkDeclAttributesEarly(DD);
 
-    if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
-      DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
     validateGenericFuncSignature(DD);
 
     DD->setSignatureIsValidated();
@@ -4657,6 +4705,9 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     finalizeAbstractStorageDecl(*this, storage);
   }
+
+  // Compute access level.
+  (void)decl->getFormalAccess();
 
   // Compute overrides.
   (void)decl->getOverriddenDecls();
@@ -5485,6 +5536,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       // We have a designated initializer. Create an override of it.
+      // FIXME: Validation makes sure we get a generic signature here.
+      validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
         Context.addSynthesizedDecl(ctor);

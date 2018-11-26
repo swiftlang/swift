@@ -207,7 +207,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   const unsigned OriginalDeclCount = SF.Decls.size();
 
   unsigned CurElem = OriginalDeclCount;
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(Ctx);
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;

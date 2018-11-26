@@ -130,9 +130,9 @@ FUNCTION(SlowDealloc, swift_slowDealloc, C_CC,
          ATTRS(NoUnwind))
 
 // void swift_willThrow(error *ptr);
-FUNCTION(WillThrow, swift_willThrow, C_CC,
+FUNCTION(WillThrow, swift_willThrow, SwiftCC,
          RETURNS(VoidTy),
-         ARGS(ErrorPtrTy),
+         ARGS(Int8PtrTy, ErrorPtrTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 // void swift_errorInMain(error *ptr);
@@ -771,6 +771,17 @@ FUNCTION(InitClassMetadata,
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+// void *swift_lookUpClassMethod(Metadata *metadata,
+//                               ClassDescriptor *description,
+//                               MethodDescriptor *method);
+FUNCTION(LookUpClassMethod,
+         swift_lookUpClassMethod, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy,
+              MethodDescriptorStructTy->getPointerTo(),
+              TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_initStructMetadata(Metadata *structType,

@@ -402,7 +402,7 @@ public:
         return REPLInputKind::REPLDirective;
       }
 
-      SCR = ide::isSourceInputComplete(CurrentLines.str());
+      SCR = ide::isSourceInputComplete(CurrentLines.str(), SourceFileKind::REPL);
       // Keep reading if input is unfinished.
     } while (!SCR.IsComplete);
 
@@ -974,7 +974,8 @@ public:
         /*BufferID*/ 0U,
         /*CurElem*/ 0,
         /*CurIRGenElem*/ 0
-      }
+      },
+      PersistentState(CI.getASTContext())
   {
     ASTContext &Ctx = CI.getASTContext();
     if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {

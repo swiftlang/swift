@@ -400,6 +400,30 @@ SourceRange TuplePattern::getSourceRange() const {
            Fields.back().getPattern()->getEndLoc() };
 }
 
+TypedPattern::TypedPattern(Pattern *pattern, TypeRepr *tr,
+                           Optional<bool> implicit)
+  : Pattern(PatternKind::Typed), SubPattern(pattern), PatTypeRepr(tr) {
+  if (implicit ? *implicit : tr && !tr->getSourceRange().isValid())
+    setImplicit();
+  Bits.TypedPattern.IsPropagatedType = false;
+}
+
+TypeLoc TypedPattern::getTypeLoc() const {
+  TypeLoc loc = TypeLoc(PatTypeRepr);
+
+  if (hasType())
+    loc.setType(getType());
+
+  return loc;
+}
+
+SourceLoc TypedPattern::getLoc() const {
+  if (SubPattern->isImplicit() && PatTypeRepr)
+    return PatTypeRepr->getSourceRange().Start;
+
+  return SubPattern->getLoc();
+}
+
 SourceRange TypedPattern::getSourceRange() const {
   if (isImplicit() || isPropagatedType()) {
     // If a TypedPattern is implicit, then its type is definitely implicit, so
@@ -408,10 +432,14 @@ SourceRange TypedPattern::getSourceRange() const {
     return SubPattern->getSourceRange();
   }
 
-  if (SubPattern->isImplicit())
-    return PatType.getSourceRange();
+  if (!PatTypeRepr)
+    return SourceRange();
 
-  return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
+  if (SubPattern->isImplicit())
+    return PatTypeRepr->getSourceRange();
+
+  return { SubPattern->getSourceRange().Start,
+           PatTypeRepr->getSourceRange().End };
 }
 
 /// Construct an ExprPattern.

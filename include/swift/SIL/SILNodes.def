@@ -598,8 +598,6 @@ NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndBorrowInst, end_borrow,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(EndBorrowArgumentInst, end_borrow_argument,
-               SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(EndAccessInst, end_access,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(BeginUnpairedAccessInst, begin_unpaired_access,

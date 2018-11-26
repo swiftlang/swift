@@ -1641,7 +1641,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DeinitExistentialValue)
-  UNARY_INSTRUCTION(EndBorrowArgument)
   UNARY_INSTRUCTION(EndBorrow)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(Return)

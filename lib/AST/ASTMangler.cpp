@@ -412,8 +412,7 @@ std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
 
 #ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
 static bool isPrivate(const NominalTypeDecl *Nominal) {
-  return Nominal->hasAccess() &&
-         Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
+  return Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 #endif
 

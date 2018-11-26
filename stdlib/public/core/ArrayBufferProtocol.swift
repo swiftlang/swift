@@ -96,7 +96,7 @@ internal protocol _ArrayBufferProtocol
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
-  var count: Int { get set }
+  override var count: Int { get set }
 
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int { get }

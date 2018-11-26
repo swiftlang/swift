@@ -76,7 +76,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument" "end_borrow") 'words) . font-lock-keyword-face)
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow") 'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Exclusivity
    `(,(regexp-opt '("begin_access" "end_access") 'words) . font-lock-keyword-face)

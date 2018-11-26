@@ -26,7 +26,9 @@ sil @does_throw : $@convention(thin) () -> @error Error {
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
   %1 = apply %0() : $@convention(thin) () -> @owned Error
 
-  // CHECK-NEXT: call void @swift_willThrow
+  // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
+  // CHECK-NEXT: call swiftcc void @swift_willThrow
+  // CHECK-NEXT: store %swift.error* null, %swift.error** %1,
   // CHECK-NEXT: store %swift.error* [[T0]], %swift.error** %1,
   // CHECK-NEXT: ret void
   builtin "willThrow"(%1 : $Error) : $()
@@ -64,8 +66,8 @@ entry(%0 : $AnyObject):
   // CHECK-aarch64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 
-  // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
-  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* swiftself undef, %swift.error** nocapture [[SWIFTERROR]]{{( )?}}[[ERRORSLOT]])
+  // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
+  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc %swift.refcounted* @try_apply_helper(%swift.refcounted* %0, %swift.refcounted* swiftself undef, %swift.error** noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
@@ -100,7 +102,7 @@ enum ColorError : Error {
 }
 
 // CHECK-LABEL: TestCallToWillThrowCallBack
-// CHECK: call void @swift_willThrow(%swift.error* %0)
+// CHECK: call swiftcc void @swift_willThrow(i8* swiftself undef, %swift.error** noalias nocapture readonly [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) %2)
 // CHECK: store %swift.error* %0
 // CHECK: ret i64 undef
 sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned Error) -> (Int64, @error Error) {
@@ -113,9 +115,9 @@ bb0(%0 : $Error):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_single(%T6errors1AC*)
 // CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @"$S27partial_apply_single_helperTA" to i8*), %swift.refcounted* undef },
-// CHECK: define internal swiftcc void @"$S27partial_apply_single_helperTA"(%swift.refcounted* swiftself, %swift.error**{{( )?}}[[SWIFTERROR]])
+// CHECK: define internal swiftcc void @"$S27partial_apply_single_helperTA"(%swift.refcounted* swiftself, %swift.error** noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}))
 // CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %T6errors1AC*
-// CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%T6errors1AC* [[T0]], %swift.refcounted* swiftself undef, %swift.error**{{( )?}}[[SWIFTERROR]]{{( )?}}{{%.*}})
+// CHECK-NEXT:  tail call swiftcc void @partial_apply_single_helper(%T6errors1AC* [[T0]], %swift.refcounted* swiftself undef, %swift.error** noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}){{( )?}}{{%.*}})
 // CHECK-NEXT:  ret void
 sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error Error {
 entry(%0 : $A):

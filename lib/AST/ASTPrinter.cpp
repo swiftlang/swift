@@ -64,6 +64,14 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
+  auto *DC = ASD->getDeclContext()->getAsDecl();
+  if (!DC) return false;
+  auto *ND = dyn_cast<NominalTypeDecl>(DC);
+  if (!ND) return false;
+  return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
+}
+
 PrintOptions PrintOptions::printTextualInterfaceFile() {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
@@ -71,6 +79,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
+  result.OmitNameOfInaccessibleProperties = true;
 
   class ShouldPrintForTextualInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
@@ -79,8 +88,14 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
         AccessScope accessScope =
             VD->getFormalAccessScope(/*useDC*/nullptr,
                                      /*treatUsableFromInlineAsPublic*/true);
-        if (!accessScope.isPublic())
+        if (!accessScope.isPublic()) {
+          // We do want to print private stored properties, without their
+          // original names present.
+          if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
+            if (contributesToParentTypeStorage(ASD))
+              return true;
           return false;
+        }
       }
 
       // Skip typealiases that just redeclare generic parameters.
@@ -512,8 +527,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
-    if (!Options.PrintAccess || !D->hasAccess() ||
-        isa<ProtocolDecl>(D->getDeclContext()))
+    if (!Options.PrintAccess || isa<ProtocolDecl>(D->getDeclContext()))
       return;
     if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
         !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
@@ -821,7 +835,13 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    recordDeclLoc(named->getDecl(), [&]{
+    auto decl = named->getDecl();
+    recordDeclLoc(decl, [&]{
+      if (Options.OmitNameOfInaccessibleProperties &&
+          contributesToParentTypeStorage(decl) &&
+          decl->getFormalAccess() < AccessLevel::Public)
+        Printer << "_";
+      else
         Printer.printName(named->getBoundName());
       });
     break;
@@ -1362,10 +1382,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return !EED->getSourceRange().isValid();
   }
 
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    if (Options.OmitNameOfInaccessibleProperties &&
+        contributesToParentTypeStorage(ASD))
+      return true;
+  }
+
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessFilter > AccessLevel::Private &&
-        VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
+        VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }
 
@@ -2799,9 +2825,10 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getPrecedenceGroupName().empty()) {
-    Printer << " : " << decl->getPrecedenceGroupName();
-  }
+  if (!decl->getFirstIdentifier().empty())
+    Printer << " : " << decl->getFirstIdentifier();
+  if (!decl->getSecondIdentifier().empty())
+    Printer << ", " << decl->getSecondIdentifier();
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -2874,6 +2901,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
@@ -2883,6 +2912,8 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }

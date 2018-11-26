@@ -208,7 +208,7 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %1 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -224,7 +224,7 @@ bb3:
 // CHECK: Found use after free?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Optional<Builtin.NativeObject>
 // CHECK: Consuming User:   end_borrow %1 : $Optional<Builtin.NativeObject>
-// CHECK: Non Consuming User:   end_borrow_argument %3 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
 // CHECK: Block: bb1
 sil @switch_enum_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
@@ -233,7 +233,7 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Optional<Builtin.NativeObject>
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -287,7 +287,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow_argument %1 : $SuperKlass
+  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @owned $Builtin.NativeObject):
@@ -314,7 +314,7 @@ bb1(%1 : @owned $SuperKlass):
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -339,11 +339,11 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow_argument %1 : $SuperKlass
+  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -363,7 +363,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
-  end_borrow_argument %1 : $SuperKlass
+  end_borrow %1 : $SuperKlass
   br bb3
 
 bb2(%2 : @owned $Builtin.NativeObject):
@@ -390,7 +390,7 @@ bb1(%1 : @owned $SuperKlass):
   br bb3
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -402,7 +402,7 @@ bb3:
 // CHECK: Found use after free?!
 // CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject
-// CHECK: Non Consuming User:   end_borrow_argument %7 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject
 // CHECK: Block: bb2
 sil @checked_cast_br_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -410,13 +410,13 @@ bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %1 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
 
 bb1(%2 : @guaranteed $SuperKlass):
-  end_borrow_argument %2 : $SuperKlass
+  end_borrow %2 : $SuperKlass
   end_borrow %1 : $Builtin.NativeObject
   br bb3
 
 bb2(%3 : @guaranteed $Builtin.NativeObject):
   end_borrow %1 : $Builtin.NativeObject
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb3:

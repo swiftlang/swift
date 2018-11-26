@@ -343,7 +343,7 @@ void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
   auto *NTD = ED->getExtendedNominal();
   if (!NTD)
     return;
-  if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
 
@@ -367,7 +367,7 @@ void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
                                           CollectedDeclarations &cpd) const {
   if (!NTD->hasName())
     return;
-  if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
   out << "- \"" << escape(NTD->getName()) << "\"\n";
@@ -382,7 +382,7 @@ void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
     if (!VD)
       continue;
 
-    if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+    if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
       continue;
     }
 
@@ -402,7 +402,7 @@ void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
 void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
   if (!VD->hasName())
     return;
-  if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
   out << "- \"" << escape(VD->getBaseName()) << "\"\n";
@@ -584,8 +584,7 @@ void DependsEmitter::emitMembers(
   out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
-    if (entry.first.first->hasAccess() &&
-        entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";
@@ -610,8 +609,7 @@ void DependsEmitter::emitNominalTypes(
       isCascading |= i->second;
     }
 
-    if (i->first.first->hasAccess() &&
-        i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";

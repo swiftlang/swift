@@ -160,5 +160,25 @@ ErrorTests.test("unsigned raw value") {
   expectEqual(-1, negOne._code)
 }
 
+ErrorTests.test("test dealloc empty error box") {
+  struct Foo<T>: Error { let value: T }
+
+  func makeFoo<T>() throws -> Foo<T> {
+    throw Foo(value: "makeFoo throw error")
+  }
+
+  func makeError<T>(of: T.Type) throws -> Error {
+    return try makeFoo() as Foo<T>
+  }
+
+  do {
+    _ = try makeError(of: Int.self)
+  } catch let foo as Foo<String> {
+    expectEqual(foo.value, "makeFoo throw error")
+  } catch {
+    expectUnreachableCatch(error)
+  }
+}
+
 runAllTests()
 

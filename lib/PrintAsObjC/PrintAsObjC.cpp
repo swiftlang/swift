@@ -2654,15 +2654,6 @@ public:
     return import == importer->getImportedHeaderModule();
   }
 
-  static void getClangSubmoduleReversePath(SmallVectorImpl<StringRef> &path,
-                                           const clang::Module *module) {
-    // FIXME: This should be an API on clang::Module.
-    do {
-      path.push_back(module->Name);
-      module = module->Parent;
-    } while (module);
-  }
-
   static int compareImportModulesByName(const ImportModuleTy *left,
                                         const ImportModuleTy *right) {
     auto *leftSwiftModule = left->dyn_cast<ModuleDecl *>();
@@ -2692,10 +2683,10 @@ public:
     assert(rightClangModule->isSubModule() &&
            "top-level modules should use a normal swift::ModuleDecl");
 
-    SmallVector<StringRef, 8> leftReversePath;
-    SmallVector<StringRef, 8> rightReversePath;
-    getClangSubmoduleReversePath(leftReversePath, leftClangModule);
-    getClangSubmoduleReversePath(rightReversePath, rightClangModule);
+    SmallVector<StringRef, 8> leftReversePath(
+        ModuleDecl::ReverseFullNameIterator(leftClangModule), {});
+    SmallVector<StringRef, 8> rightReversePath(
+        ModuleDecl::ReverseFullNameIterator(rightClangModule), {});
 
     assert(leftReversePath != rightReversePath &&
            "distinct Clang modules should not have the same full name");
@@ -2734,11 +2725,7 @@ public:
         assert(clangModule->isSubModule() &&
                "top-level modules should use a normal swift::ModuleDecl");
         out << "@import ";
-        SmallVector<StringRef, 8> submoduleNames;
-        getClangSubmoduleReversePath(submoduleNames, clangModule);
-        interleave(submoduleNames.rbegin(), submoduleNames.rend(),
-                   [&out](StringRef next) { out << next; },
-                   [&out] { out << "."; });
+        ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
         out << ";\n";
       }
     }

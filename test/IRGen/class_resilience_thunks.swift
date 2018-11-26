@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_class_thunks.swiftmodule -module-name=resilient_class_thunks %S/../Inputs/resilient_class_thunks.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -I %t -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -34,6 +34,24 @@ public func testDispatchThunkDerived(d: Derived) {
 
   // CHECK: call swiftcc void @"$S22resilient_class_thunks4BaseC14takesReferenceyyAA6ObjectCFTj"(%T22resilient_class_thunks6ObjectC* null, %T22resilient_class_thunks4BaseC* swiftself {{%.*}})
   d.takesReference(nil)
+
+  // CHECK: ret void
+}
+
+// We had a bug where if a non-resilient class overrides a method from a
+// resilient class, calling the override would directly access the vtable
+// entry of the resilient class, instead of going through the dispatch
+// thunk.
+
+open class MyDerived : Base<Int> {
+  // Override has different formal type but is ABI-compatible
+  open override func takesReference(_: Object) {}
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S23class_resilience_thunks27testDispatchThunkMyOverride1d1oyAA0G7DerivedC_010resilient_a1_C06ObjectCtF"(%T23class_resilience_thunks9MyDerivedC*, %T22resilient_class_thunks6ObjectC*)
+public func testDispatchThunkMyOverride(d: MyDerived, o: Object) {
+  // CHECK: call swiftcc void @"$S22resilient_class_thunks4BaseC14takesReferenceyyAA6ObjectCFTj"
+  d.takesReference(o)
 
   // CHECK: ret void
 }

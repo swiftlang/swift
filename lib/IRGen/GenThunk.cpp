@@ -120,3 +120,56 @@ llvm::GlobalValue *IRGenModule::defineMethodDescriptor(SILDeclRef declRef,
   auto entity = LinkEntity::forMethodDescriptor(declRef);
   return defineAlias(entity, definition);
 }
+
+/// Get or create a method descriptor variable.
+llvm::Constant *
+IRGenModule::getAddrOfMethodDescriptor(SILDeclRef declRef,
+                                       ForDefinition_t forDefinition) {
+  assert(forDefinition == NotForDefinition);
+  assert(declRef.getOverriddenWitnessTableEntry() == declRef &&
+         "Overriding protocol requirements do not have method descriptors");
+  LinkEntity entity = LinkEntity::forMethodDescriptor(declRef);
+  return getAddrOfLLVMVariable(entity, Alignment(4), forDefinition,
+                               MethodDescriptorStructTy, DebugTypeInfo());
+}
+
+/// Fetch the method lookup function for a resilient class.
+llvm::Function *
+IRGenModule::getAddrOfMethodLookupFunction(ClassDecl *classDecl,
+                                           ForDefinition_t forDefinition) {
+  IRGen.noteUseOfTypeMetadata(classDecl);
+
+  LinkEntity entity = LinkEntity::forMethodLookupFunction(classDecl);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  llvm::Type *params[] = {
+    TypeMetadataPtrTy,
+    MethodDescriptorStructTy->getPointerTo()
+  };
+  auto fnType = llvm::FunctionType::get(Int8PtrTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), SwiftCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
+void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
+  auto *f = getAddrOfMethodLookupFunction(classDecl, ForDefinition);
+
+  IRGenFunction IGF(*this, f);
+
+  auto params = IGF.collectParameters();
+  auto *metadata = params.claimNext();
+  auto *method = params.claimNext();
+
+  auto *description = getAddrOfTypeContextDescriptor(classDecl,
+                                                     RequireMetadata);
+
+  auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFn(),
+                                        {metadata, method, description});
+  IGF.Builder.CreateRet(result);
+}

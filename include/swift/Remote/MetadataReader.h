@@ -265,12 +265,12 @@ public:
     return start;
   }
 
-  /// Given a pointer to an address, attemp to read the pointed value.
-  Optional<StoredPointer> readPointedValue(StoredPointer Address) {
-    StoredPointer PointedVal;
-    if (!Reader->readInteger(RemoteAddress(Address), &PointedVal))
+  /// Given a pointer to an address, attemp to read the pointer value.
+  Optional<StoredPointer> readPointerValue(StoredPointer Address) {
+    StoredPointer PointerVal;
+    if (!Reader->readInteger(RemoteAddress(Address), &PointerVal))
       return None;
-    return Optional<StoredPointer>(PointedVal);
+    return Optional<StoredPointer>(PointerVal);
   }
 
   /// Given a pointer to the metadata, attempt to read the value

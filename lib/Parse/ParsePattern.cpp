@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -907,11 +908,27 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///
 ParserResult<Pattern> Parser::parsePattern() {
   SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
+  bool isLet = (InVarOrLetPattern != IVOLP_InVar);
+  auto specifier = isLet
+    ? VarDecl::Specifier::Let
+    : VarDecl::Specifier::Var;
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
     
   case tok::kw__:
+    // Normally, '_' is invalid in type context for patterns, but they show up
+    // in interface files as the name for type members that are non-public.
+    // Treat them as an implicitly synthesized NamedPattern with a nameless
+    // VarDecl inside.
+    if (CurDeclContext->isTypeContext() &&
+        SF.Kind == SourceFileKind::Interface) {
+      PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
+      auto VD = new (Context) VarDecl(
+        /*IsStatic*/false, specifier, /*IsCaptureList*/false,
+        consumeToken(tok::kw__), Identifier(), CurDeclContext);
+      return makeParserResult(new (Context) NamedPattern(VD, /*implicit*/true));
+    }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
@@ -919,10 +936,6 @@ ParserResult<Pattern> Parser::parsePattern() {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
-    bool isLet = (InVarOrLetPattern != IVOLP_InVar);
-    auto specifier = isLet
-                   ? VarDecl::Specifier::Let
-                   : VarDecl::Specifier::Var;
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
       diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
 

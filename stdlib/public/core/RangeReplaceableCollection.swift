@@ -63,8 +63,8 @@
 /// provide your own custom implementation.
 public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+  // FIXME: Associated type inference requires this.
+  override associatedtype SubSequence
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -362,11 +362,9 @@ public protocol RangeReplaceableCollection : Collection
   mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  // FIXME: Associated type inference requires these.
+  override subscript(bounds: Index) -> Element { get }
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//

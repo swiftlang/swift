@@ -329,6 +329,43 @@ bool swift::mayBindDynamicSelf(SILFunction *F) {
   return false;
 }
 
+static SILValue skipAddrProjections(SILValue V) {
+  for (;;) {
+    switch (V->getKind()) {
+      case ValueKind::IndexAddrInst:
+      case ValueKind::IndexRawPointerInst:
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+        V = cast<SingleValueInstruction>(V)->getOperand(0);
+        break;
+      default:
+        return V;
+    }
+  }
+  llvm_unreachable("there is no escape from an infinite loop");
+}
+
+/// Check whether the \p addr is an address of a tail-allocated array element.
+bool swift::isAddressOfArrayElement(SILValue addr) {
+  addr = stripAddressProjections(addr);
+  if (auto *MD = dyn_cast<MarkDependenceInst>(addr))
+    addr = stripAddressProjections(MD->getValue());
+
+  // High-level SIL: check for an get_element_address array semantics call.
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(addr))
+    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
+      ArraySemanticsCall Call(SEI->getOperand());
+      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
+        return true;
+    }
+
+  // Check for an tail-address (of an array buffer object).
+  if (isa<RefTailAddrInst>(skipAddrProjections(addr)))
+    return true;
+
+  return false;
+}
+
 /// Find a new position for an ApplyInst's FuncRef so that it dominates its
 /// use. Not that FunctionRefInsts may be shared by multiple ApplyInsts.
 void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {

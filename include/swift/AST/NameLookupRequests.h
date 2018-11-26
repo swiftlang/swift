@@ -206,6 +206,31 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+
+/// Request all type aliases and nominal types that appear in the "where"
+/// clause of an extension.
+class TypeDeclsFromWhereClauseRequest :
+    public SimpleRequest<TypeDeclsFromWhereClauseRequest,
+                         CacheKind::Uncached,
+                         DirectlyReferencedTypeDecls,
+                         ExtensionDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  DirectlyReferencedTypeDecls evaluate(Evaluator &evaluator,
+                                       ExtensionDecl *ext) const;
+
+public:
+  // Cycle handling
+  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// The zone number for name-lookup requests.
 #define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
 

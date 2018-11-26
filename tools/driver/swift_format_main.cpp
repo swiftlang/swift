@@ -61,7 +61,8 @@ public:
 
   void updateCode(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
-    Parser.reset(new ParserUnit(SM, BufferID, CompInv.getLangOptions(),
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
+                                BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     auto &P = Parser->getParser();

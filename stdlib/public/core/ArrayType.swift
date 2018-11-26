@@ -17,13 +17,13 @@ internal protocol ArrayProtocol
 {
   //===--- public interface -----------------------------------------------===//
   /// The number of elements the Array stores.
-  var count: Int { get }
+  override var count: Int { get }
 
   /// The number of elements the Array can store without reallocation.
   var capacity: Int { get }
 
   /// `true` if and only if the Array is empty.
-  var isEmpty: Bool { get }
+  override var isEmpty: Bool { get }
 
   /// An object that guarantees the lifetime of this array's elements.
   var _owner: AnyObject? { get }
@@ -42,7 +42,7 @@ internal protocol ArrayProtocol
   ///   mutable contiguous storage.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func reserveCapacity(_ minimumCapacity: Int)
+  override mutating func reserveCapacity(_ minimumCapacity: Int)
 
   /// Insert `newElement` at index `i`.
   ///

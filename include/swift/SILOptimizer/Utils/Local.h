@@ -123,6 +123,9 @@ ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 /// 'Self' to a generic argument of the callee.
 bool mayBindDynamicSelf(SILFunction *F);
 
+/// Check whether the \p addr is an address of a tail-allocated array element.
+bool isAddressOfArrayElement(SILValue addr);
+
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 

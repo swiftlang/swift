@@ -798,20 +798,6 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   }
   return true;
 }
-static bool isArrayEltStore(StoreInst *SI) {
-  SILValue Dest = stripAddressProjections(SI->getDest());
-  if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
-    Dest = MD->getValue();
-
-  if (auto *PtrToAddr =
-          dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
-    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
-      ArraySemanticsCall Call(SEI->getOperand());
-      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
-        return true;
-    }
-  return false;
-}
 
 /// Check whether the array semantic operation could change an array value to
 /// not be uniquely referenced.
@@ -1278,7 +1264,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
       // A store is only safe if it is to an array element and the element type
       // is trivial.
       if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-        if (!isArrayEltStore(SI) ||
+        if (!isAddressOfArrayElement(SI->getDest()) ||
             !SI->getSrc()->getType().isTrivial(Module)) {
           LLVM_DEBUG(llvm::dbgs()
                      <<"     (NO) non trivial store could store an array value "
@@ -1420,7 +1406,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 
       // Stores to array elements.
       if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-        if (isArrayEltStore(SI))
+        if (isAddressOfArrayElement(SI->getDest()))
           continue;
         LLVM_DEBUG(llvm::dbgs() << "     (NO) unknown store " << *SI);
         return ReturnWithCleanup(false);

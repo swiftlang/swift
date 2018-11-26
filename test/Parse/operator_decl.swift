@@ -85,3 +85,11 @@ precedencegroup CaretCaretCaret {
 class Foo {
   infix operator ||| // expected-error{{'operator' may only be declared at file scope}}
 }
+
+infix operator **<< : UndeclaredPrecedenceGroup
+// expected-error@-1 {{unknown precedence group 'UndeclaredPrecedenceGroup'}}
+
+protocol Proto {}
+infix operator *<*< : F, Proto
+// expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+// expected-error@-2 {{expected expression}}

@@ -377,14 +377,12 @@ void CharVector::append(int Number, NodeFactory &Factory) {
 void Demangler::clear() {
   NodeStack.free();
   Substitutions.free();
-  PendingSubstitutions.free();
   NodeFactory::clear();
 }
 
 void Demangler::init(StringRef MangledName) {
   NodeStack.init(*this, 16);
   Substitutions.init(*this, 16);
-  PendingSubstitutions.init(*this, 4);
   NumWords = 0;
   Text = MangledName;
   Pos = 0;
@@ -1249,8 +1247,7 @@ NodePointer Demangler::demangleBoundGenericType() {
   }
   NodePointer Nominal = popTypeAndGetAnyGeneric();
   NodePointer BoundNode = demangleBoundGenericArgs(Nominal, TypeListList, 0);
-  if (RetroactiveConformances)
-    BoundNode->addChild(RetroactiveConformances, *this);
+  addChild(BoundNode, RetroactiveConformances);
   NodePointer NTy = createType(BoundNode);
   addSubstitution(NTy);
   return NTy;
@@ -1482,6 +1479,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'u':
+      return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                              popNode(Node::Kind::Type));

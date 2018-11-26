@@ -148,9 +148,9 @@ void State::initializeAllNonConsumingUses(
     // dataflow, we only need the last non-consuming use to show that all
     // consuming uses post dominate both.
     //
-    // We begin by checking if the first use is a cond_br use from the previous
-    // block. In such a case, we always use the already stored value and
-    // continue.
+    // We begin by checking if the second use is a cond_br use from the previous
+    // block. In such a case, we always use the already stored value and since
+    // it is guaranteed to be later than the cond_br use.
     if (user.isCondBranchUser()) {
       continue;
     }
@@ -179,6 +179,7 @@ bool State::initializeAllConsumingUses(
     ArrayRef<BranchPropagatedUser> consumingUses,
     SmallVectorImpl<std::pair<BranchPropagatedUser, SILBasicBlock *>>
         &predsToAddToWorklist) {
+  bool noErrors = true;
   for (BranchPropagatedUser user : consumingUses) {
     SILBasicBlock *userBlock = user.getParent();
 
@@ -187,13 +188,13 @@ bool State::initializeAllConsumingUses(
     // if we successfully associated user with userBlock.
     if (!initializeConsumingUse(user, userBlock)) {
       // We already handled the error.
-      return handleError([] {});
+      noErrors &= handleError([] {});
     }
 
     // Then check if the given block has a use after free.
     if (checkForSameBlockUseAfterFree(user, userBlock)) {
       // We already handled the error.
-      return handleError([] {});
+      noErrors &= handleError([] {});
     }
 
     // If this user is in the same block as the value, do not visit
@@ -210,7 +211,7 @@ bool State::initializeAllConsumingUses(
     }
   }
 
-  return true;
+  return noErrors;
 }
 
 bool State::initializeConsumingUse(BranchPropagatedUser consumingUser,

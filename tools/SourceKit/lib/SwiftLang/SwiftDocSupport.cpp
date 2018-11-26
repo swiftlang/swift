@@ -416,21 +416,9 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::FileUnit: {
       if (auto *CD = D->getClangDecl()) {
         if (auto *M = CD->getImportedOwningModule()) {
-          const clang::Module *Root = M->getTopLevelModule();
-
-          // If Root differs from the owning module, then the owning module is
-          // a sub-module.
-          if (M != Root) {
+          if (M->isSubModule()) {
             llvm::raw_svector_ostream OS(Info.SubModuleName);
-            llvm::SmallVector<StringRef, 4> Names;
-
-            // Climb up and collect sub-module names.
-            for (auto Current = M; Current != Root; Current = Current->Parent) {
-              Names.insert(Names.begin(), Current->Name);
-            }
-            OS << Root->Name;
-            std::for_each(Names.begin(), Names.end(),
-                          [&](StringRef N) { OS << "." << N; });
+            ModuleDecl::ReverseFullNameIterator(M).printForward(OS);
           }
         }
       }

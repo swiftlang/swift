@@ -10,10 +10,10 @@ public func getVersion() -> Int {
 open class Base {
   public init() {}
   open func firstMethod() -> Int {
-    return 0
+    return 1
   }
   open func secondMethod() -> Int {
-    return 0
+    return 2
   }
   open func callOverriddenMethods() -> Int {
     return firstMethod() * 10 + secondMethod()
@@ -23,13 +23,23 @@ open class Base {
 open class Base {
   public init() {}
   open func secondMethod() -> Int {
-    return 0
+    return 2
   }
   open func firstMethod() -> Int {
-    return 0
+    return 1
   }
   open func callOverriddenMethods() -> Int {
     return firstMethod() * 10 + secondMethod()
   }
 }
 #endif
+
+public class Derived : Base {
+  public override func firstMethod() -> Int {
+    return 10
+  }
+
+  public override func secondMethod() -> Int {
+    return 20
+  }
+}

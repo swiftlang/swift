@@ -383,14 +383,25 @@ public:
 /// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
-  mutable TypeLoc PatType;
+  TypeRepr *PatTypeRepr;
 
 public:
-  TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = None)
-    : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
-    if (implicit.hasValue() ? *implicit : !tl.hasLocation())
-      setImplicit();
-    Bits.TypedPattern.IsPropagatedType = false;
+  /// Creates a new TypedPattern which annotates the provided sub-pattern with
+  /// the provided TypeRepr. If 'implicit' is true, the pattern will be
+  /// set to implicit. If false, it will not. If 'implicit' is not provided,
+  /// then the pattern will be set to 'implicit' if there is a provided TypeRepr
+  /// which has a valid SourceRange.
+  TypedPattern(Pattern *pattern, TypeRepr *tr, Optional<bool> implicit = None);
+
+  /// Creates an implicit typed pattern annotating the provided sub-pattern
+  /// with a given type.
+  static TypedPattern *
+  createImplicit(ASTContext &ctx, Pattern *pattern, Type type) {
+    auto tp = new (ctx) TypedPattern(pattern, /*typeRepr*/nullptr,
+                                     /*implicit*/true);
+    if (!type.isNull())
+      tp->setType(type);
+    return tp;
   }
 
   /// True if the type in this \c TypedPattern was propagated from a different
@@ -412,27 +423,10 @@ public:
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
 
-  TypeLoc &getTypeLoc() {
-    // If we have a delayed interface type, set our type from that.
-    if (getDelayedInterfaceType())
-      PatType.setType(getType());
+  TypeRepr *getTypeRepr() const { return PatTypeRepr; }
 
-    return PatType;
-  }
-  TypeLoc getTypeLoc() const {
-    // If we have a delayed interface type, set our type from that.
-    if (getDelayedInterfaceType())
-      PatType.setType(getType());
-
-    return PatType;
-  }
-
-  SourceLoc getLoc() const {
-    if (SubPattern->isImplicit())
-      return PatType.getSourceRange().Start;
-
-    return SubPattern->getLoc();
-  }
+  TypeLoc getTypeLoc() const;
+  SourceLoc getLoc() const;
   SourceRange getSourceRange() const;
 
   static bool classof(const Pattern *P) {

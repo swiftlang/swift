@@ -790,10 +790,6 @@ StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
     : InstructionBase(DebugLoc, Dest->getType()),
       Operands(this, Src, Dest) {}
 
-EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
-                                             SILArgument *Arg)
-    : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
-
 StringRef swift::getSILAccessKindName(SILAccessKind kind) {
   switch (kind) {
   case SILAccessKind::Init: return "init";

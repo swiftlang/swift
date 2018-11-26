@@ -22,7 +22,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/Strings.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -634,14 +633,10 @@ shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const {
   return false;
 }
 
-/// Returns true if it is the OnoneSupport module.
-bool SILModule::isOnoneSupportModule() const {
-  return getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT;
-}
-
 /// Returns true if it is the optimized OnoneSupport module.
 bool SILModule::isOptimizedOnoneSupportModule() const {
-  return getOptions().shouldOptimize() && isOnoneSupportModule();
+  return getOptions().shouldOptimize() &&
+         getSwiftModule()->isOnoneSupportModule();
 }
 
 void SILModule::setSerializeSILAction(SILModule::ActionCallback Action) {

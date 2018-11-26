@@ -92,6 +92,17 @@ public:
   LazyMemberLoader *loader;
 };
 
+/// A class that can lazily parse members for an iterable decl context.
+class LazyMemberParser {
+public:
+  virtual ~LazyMemberParser() = default;
+
+  /// Populates a given decl context \p IDC with all of its members.
+  ///
+  /// The implementation should add the members to IDC.
+  virtual void parseMembers(IterableDeclContext *IDC) = 0;
+};
+
 /// Context data for generic contexts.
 class LazyGenericContextData : public LazyContextData {
 public:

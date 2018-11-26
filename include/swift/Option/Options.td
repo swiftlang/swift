@@ -359,6 +359,11 @@ def warn_swift3_objc_inference_minimal :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
 
+def warn_implicit_overrides :
+  Flag<["-"], "warn-implicit-overrides">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about implicit overrides of protocol members">;
+
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<n>">,

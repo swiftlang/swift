@@ -399,16 +399,6 @@ ClassMetadataLayout::getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const{
   return MethodInfo(offset);
 }
 
-MetadataLayout::StoredOffset
-ClassMetadataLayout::getMethodOffsetInfo(SILDeclRef method) const {
-  return getStoredMethodInfo(method).TheOffset;
-}
-
-Offset
-ClassMetadataLayout::getVTableOffset(IRGenFunction &IGF) const {
-  return emitOffset(IGF, VTableOffset);
-}
-
 Offset ClassMetadataLayout::getFieldOffset(IRGenFunction &IGF,
                                            VarDecl *field) const {
   return emitOffset(IGF, getStoredFieldOffset(field));

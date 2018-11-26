@@ -3463,7 +3463,7 @@ protocol Prot0 : class {
 
 
 protocol Prot1 : Prot0 {
-  static func newWithConfig() throws -> Builtin.Int32
+  @_nonoverride static func newWithConfig() throws -> Builtin.Int32
 }
 
 protocol Prot2 : Prot1 {

@@ -387,9 +387,6 @@ BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
   BUILTIN(Id, Name, Attrs)
 #endif
 
-/// willThrow: Error -> ()
-BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
-
 /// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 
@@ -538,6 +535,9 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 // Swift3ImplicitObjCEntrypoint has type () -> ()
 BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
+
+/// willThrow: Error -> ()
+BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

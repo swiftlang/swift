@@ -16,7 +16,7 @@
 
 @nonobjc
 @available(macOS 10.10, iOS 8.0, watchOS 3.0, *)
-public extension CKContainer {
+extension CKContainer {
     @available(swift 4.2)
     public enum Application {
         public typealias Permissions = CKContainer_Application_Permissions

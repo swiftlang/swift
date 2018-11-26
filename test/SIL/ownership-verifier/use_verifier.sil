@@ -455,7 +455,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %2 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -473,7 +473,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   end_borrow %1 : $Builtin.NativeObject
   br bb3
 
@@ -494,7 +494,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -514,7 +514,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   switch_enum %2 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 
 bb1(%3 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %3 : $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   br bb3
 
 bb2:
@@ -694,7 +694,7 @@ bb51:
   return %9999 : $()
 }
 
-// We check first for objects and then for metatypes.
+// We check first for objects, then for metatypes, then for guaranteed values
 sil @checked_cast_br_test : $@convention(thin) (@owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %6 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -721,11 +721,11 @@ bb6:
   checked_cast_br %6 : $Builtin.NativeObject to $SuperKlass, bb7, bb8
 
 bb7(%7 : @guaranteed $SuperKlass):
-  end_borrow_argument %7 : $SuperKlass
+  end_borrow %7 : $SuperKlass
   br bb9
 
 bb8(%8 : @guaranteed $Builtin.NativeObject):
-  end_borrow_argument %8 : $Builtin.NativeObject
+  end_borrow %8 : $Builtin.NativeObject
   br bb9
 
 bb9:
@@ -833,7 +833,7 @@ bb4:
 
 bb5(%5 : @guaranteed $ThreeDifferingPayloadEnum):
   %6 = copy_value %5 : $ThreeDifferingPayloadEnum
-  end_borrow_argument %5 : $ThreeDifferingPayloadEnum
+  end_borrow %5 : $ThreeDifferingPayloadEnum
   return %6 : $ThreeDifferingPayloadEnum
 }
 
@@ -860,7 +860,7 @@ bb4:
 
 bb5(%6 : @guaranteed $ThreeDifferingPayloadEnum):
   %7 = copy_value %6 : $ThreeDifferingPayloadEnum
-  end_borrow_argument %6 : $ThreeDifferingPayloadEnum
+  end_borrow %6 : $ThreeDifferingPayloadEnum
   end_borrow %1 : $Builtin.NativeObject
   br bb6(%7 : $ThreeDifferingPayloadEnum)
 

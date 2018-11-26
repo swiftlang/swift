@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Bool
 // RUN: %target-codesign %t/reflect_Bool
 
-// RUN: %target-run-reflection-test %t/reflect_Bool | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Bool | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test

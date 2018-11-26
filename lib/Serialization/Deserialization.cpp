@@ -381,9 +381,11 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       return subPattern;
     }
 
-    auto result = new (getContext()) TypedPattern(subPattern.get(), TypeLoc(),
+    auto type = getType(typeID);
+    auto result = new (getContext()) TypedPattern(subPattern.get(),
+                                                  /*typeRepr*/nullptr,
                                                   isImplicit);
-    recordPatternType(result, getType(typeID));
+    recordPatternType(result, type);
     restoreOffset.reset();
     return result;
   }
@@ -2842,8 +2844,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
-      ctor->setOverriddenDecl(overriddenCtor);
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
@@ -2967,10 +2968,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       var->setImplicit();
     var->setIsObjC(isObjC);
 
-    if (auto overriddenVar = cast_or_null<VarDecl>(overridden.get())) {
-      var->setOverriddenDecl(overriddenVar);
+    var->setOverriddenDecl(cast_or_null<VarDecl>(overridden.get()));
+    if (var->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     break;
   }
@@ -3229,10 +3229,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
-    if (auto overriddenFunc = cast_or_null<FuncDecl>(overridden.get())) {
-      fn->setOverriddenDecl(overriddenFunc);
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
+    if (fn->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
 
     if (isImplicit)
       fn->setImplicit();
@@ -3812,10 +3811,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     if (isImplicit)
       subscript->setImplicit();
     subscript->setIsObjC(isObjC);
-    if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
-      subscript->setOverriddenDecl(overriddenSub);
+    subscript->setOverriddenDecl(cast_or_null<SubscriptDecl>(overridden.get()));
+    if (subscript->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
-    }
     break;
   }
 

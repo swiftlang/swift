@@ -1324,7 +1324,7 @@ internal struct _GenericIndexKey : CodingKey {
   }
 }
 
-public extension DecodingError {
+extension DecodingError {
   /// Returns a new `.dataCorrupted` error using a constructed coding path and
   /// the given debug description.
   ///
@@ -2058,7 +2058,7 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
 
 // Default implementation of encodeConditional(_:forKey:) in terms of
 // encode(_:forKey:)
-public extension KeyedEncodingContainerProtocol {
+extension KeyedEncodingContainerProtocol {
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
@@ -2069,7 +2069,7 @@ public extension KeyedEncodingContainerProtocol {
 
 // Default implementation of encodeIfPresent(_:forKey:) in terms of
 // encode(_:forKey:)
-public extension KeyedEncodingContainerProtocol {
+extension KeyedEncodingContainerProtocol {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeIfPresent(
@@ -2091,7 +2091,7 @@ public extension KeyedEncodingContainerProtocol {
 
 // Default implementation of decodeIfPresent(_:forKey:) in terms of
 // decode(_:forKey:) and decodeNil(forKey:)
-public extension KeyedDecodingContainerProtocol {
+extension KeyedDecodingContainerProtocol {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public func decodeIfPresent(
@@ -2115,7 +2115,7 @@ public extension KeyedDecodingContainerProtocol {
 
 // Default implementation of encodeConditional(_:) in terms of encode(_:),
 // and encode(contentsOf:) in terms of encode(_:) loop.
-public extension UnkeyedEncodingContainer {
+extension UnkeyedEncodingContainer {
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeConditional<T : AnyObject & Encodable>(
     _ object: T) throws
@@ -2146,7 +2146,7 @@ public extension UnkeyedEncodingContainer {
 
 // Default implementation of decodeIfPresent(_:) in terms of decode(_:) and
 // decodeNil()
-public extension UnkeyedDecodingContainer {
+extension UnkeyedDecodingContainer {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public mutating func decodeIfPresent(

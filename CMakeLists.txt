@@ -354,7 +354,7 @@ endfunction()
 # Print out path and version of any installed commands.
 # We migth be using the wrong version of a command, so record them all.
 function(print_versions)
-  find_version("cmake" "--version" TRUE)
+  find_version("${CMAKE_COMMAND}" "--version" TRUE)
 
   message(STATUS "Finding version for: ${CMAKE_COMMAND}")
   message(STATUS "Found version: ${CMAKE_VERSION}")
@@ -726,7 +726,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
     COMMAND "xcodebuild" "-version"
     OUTPUT_VARIABLE xcode_version
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REPLACE "\n" ", " xcode_version ${xcode_version})
+  string(REPLACE "\n" ", " xcode_version "${xcode_version}")
   message(STATUS "${xcode_version}")
   message(STATUS "")
 
@@ -866,11 +866,13 @@ endfunction()
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
-                          "${SWIFT_HOST_VARIANT_ARCH_default}"
-                          ICU_CONFIGURED)
-  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
-    find_package(ICU REQUIRED COMPONENTS uc i18n)
+  if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+    swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
+                            "${SWIFT_HOST_VARIANT_ARCH_default}"
+                            ICU_CONFIGURED)
+    if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
+      find_package(ICU REQUIRED COMPONENTS uc i18n)
+    endif()
   endif()
 endif()
 

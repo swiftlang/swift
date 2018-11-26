@@ -338,8 +338,8 @@ public protocol Collection: Sequence where SubSequence: Collection {
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
   typealias IndexDistance = Int  
 
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
+  // FIXME: Associated type inference requires this.
+  override associatedtype Element
 
   /// A type that represents a position in the collection.
   ///
@@ -378,11 +378,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
 
-  // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
-  // a custom `makeIterator()` function.  Otherwise we get an
-  // `IndexingIterator`. <rdar://problem/21539115>
+  // FIXME: Only needed for associated type inference. Otherwise,
+  // we get an `IndexingIterator` rather than properly deducing the
+  // Iterator type from makeIterator(). <rdar://problem/21539115>
   /// Returns an iterator over the elements of the collection.
-  func makeIterator() -> Iterator
+  override func makeIterator() -> Iterator
 
   /// A sequence that represents a contiguous subrange of the collection's
   /// elements.

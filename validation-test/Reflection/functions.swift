@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
 // RUN: %target-codesign %t/functions
 
-// RUN: %target-run-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // FIXME: Should not require objc_interop -- please put Objective-C-specific
 // testcases in functions_objc.swift

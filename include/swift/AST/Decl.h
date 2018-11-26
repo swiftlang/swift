@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -4130,7 +4130,6 @@ private:
   llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
 
-  void configureAccessor(AccessorDecl *accessor);
   void setFieldsFromImplInfo(StorageImplInfo implInfo) {
     Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
     Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
@@ -6271,22 +6270,49 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
+  Identifier DesignatedProtocolName;
+  SourceLoc DesignatedProtocolNameLoc;
+  TypeLoc DesignatedProtocolTypeLoc;
+
 public:
-  OperatorDecl(DeclKind kind,
-               DeclContext *DC,
-               SourceLoc OperatorLoc,
-               Identifier Name,
-               SourceLoc NameLoc)
-    : Decl(kind, DC),
-      OperatorLoc(OperatorLoc), NameLoc(NameLoc),
-      name(Name) {}
-  
+  OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
+               Identifier Name, SourceLoc NameLoc,
+               Identifier DesignatedProtocolName = Identifier(),
+               SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+      : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
+        DesignatedProtocolName(DesignatedProtocolName),
+        DesignatedProtocolNameLoc(DesignatedProtocolNameLoc) {}
+
   SourceLoc getLoc() const { return NameLoc; }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
-  
+
+  Identifier getDesignatedProtocolName() const {
+    return DesignatedProtocolName;
+  }
+
+  void setDesignatedProtocolName(Identifier name) {
+    DesignatedProtocolName = name;
+  }
+
+  SourceLoc getDesignatedProtocolNameLoc() const {
+    return DesignatedProtocolNameLoc;
+  }
+
+  void setDesignatedProtocolNameLoc(SourceLoc loc) {
+    DesignatedProtocolNameLoc = loc;
+  }
+
+  TypeLoc getDesignatedProtocolTypeLoc() const {
+    return DesignatedProtocolTypeLoc;
+  }
+
+  void setDesignatedProtocolTypeLoc(TypeLoc typeLoc) {
+    DesignatedProtocolTypeLoc = typeLoc;
+  }
+
   static bool classof(const Decl *D) {
     // Workaround: http://llvm.org/PR35906
     if (DeclKind::Last_Decl == DeclKind::Last_OperatorDecl)
@@ -6299,39 +6325,42 @@ public:
 /// Declares the behavior of an infix operator. For example:
 ///
 /// \code
-/// infix operator /+/ : AdditivePrecedence
+/// infix operator /+/ : AdditionPrecedence, Numeric
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
-  SourceLoc ColonLoc, PrecedenceGroupNameLoc;
-  Identifier PrecedenceGroupName;
+  SourceLoc ColonLoc, FirstIdentifierLoc, SecondIdentifierLoc;
+  Identifier FirstIdentifier, SecondIdentifier;
   PrecedenceGroupDecl *PrecedenceGroup = nullptr;
 
 public:
-  InfixOperatorDecl(DeclContext *DC,
-                    SourceLoc operatorLoc,
-                    Identifier name,
-                    SourceLoc nameLoc,
-                    SourceLoc colonLoc,
-                    Identifier precedenceGroupName,
-                    SourceLoc precedenceGroupNameLoc)
-    : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc),
-      ColonLoc(colonLoc), PrecedenceGroupNameLoc(precedenceGroupNameLoc),
-      PrecedenceGroupName(precedenceGroupName) {
-  }
+  InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
+                    SourceLoc nameLoc, SourceLoc colonLoc,
+                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
+                    Identifier secondIdentifier = Identifier(),
+                    SourceLoc secondIdentifierLoc = SourceLoc())
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc),
+        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
+        SecondIdentifierLoc(secondIdentifierLoc),
+        FirstIdentifier(firstIdentifier), SecondIdentifier(secondIdentifier) {}
 
   SourceLoc getEndLoc() const {
-    if (PrecedenceGroupName.empty())
-      return getNameLoc();
-    return PrecedenceGroupNameLoc;
+    if (!SecondIdentifier.empty())
+      return SecondIdentifierLoc;
+    if (!FirstIdentifier.empty())
+      return FirstIdentifierLoc;
+    return getNameLoc();
   }
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getEndLoc() };
   }
-  
-  SourceLoc getColonLoc() const { return ColonLoc; }
-  SourceLoc getPrecedenceGroupNameLoc() const { return PrecedenceGroupNameLoc; }
 
-  Identifier getPrecedenceGroupName() const { return PrecedenceGroupName; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
+  SourceLoc getFirstIdentifierLoc() const { return FirstIdentifierLoc; }
+  SourceLoc getSecondIdentifierLoc() const { return SecondIdentifierLoc; }
+
+  Identifier getFirstIdentifier() const { return FirstIdentifier; }
+  Identifier getSecondIdentifier() const { return SecondIdentifier; }
+
   PrecedenceGroupDecl *getPrecedenceGroup() const { return PrecedenceGroup; }
   void setPrecedenceGroup(PrecedenceGroupDecl *PGD) {
     PrecedenceGroup = PGD;
@@ -6356,8 +6385,11 @@ public:
 class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc)
-    : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc) {}
+                     SourceLoc NameLoc,
+                     Identifier DesignatedProtocolName = Identifier(),
+                     SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+      : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -6382,9 +6414,12 @@ public:
 class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc)
-    : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc) {}
-  
+                      SourceLoc NameLoc,
+                      Identifier DesignatedProtocolName = Identifier(),
+                      SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+      : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
+                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
   }
@@ -6579,7 +6614,8 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl();
+    return getDeclContext()->getSelfClassDecl() ||
+           isa<ProtocolDecl>(getDeclContext());
   } else {
     return false;
   }

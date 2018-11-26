@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -754,9 +754,18 @@ namespace {
           << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
-      if (auto Overridden = VD->getOverriddenDecl()) {
-        PrintWithColorRAII(OS, OverrideColor) << " override=";
-        Overridden->dumpRef(PrintWithColorRAII(OS, OverrideColor).getOS());
+      if (VD->overriddenDeclsComputed()) {
+        auto overridden = VD->getOverriddenDecls();
+        if (!overridden.empty()) {
+          PrintWithColorRAII(OS, OverrideColor) << " override=";
+          interleave(overridden,
+                     [&](ValueDecl *overridden) {
+                       overridden->dumpRef(
+                                PrintWithColorRAII(OS, OverrideColor).getOS());
+                     }, [&]() {
+                       OS << ", ";
+                     });
+        }
       }
 
       if (VD->isFinal())
@@ -1168,8 +1177,14 @@ namespace {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
       OS.indent(Indent+2);
-      OS << "precedence " << IOD->getPrecedenceGroupName();
-      if (!IOD->getPrecedenceGroup()) OS << " <null>";
+      if (!IOD->getFirstIdentifier().empty())
+        OS << "first identifier " << IOD->getFirstIdentifier();
+      else
+        OS << "first identifier <null>";
+      if (!IOD->getSecondIdentifier().empty())
+        OS << "second identifier " << IOD->getSecondIdentifier();
+      else
+        OS << "second identifier <null>";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 

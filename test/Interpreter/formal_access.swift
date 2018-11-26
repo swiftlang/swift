@@ -2,6 +2,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 
+// REQUIRES: rdar44160503
+
 class C: CustomStringConvertible {
   var value: Int
   init(_ v: Int) { value = v }

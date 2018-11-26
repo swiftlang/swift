@@ -337,6 +337,10 @@ static void maybeMarkTransparent(TypeChecker &TC, AccessorDecl *accessor) {
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
       return;
 
+  // Accessors synthesized on-demand are never transaprent.
+  if (accessor->hasForcedStaticDispatch())
+    return;
+
   accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
@@ -535,40 +539,6 @@ static Expr *buildSelfReference(VarDecl *selfDecl,
 }
 
 namespace {
-  /// A simple helper interface for buildStorageReference.
-  class StorageReferenceContext {
-    StorageReferenceContext(const StorageReferenceContext &) = delete;
-  public:
-    StorageReferenceContext() = default;
-    virtual ~StorageReferenceContext() = default;
-
-    /// Returns the declaration of the entity to use as the base of
-    /// the access, or nil if no base is required.
-    virtual VarDecl *getSelfDecl() const = 0;
-
-    /// Returns an expression producing the index value, assuming that
-    /// the storage is a subscript declaration.
-    virtual Expr *getIndexRefExpr(ASTContext &ctx,
-                                  SubscriptDecl *subscript) const = 0;
-  };
-
-  /// A reference to storage from within an accessor.
-  class AccessorStorageReferenceContext : public StorageReferenceContext {
-    AccessorDecl *Accessor;
-  public:
-    AccessorStorageReferenceContext(AccessorDecl *accessor)
-      : Accessor(accessor) {}
-    ~AccessorStorageReferenceContext() override = default;
-
-    VarDecl *getSelfDecl() const override {
-      return Accessor->getImplicitSelfDecl();
-    }
-    Expr *getIndexRefExpr(ASTContext &ctx,
-                          SubscriptDecl *subscript) const override {
-      return buildSubscriptIndexReference(ctx, Accessor);
-    }
-  };
-
   enum class TargetImpl {
     /// We're doing an ordinary storage reference.
     Ordinary,
@@ -583,8 +553,7 @@ namespace {
 } // end anonymous namespace
 
 /// Build an l-value for the storage of a declaration.
-static Expr *buildStorageReference(
-                             const StorageReferenceContext &referenceContext,
+static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
                                    TypeChecker &TC) {
@@ -625,7 +594,7 @@ static Expr *buildStorageReference(
     break;
   }
 
-  VarDecl *selfDecl = referenceContext.getSelfDecl();
+  VarDecl *selfDecl = accessor->getImplicitSelfDecl();
   if (!selfDecl) {
     assert(target != TargetImpl::Super);
     return new (ctx) DeclRefExpr(storage, DeclNameLoc(), IsImplicit, semantics);
@@ -635,21 +604,13 @@ static Expr *buildStorageReference(
     buildSelfReference(selfDecl, selfAccessKind, TC);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     return SubscriptExpr::create(ctx, selfDRE, indices, storage,
                                  IsImplicit, semantics);
   }
 
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
                                  DeclNameLoc(), IsImplicit, semantics);
-}
-
-static Expr *buildStorageReference(AccessorDecl *accessor,
-                                   AbstractStorageDecl *storage,
-                                   TargetImpl target,
-                                   TypeChecker &TC) {
-  return buildStorageReference(AccessorStorageReferenceContext(accessor),
-                               storage, target, TC);
 }
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
@@ -994,6 +955,11 @@ static void addOpaqueAccessorToStorage(TypeChecker &TC,
 
 static void addExpectedOpaqueAccessorsToStorage(TypeChecker &TC,
                                                 AbstractStorageDecl *storage) {
+  // Nameless vars from interface files should not have any accessors.
+  // TODO: Replace this check with a broader check that all storage decls
+  //       from interface files have all their accessors up front.
+  if (storage->getBaseName().empty())
+    return;
   storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
     // If the accessor is already present, there's nothing to do.
     if (storage->getAccessor(kind))
@@ -1305,6 +1271,7 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
                                    Ctx.getIdentifier("tmp2"),
                                    Get);
   Tmp2VD->setType(VD->getType());
+  Tmp2VD->setInterfaceType(VD->getInterfaceType());
   Tmp2VD->setImplicit();
 
 
@@ -1331,9 +1298,8 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
   }
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
-  Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,
-                                          TypeLoc::withoutLoc(VD->getType()),
-                                          /*implicit*/true);
+  Tmp2PBDPattern =
+    TypedPattern::createImplicit(Ctx, Tmp2PBDPattern, VD->getType());
 
   auto *Tmp2PBD = PatternBindingDecl::createImplicit(
       Ctx, StaticSpellingKind::None, Tmp2PBDPattern, InitValue, Get,
@@ -1481,9 +1447,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized using the protocol's initStorage() method.
   Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
-  PBDPattern = new (Context) TypedPattern(PBDPattern,
-                                  TypeLoc::withoutLoc(SubstStorageContextTy),
-                                  /*implicit*/true);
+  PBDPattern = TypedPattern::createImplicit(Context, PBDPattern,
+                                            SubstStorageContextTy);
   auto *PBD = PatternBindingDecl::createImplicit(
       Context, VD->getParentPatternBinding()->getStaticSpelling(), PBDPattern,
       InitStorageExpr, VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
@@ -1774,9 +1739,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
   Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
-  PBDPattern = new (Context) TypedPattern(PBDPattern,
-                                          TypeLoc::withoutLoc(StorageTy),
-                                          /*implicit*/true);
+  PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
   auto *PBD = PatternBindingDecl::createImplicit(
       Context, StaticSpellingKind::None, PBDPattern, /*init*/ nullptr,
       VD->getDeclContext(), /*VarLoc*/ VD->getLoc());

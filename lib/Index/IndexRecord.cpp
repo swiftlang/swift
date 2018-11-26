@@ -23,7 +23,6 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Index/Index.h"
-#include "swift/Strings.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Index/IndexingAction.h"
@@ -402,7 +401,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
 
   for (auto &import : imports) {
     ModuleDecl *mod = import.second;
-    if (mod->getNameStr() == SWIFT_ONONE_SUPPORT)
+    if (mod->isOnoneSupportModule())
       continue; // ignore the Onone support library.
     if (mod->isSwiftShimsModule())
       continue;

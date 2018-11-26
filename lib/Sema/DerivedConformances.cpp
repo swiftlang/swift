@@ -340,9 +340,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = new (C) TypedPattern(propPat,
-                                 TypeLoc::withoutLoc(propertyContextType),
-                                 /*implicit*/ true);
+  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(

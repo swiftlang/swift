@@ -62,3 +62,22 @@ func swiftDeprecatedObsoleted() {}
 // expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'swift'}}
 func swiftMessage() {}
 
+@available(*, unavailable, message: "\("message")")
+// expected-error@-1{{'message' cannot be an interpolated string literal}}
+func interpolatedMessage() {}
+
+// expected-error@+1{{'message' cannot be a multiline string literal}}
+@available(*, unavailable, message: """
+  foobar message.
+  """)
+func multilineMessage() {}
+
+// expected-error@+1{{'message' cannot be an extended escaping string literal}}
+@available(*, unavailable, message: #"""
+  foobar message.
+  """#)
+func extendedEscapedMultilineMessage() {}
+
+// expected-error@+1{{'renamed' cannot be an extended escaping string literal}}
+@available(*, unavailable, renamed: #"avialable()"#)
+func extenedEscpaedRenamed() {}

@@ -128,8 +128,9 @@ public:
       return;
 
     // Visit the witnesses for the direct members of a protocol.
-    for (Decl *member : protocol->getMembers())
+    for (Decl *member : protocol->getMembers()) {
       ASTVisitor<T>::visit(member);
+    }
   }
 
   /// If true, only the base protocols and associated types will be visited.
@@ -145,12 +146,14 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+      if (SILDeclRef::requiresNewWitnessTableEntry(accessor))
+        asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+    if (SILDeclRef::requiresNewWitnessTableEntry(cd))
+      asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -159,7 +162,8 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    if (SILDeclRef::requiresNewWitnessTableEntry(func))
+      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {

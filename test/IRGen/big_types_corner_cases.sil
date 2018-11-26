@@ -65,7 +65,7 @@ bb0(%0 : $_ArrayBuffer<Element>):
   return %9 : $BigTempStruct<Element>
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i8*, %swift.refcounted*, %swift.refcounted* swiftself, %swift.error** swifterror)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i8*, %swift.refcounted*, %swift.refcounted* swiftself, %swift.error** noalias nocapture swifterror dereferenceable(8))
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]]
 // CHECK: ret void

@@ -1215,7 +1215,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::RetainValueAddrInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::DestroyValueInst:

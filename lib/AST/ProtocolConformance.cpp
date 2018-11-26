@@ -403,6 +403,37 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
+ProtocolConformanceRef
+ProtocolConformanceRef::getInheritedConformanceRef(ProtocolDecl *base) const {
+  if (isAbstract()) {
+    assert(getRequirement()->inheritsFrom(base));
+    return ProtocolConformanceRef(base);
+  }
+
+  auto concrete = getConcrete();
+  auto proto = concrete->getProtocol();
+  auto path =
+    proto->getGenericSignature()->getConformanceAccessPath(
+                                            proto->getProtocolSelfType(), base);
+  ProtocolConformanceRef result = *this;
+  Type resultType = concrete->getType();
+  bool first = true;
+  for (const auto &step : path) {
+    if (first) {
+      assert(step.first->isEqual(proto->getProtocolSelfType()));
+      assert(step.second == proto);
+      first = false;
+      continue;
+    }
+
+    result =
+        result.getAssociatedConformance(resultType, step.first, step.second);
+    resultType = result.getAssociatedType(resultType, step.first);
+  }
+
+  return result;
+}
+
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     const {
   switch (CRState) {

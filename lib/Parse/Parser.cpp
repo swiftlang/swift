@@ -216,8 +216,9 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
                                 int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
-  bool IsMultiline = Tok.IsMultilineString();
-  unsigned QuoteLen = IsMultiline ? 3 : 1;
+  bool IsMultiline = Tok.isMultilineString();
+  unsigned CustomDelimiterLen = Tok.getCustomDelimiterLen();
+  unsigned QuoteLen = (IsMultiline ? 3 : 1) + CustomDelimiterLen;
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
@@ -239,7 +240,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
-      NewTok.setToken(tok::string_literal, Text, IsMultiline);
+      NewTok.setToken(tok::string_literal, Text,
+                      IsMultiline, CustomDelimiterLen);
       Toks.push_back(NewTok);
 
     } else {
@@ -372,7 +374,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
   void relexComment(CharSourceRange CommentRange,
-                    llvm::SmallVectorImpl<Token> &Scracth) {
+                    llvm::SmallVectorImpl<Token> &Scratch) {
     Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
             HashbangMode::Disallowed,
             CommentRetentionMode::ReturnAsTokens,
@@ -385,7 +387,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
       if (Result.is(tok::eof))
         break;
       assert(Result.is(tok::comment));
-      Scracth.push_back(Result);
+      Scratch.push_back(Result);
     }
   }
 
@@ -479,7 +481,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                                            L->getBufferID())) {
   State = PersistentState;
   if (!State) {
-    OwnedState.reset(new PersistentParserState());
+    OwnedState.reset(new PersistentParserState(Context));
     State = OwnedState.get();
   }
 
@@ -1003,14 +1005,14 @@ struct ParserUnit::Implementation {
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
-  Implementation(SourceManager &SM, unsigned BufferID,
+  Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                  const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
       Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
-            SourceFileKind::Main, BufferID,
+            SFKind, BufferID,
             SourceFile::ImplicitModuleImportKind::None,
             Opts.CollectParsedToken,
             Opts.BuildSyntaxTree)) {
@@ -1024,22 +1026,22 @@ struct ParserUnit::Implementation {
   }
 };
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID)
-  : ParserUnit(SM, BufferID, LangOptions(), "input") {
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID)
+  : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        const LangOptions &LangOpts, StringRef ModuleName,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, BufferID, LangOpts, ModuleName)) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName)) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
 }
 
-ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
+ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, BufferID, LangOptions(), "input")) {
+  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,

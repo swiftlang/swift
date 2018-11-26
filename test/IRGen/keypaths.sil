@@ -171,10 +171,10 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //              -- instantiable in-line, size 16
 // CHECK-32-SAME: <i32 0x8000_0010>,
-// -- computed, settable, nonmutating, identified by vtable, no args
-// CHECK-SAME: <i32 0x0250_0000>,
+// -- computed, settable, nonmutating, identified by pointer, no args
+// CHECK-SAME: <i32 0x0240_0000>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// CHECK-SAME: [[WORD]]
+// CHECK-SAME: %swift.method_descriptor* getelementptr inbounds (<{{.*}}>, <{{.*}}>* @"$S8keypaths1CCMn", i32 0, i32 13),
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get,
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set }>
 

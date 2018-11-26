@@ -2523,7 +2523,7 @@ fileprivate var _iso8601Formatter: ISO8601DateFormatter = {
 // Error Utilities
 //===----------------------------------------------------------------------===//
 
-fileprivate extension EncodingError {
+extension EncodingError {
     /// Returns a `.invalidValue` error describing the given invalid floating-point value.
     ///
     ///

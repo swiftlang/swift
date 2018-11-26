@@ -2104,7 +2104,7 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        (VD->hasAccess() && !VD->isAccessibleFrom(CurrDeclContext)) ||
+        !VD->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
 
@@ -2751,7 +2751,7 @@ public:
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
     if (!EED->hasName() ||
-        (EED->hasAccess() && !EED->isAccessibleFrom(CurrDeclContext)) ||
+        !EED->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(EED))
       return;
 

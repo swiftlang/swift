@@ -14,6 +14,8 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
+// CHECK: @"$S15resilient_class22ResilientOutsideParentCACycfcTq" = external global %swift.method_descriptor
+
 // CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
 
 // CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
@@ -31,7 +33,6 @@
 // CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
 // CHECK: @"$S15resilient_class22ResilientOutsideParentC8getValueSiyFTq" = external global %swift.method_descriptor
-// CHECK: @"$S15resilient_class22ResilientOutsideParentCACycfcTq" = external global %swift.method_descriptor
 
 // CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
 // --       flags: class, unique, has vtable, has override table, in-place initialization, has resilient superclass
@@ -347,6 +348,22 @@ extension ResilientGenericOutsideParent {
 // CHECK: ret i32 [[FIELD_VALUE]]
 
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T16class_resilience14ResilientChildC* @"$S16class_resilience14ResilientChildCACycfc"(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK:      [[SUPER_SELF:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to %T15resilient_class22ResilientOutsideParentC*
+
+// Note: we know the superclass of ResilientChild statically, so we can emit
+// it directly.
+
+// CHECK:      [[SUPER_METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"
+// CHECK-NEXT: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[SUPER_METADATA_RESPONSE]], 0
+
+// CHECK:      [[SUPER_METHOD:%.*]] = call swiftcc i8* @"$S15resilient_class22ResilientOutsideParentCMu"(%swift.type* [[SUPER_METADATA:%.*]], %swift.method_descriptor* @"$S15resilient_class22ResilientOutsideParentCACycfcTq")
+// CHECK-NEXT: [[SUPER_METHOD_FN:%.*]] = bitcast i8* [[SUPER_METHOD]] to %T15resilient_class22ResilientOutsideParentC* (%T15resilient_class22ResilientOutsideParentC*)*
+// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc %T15resilient_class22ResilientOutsideParentC* [[SUPER_METHOD_FN]](%T15resilient_class22ResilientOutsideParentC* swiftself [[SUPER_SELF]])
+// CHECK-NEXT: [[NEW_SELF:%.*]] = bitcast %T15resilient_class22ResilientOutsideParentC* [[RESULT]] to %T16class_resilience14ResilientChildC*
+// CHECK:       ret %T16class_resilience14ResilientChildC* [[NEW_SELF]]
+
+
 // ResilientGenericChild.field getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience21ResilientGenericChildC5fields5Int32Vvg"(%T16class_resilience21ResilientGenericChildC* swiftself)
@@ -397,20 +414,6 @@ extension ResilientGenericOutsideParent {
 // CHECK:       ret %swift.type* [[GENERIC_PARAM]]
 
 
-// ResilientChild.field getter dispatch thunk
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself)
-// CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
-// CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
-// CHECK-NEXT: [[METADATA_BYTES:%.*]] = bitcast %swift.type* [[ISA]] to i8*
-// CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, i8* [[METADATA_BYTES]], [[INT]] [[BASE]]
-// CHECK-NEXT: [[VTABLE_OFFSET_ADDR:%.*]] = bitcast i8* [[VTABLE_OFFSET_TMP]] to i32 (%T16class_resilience14ResilientChildC*)**
-// CHECK-NEXT: [[METHOD:%.*]] = load i32 (%T16class_resilience14ResilientChildC*)*, i32 (%T16class_resilience14ResilientChildC*)** [[VTABLE_OFFSET_ADDR]]
-// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i32 [[METHOD]](%T16class_resilience14ResilientChildC* swiftself %0)
-// CHECK-NEXT: ret i32 [[RESULT]]
-
-
 // ClassWithResilientProperty metadata initialization function
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S16class_resilience26ClassWithResilientPropertyCMr"(%swift.type*, i8*, i8**)
@@ -439,7 +442,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd"
 
-// CHECK: br label %metadata-dependencies.cont
+// CHECK:      br label %metadata-dependencies.cont
 
 // CHECK: metadata-dependencies.cont:
 
@@ -448,6 +451,15 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
+// ClassWithResilientProperty method lookup function
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$S16class_resilience26ClassWithResilientPropertyCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$S16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   ret i8* [[RESULT]]
+// CHECK-NEXT: }
 
 
 // ClassWithResilientlySizedProperty metadata initialization function
@@ -489,6 +501,15 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 
+// ClassWithResilientlySizedProperty method lookup function
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$S16class_resilience33ClassWithResilientlySizedPropertyCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$S16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   ret i8* [[RESULT]]
+// CHECK-NEXT: }
+
+
 // ResilientChild metadata initialization function
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S16class_resilience14ResilientChildCMr"(%swift.type*, i8*, i8**)
@@ -514,6 +535,15 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
+// ResilientChild method lookup function
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$S16class_resilience14ResilientChildCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$S16class_resilience14ResilientChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   ret i8* [[RESULT]]
+// CHECK-NEXT: }
 
 
 // ResilientChild.field setter dispatch thunk
@@ -595,3 +625,12 @@ extension ResilientGenericOutsideParent {
 // CHECK:              [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[DEP]], 0
 // CHECK:              [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[DEP_REQ]], 1
 // CHECK:              ret %swift.metadata_response [[T1]]
+
+
+// ResilientGenericChild method lookup function
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$S16class_resilience21ResilientGenericChildCMu"(%swift.type*, %swift.method_descriptor*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$S16class_resilience21ResilientGenericChildCMn" to %swift.type_descriptor*))
+// CHECK-NEXT:   ret i8* [[RESULT]]
+// CHECK-NEXT: }

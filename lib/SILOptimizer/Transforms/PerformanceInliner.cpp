@@ -20,7 +20,6 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -492,9 +491,9 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // Do not inline @_semantics functions when compiling the stdlib,
   // because they need to be preserved, so that the optimizer
   // can properly optimize a user code later.
-  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
+  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
   if (Callee->hasSemanticsAttrThatStartsWith("array.") &&
-      (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT))
+      (SwiftModule->isStdlibModule() || SwiftModule->isOnoneSupportModule()))
     return false;
 
   // Do not inline into thunks.

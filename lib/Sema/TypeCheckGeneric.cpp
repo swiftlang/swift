@@ -132,21 +132,10 @@ TypeChecker::gatherGenericParamBindingsText(
 void
 TypeChecker::prepareGenericParamList(GenericParamList *gp,
                                      DeclContext *dc) {
-  AccessLevel access;
-  if (auto *fd = dyn_cast<FuncDecl>(dc))
-    access = fd->getFormalAccess();
-  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
-    access = nominal->getFormalAccess();
-  else
-    access = AccessLevel::Internal;
-  access = std::max(access, AccessLevel::Internal);
-
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
     checkDeclAttributesEarly(paramDecl);
     paramDecl->setDepth(depth);
-    if (!paramDecl->hasAccess())
-      paramDecl->setAccess(access);
   }
 }
 

@@ -107,7 +107,8 @@ protected:
     UnderlyingLocation() : DebugInfoLoc({}) {}
     UnderlyingLocation(ASTNodeTy N) : ASTNode(N) {}
     UnderlyingLocation(SourceLoc L) : SILFileLoc(L) {}
-    UnderlyingLocation(DebugLoc D) : DebugInfoLoc(D) {}
+    UnderlyingLocation(DebugLoc D)
+        : DebugInfoLoc({D.Filename.data(), D.Line, D.Column}) {}
     struct ASTNodeLoc {
       ASTNodeLoc(ASTNodeTy N) : Primary(N) {}
       /// Primary AST location, always used for diagnostics.
@@ -122,11 +123,25 @@ protected:
     SourceLoc SILFileLoc;
 
     /// A deserialized source location.
-    DebugLoc DebugInfoLoc;
+    ///
+    /// This represents \e most of the information in a SILLocation::DebugLoc,
+    /// but for bit-packing purposes the length of the filename is stored in
+    /// the SILLocation's ExtraStorageData instead of here.
+    ///
+    /// \sa SILLocation::getDebugInfoLoc
+    struct CompactDebugLoc {
+      const char *FilenameData;
+      unsigned Line;
+      unsigned Column;
+    } DebugInfoLoc;
   } Loc;
 
   /// The kind of this SIL location.
   unsigned KindData;
+
+  /// Extra data that's not in UnderlyingLocation to keep the size of
+  /// SILLocation down.
+  unsigned ExtraStorageData = 0;
 
   enum {
     LocationKindBits = 3,
@@ -216,9 +231,8 @@ protected:
   }
 
   SILLocation(DebugLoc L, LocationKind K, unsigned Flags = 0)
-      : Loc(L), KindData(K | Flags) {
-    setStorageKind(DebugInfoKind);
-    assert(isDebugInfoLoc());
+      : KindData(K | Flags) {
+    setDebugInfoLoc(L);
   }
   /// @}
 
@@ -268,7 +282,7 @@ public:
   bool isNull() const {
     switch (getStorageKind()) {
     case ASTNodeKind:   return Loc.ASTNode.Primary.isNull();
-    case DebugInfoKind: return Loc.DebugInfoLoc.Filename.empty();
+    case DebugInfoKind: return ExtraStorageData == 0;
     case SILFileKind:   return Loc.SILFileLoc.isInvalid();
     default:            return true;
     }
@@ -339,7 +353,10 @@ public:
 
   /// Populate this empty SILLocation with a DebugLoc.
   void setDebugInfoLoc(DebugLoc L) {
-    Loc.DebugInfoLoc = L;
+    ExtraStorageData = L.Filename.size();
+    assert(ExtraStorageData == L.Filename.size() &&
+           "file name is longer than 32 bits");
+    Loc = L;
     setStorageKind(DebugInfoKind);
   }
 
@@ -427,7 +444,8 @@ public:
   }
   DebugLoc getDebugInfoLoc() const {
     assert(isDebugInfoLoc());
-    return Loc.DebugInfoLoc;
+    return DebugLoc(Loc.DebugInfoLoc.Line, Loc.DebugInfoLoc.Column,
+                    StringRef(Loc.DebugInfoLoc.FilenameData, ExtraStorageData));
   }
 
   /// Fingerprint a DebugLoc for use in a DenseMap.
@@ -441,7 +459,7 @@ public:
 
   /// Return the decoded debug location.
   LLVM_NODISCARD DebugLoc decodeDebugLoc(const SourceManager &SM) const {
-    return isDebugInfoLoc() ? Loc.DebugInfoLoc
+    return isDebugInfoLoc() ? getDebugInfoLoc()
                             : decode(getDebugSourceLoc(), SM);
   }
 

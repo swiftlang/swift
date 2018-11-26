@@ -85,6 +85,15 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
 
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
+    // Don't look at the overrides of operators in protocols. The global
+    // lookup of operators means that we can find overriding operators that
+    // aren't relevant to the types in hand, and will fail to type check.
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        if (func->isOperator())
+          continue;
+    }
+
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -584,6 +593,43 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
     auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
                                                  modulesFound, anyObject);
     result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+  }
+
+  return result;
+}
+
+TinyPtrVector<TypeDecl *>
+TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                          ExtensionDecl *ext) const {
+  ASTContext &ctx = ext->getASTContext();
+
+  TinyPtrVector<TypeDecl *> result;
+  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+    auto resolve = [&](TypeLoc loc) {
+      DirectlyReferencedTypeDecls decls;
+      if (auto *typeRepr = loc.getTypeRepr())
+        decls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+      else if (Type type = loc.getType())
+        decls = directReferencesForType(type);
+
+      result.insert(result.end(), decls.begin(), decls.end());
+    };
+
+    switch (req.getKind()) {
+    case RequirementReprKind::TypeConstraint:
+      resolve(req.getSubjectLoc());
+      resolve(req.getConstraintLoc());
+      break;
+
+    case RequirementReprKind::SameType:
+      resolve(req.getFirstTypeLoc());
+      resolve(req.getSecondTypeLoc());
+      break;
+
+    case RequirementReprKind::LayoutConstraint:
+      resolve(req.getSubjectLoc());
+      break;
+    }
   }
 
   return result;

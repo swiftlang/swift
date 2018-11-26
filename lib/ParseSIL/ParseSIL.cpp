@@ -117,8 +117,8 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
-  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
-
+  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
+                               SF.hasInterfaceHash());
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
@@ -2680,7 +2680,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
-    UNARY_INSTRUCTION(EndBorrowArgument)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)

@@ -630,13 +630,12 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  // FIXME: Should be `Words : Collection where Words.Element == UInt`
-  // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
-  /// The `Words` type must conform to the `Collection` protocol with an
-  /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  /// The `Words` type must conform to the `RandomAccessCollection` protocol
+  /// with an `Element` type of `UInt` and `Index` type of `Int.
+  associatedtype Words : RandomAccessCollection
+      where Words.Element == UInt, Words.Index == Int
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
@@ -758,14 +757,14 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +(lhs: Self, rhs: Self) -> Self
+  override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
-  static func +=(lhs: inout Self, rhs: Self)
+  override static func +=(lhs: inout Self, rhs: Self)
 
   /// Subtracts one value from another and produces their difference.
   ///
@@ -787,7 +786,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -(lhs: Self, rhs: Self) -> Self
+  override static func -(lhs: Self, rhs: Self) -> Self
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
@@ -795,7 +794,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
-  static func -=(lhs: inout Self, rhs: Self)
+  override static func -=(lhs: inout Self, rhs: Self)
 
   /// Multiplies two values and produces their product.
   ///
@@ -817,7 +816,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -825,7 +824,7 @@ public protocol BinaryInteger :
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 
   /// Returns the inverse of the bits set in the argument.
   ///

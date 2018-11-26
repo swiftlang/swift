@@ -57,6 +57,7 @@ set(swift_runtime_sources
     ImageInspectionELF.cpp
     ImageInspectionCOFF.cpp
     KnownMetadata.cpp
+    LLVMSupport.cpp
     Metadata.cpp
     MetadataLookup.cpp
     MutexPThread.cpp

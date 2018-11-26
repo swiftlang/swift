@@ -179,7 +179,7 @@ public class NSKeyValueObservation : NSObject {
     }
 }
 
-public extension _KeyValueCodingAndObserving {
+extension _KeyValueCodingAndObserving {
     
     ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
     public func observe<Value>(

@@ -29,7 +29,7 @@ public func _log(_ message: @autoclosure () -> String) {
   // print(message())
 }
 
-extension FixedWidthInteger where Words : Collection {
+extension FixedWidthInteger {
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
     let hexDigits: [Unicode.Scalar] = [
@@ -236,7 +236,7 @@ func expectEqual<T : FixedWidthInteger>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where T.Words : Collection {
+) {
   if expected != actual {
     expectationFailure(
       "expected: \(String(reflecting: expected))"
@@ -727,6 +727,9 @@ tests.test("words") {
 
   expectEqualSequence([1], 1.words)
   expectEqualSequence([0], 0.words)
+
+  // Random access to words with Int indexing
+  expectEqual(1, 1.words[0])
 }
 
 tests.test("multipliedFullWidth/UInt8") {

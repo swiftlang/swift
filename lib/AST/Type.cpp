@@ -3349,7 +3349,8 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
 
   auto type = memberType.subst(subs, SubstFlags::UseErrorType);
 
-  if (isa<AbstractFunctionDecl>(baseDecl)) {
+  if (isa<AbstractFunctionDecl>(baseDecl) &&
+      !baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     type = type->replaceSelfParameterType(this);
     if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
       if (func->hasDynamicSelf()) {

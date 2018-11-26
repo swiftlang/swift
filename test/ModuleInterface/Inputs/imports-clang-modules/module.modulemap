@@ -1,0 +1,8 @@
+module A { header "A.h" }
+module B {
+  explicit module B1 { header "B1.h" }
+  explicit module B2 { header "B2.h" }
+  explicit module B3 { header "B3.h" }
+}
+module C { header "C.h" }
+module D { header "D.h" }

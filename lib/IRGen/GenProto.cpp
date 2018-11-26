@@ -969,7 +969,13 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
     return true;
 
   // Check whether any of the inherited conformances are dependent.
-  for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+  auto proto = conformance->getProtocol();
+  for (const auto &req : proto->getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+      continue;
+
+    auto inherited = req.getSecondType()->castTo<ProtocolType>()->getDecl();
     if (inherited->isObjC())
       continue;
 
@@ -1201,7 +1207,7 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     ArrayRef<SILWitnessTable::Entry> SILEntries;
     ArrayRef<SILWitnessTable::ConditionalConformance>
         SILConditionalConformances;
-    const ProtocolInfo &PI;
+
     Optional<FulfillmentMap> Fulfillments;
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
@@ -1211,8 +1217,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     // Conditional conformances and metadata caches are stored at negative
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
+    bool ResilientConformance;
     bool RequiresSpecialization = false;
-    bool ResilientConformance = false;
+
+    const ProtocolInfo &PI;
 
   public:
     WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
@@ -1228,13 +1236,14 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
                                                          Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
+          ResilientConformance(isResilientConformance(&Conformance)),
           PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
-                                 ProtocolInfoKind::Full)) {
+                                 (ResilientConformance
+                                  ? ProtocolInfoKind::RequirementSignature
+                                  : ProtocolInfoKind::Full))) {
       // If the conformance is resilient, we require runtime instantiation.
-      if (isResilientConformance(&Conformance)) {
+      if (ResilientConformance)
         RequiresSpecialization = true;
-        ResilientConformance = true;
-      }
     }
 
     /// The top-level entry point.
@@ -2101,6 +2110,10 @@ void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 /// Do a memoized witness-table layout for a protocol.
 const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol,
                                                  ProtocolInfoKind kind) {
+  // If the protocol is resilient, we cannot know the full witness table layout.
+  assert(!isResilient(protocol, ResilienceExpansion::Maximal) ||
+         kind == ProtocolInfoKind::RequirementSignature);
+
   return Types.getProtocolInfo(protocol, kind);
 }
 

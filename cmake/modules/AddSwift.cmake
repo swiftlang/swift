@@ -1572,6 +1572,13 @@ function(add_swift_library name)
   endif()
 
   if(SWIFTLIB_TARGET_LIBRARY)
+    # In the standard library and overlays, warn about implicit overrides
+    # as a reminder to consider when inherited protocols need different
+    # behavior for their requirements.
+    if (SWIFTLIB_IS_STDLIB)
+      list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
+    endif()
+
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()

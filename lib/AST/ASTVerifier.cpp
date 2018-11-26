@@ -865,9 +865,10 @@ public:
           D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!D->isInvalid() && D->hasInterfaceType() &&
             !isa<ClassDecl>(D->getDeclContext()) &&
+            !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
-          Out << "'override' attribute outside of a class\n";
+          Out << "'override' attribute outside of a class or protocol\n";
           D->dump(Out);
           abort();
         }
@@ -2282,12 +2283,6 @@ public:
             abort();
           }
         }
-      } else {
-        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
-          dumpRef(VD);
-          Out << " does not have access\n";
-          abort();
-        }
       }
 
       verifyCheckedBase(VD);
@@ -2995,6 +2990,25 @@ public:
 
     void verifyChecked(FuncDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
+
+      // Note that there's nothing inherently wrong with wanting to use this on
+      // non-accessors in the future, but you should visit all call sites and
+      // make sure we do the right thing, because this flag conflates several
+      // different behaviors.
+      if (FD->hasForcedStaticDispatch()) {
+        auto *AD = dyn_cast<AccessorDecl>(FD);
+        if (AD == nullptr) {
+          Out << "hasForcedStaticDispatch() set on non-accessor\n";
+          abort();
+        }
+
+        if (AD->getAccessorKind() != AccessorKind::Read &&
+            AD->getAccessorKind() != AccessorKind::Modify) {
+          Out << "hasForcedStaticDispatch() set on accessor other than "
+                 "read or modify\n";
+          abort();
+        }
+      }
 
       if (FD->isMutating()) {
         if (!FD->isInstanceMember()) {

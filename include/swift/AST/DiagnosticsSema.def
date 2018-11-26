@@ -706,6 +706,9 @@ ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
+ERROR(operators_designated_protocol_not_a_protocol,none,
+      "type %0 unexpected; expected a protocol type",
+      (Type))
 
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
@@ -1180,9 +1183,19 @@ ERROR(access_control_setter_more,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{%error|a fileprivate|an internal|a public|an open}2 setter",
       (AccessLevel, unsigned, AccessLevel))
+WARNING(access_control_setter_redundant,none,
+      "'%select{private|fileprivate|internal|public|open}0(set)' modifier is "
+      "redundant for %select{a private|a fileprivate|an internal|a public|an open}2 "
+      "%1",
+      (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|public|%error}2 extension",
+    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
+    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+WARNING(access_control_ext_member_redundant,none,
+    "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
+    "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
+    "|an internal|a public|%error}2 extension",
     (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_ext_requirement_member_more,none,
     "cannot declare %select{%error|a fileprivate|an internal|a public|an open}0 %1 "
@@ -2031,6 +2044,9 @@ NOTE(overridden_here_can_be_objc,none,
 
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+WARNING(missing_override_warn,none,
+        "implicit override should be marked with 'override' or suppressed "
+        "with '@_nonoverride'", ())
 
 ERROR(multiple_override,none,
       "%0 has already been overridden", (DeclName))
@@ -2094,6 +2110,10 @@ NOTE(override_type_mismatch_with_fixits_init,none,
      (unsigned, Type))
 ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
+ERROR(nonoverride_wrong_decl_context,none,
+      "'@_nonoverride' can only be specified on class or protocol members", ())
+ERROR(nonoverride_and_override_attr,none,
+      "'override' cannot be combined with '@_nonoverride'", ())
 ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
