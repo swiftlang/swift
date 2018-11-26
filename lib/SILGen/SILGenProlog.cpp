@@ -437,7 +437,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
         if (auto body = TheClosure.getBody()) {
           if (!body->getElements().empty()) {
             auto &ctx = SGM.M.getASTContext();
-            ctx.Diags.diagnose(body->getStartLoc(), diag::unreachable_code_uninhabited_param_note);
+            ctx.Diags.diagnose(body->getStartLoc(), diag::unreachable_code_uninhabited_param_note, param->getName());
           }
         }
         break;
