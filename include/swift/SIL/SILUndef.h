@@ -17,6 +17,7 @@
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
+
 class SILArgument;
 class SILInstruction;
 class SILModule;
@@ -29,8 +30,8 @@ public:
   void operator=(const SILArgument &) = delete;
   void operator delete(void *, size_t) SWIFT_DELETE_OPERATOR_DELETED;
 
-  static SILUndef *get(SILType Ty, SILModule *M);
-  static SILUndef *get(SILType Ty, SILModule &M) { return get(Ty, &M); }
+  static SILUndef *get(SILType ty, SILModule &m);
+  static SILUndef *get(SILType ty, SILModule *m) { return get(ty, *m); }
 
   template<class OwnerTy>
   static SILUndef *getSentinelValue(SILType Ty, OwnerTy Owner) { return new (*Owner) SILUndef(Ty); }
