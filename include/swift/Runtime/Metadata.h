@@ -610,8 +610,8 @@ void swift_initStructMetadata(StructMetadata *self,
 /// swift_initClassMetadata().
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassDescriptor *descriptor,
-                            ResilientClassMetadataPattern *pattern);
+swift_relocateClassMetadata(const ClassDescriptor *descriptor,
+                            const ResilientClassMetadataPattern *pattern);
 
 /// Initialize various fields of the class metadata.
 ///
@@ -667,9 +667,9 @@ void swift_updateClassMetadata(ClassMetadata *self,
 /// the same class or a subclass of the descriptor.
 SWIFT_RUNTIME_EXPORT
 void *
-swift_lookUpClassMethod(ClassMetadata *metadata,
-                        MethodDescriptor *method,
-                        ClassDescriptor *description);
+swift_lookUpClassMethod(const ClassMetadata *metadata,
+                        const MethodDescriptor *method,
+                        const ClassDescriptor *description);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
