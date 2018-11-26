@@ -6907,35 +6907,32 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // connect all of the components, or else we wouldn't have an equivalence
   // class.
   if (intercomponentEdges.size() > numComponents - 1) {
-    auto &sourceMgr = getASTContext().SourceMgr;
-
     // First let's order all of the intercomponent edges
     // as written in source, this helps us to diagnose
     // all of the duplicate constraints in correct order.
-    std::vector<unsigned> sourceOrderedEdges;
-    for (unsigned i : indices(intercomponentEdges))
-      sourceOrderedEdges.push_back(i);
+    std::vector<IntercomponentEdge *> sourceOrderedEdges;
+    for (auto &edge : intercomponentEdges)
+      sourceOrderedEdges.push_back(&edge);
 
-    std::sort(sourceOrderedEdges.begin(), sourceOrderedEdges.end(),
-              [&sourceMgr, &intercomponentEdges](
-                  const unsigned &indexA, const unsigned &indexB) -> bool {
-                auto &a = intercomponentEdges[indexA];
-                auto &b = intercomponentEdges[indexB];
+    llvm::array_pod_sort(
+        sourceOrderedEdges.begin(), sourceOrderedEdges.end(),
+        [](IntercomponentEdge *const *a, IntercomponentEdge *const *b) -> int {
+          auto &sourceMgr = (*a)->constraint.value->getASTContext().SourceMgr;
 
-                auto locA = a.constraint.source->getLoc();
-                auto locB = b.constraint.source->getLoc();
+          auto locA = (*a)->constraint.source->getLoc();
+          auto locB = (*b)->constraint.source->getLoc();
 
-                auto bufferA = sourceMgr.findBufferContainingLoc(locA);
-                auto bufferB = sourceMgr.findBufferContainingLoc(locB);
+          auto bufferA = sourceMgr.findBufferContainingLoc(locA);
+          auto bufferB = sourceMgr.findBufferContainingLoc(locB);
 
-                if (bufferA != bufferB)
-                  return bufferA < bufferB;
+          if (bufferA != bufferB)
+            return bufferA < bufferB ? -1 : 1;
 
-                auto offsetA = sourceMgr.getLocOffsetInBuffer(locA, bufferA);
-                auto offsetB = sourceMgr.getLocOffsetInBuffer(locB, bufferB);
+          auto offsetA = sourceMgr.getLocOffsetInBuffer(locA, bufferA);
+          auto offsetB = sourceMgr.getLocOffsetInBuffer(locB, bufferB);
 
-                return offsetA < offsetB;
-              });
+          return offsetA < offsetB ? -1 : (offsetA == offsetB ? 0 : 1);
+        });
 
     auto isDiagnosable = [](const IntercomponentEdge &edge, bool isPrimary) {
       return edge.constraint.source->shouldDiagnoseRedundancy(isPrimary);
@@ -6949,8 +6946,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     // entry is found, that entry is going to point to previous
     // declaration and is going to mark current edge as a duplicate of
     // such entry.
-    for (const unsigned edgeIdx : sourceOrderedEdges) {
-      const auto &edge = intercomponentEdges[edgeIdx];
+    for (auto edgeIdx : indices(sourceOrderedEdges)) {
+      const auto &edge = *sourceOrderedEdges[edgeIdx];
 
       Type lhs = edge.constraint.getSubjectDependentType(genericParams);
       Type rhs = edge.constraint.value;
@@ -7016,7 +7013,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
                      edge.constraint.value);
 
       if (previousIndex) {
-        auto &prevEquiv = intercomponentEdges[*previousIndex].constraint;
+        auto &prevEquiv = sourceOrderedEdges[*previousIndex]->constraint;
         Diags.diagnose(
             prevEquiv.source->getLoc(), diag::previous_same_type_constraint,
             prevEquiv.source->classifyDiagKind(),
