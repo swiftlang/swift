@@ -5153,6 +5153,7 @@ class CodeCompletionTypeContextAnalyzer {
   // Results populated by Analyze()
   SmallVector<Type, 2> PossibleTypes;
   SmallVector<StringRef, 2> PossibleNames;
+  SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
 
   void recordPossibleType(Type ty) {
     if (!ty || ty->is<ErrorType>())
@@ -5166,7 +5167,7 @@ class CodeCompletionTypeContextAnalyzer {
 
   bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr) {
     // Collect parameter lists for possible func decls.
-    SmallVector<FunctionTypeAndDecl, 4> Candidates;
+    SmallVector<FunctionTypeAndDecl, 2> Candidates;
     Expr *Arg = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (!collectPossibleCalleesForApply(DC, applyExpr, Candidates))
@@ -5177,6 +5178,7 @@ class CodeCompletionTypeContextAnalyzer {
         return false;
       Arg = subscriptExpr->getIndex();
     }
+    PossibleCallees.append(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
@@ -5413,6 +5415,9 @@ public:
 
   ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
   ArrayRef<StringRef> getPossibleNames() const { return PossibleNames; }
+  ArrayRef<FunctionTypeAndDecl> getPossibleCallees() const {
+    return PossibleCallees;
+  }
 };
 
 } // end anonymous namespace
@@ -5584,13 +5589,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     }
 
-    if (ExprType) {
-      if (ShouldCompleteCallPatternAfterParen) {
+    if (ShouldCompleteCallPatternAfterParen) {
+      if (ExprType) {
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
-        // Add argument labels, then fallthrough to get values.
-        Lookup.addArgNameCompletionResults(TypeAnalyzer.getPossibleNames());
+        for (auto &typeAndDecl : TypeAnalyzer.getPossibleCallees())
+          Lookup.getValueExprCompletions(typeAndDecl.first, typeAndDecl.second);
       }
+    } else {
+      // Add argument labels, then fallthrough to get values.
+      Lookup.addArgNameCompletionResults(TypeAnalyzer.getPossibleNames());
     }
 
     if (!Lookup.FoundFunctionCalls ||
