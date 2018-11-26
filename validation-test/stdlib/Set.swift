@@ -81,28 +81,6 @@ func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   return s
 }
 
-func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
-  var s1 = Set<TestKeyTy>(minimumCapacity: 10)
-
-  s1.insert(k1)
-  s1.insert(k2)
-  s1.insert(k3)
-
-  expectTrue(s1.contains(k1))
-  expectTrue(s1.contains(k2))
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k1)
-  expectTrue(s1.contains(k2))
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k2)
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k3)
-  expectEqual(0, s1.count)
-}
-
 func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted()) {
     $0 == $1
@@ -361,6 +339,9 @@ SetTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   s.insert(4040)
   expectEqual(identity1, s._rawIdentifier())
 
+  s.update(with: 5050)
+  expectEqual(identity1, s._rawIdentifier())
+
   // Keep indexes alive during the calls above.
   _fixLifetime(startIndex)
   _fixLifetime(endIndex)
@@ -380,6 +361,8 @@ SetTestSuite.test("COW.Slow.IndexesDontAffectUniquenessCheck") {
 
   expectEqual(identity1, s._rawIdentifier())
   s.insert(TestKeyTy(4040))
+  expectEqual(identity1, s._rawIdentifier())
+  s.update(with: TestKeyTy(5050))
   expectEqual(identity1, s._rawIdentifier())
 
   // Keep indexes alive during the calls above.
@@ -472,6 +455,14 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
   expectTrue(s.contains(TestKeyTy(3030)))
   expectTrue(s.contains(TestKeyTy(4040)))
 
+  // Replace an existing key.
+  s.update(with: TestKeyTy(2020))
+  expectEqual(identity1, s._rawIdentifier())
+  expectEqual(3, s.count)
+  expectTrue(s.contains(TestKeyTy(2020)))
+  expectTrue(s.contains(TestKeyTy(3030)))
+  expectTrue(s.contains(TestKeyTy(4040)))
+
   do {
     let s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
@@ -499,6 +490,25 @@ SetTestSuite.test("COW.Fast.InsertDoesNotReallocate") {
   s1.insert(4040)
   s1.insert(5050)
   s1.insert(6060)
+  expectEqual(count1 + 3, s1.count)
+  expectEqual(identity1, s1._rawIdentifier())
+}
+
+SetTestSuite.test("COW.Fast.UpdateWithDoesNotReallocate") {
+  var s1 = getCOWFastSet()
+
+  let identity1 = s1._rawIdentifier()
+  let count1 = s1.count
+
+  // Updating an existing element should not create new storage
+  s1.update(with: 2020)
+  expectEqual(identity1, s1._rawIdentifier())
+  expectEqual(count1, s1.count)
+
+  // Updating with new elements should not create new storage
+  s1.update(with: 4040)
+  s1.update(with: 5050)
+  s1.update(with: 6060)
   expectEqual(count1 + 3, s1.count)
   expectEqual(identity1, s1._rawIdentifier())
 }
@@ -549,6 +559,33 @@ SetTestSuite.test("COW.Slow.InsertDoesNotReallocate") {
     // Keep variables alive.
     _fixLifetime(s1)
     _fixLifetime(s2)
+  }
+}
+
+SetTestSuite.test("COW.Slow.UpdateWithDoesNotReallocate") {
+  do {
+    var s1 = getCOWSlowSet()
+    let identity1 = s1._rawIdentifier()
+
+    // Replace a redundant element.
+    s1.update(with: TestKeyTy(2020))
+    expectEqual(identity1, s1._rawIdentifier())
+
+    expectEqual(3, s1.count)
+    expectTrue(s1.contains(TestKeyTy(1010)))
+    expectTrue(s1.contains(TestKeyTy(2020)))
+    expectTrue(s1.contains(TestKeyTy(3030)))
+
+    // Update with new elements.
+    s1.update(with: TestKeyTy(4040))
+    s1.update(with: TestKeyTy(5050))
+    s1.update(with: TestKeyTy(6060))
+
+    expectEqual(identity1, s1._rawIdentifier())
+    expectEqual(6, s1.count)
+
+    // Keep variables alive.
+    _fixLifetime(s1)
   }
 
   do {
@@ -1085,31 +1122,64 @@ SetTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Native set tests.
 //===---
 
+func helperDeleteThree(
+  _ k1: RawTestKeyTy,
+  _ k2: RawTestKeyTy,
+  _ k3: RawTestKeyTy
+) {
+  var s1 = Set<RawTestKeyTy>(minimumCapacity: 10)
+
+  s1.insert(k1)
+  s1.insert(k2)
+  s1.insert(k3)
+
+  expectTrue(s1.contains(k1))
+  expectTrue(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k1)
+  expectFalse(s1.contains(k1))
+  expectTrue(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k2)
+  expectFalse(s1.contains(k1))
+  expectFalse(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k3)
+  expectFalse(s1.contains(k1))
+  expectFalse(s1.contains(k2))
+  expectFalse(s1.contains(k3))
+
+  expectEqual(0, s1.count)
+}
+
 SetTestSuite.test("deleteChainCollision") {
-  let k1 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2 = TestKeyTy(value: 2020, hashValue: 0)
-  let k3 = TestKeyTy(value: 3030, hashValue: 0)
+  let k1 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 2020, hashValue: 0)
+  let k3 = RawTestKeyTy(value: 3030, hashValue: 0)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 SetTestSuite.test("deleteChainNoCollision") {
-  let k1 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2 = TestKeyTy(value: 2020, hashValue: 1)
-  let k3 = TestKeyTy(value: 3030, hashValue: 2)
+  let k1 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 2020, hashValue: 1)
+  let k3 = RawTestKeyTy(value: 3030, hashValue: 2)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 SetTestSuite.test("deleteChainCollision2") {
-  let k1_0 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2_0 = TestKeyTy(value: 2020, hashValue: 0)
-  let k3_2 = TestKeyTy(value: 3030, hashValue: 2)
-  let k4_0 = TestKeyTy(value: 4040, hashValue: 0)
-  let k5_2 = TestKeyTy(value: 5050, hashValue: 2)
-  let k6_0 = TestKeyTy(value: 6060, hashValue: 0)
+  let k1_0 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2_0 = RawTestKeyTy(value: 2020, hashValue: 0)
+  let k3_2 = RawTestKeyTy(value: 3030, hashValue: 2)
+  let k4_0 = RawTestKeyTy(value: 4040, hashValue: 0)
+  let k5_2 = RawTestKeyTy(value: 5050, hashValue: 2)
+  let k6_0 = RawTestKeyTy(value: 6060, hashValue: 0)
 
-  var s = Set<TestKeyTy>(minimumCapacity: 10)
+  var s = Set<RawTestKeyTy>(minimumCapacity: 10)
 
   s.insert(k1_0) // in bucket 0
   s.insert(k2_0) // in bucket 1
@@ -1133,7 +1203,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   var generator = LinearCongruentialGenerator(seed: seed)
   print("using LinearCongruentialGenerator(seed: \(seed))")
 
-  func check(_ s: Set<TestKeyTy>) {
+  func check(_ s: Set<RawTestKeyTy>) {
     let keys = Array(s)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1150,22 +1220,27 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
-  var knownKeys: [TestKeyTy] = []
-  func getKey(_ value: Int) -> TestKeyTy {
+  var knownKeys: [RawTestKeyTy] = []
+  func getKey(_ value: Int) -> RawTestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
       }
     }
-    let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
-    let k = TestKeyTy(value: value, hashValue: hashValue)
+    let hashValue = Int.random(
+      in: 0 ..< (chainLength - chainOverlap),
+      using: &generator) * collisionChains
+    let k = RawTestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
-  var s = Set<TestKeyTy>(minimumCapacity: 30)
+  var s = Set<RawTestKeyTy>(minimumCapacity: 30)
   for _ in 1..<300 {
-    let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
+    let value = Int.random(
+      in: 0 ..< (collisionChains * chainLength),
+      using: &generator)
+    let key = getKey(value)
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       s.remove(key)
     } else {
@@ -1390,19 +1465,68 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Insert") {
   }
 }
 
+SetTestSuite.test("BridgedFromObjC.Verbatim.UpdateWith") {
+  do {
+    var s = getBridgedVerbatimSet()
+    let identity1 = s._rawIdentifier()
+    expectTrue(isCocoaSet(s))
+
+    expectFalse(s.contains(TestObjCKeyTy(2040)))
+    s.update(with: TestObjCKeyTy(2040))
+
+    let identity2 = s._rawIdentifier()
+    expectNotEqual(identity1, identity2)
+    expectTrue(isNativeSet(s))
+    expectEqual(4, s.count)
+
+    expectTrue(s.contains(TestObjCKeyTy(1010)))
+    expectTrue(s.contains(TestObjCKeyTy(2020)))
+    expectTrue(s.contains(TestObjCKeyTy(3030)))
+    expectTrue(s.contains(TestObjCKeyTy(2040)))
+  }
+}
+
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
   do {
     var s = getBridgedNonverbatimSet()
-    //let identity1 = s._rawIdentifier()
+    let identity1 = s._rawIdentifier()
+    let count1 = s.count
+    let capacity1 = s.capacity
     expectTrue(isNativeSet(s))
 
     expectFalse(s.contains(TestBridgedKeyTy(2040)))
     s.insert(TestObjCKeyTy(2040) as TestBridgedKeyTy)
 
-    //let identity2 = s._rawIdentifier()
+    let identity2 = s._rawIdentifier()
     // Storage identity may or may not change depending on allocation behavior.
     // (s is eagerly bridged to a regular uniquely referenced native Set.)
-    //expectNotEqual(identity1, identity2)
+    expectTrue((count1 < capacity1) == (identity1 == identity2))
+
+    expectTrue(isNativeSet(s))
+    expectEqual(4, s.count)
+
+    expectTrue(s.contains(TestBridgedKeyTy(1010)))
+    expectTrue(s.contains(TestBridgedKeyTy(2020)))
+    expectTrue(s.contains(TestBridgedKeyTy(3030)))
+    expectTrue(s.contains(TestBridgedKeyTy(2040)))
+  }
+}
+
+SetTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateWith") {
+  do {
+    var s = getBridgedNonverbatimSet()
+    let identity1 = s._rawIdentifier()
+    let count1 = s.count
+    let capacity1 = s.capacity
+    expectTrue(isNativeSet(s))
+
+    expectFalse(s.contains(TestBridgedKeyTy(2040)))
+    s.update(with: TestObjCKeyTy(2040) as TestBridgedKeyTy)
+
+    let identity2 = s._rawIdentifier()
+    // Storage identity may or may not change depending on allocation behavior.
+    // (s is eagerly bridged to a regular uniquely referenced native Set.)
+    expectTrue((count1 < capacity1) == (identity1 == identity2))
 
     expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
@@ -1549,6 +1673,8 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Contains") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
   var s = getBridgedNonverbatimSet()
   let identity1 = s._rawIdentifier()
+  let count1 = s.count
+  let capacity1 = s.capacity
   expectTrue(isNativeSet(s))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
@@ -1562,7 +1688,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Contains") {
 
   // Storage identity may or may not change depending on allocation behavior.
   // (s is eagerly bridged to a regular uniquely referenced native Set.)
-  //expectNotEqual(identity1, identity2)
+  expectTrue((count1 < capacity1) == (identity1 == identity2))
 
   expectTrue(isNativeSet(s))
   expectEqual(4, s.count)
@@ -2885,7 +3011,7 @@ SetTestSuite.test("insert") {
   expectTrue(s1.contains(4040))
 }
 
-SetTestSuite.test("replace") {
+SetTestSuite.test("update(with:)") {
   // These are anagrams - they should amount to the same sets.
   var s1 = Set<TestKeyTy>([1010, 2020, 3030])
 
@@ -4297,6 +4423,194 @@ SetTestSuite.test("localHashSeeds") {
   let sliceElements = slice.dropFirst(bunch)
   // If this test fails, there is a problem with local hash seeding.
   expectFalse(smallElements.elementsEqual(sliceElements))
+}
+
+SetTestSuite.test("RemoveAt.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.firstIndex(of: 10)!
+
+  s.remove(at: j)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("RemoveValueForKey.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+
+  s.remove(10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ResizeOnInsertion.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s[i], 20)
+  s.insert(0)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ResizeOnUpdate.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.update(with: 100 + i)
+  }
+  expectEqual(s[i], 20)
+  s.update(with: 0)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("RemoveAll.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.removeAll(keepingCapacity: true)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ReserveCapacity.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(0)
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(s.capacity)
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(s.capacity * 10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AcrossInstances") {
+  // The mutation count may happen to be the same across any two sets.
+  // The probability of this is low, but it could happen -- so check a bunch of
+  // these cases at once; a trap will definitely occur at least once.
+  let sets = (0 ..< 10).map { _ in Set<Int>([10, 20, 30, 40]) }
+  let indices = sets.map { $0.firstIndex(of: 20)! }
+  let s: Set<Int> = [10, 20, 30, 40]
+
+  expectCrashLater()
+  for i in indices {
+    _ = s[i]
+  }
+  _fixLifetime(sets)
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.remove(10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let identifier = s._rawIdentifier()
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectEqual(s[i], 20)
+
+  s.insert(0)
+
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.RangeSubscript.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.index(after: i)
+  expectTrue(i < j)
+
+  s.remove(40)
+
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = s[i..<j]
+}
+
+SetTestSuite.test("IndexValidation.RangeSubscript.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.index(after: i)
+  expectTrue(i < j)
+  let identifier = s._rawIdentifier()
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectTrue(i < j)
+
+  s.insert(0)
+
+  expectTrue(i < j)
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  _ = s[i..<j]
+}
+
+SetTestSuite.test("IndexValidation.RemoveAt.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.remove(10)
+
+  expectCrashLater()
+  s.remove(at: i)
+}
+
+SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let identifier = s._rawIdentifier()
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectEqual(s[i], 20)
+
+  s.insert(0)
+
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  s.remove(at: i)
 }
 
 runAllTests()
