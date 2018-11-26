@@ -4,7 +4,6 @@ import Darwin
 import Glibc
 #endif
 import CTensorFlow
-import CTensorFlowUnittest
 import TensorFlow
 import StdlibUnittest
 
