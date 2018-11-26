@@ -1863,6 +1863,12 @@ function(add_swift_target_library name)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
       endif()
 
+      if("${sdk}" STREQUAL WINDOWS)
+        if(arch STREQUAL x86_64)
+          set(swiftlib_swift_compile_flags_arch -Xcc -D_AMD64_)
+        endif()
+      endif()
+
       # Add this library variant.
       _add_swift_library_single(
         ${VARIANT_NAME}
@@ -1881,7 +1887,7 @@ function(add_swift_target_library name)
         LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
-        SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_private_frameworks_flag}
+        SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
         PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
         INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
