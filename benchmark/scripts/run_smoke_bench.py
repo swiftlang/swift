@@ -96,7 +96,7 @@ def test_opt_level(opt_level, old_dir, new_dir, threshold, num_samples):
     new_logf = open(log_filename(new_dir), 'w')
 
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    score_re = re.compile(r"(\d+),(\w+),\d+,(\d+)")
+    score_re = re.compile(r"(\d+),([\w.\-]+),\d+,(\d+)")
 
     while to_test is None or len(to_test) > 0:
         tested_benchmarks = set()
@@ -180,7 +180,8 @@ def get_results(bench_dir, opt_level, num_samples, to_test):
         if to_test:
             args += to_test
         env = {'DYLD_LIBRARY_PATH': os.path.join(bench_dir, 'lib', 'swift',
-               'macos')}
+               'macos'),
+               'SWIFT_DETERMINISTIC_HASHING': '1'}
         output = subprocess.check_output(args, env=env)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(e.output)
