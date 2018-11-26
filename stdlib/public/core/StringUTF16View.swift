@@ -537,6 +537,8 @@ extension String {
   ) {
     _internalInvariant(_guts.isFastUTF8)
 
+    if _slowPath(range.isEmpty) { return }
+
     return _guts.withFastUTF8 { utf8 in
       var writeIdx = 0
       let writeEnd = buffer.count
