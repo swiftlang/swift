@@ -72,6 +72,26 @@
 using namespace swift;
 using namespace metadataimpl;
 
+template<>
+Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
+    const TypeContextDescriptor *description) const {
+  // If this class has resilient ancestry, the size of the metadata is not known
+  // at compile time, so we allocate it dynamically, filling it in from a
+  // pattern.
+  if (hasResilientClassPattern(description)) {
+    auto *pattern = ResilientPattern.get();
+
+    // If there is a relocation function, call it.
+    if (auto *fn = ResilientPattern->RelocationFunction.get())
+      return fn(description, pattern);
+
+    // Otherwise, use the default behavior.
+    auto *classDescription = cast<ClassDescriptor>(description);
+    return swift_relocateClassMetadata(classDescription, pattern);
+  }
+  return IncompleteMetadata.get();
+}
+
 /// Copy the generic arguments into place in a newly-allocated metadata.
 static void installGenericArguments(Metadata *metadata,
                                     const TypeContextDescriptor *description,

@@ -2742,9 +2742,9 @@ namespace {
     }
 
     void addRelocationFunction() {
-      auto function = IGM.getAddrOfTypeMetadataInstantiationFunction(
-        Target, NotForDefinition);
-      B.addRelativeAddress(function);
+      // We don't use this yet, but it's available as a future customization
+      // point.
+      B.addRelativeAddressOrNull(nullptr);
     }
 
     void addDestructorFunction() {
@@ -2792,39 +2792,6 @@ namespace {
         emitInitializeClassMetadata(IGF, Target, FieldLayout, metadata,
                                     collector);
       });
-
-      emitRelocationFunction();
-    }
-
-  private:
-    /// Emit the create function for a class with resilient ancestry.
-    void emitRelocationFunction() {
-      // using MetadataRelocator =
-      //   Metadata *(TypeContextDescriptor *type, void *pattern);
-      llvm::Function *f =
-        IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
-      f->setAttributes(IGM.constructInitialAttributes());
-
-      IRGenFunction IGF(IGM, f);
-
-      // Skip instrumentation when building for TSan to avoid false positives.
-      // The synchronization for this happens in the Runtime and we do not see it.
-      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
-        f->removeFnAttr(llvm::Attribute::SanitizeThread);
-
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, f);
-
-      Explosion params = IGF.collectParameters();
-      llvm::Value *descriptor = params.claimNext();
-      llvm::Value *pattern = params.claimNext();
-
-      // Allocate class metadata using the pattern we emitted.
-      llvm::Value *metadata =
-        IGF.Builder.CreateCall(IGF.IGM.getRelocateClassMetadataFn(),
-                               {descriptor, pattern});
-
-      IGF.Builder.CreateRet(metadata);
     }
   };
 

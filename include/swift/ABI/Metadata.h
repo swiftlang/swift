@@ -3349,7 +3349,11 @@ using MetadataRelocator =
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern {
   /// A function that allocates metadata with the correct size at runtime.
-  TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
+  ///
+  /// If this is null, the runtime instead calls swift_relocateClassMetadata(),
+  /// passing in the class descriptor and this pattern.
+  TargetRelativeDirectPointer<Runtime, MetadataRelocator, /*nullable*/ true>
+    RelocationFunction;
 
   /// The heap-destructor function.
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
@@ -3410,14 +3414,10 @@ struct TargetSingletonMetadataInitialization {
             classDescription->hasResilientSuperclass());
   }
 
+  /// This method can only be called from the runtime itself. It is defined
+  /// in MetadataCache.h.
   TargetMetadata<Runtime> *allocate(
-      const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasResilientClassPattern(description)) {
-      return ResilientPattern->RelocationFunction(description,
-                                                  ResilientPattern.get());
-    }
-    return IncompleteMetadata.get();
-  }
+      const TargetTypeContextDescriptor<Runtime> *description) const;
 };
 
 template <typename Runtime>
