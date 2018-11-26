@@ -406,7 +406,7 @@ extension _HashTable {
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
     _sanityCheck(bucketCount == other.bucketCount)
-    self.words.assign(from: other.words, count: bucketCount)
+    self.words.assign(from: other.words, count: wordCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.
