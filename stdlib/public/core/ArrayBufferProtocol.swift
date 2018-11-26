@@ -128,7 +128,8 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
   @inline(never)
-  @usableFromInline
+  @inlineable // This code should be specializable such that copying an array is
+              // fast and does not end up in an unspecialized entry point.
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
