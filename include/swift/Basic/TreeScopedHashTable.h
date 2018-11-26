@@ -37,6 +37,7 @@ template <typename K, typename V> class TreeScopedHashTableVal {
   TreeScopedHashTableVal(const K &Key, const V &Val) : Key(Key), Val(Val) {}
 
 public:
+  ~TreeScopedHashTableVal() = default;
   TreeScopedHashTableVal(const TreeScopedHashTableVal &) = delete;
   TreeScopedHashTableVal(TreeScopedHashTableVal &&) = delete;
   TreeScopedHashTableVal &operator=(const TreeScopedHashTableVal &) = delete;
