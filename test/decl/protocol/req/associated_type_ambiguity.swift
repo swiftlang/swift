@@ -15,7 +15,7 @@ protocol P1 {
 }
 
 protocol P2 {
-  associatedtype T // expected-note {{found this candidate}}
+  associatedtype T // expected-note 2 {{found this candidate}}
 }
 
 // FIXME: This extension's generic signature is still minimized differently from
@@ -36,7 +36,7 @@ extension P1 where Self : P2 {
 // Same as above, but now we have two visible associated types with the same
 // name.
 protocol P3 {
-  associatedtype T
+  associatedtype T // expected-note {{found this candidate}}
 }
 
 // FIXME: This extension's generic signature is still minimized differently from
@@ -48,7 +48,7 @@ extension P2 where Self : P3, T == Int {
 }
 
 extension P2 where Self : P3 {
-  func takeT1(_: T) {}
+  func takeT1(_: T) {} // expected-error {{'T' is ambiguous for type lookup in this context}}
   func takeT2(_: Self.T) {}
 }
 
