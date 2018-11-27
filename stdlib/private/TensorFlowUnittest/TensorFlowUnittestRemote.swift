@@ -79,8 +79,8 @@ private class TestCluster {
     for i in 1..<taskCount {
       debugLog("Starting task \(i)...")
       let serverDefText = createServerDef(forTasksConfig: tasks, taskIndex: i)
-      let serverDef: UnsafeMutablePointer<TF_Buffer>! = TFE_GetServerDef(
-		      serverDefText, status)
+      let serverDef: UnsafeMutablePointer! =
+          TFE_GetServerDef(serverDefText, status)
       checkOk(status)
       let server: CTFServer! = TF_NewServer(
           serverDef.pointee.data, serverDef.pointee.length, status)
