@@ -281,7 +281,7 @@ public:
   inline Operand *getSingleUse() const;
 
   template <class T>
-  inline T *getSingleUserOfType();
+  inline T *getSingleUserOfType() const;
 
   /// Return the instruction that defines this value, or null if it is
   /// not defined by an instruction.
@@ -384,6 +384,8 @@ public:
   ///
   /// An example of a SILValue without ownership semantics is a
   /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
@@ -711,7 +713,7 @@ inline Operand *ValueBase::getSingleUse() const {
 }
 
 template <class T>
-inline T *ValueBase::getSingleUserOfType() {
+inline T *ValueBase::getSingleUserOfType() const {
   T *Result = nullptr;
   for (auto *Op : getUses()) {
     if (auto *Tmp = dyn_cast<T>(Op->getUser())) {

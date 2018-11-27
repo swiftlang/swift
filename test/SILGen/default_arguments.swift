@@ -9,9 +9,9 @@
 // Default argument for first parameter.
 // CHECK-LABEL: sil hidden @$s17default_arguments7defarg11i1d1sySi_SdSStFfA_ : $@convention(thin) () -> Int
 // CHECK: [[INT:%[0-9]+]] = metatype $@thin Int.Type
-// CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 17
-// CHECK: [[CVT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBi{{[_0-9]*}}__tcfC
-// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[LIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 17
+// CHECK: [[CVT:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[INT]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
@@ -34,9 +34,8 @@ func testDefaultArg1() {
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
   // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @$s17default_arguments7defarg1{{.*}}A1_
   // CHECK: [[DEF2:%[0-9]+]] = apply [[DEF2FN]]()
-  // CHECK: [[BORROWED_DEF2:%.*]] = begin_borrow [[DEF2]]
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @$s17default_arguments7defarg1{{[_0-9a-zA-Z]*}}F
-  // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[BORROWED_DEF2]])
+  // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[DEF2]])
   defarg1(d:3.125)
 }
 
@@ -45,16 +44,15 @@ func defarg2(_ i: Int, d: Double = 3.125, s: String = "Hello") { }
 // CHECK-LABEL: sil hidden @$s17default_arguments15testDefaultArg2{{[_0-9a-zA-Z]*}}F
 func testDefaultArg2() {
 // CHECK:  [[INT64:%[0-9]+]] = metatype $@thin Int.Type
-// CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
-// CHECK:  [[LITFN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBi{{[_0-9]*}}__tcfC
-// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:  [[INTLIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5
+// CHECK:  [[LITFN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+// CHECK:  [[I:%[0-9]+]] = apply [[LITFN]]([[INTLIT]], [[INT64]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[DFN:%[0-9]+]] = function_ref @$s17default_arguments7defarg2{{.*}}A0_ : $@convention(thin) () -> Double
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
 // CHECK:  [[SFN:%[0-9]+]] = function_ref @$s17default_arguments7defarg2{{.*}}A1_ : $@convention(thin) () -> @owned String
 // CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@convention(thin) () -> @owned String
-// CHECK:  [[BORROWED_S:%.*]] = begin_borrow [[S]]
 // CHECK:  [[FNREF:%[0-9]+]] = function_ref @$s17default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @guaranteed String) -> ()
-// CHECK:  apply [[FNREF]]([[I]], [[D]], [[BORROWED_S]]) : $@convention(thin) (Int, Double, @guaranteed String) -> ()
+// CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@convention(thin) (Int, Double, @guaranteed String) -> ()
   defarg2(5)
 }
 
@@ -66,7 +64,7 @@ func testAutocloseFile() {
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
   // CHECK-LABEL: sil private [transparent] @$s17default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
-  // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
+  // CHECK: integer_literal $Builtin.IntLiteral, [[@LINE+1]]
   autocloseFile()
 }
 
@@ -251,10 +249,10 @@ func r20494437onSuccess(_ a: r20494437ExecutionContext) {
 func r18400194(_ a: Int, x: Int = 97) {}
 
 // CHECK-LABEL: sil hidden @$s17default_arguments9r18400194_1xySi_SitFfA0_
-// CHECK: integer_literal $Builtin.Int2048, 97
+// CHECK: integer_literal $Builtin.IntLiteral, 97
 
 // CHECK-LABEL: sil hidden @$s17default_arguments14test_r18400194yyF
-// CHECK: integer_literal $Builtin.Int2048, 1
+// CHECK: integer_literal $Builtin.IntLiteral, 1
 // CHECK:  function_ref @$s17default_arguments9r18400194_1xySi_SitFfA0_ : $@convention(thin) () -> Int
 // CHECK: function_ref @$s17default_arguments9r18400194_1xySi_SitF : $@convention(thin) (Int, Int) -> (){{.*}}
 func test_r18400194() {
@@ -341,27 +339,23 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
 // CHECK:  [[R:%.*]] = function_ref @$s17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Erro
-// CHECK:  try_apply [[R]]([[BORROWED_E]])
+// CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
 // CHECK:  [[R:%.*]] = function_ref @$s17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
-// CHECK:  try_apply [[R]]([[BORROWED_E]])
+// CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments0A8Escaping7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
 // CHECK:  [[R:%.*]] = function_ref @$s17default_arguments0A8Escaping7closureySbyc_tF : $@convention(thin) (@guaranteed @callee_guaranteed () -> Bool) -> ()
-// CHECK:  apply [[R]]([[BORROWED_E]])
+// CHECK:  apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$s17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
 // CHECK:  [[R:%.*]] = function_ref @$s17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tF : $@convention(thin) (@guaranteed @callee_guaranteed () -> Bool) -> ()
-// CHECK:  apply [[R]]([[BORROWED_E]])
+// CHECK:  apply [[R]]([[E]])
 
 func callThem() throws {
    try throwingDefault()

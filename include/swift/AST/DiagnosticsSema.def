@@ -1430,6 +1430,15 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+ERROR(pattern_no_uninhabited_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "enum type %3 with no cases",
+      (bool, bool, Identifier, Type))
+ERROR(pattern_no_uninhabited_tuple_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "tuple type %3 containing enum with no cases",
+      (bool, bool, Identifier, Type))
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
@@ -1833,9 +1842,18 @@ NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
      (DeclName, DeclName))
 NOTE(associated_type_deduction_witness_failed,none,
-     "inferred type %1 (by matching requirement %0) is invalid: "
-     "does not %select{inherit from|conform to}3 %2",
+     "candidate would match and infer %0 = %1 if %1 "
+     "%select{inherited from|conformed to}3 %2",
      (DeclName, Type, Type, bool))
+NOTE(associated_type_witness_conform_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a nominal type and so can't conform to %2",
+     (DeclName, Type, Type))
+NOTE(associated_type_witness_inherit_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a class type and so can't inherit from %2",
+     (DeclName, Type, Type))
+
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1856,6 +1874,9 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
+NOTE(protocol_witness_missing_requirement,none,
+     "candidate would match if %0 %select{conformed to|subclassed|"
+     "was the same type as}2 %1", (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
@@ -1907,9 +1928,6 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
-WARNING(witness_unavailable_warn,none,
-        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
-        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(witness_unavailable,none,
         "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
@@ -2328,7 +2346,7 @@ ERROR(multiple_enum_raw_types,none,
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
-      "raw type %0 is not expressible by any literal",
+      "raw type %0 is not expressible by a string, integer, or floating-point literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable conformance cannot be synthesized because raw type %0 is not "
@@ -2759,8 +2777,6 @@ NOTE(found_candidate,none,
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
 
-ERROR(no_MaxBuiltinIntegerType_found,none,
-   "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
 ERROR(integer_literal_overflows_maxwidth, none,

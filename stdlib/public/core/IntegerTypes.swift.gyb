@@ -23,10 +23,6 @@ from itertools import chain
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
-# Number of bits in integer literals.
-builtinIntLiteralBits = 2048
-IntLiteral = 'Int%s' % builtinIntLiteralBits
-
 class struct(object):
   def __init__(self, **kw):
     self.__dict__ = kw
@@ -1112,8 +1108,8 @@ public struct ${Self}
 
 
   @_transparent
-  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.s_to_${u}_checked_trunc_${IntLiteral}_${BuiltinName}(x).0
+  public init(_builtinIntegerLiteral x: Builtin.IntLiteral) {
+    _value = Builtin.s_to_${u}_checked_trunc_IntLiteral_${BuiltinName}(x).0
   }
 
   /// Creates a new instance with the same memory representation as the given

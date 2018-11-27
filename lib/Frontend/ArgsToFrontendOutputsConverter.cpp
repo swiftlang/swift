@@ -507,14 +507,16 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
 
 Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
-  if (Arg *A = Args.getLastArg(options::OPT_emit_objc_header_path,
-                               options::OPT_emit_module_path,
-                               options::OPT_emit_module_doc_path,
-                               options::OPT_emit_dependencies_path,
-                               options::OPT_emit_reference_dependencies_path,
-                               options::OPT_serialize_diagnostics_path,
-                               options::OPT_emit_loaded_module_trace_path,
-                               options::OPT_emit_tbd_path)) {
+  if (Arg *A = Args.getLastArg(
+        options::OPT_emit_objc_header_path,
+        options::OPT_emit_module_path,
+        options::OPT_emit_module_doc_path,
+        options::OPT_emit_dependencies_path,
+        options::OPT_emit_reference_dependencies_path,
+        options::OPT_serialize_diagnostics_path,
+        options::OPT_emit_loaded_module_trace_path,
+        options::OPT_emit_parseable_module_interface_path,
+        options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

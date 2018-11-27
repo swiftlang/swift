@@ -27,7 +27,7 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
 endif()
 
-add_swift_library(swiftPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+add_swift_target_library(swiftPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Python.swift
   NumpyConversion.swift
 

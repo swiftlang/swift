@@ -263,7 +263,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
     return ManagedValue(borrowed, CleanupHandle::invalid());
   }
 
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &cleanup = Cleanups.pushCleanup<FormalEvaluationEndBorrowCleanup>();
   CleanupHandle handle = Cleanups.getTopCleanup();
   FormalEvalContext.push<SharedBorrowFormalAccess>(loc, handle, original,
@@ -2065,9 +2065,8 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
     if (value.getOwnershipKind() == ValueOwnershipKind::Trivial)
       return ManagedValue::forUnmanaged(value.getValue());
 
-    // Otherwise, retain and enter a release cleanup.
-    valueTL.emitCopyValue(B, loc, value.getValue());
-    return emitManagedRValueWithCleanup(value.getValue(), valueTL);
+    // Otherwise, copy the value and return.
+    return value.getFinalManagedValue().copy(*this, loc);
   }
 
   // Otherwise, produce a temporary and copy into that.

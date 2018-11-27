@@ -202,7 +202,7 @@ void CapturePropagationCloner::cloneClosure(
 
     // The PartialApplyArg from the caller is now mapped to its cloned
     // instruction.  Also map the original argument to the cloned instruction.
-    entryArgs.push_back(remapValue(PartialApplyArg));
+    entryArgs.push_back(getMappedValue(PartialApplyArg));
     ++ArgIdx;
   }
   IsCloningConstant = false;

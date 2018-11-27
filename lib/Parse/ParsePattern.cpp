@@ -665,15 +665,9 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
 }
 
 /// Parse function arguments.
-///   func-arguments:
-///     curried-arguments | selector-arguments
-///   curried-arguments:
-///     parameter-clause+
-///   selector-arguments:
-///     '(' selector-element ')' (identifier '(' selector-element ')')+
-///   selector-element:
-///      identifier '(' pattern-atom (':' type)? ('=' expr)? ')'
 ///
+/// Emits a special diagnostic if there are multiple parameter lists,
+/// but otherwise is identical to parseSingleParameterClause().
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                ParameterList *&BodyParams,
@@ -687,40 +681,18 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   status |= FirstParameterClause;
   BodyParams = FirstParameterClause.get();
 
-  SmallVector<ParameterList *, 2> AllParams;
-  AllParams.push_back(BodyParams);
+  bool MultipleParameterLists = false;
   while (Tok.is(tok::l_paren)) {
+    MultipleParameterLists = true;
     auto CurriedParameterClause
       = parseSingleParameterClause(ParameterContextKind::Curried);
     status |= CurriedParameterClause;
-    AllParams.push_back(CurriedParameterClause.get());
   }
 
   // If the decl uses currying syntax, complain that that syntax has gone away.
-  if (AllParams.size() > 1) {
-    SourceRange allPatternsRange(
-      BodyParams->getStartLoc(),
-      AllParams.back()->getEndLoc());
-    auto diag = diagnose(allPatternsRange.Start,
-                         diag::parameter_curry_syntax_removed);
-    diag.highlight(allPatternsRange);
-    bool seenArg = false;
-    for (unsigned i = 0; i < AllParams.size() - 1; i++) {
-      // Replace ")(" with ", ", so "(x: Int)(y: Int)" becomes
-      // "(x: Int, y: Int)". But just delete them if they're not actually
-      // separating any arguments, e.g. in "()(y: Int)".
-      StringRef replacement(", ");
-      auto *leftParamList = AllParams[i];
-      auto *rightParamList = AllParams[i + 1];
-      if (leftParamList->size() != 0)
-        seenArg = true;
-      if (!seenArg || rightParamList->size() == 0)
-        replacement = "";
-    
-      diag.fixItReplace(SourceRange(leftParamList->getEndLoc(),
-                                    rightParamList->getStartLoc()),
-                        replacement);
-    }
+  if (MultipleParameterLists) {
+    diagnose(BodyParams->getStartLoc(),
+             diag::parameter_curry_syntax_removed);
   }
 
   return status;
@@ -1192,7 +1164,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   if (subPattern.isNull())
     return nullptr;
   auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
-  return makeParserResult(varP);
+  return makeParserResult(ParserStatus(subPattern), varP);
 }
 
 

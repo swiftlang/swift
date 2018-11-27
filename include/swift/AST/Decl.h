@@ -463,7 +463,8 @@ protected:
     HasStubImplementation : 1
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16,
     : NumPadBits,
@@ -472,7 +473,7 @@ protected:
     Index : 16
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, ValueDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
@@ -570,6 +571,22 @@ protected:
     /// attribute.  A single bit because it's lazily computed along with the
     /// HasAssociatedValues bit.
     HasAnyUnavailableValues : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1,
+    /// If the module was or is being compiled with `-enable-testing`.
+    TestingEnabled : 1,
+
+    /// If the module failed to load
+    FailedToLoad : 1,
+
+    /// Whether the module is resilient.
+    ///
+    /// \sa ResilienceStrategy
+    RawResilienceStrategy : 1,
+
+    /// Whether all imports have been resolved. Used to detect circular imports.
+    HasResolvedImports : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,

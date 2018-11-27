@@ -253,133 +253,57 @@ func setupMemo() {
 }
 
 // Precompute whole scalar set
-var controlCharactersPrecomputed: Set<UInt32> = {
+func precompute(_ charSet: CharacterSet) -> Set<UInt32> {
   var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if controlCharacters.contains(scalar) {
-      result.insert(scalar.value)
+  for plane in 0...0x10 {
+    guard charSet.hasMember(inPlane: UInt8(plane)) else { continue }
+    let offset = plane &* 0x1_0000
+    for codePoint in 0...0xFFFF {
+      guard let scalar = UnicodeScalar(codePoint &+ offset) else { continue }
+      if charSet.contains(scalar) {
+        result.insert(scalar.value)
+      }
     }
   }
   return result
-}()
+}
+var controlCharactersPrecomputed: Set<UInt32> = precompute(controlCharacters)
 func isControlPrecomputed(_ c: Character) -> Bool {
   return controlCharactersPrecomputed.contains(c.firstScalar.value)
 }
-var alphanumericsPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if alphanumerics.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var alphanumericsPrecomputed: Set<UInt32> = precompute(alphanumerics)
 func isAlphanumericPrecomputed(_ c: Character) -> Bool {
   return alphanumericsPrecomputed.contains(c.firstScalar.value)
 }
-var lowercaseLettersPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if lowercaseLetters.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var lowercaseLettersPrecomputed: Set<UInt32> = precompute(lowercaseLetters)
 func isLowercasePrecomputed(_ c: Character) -> Bool {
   return lowercaseLettersPrecomputed.contains(c.firstScalar.value)
 }
-var punctuationCharactersPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if punctuationCharacters.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var punctuationCharactersPrecomputed: Set<UInt32> = precompute(punctuationCharacters)
 func isPunctuationPrecomputed(_ c: Character) -> Bool {
   return punctuationCharactersPrecomputed.contains(c.firstScalar.value)
 }
-var whitespacesPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if whitespaces.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var whitespacesPrecomputed: Set<UInt32> = precompute(whitespaces)
 func isWhitespacePrecomputed(_ c: Character) -> Bool {
   return whitespacesPrecomputed.contains(c.firstScalar.value)
 }
-var lettersPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if letters.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var lettersPrecomputed: Set<UInt32> = precompute(letters)
 func isLetterPrecomputed(_ c: Character) -> Bool {
   return lettersPrecomputed.contains(c.firstScalar.value)
 }
-var uppercaseLettersPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if uppercaseLetters.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var uppercaseLettersPrecomputed: Set<UInt32> = precompute(uppercaseLetters)
 func isUppercasePrecomputed(_ c: Character) -> Bool {
   return uppercaseLettersPrecomputed.contains(c.firstScalar.value)
 }
-var decimalDigitsPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if decimalDigits.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var decimalDigitsPrecomputed: Set<UInt32> = precompute(decimalDigits)
 func isDecimalPrecomputed(_ c: Character) -> Bool {
   return decimalDigitsPrecomputed.contains(c.firstScalar.value)
 }
-var newlinesPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if newlines.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var newlinesPrecomputed: Set<UInt32> = precompute(newlines)
 func isNewlinePrecomputed(_ c: Character) -> Bool {
   return newlinesPrecomputed.contains(c.firstScalar.value)
 }
-var capitalizedLettersPrecomputed: Set<UInt32> = {
-  var result = Set<UInt32>()
-  for i in 0...0x0010_FFFF {
-    guard let scalar = UnicodeScalar(i) else { continue }
-    if capitalizedLetters.contains(scalar) {
-      result.insert(scalar.value)
-    }
-  }
-  return result
-}()
+var capitalizedLettersPrecomputed: Set<UInt32> = precompute(capitalizedLetters)
 func isCapitalizedPrecomputed(_ c: Character) -> Bool {
   return capitalizedLettersPrecomputed.contains(c.firstScalar.value)
 }

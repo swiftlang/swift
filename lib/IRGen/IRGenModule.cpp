@@ -48,6 +48,7 @@
 #include "llvm/Support/MD5.h"
 
 #include "GenEnum.h"
+#include "GenIntegerLiteral.h"
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
@@ -170,6 +171,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
+
+  FloatTy = llvm::Type::getFloatTy(getLLVMContext());
+  DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
 
   auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
   assert(CI && "no clang module loader");

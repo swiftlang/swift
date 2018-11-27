@@ -40,8 +40,8 @@ ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
                                             SILLocation loc) {
-  assert(SGF.InFormalEvaluationScope && "Can only perform a formal access copy in a "
-                                 "formal evaluation scope");
+  assert(SGF.isInFormalEvaluationScope() &&
+         "Can only perform a formal access copy in a formal evaluation scope");
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isTrivial())
     return *this;

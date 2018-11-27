@@ -75,27 +75,27 @@ extension Set._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferenced_native_noSpareBits()
+    return object.isUniquelyReferencedUnflaggedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
     if guaranteedNative { return true }
-    return object.isNativeWithClearedSpareBits(0)
+    return object.isUnflaggedNative
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
     get {
-      return _NativeSet(object.nativeInstance_noSpareBits)
+      return _NativeSet(object.unflaggedNativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeSet<Element>(object.nativeInstance_noSpareBits)
+      var native = _NativeSet<Element>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
       yield &native
       object = .init(native: native._storage)

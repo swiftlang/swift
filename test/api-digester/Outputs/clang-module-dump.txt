@@ -69,9 +69,17 @@
       "superclassNames": [
         "NSObject"
       ],
-      "conformingProtocols": [
-        "ObjcProt",
-        "NSObjectProtocol"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "ObjcProt",
+          "printedName": "ObjcProt"
+        },
+        {
+          "kind": "Conformance",
+          "name": "NSObjectProtocol",
+          "printedName": "NSObjectProtocol"
+        }
       ]
     },
     {

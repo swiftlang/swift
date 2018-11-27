@@ -22,6 +22,7 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DeclContext.h"
@@ -767,11 +768,14 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
        << ") task=" << indDiff.second << ')';
     break;
   }
-  case Kind::DifferentialOperator:
+  case Kind::DifferentialOperator: {
+    StreamPrinter printer(os);
+    PrintOptions options;
     os << "differential_operator=(";
-    getDifferentialOperator()->print(os);
+    getDifferentialOperator()->print(printer, options);
     os << ')';
     break;
+  }
   case Kind::DifferentiableAttribute: {
     auto diffAttr = getDifferentiableAttribute();
     os << "differentiable_attribute=(attr=(";
@@ -1616,9 +1620,9 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
   auto *intLitTypeDecl = intLitTy->getAnyNominal();
   assert(intLitTypeDecl);
   // %1 = float_literal $Builtin.FPIEEE80, <value>
-  auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
-  auto builtinInteger = builder.createIntegerLiteral(
-      loc, builtinIntegerTy, APInt(2048, scalar));
+  auto builtinIntegerLiteralTy = SILType::getBuiltinIntegerLiteralType(astCtx);
+  auto builtinInteger =
+      builder.createIntegerLiteral(loc, builtinIntegerLiteralTy, scalar);
   // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
@@ -3391,7 +3395,7 @@ public:
   }
 
   /// Remap a value in the original function.
-  SILValue remapValue(SILValue value) {
+  SILValue getMappedValue(SILValue value) {
     // If `value` is a checkpointed primal value, extract it from the primal
     // value aggregate.
     if (auto extractedPV = extractPrimalValueIfAny(value))
@@ -3400,7 +3404,7 @@ public:
     // rematerialize it in the adjoint function.
     if (auto *inst = value->getDefiningInstruction())
       rematerializeOriginalInstruction(inst);
-    return rematCloner.remapValue(value);
+    return rematCloner.getMappedValue(value);
   }
 
   /// Handle `apply` instruction. If it's active (on the differentiation path),
@@ -3446,7 +3450,7 @@ public:
     auto originalParamsWithoutSelf = ai->hasSelfArgument() ?
         originalParams.slice(0, originalParams.size() - 1) : originalParams;
     for (auto param : originalParamsWithoutSelf)
-      args.push_back(remapValue(param));
+      args.push_back(getMappedValue(param));
 
     // Add nested primal values.
     if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
@@ -3455,7 +3459,7 @@ public:
       args.append(nestedPrimVals.begin(), nestedPrimVals.end());
     }
     // Add original results.
-    auto origResultAggr = remapValue(ai);
+    auto origResultAggr = getMappedValue(ai);
     SmallVector<SILValue, 8> origResults;
     extractAllElements(origResultAggr, builder, origResults);
     args.append(origResults.begin(), origResults.end());
@@ -3478,7 +3482,7 @@ public:
 
     // Push the mapped self parameter, if any.
     if (ai->hasSelfArgument())
-      args.push_back(remapValue(ai->getSelfArgument()));
+      args.push_back(getMappedValue(ai->getSelfArgument()));
 
     // Call the adjoint function.
     auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
@@ -3689,18 +3693,18 @@ public:
       auto adjVal = materializeAdjointDirect(adj, opLoc);
       auto *adjLHS = builder.createBuiltinBinaryFunction(
           opLoc, "fmul", opType, opType,
-          {adjVal, remapValue(bi->getOperand(1))});
+          {adjVal, getMappedValue(bi->getOperand(1))});
       addAdjointValue(bi->getOperand(0), adjLHS);
       auto *adjRHS = builder.createBuiltinBinaryFunction(
           opLoc, "fmul", opType, opType,
-          {adjVal, remapValue(bi->getOperand(0))});
+          {adjVal, getMappedValue(bi->getOperand(0))});
       addAdjointValue(bi->getOperand(1), adjRHS);
       break;
     }
     case BuiltinValueKind::FDiv: {
       auto adjVal = materializeAdjointDirect(adj, opLoc);
-      auto lhs = remapValue(bi->getOperand(0));
-      auto rhs = remapValue(bi->getOperand(1));
+      auto lhs = getMappedValue(bi->getOperand(0));
+      auto rhs = getMappedValue(bi->getOperand(1));
       // x' = seed / y
       auto adjLHS = builder.createBuiltinBinaryFunction(opLoc, "fdiv", opType,
                                                         opType, {adjVal, rhs});
@@ -3743,7 +3747,7 @@ void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
                          });
   // Ensure that all operands have a corresponding value in the adjoint.
   for (auto &op : inst->getAllOperands())
-    remapValue(op.get());
+    getMappedValue(op.get());
   rematCloner.setInsertionPointBeforeAnyTerminator(ncd);
   rematCloner.visit(inst);
 }

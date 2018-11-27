@@ -120,12 +120,16 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 }
 
 void Scope::popImpl() {
-  cleanups.stack.checkIterator(depth);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  assert(cleanups.innermostScope == depth && "popping scopes out of order");
-
+  verify();
   cleanups.innermostScope = savedInnermostScope;
   cleanups.endScope(depth, loc);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  if (cleanups.innermostScope)
+    cleanups.stack.checkIterator(cleanups.innermostScope->depth);
+  cleanups.popTopDeadCleanups();
+}
+
+void Scope::verify() {
+  assert(cleanups.innermostScope == this && "popping scopes out of order");
+  assert(depth.isValid());
+  cleanups.stack.checkIterator(depth);
 }

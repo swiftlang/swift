@@ -1351,13 +1351,17 @@ END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 class BuiltinIntegerWidth {
   /// Tag values for abstract integer sizes.
   enum : unsigned {
-    Least_SpecialValue = ~2U,
-    /// The size of a pointer on the target system.
-    PointerWidth = ~0U,
-    
     /// Inhabitants stolen for use as DenseMap special values.
-    DenseMapEmpty = ~1U,
-    DenseMapTombstone = ~2U,
+    DenseMapEmpty = ~0U,
+    DenseMapTombstone = ~1U,
+
+    /// An arbitrary-precision integer.
+    ArbitraryWidth = ~2U,
+
+    /// The size of a pointer on the target system.
+    PointerWidth = ~3U,
+    
+    Least_SpecialValue = ~3U,
   };
   
   unsigned RawValue;
@@ -1377,6 +1381,10 @@ public:
   static BuiltinIntegerWidth pointer() {
     return BuiltinIntegerWidth(PointerWidth);
   }
+
+  static BuiltinIntegerWidth arbitrary() {
+    return BuiltinIntegerWidth(ArbitraryWidth);
+  }
   
   /// Is this a fixed width?
   bool isFixedWidth() const { return RawValue < Least_SpecialValue; }
@@ -1389,6 +1397,9 @@ public:
   
   /// Is this the abstract target pointer width?
   bool isPointerWidth() const { return RawValue == PointerWidth; }
+
+  /// Is this the abstract arbitrary-width value?
+  bool isArbitraryWidth() const { return RawValue == ArbitraryWidth; }
   
   /// Get the least supported value for the width.
   ///
@@ -1398,6 +1409,8 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 32;
+    if (isArbitraryWidth())
+      return 1;
     llvm_unreachable("impossible width value");
   }
   
@@ -1409,8 +1422,16 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 64;
+    if (isArbitraryWidth())
+      return ~0U;
     llvm_unreachable("impossible width value");
   }
+
+  /// Parse a value of this bit-width.
+  ///
+  /// If the radix is 0, it is autosensed.
+  APInt parse(StringRef text, unsigned radix, bool negate,
+              bool *hadError = nullptr) const;
   
   friend bool operator==(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
     return a.RawValue == b.RawValue;
@@ -1420,15 +1441,31 @@ public:
   }
 };
 
+/// An abstract base class for the two integer types.
+class AnyBuiltinIntegerType : public BuiltinType {
+protected:
+  AnyBuiltinIntegerType(TypeKind kind, const ASTContext &C)
+    : BuiltinType(kind, C) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyBuiltinIntegerType &&
+           T->getKind() <= TypeKind::Last_AnyBuiltinIntegerType;
+  }
+
+  BuiltinIntegerWidth getWidth() const; // defined inline below
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AnyBuiltinIntegerType, BuiltinType)
+
 /// The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
-class BuiltinIntegerType : public BuiltinType {
+class BuiltinIntegerType : public AnyBuiltinIntegerType {
   friend class ASTContext;
 private:
   BuiltinIntegerWidth Width;
   BuiltinIntegerType(BuiltinIntegerWidth BitWidth, const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
+    : AnyBuiltinIntegerType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
   
 public:
   /// Get a builtin integer type.
@@ -1445,7 +1482,8 @@ public:
     return get(BuiltinIntegerWidth::pointer(), C);
   }
   
-  /// Return the bit width of the integer.
+  /// Return the bit width of the integer.  Always returns a non-arbitrary
+  /// width.
   BuiltinIntegerWidth getWidth() const {
     return Width;
   }
@@ -1483,8 +1521,31 @@ public:
     return T->getKind() == TypeKind::BuiltinInteger;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
-  
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, AnyBuiltinIntegerType)
+
+/// BuiltinIntegerLiteralType - The builtin arbitrary-precision integer type.
+/// Useful for constructing integer literals.
+class BuiltinIntegerLiteralType : public AnyBuiltinIntegerType {
+  friend class ASTContext;
+  BuiltinIntegerLiteralType(const ASTContext &C)
+    : AnyBuiltinIntegerType(TypeKind::BuiltinIntegerLiteral, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinIntegerLiteral;
+  }
+
+  BuiltinIntegerWidth getWidth() const = delete;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType);
+
+inline BuiltinIntegerWidth AnyBuiltinIntegerType::getWidth() const {
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(this)) {
+    return intTy->getWidth();
+  } else {
+    return BuiltinIntegerWidth::arbitrary();
+  }
+}
+
 class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
 public:
@@ -1737,6 +1798,12 @@ public:
   ParameterTypeFlags withValueOwnership(ValueOwnership ownership) const {
     return (value - ParameterTypeFlags::Ownership)
             | ParameterFlags(uint8_t(ownership) << OwnershipShift);
+  }
+
+  ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
+    return ParameterTypeFlags(isAutoClosure
+                              ? value | ParameterTypeFlags::AutoClosure
+                              : value - ParameterTypeFlags::AutoClosure);
   }
 
   // SWIFT_ENABLE_TENSORFLOW

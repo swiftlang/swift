@@ -926,7 +926,9 @@
 // CHECK-64: (struct TypeLowering.EnumStruct)
 // CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=[[PTR_XI]]
 // CHECK-64-NEXT:   (field name=empty offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (struct size=0 alignment=1 stride=1 num_extra_inhabitants=0
+// CHECK-64-NEXT:       (field name=value offset=0
+// CHECK-64-NEXT:         (no_payload_enum size=0 alignment=1 stride=1 num_extra_inhabitants=0))))
 // CHECK-64-NEXT:   (field name=noPayload offset=0
 // CHECK-64-NEXT:     (no_payload_enum size=1 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=sillyNoPayload offset=1

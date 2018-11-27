@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -122,7 +122,7 @@ class TestUserInfo : TestUserInfoSuper {
         expectNotEqual(note1, note5)
     }
 
-    func notification(_ notif: Notification) {
+    @objc func notification(_ notif: Notification) {
         posted = notif
     }
 

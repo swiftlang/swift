@@ -73,6 +73,7 @@
 #include "GenExistential.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
+#include "GenIntegerLiteral.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
 #include "GenPoly.h"
@@ -3787,10 +3788,15 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 }
 
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
-  llvm::Value *constant = emitConstantInt(IGM, i);
-
   Explosion e;
-  e.add(constant);
+  if (i->getType().is<BuiltinIntegerLiteralType>()) {
+    auto pair = emitConstantIntegerLiteral(IGM, i);
+    e.add(pair.Data);
+    e.add(pair.Flags);
+  } else {
+    llvm::Value *constant = emitConstantInt(IGM, i);
+    e.add(constant);
+  }
   setLoweredExplosion(i, e);
 }
 
@@ -3989,12 +3995,8 @@ static llvm::BasicBlock *emitBBMapForSwitchValue(
 
 static llvm::ConstantInt *
 getSwitchCaseValue(IRGenFunction &IGF, SILValue val) {
-  if (auto *IL = dyn_cast<IntegerLiteralInst>(val)) {
-    return dyn_cast<llvm::ConstantInt>(emitConstantInt(IGF.IGM, IL));
-  }
-  else {
-    llvm_unreachable("Switch value cases should be integers");
-  }
+  auto *IL = cast<IntegerLiteralInst>(val);
+  return cast<llvm::ConstantInt>(emitConstantInt(IGF.IGM, IL));
 }
 
 static void

@@ -37,6 +37,7 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
   if (auto NextNode = Node.getData().getNextNode()) {
     auto NextLeafNode = NextNode->getFirstToken();
     auto NextRawNode = NextLeafNode->getRaw();
+    assert(NextRawNode->isPresent());
     NextLeafNodeLength += NextRawNode->getTokenText().size();
     for (auto TriviaPiece : NextRawNode->getLeadingTrivia()) {
       NextLeafNodeLength += TriviaPiece.getTextLength();
@@ -66,7 +67,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
   size_t ChildStart = NodeStart;
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
     llvm::Optional<Syntax> Child = Node.getChild(I);
-    if (!Child.hasValue()) {
+    if (!Child.hasValue() || Child->isMissing()) {
       continue;
     }
     auto ChildEnd = ChildStart + Child->getTextLength();

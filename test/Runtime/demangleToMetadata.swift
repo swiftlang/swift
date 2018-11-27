@@ -241,6 +241,11 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.NativeObject.self, _typeByMangledName("Bo")!)
   expectEqual(Builtin.BridgeObject.self, _typeByMangledName("Bb")!)
   expectEqual(Builtin.UnsafeValueBuffer.self, _typeByMangledName("BB")!)
+
+  expectEqual(Builtin.FPIEEE32.self, _typeByMangledName("Bf32_")!)
+  expectEqual(Builtin.FPIEEE64.self, _typeByMangledName("Bf64_")!)
+
+  expectEqual(Builtin.Vec4xFPIEEE32.self, _typeByMangledName("Bf32_Bv4_")!)
 }
 
 class CG4<T: P1, U: P2> {

@@ -37,6 +37,12 @@ DemanglerPrinter &DemanglerPrinter::operator<<(unsigned long long n) & {
   Stream.append(buffer);
   return *this;
 }
+DemanglerPrinter &DemanglerPrinter::writeHex(unsigned long long n) & {
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "%llX", n);
+  Stream.append(buffer);
+  return *this;
+}
 DemanglerPrinter &DemanglerPrinter::operator<<(long long n) & {
   char buffer[32];
   snprintf(buffer, sizeof(buffer), "%lld",n);
@@ -285,6 +291,7 @@ private:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
     case Node::Kind::Protocol:
+    case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::ReturnType:
     case Node::Kind::SILBoxType:
     case Node::Kind::SILBoxTypeWithLayout:
@@ -295,8 +302,7 @@ private:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
-    case Node::Kind::SymbolicReference:
-    case Node::Kind::UnresolvedSymbolicReference:
+    case Node::Kind::TypeSymbolicReference:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -398,6 +404,7 @@ private:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -931,6 +938,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::MethodLookupFunction:
     Printer << "method lookup function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ObjCMetadataUpdateFunction:
+    Printer << "ObjC metadata update function for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
@@ -1499,11 +1510,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "merged ";
     }
     return nullptr;
-  case Node::Kind::SymbolicReference:
-    Printer << "symbolic reference " << Node->getIndex();
+  case Node::Kind::TypeSymbolicReference:
+    Printer << "type symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
     return nullptr;
-  case Node::Kind::UnresolvedSymbolicReference:
-    Printer << "$" << Node->getIndex();
+  case Node::Kind::ProtocolSymbolicReference:
+    Printer << "protocol symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";

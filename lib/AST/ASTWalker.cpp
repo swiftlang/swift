@@ -984,7 +984,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Expr *sub = doIt(objcStringLiteral);
       if (!sub) return nullptr;
       E->setObjCStringLiteralExpr(sub);
-      return E;
     }
 
     auto components = E->getComponents();

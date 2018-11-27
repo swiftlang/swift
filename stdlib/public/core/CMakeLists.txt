@@ -37,6 +37,7 @@ set(SWIFTLIB_ESSENTIAL
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
+  BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift.gyb
   Character.swift
@@ -79,7 +80,6 @@ set(SWIFTLIB_ESSENTIAL
   Hasher.swift
   Hashing.swift
   HashTable.swift
-  HeapBuffer.swift
   ICU.swift
   Indices.swift
   InputStream.swift
@@ -260,13 +260,12 @@ endif()
 
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
-  add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
@@ -277,7 +276,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
 
-add_swift_library(swiftCore
+add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
                   # The copy_shim_headers target dependency is required to let the

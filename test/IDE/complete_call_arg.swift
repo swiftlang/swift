@@ -52,6 +52,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_2 | %FileCheck %s -check-prefix=SHUFFLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_3 | %FileCheck %s -check-prefix=SHUFFLE_3
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | %FileCheck %s -check-prefix=SUBSCRIPT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_1_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2 | %FileCheck %s -check-prefix=SUBSCRIPT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_2_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3 | %FileCheck %s -check-prefix=SUBSCRIPT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_3_DOT
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -398,11 +405,9 @@ struct EmptyOverload {
   init(foo: Int) {}
 }
 _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
-// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
-// check it's not empty.
 // EMPTY_OVERLOAD: Begin completions
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i2[#Int#];
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i1[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i1[#Int#];
 // EMPTY_OVERLOAD: End completions
 
 public func fopen() -> TestBoundGeneric1! { fatalError() }
@@ -462,3 +467,45 @@ func testTupleShuffle() {
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     foo[#SimpleEnum#]; name=foo
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     bar[#SimpleEnum#]; name=bar
 // SHUFFLE_3-DAG: Decl[EnumElement]/ExprSpecific:     baz[#SimpleEnum#]; name=baz
+
+class HasSubscript {
+  subscript(idx: Int) -> String {}
+  subscript(idx: Int, default defaultValue: String) -> String {}
+}
+func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
+  let _ = obj[#^SUBSCRIPT_1^#
+// SUBSCRIPT_1: Begin completions
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s1[#String#]; name=s1
+// SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s2[#String#]; name=s2
+
+  let _ = obj[.#^SUBSCRIPT_1_DOT^#
+// SUBSCRIPT_1_DOT: Begin completions
+// SUBSCRIPT_1_DOT-NOT: i1
+// SUBSCRIPT_1_DOT-NOT: s1
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              max[#Int#]; name=max
+// SUBSCRIPT_1_DOT-DAG: Decl[StaticVar]/Super:              min[#Int#]; name=min
+
+  let _ = obj[42, #^SUBSCRIPT_2^#
+// SUBSCRIPT_2: Begin completions, 1 items
+// SUBSCRIPT_2-NEXT: Keyword/ExprSpecific:               default: [#Argument name#]; name=default: 
+
+  let _ = obj[42, .#^SUBSCRIPT_2_DOT^#
+// SUBSCRIPT_2_DOT-NOT: Begin completions
+
+  let _ = obj[42, default: #^SUBSCRIPT_3^#
+// SUBSCRIPT_3: Begin completions
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i1[#Int#]; name=i1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i2[#Int#]; name=i2
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
+// SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
+
+  let _ = obj[42, default: .#^SUBSCRIPT_3_DOT^#
+// SUBSCRIPT_3_DOT: Begin completions
+// SUBSCRIPT_3_DOT-NOT: i1
+// SUBSCRIPT_3_DOT-NOT: s1
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#String#]; name=init()
+// SUBSCRIPT_3_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(c): Character#})[#String#]; name=init(c: Character)
+
+}

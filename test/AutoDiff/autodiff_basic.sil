@@ -49,11 +49,11 @@ bb0(%0 : @trivial $Float):
 // CHECK-LABEL: sil hidden @AD__foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %1 = alloc_stack $Float
-// CHECK:   %2 = integer_literal $Builtin.Int2048, 1
+// CHECK:   %2 = integer_literal $Builtin.IntLiteral, 1
 // CHECK:   %3 = metatype $@thick Int64.Type
-// CHECK:   %4 = witness_method $Int64, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : <Self where Self : _ExpressibleByBuiltinIntegerLiteral> (Self.Type) -> (Builtin.Int2048) -> Self : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %4 = witness_method $Int64, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : <Self where Self : _ExpressibleByBuiltinIntegerLiteral> (Self.Type) -> (Builtin.IntLiteral) -> Self : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %5 = alloc_stack $Int64
-// CHECK:   %6 = apply %4<Int64>(%5, %2, %3) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %6 = apply %4<Int64>(%5, %2, %3) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %7 = metatype $@thick Float.Type
 // CHECK:   %8 = witness_method $Float, #ExpressibleByIntegerLiteral.init!allocator.1 : <Self where Self : ExpressibleByIntegerLiteral> (Self.Type) -> (Self.IntegerLiteralType) -> Self : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %9 = apply %8<Float>(%1, %5, %7) : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
@@ -71,11 +71,11 @@ bb0(%0 : @trivial $Float):
 // CHECK-LABEL: sil hidden @AD__foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float) {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %1 = alloc_stack $Float
-// CHECK:   %2 = integer_literal $Builtin.Int2048, 1
+// CHECK:   %2 = integer_literal $Builtin.IntLiteral, 1
 // CHECK:   %3 = metatype $@thick Int64.Type
-// CHECK:   %4 = witness_method $Int64, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : <Self where Self : _ExpressibleByBuiltinIntegerLiteral> (Self.Type) -> (Builtin.Int2048) -> Self : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %4 = witness_method $Int64, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : <Self where Self : _ExpressibleByBuiltinIntegerLiteral> (Self.Type) -> (Builtin.IntLiteral) -> Self : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %5 = alloc_stack $Int64
-// CHECK:   %6 = apply %4<Int64>(%5, %2, %3) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %6 = apply %4<Int64>(%5, %2, %3) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %7 = metatype $@thick Float.Type
 // CHECK:   %8 = witness_method $Float, #ExpressibleByIntegerLiteral.init!allocator.1 : <Self where Self : ExpressibleByIntegerLiteral> (Self.Type) -> (Self.IntegerLiteralType) -> Self : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   %9 = apply %8<Float>(%1, %5, %7) : $@convention(witness_method: ExpressibleByIntegerLiteral) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0

@@ -8,7 +8,6 @@ cake1: Protocol P3 has generic signature change from <Self : P1, Self : P2> to <
 /* Removed Decls */
 cake1: AssociatedType RequiementChanges.removedType has been removed
 cake1: Constructor Somestruct2.init(_:) has been removed
-cake1: Constructor fixedLayoutStruct.init(b:a:) has been removed
 cake1: Func C4.foo() has been removed
 cake1: Func RequiementChanges.removedFunc() has been removed
 cake1: Subscript RemoveSetters.subscript(_:) has removed its setter
@@ -33,6 +32,7 @@ cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake1: TypeAlias TChangesFromIntToString.T has underlying type change from Int to String
 
 /* Decl Attribute changes */
 cake1: Func C1.foo1() is now not static
@@ -45,9 +45,9 @@ cake1: Var C1.CIIns2 changes from strong to weak
 
 /* Conformance changes */
 cake1: Func ObjCProtocol.removeOptional() is no longer an optional requirement
-cake1: Protocol P3 has added inherited protocol P4
 cake1: Protocol P3 has removed inherited protocol P2
 cake1: Struct fixedLayoutStruct has removed conformance to P1
+cake2: Protocol P3 has added inherited protocol P4
 
 /* Protocol Requirement Change */
 cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int

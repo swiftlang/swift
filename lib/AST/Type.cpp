@@ -201,6 +201,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -4020,6 +4021,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:

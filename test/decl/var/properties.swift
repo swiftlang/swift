@@ -1267,3 +1267,25 @@ class WeakFixItTest {
   // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
   weak var bar : WFI_P1 & WFI_P2
 }
+
+// SR-8811
+// Stored properties cannot have uninhabited types
+
+struct SR8811 {
+  var x: Never // expected-error {{stored property 'x' cannot have enum type 'Never' with no cases}}
+  
+  var y: (Int, Never, Bool) // expected-error {{stored property 'y' cannot have tuple type '(Int, Never, Bool)' containing enum with no cases}}
+}
+
+let sr8811x: Never // expected-error {{constant 'sr8811x' cannot have enum type 'Never' with no cases}}
+
+var sr8811y: (Int, Never) // expected-error {{variable 'sr8811y' cannot have tuple type '(Int, Never)' containing enum with no cases}}
+
+// Ok
+var sr8811z: Never {
+  return fatalError()
+}
+
+enum SR8811EmptyGenericEnum<A> {}
+
+let sr8811z: SR8811EmptyGenericEnum<Int> // expected-error {{constant 'sr8811z' cannot have enum type 'SR8811EmptyGenericEnum<Int>' with no cases}}

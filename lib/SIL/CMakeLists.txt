@@ -3,7 +3,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
   include_directories(BEFORE "${TF_INCLUDE_DIR}" )
 endif()
 
-add_swift_library(swiftSIL STATIC
+add_swift_host_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
   Bridging.cpp
@@ -50,7 +50,7 @@ add_swift_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  ValueOwnershipKindClassifier.cpp
+  ValueOwnership.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema

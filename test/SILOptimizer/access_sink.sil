@@ -1,0 +1,217 @@
+// RUN: %target-sil-opt -access-enforcement-release -assume-parsing-unqualified-ownership-sil %s -enable-sil-verify-all | %FileCheck %s
+//
+// Test the AccessEnforcementReleaseSinking pass in isolation.
+// This ensures that no upstream passes have removed SIL-level access markers
+// that are required to ensure the pass is not overly optimistic.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct X {
+  @sil_stored var i: Int64 { get set }
+  init(i: Int64)
+  init()
+}
+
+var globalX: X
+
+sil_global hidden @globalX : $X
+
+sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+
+// public func testSimpleRelease() {
+// Checks the simple case of release sinking
+//
+// CHECK-LABEL: sil @testSimpleRelease : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-LABEL: } // end sil function 'testSimpleRelease'
+sil @testSimpleRelease : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testMultiBlocklSimpleRelease() {
+// Checks the simple case of release sinking with the begin_access in a different block
+//
+// CHECK-LABEL: sil @testMultiBlocklSimpleRelease : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: bb1
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-LABEL: } // end sil function 'testMultiBlocklSimpleRelease'
+sil @testMultiBlocklSimpleRelease : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  br bb1
+  
+bb1:
+  release_value %2 : $X
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testMultiBlocklBailOnRelease() {
+// Checks bailing (for now) on the simple case due to the release being in a different block
+//
+// CHECK-LABEL: sil @testMultiBlocklBailOnRelease : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-NEXT: br bb1
+// CHECK: bb1
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-LABEL: } // end sil function 'testMultiBlocklBailOnRelease'
+sil @testMultiBlocklBailOnRelease : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  br bb1
+  
+bb1:
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testApplyBarrier() {
+// Checks we don't sink across apply-site barrier
+//
+// CHECK-LABEL: sil @testApplyBarrier : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK: apply
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-LABEL: } // end sil function 'testApplyBarrier'
+sil @testApplyBarrier : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testUniquenessBarrier() {
+// Checks we don't sink across a uniqueness check
+//
+// CHECK-LABEL: sil @testUniquenessBarrier : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-NEXT: is_unique
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-LABEL: } // end sil function 'testUniquenessBarrier'
+sil @testUniquenessBarrier : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  is_unique %1 : $*X
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testBeginBarrier() {
+// Checks we don't sink across begin_access barrier
+//
+// CHECK-LABEL: sil @testBeginBarrier : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-LABEL: } // end sil function 'testBeginBarrier'
+sil @testBeginBarrier : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  %b0 = begin_access [modify] [dynamic] %0 : $*X
+  end_access %b0 : $*X
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testSinkCrossMultiEnds() {
+// Checks that we choose the *bottom* end_access when sinking
+//
+// CHECK-LABEL: sil @testSinkCrossMultiEnds : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-LABEL: } // end sil function 'testSinkCrossMultiEnds'
+sil @testSinkCrossMultiEnds : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %b0 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  end_access %b0 : $*X
+  end_access %1 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testSinkAfterBarrierEncounter() {
+// Checks that we sink after barrier resetting
+//
+// CHECK-LABEL: sil @testSinkAfterBarrierEncounter : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[LOADED:%.*]] = load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: release_value [[LOADED]]
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-LABEL: } // end sil function 'testSinkAfterBarrierEncounter'
+sil @testSinkAfterBarrierEncounter : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  release_value %2 : $X
+  end_access %1 : $*X
+  %b0 = begin_access [modify] [dynamic] %0 : $*X
+  end_access %b0 : $*X
+  %ret = tuple ()
+  return %ret : $()
+}

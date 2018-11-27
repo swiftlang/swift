@@ -107,9 +107,6 @@ public:
   /// compiler to act as if it is version 3.1.
   Optional<Version> getEffectiveLanguageVersion() const;
 
-  /// Whether this version is in the Swift 3 family
-  bool isVersion3() const { return !empty() && Components[0] == 3; }
-
   /// Whether this version is greater than or equal to the given major version
   /// number.
   bool isVersionAtLeast(unsigned major, unsigned minor = 0) const {

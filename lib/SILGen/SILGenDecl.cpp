@@ -242,31 +242,6 @@ void TemporaryInitialization::finishInitialization(SILGenFunction &SGF) {
 }
 
 namespace {
-class EndBorrowCleanup : public Cleanup {
-  SILValue original;
-  SILValue borrowed;
-
-public:
-  EndBorrowCleanup(SILValue original, SILValue borrowed)
-      : original(original), borrowed(borrowed) {}
-
-  void emit(SILGenFunction &SGF, CleanupLocation l,
-            ForUnwind_t forUnwind) override {
-    SGF.B.createEndBorrow(l, borrowed, original);
-  }
-
-  void dump(SILGenFunction &) const override {
-#ifndef NDEBUG
-    llvm::errs() << "EndBorrowCleanup "
-                 << "State:" << getState() << "\n"
-                 << "original:" << original << "\n"
-                 << "borrowed:" << borrowed << "\n";
-#endif
-  }
-};
-} // end anonymous namespace
-
-namespace {
 class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
@@ -1541,7 +1516,7 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
       getEvaluation(SGF).setFinished();
     }
 
-    state = newState;
+    Cleanup::setState(SGF, newState);
   }
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
@@ -1573,7 +1548,7 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
 ManagedValue
 SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(addr->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(addr);
@@ -1588,7 +1563,7 @@ SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
 ManagedValue
 SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   auto &lowering = getTypeLowering(value->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(value);
@@ -1602,7 +1577,7 @@ SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
 
 CleanupHandle SILGenFunction::enterDormantFormalAccessTemporaryCleanup(
     SILValue addr, SILLocation loc, const TypeLowering &tempTL) {
-  assert(InFormalEvaluationScope && "Must be in formal evaluation scope");
+  assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
   if (tempTL.isTrivial())
     return CleanupHandle::invalid();
 

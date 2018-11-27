@@ -832,7 +832,6 @@ public:
   Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
-  Type getMaxIntegerType(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);

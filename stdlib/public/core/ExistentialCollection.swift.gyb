@@ -352,9 +352,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   func _customLastIndexOfEquatableElement(element: Element) -> Index??
   */
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _first: Element? { _abstract() }
-
   @inlinable
   internal init(
     _startIndex: _AnyIndexBox,
@@ -385,8 +382,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
   @inlinable
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
-  @inlinable
-  internal var _last: Element? { _abstract() }
 %   end
 }
 
@@ -617,11 +612,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     return numericCast(_base.count)
   }
 
-  @inlinable
-  internal override var _first: Element? {
-    return _base.first
-  }
-
 %     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
   @inlinable
   internal override func _index(before position: _AnyIndexBox) -> _AnyIndexBox {
@@ -636,10 +626,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     fatalError("Index type mismatch!")
   }
 
-  @inlinable
-  internal override var _last: Element? {
-    return _base.last
-  }
 %     end
 
 %   end
@@ -1118,11 +1104,6 @@ extension ${Self}: ${SelfProtocol} {
     return _box._count
   }
 
-  @inlinable
-  public var first: Element? {
-    return _box._first
-  }
-
 %   if Traversal == 'Bidirectional' or Traversal == 'RandomAccess':
   @inlinable
   public func index(before i: Index) -> Index {
@@ -1137,11 +1118,6 @@ extension ${Self}: ${SelfProtocol} {
     else {
       i = index(before: i)
     }
-  }
-
-  @inlinable
-  public var last: Element? {
-    return _box._last
   }
 %   end
 }

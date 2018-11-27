@@ -21,13 +21,8 @@ func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-@inlinable
-internal func _stdlib_NSSet_allObjects(
-  _ nss: _NSSet
-) -> _HeapBuffer<Int, AnyObject> {
-  let count = nss.count
-  let storage = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, count, count)
+internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) -> _BridgingBuffer {
+  let storage = _BridgingBuffer(nss.count)
   _stdlib_CFSetGetValues(nss, storage.baseAddress)
   return storage
 }
@@ -329,7 +324,7 @@ extension _CocoaSet: _SetBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSSet_allObjects(self.object)
-      return Index(Index.Storage(self, allKeys, 0))
+      return Index(Index.Storage(self, allKeys), offset: 0)
     }
   }
 
@@ -338,31 +333,30 @@ extension _CocoaSet: _SetBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSSet_allObjects(self.object)
-      return Index(Index.Storage(self, allKeys, allKeys.value))
+      return Index(Index.Storage(self, allKeys), offset: allKeys.count)
     }
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func index(after index: Index) -> Index {
-    var result = index.copy()
-    formIndex(after: &result, isUnique: true)
+    validate(index)
+    var result = index
+    result._offset += 1
     return result
   }
 
   internal func validate(_ index: Index) {
     _precondition(index.storage.base.object === self.object,
       "Invalid index")
-    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+    _precondition(index._offset < index.storage.allKeys.count,
       "Attempt to access endIndex")
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal func formIndex(after index: inout Index, isUnique: Bool) {
     validate(index)
-    if !isUnique { index = index.copy() }
-    let storage = index.storage // FIXME: rdar://problem/44863751
-    storage.currentKeyIndex += 1
+    index._offset += 1
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
@@ -377,9 +371,9 @@ extension _CocoaSet: _SetBuffer {
     }
 
     let allKeys = _stdlib_NSSet_allObjects(object)
-    for i in 0..<allKeys.value {
+    for i in 0..<allKeys.count {
       if _stdlib_NSObject_isEqual(element, allKeys[i]) {
-        return Index(Index.Storage(self, allKeys, i))
+        return Index(Index.Storage(self, allKeys), offset: i)
       }
     }
     _sanityCheckFailure(
@@ -409,17 +403,8 @@ extension _CocoaSet {
   @_fixed_layout
   @usableFromInline
   internal struct Index {
-    @usableFromInline
-    internal var _object: Builtin.BridgeObject
-    @usableFromInline
     internal var _storage: Builtin.BridgeObject
-
-    internal var object: AnyObject {
-      @inline(__always)
-      get {
-        return _bridgeObject(toNonTaggedObjC: _object)
-      }
-    }
+    internal var _offset: Int
 
     internal var storage: Storage {
       @inline(__always)
@@ -429,9 +414,9 @@ extension _CocoaSet {
       }
     }
 
-    internal init(_ storage: __owned Storage) {
-      self._object = _bridgeObject(fromNonTaggedObjC: storage.base.object)
+    internal init(_ storage: __owned Storage, offset: Int) {
       self._storage = _bridgeObject(fromNative: storage)
+      self._offset = offset
     }
   }
 }
@@ -452,19 +437,14 @@ extension _CocoaSet.Index {
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    internal var allKeys: _HeapBuffer<Int, AnyObject>
-
-    /// Index into `allKeys`
-    internal var currentKeyIndex: Int
+    internal var allKeys: _BridgingBuffer
 
     internal init(
       _ base: __owned _CocoaSet,
-      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
-      _ currentKeyIndex: Int
+      _ allKeys: __owned _BridgingBuffer
     ) {
       self.base = base
       self.allKeys = allKeys
-      self.currentKeyIndex = currentKeyIndex
     }
   }
 }
@@ -477,14 +457,6 @@ extension _CocoaSet.Index {
       return unsafeBitCast(storage, to: UInt.self)
     }
   }
-
-  internal func copy() -> _CocoaSet.Index {
-    let storage = self.storage
-    return _CocoaSet.Index(Storage(
-        storage.base,
-        storage.allKeys,
-        storage.currentKeyIndex))
-  }
 }
 
 extension _CocoaSet.Index {
@@ -493,9 +465,9 @@ extension _CocoaSet.Index {
   internal var element: AnyObject {
     @_effects(readonly)
     get {
-      _precondition(storage.currentKeyIndex < storage.allKeys.value,
+      _precondition(_offset < storage.allKeys.count,
         "Attempting to access Set elements using an invalid index")
-      return storage.allKeys[storage.currentKeyIndex]
+      return storage.allKeys[_offset]
     }
   }
 
@@ -504,7 +476,7 @@ extension _CocoaSet.Index {
   internal var age: Int32 {
     @_effects(releasenone)
     get {
-      return _HashTable.age(for: object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }
@@ -515,7 +487,7 @@ extension _CocoaSet.Index: Equatable {
   internal static func == (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
-    return lhs.storage.currentKeyIndex == rhs.storage.currentKeyIndex
+    return lhs._offset == rhs._offset
   }
 }
 
@@ -525,7 +497,7 @@ extension _CocoaSet.Index: Comparable {
   internal static func < (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
-    return lhs.storage.currentKeyIndex < rhs.storage.currentKeyIndex
+    return lhs._offset < rhs._offset
   }
 }
 
