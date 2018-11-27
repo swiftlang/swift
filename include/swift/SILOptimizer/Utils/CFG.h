@@ -127,6 +127,16 @@ bool splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
 bool mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
                                   SILLoopInfo *LI);
 
+/// Merge basic blocks in the given function by eliminating all unconditional
+/// branches to single-predecessor branch targets.
+///
+/// During optimization, SimplifyCFG also handles this, but this is a basic
+/// canonicalization after any pass that splits blocks, such as inlining. This
+/// is not done on-the-fly after splitting blocks because merging is linear in
+/// the number of instructions, so interleaved merging and splitting is
+/// quadratic.
+bool mergeBasicBlocks(SILFunction *F);
+
 /// Given a list of \p UserBlocks and a list of \p DefBlocks, find a set of
 /// blocks that together with \p UserBlocks joint-postdominate \p
 /// DefBlocks. This is in a sense finding a set of blocks that "complete" \p

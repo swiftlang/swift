@@ -86,8 +86,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   if (ThisParent == L2.getContainingBlock()) return;
 
   // Update the parent fields in the instructions.
-  for (; first != last; ++first)
+  for (; first != last; ++first) {
+    SWIFT_FUNC_STAT_NAMED("sil");
     first->ParentBB = ThisParent;
+  }
 }
 
 //===----------------------------------------------------------------------===//
