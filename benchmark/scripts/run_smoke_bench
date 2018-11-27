@@ -119,6 +119,8 @@ def test_opt_levels(args):
                             args.platform, output_file):
             changes = True
 
+    check_added(args, output_file)
+
     if output_file:
         if changes:
             output_file.write(get_info_text())
@@ -338,7 +340,7 @@ class DriverArgs(object):
         self.optimization = 'O'
 
 
-def check_added(args):
+def check_added(args, output_file=None):
     from imp import load_source
     # import Benchmark_Driver  # doesn't work because it misses '.py' extension
     Benchmark_Driver = load_source(
@@ -347,12 +349,15 @@ def check_added(args):
     # from Benchmark_Driver import BenchmarkDriver, BenchmarkDoctor
     BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
     BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
+    MarkdownReportHandler = Benchmark_Driver.MarkdownReportHandler
 
     old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0]))
     new = BenchmarkDriver(DriverArgs(args.newbuilddir[0]))
     added = set(new.tests).difference(set(old.tests))
     new.tests = list(added)
     doctor = BenchmarkDoctor(args, driver=new)
+    if output_file:
+        doctor.log.addHandler(MarkdownReportHandler(output_file))
     doctor.check()
 
 
