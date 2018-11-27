@@ -71,4 +71,20 @@ TensorADTests.testAllBackends("negate") {
   expectTrue([-1] == grad([10]))
 }
 
+TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
+  @differentiable(reverse, adjoint: adjointFoo)
+  func foo(_ x: Tensor<Float>) -> Tensor<Float> {
+      return Raw.identity(x)
+  }
+  func adjointFoo(_ x: Tensor<Float>, originalValue: Tensor<Float>, 
+                  seed: Tensor<Float>) -> Tensor<Float> {
+    return seed
+  }
+  func body(_ x: Tensor<Float>) -> Tensor<Float> {
+    return foo(foo(x))
+  }
+  let res = #gradient(body)(Tensor(Float(10)))
+  expectEqual(Tensor(1.0), res)
+}
+
 runAllTests()
