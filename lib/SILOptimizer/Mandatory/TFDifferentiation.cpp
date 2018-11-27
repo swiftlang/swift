@@ -2186,7 +2186,6 @@ protected:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleExtractInst:
     case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::ApplyInst:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::StructElementAddrInst:
     case SILInstructionKind::EnumInst:
@@ -2252,6 +2251,10 @@ public:
       // FIXME: Get or create typed tape, and emit push-to-tape builtin.
       llvm_unreachable("Unhandled tape checkpoint");
     case PrimalValueKind::StaticCheckpoint:
+      // Checkpointing active function applications is handled within
+      // `PrimalGenCloner::visitApplyInst`.
+      if (isa<ApplyInst>(orig))
+        break;
       for (auto resultPair :
            llvm::zip(orig->getResults(), cloned->getResults())) {
         LLVM_DEBUG(getADDebugStream()
@@ -4333,6 +4336,11 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   auto *adjApply =
       builder.createApply(loc, adjRef, canGrad.getForwardingSubstitutionMap(),
                           adjointArgs, /*isNonThrowing*/ false);
+  // Release primal results. This includes primal values and original results.
+  for (unsigned i : indices(primalResults))
+    if (primalTy->getResults()[i].getConvention() == ResultConvention::Owned)
+      builder.createReleaseValue(loc, primalResults[i],
+                                 builder.getDefaultAtomicity());
   // Clean up stack allocations.
   for (auto val : reversed(stackAllocsToCleanUp))
     builder.createDeallocStack(loc, val);
