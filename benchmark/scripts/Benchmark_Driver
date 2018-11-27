@@ -407,20 +407,25 @@ class BenchmarkDoctor(object):
         range_i1, range_i2 = max_i1 - min_i1, max_i2 - min_i2
         normal_range = 15  # pages
         name = measurements['name']
+        more_info = False
 
         if abs(min_i1 - min_i2) > max(range_i1, range_i2, normal_range):
+            more_info = True
             BenchmarkDoctor.log_memory.error(
                 "'%s' varies the memory footprint of the base "
                 "workload depending on the `num-iters`.", name)
 
         if max(range_i1, range_i2) > normal_range:
+            more_info = True
             BenchmarkDoctor.log_memory.warning(
                 "'%s' has very wide range of memory used between "
                 "independent, repeated measurements.", name)
 
-        BenchmarkDoctor.log_memory.debug(
-            "%s mem_pages [i1, i2]:  min=[%d, %d] 𝚫=%d R=[%d, %d]", name,
-            *[min_i1, min_i2, abs(min_i1 - min_i2), range_i1, range_i2])
+        if more_info:
+            BenchmarkDoctor.log_memory.info(
+                "'%s' mem_pages [i1, i2]: min=[%d, %d] 𝚫=%d R=[%d, %d]",
+                name,
+                *[min_i1, min_i2, abs(min_i1 - min_i2), range_i1, range_i2])
 
     @staticmethod
     def _adjusted_1s_samples(runtime):

@@ -682,9 +682,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
              "workload depending on the `num-iters`."],
             self.logs['error'])
         self.assert_contains(
+            ["'VariableMemory' "
+             "mem_pages [i1, i2]: min=[1460, 1750] 𝚫=290 R=[12, 2]"],
+            self.logs['info'])
+        self.assert_contains(
             ["'HighVariance' has very wide range of memory used between "
              "independent, repeated measurements."],
             self.logs['warning'])
+        self.assert_contains(
+            ["'HighVariance' "
+             "mem_pages [i1, i2]: min=[4818, 4674] 𝚫=144 R=[1382, 1570]"],
+            self.logs['info'])
 
 
 if __name__ == '__main__':
