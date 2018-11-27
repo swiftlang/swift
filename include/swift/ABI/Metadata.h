@@ -1059,8 +1059,9 @@ private:
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
 
 public:
-  /// A function for destroying instance variables, used to clean up
-  /// after an early return from a constructor.
+  /// A function for destroying instance variables, used to clean up after an
+  /// early return from a constructor. If null, no clean up will be performed
+  /// and all ivars must be trivial.
   TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
 
   // After this come the class members, laid out as follows:
@@ -3110,7 +3111,8 @@ struct TargetGenericClassMetadataPattern final :
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
@@ -3353,7 +3355,8 @@ struct TargetResilientClassMetadataPattern {
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
