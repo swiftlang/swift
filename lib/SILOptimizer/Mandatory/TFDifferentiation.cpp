@@ -1619,9 +1619,9 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
   auto *intLitTypeDecl = intLitTy->getAnyNominal();
   assert(intLitTypeDecl);
   // %1 = float_literal $Builtin.FPIEEE80, <value>
-  auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
-  auto builtinInteger = builder.createIntegerLiteral(
-      loc, builtinIntegerTy, APInt(2048, scalar));
+  auto builtinIntegerLiteralTy = SILType::getBuiltinIntegerLiteralType(astCtx);
+  auto builtinInteger =
+      builder.createIntegerLiteral(loc, builtinIntegerLiteralTy, scalar);
   // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
