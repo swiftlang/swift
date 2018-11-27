@@ -167,6 +167,7 @@ extension MultiGeneric: PublicProto where U: PrivateProto {}
 // CHECK: public struct MultiGeneric<T, U, V> {
 // CHECK-END: extension conformances.MultiGeneric : PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 
+
 internal struct InternalImpl_BAD: PrivateSubProto {}
 internal struct InternalImplConstrained_BAD<T> {}
 extension InternalImplConstrained_BAD: PublicProto where T: PublicProto {}
@@ -180,6 +181,13 @@ public struct WrapperForInternal {
 }
 extension WrapperForInternal.InternalImplConstrained_BAD: PublicProto where T: PublicProto {}
 extension WrapperForInternal.InternalImplConstrained2_BAD: PublicProto where T: PrivateProto {}
+
+
+internal protocol ExtraHashable: Hashable {}
+extension Bool: ExtraHashable {}
+
+// NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Hashable
+// NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable
 
 
 // CHECK-END: @usableFromInline
