@@ -120,6 +120,11 @@ public struct MySize {
 // CHECK-LABEL: sil @$s17struct_resilience6MySizeV1hSivg : $@convention(method) (@in_guaranteed MySize) -> Int
   public let h: Int
 
+  // Weak property
+
+// CHECK-LABEL: sil @$s17struct_resilience6MySizeV1iyXlSgvg : $@convention(method) (@in_guaranteed MySize) -> @owned Optional<AnyObject>
+  public weak var i: AnyObject?
+
   // Static stored property
 
 // CHECK-LABEL: sil @$s17struct_resilience6MySizeV9copyrightSivgZ : $@convention(method) (@thin MySize.Type) -> Int
