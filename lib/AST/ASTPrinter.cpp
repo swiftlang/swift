@@ -591,11 +591,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
 
     printAccess(D->getFormalAccess());
+    bool shouldSkipSetterAccess =
+      llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess);
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
         AccessLevel setterAccess = setter->getFormalAccess();
-        if (setterAccess != D->getFormalAccess())
+        if (setterAccess != D->getFormalAccess() && !shouldSkipSetterAccess)
           printAccess(setterAccess, "(set)");
       }
     }
@@ -1784,12 +1786,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
     case WriteImplKind::InheritedWithObservers: {
-      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
-      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
-      if (skippedDidSet && skippedWillSet) {
-        PrintAccessor(ASD->getGetter());
-        PrintAccessor(ASD->getSetter());
-      }
+      PrintAccessor(ASD->getGetter());
+      PrintAccessor(ASD->getSetter());
       break;
     }
     case WriteImplKind::Set:
