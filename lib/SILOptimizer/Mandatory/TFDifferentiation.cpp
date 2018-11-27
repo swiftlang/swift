@@ -2351,6 +2351,14 @@ public:
     // The original return is not to be cloned.
     return;
   }
+  
+  void visitReleaseValueInst(ReleaseValueInst *rvi) {
+    // Checkpoints are not to be released.
+    if (auto *inst = rvi->getOperand()->getDefiningInstruction())
+      if (classifyPrimalValue(inst) == PrimalValueKind::StaticCheckpoint)
+        return;
+    SILClonerWithScopes::visitReleaseValueInst(rvi);
+  }
 
   /// Handle the primal transformation of an `apply` instruction. We do not
   /// always transform `apply`. When we do, we do not just blindly differentiate
@@ -2481,11 +2489,13 @@ public:
     // or address operations to perform checkpointing.
 
     // Checkpoint nested primal values as a tuple.
-    auto nestedPrimValDeclTy =
-        joinElementTypesFromValues(primVals, getASTContext());
-    getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
-    auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
-    staticPrimalValues.push_back(primValAggr);
+    if (!primVals.empty()) {
+      auto nestedPrimValDeclTy =
+          joinElementTypesFromValues(primVals, getASTContext());
+      getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
+      auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
+      staticPrimalValues.push_back(primValAggr);
+    }
 
     // Checkpoint original results as a tuple.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
