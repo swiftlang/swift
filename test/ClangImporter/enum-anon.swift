@@ -22,9 +22,9 @@ func testDiags() {
 
   let _: String = SR2511().y // expected-error {{cannot convert value of type 'UInt32' to specified type 'String'}}
 
-  // FIXME: This constant doesn't seem to be imported at all. At least one of
-  // the following two names should work.
-  let _: String = SR2511B // expected-error {{use of unresolved identifier 'SR2511B'}}
+  // The nested anonymous enum value should still have top-level scope, because
+  // that's how C works. It should also have the same type as the field (above).
+  let _: String = SR2511B // expected-error {{cannot convert value of type 'UInt32' to specified type 'String'}}
   let _: String = SR2511.SR2511B // expected-error {{type 'SR2511' has no member 'SR2511B'}}
 }
 #endif
