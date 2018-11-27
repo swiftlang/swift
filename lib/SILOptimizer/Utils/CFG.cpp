@@ -493,6 +493,19 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   return true;
 }
 
+bool swift::mergeBasicBlocks(SILFunction *F) {
+  bool merged = false;
+  for (auto BBIter = F->begin(); BBIter != F->end();) {
+    if (mergeBasicBlockWithSuccessor(&*BBIter, /*DT*/ nullptr, /*LI*/ nullptr)) {
+      merged = true;
+      // Continue to merge the current block without advancing.
+      continue;
+    }
+    ++BBIter;
+  }
+  return merged;
+}
+
 /// Splits the critical edges between from and to. This code assumes there is
 /// only one edge between the two basic blocks.
 SILBasicBlock *swift::splitIfCriticalEdge(SILBasicBlock *From,

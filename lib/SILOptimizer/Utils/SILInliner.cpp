@@ -388,7 +388,7 @@ protected:
 };
 } // namespace swift
 
-SILBasicBlock::iterator
+std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
   assert(canInlineApplySite(apply)
@@ -396,7 +396,8 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
 
   SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
                          OpenedArchetypesTracker, DeletionCallback);
-  return cloner.cloneInline(appliedArgs);
+  auto nextI = cloner.cloneInline(appliedArgs);
+  return std::make_pair(nextI, cloner.getLastClonedBB());
 }
 
 SILInlineCloner::SILInlineCloner(
@@ -512,23 +513,16 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // NextIter is initialized during `fixUp`.
   cloneFunctionBody(getCalleeFunction(), callerBB, entryArgs);
 
-  // As a trivial optimization, if the apply block falls through, merge it. The
-  // fall through is likely the ReturnToBB, but that is not guaranteed.
-  if (auto *BI = dyn_cast<BranchInst>(callerBB->getTerminator())) {
-    // FIXME: should be an assert once critical edges are fixed.
-    // assert(BI->getDestBB()->getSinglePredecessorBlock() &&
-    //       "the return block cannot have other predecessors.");
-    if (BI->getDestBB()->getSinglePredecessorBlock()) {
-      SILInstruction *firstInlinedInst = &*NextIter;
-      if (firstInlinedInst == BI)
-        firstInlinedInst = &BI->getDestBB()->front();
-
-      mergeBasicBlockWithSuccessor(BI->getParent(), /*DT*/ nullptr,
-                                   /*LI*/ nullptr);
-      NextIter = firstInlinedInst->getIterator();
-      ReturnToBB = nullptr;
-    }
-  }
+  // For non-throwing applies, the inlined body now unconditionally branches to
+  // the returned-to-code, which was previously part of the call site's basic
+  // block. We could trivially merge these blocks now, however, this would be
+  // quadratic: O(num-calls-in-block * num-instructions-in-block). Also,
+  // guaranteeing that caller instructions following the inlined call are in a
+  // separate block gives the inliner control over revisiting only the inlined
+  // instructions.
+  //
+  // Once all calls in a function are inlined, unconditional branches are
+  // eliminated by mergeBlocks.
   return NextIter;
 }
 

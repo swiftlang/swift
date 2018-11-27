@@ -353,19 +353,13 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
 
 // CHECK: [[BB5]]:
   // CHECK: [[VAL50:%.*]] = load [[PB16]]
-  // CHECK: br [[BB6:.*]]([[VAL50]]
-
-// CHECK: [[BB6]]([[VAL52:%.*]] : $Float):
   // CHECK: strong_release [[VAL16]]
   // CHECK: strong_release [[VAL15]]
-  // CHECK: br [[BB7:.*]]([[VAL52]]
-
-// CHECK: [[BB7]]([[VAL56:%.*]] : $Float):
   // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL58:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
-  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL56]], [[VAL60]])
+  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL50]], [[VAL60]])
   // CHECK: strong_release [[VAL1]]
   // CHECK: return [[VAL61]]
 
@@ -512,22 +506,14 @@ bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeOb
 // CHECK-LABEL: sil [transparent] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
-// CHECK:   br bb1
-//
-// CHECK: bb1:
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG]])
-// CHECK:   br bb2
-//
-// CHECK: bb2:
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_retain [[PAI]]
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_release [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
-//
-// CHECK: bb3:
 // CHECK:   strong_retain [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI]])
@@ -631,9 +617,6 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
@@ -681,9 +664,6 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: br [[BB3]](
 
 // CHECK: [[BB3]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL3]]
   // CHECK: return {{.*}}
 

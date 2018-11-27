@@ -49,7 +49,7 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 /// and that the function implementing the closure consumes its capture
 /// arguments.
 static void fixupReferenceCounts(
-    SILBasicBlock::iterator I, SILValue CalleeValue,
+    SILInstruction *I, SILValue CalleeValue,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
     bool isCalleeGuaranteed) {
   // Add a copy of each non-address type capture argument to lifetime extend the
@@ -60,7 +60,7 @@ static void fixupReferenceCounts(
     if (!CaptureArg.first->getType().isAddress() &&
         CaptureArg.second != ParameterConvention::Direct_Guaranteed &&
         CaptureArg.second != ParameterConvention::Direct_Unowned) {
-      createIncrementBefore(CaptureArg.first, &*I);
+      createIncrementBefore(CaptureArg.first, I);
     } else {
       // FIXME: What about indirectly owned parameters? The invocation of the
       // closure would perform an indirect copy which we should mimick here.
@@ -190,34 +190,30 @@ namespace {
 class ClosureCleanup {
   using DeadInstSet = SmallBlotSetVector<SILInstruction *, 4>;
 
-  /// A helper class to update an instruction iterator if
-  /// removal of instructions would invalidate it.
+  /// A helper class to update the set of dead instructions.
   ///
   /// Since this is called by the SILModule callback, the instruction may longer
   /// be well-formed. Do not visit its operands. However, it's position in the
   /// basic block is still valid.
   ///
-  /// FIXME: Using the Module's callback mechanism is undesirable. Instead,
-  /// cleanupCalleeValue could be easily rewritten to use its own instruction
-  /// deletion helper and pass a callback to tryDeleteDeadClosure and
-  /// recursivelyDeleteTriviallyDeadInstructions.
-  class IteratorUpdateHandler : public DeleteNotificationHandler {
+  /// FIXME: Using the Module's callback mechanism for this is terrible.
+  /// Instead, cleanupCalleeValue could be easily rewritten to use its own
+  /// instruction deletion helper and pass a callback to tryDeleteDeadClosure
+  /// and recursivelyDeleteTriviallyDeadInstructions.
+  class DeleteUpdateHandler : public DeleteNotificationHandler {
     SILModule &Module;
-    SILBasicBlock::iterator CurrentI;
     DeadInstSet &DeadInsts;
 
   public:
-    IteratorUpdateHandler(SILBasicBlock::iterator I, DeadInstSet &DeadInsts)
-        : Module(I->getModule()), CurrentI(I), DeadInsts(DeadInsts) {
+    DeleteUpdateHandler(SILModule &M, DeadInstSet &DeadInsts)
+        : Module(M), DeadInsts(DeadInsts) {
       Module.registerDeleteNotificationHandler(this);
     }
 
-    ~IteratorUpdateHandler() override {
+    ~DeleteUpdateHandler() override {
       // Unregister the handler.
       Module.removeDeleteNotificationHandler(this);
     }
-
-    SILBasicBlock::iterator getIterator() const { return CurrentI; }
 
     // Handling of instruction removal notifications.
     bool needsNotifications() override { return true; }
@@ -229,9 +225,6 @@ class ClosureCleanup {
         return;
 
       DeadInsts.erase(deletedI);
-
-      if (CurrentI == SILBasicBlock::iterator(deletedI))
-        ++CurrentI;
     }
   };
 
@@ -260,8 +253,8 @@ public:
   // Note: instructions in the `deadFunctionVals` set may use each other, so the
   // set needs to continue to be updated (by this handler) when deleting
   // instructions. This assumes that DeadFunctionValSet::erase() is stable.
-  SILBasicBlock::iterator cleanupDeadClosures(SILBasicBlock::iterator II) {
-    IteratorUpdateHandler iteratorUpdate(II, deadFunctionVals);
+  void cleanupDeadClosures(SILFunction *F) {
+    DeleteUpdateHandler deleteUpdate(F->getModule(), deadFunctionVals);
     for (Optional<SILInstruction *> I : deadFunctionVals) {
       if (!I.hasValue())
         continue;
@@ -269,7 +262,6 @@ public:
       if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
         cleanupCalleeValue(SVI);
     }
-    return iteratorUpdate.getIterator();
   }
 };
 } // end of namespace
@@ -472,21 +464,21 @@ static SILFunction *getCalleeFunction(
   return CalleeFunction;
 }
 
-static std::tuple<FullApplySite, SILBasicBlock::iterator>
-tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
-                           ClassHierarchyAnalysis *CHA) {
+static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
+                                                  ClassHierarchyAnalysis *CHA) {
   auto NewInst = tryDevirtualizeApply(InnerAI, CHA);
-  if (!NewInst) {
-    return std::make_tuple(InnerAI, I);
-  }
+  if (!NewInst)
+    return InnerAI.getInstruction();
 
   deleteDevirtualizedApply(InnerAI);
 
+  // FIXME: Comments at the use of this helper indicate that devirtualization
+  // may return SILArgument. Yet here we assert that it must return an
+  // instruction.
   auto newApplyAI = NewInst.getInstruction();
   assert(newApplyAI && "devirtualized but removed apply site?");
 
-  return std::make_tuple(FullApplySite::isa(newApplyAI),
-                         newApplyAI->getIterator());
+  return newApplyAI;
 }
 
 /// \brief Inlines all mandatory inlined functions into the body of a function,
@@ -532,23 +524,34 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
   SmallVector<std::pair<SILValue, ParameterConvention>, 16> CaptureArgs;
   SmallVector<SILValue, 32> FullArgs;
 
-  for (auto BI = F->begin(), BE = F->end(); BI != BE; ++BI) {
+  // Visiting blocks in reverse order avoids revisiting instructions after block
+  // splitting, which would be quadratic.
+  for (auto BI = F->rbegin(), BE = F->rend(), nextBB = BI; BI != BE;
+       BI = nextBB) {
+    // After inlining, the block iterator will be adjusted to point to the last
+    // block containing inlined instructions. This way, the inlined function
+    // body will be reprocessed within the caller's context without revisiting
+    // any original instructions.
+    nextBB = std::next(BI);
+
     // While iterating over this block, instructions are inserted and deleted.
-    for (auto II = BI->begin(), nextI = II; II != BI->end(); II = nextI) {
-      nextI = std::next(II);
-
+    // To avoid quadratic block splitting, instructions must be processed in
+    // reverse order (block splitting reassigned the parent pointer of all
+    // instructions below the split point).
+    for (auto II = BI->rbegin(); II != BI->rend(); ++II) {
       FullApplySite InnerAI = FullApplySite::isa(&*II);
-
       if (!InnerAI)
         continue;
 
-      auto *ApplyBlock = InnerAI.getParent();
-
-      // *NOTE* If devirtualization succeeds, sometimes II will not be InnerAI,
+      // *NOTE* If devirtualization succeeds, devirtInst may not be InnerAI,
       // but a casted result of InnerAI or even a block argument due to
-      // abstraction changes when calling the witness or class method. We still
-      // know that InnerAI dominates II though.
-      std::tie(InnerAI, II) = tryDevirtualizeApplyHelper(InnerAI, II, CHA);
+      // abstraction changes when calling the witness or class method.
+      auto *devirtInst = tryDevirtualizeApplyHelper(InnerAI, CHA);
+      // Restore II to the current apply site.
+      II = devirtInst->getReverseIterator();
+      // If the devirtualized call result is no longer a invalid FullApplySite,
+      // then it has succeeded, but the result is not immediately inlinable.
+      InnerAI = FullApplySite::isa(devirtInst);
       if (!InnerAI)
         continue;
 
@@ -597,13 +600,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
       SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
                          Subs, OpenedArchetypesTracker);
-      if (!Inliner.canInlineApplySite(InnerAI)) {
-        // See comment above about casting when devirtualizing and how this
-        // sometimes causes II and InnerAI to be different and even in different
-        // blocks.
-        II = InnerAI.getInstruction()->getIterator();
+      if (!Inliner.canInlineApplySite(InnerAI))
         continue;
-      }
 
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
@@ -620,7 +618,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         bool IsCalleeGuaranteed =
             PAI &&
             PAI->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
-        fixupReferenceCounts(II, CalleeValue, CaptureArgs, IsCalleeGuaranteed);
+        fixupReferenceCounts(InnerAI.getInstruction(), CalleeValue, CaptureArgs,
+                             IsCalleeGuaranteed);
       }
 
       // Register a callback to record potentially unused function values after
@@ -632,20 +631,23 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
       // Inlining deletes the apply, and can introduce multiple new basic
       // blocks. After this, CalleeValue and other instructions may be invalid.
-      nextI = Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      // nextBB will point to the last inlined block
+      auto firstInlinedInstAndLastBB =
+          Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      nextBB = firstInlinedInstAndLastBB.second->getReverseIterator();
       ++NumMandatoryInlines;
 
       // The IR is now valid, and trivial dead arguments are removed. However,
       // we may be able to remove dead callee computations (e.g. dead
       // partial_apply closures).
-      nextI = closureCleanup.cleanupDeadClosures(nextI);
+      closureCleanup.cleanupDeadClosures(F);
 
-      assert(nextI == ApplyBlock->end()
-             || nextI->getParent() == ApplyBlock
-                    && "Mismatch between the instruction and basic block");
+      // Resume inlining within nextBB, which contains only the inlined
+      // instructions and possibly instructions in the original call block that
+      // have not yet been visited.
+      break;
     }
   }
-
   // Keep track of full inlined functions so we don't waste time recursively
   // reprocessing them.
   FullyInlinedSet.insert(F);
@@ -680,6 +682,9 @@ class MandatoryInlining : public SILModuleTransform {
       runOnFunctionRecursively(FuncBuilder, &F,
                                FullApplySite(), FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet(), CHA);
+      // The inliner splits blocks at call sites. Re-merge trivial branches
+      // to reestablish a canonical CFG.
+      mergeBasicBlocks(&F);
     }
 
     if (!ShouldCleanup)
