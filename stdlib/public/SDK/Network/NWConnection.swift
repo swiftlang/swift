@@ -102,6 +102,15 @@ public final class NWConnection : CustomDebugStringConvertible {
 		}
 	}
 
+	/// Retrieve the maximum datagram size that can be sent
+	/// on the connection. Any datagrams sent should be less
+	/// than or equal to this size.
+	public var maximumDatagramSize: Int {
+		get {
+			return Int(nw_connection_get_maximum_datagram_size(self.nw))
+		}
+	}
+
 	private var _currentPath: NWPath? = nil
 
 	/// Current path for the connection, which can be used to extract interface and effective endpoint information
