@@ -37,9 +37,9 @@ private class TestCluster {
   /// 
   /// - Parameters:
   ///   - forTasksConfig: Text representation of tasks config.
-  ///   - withTaskIndex: The task index for this server def.
+  ///   - taskIndex: The task index for this server def.
   ///
-  func createServerDef(forTasksConfig: String, withTaskIndex: Int) -> String {
+  func createServerDef(forTasksConfig: String, taskIndex: Int) -> String {
     return  """
       cluster {
         job {
@@ -48,7 +48,7 @@ private class TestCluster {
         }
       }
       job_name: "localhost"
-      task_index: \(withTaskIndex)
+      task_index: \(taskIndex)
       protocol: "grpc"
       """
   }
@@ -78,11 +78,12 @@ private class TestCluster {
     // be started when we set TFE_ContextSetServerDef.
     for i in 1..<taskCount {
       debugLog("Starting task \(i)...")
-      let serverDefText = createServerDef(forTasksConfig: tasks, withTaskIndex: i)
-      let serverDef = TFE_GetServerDef(serverDefText, status)
+      let serverDefText = createServerDef(forTasksConfig: tasks, taskIndex: i)
+      let serverDef: UnsafeMutablePointer<TF_Buffer>! = TFE_GetServerDef(
+		      serverDefText, status)
       checkOk(status)
       let server: CTFServer! = TF_NewServer(
-          serverDef!.pointee.data, serverDef!.pointee.length, status)
+          serverDef.pointee.data, serverDef.pointee.length, status)
       checkOk(status)
       TF_ServerStart(server, status)
       checkOk(status)
@@ -92,7 +93,7 @@ private class TestCluster {
     }
     TF_DeleteStatus(status)
     // Return the server def for task 0 for use in compiler runtime.
-    return createServerDef(forTasksConfig: tasks, withTaskIndex: 0)
+    return createServerDef(forTasksConfig: tasks, taskIndex: 0)
   }
 }
 
