@@ -250,12 +250,14 @@ class BuildScriptInvocation(object):
                     args.android_icu_uc is None or \
                     args.android_icu_uc_include is None or \
                     args.android_icu_i18n is None or \
-                    args.android_icu_i18n_include is None:
+                    args.android_icu_i18n_include is None or \
+                    args.android_icu_data is None:
                 diagnostics.fatal(
                     "when building for Android, --android-ndk, "
                     "--android-ndk-version, --android-icu-uc, "
                     "--android-icu-uc-include, --android-icu-i18n, "
-                    "and --android-icu-i18n-include must be specified")
+                    "--android-icu-i18n-include, and --android-icu-data "
+                    "must be specified")
 
     @staticmethod
     def apply_default_arguments(toolchain, args):
@@ -292,8 +294,12 @@ class BuildScriptInvocation(object):
 
         # Add optional stdlib-deployment-targets
         if args.android:
-            args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Android.armv7.name)
+            if args.android_arch == "armv7":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.armv7.name)
+            elif args.android_arch == "aarch64":
+                args.stdlib_deployment_targets.append(
+                    StdlibDeploymentTarget.Android.aarch64.name)
 
         # Infer platform flags from manually-specified configure targets.
         # This doesn't apply to Darwin platforms, as they are
@@ -687,14 +693,15 @@ class BuildScriptInvocation(object):
 
         if args.android:
             impl_args += [
+                "--android-arch", args.android_arch,
                 "--android-ndk", args.android_ndk,
                 "--android-api-level", args.android_api_level,
-                "--android-ndk-gcc-version",
-                args.android_ndk_gcc_version,
+                "--android-ndk-gcc-version", args.android_ndk_gcc_version,
                 "--android-icu-uc", args.android_icu_uc,
                 "--android-icu-uc-include", args.android_icu_uc_include,
                 "--android-icu-i18n", args.android_icu_i18n,
                 "--android-icu-i18n-include", args.android_icu_i18n_include,
+                "--android-icu-data", args.android_icu_data,
             ]
         if args.android_deploy_device_path:
             impl_args += [
