@@ -650,7 +650,8 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     if (Decl && !Decl->isImplicit())
       Loc = SILLocation(Decl);
 
-    diagnose(Module, Loc, diag::stored_property_not_initialized, Name);
+    diagnose(Module, Loc, diag::stored_property_not_initialized,
+             StringRef(Name));
   }
 }
 
@@ -707,7 +708,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   for (unsigned i = 0, e = Use.NumElements; i != e; ++i)
     isLet &= TheMemory.isElementLetProperty(i);
 
-  diagnose(Module, DiagLoc, DiagMessage, Name, isLet);
+  diagnose(Module, DiagLoc, DiagMessage, StringRef(Name), isLet);
 
   // As a debugging hack, print the instruction itself if there is no location
   // information.  This should never happen.
@@ -1164,10 +1165,10 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
                FD->getName(), /*method*/ 0, PropertyName);
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
-               diag::assignment_to_immutable_value, PropertyName);
+               diag::assignment_to_immutable_value, StringRef(PropertyName));
     } else {
       diagnose(Module, Use.Inst->getLoc(),
-               diag::immutable_value_passed_inout, PropertyName);
+               diag::immutable_value_passed_inout, StringRef(PropertyName));
     }
 
     if (auto *Var = dyn_cast<VarDecl>(VD)) {
