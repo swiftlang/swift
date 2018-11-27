@@ -83,7 +83,7 @@
 
 // CHECK: @"$s16class_resilience14ResilientChildCMP" = internal constant <{{.*}}> <{
 // --       instantiation function:
-// CHECK-SAME:   @"$s16class_resilience14ResilientChildCMi"
+// CHECK-SAME:   i32 0,
 // --       destructor:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCfD"
 // --       ivar destroyer:
@@ -525,28 +525,12 @@ extension ResilientGenericOutsideParent {
 // CHECK-NEXT: ret void
 
 
-// ResilientChild metadata relocation function
-
-// CHECK-LABEL: define internal %swift.type* @"$s16class_resilience14ResilientChildCMi"(%swift.type_descriptor*, i8*)
-// CHECK-NEXT: entry:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
-
-
 // FixedLayoutChild metadata initialization function
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience16FixedLayoutChildCMr"(%swift.type*, i8*, i8**)
 
 // Initialize the superclass field...
 // CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
-
-
-// FixedLayoutChild metadata relocation function
-
-// CHECK-LABEL: define internal %swift.type* @"$s16class_resilience16FixedLayoutChildCMi"(%swift.type_descriptor*, i8*)
-// CHECK-NEXT: entry:
-// CHECK-NEXT: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata(%swift.type_descriptor* %0, i8* %1)
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
 
 
 // ResilientGenericChild metadata initialization function

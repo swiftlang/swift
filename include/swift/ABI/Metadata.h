@@ -1059,8 +1059,9 @@ private:
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
 
 public:
-  /// A function for destroying instance variables, used to clean up
-  /// after an early return from a constructor.
+  /// A function for destroying instance variables, used to clean up after an
+  /// early return from a constructor. If null, no clean up will be performed
+  /// and all ivars must be trivial.
   TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
 
   // After this come the class members, laid out as follows:
@@ -3110,7 +3111,8 @@ struct TargetGenericClassMetadataPattern final :
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
@@ -3347,13 +3349,18 @@ using MetadataRelocator =
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern {
   /// A function that allocates metadata with the correct size at runtime.
-  TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
+  ///
+  /// If this is null, the runtime instead calls swift_relocateClassMetadata(),
+  /// passing in the class descriptor and this pattern.
+  TargetRelativeDirectPointer<Runtime, MetadataRelocator, /*nullable*/ true>
+    RelocationFunction;
 
   /// The heap-destructor function.
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
@@ -3407,14 +3414,10 @@ struct TargetSingletonMetadataInitialization {
             classDescription->hasResilientSuperclass());
   }
 
+  /// This method can only be called from the runtime itself. It is defined
+  /// in MetadataCache.h.
   TargetMetadata<Runtime> *allocate(
-      const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasResilientClassPattern(description)) {
-      return ResilientPattern->RelocationFunction(description,
-                                                  ResilientPattern.get());
-    }
-    return IncompleteMetadata.get();
-  }
+      const TargetTypeContextDescriptor<Runtime> *description) const;
 };
 
 template <typename Runtime>
