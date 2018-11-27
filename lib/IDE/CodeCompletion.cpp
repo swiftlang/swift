@@ -4971,11 +4971,12 @@ namespace  {
 } // end anonymous namespace
 
 namespace {
-using FunctionParams = ArrayRef<AnyFunctionType::Param>;
+using FunctionTypeAndDecl = std::pair<AnyFunctionType *, ValueDecl *>;
 
-void collectPossibleParamListByQualifiedLookup(
+/// Collect function (or subscript) members with the given \p name on \p baseTy.
+void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
 
   SmallVector<ValueDecl *, 2> decls;
   auto resolver = DC.getASTContext().getLazyResolver();
@@ -5000,14 +5001,16 @@ void collectPossibleParamListByQualifiedLookup(
     if (!fnType || fnType->hasError())
       continue;
     if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
-      candidates.push_back(AFT->getParams());
+      candidates.emplace_back(AFT, VD);
     }
   }
 }
 
-void collectPossibleParamListByQualifiedLookup(
+/// Collect function (or subscript) members with the given \p name on
+/// \p baseExpr expression.
+void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
   auto baseTyOpt = getTypeOfCompletionContextExpr(
       DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
@@ -5017,31 +5020,32 @@ void collectPossibleParamListByQualifiedLookup(
   if (!baseTy->mayHaveMembers())
     return;
 
-  collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
+  collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
 }
 
-bool collectPossibleParamListsApply(
+/// For the given \c callExpr, collect possible callee types and declarations.
+bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
     if (auto *funcType = type->getAs<AnyFunctionType>())
-      candidates.push_back(funcType->getParams());
+      candidates.emplace_back(funcType, fnExpr->getReferencedDecl().getDecl());
   } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
       auto declType = decl->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
       auto declType = decl->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-    collectPossibleParamListByQualifiedLookup(
+    collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
   }
 
@@ -5053,11 +5057,11 @@ bool collectPossibleParamListsApply(
       return false;
 
     if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
-      candidates.push_back(AFT->getParams());
+      candidates.emplace_back(AFT, ref.getDecl());
     } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
-        collectPossibleParamListByQualifiedLookup(
+        collectPossibleCalleesByQualifiedLookup(
             DC, baseTy, DeclBaseName::createConstructor(), candidates);
     }
   }
@@ -5065,23 +5069,28 @@ bool collectPossibleParamListsApply(
   return !candidates.empty();
 }
 
-bool collectPossibleParamListsSubscript(
+/// For the given \c subscriptExpr, collect possible callee types and
+/// declarations.
+bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
-    SmallVectorImpl<FunctionParams> &candidates) {
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   if (subscriptExpr->hasDecl()) {
     if (auto SD = dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
       auto declType = SD->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
+        candidates.emplace_back(funcType, SD);
     }
   } else {
-    collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                              DeclBaseName::createSubscript(),
-                                              candidates);
+    collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
+                                            DeclBaseName::createSubscript(),
+                                            candidates);
   }
   return !candidates.empty();
 }
 
+/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
+/// \c ParenExpr, or a \c TupleShuffleExpr.
+/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
 bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                        unsigned &Position, bool &HasName) {
   if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
@@ -5150,21 +5159,36 @@ class CodeCompletionTypeContextAnalyzer {
   ASTContext &Context;
   ExprParentFinder Finder;
 
-  bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr,
-                                  std::vector<Type> &ExpectedTypes,
-                                  std::vector<StringRef> &ExpectedNames) {
+  // Results populated by Analyze()
+  SmallVector<Type, 2> PossibleTypes;
+  SmallVector<StringRef, 2> PossibleNames;
+  SmallVector<FunctionTypeAndDecl, 2> PossibleCallees;
+
+  void recordPossibleType(Type ty) {
+    if (!ty || ty->is<ErrorType>())
+      return;
+    PossibleTypes.push_back(ty->getRValueType());
+  }
+
+  void recordPossibleName(StringRef name) {
+    PossibleNames.push_back(name);
+  }
+
+  /// Collect context information at call argument position.
+  bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr) {
     // Collect parameter lists for possible func decls.
-    SmallVector<FunctionParams, 4> Candidates;
+    SmallVector<FunctionTypeAndDecl, 2> Candidates;
     Expr *Arg = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
-      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
+      if (!collectPossibleCalleesForApply(DC, applyExpr, Candidates))
         return false;
       Arg = applyExpr->getArg();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
-      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
+      if (!collectPossibleCalleesForSubscript(DC, subscriptExpr, Candidates))
         return false;
       Arg = subscriptExpr->getIndex();
     }
+    PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
@@ -5180,20 +5204,21 @@ class CodeCompletionTypeContextAnalyzer {
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
-      for (auto Params : Candidates) {
+      for (auto &typeAndDecl : Candidates) {
+        auto Params = typeAndDecl.first->getParams();
         if (Position >= Params.size())
           continue;
         const auto &Param = Params[Position];
         if (Param.hasLabel() && MayNeedName) {
           if (seenNames.insert(Param.getLabel()).second)
-            ExpectedNames.push_back(Param.getLabel().str());
+            recordPossibleName(Param.getLabel().str());
         } else {
           if (seenTypes.insert(Param.getOldType().getPointer()).second)
-            ExpectedTypes.push_back(Param.getOldType());
+            recordPossibleType(Param.getOldType());
         }
       }
     }
-    return !ExpectedTypes.empty() || !ExpectedNames.empty();
+    return !PossibleTypes.empty() || !PossibleNames.empty();
   }
 
 public:
@@ -5249,21 +5274,13 @@ public:
         return false;
     }) {}
 
-  void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback,
-                   SmallVectorImpl<StringRef> &PossibleNames) {
+  void analyzeExpr(Expr *Parent) {
     switch (Parent->getKind()) {
       case ExprKind::Call:
       case ExprKind::Subscript:
       case ExprKind::Binary:
       case ExprKind::PrefixUnary: {
-        std::vector<Type> PotentialTypes;
-        std::vector<StringRef> ExpectedNames;
-        collectArgumentExpectation(
-            *DC, Parent, ParsedExpr, PotentialTypes, ExpectedNames);
-        for (Type Ty : PotentialTypes)
-          Callback(Ty);
-        for (auto name : ExpectedNames)
-          PossibleNames.push_back(name);
+        collectArgumentExpectation(*DC, Parent, ParsedExpr);
         break;
       }
       case ExprKind::Assign: {
@@ -5276,10 +5293,10 @@ public:
           // The destination is of the expected type.
           auto *destExpr = AE->getDest();
           if (auto type = destExpr->getType()) {
-            Callback(type);
+            recordPossibleType(type);
           } else if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
             if (auto *decl = DRE->getDecl())
-              Callback(decl->getInterfaceType());
+              recordPossibleType(decl->getInterfaceType());
           }
         }
         break;
@@ -5290,7 +5307,7 @@ public:
         unsigned Position = 0;
         bool HasName;
         if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
-          Callback(
+          recordPossibleType(
               Parent->getType()->castTo<TupleType>()->getElementType(Position));
         }
         break;
@@ -5300,15 +5317,16 @@ public:
     }
   }
 
-  void analyzeStmt(Stmt *Parent, llvm::function_ref<void(Type)> Callback) {
+  void analyzeStmt(Stmt *Parent) {
     switch (Parent->getKind()) {
     case StmtKind::Return:
-      Callback(getReturnTypeFromContext(DC));
+      recordPossibleType(getReturnTypeFromContext(DC));
       break;
     case StmtKind::ForEach:
       if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
         if (containsTarget(SEQ)) {
-          Callback(Context.getSequenceDecl()->getDeclaredInterfaceType());
+          recordPossibleType(
+              Context.getSequenceDecl()->getDeclaredInterfaceType());
         }
       }
       break;
@@ -5317,7 +5335,7 @@ public:
     case StmtKind::While:
     case StmtKind::Guard:
       if (isBoolConditionOf(Parent)) {
-        Callback(Context.getBoolDecl()->getDeclaredInterfaceType());
+        recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
       }
       break;
     default:
@@ -5346,7 +5364,7 @@ public:
     return SM.rangeContains(E->getSourceRange(), ParsedExpr->getSourceRange());
   }
 
-  void analyzeDecl(Decl *D, llvm::function_ref<void(Type)> Callback) {
+  void analyzeDecl(Decl *D) {
     switch (D->getKind()) {
       case DeclKind::PatternBinding: {
         auto PBD = cast<PatternBindingDecl>(D);
@@ -5354,7 +5372,7 @@ public:
           if (auto Init = PBD->getInit(I)) {
             if (containsTarget(Init)) {
               if (PBD->getPattern(I)->hasType()) {
-                Callback(PBD->getPattern(I)->getType());
+                recordPossibleType(PBD->getPattern(I)->getType());
                 break;
               }
             }
@@ -5367,13 +5385,13 @@ public:
     }
   }
 
-  void analyzePattern(Pattern *P, llvm::function_ref<void(Type)> Callback) {
+  void analyzePattern(Pattern *P) {
     switch (P->getKind()) {
     case PatternKind::Expr: {
       auto ExprPat = cast<ExprPattern>(P);
       if (auto D = ExprPat->getMatchVar()) {
         if (D->hasInterfaceType())
-          Callback(D->getInterfaceType());
+          recordPossibleType(D->getInterfaceType());
       }
       break;
     }
@@ -5382,37 +5400,33 @@ public:
     }
   }
 
-  bool Analyze(llvm::SmallVectorImpl<Type> &PossibleTypes) {
-    SmallVector<StringRef, 1> PossibleNames;
-    return Analyze(PossibleTypes, PossibleNames) && !PossibleTypes.empty();
-  }
-  bool Analyze(SmallVectorImpl<Type> &PossibleTypes,
-               SmallVectorImpl<StringRef> &PossibleNames) {
+  bool Analyze() {
     // We cannot analyze without target.
     if (!ParsedExpr)
       return false;
     DC->walkContext(Finder);
-    auto Callback = [&] (Type Result) {
-      if (Result &&
-          Result->getKind() != TypeKind::Error)
-        PossibleTypes.push_back(Result->getRValueType());
-    };
 
     for (auto It = Finder.Ancestors.rbegin(); It != Finder.Ancestors.rend();
          ++ It) {
       if (auto Parent = It->getAsExpr()) {
-        analyzeExpr(Parent, Callback, PossibleNames);
+        analyzeExpr(Parent);
       } else if (auto Parent = It->getAsStmt()) {
-        analyzeStmt(Parent, Callback);
+        analyzeStmt(Parent);
       } else if (auto Parent = It->getAsDecl()) {
-        analyzeDecl(Parent, Callback);
+        analyzeDecl(Parent);
       } else if (auto Parent = It->getAsPattern()) {
-        analyzePattern(Parent, Callback);
+        analyzePattern(Parent);
       }
       if (!PossibleTypes.empty() || !PossibleNames.empty())
         return true;
     }
     return false;
+  }
+
+  ArrayRef<Type> getPossibleTypes() const { return PossibleTypes; }
+  ArrayRef<StringRef> getPossibleNames() const { return PossibleNames; }
+  ArrayRef<FunctionTypeAndDecl> getPossibleCallees() const {
+    return PossibleCallees;
   }
 };
 
@@ -5510,9 +5524,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                      ParsedExpr);
-    llvm::SmallVector<Type, 2> PossibleTypes;
-    if (TypeAnalyzer.Analyze(PossibleTypes)) {
-      Lookup.setExpectedTypes(PossibleTypes);
+    if (TypeAnalyzer.Analyze()) {
+      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     }
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
@@ -5555,9 +5568,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::PostfixExprBeginning: {
     ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
                                                  CodeCompleteTokenExpr);
-    llvm::SmallVector<Type, 1> Types;
-    if (Analyzer.Analyze(Types)) {
-      Lookup.setExpectedTypes(Types);
+    if (Analyzer.Analyze()) {
+      Lookup.setExpectedTypes(Analyzer.getPossibleTypes());
     }
     DoPostfixExprBeginning();
     break;
@@ -5583,19 +5595,20 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                      CodeCompleteTokenExpr);
-    SmallVector<Type, 2> PossibleTypes;
-    SmallVector<StringRef, 2> PossibleNames;
-    if (TypeAnalyzer.Analyze(PossibleTypes, PossibleNames)) {
-      Lookup.setExpectedTypes(PossibleTypes);
+    if (TypeAnalyzer.Analyze()) {
+      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
     }
 
-    if (ExprType) {
-      if (ShouldCompleteCallPatternAfterParen) {
+    if (ShouldCompleteCallPatternAfterParen) {
+      if (ExprType) {
         Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
       } else {
-        // Add argument labels, then fallthrough to get values.
-        Lookup.addArgNameCompletionResults(PossibleNames);
+        for (auto &typeAndDecl : TypeAnalyzer.getPossibleCallees())
+          Lookup.getValueExprCompletions(typeAndDecl.first, typeAndDecl.second);
       }
+    } else {
+      // Add argument labels, then fallthrough to get values.
+      Lookup.addArgNameCompletionResults(TypeAnalyzer.getPossibleNames());
     }
 
     if (!Lookup.FoundFunctionCalls ||
@@ -5705,12 +5718,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::UnresolvedMember: {
     Lookup.setHaveDot(DotLoc);
-    SmallVector<Type, 2> PossibleTypes;
     ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                      CodeCompleteTokenExpr);
-    if (TypeAnalyzer.Analyze(PossibleTypes))
-      Lookup.setExpectedTypes(PossibleTypes);
-    Lookup.getUnresolvedMemberCompletions(PossibleTypes);
+    if (TypeAnalyzer.Analyze())
+      Lookup.setExpectedTypes(TypeAnalyzer.getPossibleTypes());
+    Lookup.getUnresolvedMemberCompletions(TypeAnalyzer.getPossibleTypes());
     break;
   }
   case CompletionKind::AssignmentRHS : {
@@ -5723,14 +5735,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::CallArg : {
     ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
                                                  CodeCompleteTokenExpr);
-    SmallVector<Type, 2> PossibleTypes;
-    SmallVector<StringRef, 2> PossibleNames;
-    Analyzer.Analyze(PossibleTypes, PossibleNames);
-    if (!PossibleNames.empty()) {
-      Lookup.addArgNameCompletionResults(PossibleNames);
+    Analyzer.Analyze();
+    if (!Analyzer.getPossibleNames().empty()) {
+      Lookup.addArgNameCompletionResults(Analyzer.getPossibleNames());
       break;
     }
-    Lookup.setExpectedTypes(PossibleTypes);
+    Lookup.setExpectedTypes(Analyzer.getPossibleTypes());
     DoPostfixExprBeginning();
     break;
   }

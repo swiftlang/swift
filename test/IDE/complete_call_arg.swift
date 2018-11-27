@@ -11,6 +11,9 @@
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD5 | %FileCheck %s -check-prefix=OVERLOAD5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD6 | %FileCheck %s -check-prefix=OVERLOAD6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD7 | %FileCheck %s -check-prefix=OVERLOAD6
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
@@ -215,11 +218,23 @@ class C3 {
   func f2() {
     foo2(C2I, #^OVERLOAD2^#)
   }
-  func f2() {
+  func f3() {
     foo2(C1I, b1: #^OVERLOAD3^#)
   }
-  func f2() {
+  func f4() {
     foo2(C2I, b2: #^OVERLOAD4^#)
+  }
+
+  func f5() {
+    foo2(#^OVERLOAD5^#
+  }
+
+  func overloaded(_ a1: C1, b1: C2) {}
+  func overloaded(a2: C2, b2: C1) {}
+
+  func f6(obj: C3) {
+    overloaded(#^OVERLOAD6^#
+    obj.overloaded(#^OVERLOAD7^#
   }
 }
 
@@ -250,6 +265,20 @@ class C3 {
 
 // FIXME: This should be a negative test case
 // NEGATIVE_OVERLOAD4-NOT: Decl[Class]{{.*}} C2
+
+// OVERLOAD5: Begin completions
+// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C1#}, {#b1: C2#}[')'][#Void#]; name=a: C1, b1: C2
+// OVERLOAD5-DAG: Pattern/CurrModule:                 ['(']{#(a): C2#}, {#b2: C1#}[')'][#Void#]; name=a: C2, b2: C1
+// OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD5-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
+// OVERLOAD5: End completions
+
+// OVERLOAD6: Begin completions
+// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#(a1): C1#}, {#b1: C2#}[')'][#Void#]; name=a1: C1, b1: C2
+// OVERLOAD6-DAG: Pattern/CurrModule:                 ['(']{#a2: C2#}, {#b2: C1#}[')'][#Void#]; name=a2: C2, b2: C1
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
+// OVERLOAD6: End completions
 
 class C4 {
   func f1(_ G : Gen) {
