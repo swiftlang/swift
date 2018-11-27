@@ -189,12 +189,6 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
-      // The getter is considered mutating if it's on a value type.
-      if (!storage->getDeclContext()->getSelfClassDecl() &&
-          !storage->isStatic()) {
-        storage->setIsGetterMutating(true);
-      }
-
       // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
