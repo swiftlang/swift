@@ -127,10 +127,8 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   internal let _body: () -> Element?
 }
 
-@_fixed_layout
 @usableFromInline
 internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
@@ -145,14 +143,13 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   internal func next() -> Element? { _abstract() }
 }
 
-@_fixed_layout
 @usableFromInline
 internal final class _IteratorBox<
   Base : IteratorProtocol
 > : _AnyIteratorBoxBase<Base.Element> {
-  @inlinable
+  @usableFromInline
   internal init(_ base: Base) { self._base = base }
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   deinit {}
   @inlinable
   internal override func next() -> Base.Element? { return _base.next() }
@@ -165,7 +162,6 @@ internal final class _IteratorBox<
 
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 
-@_fixed_layout
 @usableFromInline
 %   if Kind == 'Sequence':
 internal class _AnySequenceBox<Element>
@@ -183,7 +179,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 {
 
 %   if Kind == 'Sequence':
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal init() { }
 
   @inlinable
@@ -373,7 +369,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   func _customLastIndexOfEquatableElement(element: Element) -> Index??
   */
 
-  @inlinable
+  @usableFromInline
   internal init(
     _startIndex: _AnyIndexBox,
     endIndex: _AnyIndexBox
@@ -423,7 +419,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 
 
-@_fixed_layout
 @usableFromInline
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 {
@@ -533,16 +528,15 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   }
 %   end
 
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
 %   if Kind == 'Sequence':
-  @inlinable
+  @usableFromInline
   internal init(_base: S) {
     self._base = _base
   }
 %   else:
-  @inlinable
+  @usableFromInline
   internal init(_base: S) {
     self._base = _base
     super.init(
@@ -671,7 +665,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol> {
   @usableFromInline
   internal var _makeUnderlyingIterator: () -> Iterator
 
-  @inlinable
+  @usableFromInline
   internal init(_ makeUnderlyingIterator: @escaping () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
@@ -703,7 +697,7 @@ public struct AnySequence<Element> {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
-  @inlinable
+  @usableFromInline
   internal init(_box: _AnySequenceBox<Element>) {
     self._box = _box
   }
@@ -845,13 +839,12 @@ internal protocol _AnyIndexBox : class {
   func _isLess(than rhs: _AnyIndexBox) -> Bool
 }
 
-@_fixed_layout
 @usableFromInline
 internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
   @usableFromInline
   internal var _base: BaseIndex
 
-  @inlinable
+  @usableFromInline
   internal init(_base: BaseIndex) {
     self._base = _base
   }
@@ -889,12 +882,11 @@ public struct AnyIndex {
   internal var _box: _AnyIndexBox
 
   /// Creates a new index wrapping `base`.
-  @inlinable
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
   }
-
-  @inlinable
+  
+  @usableFromInline
   internal init(_box: _AnyIndexBox) {
     self._box = _box
   }
