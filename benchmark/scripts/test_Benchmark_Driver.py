@@ -18,6 +18,7 @@ import os
 import time
 import unittest
 
+from StringIO import StringIO
 from imp import load_source
 
 from compare_perf_tests import PerformanceTestResult
@@ -33,6 +34,7 @@ parse_args = Benchmark_Driver.parse_args
 BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
 BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
 LoggingReportFormatter = Benchmark_Driver.LoggingReportFormatter
+MarkdownReportHandler = Benchmark_Driver.MarkdownReportHandler
 
 
 class Test_parse_args(unittest.TestCase):
@@ -419,6 +421,58 @@ class TestLoggingReportFormatter(unittest.TestCase):
             'levelname': 'INFO', 'msg': 'Hi!'})
         f = LoggingReportFormatter()
         self.assertEquals(f.format(lr), 'INFO Hi!')
+
+
+class TestMarkdownReportHandler(unittest.TestCase):
+    def setUp(self):
+        super(TestMarkdownReportHandler, self).setUp()
+        self.stream = StringIO()
+        self.handler = MarkdownReportHandler(self.stream)
+
+    def assert_contains(self, texts):
+        assert not isinstance(texts, str)
+        for text in texts:
+            self.assertIn(text, self.stream.getvalue())
+
+    def record(self, level, category, msg):
+        return logging.makeLogRecord({
+            'name': 'BenchmarkDoctor.' + category,
+            'levelno': level, 'msg': msg})
+
+    def test_init_writes_table_header(self):
+        self.assertEquals(self.handler.level, logging.INFO)
+        self.assert_contains(['Benchmark Check Report\n', '---|---'])
+
+    def test_close_writes_final_newlines(self):
+        self.handler.close()
+        self.assert_contains(['---|---\n\n'])
+
+    def test_errors_and_warnings_start_new_rows_with_icons(self):
+        self.handler.emit(self.record(logging.ERROR, '', 'Blunder'))
+        self.handler.emit(self.record(logging.WARNING, '', 'Boo-boo'))
+        self.assert_contains(['\n⛔️ | Blunder',
+                              '\n⚠️ | Boo-boo'])
+
+    def test_category_icons(self):
+        self.handler.emit(self.record(logging.WARNING, 'naming', 'naming'))
+        self.handler.emit(self.record(logging.WARNING, 'runtime', 'runtime'))
+        self.handler.emit(self.record(logging.WARNING, 'memory', 'memory'))
+        self.assert_contains(['🔤 | naming',
+                              '⏱ | runtime',
+                              'Ⓜ️ | memory'])
+
+    def test_info_stays_in_table_cell_breaking_line_row_to_subscript(self):
+        """Assuming Infos only follow after Errors and Warnings.
+
+        Infos don't emit category icons.
+        """
+        self.handler.emit(self.record(logging.ERROR, 'naming', 'Blunder'))
+        self.handler.emit(self.record(logging.INFO, 'naming', 'Fixit'))
+        self.assert_contains(['Blunder <br><sub> Fixit'])
+
+    def test_names_in_code_format(self):
+        self.handler.emit(self.record(logging.WARNING, '', "'QuotedName'"))
+        self.assert_contains(['| `QuotedName`'])
 
 
 def _PTR(min=700, mem_pages=1000, setup=None):

@@ -261,6 +261,51 @@ class LoggingReportFormatter(logging.Formatter):
             '{0} {1}{2}'.format(record.levelname, category, msg))
 
 
+class MarkdownReportHandler(logging.StreamHandler):
+    r"""Write custom formatted messages from BenchmarkDoctor to the stream.
+
+    It works around StreamHandler's hardcoded '\n' and handles the custom
+    level and category formatting for BenchmarkDoctor's check report.
+    """
+
+    def __init__(self, stream):
+        """Initialize the handler and write a Markdown table header."""
+        super(MarkdownReportHandler, self).__init__(stream)
+        self.setLevel(logging.INFO)
+        self.stream.write('\n✅  | Benchmark Check Report\n---|---')
+        self.stream.flush()
+
+    levels = {logging.WARNING: '\n⚠️', logging.ERROR: '\n⛔️',
+              logging.INFO: ' <br><sub> '}
+    categories = {'naming': '🔤', 'runtime': '⏱', 'memory': 'Ⓜ️'}
+    quotes_re = re.compile("'")
+
+    def format(self, record):
+        msg = super(MarkdownReportHandler, self).format(record)
+        return (self.levels.get(record.levelno, '') +
+                ('' if record.levelno == logging.INFO else
+                 self.categories.get(record.name.split('.')[-1], '') + ' | ') +
+                self.quotes_re.sub('`', msg))
+
+    def emit(self, record):
+        msg = self.format(record)
+        stream = self.stream
+        try:
+            if (isinstance(msg, unicode) and
+                    getattr(stream, 'encoding', None)):
+                stream.write(msg.encode(stream.encoding))
+            else:
+                stream.write(msg)
+        except UnicodeError:
+            stream.write(msg.encode("UTF-8"))
+        self.flush()
+
+    def close(self):
+        self.stream.write('\n\n')
+        self.stream.flush()
+        super(MarkdownReportHandler, self).close()
+
+
 class BenchmarkDoctor(object):
     """Checks that the benchmark conforms to the standard set of requirements.
 
@@ -302,8 +347,9 @@ class BenchmarkDoctor(object):
         ]
 
     def __del__(self):
-        """Unregister handler on exit."""
-        self.log.removeHandler(self.console_handler)
+        """Close log handlers on exit."""
+        for handler in list(self.log.handlers):
+            handler.close()
 
     capital_words_re = re.compile('[A-Z][a-zA-Z0-9]+')
 
