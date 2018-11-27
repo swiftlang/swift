@@ -26,9 +26,6 @@ import StdlibUnittest
 
 var DatasetTests = TestSuite("Dataset")
 
-// TODO: This test uses function attributes, which dynamic compilation does not
-// support yet.
-#if !TF_DYNAMIC_COMPILATION
 // Creates a dataset, which produces one float scalar value in each get next
 // call.
 @TensorFlowGraph
@@ -101,7 +98,6 @@ public func model() {
 DatasetTests.testAllBackends("Basic") {
   model()
 }
-#endif // !TF_DYNAMIC_COMPILATION
 
 DatasetTests.testAllBackends("MultiValue") {
   enableCPU()

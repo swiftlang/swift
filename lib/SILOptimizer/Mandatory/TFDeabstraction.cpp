@@ -42,6 +42,11 @@ using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
+llvm::cl::opt<bool> TFLogDeabstractionStats(
+    "tf-log-deabstraction-stats", llvm::cl::init(false),
+    llvm::cl::desc("Log the function-level sizes and call edges as CSV events. "
+                   "One use case is to analyze the impact of inlining."));
+
 static llvm::cl::opt<bool>
 TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
@@ -145,7 +150,7 @@ namespace {
   private:
     void logCurrentState(const char *name, bool isDetailed);
     void inlineCalls();
-    bool simplifyTensorOperands();
+    void simplifyTensorOperands();
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
@@ -339,18 +344,22 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
   return value;
 }
 
-/// Scan the argument list of the graph_op.  If any argument is passed indirectly
-/// (i.e., an address of a stack location is passed instead of the value itself)
-/// then rewrite the graph_op to use a loaded version of that value.
+/// Scan the argument list of the graph_op.  If any argument is passed
+/// indirectly (i.e., an address of a stack location is passed instead of the
+/// value itself) then rewrite the graph_op to use a loaded version of that
+/// value.
 ///
-/// Similarly, if an argument is an indirect output, then rewrite the graph_op to
-/// return the value directly, and emit an instruction that stores the direct
+/// Similarly, if an argument is an indirect output, then rewrite the graph_op
+/// to return the value directly, and emit an instruction that stores the direct
 /// value to the indirect output address.
 ///
 /// Also, if a primitive integer or floating point value is passed as a struct
 /// value, extract out the underlying integer or float value.
 ///
-/// Returns nullptr on error.
+/// Returns nullptr when we fail to simplify `origInst` (e.g. when the result of
+/// that graph_op is not loadable, such that this op won't be included in the
+/// extracted graph). In that case, we can still run this graph_op via eager op
+/// dispatch.
 ///
 static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
                                             TFDeabstraction &TFDA) {
@@ -454,14 +463,8 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
       auto argumentType = argumentValue->getType();
       assert(argumentType.isAddress());
       if (!argumentType.isLoadable(origInst->getModule())) {
-        auto astType = argumentType.getASTType();
-        if (astType->hasArchetype()) {
-          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
-                   diag::tf_op_result_generic, astType);
-        } else {
-          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
-                   diag::tf_op_result_not_value_or_aggregate, astType);
-        }
+        // In graph mode, we will run this graph_op out-of-graph, via eager op
+        // dispatch.
         return nullptr;
       }
       assert(origInst->getNumResults() == 0 &&
@@ -628,12 +631,9 @@ static bool explodeAggregateInst(SILInstruction *inst,
 /// Since we're scanning the function, keep track of all of the tensor
 /// operations to avoid additional linear scans over the function.
 ///
-/// Returns true on error.
-///
-bool TFDeabstraction::simplifyTensorOperands() {
+void TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
   bool containsGraphOp = false;
-  bool hasError = false;
 
   bool alreadyPrinted = false;
   auto logIfFirstChange = [&]() {
@@ -655,7 +655,7 @@ bool TFDeabstraction::simplifyTensorOperands() {
         auto newInst = simplifyOperands(graphOpInst, *this);
 
         if (!newInst) {
-          hasError = true;
+          graphOpInst->setNoClustering(true);
           continue;
         }
 
@@ -721,8 +721,6 @@ bool TFDeabstraction::simplifyTensorOperands() {
   // working on the host-side tensor operation.
   if (!containsGraphOp)
     tensorOps.clear();
-
-  return hasError;
 }
 
 namespace {
@@ -2147,7 +2145,8 @@ unwrapAggregateInstructions(SILValue value,
 
 /// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
 /// the already-lowered values when possible to avoid code bloat.  Returns true
-/// to represent error if it detects a non-TensorFlow leaf field.
+/// if it encounters a leaf field whose type is not confirmed to be a TensorFlow
+/// value (e.g. if it's some generic type T).
 static bool unpackTensorAggregates(
     const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
     llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
@@ -2279,6 +2278,10 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   };
 
   GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // When any deabstraction step fails below (e.g. cannot const-evaluate a tfop
+  // attribute), `noClustering` is set to true so that we run the graph_op
+  // out-of-graph via eager op dispatch.
+  bool noClustering = false;
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
@@ -2316,7 +2319,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     auto argumentValue = argument.getSingleArgument();
     auto argumentTy = argumentValue->getType();
     auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
-    auto argumentLoc = getUserSourceLocation(argumentValue);
 
     // Collect and validate input arguments.
     if (std::get<1>(argumentNameAndLowering) ==
@@ -2339,24 +2341,29 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             element = copyAddr->getSrc();
 
           if (!element) {
-            diagnoseInvalid(argumentLoc,
-                            "argument of type '" + elementType->getString() +
-                            "' is not a TensorFlow value or an aggregate of "
-                            "TensorFlow values");
-            return;
+            // It's not clear if we'll ever hit this condition. Perhaps
+            // asserting it won't happen would be more rigorous, but here we
+            // chose the "safer" route of having compiler still accept programs
+            // that trigger this condition.
+            noClustering = true;
+            break;
           }
 
           if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
-            diagnoseInvalid(argumentLoc,
-                            "argument of type '" + elementType->getString() +
-                            "' is not a TensorFlow value or an aggregate of "
-                            "TensorFlow values");
-            return;
+            // If some element of the array fails to unpack, we expect all
+            // elements to fail to unpack (as they share the same array element
+            // type), so we bail out of the loop over array elements, and call
+            // `opBuilder.addArgument(argumentValue)` below.
+            noClustering = true;
+            break;
           }
         }
-        opBuilder.addListArgument(inputList);
+        if (noClustering)
+          opBuilder.addArgument(argumentValue);
+        else
+          opBuilder.addListArgument(inputList);
         continue;
       }
 
@@ -2364,31 +2371,16 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       if (unpackTensorAggregates(context, origInst->getLoc(), B, argumentValue,
                                  loweredTupleElts, loweredStructFields,
                                  unwrapCache, inputList)) {
-        // FIXME: Since TFDeabstraction happens after mandatory inlining,
-        // numeric arguments will appear as having a builtin type such as
-        // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
-        auto astTypeString = argumentTy.getASTType().getString();
-        diagnoseInvalid(argumentLoc,
-                        "argument of type '" + astTypeString +
-                        "' is not a TensorFlow value or an aggregate of "
-                        "TensorFlow values");
-        return;
+        noClustering = true;
+        opBuilder.addArgument(argumentValue);
+        continue;
       }
-      if (inputList.size() != 1) {
-        // We could accept this situation and unpack the input into an input
-        // list.  However, we want users to explicitly indicate that they want
-        // unpacking to an input list by wrapping their input in an array, so we
-        // reject this situation.
-        auto astTypeString = argumentTy.getASTType().getString();
-        // FIXME: We could use `argumentLoc`, but the error would show up on the
-        // type declaration instead. Need to investigate how to get the argument
-        // location.
-        diagnoseInvalid(argumentLoc, "argument of type '" + astTypeString +
-                        "' must contain exactly one TensorFlow value",
-                        origInstLoc);
-        return;
+      if (inputList.size() == 1) {
+        opBuilder.addArgument(inputList[0]);
+      } else {
+        assert(inputList.size() > 1);
+        opBuilder.addListArgument(inputList);
       }
-      opBuilder.addArgument(inputList[0]);
       continue;
     }
 
@@ -2400,21 +2392,19 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                       "' " + message.str());
     };
 
-    // Ok, we have an attribute argument, we should have been able to fold it
-    // through our constexpr evaluation logic.
+    // Ok, we have an attribute argument, try const-folding it through our
+    // constexpr evaluation logic, so that we can run it in the graph. If this
+    // fails, we will run it out-of-graph (via eager op dispatch).
+    auto attrIdentifier =
+        context.getIdentifier(argument.getArgumentNameWithSuffix());
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      // TODO: improve the diagnostic to talk about the parameter label in
-      // the user code, not the internal op attribute.  The bookkeeping for
-      // this isn't obvious though.
-      diagnoseInvalidAttr("requires a constant argument");
-
-      // If we have more specific information about what went wrong, emit
-      // notes.
-      if (it != constants.end() &&
-          it->second.getKind() == SymbolicValue::Unknown)
-        it->second.emitUnknownDiagnosticNotes(origInstLoc);
-      return;
+      LLVM_DEBUG(llvm::dbgs() << "  graph_op " << *origInst
+                              << " has a dynamic attr: " << argumentValue
+                              << " and will be evaluated out-of-graph.\n");
+      noClustering = true;
+      opBuilder.addArgument(argumentValue, attrIdentifier.str());
+      continue;
     }
 
     // Get the constant, ignoring struct wrappers.
@@ -2423,7 +2413,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // Clone it out of the ConstExpr pool into the global SILModule pool.
     constValue = constValue.cloneInto(allocator);
 
-    auto attrIdentifier = context.getIdentifier(argument.getArgumentNameWithSuffix());
     opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
@@ -2436,201 +2425,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       // User code should not specify this pseudo device.
       if (opDevice == TF_ALL_DEVICES)
         return diagnoseInvalidAttr("may not use this device name");
-    }
-
-    // Emits a diagnostic and returns true if the value is invalid for a shape
-    // attr.
-    auto verifyNormalAttr = [&](SymbolicValue constValue) -> bool {
-      switch (constValue.getKind()) {
-      case SymbolicValue::Unknown:
-      case SymbolicValue::UninitMemory:
-        llvm_unreachable(
-            "earlier code should have ruled out non-constant values");
-
-      case SymbolicValue::Address:
-        llvm_unreachable("it's impossible to pass an address as an attr");
-
-      case SymbolicValue::Enum:
-      case SymbolicValue::EnumWithPayload:
-      case SymbolicValue::Aggregate:
-        diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
-        return true;
-
-      case SymbolicValue::Metatype:
-        diagnoseInvalidAttr("cannot be a metatype");
-        return true;
-
-      case SymbolicValue::Integer:
-      case SymbolicValue::Float:
-      case SymbolicValue::String:
-      case SymbolicValue::Function:
-        break;
-
-      case SymbolicValue::Array:
-        // Best effort check for common problems.
-        CanType eltTy;
-        for (auto elt : constValue.getArrayValue(eltTy)) {
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() == SymbolicValue::Metatype) {
-            diagnoseInvalidAttr("cannot be an array of metatypes");
-            return true;
-          }
-        }
-        break;
-      }
-      return false;
-    };
-
-    // Emits a diagnostic and returns a negative number if the value is not an
-    // int array.  Otherwise returns the product of the array element
-    // values. e.g. For array [2, 3], return 6.
-    auto getIntArrayProduct = [&](SymbolicValue constValue) -> long long {
-      // strip away the possible aggregate wrapper.
-      constValue = constValue.lookThroughSingleElementAggregates();
-      if (constValue.getKind() != SymbolicValue::Array) {
-        diagnoseInvalidAttr("requires an array");
-        return -1;
-      }
-      CanType eltType;
-      auto elements = constValue.getArrayValue(eltType);
-      if (!StringRef(eltType->getString()).startswith("Int")) {
-        diagnoseInvalidAttr("requires an array of ints");
-        return -1;
-      }
-      long long ret = 1;
-      for (auto elt : elements) {
-        // strip away the possible aggregate wrapper.
-        elt = elt.lookThroughSingleElementAggregates();
-        if (elt.getKind() != SymbolicValue::Integer) {
-          diagnoseInvalidAttr("requires an array of ints");
-          return -1;
-        }
-        // It is possible for this to overflow, but the resulting compilation
-        // will still be correct, so for simplicity we do not guard against
-        // overflow. More specifically, when it overflows, we would either
-        // return a negative value and thus reject the input program, or
-        // return an incorrect positive value. In both cases, the input
-        // program will still be eventually rejected (e.g. in TF graph
-        // compiler), since the specified shape is too large. As such, the
-        // correctness of compilation is preserved.
-        ret *= elt.getIntegerValue().getLimitedValue();
-      }
-      return ret;
-    };
-    // Verify that the type of this attribute is ok for the ArgumentLowering we
-    // have.
-    switch (std::get<1>(argumentNameAndLowering)) {
-    case GraphOperationInfo::ArgumentLowering::Input:
-      llvm_unreachable("Attributes cannot be inputs");
-    case GraphOperationInfo::ArgumentLowering::Out:
-      llvm_unreachable("Attributes cannot be output parameters");
-    case GraphOperationInfo::ArgumentLowering::NormalAttribute:
-      if (verifyNormalAttr(constValue))
-        return; // error already emitted.
-      break;
-    case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
-      // A shape attr must be an int array.
-      if (getIntArrayProduct(constValue) < 0)
-        return; // error already emitted.
-      break;
-    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
-      if (constValue.getKind() == SymbolicValue::Integer ||
-          constValue.getKind() == SymbolicValue::Float   ||
-          constValue.getKind() == SymbolicValue::String)
-        break;
-
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires a constant that is an integer,"
-                                   " floating point, or array thereof");
-
-      // Returns a negative number if the next attr is not a shape.  Otherwise
-      // returns the number of elements as given by the shape attr. e.g. a
-      // tensor with shape [2, 3] has 6 elements.
-      auto getNumEltsFromShapeAttr = [&]() -> long long {
-        if (i + 1 >= opInfo.getStructuredArguments().size())
-          return -1;
-        auto nextOperand = opInfo.getStructuredArguments()[i + 1];
-        auto nextArgumentLowering = std::get<1>(
-            nextOperand.getArgumentNameAndLowering());
-        if (nextArgumentLowering !=
-            GraphOperationInfo::ArgumentLowering::ShapeAttribute)
-          return -1;
-        assert(nextOperand.getKind() == GraphOperationInfo::SAK_Single &&
-               "SILGen should not have generated a list argument");
-        auto it = constants.find(nextOperand.getSingleArgument());
-        if (it == constants.end() || !it->second.isConstant())
-          return -1;
-        auto constValue = it->second.lookThroughSingleElementAggregates();
-        return getIntArrayProduct(constValue);
-      };
-      // Shape attr is an int array.
-      auto numEltsFromShapeAttr = getNumEltsFromShapeAttr();
-      if (numEltsFromShapeAttr < 0)
-        return diagnoseInvalidAttr("must be followed by a shape attribute");
-
-      // Validate that the shape matches the # elements we have.
-      CanType eltType;
-      auto elements = constValue.getArrayValue(eltType);
-
-      if ((size_t)numEltsFromShapeAttr != elements.size())
-        return diagnoseInvalidAttr("does not match the shape attribute in "
-                                   "the number of scalar elements");
-
-      // Empty tensor value is ok.
-      if (elements.empty()) break;
-
-      auto firstElt = elements.front().lookThroughSingleElementAggregates();
-
-      // Verify that all the elements are the same type, and that they are
-      // either integer or FP.
-      if (firstElt.getKind() == SymbolicValue::Integer) {
-        for (auto elt : elements) {
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() != SymbolicValue::Integer ||
-              elt.getIntegerValueBitWidth() !=
-              firstElt.getIntegerValueBitWidth())
-            return diagnoseInvalidAttr("array values must be the same type");
-        }
-      } else if (firstElt.getKind() == SymbolicValue::Float) {
-        for (auto elt : elements) {
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() != SymbolicValue::Float ||
-              elt.getFloatValueSemantics() != firstElt.getFloatValueSemantics())
-            return diagnoseInvalidAttr("array values must be the same type");
-        }
-      } else if (firstElt.getKind() == SymbolicValue::String) {
-        for (auto elt : elements) {
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() != SymbolicValue::String)
-            return diagnoseInvalidAttr("array values must be the same type");
-        }
-      }
-      else {
-        return diagnoseInvalidAttr("requires a constant that is an integer,"
-                                   " floating point, string, or array thereof");
-      }
-      break;
-    }
-    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
-      // Integers are ok.
-      if (constValue.getKind() == SymbolicValue::Integer)
-        break;
-
-      // Arrays of integers are ok.
-      if (constValue.getKind() == SymbolicValue::Array) {
-        CanType eltTy;
-        for (auto elt : constValue.getArrayValue(eltTy)) {
-          elt = elt.lookThroughSingleElementAggregates();
-          if (elt.getKind() != SymbolicValue::Integer)
-            return diagnoseInvalidAttr("requires an integer or array of "
-                                       "integers");
-        }
-        break;
-      }
-
-      // Everything else is bad.
-      return diagnoseInvalidAttr("requires an integer or array of integers");
-    }
     }
   }
 
@@ -2661,6 +2455,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
     auto op = opBuilder.build(B, context, loc, resultSILTypes);
+    op->setNoClustering(noClustering);
 
     // Recursively pack results to a value with the user-specified aggregate type.
     auto resultIt = op->getResults().begin();
@@ -2698,6 +2493,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       assert(isTensorFlowValue(resultType) &&
              "when there are multiple results, they should be tf types");
     auto op = opBuilder.build(B, context, loc, origResultTypes);
+    op->setNoClustering(noClustering);
     origInst->replaceAllUsesPairwiseWith(op);
   }
 
@@ -2705,6 +2501,16 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
+}
+
+// Event schema:
+// "S4TF FuncSize",FuncName,Size,StageName
+// StageName can be one of {"BeforeInline", "AfterInline", "AfterDA"}
+static void maybeLogFuncSize(const SILFunction &fn, StringRef stageName) {
+  if (!TFLogDeabstractionStats)
+    return;
+  llvm::dbgs() << "S4TF FuncSize," << fn.getName() << "," << fn.codeSize()
+               << "," << stageName << "\n";
 }
 
 /// Process the specified top level function as a deabstraction context: if it
@@ -2721,13 +2527,15 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 ///   4) Scalarization of struct/tuple values.
 ///
 void TFDeabstraction::doIt() {
+  maybeLogFuncSize(fn, "BeforeInline");
+
   // Start by inlining functions that take and return Tensor values.
   inlineCalls();
+  maybeLogFuncSize(fn, "AfterInline");
 
   // Scan for any Tensor operations, removing indirect operands and structs that
   // interfere with SSA construction.
-  if (simplifyTensorOperands())
-    return;
+  simplifyTensorOperands();
 
   // If we didn't find any ops, early exit processing of this function to save
   // compile time.
@@ -2767,6 +2575,7 @@ void TFDeabstraction::doIt() {
   cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
+  maybeLogFuncSize(fn, "AfterDA");
 }
 
 

@@ -147,23 +147,6 @@ public func sinkTensorToScalarCrash() {
   opaqueGenericFunction(loss)
 }
 
-public extension Tensor {
-  // This is a theoretical operation that takes a generic scalar value as an
-  // attribute.
-  @inlinable @inline(__always)
-  func genericAttr<T : TensorFlowScalar>(axis: T) -> Tensor {
-    // expected-error @+1 {{op named 'ExampleOp' is not registered in TensorFlow}}
-    let ret: TensorHandle<Scalar> = #tfop("ExampleOp", handle, axis: axis, axisType$dtype: T.tensorFlowDataType)
-    return Tensor<Scalar>(handle: ret)
-  }
-}
-
-public func testGenericThing() {
-  let a = Tensor<Float>(zeros: [1,2])
-  let b = a.genericAttr(axis: 42)
-  _ = b+b
-}
-
 
 // b/76058387: Deabstraction crasher
 public func testPropagateScalarOperands() {
@@ -384,6 +367,20 @@ public func SR8419(iterationCount: Int) {
 // up or down.
 struct AggregateStruct {
   let a, b: Tensor<Float>
+}
+extension AggregateStruct : TensorGroup {
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+  public static var _typeList: [TensorDataType] {
+    fatalError("dummy conformance")
+  }
+  public static var _unknownShapeList: [TensorShape?] {
+    fatalError("dummy conformance")
+  }
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
 }
 public func inlineDeabstracted_a() -> Tensor<Float> {
   return deabstractedCallee([1, 2, 3])

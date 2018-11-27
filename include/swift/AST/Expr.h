@@ -3847,6 +3847,13 @@ public:
            E->getKind() == ExprKind::ValueAndGradient;
   }
 
+  AutoDiffParameterIndices *getCheckedParameterIndices() const {
+    return CheckedParameterIndices;
+  }
+  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
+    CheckedParameterIndices = pi;
+  }
+
 private:
   /// The start location of this expression.
   SourceLoc Loc;
@@ -3860,6 +3867,8 @@ private:
   unsigned ResultIndex;
   /// The location of ')'.
   SourceLoc RParenLoc;
+  /// Checked parameter indices, to be resolved by the type checker.
+  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
 
 protected:
   explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,

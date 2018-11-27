@@ -620,13 +620,12 @@ AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
 }
 
 AutoDiffFunctionInst::AutoDiffFunctionInst(
-    SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+    SILModule &module, SILDebugLocation debugLoc,
     const SmallBitVector &parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
           debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
                                     parameterIndices)),
-      legacyReverseModeFlag(isLegacyReverseMode),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
       numOperands(1 + associatedFunctions.size()) {
@@ -634,38 +633,62 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
-    bool isLegacyReverseAD, const SmallBitVector &parameterIndices,
+    const SmallBitVector &parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
     ArrayRef<SILValue> associatedFunctions) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
   return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
-                                             isLegacyReverseAD,
                                              parameterIndices,
                                              differentiationOrder,
                                              originalFunction,
                                              associatedFunctions);
 }
 
-
-ArrayRef<Operand> AutoDiffFunctionInst::
-getAssociatedFunctionList(unsigned differentiationOrder) const {
+std::pair<SILValue, SILValue> AutoDiffFunctionInst::
+getAssociatedFunctionPair(unsigned differentiationOrder) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
-  auto numAssocFns = autodiff::
-      getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode());
-  auto offset = (differentiationOrder - 1) * numAssocFns;
-  return getAssociatedFunctions().slice(offset, numAssocFns);
+  assert(!getAssociatedFunctions().empty() && "No associated functions. Maybe "
+         "the differentiation pass has not run?");
+  auto offset = (differentiationOrder - 1) * 2;
+  auto assocFns = getAssociatedFunctions();
+  return {assocFns[offset].get(), assocFns[offset+1].get()};
 }
 
 SILValue AutoDiffFunctionInst::
 getAssociatedFunction(unsigned differentiationOrder,
-                      SILAutoDiffAssociatedFunctionKind kind) const {
+                      AutoDiffAssociatedFunctionKind kind) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
   auto offset = autodiff::getOffsetForAutoDiffAssociatedFunction(
       differentiationOrder, kind);
   return getAssociatedFunctions()[offset].get();
+}
+
+SILType AutoDiffFunctionExtractInst::
+getAssociatedFunctionType(SILValue function,
+                          AutoDiffAssociatedFunctionKind kind,
+                          unsigned differentiationOrder,
+                          SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getExtInfo().isDifferentiable());
+  // FIXME: Get indices from the @autodiff function type.
+  auto assocFnTy = fnTy->getAutoDiffAssociatedFunctionType(SmallBitVector(),
+                                                           differentiationOrder,
+                                                           kind, module);
+  return SILType::getPrimitiveObjectType(assocFnTy);
+}
+
+AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    AutoDiffAssociatedFunctionKind associatedFunctionKind,
+    unsigned differentiationOrder, SILValue theFunction)
+    : InstructionBase(debugLoc, getAssociatedFunctionType(
+          theFunction, associatedFunctionKind, differentiationOrder, module)),
+      associatedFunctionKind(associatedFunctionKind),
+      differentiationOrder(differentiationOrder),
+      operands(this, theFunction) {
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -2508,13 +2531,11 @@ DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
 GraphOperationInst::GraphOperationInst(
     SILModule &M, SILDebugLocation loc, Identifier name,
     ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
-    ArrayRef<SILType> resultTypes,
-    ArrayRef<ValueOwnershipKind> resultOwnerships) :
-  InstructionBase(loc),
-  MultipleValueInstructionTrailingObjects(this, resultTypes,
-                                          resultOwnerships),
-  Name(name), NumOperands(arguments.size())
-{
+    bool noClustering, ArrayRef<SILType> resultTypes,
+    ArrayRef<ValueOwnershipKind> resultOwnerships)
+    : InstructionBase(loc), MultipleValueInstructionTrailingObjects(
+                                this, resultTypes, resultOwnerships),
+      Name(name), NumOperands(arguments.size()), NoClustering(noClustering) {
   auto allOperands = getAllOperands();
   for (unsigned i : indices(arguments))
     new (&allOperands[i]) Operand(this, arguments[i]);
@@ -2530,10 +2551,11 @@ GraphOperationInst::~GraphOperationInst() {
   delete[] getAttributes().data();
 }
 
-GraphOperationInst *GraphOperationInst::create(
-    SILModule &M, SILDebugLocation loc, Identifier name,
-    ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attributes,
-    ArrayRef<SILType> resultTypes) {
+GraphOperationInst *
+GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
+                           ArrayRef<SILValue> arguments,
+                           ArrayRef<GraphOperationAttribute> attributes,
+                           bool noClustering, ArrayRef<SILType> resultTypes) {
   llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
   for (auto resultType : resultTypes) {
     auto ownership = resultType.isTrivial(M)
@@ -2545,8 +2567,9 @@ GraphOperationInst *GraphOperationInst::create(
     totalSizeToAlloc<MultipleValueInstruction *, GraphOperationResult, Operand>(
       1, resultTypes.size(), arguments.size());
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
-  return ::new (buffer) GraphOperationInst(M, loc, name, arguments, attributes,
-                                           resultTypes, resultOwnerships);
+  return ::new (buffer)
+      GraphOperationInst(M, loc, name, arguments, attributes, noClustering,
+                         resultTypes, resultOwnerships);
 }
 
 GraphOperationAttribute GraphOperationInst::getAttribute(unsigned i) const {

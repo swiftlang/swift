@@ -26,4 +26,19 @@ ParameterUpdateTests.test("UpdateParameters") {
   expectEqual(2, f.w.scalar!)
 }
 
+ParameterUpdateTests.test("UpdateParameterArrays") {
+  struct Foo : Parameterized {
+    @TFParameter var w = [Tensor<Float>(1), Tensor<Float>(2)]
+    mutating func foo() {
+      updateParameters(withGradients: Parameters(w: [Tensor(1), Tensor(2)])) {
+        $0 += $1
+      }
+    }
+  }
+  var f = Foo()
+  f.foo()
+  expectEqual(2, f.w[0].scalar!)
+  expectEqual(4, f.w[1].scalar!)
+}
+
 runAllTests()

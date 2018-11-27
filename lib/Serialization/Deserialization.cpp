@@ -2549,11 +2549,16 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         DeclID primalDeclId;
         uint64_t adjointNameId;
         DeclID adjointDeclId;
+        uint64_t jvpNameId;
+        DeclID jvpDeclId;
+        uint64_t vjpNameId;
+        DeclID vjpDeclId;
         ArrayRef<uint64_t> paramValues;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-          scratch, autodiffModeValue, primalNameId, primalDeclId, adjointNameId,
-          adjointDeclId, paramValues);
+            scratch, autodiffModeValue, primalNameId, primalDeclId,
+            adjointNameId, adjointDeclId, jvpNameId, jvpDeclId, vjpNameId,
+            vjpDeclId, paramValues);
         autodiffMode = autodiffModeValue
           ? AutoDiffMode::Reverse
           : AutoDiffMode::Forward;
@@ -2565,8 +2570,24 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
           primal = { getIdentifier(primalNameId), DeclNameLoc() };
           primalDecl = cast<FuncDecl>(getDecl(primalDeclId));
         }
-        FuncSpecifier adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
-        FuncDecl *adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
+        Optional<FuncSpecifier> adjoint;
+        FuncDecl *adjointDecl = nullptr;
+        if (adjointNameId != 0 && adjointDeclId != 0) {
+          adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
+          adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
+        }
+        Optional<FuncSpecifier> jvp;
+        FuncDecl *jvpDecl = nullptr;
+        if (jvpNameId != 0 && jvpDeclId != 0) {
+          jvp = { getIdentifier(jvpNameId), DeclNameLoc() };
+          jvpDecl = cast<FuncDecl>(getDecl(jvpDeclId));
+        }
+        Optional<FuncSpecifier> vjp;
+        FuncDecl *vjpDecl = nullptr;
+        if (vjpNameId != 0 && vjpDeclId != 0) {
+          vjp = { getIdentifier(vjpNameId), DeclNameLoc() };
+          vjpDecl = cast<FuncDecl>(getDecl(vjpDeclId));
+        }
 
         SmallVector<AutoDiffParameter, 4> parameters;
         SourceLoc loc;
@@ -2576,13 +2597,16 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
             : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
           parameters.push_back(parameter);
         }
+        // TODO: Deserialize CheckedParameterIndices.
         // TODO: Deserialize trailing where clause.
         auto diffAttr =
           DifferentiableAttr::create(ctx, loc, SourceRange(), autodiffMode,
-                                     loc, parameters, primal, adjoint,
-                                     /*TrailingWhereClause*/ nullptr);
+                                     loc, parameters, primal, adjoint, jvp,
+                                     vjp, /*TrailingWhereClause*/ nullptr);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
+        diffAttr->setJVPFunction(jvpDecl);
+        diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;
         break;
       }

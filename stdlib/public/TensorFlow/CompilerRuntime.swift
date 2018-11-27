@@ -481,6 +481,14 @@ fileprivate extension _ExecutionContext {
   }
 }
 
+public extension _ExecutionContext {
+  /// Load functions from a graph encoded as a byte-pointer and length into the
+  /// tensorflow eagerContext.
+  func loadFunctionsFromGraph(byteAddress: UnsafeRawPointer, byteCount: Int) {
+    _ = loadProgramInBytes(byteAddress, count: byteCount)
+  }
+}
+
 @usableFromInline
 internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
@@ -1123,6 +1131,21 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
   computation.terminate()
 }
 
+/// Registers all functions in a graph into the eager context if in eager mode.
+///
+/// - Parameters:
+///   - programByteAddress: The address of the raw program.
+///   - programByteCount: The number of bytes in the program.
+@inlinable
+@_silgen_name("_swift_tfc_RegisterTensorFunctions")
+public func _TFCRegisterTensorFunctions(
+  _ programByteAddress: UnsafeRawPointer,
+  _ programByteCount: Int
+) {
+  _ExecutionContext.global.loadFunctionsFromGraph(byteAddress: programByteAddress,
+                                                  byteCount: programByteCount)
+}
+
 /// Creates a scalar CTensorHandle value for the given data type.
 ///
 /// - Parameters:
@@ -1323,6 +1346,32 @@ func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
 }
 
 @usableFromInline
+@_silgen_name("_swift_tfc_OpSetAttrTensorShape")
+func _TFCOpSetAttrTensorShape(_ op: CTFEOp,
+                              _ attrName: UnsafePointer<Int8>,
+                              _ shape: TensorShape,
+                              _ status: CTFStatus) {
+  let dimensions: [Int64] = shape.dimensions.map(Int64.init)
+  dimensions.withUnsafeBufferPointer { buffer in
+    TFE_OpSetAttrShape(op, attrName, buffer.baseAddress, Int32(buffer.count),
+                       status)
+  }
+}
+
+@usableFromInline
+@_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShape")
+func _TFCOpSetAttrOptionalTensorShape(_ op: CTFEOp,
+                                      _ attrName: UnsafePointer<Int8>,
+                                      _ optionalShape: TensorShape?,
+                                      _ status: CTFStatus) {
+  guard let shape = optionalShape else {
+    TFE_OpSetAttrShape(op, attrName, nil, -1, status)
+    return
+  }
+  _TFCOpSetAttrTensorShape(op, attrName, shape, status)
+}
+
+@usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTensorShapeArray")
 func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
                                    _ attrName: UnsafePointer<Int8>,
@@ -1396,6 +1445,46 @@ func _TFCOpSetAttrString(_ op: CTFEOp,
     // utf8CString is null-terminated; TFE_OpSetAttrString wants
     // non-null-terminated.
     TFE_OpSetAttrString(op, attrName, buffer.baseAddress, buffer.count - 1)
+  }
+}
+
+/// Wrapper around TFE_OpSetAttrStringList that handles converting the Swift
+/// Strings into buffers that TFE_OpSetAttrStringList can read.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpSetAttrStringArray")
+func _TFCOpSetAttrStringArray(_ op: CTFEOp,
+                             _ attrName: UnsafePointer<Int8>,
+                             _ strings: [String]) {
+  // Collect all the strings' utf8 bytes into a single array so that we can
+  // address all the strings with a single
+  // `flattenedStringBytes.withUnsafeBufferPointer`.
+  var flattenedStringBytes: [CChar] = []
+  var lengths: [Int] = []
+  for string in strings {
+    // Don't include the null-terminator because TFE_OpSetAttrStringList uses
+    // lengths instead of null-terminators.
+    let stringBytes = string.utf8CString.dropLast()
+    flattenedStringBytes.append(contentsOf: stringBytes)
+    lengths.append(stringBytes.count)
+  }
+
+  // Calculate the addresses of all the strings within our single buffer, and
+  // then call TFE_OpSetAttrStringList.
+  flattenedStringBytes.withUnsafeBufferPointer { flattenedStringBytesBuffer in
+    var stringAddrs: [UnsafeRawPointer?] = []
+    var currentStringAddr =
+        flattenedStringBytesBuffer.baseAddress.map(UnsafeRawPointer.init)
+    for length in lengths {
+      stringAddrs.append(currentStringAddr)
+      currentStringAddr = currentStringAddr?.advanced(by: length)
+    }
+
+    stringAddrs.withUnsafeBufferPointer { stringAddrsBuffer in
+      lengths.withUnsafeBufferPointer { lengthsBuffer in
+        TFE_OpSetAttrStringList(op, attrName, stringAddrsBuffer.baseAddress,
+                                lengthsBuffer.baseAddress, Int32(strings.count))
+      }
+    }
   }
 }
 

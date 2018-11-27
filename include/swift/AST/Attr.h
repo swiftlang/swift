@@ -1311,8 +1311,17 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Attribute that marks a function differentiable and specifies the adjoint
-/// of the function. For example:
+/// Attribute that marks a function differentiable and optionally specifies
+/// custom associated autodiff functions: 'primal', 'adjoint', 'jvp', and
+/// 'vjp'.
+///
+/// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
+/// until we have fully switched to 'jvp' and 'vjp'.
+///
+/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
+/// AD pass does not use them. We are incrementally adding support for them.
+///
+/// For example:
 ///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
@@ -1331,19 +1340,34 @@ private:
   Optional<DeclNameWithLoc> Primal;
   /// The adjoint function.
   Optional<DeclNameWithLoc> Adjoint;
+  /// The JVP function.
+  Optional<DeclNameWithLoc> JVP;
+  /// The VJP function.
+  Optional<DeclNameWithLoc> VJP;
   /// The constraint clauses for generic types.
   TrailingWhereClause *WhereClause = nullptr;
   /// The primal function (optional), to be resolved by the type checker if
   /// specified.
   FuncDecl *PrimalFunction = nullptr;
-  /// The adjoint function, to be resolved by the type checker.
+  /// The adjoint function (optional), to be resolved by the type checker if
+  /// specified.
   FuncDecl *AdjointFunction = nullptr;
+  /// The JVP function (optional), to be resolved by the type checker if
+  /// specified.
+  FuncDecl *JVPFunction = nullptr;
+  /// The VJP function (optional), to be resolved by the type checker if
+  /// specified.
+  FuncDecl *VJPFunction = nullptr;
+  /// Checked parameter indices, to be resolved by the type checker.
+  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                               AutoDiffMode mode, SourceLoc modeLoc,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
+                              Optional<DeclNameWithLoc> jvp,
+                              Optional<DeclNameWithLoc> vjp,
                               TrailingWhereClause *clause);
 
 public:
@@ -1353,12 +1377,23 @@ public:
                                     ArrayRef<AutoDiffParameter> parameters,
                                     Optional<DeclNameWithLoc> primal,
                                     Optional<DeclNameWithLoc> adjoint,
+                                    Optional<DeclNameWithLoc> jvp,
+                                    Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   AutoDiffMode getMode() const { return Mode; }
   SourceLoc getModeLoc() const { return ModeLoc; }
   Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
   Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
+  Optional<DeclNameWithLoc> getJVP() const { return JVP; }
+  Optional<DeclNameWithLoc> getVJP() const { return VJP; }
+
+  AutoDiffParameterIndices *getCheckedParameterIndices() const {
+    return CheckedParameterIndices;
+  }
+  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
+    CheckedParameterIndices = pi;
+  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
@@ -1377,6 +1412,10 @@ public:
   void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }
   FuncDecl *getAdjointFunction() const { return AdjointFunction; }
   void setAdjointFunction(FuncDecl *decl) { AdjointFunction = decl; }
+  FuncDecl *getJVPFunction() const { return JVPFunction; }
+  void setJVPFunction(FuncDecl *decl) { JVPFunction = decl; }
+  FuncDecl *getVJPFunction() const { return VJPFunction; }
+  void setVJPFunction(FuncDecl *decl) { VJPFunction = decl; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;

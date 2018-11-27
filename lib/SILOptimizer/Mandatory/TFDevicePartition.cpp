@@ -227,8 +227,9 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   for (auto r : inst->getResults())
     resultTypes.push_back(r->getType());
 
-  auto newOp = B.createGraphOperation(loc, inst->getName(), args,
-                                      inst->getAttributes(), resultTypes);
+  auto newOp =
+      B.createGraphOperation(loc, inst->getName(), args, inst->getAttributes(),
+                             /*runOutOfGraph*/ false, resultTypes);
 
   for (unsigned i = 0, e = inst->getNumResults(); i != e; ++i)
     ValueMap[inst->getResult(i)] = newOp->getResult(i);
@@ -752,7 +753,8 @@ public:
         for (unsigned i = 0, e = graphOpInst->getNumAttributes(); i != e; ++i) {
           auto attr = graphOpInst->getAttribute(i);
           auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-          if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
+          assert(attrInfo && "attribute has malformed name");
+          if (!tf::isShapeArrayPseudoAttr(attrInfo->first, attr.value))
             continue;
           newInstBuilder.addAttribute(attr);
         }

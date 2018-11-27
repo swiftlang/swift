@@ -10,7 +10,7 @@ struct Tensor<Scalar> {}
 
 sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
 bb0:
-  %0 = graph_op "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
+  %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
   %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F, hex2: f32 0x4048F5C3} : $Tensor<Float>
   %2 = graph_op "tf.Dummy"() {float1: f64 3.14, float2: f32 -3.14} : $Tensor<Float>
   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>
@@ -24,7 +24,7 @@ bb0:
 
 // CHECK-LABEL: sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = graph_op "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
+// CHECK-NEXT:   %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
 // CHECK-NEXT:   %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, hex2: f32 0x4048F5C3 /* 3.1400001 */} : $Tensor<Float>
 // CHECK-NEXT:   %2 = graph_op "tf.Dummy"() {float1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, float2: f32 0xC048F5C3 /* -3.1400001 */} : $Tensor<Float>
 // CHECK-NEXT:   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>

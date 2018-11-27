@@ -13,7 +13,9 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Range.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -46,6 +48,15 @@ bool SILAutoDiffIndices::operator==(
   return buffer.none();
 }
 
+AutoDiffAssociatedFunctionKind::
+AutoDiffAssociatedFunctionKind(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+         .Case("jvp", JVP).Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
 Differentiability::Differentiability(AutoDiffMode mode,
                                      bool wrtSelf,
                                      llvm::SmallBitVector parameterIndices,
@@ -71,38 +82,164 @@ Differentiability::Differentiability(AutoDiffMode mode,
   resultIndices.set();
 }
 
-unsigned
-autodiff::getNumAutoDiffAssociatedFunctionsPerOrder(bool isLegacyReverseMode) {
-  return isLegacyReverseMode ? 2 : 4;
+unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
+    unsigned order, AutoDiffAssociatedFunctionKind kind) {
+  return (order - 1) * 2 + kind.rawValue;
 }
 
-unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
-    unsigned order, SILAutoDiffAssociatedFunctionKind kind) {
-  bool isLegacyReverseMode =
-      kind == SILAutoDiffAssociatedFunctionKind::LegacyPrimal ||
-      kind == SILAutoDiffAssociatedFunctionKind::LegacyAdjoint;
-  unsigned numPerOrder =
-      autodiff::getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode);
-  unsigned offset;
-  switch (kind) {
-  case SILAutoDiffAssociatedFunctionKind::LegacyPrimal:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::LegacyAdjoint:
-    offset = 1;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::JVP:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::Differential:
-    offset = 1;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::VJP:
-    offset = 2;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::Pullback:
-    offset = 3;
-    break;
+/// If `isMethod` is true, returns the non-self part of `functionType`. (e.g.
+/// "(Self) -> (A, B) -> R" becomes "(A, B) -> R"). Otherwise, returns
+/// `functionType` unmodified.
+static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
+                                            bool isMethod) {
+  if (isMethod) {
+    assert(functionType->getNumParams() == 1 &&
+           "unexpected num params for method");
+    return functionType->getResult()->castTo<AnyFunctionType>();
   }
-  return (order - 1) * numPerOrder + offset;
+  return functionType;
+}
+
+/// Allocates and initializes an empty `AutoDiffParameterIndices` for the
+/// given `functionType`. `isMethod` specifies whether to treat the function
+/// as a method.
+AutoDiffParameterIndices *
+AutoDiffParameterIndices::create(ASTContext &C, AnyFunctionType *functionType,
+                                 bool isMethod) {
+  // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
+  // gets called, which causes a small memory leak in the case that the
+  // SmallBitVector decides to allocate some heap space.
+  void *mem = C.Allocate(sizeof(AutoDiffParameterIndices),
+                         alignof(AutoDiffParameterIndices));
+  unsigned paramCount =
+      unwrapSelfParameter(functionType, isMethod)->getNumParams() +
+      (isMethod ? 1 : 0);
+  return ::new (mem) AutoDiffParameterIndices(paramCount, isMethod);
+}
+
+unsigned AutoDiffParameterIndices::getNumNonSelfParameters() const {
+  return indices.size() - (isMethodFlag ? 1 : 0);
+}
+
+/// Adds the indexed parameter to the set. When `isMethodFlag` is not set, the
+/// indices index into the first parameter list. For example,
+///
+///   functionType = (A, B, C) -> R
+///   paramIndex = 0
+///   ==> adds "A" to the set.
+///
+/// When `isMethodFlag` is set, the indices index into the first non-self
+/// parameter list. For example,
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   paramIndex = 0
+///   ==> adds "A" to the set.
+///
+void AutoDiffParameterIndices::setNonSelfParameter(unsigned paramIndex) {
+  assert(paramIndex < getNumNonSelfParameters() && "paramIndex out of bounds");
+  indices.set(paramIndex);
+}
+
+/// Adds all the paramaters from the first non-self parameter list to the set.
+/// For example,
+///
+///   functionType = (A, B, C) -> R
+///   ==> adds "A", B", and "C" to the set.
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   ==> adds "A", B", and "C" to the set.
+///
+void AutoDiffParameterIndices::setAllNonSelfParameters() {
+  indices.set(0, getNumNonSelfParameters());
+}
+
+/// Adds the self parameter to the set. `isMethodFlag` must be set. For
+/// example,
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   ==> adds "Self" to the set
+///
+void AutoDiffParameterIndices::setSelfParameter() {
+  assert(isMethodFlag &&
+         "trying to add self param to non-method parameter indices");
+  indices.set(indices.size() - 1);
+}
+
+/// Pushes the subset's parameter's types to `paramTypes`, in the order in
+/// which they appear in the function type. For example,
+///
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> pushes {A, C} to `paramTypes`.
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   if "Self" and "C" are in the set,
+///   ==> pushes {Self, C} to `paramTypes`.
+///
+void AutoDiffParameterIndices::getSubsetParameterTypes(
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes) const {
+  AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
+  if (isMethodFlag && indices[indices.size() - 1])
+    paramTypes.push_back(functionType->getParams()[0].getPlainType());
+  for (unsigned paramIndex : range(unwrapped->getNumParams()))
+    if (indices[paramIndex])
+      paramTypes.push_back(unwrapped->getParams()[paramIndex].getPlainType());
+}
+
+static unsigned countNumFlattenedElementTypes(Type type) {
+  if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
+    return accumulate(tupleTy->getElementTypes(), 0,
+                      [&](unsigned num, Type type) {
+                        return num + countNumFlattenedElementTypes(type);
+                      });
+  return 1;
+}
+
+/// Returns a bitvector for the SILFunction parameters corresponding to the
+/// parameters in this set. In particular, this explodes tuples and puts the
+/// method self parameter at the end. For example,
+///
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> returns 101
+///   (because the lowered SIL type is (A, B, C) -> R)
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   if "Self" and "C" are in the set,
+///   ==> returns 0011
+///   (because the lowered SIL type is (A, B, C, Self) -> R)
+///
+///   functionType = (A, (B, C), D) -> R
+///   if "A" and "(B, C)" are in the set,
+///   ==> returns 1110
+///   (because the lowered SIL type is (A, B, C, D) -> R)
+///
+llvm::SmallBitVector
+AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
+  // Calculate the lowered sizes of all the parameters.
+  AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
+  SmallVector<unsigned, 8> paramLoweredSizes;
+  unsigned totalLoweredSize = 0;
+  auto addLoweredParamInfo = [&](Type type) {
+    unsigned paramLoweredSize = countNumFlattenedElementTypes(type);
+    paramLoweredSizes.push_back(paramLoweredSize);
+    totalLoweredSize += paramLoweredSize;
+  };
+  for (auto &param : unwrapped->getParams())
+    addLoweredParamInfo(param.getPlainType());
+  if (isMethodFlag)
+    addLoweredParamInfo(functionType->getParams()[0].getPlainType());
+
+  // Construct the result by setting each range of bits that corresponds to each
+  // "on" parameter.
+  llvm::SmallBitVector result(totalLoweredSize);
+  unsigned currentBitIndex = 0;
+  for (unsigned i : range(indices.size())) {
+    auto paramLoweredSize = paramLoweredSizes[i];
+    if (indices[i])
+      result.set(currentBitIndex, currentBitIndex + paramLoweredSize);
+    currentBitIndex += paramLoweredSize;
+  }
+
+  return result;
 }

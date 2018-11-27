@@ -643,7 +643,10 @@ public:
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
-  /// These are all the tensor ops found in the initial scan over the function.
+  /// These are the tensor ops to be executed in the extracted graph function.
+  // They are found in the initial scan over the function.
+  // Note when a graphOp inst is marked to run out-of-graph
+  // (graphOp->getRunOutOfGraph() is true), it will not be included here.
   SmallPtrSet<SILInstruction *, 8> tensorOpsSet;
 
   /// This keeps track of the set of blocks that are marked as needing to be
@@ -823,6 +826,22 @@ private:
   /// being sent back.
   void
   insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues);
+
+  /// Rewrite the host program, inserting a call to a #tfop that calls the
+  /// generated graph. This way, if someone still calls this function,
+  /// everything will just work. This should only be called for accelerator only
+  /// functions.
+  ///
+  /// eg:
+  ///   A function taking one tensor and returning another will become:
+  ///
+  ///   sil @$current_function: (Tensor<Float>) -> Tensor<Float> {
+  ///     %1 = struct_extract %0 : $Tensor<Float>, #Tensor.handle
+  ///     %2 = graph_op "current_function.tf_only"(%1)
+  ///     %3 = struct $Tensor<Float> (%2 : $TensorHandle<Float>)
+  ///     return %3 : $Tensor<Float>
+  ///   }
+  void insertReplacementGraphOp(ArrayRef<SILValue> resultValues);
 
   // `oldResult` is a tensor in the original host program which has some use
   // beyond the tensor end point, and `newResult` is its correpsponding tensor
@@ -2029,6 +2048,12 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       if (!graphOp)
         continue;
       logInput();
+
+      // If we need to run this op out-of-graph (e.g. because it has a dynamic
+      // attribute), do not add it to `tensorOps`.
+      if (graphOp->getNoClustering())
+        continue;
+
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
 
@@ -3688,6 +3713,63 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
   }
 }
 
+void TFFunctionPartition::insertReplacementGraphOp(
+    ArrayRef<SILValue> resultValues) {
+  // Sanity check that all result values are tensor handles. Note SIL
+  // accelerator functions under the "tensorflow" convention can also return
+  // variant and resource tensors (in addition to tensor handles), but such
+  // functions will not generate all host-side code, and thus this method will
+  // not be called.
+  assert(TFSendRecvOpaqueHandle ||
+         llvm::all_of(resultValues,
+                      [](SILValue resultValue) {
+                        return isTensorHandle(resultValue->getType());
+                      }) &&
+             "Cannot return a non-TensorHandle value to host in the TF program "
+             "-- should this function use tensorflow convention?");
+
+  auto &ctx = hostFn.getASTContext();
+  auto loc = hostFn.getLocation();
+
+  SILBuilder B(tensorStartPoint);
+
+  SmallVector<SILType, 4> ResultSILTypes;
+  for (auto resultValue : resultValues) {
+    ResultSILTypes.push_back(resultValue->getType());
+  }
+
+  GraphOperationBuilder opBuilder(
+      getGraphFuncNameForFuncAttr(hostFn.getName()));
+  for (auto arg : tensorFnArguments) {
+    opBuilder.addArgument(arg);
+  }
+
+  auto *opResult = opBuilder.build(B, ctx, loc, ResultSILTypes);
+
+  // This loop replaces all usages of a result from resultValues in all ops
+  // after tensorEndPoint.
+  for (unsigned resultNumber = 0, e = resultValues.size(); resultNumber != e;
+       ++resultNumber) {
+    SILValue result = resultValues[resultNumber];
+    SILValue newTH = opResult->getResult(resultNumber);
+    // Manually walk the use list in a custom way to avoid invalidating the
+    // iterator as we potentially change it.
+    for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE;) {
+      auto *operand = *UI++;
+      auto user = operand->getUser();
+
+      // Users may be either inside (e.g. another tensor op, or a non-tensor op
+      // that causes a copy back to the host) or outside the tensor program.  If
+      // it is after the tensor op, we can replace the use with the
+      // corresponding result value.  If inside, we'll track its retain/release
+      // balance, and then nuke it later.
+      if (DI.dominates(tensorEndPoint, user)) {
+        operand->set(newTH);
+      }
+    }
+  }
+}
+
 void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     ArrayRef<SILValue> resultValues) {
   // Sanity check that all result values are tensor handles. Note SIL
@@ -4184,6 +4266,8 @@ bool TFFunctionPartition::partition(bool isTest) {
     // code.
     if (!tensorProgram.theTensorComputation)
       return true;
+  } else {
+    insertReplacementGraphOp(resultValues);
   }
 
   // Calculate the parameter list for the new function.
@@ -4210,7 +4294,8 @@ bool TFFunctionPartition::partition(bool isTest) {
   auto resultFn = FB.getOrCreateFunction(
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
-      /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+      /* Function is SIL-only (no-debug): */ IsBare, IsNotTransparent,
+      IsNotSerialized);
   SWIFT_DEFER {
     // If we error out before assigning `resultFn` to the member field
     // `acceleratorFn`, we should make sure this synthensized function is
@@ -4228,7 +4313,8 @@ bool TFFunctionPartition::partition(bool isTest) {
   PC.cloneFunction(resultValues);
 
   // Clean up the source function, removing the tensor code.
-  if (!isAcceleratorOnly(hostFn) && !PC.finalizeOriginal())
+  if ((!isAcceleratorOnly(hostFn) || llvm::TFDynamicCompilation) &&
+      !PC.finalizeOriginal())
     return true;
 
   // Success!
@@ -4271,11 +4357,6 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
     if (graphLowering->lowerTFFunction(hostFn.getName(), acceleratorFn,
                                        deviceInfo))
       return true;
-
-    // Remove the host function so it doesn't go through the normal
-    // compiler flow.
-    transform.getPassManager()->notifyWillDeleteFunction(&hostFn);
-    hostFn.getModule().eraseFunction(&hostFn);
   } else {
     if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,
                                     deviceInfo))
@@ -4381,6 +4462,52 @@ private:
   bool partitionFunction(SILFunction *hostFn,
                          std::unique_ptr<TFFunctionPartition> &partitioner);
 };
+
+/// Inserts at the beginning of mainFunc the code needed to register all the
+/// constructed functions with the eager-mode runtime.
+void registerGraphFunctions(SILFunction *mainFunc,
+                            const std::vector<char> &bytes) {
+  // TODO: If this is a module that is not main, we may need to make a
+  // public module-initializer function that can be called from the true main
+  // module.
+  auto &M = mainFunc->getModule();
+  auto &ctx = mainFunc->getASTContext();
+  auto loc = mainFunc->getLocation();
+
+  SILBuilder B(&mainFunc->getEntryBlock()->front());
+
+  auto programRaw =
+      B.createStringLiteral(loc, StringRef(bytes.data(), bytes.size()),
+                            StringLiteralInst::Encoding::Bytes);
+
+  auto program =
+      wrapInStruct(programRaw, ctx.getUnsafeRawPointerDecl(), B, loc);
+
+  auto programLength = createIntValue(bytes.size(), B, loc);
+
+  // Registers all the functions in the graph with the eager runtime.
+  //
+  // @_silgen_name("_swift_tfc_RegisterTensorFunctions")
+  // public func _TFCRegisterTensorFunctions(
+  //   _ programByteAddress: UnsafeRawPointer,
+  //   _ programByteCount: Int,
+  // ) {
+  auto registerTensorFunction = M.findFunction(
+      "_swift_tfc_RegisterTensorFunctions", SILLinkage::PublicExternal);
+
+  assert(registerTensorFunction != nullptr &&
+         "Cannot find _swift_tfc_RegisterTensorFunctions");
+
+  SILValue startArgs[] = {
+      program,       // programByteAddress: UnsafeRawPointer
+      programLength, // programByteCount: Int
+  };
+
+  B.createApply(loc, B.createFunctionRef(loc, registerTensorFunction),
+                /*no substitutions*/ {}, startArgs,
+                /*isNonThrowing*/ false);
+}
+
 } // end anonymous namespace
 
 void TFPartition::run() {
@@ -4398,6 +4525,7 @@ void TFPartition::run() {
   if (!tfModule)
     return;
 
+  SILFunction *mainFunc = nullptr;
   // We use a two-pass design below. The first pass partitions and lowers those
   // partitionable functions into graphs. When we process a function that
   // references in function-typed attributes other functions that are not yet
@@ -4413,6 +4541,9 @@ void TFPartition::run() {
     if (!fn.isDefinition())
       continue;
     fns.push_back(&fn);
+    if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION) {
+      mainFunc = &fn;
+    }
   }
 
   // Track the set of functions that reference some function-typed attributes
@@ -4449,6 +4580,10 @@ void TFPartition::run() {
     // replicated byte buffers. Can move to a global byte buffer if this helps
     // with performance.
     partitioner->finalizeHostFunction(bytes, thisGraphFunc.graphFnName);
+  }
+
+  if (llvm::TFDynamicCompilation && mainFunc) {
+    registerGraphFunctions(mainFunc, bytes);
   }
 }
 
@@ -4544,19 +4679,6 @@ bool TFPartition::partitionFunction(
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                           << " contains tensor op(s).\n");
-
-  // Check to see if we cannot transform the function but should.  In this
-  // case we emit a compiler error.  This is a limitation of the compiler that
-  // will need to be resolved in the future (possibly through a model change),
-  // it's not clear if we should allow partitioning to work on unspecialized
-  // generics.
-  if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
-    auto &ctx = hostFn->getASTContext();
-    diagnose(ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
-             "TensorFlow graph program extraction does not work on generic "
-             "functions yet");
-    return true;
-  }
 
   // Because we're in active development, it is common to do something wrong
   // in the TensorFlow module.  Detect and reject things here.

@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 456; // Last change: encode depth in generic param XREFs
+const uint16_t SWIFTMODULE_VERSION_MINOR = 457; // Last change: add jvp and vjp to sil differentiable attribute
 
 using DeclIDField = BCFixed<31>;
 
@@ -1593,6 +1593,10 @@ namespace decls_block {
     DeclIDField, // Primal function declaration.
     IdentifierIDField, // Adjoint name.
     DeclIDField, // Adjoint function declaration.
+    IdentifierIDField, // JVP name.
+    DeclIDField, // JVP function declaration.
+    IdentifierIDField, // VJP name.
+    DeclIDField, // VJP function declaration.
     BCArray<BCFixed<32>> // Differentiation parameters.
   >;
 

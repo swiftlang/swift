@@ -108,4 +108,18 @@ extension Tensor : ConvertibleFromNumpyArray
     self.init(shape: shape, scalars: buffPtr)
   }
 }
+
+extension ShapedArray where Scalar : NumpyScalarCompatible {
+  /// Creates a NumPy array with the same elements.
+  ///
+  /// - Precondition: The `numpy` Python package must have been installed.
+  public func makeNumpyArray() -> PythonObject {
+    return scalars.makeNumpyArray().reshape(shape)
+  }
+}
+
+extension Tensor where Scalar : NumpyScalarCompatible {
+  public func makeNumpyArray() -> PythonObject { return array.makeNumpyArray() }
+}
+
 #endif

@@ -365,7 +365,7 @@ ERROR(pound_assert_failure,none,
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
 ERROR(autodiff_incomplete_differentiable_attr,none,
-      "incomplete `reverse_differentiable` attribute; it should specify either "
+      "incomplete `differentiable` attribute; it should specify either "
       "both primal and adjoint or nothing", ())
 ERROR(autodiff_opaque_function_unsupported,none,
       "differentiating an opaque function is not supported yet", ())
@@ -376,6 +376,8 @@ ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
+NOTE(autodiff_function_generic_functions_unsupported,none,
+     "differentiating generic functions is not supported yet", ())
 NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
 NOTE(autodiff_when_differentiating_function_call,none,

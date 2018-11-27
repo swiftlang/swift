@@ -7568,31 +7568,25 @@ public:
   }
 };
 
-// `autodiff_function` - given a function and differentiation indices and its
-// associated differentiation functions, create an `@autodiff` function that
-// represents a bundle of these functions and configurations.
+/// `autodiff_function` - given a function and differentiation indices and its
+/// associated differentiation functions, create an `@autodiff` function that
+/// represents a bundle of these functions and configurations.
 class AutoDiffFunctionInst final :
-  public InstructionBaseWithTrailingOperands<
-             SILInstructionKind::AutoDiffFunctionInst,
-             AutoDiffFunctionInst, SingleValueInstruction> {
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::AutoDiffFunctionInst,
+               AutoDiffFunctionInst, SingleValueInstruction> {
 private:
   friend SILBuilder;
-  // A boolean flag that indicates whether this is for legacy reverse-mode AD,
-  // which indicates that there's a primal and an adjoint and that this is only
-  // first-order differentiation. This will be removed once legacy reverse-mode
-  // AD gets upgraded to the new linearization + partial evaluation AD model.
-  bool legacyReverseModeFlag;
-  // Differentiation parameter indices.
+  /// Differentiation parameter indices.
   SmallBitVector parameterIndices;
-  // The order of differentiation.
+  /// The order of differentiation.
   unsigned differentiationOrder;
-  // The number of operands. The first operand is always the original function.
-  // The rest of operands determined by the order of differentiation and whether
-  // this is the new AD model or the legacy reverse-mode AD model.
+  /// The number of operands. The first operand is always the original function.
+  /// The rest of operands determined by the order of differentiation and whether
+  /// this is the new AD model or the legacy reverse-mode AD model.
   unsigned numOperands;
 
   AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
-                       bool isLegacyReverseMode,
                        const SmallBitVector &parameterIndices,
                        unsigned differentiationOrder,
                        SILValue originalFunction,
@@ -7601,7 +7595,6 @@ private:
 public:
   static AutoDiffFunctionInst *create(SILModule &module,
                                       SILDebugLocation debugLoc,
-                                      bool isLegacyReverseAD,
                                       const SmallBitVector &parameterIndices,
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
@@ -7613,12 +7606,6 @@ public:
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
-
-  /// Returns a boolean flag that indicates whether this is for legacy
-  /// reverse-mode AD.
-  bool isLegacyReverseMode() const {
-    return legacyReverseModeFlag;
-  }
 
   /// Returns differentiation indices.
   const SmallBitVector &getParameterIndices() const {
@@ -7634,18 +7621,73 @@ public:
     return numOperands - 1;
   }
 
+  bool hasAssociatedFunctions() const {
+    return numOperands > 1;
+  }
+
   ArrayRef<Operand> getAssociatedFunctions() const {
     return getAllOperands().drop_front();
   }
 
-  ArrayRef<Operand>
-  getAssociatedFunctionList(unsigned differentiationOrder) const;
+  std::pair<SILValue, SILValue>
+  getAssociatedFunctionPair(unsigned differentiationOrder) const;
 
   SILValue getAssociatedFunction(unsigned differentiationOrder,
-                                 SILAutoDiffAssociatedFunctionKind kind) const;
+                                 AutoDiffAssociatedFunctionKind kind) const;
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::AutoDiffFunctionInst;
+  }
+};
+
+/// `autodiff_function_extract` - given an `@autodiff` function representing a
+/// bundle of the original function and associated functions, extract the
+/// specified function.
+class AutoDiffFunctionExtractInst :
+    public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
+                           SingleValueInstruction> {
+private:
+  /// The kind of the associated function to extract.
+  AutoDiffAssociatedFunctionKind associatedFunctionKind;
+  /// The differentiation order.
+  unsigned differentiationOrder;
+  /// The list containing the `@autodiff` function operand.
+  FixedOperandList<1> operands;
+
+  static SILType
+  getAssociatedFunctionType(SILValue function,
+                            AutoDiffAssociatedFunctionKind kind,
+                            unsigned differentiationOrder,
+                            SILModule &module);
+
+public:
+  explicit AutoDiffFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      unsigned differentiationOrder, SILValue theFunction);
+
+  AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
+    return associatedFunctionKind;
+  }
+
+  SILValue getFunctionOperand() const {
+    return operands[0].get();
+  }
+
+  unsigned getDifferentiationOrder() const {
+    return differentiationOrder;
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return operands.asArray();
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return operands.asArray();
+  }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::AutoDiffFunctionExtractInst;
   }
 };
 
@@ -7852,10 +7894,15 @@ class GraphOperationInst final
   unsigned NumOperands;
   /// The attributes of the graph operation.
   MutableArrayRef<GraphOperationAttribute> Attributes;
+  /// When true, this instruction is to be executed out-of-graph (via eager op
+  /// dispatch). Otherwise, we attempt to "cluster" this graph op with other
+  /// graph ops into a graph function. For an op with dynamic attribute(s), it
+  /// must run out-of-graph, and thus have this field set to true.
+  bool NoClustering;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
                      ArrayRef<SILValue> arguments,
-                     ArrayRef<GraphOperationAttribute> attrs,
+                     ArrayRef<GraphOperationAttribute> attrs, bool noClustering,
                      ArrayRef<SILType> resultTypes,
                      ArrayRef<ValueOwnershipKind> resultOwnerships);
 
@@ -7864,11 +7911,10 @@ public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
   ~GraphOperationInst();
-  static GraphOperationInst *create(SILModule &M, SILDebugLocation loc,
-                                    Identifier name,
-                                    ArrayRef<SILValue> arguments,
-                                    ArrayRef<GraphOperationAttribute> attrs,
-                                    ArrayRef<SILType> resultTypes);
+  static GraphOperationInst *
+  create(SILModule &M, SILDebugLocation loc, Identifier name,
+         ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
+         bool noClustering, ArrayRef<SILType> resultTypes);
 
   Identifier getName() const { return Name; }
   unsigned getNumOperands() const { return NumOperands; }
@@ -7900,6 +7946,9 @@ public:
   }
 
   Optional<SymbolicValue> getAttributeNamed(StringRef name);
+
+  void setNoClustering(bool noClustering) { NoClustering = noClustering; }
+  bool getNoClustering() const { return NoClustering; }
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;

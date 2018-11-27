@@ -852,6 +852,8 @@ public:
       SmallVectorImpl<AutoDiffParameter> &params,
       Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
       Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
+      Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
+      Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a specific attribute.

@@ -1153,8 +1153,6 @@ public:
   }
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (adfi->isLegacyReverseMode())
-      *this << "[legacy_reverse] ";
     if (adfi->getParameterIndices().any()) {
       *this << "[wrt";
       for (auto i : adfi->getParameterIndices().set_bits())
@@ -1167,14 +1165,25 @@ public:
       *this << " with ";
       interleave(range(1, adfi->getDifferentiationOrder() + 1),
                  [&](unsigned order) {
-                   auto list = adfi->getAssociatedFunctionList(order);
-                   *this << '{';
-                   interleave(list, [&](const Operand &op) {
-                     *this << getIDAndType(op.get());
-                   }, [this] { *this << ", "; });
-                   *this << '}';
+                   auto pair = adfi->getAssociatedFunctionPair(order);
+                   *this << '{' << getIDAndType(pair.first) << ", "
+                         << getIDAndType(pair.second) << '}';
                  }, [this] { *this << ", "; });
     }
+  }
+
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    *this << '[';
+    switch (adfei->getAssociatedFunctionKind()) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] [order " << adfei->getDifferentiationOrder()
+          << "] " << getIDAndType(adfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -1283,6 +1292,9 @@ public:
     tf::GraphOperationInfo info(GI);
     auto opName = info.getOperationName();
     auto &arguments = info.getStructuredArguments();
+
+    if (GI->getNoClustering())
+      *this << "[no_clustering] ";
 
     *this << QuotedString(opName);
 
@@ -2490,8 +2502,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  for (auto *Attr : getReverseDifferentiableAttrs()) {
-    OS << "[reverse_differentiable "; Attr->print(OS); OS << "] ";
+  for (auto *Attr : getDifferentiableAttrs()) {
+    OS << "[differentiable "; Attr->print(OS); OS << "] ";
   }
 
   // TODO: Handle clang node owners which don't have a name.
@@ -3175,7 +3187,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
+void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   auto &indices = getIndices();
   OS << "source " << indices.source << " wrt ";
   interleave(indices.parameters.set_bits(),
@@ -3188,6 +3200,12 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
     OS << " adjoint @" << AdjointName;
   }
   if (AdjointIsPrimitive) OS << " primitive";
+  if (!JVPName.empty()) {
+    OS << " jvp @" << JVPName;
+  }
+  if (!VJPName.empty()) {
+    OS << " vjp @" << VJPName;
+  }
 }
 
 //===----------------------------------------------------------------------===//

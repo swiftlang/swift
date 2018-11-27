@@ -11,18 +11,18 @@ import TensorFlow
 
 // b/75247714: #tfop crashes when attribute argument is a tuple
 public func test75247714() {
-  // expected-error @+1 {{attribute 'bar' cannot be an enum, struct, or tuple}}
+  // expected-error@+1 {{attribute requires Bool, Int64, Double, Float, String, array thereof, [TensorShape?], or Function, but got type '(Int, Int)'}}
   let _ : () = #tfop("foo", bar: (1, 2))
 }
 
 
 // b/76115311
 func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
+  // expected-error @+1 {{type 'Scalar' does not conform to protocol 'TensorArrayProtocol'}}
   return #tfop("FooOp", value)
 }
 
 public func b76115311() {
-  // expected-error @+1 {{argument of type 'Builtin.FPIEEE32' is not a TensorFlow value or an aggregate of TensorFlow values}}
   let matrix: Tensor<Float> = genericMethod76115311()
   _ = matrix+matrix
 }

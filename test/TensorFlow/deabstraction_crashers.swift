@@ -2,7 +2,7 @@
 import TensorFlow
 
 public func SR8299(a: Tensor<Float>) {
-   // expected-error @+1 {{attribute 'someAttr' requires a constant argument}}
+  // expected-error@+1 {{attribute requires Bool, Int64, Double, Float, String, array thereof, [TensorShape?], or Function, but got type 'Tensor<Float>'}}
    () = #tfop("foo", someAttr: a)
 }
 

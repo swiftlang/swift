@@ -913,9 +913,9 @@ void
 SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
-    getBuilder().createGradient(getOpLocation(Inst->getLoc()),
-                                getOpValue(Inst->getOriginal()),
-                                Inst->getConfig()));
+      getBuilder().createGradient(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOriginal()),
+                                  Inst->getConfig()));
 }
 
 template<typename ImplClass>
@@ -928,11 +928,22 @@ SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
     mappedAssocFns.push_back(getOpValue(fn.get()));
   recordClonedInstruction(Inst,
     getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
-                                        Inst->isLegacyReverseMode(),
                                         Inst->getParameterIndices(),
                                         Inst->getDifferentiationOrder(),
                                         getOpValue(Inst->getOriginalFunction()),
                                         mappedAssocFns));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+      getBuilder().createAutoDiffFunctionExtract(
+          getOpLocation(Inst->getLoc()),
+          Inst->getAssociatedFunctionKind(),
+          Inst->getDifferentiationOrder(),
+          getOpValue(Inst->getFunctionOperand())));
 }
 
 template<typename ImplClass>
@@ -1838,10 +1849,10 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   SmallVector<SILType, 4> resultTypes;
   for (auto result : Inst->getResults())
     resultTypes.push_back(getOpType(result->getType()));
-  recordClonedInstruction(Inst,
-      getBuilder().createGraphOperation(getOpLocation(Inst->getLoc()),
-                                        Inst->getName(), arguments,
-                                        Inst->getAttributes(), resultTypes));
+  recordClonedInstruction(
+      Inst, getBuilder().createGraphOperation(
+                getOpLocation(Inst->getLoc()), Inst->getName(), arguments,
+                Inst->getAttributes(), Inst->getNoClustering(), resultTypes));
 }
 
 template <typename ImplClass>

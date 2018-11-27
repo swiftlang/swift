@@ -414,6 +414,8 @@ public:
   /// GraphFunctionDeviceInfo and store it here.
   llvm::Optional<GraphFunctionDeviceInfo> deviceInfo;
 
+  AttributeTypeClassifier attributeTypeClassifier;
+
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
   /// We calculate it on demand, so that we don't have to do it if the
@@ -955,6 +957,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *i);
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1958,16 +1961,6 @@ static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
   return nullptr;
 }
 
-/// Returns the type Optional<`element`>.
-static Type getOptionalType(const ASTContext &ctx, Type element) {
-  return BoundGenericType::get(ctx.getOptionalDecl(), Type(), {element});
-}
-
-/// Returns the type Array<`element`>.
-static Type getArrayType(const ASTContext &ctx, Type element) {
-  return BoundGenericType::get(ctx.getArrayDecl(), Type(), {element});
-}
-
 // SWIFT_ENABLE_TENSORFLOW
 /// Gradient is not valid in canonical SIL yet. For now, we print a runtime
 /// error.
@@ -1986,6 +1979,11 @@ void IRGenSILFunction::visitGradientInst(GradientInst *i) {
 }
 
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
+  llvm_unreachable("FIXME: handle this");
+}
+
+void IRGenSILFunction::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
   llvm_unreachable("FIXME: handle this");
 }
 
@@ -2260,30 +2258,22 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
-      // Handle basic scalar types by looking at the underlying llvm scalar
-      // type. This is independent of all the Swift abstractions around the
-      // type, so we can handle basic scalar types without worrying about Swift
-      // abstractions (e.g. Int64 vs Builtin.Int64).
-      ExplosionSchema schema = getTypeInfo(silType).getSchema();
-      llvm::Type *singleScalarType = nullptr;
-      if (schema.size() == 1 && schema[0].isScalar())
-        singleScalarType = schema[0].getScalarType();
-
-      if (singleScalarType == IGM.Int1Ty) {
+      switch (attributeTypeClassifier.classifyNormalAttribute(astType)) {
+      case tf::AttributeTypeClassifier::Normal::Bool: {
         auto *fn = IGM.getTFE_OpSetAttrBoolFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
 
-      if (singleScalarType == IGM.Int64Ty) {
+      case tf::AttributeTypeClassifier::Normal::Int64: {
         auto *fn = IGM.getTFE_OpSetAttrIntFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
 
-      if (singleScalarType == IGM.DoubleTy) {
+      case tf::AttributeTypeClassifier::Normal::Double: {
         auto *fn = IGM.getTFE_OpSetAttrFloatFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         auto *truncValue = Builder.CreateFPTrunc(attrValue, IGM.FloatTy);
@@ -2291,18 +2281,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         break;
       }
 
-      if (singleScalarType == IGM.FloatTy) {
+      case tf::AttributeTypeClassifier::Normal::Float: {
         auto *fn = IGM.getTFE_OpSetAttrFloatFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
 
-      // It is not a basic scalar type. Inspect the astType to figure out how
-      // to handle it.
-
-      if (astType->isEqual(
-          astCtx.getStringDecl()->getDeclaredInterfaceType())) {
+      case tf::AttributeTypeClassifier::Normal::String: {
         auto *fn = IGM.getTFC_OpSetAttrStringFn();
 
         // Swift Strings are passed in LLVM IR by passing the 2 LLVM values that
@@ -2317,85 +2303,104 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getBoolDecl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::BoolArray: {
         auto *fn = IGM.getTFC_OpSetAttrBoolArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getInt32Decl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::Int32Array: {
         auto *fn = IGM.getTFC_OpSetAttrInt32ArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getInt64Decl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::Int64Array: {
         auto *fn = IGM.getTFC_OpSetAttrInt64ArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getDoubleDecl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::DoubleArray: {
         auto *fn = IGM.getTFC_OpSetAttrDoubleArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getFloatDecl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::FloatArray: {
         auto *fn = IGM.getTFC_OpSetAttrFloatArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getTensorShapeDecl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::Normal::StringArray: {
+        auto *fn = IGM.getTFC_OpSetAttrStringArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      case tf::AttributeTypeClassifier::Normal::TensorShapeArray: {
         auto *fn = IGM.getTFC_OpSetAttrTensorShapeArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
-        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
+        Builder.CreateCall(fn,
+                           {op, attrNameValAddr, attrValueUntyped, status});
         checkOk(status);
         break;
       }
 
-      if (astType->isEqual(getArrayType(astCtx, getOptionalType(
-          astCtx, astCtx.getTensorShapeDecl()->getDeclaredInterfaceType())))) {
+      case tf::AttributeTypeClassifier::Normal::OptionalTensorShapeArray: {
         auto *fn = IGM.getTFC_OpSetAttrOptionalTensorShapeArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue,
+                                                       IGM.Int8PtrTy);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
         checkOk(status);
         break;
       }
 
-      if (astType->isEqual(getArrayType(
-          astCtx, astCtx.getStringDecl()->getDeclaredInterfaceType()))) {
-        // TODO: dynamic string list attributes
-        lowerOpToError("dynamic string list attributes not supported");
+      case tf::AttributeTypeClassifier::Normal::Function:
+        if (auto *CFI = dyn_cast<ConvertFunctionInst>(silValue)) {
+          silValue = CFI->getConverted();
+        }
+        if (auto *Fn = dyn_cast<FunctionRefInst>(silValue)) {
+          auto fnName = getGraphFuncNameForFuncAttr(
+              Fn->getReferencedFunction()->getName());
+          auto attrValAddr = IGM.getAddrOfGlobalString(fnName);
+          auto attrLength = llvm::ConstantInt::get(IGM.SizeTy, fnName.size());
+
+          auto *setAttrFn = IGM.getTFE_OpSetAttrFunctionNameFn();
+          Builder.CreateCall(setAttrFn,
+                             {op, attrNameValAddr, attrValAddr, attrLength});
+          break;
+        }
+        lowerOpToError("dynamic function attributes not fully supported. "
+                       "Most likely the function is not a constant.");
         return;
+      case tf::AttributeTypeClassifier::Normal::Unsupported:
+        assert(0 && "unknown NormalAttribute type");
       }
 
-      if (astType->is<SILFunctionType>()) {
-        // TODO: dynamic function attributes
-        lowerOpToError("dynamic function attributes not supported");
-        return;
-      }
-
-      assert(0 && "unknown NormalAttribute type");
+      break;
     }
     case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
       assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
@@ -2409,28 +2414,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
-      // Handle basic scalar types by looking at the underlying llvm scalar
-      // type. This is independent of all the Swift abstractions around the
-      // type, so we can handle basic scalar types without worrying about Swift
-      // abstractions (e.g. Int64 vs Builtin.Int64).
-      ExplosionSchema schema = getTypeInfo(silType).getSchema();
-      llvm::Type *singleScalarType = nullptr;
-      if (schema.size() == 1 && schema[0].isScalar())
-        singleScalarType = schema[0].getScalarType();
-
-      if (singleScalarType == IGM.Int32Ty) {
+      switch (attributeTypeClassifier.classifyTFDataTypeAttribute(astType)) {
+      case tf::AttributeTypeClassifier::TFDataType::TensorDataType: {
         auto *fn = IGM.getTFE_OpSetAttrTypeFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
-
-      // It is not a basic scalar type. Inspect the astType to figure out how
-      // to handle it.
-
-      if (astType->isEqual(getArrayType(
-          astCtx,
-          astCtx.getTensorDataTypeDecl()->getDeclaredInterfaceType()))) {
+      case tf::AttributeTypeClassifier::TFDataType::TensorDataTypeArray: {
         auto *fn = IGM.getTFC_OpSetAttrTypeArrayFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
@@ -2438,8 +2429,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         checkOk(status);
         break;
       }
+      case tf::AttributeTypeClassifier::TFDataType::Unsupported:
+        assert(0 && "unknown TFDataTypeAttribute type");
+      }
 
-      assert(0 && "unknown TFDataTypeAttribute type");
+      break;
     }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
@@ -2451,9 +2445,29 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic ShapeAttribute of type "
                  << astType << "\n");
 
-      // TODO: dynamic shape attributes
-      lowerOpToError("dynamic shape attributes not supported");
-      return;
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
+
+      switch (attributeTypeClassifier.classifyShapeAttribute(astType)) {
+      case tf::AttributeTypeClassifier::Shape::TensorShape: {
+        auto *fn = IGM.getTFC_OpSetAttrTensorShapeFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
+        checkOk(status);
+        break;
+      }
+      case tf::AttributeTypeClassifier::Shape::OptionalTensorShape: {
+        auto *fn = IGM.getTFC_OpSetAttrOptionalTensorShapeFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue, status});
+        checkOk(status);
+        break;
+      }
+      case tf::AttributeTypeClassifier::Shape::Unsupported:
+        assert(0 && "unknown ShapeAttribute type");
+      }
+
+      break;
     }
   }
 
@@ -2464,8 +2478,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
        nextAttributeNumber != e;) {
     auto attr = i->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-    std::string attrName = attrInfo.first.str();
-    switch (attrInfo.second) {
+    assert(attrInfo && "attribute has malformed name");
+    std::string attrName = attrInfo->first.str();
+    switch (attrInfo->second) {
     case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
     case GraphOperationInfo::ArgumentLowering::Out:

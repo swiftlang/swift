@@ -79,6 +79,122 @@ public:
 };
 
 class AnyFunctionType;
+class Type;
+
+/// Identifies a subset of a function's parameters.
+///
+/// Works with AST-level function decls and types. Requires further lowering to
+/// work with SIL-level functions and types. (In particular, tuples must be
+/// exploded).
+class AutoDiffParameterIndices {
+  /// Bits corresponding to parameters in the set are "on", and bits
+  /// corresponding to parameters not in the set are "off".
+  ///
+  /// Normally, the bits correspond to the function's parameters in order. For
+  /// example,
+  ///
+  ///   Function type: (A, B, C) -> R
+  ///   Bits: [A][B][C]
+  ///
+  /// When `isMethodFlag` is set, the bits correspond to the function's
+  /// non-self parameters in order, followed by the function's self parameter.
+  /// For example,
+  ///
+  ///   Function type: (Self) -> (A, B, C) -> R
+  ///   Bits: [A][B][C][Self]
+  ///
+  llvm::SmallBitVector indices;
+
+  /// Whether the function is a method.
+  ///
+  bool isMethodFlag;
+
+  unsigned getNumNonSelfParameters() const;
+
+  AutoDiffParameterIndices(unsigned numIndices, bool isMethodFlag)
+      : indices(numIndices), isMethodFlag(isMethodFlag) {}
+
+public:
+  /// Allocates and initializes an empty `AutoDiffParameterIndices` for the
+  /// given `functionType`. `isMethod` specifies whether to treat the function
+  /// as a method.
+  static AutoDiffParameterIndices *
+  create(ASTContext &C, AnyFunctionType *functionType, bool isMethod);
+
+  bool isMethod() const { return isMethodFlag; }
+
+  /// Tests whether this set of parameters is empty.
+  bool isEmpty() const { return indices.none(); }
+
+  /// Adds the indexed parameter to the set. When `isMethodFlag` is not set,
+  /// the indices index into the first parameter list. For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   paramIndex = 0
+  ///   ==> adds "A" to the set.
+  ///
+  /// When `isMethodFlag` is set, the indices index into the first non-self
+  /// parameter list. For example,
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   paramIndex = 0
+  ///   ==> adds "A" to the set.
+  ///
+  void setNonSelfParameter(unsigned parameterIndex);
+
+  /// Adds all the paramaters from the first non-self parameter list to the set.
+  /// For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   ==> adds "A", B", and "C" to the set.
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   ==> adds "A", B", and "C" to the set.
+  ///
+  void setAllNonSelfParameters();
+
+  /// Adds the self parameter to the set. `isMethodFlag` must be set. For
+  /// example,
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   ==> adds "Self" to the set
+  ///
+  void setSelfParameter();
+
+  /// Pushes the subset's parameter's types to `paramTypes`, in the order in
+  /// which they appear in the function type. For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   if "A" and "C" are in the set,
+  ///   ==> pushes {A, C} to `paramTypes`.
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   if "Self" and "C" are in the set,
+  ///   ==> pushes {Self, C} to `paramTypes`.
+  ///
+  void getSubsetParameterTypes(AnyFunctionType *functionType,
+                               SmallVectorImpl<Type> &paramTypes) const;
+
+  /// Returns a bitvector for the SILFunction parameters corresponding to the
+  /// parameters in this set. In particular, this explodes tuples and puts the
+  /// method self parameter at the end. For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   if "A" and "C" are in the set,
+  ///   ==> returns 101
+  ///   (because the lowered SIL type is (A, B, C) -> R)
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   if "Self" and "C" are in the set,
+  ///   ==> returns 0011
+  ///   (because the lowered SIL type is (A, B, C, Self) -> R)
+  ///
+  ///   functionType = (A, (B, C), D) -> R
+  ///   if "A" and "(B, C)" are in the set,
+  ///   ==> returns 1110
+  ///   (because the lowered SIL type is (A, B, C, D) -> R)
+  ///
+  llvm::SmallBitVector getLowered(AnyFunctionType *functionType) const;
+};
 
 /// Differentiability of a function specifies the differentiation mode,
 /// parameter indices at which the function is differentiable with respect to,
@@ -227,9 +343,7 @@ struct SILAutoDiffConfig {
 
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
-  static
-  SILAutoDiffConfig getMaster(
-      const SILAutoDiffIndices &indices) {
+  static SILAutoDiffConfig getMaster(const SILAutoDiffIndices &indices) {
     return {
       indices,
       getCanonicalGradientOptions()
@@ -251,54 +365,36 @@ struct SILAutoDiffConfig {
 };
 
 /// The kind of an associated function in the `autodiff_function` and
-/// `autodiff_extract` instructions in SIL.
-enum class SILAutoDiffAssociatedFunctionKind {
-  // The primal function in legacy reverse-mode.
-  LegacyPrimal,
-  // The adjoint function in legacy reverse-mode.
-  LegacyAdjoint,
-  // The vector-Jacobian products operator.
-  JVP,
-  // The differential, the result of JVP except that it has boxed arguments
-  // (closure captures) for partial application within JVP.
-  Differential,
-  // The Jacobian-vector products operator.
-  VJP,
-  // The pullback, the result of JVP except that it has boxed arguments
-  // (closure captures) for partial application within VJP.
-  Pullback
+/// `autodiff_function_extract` instructions in SIL.
+struct AutoDiffAssociatedFunctionKind {
+  enum innerty : uint8_t {
+     // The Jacobian-vector products function.
+     JVP = 0,
+     // The vector-Jacobian products function.
+     VJP = 1
+  } rawValue;
+
+  AutoDiffAssociatedFunctionKind() = default;
+  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit AutoDiffAssociatedFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
 };
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
-
-/// Returns the required number of associated functions per differentiation
-/// order.
-unsigned getNumAutoDiffAssociatedFunctionsPerOrder(bool isLegacyReverseMode);
 
 /// Returns the offset for an associated function at a specific differentiation
 /// order.
 /// This is used for both ordering in the `autodiff_function` instruction and
 /// ABI layout.
 ///
-/// |---------------------------------------------------------------|
-/// | 1. Standard mode.                                             |
-/// |---------------------------------------------------------------|
-/// |              Order 1               Order 2                 ...|
-/// |----------| |-----|----|-----|----| |-----|----|-----|----| ...|
-/// | Original | | JVP | DF | VJP | PB | | JVP | DF | VJP | PB | ...|
-/// |----------| |-----|----|-----|----| |-----|----|-----|----| ...|
-/// |---------------------------------------------------------------|
-/// | 2. Legacy reverse mode.                                       |
-/// |---------------------------------------------------------------|
-/// |              Order 1                                          |
-/// |----------| |--------|---------|                               |
-/// | Original | | Primal | Adjoint |                               |
-/// |----------| |--------|---------|                               |
-/// |---------------------------------------------------------------|
+///                Order 1       Order 2     ...
+/// |----------| |-----|-----| |-----|-----| ...
+/// | Original | | JVP | VJP | | JVP | VJP | ...
+/// |----------| |-----|-----| |-----|-----| ...
 unsigned
 getOffsetForAutoDiffAssociatedFunction(unsigned order,
-                                       SILAutoDiffAssociatedFunctionKind kind);
+                                       AutoDiffAssociatedFunctionKind kind);
 
 } // end namespace autodiff
 

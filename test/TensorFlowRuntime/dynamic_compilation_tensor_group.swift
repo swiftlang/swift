@@ -1,3 +1,4 @@
+// RUN: %target-run-simple-swift
 // RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 
@@ -134,7 +135,7 @@ func some_tf_op(n : Int) {
   }
 
   let actual: Tensor<Float> = #tfop("Pack",
-    [arr], T$dtype: Float.tensorFlowDataType, axis: 0)
+    [arr], T$dtype: Float.tensorFlowDataType, axis: Int64(0))
   let expected  = ShapedArray<Float>(shape: [n, 3], scalars: arr_exp)
   expectEqual(expected, actual.array)
 }

@@ -22,6 +22,7 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
+  class CanType;
   class NominalTypeDecl;
   class StructDecl;
   class Type;
@@ -92,6 +93,81 @@ namespace tf {
 
   private:
     bool structContainsTensorFlowValue(StructDecl *decl);
+  };
+
+  /// This class provides a single source of truth for the set of types that are
+  /// allowed as #tfop attributes, to ensure that all passes handle the same
+  /// sets of #tfop attributes.
+  class AttributeTypeClassifier {
+  public:
+    /// A classification of all the types that NormalAttributes support.
+    enum class Normal {
+      Bool,
+      Int64,
+      Double,
+      Float,
+      String,
+      BoolArray,
+      Int32Array,
+      Int64Array,
+      DoubleArray,
+      FloatArray,
+      StringArray,
+      TensorShapeArray,
+      OptionalTensorShapeArray,
+      Function,
+
+      /// Marker for types that NormalAttribute does not support.
+      Unsupported
+    };
+
+    /// An English list of all the types that NormalAttribute supports, for use
+    /// in diagnostics.
+    static constexpr char normalSupportedTypesDesc[] =
+        "Bool, Int64, Double, Float, String, array thereof, [TensorShape?], "
+        "or Function";
+
+    /// A classification of all the types that ShapeAttributes support.
+    enum class Shape {
+      TensorShape,
+      OptionalTensorShape,
+
+      /// Marker for types that ShapeAttribute does not support.
+      Unsupported
+    };
+
+    /// An English list of all the types that ShapeAttribute supports, for use
+    /// in diagnostics.
+    static constexpr char shapeSupportedTypesDesc[] =
+        "TensorShape or TensorShape?";
+
+    /// A classification of all the types that TFDataTypeAttributes support.
+    enum class TFDataType {
+      TensorDataType,
+      TensorDataTypeArray,
+
+      /// Marker for types that TFDataTypeAttribute does not support.
+      Unsupported
+    };
+
+    /// An English list of all the types that TFDataTypeAttribute supports, for
+    /// use in diagnostics.
+    static constexpr char tfDataTypeSupportedTypesDesc[] =
+        "TensorDataType or [TensorDataType]";
+
+    /// Classify `type` for use as a NormalAttribute.
+    Normal classifyNormalAttribute(Type type);
+
+    /// Classify `type` for use as a ShapeAttribute.
+    Shape classifyShapeAttribute(Type type);
+
+    /// Classify `type` for use as a TFDataTypeAttribute.
+    TFDataType classifyTFDataTypeAttribute(Type type);
+
+  private:
+    llvm::DenseMap<CanType, Normal> normalAttributeTypes;
+    llvm::DenseMap<CanType, Shape> shapeAttributeTypes;
+    llvm::DenseMap<CanType, TFDataType> tfDataTypeAttributeTypes;
   };
 
 } // end namespace tf

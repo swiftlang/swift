@@ -52,9 +52,6 @@ DatasetAPITests.testAllBackends("SingleValueTransformations") {
   expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
-// TODO: This test uses function attributes, which dynamic compilation does not
-// support yet.
-#if !TF_DYNAMIC_COMPILATION
 DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
   let dataset = Dataset(elements: scalars)
@@ -63,7 +60,6 @@ DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
   expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }
-#endif // !TF_DYNAMIC_COMPILATION
 
 DatasetAPITests.testAllBackends("SingleValueBatched") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)

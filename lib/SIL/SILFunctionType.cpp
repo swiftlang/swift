@@ -99,8 +99,7 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-CanSILFunctionType
-SILFunctionType::getGradientType(
+CanSILFunctionType SILFunctionType::getGradientType(
     const SILAutoDiffConfig &config, SILModule &M) {
   // FIXME: Handle `Delayed` gradient option.
   auto originalParams = getParameters();
@@ -208,6 +207,100 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
   // FIXME(rxwei): Handle parameter indices.
   return getWithExtInfo(
       getExtInfo().withDifferentiability(Differentiability::Bidirectional));
+}
+
+CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
+    const SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    AutoDiffAssociatedFunctionKind kind, SILModule &module) {
+  // JVP: (T...) -> ((R...),
+  //                 (T.TangentVector...) -> (R.TangentVector...))
+  // VJP: (T...) -> ((R...),
+  //                 (R.CotangentVector...) -> (T.CotangentVector...))
+  auto getAssociatedType = [this](CanType type, StringRef name) -> CanType {
+    auto *nomTy = type->getAnyNominal();
+    assert(nomTy);
+    auto *assocTyDecl = nomTy->lookupDirect(
+        getASTContext().getIdentifier(name)).front();
+    auto assocTy = assocTyDecl->getInterfaceType()
+        ->castTo<MetatypeType>()->getMetatypeInstanceType();
+    auto subMap = type->getMemberSubstitutionMap(
+        assocTyDecl->getModuleContext(), assocTyDecl);
+    return assocTy.subst(subMap)->getCanonicalType();
+  };
+  // Given a type, returns its formal SIL parameter info.
+  auto getFormalParameterInfo = [&module](CanType type) -> SILParameterInfo {
+    SILType silTy = SILType::getPrimitiveObjectType(type);
+    ParameterConvention conv;
+    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+      conv = ParameterConvention::Indirect_In_Guaranteed;
+    else if (silTy.isTrivial(module))
+      conv = ParameterConvention::Direct_Unowned;
+    else
+      conv = ParameterConvention::Direct_Guaranteed;
+    return {type, conv};
+  };
+  // Given a type, returns its formal SIL result info.
+  auto getFormalResultInfo = [&module](CanType type) -> SILResultInfo {
+    SILType silTy = SILType::getPrimitiveObjectType(type);
+    ResultConvention conv;
+    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+      conv = ResultConvention::Indirect;
+    else if (silTy.isTrivial(module))
+      conv = ResultConvention::Unowned;
+    else
+      conv = ResultConvention::Owned;
+    return {type, conv};
+  };
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP: {
+    SmallVector<SILParameterInfo, 8> tangentParams;
+    for (auto &param : getParameters())
+      tangentParams.push_back({
+        getAssociatedType(param.getType(), "TangentVector"),
+        param.getConvention()
+      });
+    SmallVector<SILResultInfo, 8> tangentResults;
+    for (auto &result : getResults())
+      tangentResults.push_back({
+        getAssociatedType(result.getType(), "TangentVector"),
+        result.getConvention()
+      });
+    auto differentialType = SILFunctionType::get(
+        getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Guaranteed, tangentParams, {},
+        tangentResults, None, getASTContext());
+    SmallVector<SILResultInfo, 8> jvpResults(getResults().begin(),
+                                             getResults().end());
+    jvpResults.push_back({differentialType, ResultConvention::Owned});
+    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+                                getCoroutineKind(), getCalleeConvention(),
+                                getParameters(), getYields(), jvpResults,
+                                getOptionalErrorResult(), getASTContext());
+  }
+  case AutoDiffAssociatedFunctionKind::VJP: {
+    SmallVector<SILParameterInfo, 8> cotangentParams;
+    for (auto &result : getResults())
+      cotangentParams.push_back(
+          getFormalParameterInfo(
+              getAssociatedType(result.getType(), "CotangentVector")));
+    SmallVector<SILResultInfo, 8> cotangentResults;
+    for (auto &param : getParameters())
+      cotangentResults.push_back(
+          getFormalResultInfo(
+              getAssociatedType(param.getType(), "CotangentVector")));
+    auto pullbackType = SILFunctionType::get(
+        getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Guaranteed, cotangentParams, {},
+        cotangentResults, {}, getASTContext());
+    SmallVector<SILResultInfo, 8> vjpResults(getResults().begin(),
+                                             getResults().end());
+    vjpResults.push_back({pullbackType, ResultConvention::Owned});
+    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+                                getCoroutineKind(), getCalleeConvention(),
+                                getParameters(), getYields(), vjpResults,
+                                getOptionalErrorResult(), getASTContext());
+  }
+  }
 }
 
 ProtocolDecl *

@@ -39,7 +39,7 @@ InfeedTests.testTPU("JustDataset") {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "fake",
     filePath: "dummy_path",
-    batchSize: 1,
+    batchSize: Int64(1),
     outputShapes: [TensorShape()]))
   // 1 is the magic output currently hard-coded.
   expectEqual(42.0, result.array.scalars[0])
@@ -53,7 +53,7 @@ InfeedTests.testTPU("DatasetWithOtherNodes") {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "fake",
     filePath: "dummy_path",
-    batchSize: 1,
+    batchSize: Int64(1),
     outputShapes: [TensorShape()]))
   let result = x + 1
   expectEqual(43.0, result.array.scalars[0])
@@ -67,7 +67,7 @@ InfeedTests.testTPU("DatasetWithMnist") {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "mnist",
     filePath: "/cns/ok-d/home/sasabour/mnist",
-    batchSize: 2048,
+    batchSize: Int64(2048),
     output_shapes: [TensorShape(2048,784), TensorShape(2048)])
   let images = Tensor<Float>(handle: #tfop("Identity", images1))
   let labels = Tensor<Int32>(handle: #tfop("Identity", labels1))

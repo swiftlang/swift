@@ -467,14 +467,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
-      optimizationMode, effect, numSpecAttrs, numReverseDifferentiableAttrs,
+      optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
       hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
-      optimizationMode, effect, numSpecAttrs, numReverseDifferentiableAttrs,
+      optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
       hasQualifiedOwnership, isWeakLinked, funcTyID, genericEnvID,
       clangNodeOwnerID, SemanticsIDs);
 
@@ -617,7 +617,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // SWIFT_ENABLE_TENSORFLOW
   // Read and instantiate the differentiable attributes.
-  while (numReverseDifferentiableAttrs--) {
+  while (numDifferentiableAttrs--) {
     auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
@@ -629,24 +629,28 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     uint64_t primalNameId;
     uint64_t adjointNameId;
     bool adjointIsPrimitive;
+    uint64_t jvpNameId;
+    uint64_t vjpNameId;
     uint64_t source;
     ArrayRef<uint64_t> parameters;
-    SILReverseDifferentiableAttrLayout::readRecord(scratch, primalNameId,
-                                                   adjointNameId,
-                                                   adjointIsPrimitive,
-                                                   source, parameters);
+    SILDifferentiableAttrLayout::readRecord(scratch, primalNameId,
+                                            adjointNameId, adjointIsPrimitive,
+                                            jvpNameId, vjpNameId, source,
+                                            parameters);
 
     StringRef primalName = MF->getIdentifier(primalNameId).str();
     StringRef adjointName = MF->getIdentifier(adjointNameId).str();
     llvm::SmallBitVector parametersBitVector(parameters.size());
+    StringRef jvpName = MF->getIdentifier(jvpNameId).str();
+    StringRef vjpName = MF->getIdentifier(vjpNameId).str();
     for (unsigned i = 0; i < parameters.size(); i++)
       parametersBitVector[i] = parameters[i];
     SILAutoDiffIndices indices(source, parametersBitVector);
 
-    auto *attr = SILReverseDifferentiableAttr::create(SILMod, indices,
-                                                      primalName, adjointName,
-                                                      adjointIsPrimitive);
-    fn->addReverseDifferentiableAttr(attr);
+    auto *attr = SILDifferentiableAttr::create(SILMod, indices, primalName,
+                                               adjointName, adjointIsPrimitive,
+                                               jvpName, vjpName);
+    fn->addDifferentiableAttr(attr);
   }
 
   GenericEnvironment *genericEnv = nullptr;
@@ -1486,6 +1490,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AutoDiffFunctionInst: {
     llvm_unreachable("FIXME: Unhandled");
   }
+  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+    llvm_unreachable("FIXME: unhandled");
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Deserialize attributes.
     auto EndOfArgValues = 3 * NumArguments;
@@ -1504,8 +1511,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                            (SILValueCategory)(unsigned)ListOfValues[i+1]);
       ResultSILTypes.push_back(Ty);
     }
-    ResultVal = Builder.createGraphOperation(Loc, MangledName, Args, {},
-                                             ResultSILTypes);
+    // TODO: deserialize `noClustering`.
+    ResultVal =
+        Builder.createGraphOperation(Loc, MangledName, Args, {},
+                                     /*noClustering*/ false, ResultSILTypes);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
@@ -2570,7 +2579,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
-      optimizationMode, effect, numSpecAttrs, numReverseDifferentiableAttrs,
+      optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
       hasQualifiedOwnership, isWeakLinked;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
@@ -2578,7 +2587,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs,
       // SWIFT_ENABLE_TENSORFLOW
-      numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked,
+      numDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked,
       funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

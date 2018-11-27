@@ -3114,7 +3114,14 @@ public:
   Differentiability getDifferentiability() const {
     return getExtInfo().getDifferentiability();
   }
-  
+
+  AnyFunctionType *getAutoDiffAssociatedFunctionType(
+      const AutoDiffParameterIndices &indices, unsigned differentiationOrder,
+      AutoDiffAssociatedFunctionKind kind);
+  AnyFunctionType *
+  getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
+                                 const TupleType *primalResultTy);
+
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
   bool isAutoClosure() const {
@@ -4143,6 +4150,12 @@ public:
 
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
+
+  /// Returns the type of a differentiation function that is associated with
+  /// a function of this type.
+  CanSILFunctionType getAutoDiffAssociatedFunctionType(
+      const SmallBitVector &parameterIndices, unsigned differentiationOrder,
+      AutoDiffAssociatedFunctionKind kind, SILModule &module);
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for

@@ -1254,7 +1254,42 @@ public:
   }
 
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // TODO: Handle this.
+    // FIXME(rxwei): Complete verification.
+    auto origTy =
+        adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+    require(origTy, "The original function must have a function type");
+    require(!origTy->isDifferentiable(),
+            "The original function must not be @autodiff");
+    if (F.getModule().getStage() == SILStage::Canonical ||
+        adfi->hasAssociatedFunctions()) {
+      for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
+        auto pair = adfi->getAssociatedFunctionPair(order);
+        auto jvpType = pair.first->getType().getAs<SILFunctionType>();
+        require(jvpType, "The JVP function must have a function type");
+        require(!jvpType->isDifferentiable(),
+                "The JVP function must not be @autodiff");
+        auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
+            adfi->getParameterIndices(), order,
+            AutoDiffAssociatedFunctionKind::JVP, F.getModule());
+        require(expectedJVPType == jvpType, "Unexpected JVP function type");
+        auto vjpType = pair.second->getType().getAs<SILFunctionType>();
+        require(vjpType, "The VJP function must have a function type");
+        require(!vjpType->isDifferentiable(),
+                "The VJP function must not be @autodiff");
+        auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
+            adfi->getParameterIndices(), order,
+            AutoDiffAssociatedFunctionKind::VJP, F.getModule());
+        require(expectedVJPType == vjpType, "Unexpected VJP function type");
+      }
+    }
+  }
+  
+  void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    // FIXME(rxwei): Complete verification.
+    auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->isDifferentiable(),
+            "The function operand must be an '@autodiff' function");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
@@ -4542,9 +4577,9 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Verify the [reverse_differentiable] attribute.
-  void verifyReverseDifferentiableAttr(SILFunction *F,
-                                       SILReverseDifferentiableAttr &Attr) {
+  /// Verify the [differentiable] attribute.
+  void verifyDifferentiableAttr(SILFunction *F,
+                                       SILDifferentiableAttr &Attr) {
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
@@ -4925,8 +4960,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *RDiffAttr : F->getReverseDifferentiableAttrs())
-      verifyReverseDifferentiableAttr(F, *RDiffAttr);
+    for (auto *RDiffAttr : F->getDifferentiableAttrs())
+      verifyDifferentiableAttr(F, *RDiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

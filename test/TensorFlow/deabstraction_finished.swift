@@ -95,8 +95,9 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
 
 public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [1, 2]
+  let tensor = Tensor<Float>([[17.0, 18.0]])
 
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: shape))
+  return Tensor(handle: #tfop("EnsureShape", tensor, shape$shape: shape))
 }
 
 // b/75407624
@@ -276,3 +277,11 @@ public func getTensorAndAddOneFunction() -> (Tensor<Float>, (Tensor<Float>) -> T
 // CHECK-NOT: --- TFPartition Accelerator Result: {{.*}}getZero{{.*}}
 // CHECK: --- TFPartition Accelerator Result: {{.*}}getTensorAndAddOneFunction{{.*}}
 
+// This test can still compile in graph mode, especially of the dynamic
+// attribute `padding`, since we will run the conv2D op out-of-graph (via eager
+// op dispatch).
+public func nonConstantAttribute(x: Tensor<Float>, padding: Padding) {
+  _hostOp(x.convolved2D(withFilter: Tensor<Float>(ones: [1, 3, 3, 1]),
+                        strides: (1, 1, 1, 1),
+                        padding: padding))
+}

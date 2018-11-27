@@ -6,44 +6,56 @@ import TensorFlow
 import ExternalStructs
 
 @inlinable @inline(__always)
-public func genericPackedResults1<T>() -> T {
+public func genericPackedResults1<T: TensorGroup>() -> T {
   // expected-error @+1 {{op named 'SomeOp2' is not registered in TensorFlow}}
   return #tfop("SomeOp2")
 }
 
-public func packResultsToAggregate_indirectResult1() {
-  struct Foo {
-    let x: Tensor<Float>
+struct ContainsOneTensor {
+  let x: Tensor<Float>
+}
+extension ContainsOneTensor : TensorGroup {
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
   }
-  let foo: Foo = genericPackedResults1()
+  public static var _typeList: [TensorDataType] {
+    fatalError("dummy conformance")
+  }
+  public static var _unknownShapeList: [TensorShape?] {
+    fatalError("dummy conformance")
+  }
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+}
+
+public func packResultsToAggregate_indirectResult1() {
+  let foo: ContainsOneTensor = genericPackedResults1()
   _hostOp(foo)
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}packResultsToAggregate_indirectResult1{{.*}}
 // CHECK: [[B0:%.*]] = graph_op "SomeOp2"()
 // CHECK: [[B1:%.*]] = struct $Tensor<Float> ([[B0]] : $TensorHandle<Float>)
-// CHECK: [[B2:%.*]] = struct $Foo ([[B1]] : $Tensor<Float>)
+// CHECK: [[B2:%.*]] = struct $ContainsOneTensor ([[B1]] : $Tensor<Float>)
 
 @inlinable @inline(__always)
-public func genericPackedResults2<T>() -> (T, Tensor<Float>) {
+public func genericPackedResults2<T: TensorGroup>() -> (T, Tensor<Float>) {
   // expected-error @+1 {{op named 'SomeOp3' is not registered in TensorFlow}}
   return #tfop("SomeOp3")
 }
 
 public func packResultsToAggregate_indirectResult2() {
-  struct Foo {
-    let x: Tensor<Float>
-  }
-  let foo: (Foo, Tensor<Float>) = genericPackedResults2()
+  let foo: (ContainsOneTensor, Tensor<Float>) = genericPackedResults2()
   _hostOp(foo)
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}packResultsToAggregate_indirectResult2{{.*}}
 // CHECK: ([[C0:%.*]], [[C1:%.*]]) = graph_op "SomeOp3"()
 // CHECK: [[C2:%.*]] = struct $Tensor<Float> ([[C0]] : $TensorHandle<Float>)
-// CHECK: [[C3:%.*]] = struct $Foo ([[C2]] : $Tensor<Float>)
+// CHECK: [[C3:%.*]] = struct $ContainsOneTensor ([[C2]] : $Tensor<Float>)
 // CHECK: [[C4:%.*]] = struct $Tensor<Float> ([[C1]] : $TensorHandle<Float>)
-// CHECK: [[C5:%.*]] = tuple ([[C3]] : $Foo, [[C4]] : $Tensor<Float>)
+// CHECK: [[C5:%.*]] = tuple ([[C3]] : $ContainsOneTensor, [[C4]] : $Tensor<Float>)
 
 public func packResultsToAggregate_externalStructFixedLayout() {
   // expected-error @+1 {{op named 'SomeOp4' is not registered in TensorFlow}}
@@ -56,44 +68,55 @@ public func packResultsToAggregate_externalStructFixedLayout() {
 // CHECK: [[C1:%.*]] = struct $Tensor<Float> ([[C0]] : $TensorHandle<Float>)
 // CHECK: [[C2:%.*]] = struct $ExternalStructFixedLayout ([[C1]] : $Tensor<Float>)
 
-public func unpackAggregate_basic() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
+struct ManyNestedTensors {
+  let x: Tensor<Float>
+  let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
+}
+extension ManyNestedTensors : TensorGroup {
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
   }
-  let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
+  public static var _typeList: [TensorDataType] {
+    fatalError("dummy conformance")
+  }
+  public static var _unknownShapeList: [TensorShape?] {
+    fatalError("dummy conformance")
+  }
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+}
+
+public func unpackAggregate_basic() {
+  let foo = ManyNestedTensors(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
   // expected-error @+1 {{op named 'SomeOp5' is not registered in TensorFlow}}
   let _: Tensor<Float> = #tfop("SomeOp5", [foo])
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_basic{{.*}}
-// CHECK: [[D_Foo_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
-// CHECK: [[D_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
-// CHECK: [[D_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
-// CHECK: [[D_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
-// CHECK: graph_op "SomeOp5"({{\[}}[[D_Foo_x]] : $TensorHandle<Float>, [[D_Foo_y_0]] : $TensorHandle<Float>, [[D_Foo_y_1_a]] : $TensorHandle<Int32>, [[D_Foo_y_1_b]] : $TensorHandle<Bool>{{\]}})
+// CHECK: [[D_ManyNestedTensors_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
+// CHECK: [[D_ManyNestedTensors_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
+// CHECK: [[D_ManyNestedTensors_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
+// CHECK: [[D_ManyNestedTensors_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
+// CHECK: graph_op "SomeOp5"({{\[}}[[D_ManyNestedTensors_x]] : $TensorHandle<Float>, [[D_ManyNestedTensors_y_0]] : $TensorHandle<Float>, [[D_ManyNestedTensors_y_1_a]] : $TensorHandle<Int32>, [[D_ManyNestedTensors_y_1_b]] : $TensorHandle<Bool>{{\]}})
 
 @inlinable @inline(__always)
-public func genericUnpackedAggregate<T>(t: T) -> Tensor<Float> {
+public func genericUnpackedAggregate<T : TensorGroup>(t: T) -> Tensor<Float> {
   // expected-error @+1 {{op named 'SomeOp6' is not registered in TensorFlow}}
   return #tfop("SomeOp6", [t])
 }
 
 public func unpackAggregate_generic() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
-  }
-  let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
+  let foo = ManyNestedTensors(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
   let _: Tensor<Float> = genericUnpackedAggregate(t: foo)
 }
 
 // CHECK-LABEL: --- TFDeabstraction Result: {{.*}}unpackAggregate_generic{{.*}}
-// CHECK: [[E_Foo_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
-// CHECK: [[E_Foo_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
-// CHECK: [[E_Foo_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
-// CHECK: [[E_Foo_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
-// CHECK: graph_op "SomeOp6"({{\[}}[[E_Foo_x]] : $TensorHandle<Float>, [[E_Foo_y_0]] : $TensorHandle<Float>, [[E_Foo_y_1_a]] : $TensorHandle<Int32>, [[E_Foo_y_1_b]] : $TensorHandle<Bool>{{\]}})
+// CHECK: [[E_ManyNestedTensors_x:%.*]] = graph_op "Const"(){{.*}}f32 0x3F800000 /* 1 */{{.*}}
+// CHECK: [[E_ManyNestedTensors_y_0:%.*]] = graph_op "Const"(){{.*}}f32 0x40000000 /* 2 */{{.*}}
+// CHECK: [[E_ManyNestedTensors_y_1_a:%.*]] = graph_op "Const"(){{.*}}i32 3{{.*}}
+// CHECK: [[E_ManyNestedTensors_y_1_b:%.*]] = graph_op "Const"(){{.*}}i1 0{{.*}}
+// CHECK: graph_op "SomeOp6"({{\[}}[[E_ManyNestedTensors_x]] : $TensorHandle<Float>, [[E_ManyNestedTensors_y_0]] : $TensorHandle<Float>, [[E_ManyNestedTensors_y_1_a]] : $TensorHandle<Int32>, [[E_ManyNestedTensors_y_1_b]] : $TensorHandle<Bool>{{\]}})
 
 // Checks that unpacking reuses extraction instructions instead of making new
 // ones for each element of the input list.
@@ -118,12 +141,8 @@ public func unpackAggregate_reuse(x: Tensor<Float>) {
 // }
 
 public func packResultsToAggregate_basic() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
-  }
   // expected-error @+1 {{op named 'SomeOp' is not registered in TensorFlow}}
-  let (r0, r1): (Foo, Tensor<Double>) = #tfop("SomeOp")
+  let (r0, r1): (ManyNestedTensors, Tensor<Double>) = #tfop("SomeOp")
   let _ = Tensor(0) + r0.y.1.a
   _hostOp(r1)
 }

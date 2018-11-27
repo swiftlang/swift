@@ -587,6 +587,7 @@ public: // Lowering functionality.
   GLStatus lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator = false);
   GLStatus lowerRegion(SESERegionTree *region);
   GLStatus lowerSequenceRegion(SequenceSESERegion *r);
+  GLStatus lowerSharedRegion(SharedSESERegion *r);
   GLStatus lowerWhileLoopRegion(WhileLoopSESERegion *r);
   GLStatus lowerConditionalRegion(ConditionalSESERegion *r);
 
@@ -948,8 +949,9 @@ static void decodeShapeArrayAtAttr(const ASTContext &ctx,
   auto *inst = graphOpInfo.getInst();
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo.second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
-  assert(attrInfo.first == attrName);
+  assert(attrInfo && "attribute has malformed name");
+  assert(attrInfo->second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
+  assert(attrInfo->first == attrName);
   decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
 
@@ -1627,13 +1629,14 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     // Look at which attribute comes next.
     auto attr = inst->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+    assert(attrInfo && "attribute has malformed name");
     auto attrValue = attr.value;
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
-    std::string name = attrInfo.first.str();
+    std::string name = attrInfo->first.str();
 
-    switch (attrInfo.second) {
+    switch (attrInfo->second) {
     case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
     case GraphOperationInfo::ArgumentLowering::Out:
@@ -1999,12 +2002,25 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   for (auto &child : r->getNodes()) {
     // The outputs for a sequence corresponds to the outputs of the last region
     // in the sequence. Hence, clear outputs for the current function if any.
-    getCurrentGraphFunction().outputs.clear();
+    // Do not clear the outputs if the next region is a function as the outputs
+    // are required to process that function region.
+    auto &graphFn = getCurrentGraphFunction();
+    if (child->getKind() == SESERegionTree::Shared) {
+      for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
+        addValueMapping({graphFn.outputs[i].first, 0},
+                        graphFn.outputs[i].second);
+      }
+    }
+    graphFn.outputs.clear();
     GLStatus S = lowerRegion(child.get());
     if (S != GLStatus::Success)
       return S;
   }
   return GLStatus::Success;
+}
+
+GLStatus TFGraphFunctionLowering::lowerSharedRegion(SharedSESERegion *r) {
+  return lowerRegion(r->getSharedRegionTree());
 }
 
 /// Given a conditional branch, produce the TF_Output for its branch condition.
@@ -2507,6 +2523,8 @@ GLStatus TFGraphFunctionLowering::lowerRegion(SESERegionTree *region) {
     return lowerBasicBlock(cast<SingleBlockSESERegion>(region)->getBB());
   case SESERegionTree::Sequence:
     return lowerSequenceRegion(cast<SequenceSESERegion>(region));
+  case SESERegionTree::Shared:
+    return lowerSharedRegion(cast<SharedSESERegion>(region));
   case SESERegionTree::WhileLoop:
     return lowerWhileLoopRegion(cast<WhileLoopSESERegion>(region));
   case SESERegionTree::Conditional:

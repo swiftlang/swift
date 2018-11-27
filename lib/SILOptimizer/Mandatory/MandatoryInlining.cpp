@@ -25,12 +25,17 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/ADT/Statistic.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
 using DenseFunctionSet = llvm::DenseSet<SILFunction *>;
 using ImmutableFunctionSet = llvm::ImmutableSet<SILFunction *>;
+
+// SWIFT_ENABLE_TENSORFLOW
+extern llvm::cl::opt<bool> TFLogDeabstractionStats;
 
 STATISTIC(NumMandatoryInlines,
           "Number of function application sites inlined by the mandatory "
@@ -487,6 +492,20 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
                          newApplyAI->getIterator());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// Event schema:
+//
+// "S4TF CallEdge", ParentName, ParentSizeBefore, ParentSizeAfter, ChildName,
+// ChildSize
+static void maybeLogCallEdge(SILFunction *parent, unsigned parentSizeBefore,
+                             SILFunction *child) {
+  if (!TFLogDeabstractionStats)
+    return;
+  llvm::dbgs() << "S4TF CallEdge," << parent->getName() << ","
+               << parentSizeBefore << "," << parent->codeSize() << ","
+               << child->getName() << "," << child->codeSize() << "\n";
+}
+
 /// \brief Inlines all mandatory inlined functions into the body of a function,
 /// first recursively inlining all mandatory apply instructions in those
 /// functions into their bodies if necessary.
@@ -501,16 +520,14 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 ///   the current call stack of recursive calls
 ///
 /// \returns true if successful, false if failed due to circular inlining.
-static bool
-runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
-			 SILFunction *F, FullApplySite AI,
-                         DenseFunctionSet &FullyInlinedSet,
-                         ImmutableFunctionSet::Factory &SetFactory,
-                         ImmutableFunctionSet CurrentInliningSet,
-                         ClassHierarchyAnalysis *CHA,
-                         // SWIFT_ENABLE_TENSORFLOW
-                         SILInliner::InlineKind inlineKind,
-                     const ShouldMandatoryInlineFnPred &shouldInlinePredicate) {
+static bool runOnFunctionRecursively(
+    SILOptFunctionBuilder &FuncBuilder, SILFunction *F, FullApplySite AI,
+    DenseFunctionSet &FullyInlinedSet,
+    ImmutableFunctionSet::Factory &SetFactory,
+    ImmutableFunctionSet CurrentInliningSet, ClassHierarchyAnalysis *CHA,
+    // SWIFT_ENABLE_TENSORFLOW
+    SILInliner::InlineKind inlineKind,
+    const ShouldMandatoryInlineFnPred &shouldInlinePredicate) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -600,6 +617,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       }
 
       // SWIFT_ENABLE_TENSORFLOW
+      unsigned parentSizeBefore = F->codeSize();
       SILInliner Inliner(FuncBuilder, inlineKind, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineApplySite(InnerAI)) {
@@ -648,6 +666,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       assert(nextI == ApplyBlock->end()
              || nextI->getParent() == ApplyBlock
                     && "Mismatch between the instruction and basic block");
+
+      // SWIFT_ENABLE_TENSORFLOW
+      maybeLogCallEdge(F, parentSizeBefore, CalleeFunction);
     }
   }
 
@@ -656,7 +677,6 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
   FullyInlinedSet.insert(F);
   return true;
 }
-
 
 // SWIFT_ENABLE_TENSORFLOW
 /// Scan the given function body, mandatory inlining calls to callees that

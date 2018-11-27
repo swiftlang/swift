@@ -3,12 +3,12 @@
 import TensorFlow
 
 public func implicitDevicePlacement() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 1.0)
+  let x: TensorHandle<Float> = #tfop("Identity", Tensor<Float>(1), T$dtype: Float.tensorFlowDataType)
   _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDevicePlacement{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f64 0x3FF0000000000000 /* 1 */, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: graph_op "Identity"({{.*}}) {T$dtype: i32 1, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 
 public func implicitDeviceConfig() {
   let x = Tensor<Float>(1.0)
@@ -56,12 +56,12 @@ public func explicitDeviceConfigTPU() {
 
 // This involves cross-device sends/recvs.
 public func explicitDevicePlacementGPU() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Identity", Tensor<Float>(1.0), T$dtype: Float.tensorFlowDataType, __device: "/job:localhost/replica:0/task:0/device:GPU:0")
   _hostOp(x)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDevicePlacementGPU{{.*}}
-// CHECK: graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f64 0x3FF0000000000000 /* 1 */, __device: "/job:localhost/replica:0/task:0/device:GPU:0"} : $TensorHandle<Float>
+// CHECK: graph_op "Identity"({{.*}}) {T$dtype: i32 1, __device: "/job:localhost/replica:0/task:0/device:GPU:0"} : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}explicitDevicePlacementGPU{{.*}}
 // CHECK: graph_op "tfc.TensorTransfer
@@ -103,11 +103,11 @@ public func explicitDevicePlacementGPU() {
 // Instead, we check on the _Send node in the next test.
 
 public func explicitDevicePlacementAll() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Identity", Tensor<Float>(1), T$dtype: Float.tensorFlowDataType, __device: "/job:localhost/replica:0/task:0/device:GPU:0")
   // For GPU -> TPU transfer, always go through CPU first. Compiler can be
   // extended to generate this Identity op if needed.
   let x_cpu: TensorHandle<Float> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:CPU:0")
-  let y_cpu: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 1.0, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:CPU:0")
+  let y_cpu: TensorHandle<Float> = #tfop("Identity", Tensor<Float>(1), T$dtype: Float.tensorFlowDataType, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   // y is sent from CPU to TPU.
   let z_tpu: TensorHandle<Float> = #tfop("Add", x_cpu, y_cpu , __shapes: [TensorShape()], __device: "TPU_SYSTEM")
   _hostOp(z_tpu)
@@ -165,7 +165,7 @@ public func explicitDevicePlacementAll() {
 // CHECK-NEXT:       device: "/job:localhost/replica:0/task:0/device:CPU:0"
 
 public func GPUToTPUTransfer_Unsupported() {
-  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 1.0, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:GPU:0")
+  let x: TensorHandle<Float> = #tfop("Identity", Tensor<Float>(1), T$dtype: Float.tensorFlowDataType, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:GPU:0")
   // expected-error @+1 {{TPU infeed enqueue cannot run on this device}}
   let _: TensorHandle<Float> = #tfop("Identity", x, __device: "TPU_SYSTEM")
 }

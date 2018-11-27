@@ -65,7 +65,8 @@ GraphOperationInst* GraphOperationBuilder::build(
     SILBuilder &B, ASTContext &C, SILLocation loc,
     ArrayRef<SILType> resultSILTypes) const {
   return B.createGraphOperation(loc, C.getIdentifier(MangledName), Operands,
-                                Attributes, resultSILTypes);
+                                Attributes, /*noClustering*/ false,
+                                resultSILTypes);
 }
 
 } // end namespace tf

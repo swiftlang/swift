@@ -642,6 +642,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(AutoDiffFunctionInst, autodiff_function,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(AutoDiffFunctionExtractInst, autodiff_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
