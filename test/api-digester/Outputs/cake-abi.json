@@ -292,7 +292,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "ownership": 1,
@@ -359,7 +360,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "ownership": 2,
@@ -685,7 +687,8 @@
           "usr": "s:4cake17fixedLayoutStructV1aSivp",
           "moduleName": "cake",
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
@@ -728,7 +731,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 1,
           "hasStorage": true,
@@ -773,7 +777,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 2,
           "hasStorage": true
@@ -815,7 +820,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "Available"
+            "Available",
+            "HasStorage"
           ],
           "fixedbinaryorder": 3,
           "isLet": true,
@@ -1077,7 +1083,8 @@
       "usr": "s:4cake9GlobalVarSivp",
       "moduleName": "cake",
       "declAttributes": [
-        "HasInitialValue"
+        "HasInitialValue",
+        "HasStorage"
       ],
       "isLet": true,
       "hasStorage": true
@@ -1135,7 +1142,8 @@
           "moduleName": "cake",
           "isInternal": true,
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
