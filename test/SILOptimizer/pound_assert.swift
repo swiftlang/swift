@@ -34,7 +34,8 @@ func infiniteLoop() -> Int {
 }
 
 func test_infiniteLoop() {
-  // expected-error @+1 {{#assert condition not constant}}
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{when called from here}}
   #assert(infiniteLoop() == 1)
 }
 

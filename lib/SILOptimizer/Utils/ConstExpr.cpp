@@ -80,6 +80,10 @@ public:
         numInstEvaluated(numInstEvaluated) {}
 
   void setValue(SILValue value, SymbolicValue symVal) {
+    // TODO(constexpr patch): Uncomment this assertion once Address kinds have
+    // been added.
+    // assert(symVal.getKind() != SymbolicValue::Address &&
+    //        "calculatedValues does not hold addresses");
     calculatedValues.insert({value, symVal});
   }
 

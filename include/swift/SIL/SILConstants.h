@@ -121,15 +121,15 @@ private:
 
   union {
     /// This is the reason code for RK_Unknown values.
-    UnknownReason unknown_reason : 32;
+    UnknownReason unknownReason : 32;
 
     /// This is the number of bits in an RK_Integer or RK_IntegerInline
     /// representation, which makes the number of entries in the list derivable.
-    unsigned integer_bitwidth;
+    unsigned integerBitwidth;
 
     /// This is the number of elements for an RK_Aggregate representation.
-    unsigned aggregate_numElements;
-  } aux;
+    unsigned aggregateNumElements;
+  } auxInfo;
 
 public:
   /// This enum is used to indicate the sort of value held by a SymbolicValue
@@ -238,7 +238,9 @@ public:
 };
 
 static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
-              "SymbolicValue should stay small and POD");
+              "SymbolicValue should stay small");
+static_assert(std::is_pod<SymbolicValue>::value,
+              "SymbolicValue should stay POD");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
   val.print(os);

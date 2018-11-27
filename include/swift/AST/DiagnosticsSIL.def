@@ -303,9 +303,15 @@ ERROR(pound_assert_condition_not_constant,none,
 ERROR(pound_assert_failure,none,
        "%0", (StringRef))
 
-NOTE(constexpr_unknown_reason, none, "%0", (StringRef))
-NOTE(constexpr_called_from, none, "when called from here", ())
-NOTE(constexpr_not_evaluable, none,
+NOTE(constexpr_unknown_reason_default,none, "could not fold operation", ())
+NOTE(constexpr_too_many_instructions,none,
+     "exceeded instruction limit: %0 when evaluating the expression at compile "
+     "time", (unsigned))
+NOTE(constexpr_loop,none, "control flow loop found", ())
+NOTE(constexpr_overflow,none, "integer overflow detected", ())
+NOTE(constexpr_trap,none, "trap detected", ())
+NOTE(constexpr_called_from,none, "when called from here", ())
+NOTE(constexpr_not_evaluable,none,
      "expression not evaluable as constant here", ())
 
 ERROR(non_physical_addressof,none,

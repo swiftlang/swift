@@ -131,7 +131,7 @@ SymbolicValue SymbolicValue::getInteger(int64_t value, unsigned bitWidth) {
   SymbolicValue result;
   result.representationKind = RK_IntegerInline;
   result.value.integerInline = value;
-  result.aux.integer_bitwidth = bitWidth;
+  result.auxInfo.integerBitwidth = bitWidth;
   return result;
 }
 
@@ -150,20 +150,21 @@ SymbolicValue SymbolicValue::getInteger(const APInt &value,
   SymbolicValue result;
   result.representationKind = RK_Integer;
   result.value.integer = words;
-  result.aux.integer_bitwidth = value.getBitWidth();
+  result.auxInfo.integerBitwidth = value.getBitWidth();
   return result;
 }
 
 APInt SymbolicValue::getIntegerValue() const {
   assert(getKind() == Integer);
   if (representationKind == RK_IntegerInline) {
-    auto numBits = aux.integer_bitwidth;
+    auto numBits = auxInfo.integerBitwidth;
     return APInt(numBits, value.integerInline);
   }
 
   assert(representationKind == RK_Integer);
-  auto numBits = aux.integer_bitwidth;
-  auto numWords = (numBits + 63) / 64;
+  auto numBits = auxInfo.integerBitwidth;
+  auto numWords =
+      (numBits + APInt::APINT_BITS_PER_WORD - 1) / APInt::APINT_BITS_PER_WORD;
   return APInt(numBits, {value.integer, numWords});
 }
 
@@ -171,7 +172,7 @@ unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert(getKind() == Integer);
   assert (representationKind == RK_IntegerInline ||
           representationKind == RK_Integer);
-  return aux.integer_bitwidth;
+  return auxInfo.integerBitwidth;
 }
 
 //===----------------------------------------------------------------------===//
@@ -190,13 +191,13 @@ SymbolicValue SymbolicValue::getAggregate(ArrayRef<SymbolicValue> elements,
   SymbolicValue result;
   result.representationKind = RK_Aggregate;
   result.value.aggregate = resultElts;
-  result.aux.aggregate_numElements = elements.size();
+  result.auxInfo.aggregateNumElements = elements.size();
   return result;
 }
 
 ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
   assert(getKind() == Aggregate);
-  return ArrayRef<SymbolicValue>(value.aggregate, aux.aggregate_numElements);
+  return ArrayRef<SymbolicValue>(value.aggregate, auxInfo.aggregateNumElements);
 }
 
 //===----------------------------------------------------------------------===//
@@ -217,7 +218,7 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
   UnknownReason reason;
 
   /// The number of elements in the call stack.
-  unsigned call_stack_size;
+  unsigned callStackSize;
 
   static UnknownSymbolicValue *create(SILNode *node, UnknownReason reason,
                                       ArrayRef<SourceLoc> elements,
@@ -235,20 +236,20 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
   }
 
   ArrayRef<SourceLoc> getCallStack() const {
-    return {getTrailingObjects<SourceLoc>(), call_stack_size};
+    return {getTrailingObjects<SourceLoc>(), callStackSize};
   }
 
   // This is used by the llvm::TrailingObjects base class.
   size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
-    return call_stack_size;
+    return callStackSize;
   }
 
 private:
   UnknownSymbolicValue() = delete;
   UnknownSymbolicValue(const UnknownSymbolicValue &) = delete;
   UnknownSymbolicValue(SILNode *node, UnknownReason reason,
-                       unsigned call_stack_size)
-      : node(node), reason(reason), call_stack_size(call_stack_size) {}
+                       unsigned callStackSize)
+      : node(node), reason(reason), callStackSize(callStackSize) {}
 };
 } // namespace swift
 
@@ -330,7 +331,7 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
 /// is an interesting SourceLoc to point at.
 /// Returns true if a diagnostic was emitted.
 static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
-                               SILLocation fallbackLoc, std::string error) {
+                               SILLocation fallbackLoc) {
   auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
   if (loc.isNull()) {
     // If we have important clarifying information, make sure to emit it.
@@ -339,10 +340,32 @@ static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
     loc = fallbackLoc;
   }
 
-  auto &module = badInst->getModule();
-  diagnose(module.getASTContext(), loc.getSourceLoc(),
-           diag::constexpr_unknown_reason, error)
-      .highlight(loc.getSourceRange());
+  auto &ctx = badInst->getModule().getASTContext();
+  auto sourceLoc = loc.getSourceLoc();
+  switch (reason) {
+  case UnknownReason::Default:
+    diagnose(ctx, sourceLoc, diag::constexpr_unknown_reason_default)
+        .highlight(loc.getSourceRange());
+    break;
+  case UnknownReason::TooManyInstructions:
+    // TODO: Should pop up a level of the stack trace.
+    diagnose(ctx, sourceLoc, diag::constexpr_too_many_instructions,
+             ConstExprLimit)
+        .highlight(loc.getSourceRange());
+    break;
+  case UnknownReason::Loop:
+    diagnose(ctx, sourceLoc, diag::constexpr_loop)
+        .highlight(loc.getSourceRange());
+    break;
+  case UnknownReason::Overflow:
+    diagnose(ctx, sourceLoc, diag::constexpr_overflow)
+        .highlight(loc.getSourceRange());
+    break;
+  case UnknownReason::Trap:
+    diagnose(ctx, sourceLoc, diag::constexpr_trap)
+        .highlight(loc.getSourceRange());
+    break;
+  }
   return true;
 }
 
@@ -353,29 +376,8 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   if (!badInst)
     return;
 
-  std::string error;
-  switch (getUnknownReason()) {
-  case UnknownReason::Default:
-    error = "could not fold operation";
-    break;
-  case UnknownReason::TooManyInstructions:
-    // TODO: Should pop up a level of the stack trace.
-    error = "exceeded instruction limit: " + std::to_string(ConstExprLimit) +
-            " when evaluating the expression at compile time";
-    break;
-  case UnknownReason::Loop:
-    error = "control flow loop found";
-    break;
-  case UnknownReason::Overflow:
-    error = "integer overflow detected";
-    break;
-  case UnknownReason::Trap:
-    error = "trap detected";
-    break;
-  }
-
-  bool emittedFirstNote =
-      emitNoteDiagnostic(badInst, getUnknownReason(), fallbackLoc, error);
+  bool emittedFirstNote = emitNoteDiagnostic(badInst, getUnknownReason(),
+                                             fallbackLoc);
 
   auto sourceLoc = fallbackLoc.getSourceLoc();
   auto &module = badInst->getModule();
@@ -383,18 +385,9 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     diagnose(module.getASTContext(), sourceLoc, diag::constexpr_not_evaluable);
     return;
   }
-  auto &SM = module.getASTContext().SourceMgr;
-  unsigned originalDiagnosticLineNumber =
-      SM.getLineNumber(fallbackLoc.getSourceLoc());
   for (auto &sourceLoc : llvm::reverse(getUnknownCallStack())) {
     // Skip unknown sources.
     if (!sourceLoc.isValid())
-      continue;
-    // Also skip notes that point to the same line as the original error, for
-    // example in:
-    //   #assert(foo(bar()))
-    // it is not useful to get three diagnostics referring to the same line.
-    if (SM.getLineNumber(sourceLoc) == originalDiagnosticLineNumber)
       continue;
 
     auto diag = emittedFirstNote ? diag::constexpr_called_from
