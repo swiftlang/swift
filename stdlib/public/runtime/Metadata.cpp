@@ -89,7 +89,29 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
     auto *classDescription = cast<ClassDescriptor>(description);
     return swift_relocateClassMetadata(classDescription, pattern);
   }
-  return IncompleteMetadata.get();
+
+  // Otherwise, we have a static template that we can initialize in-place.
+  auto *metadata = IncompleteMetadata.get();
+
+  // If this is a class, we have to initialize the value witness table early
+  // so that two-phase initialization can proceed as if this metadata is
+  // complete for layout purposes when it appears as part of an aggregate type.
+  if (auto *classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+    auto *fullMetadata = asFullMetadata(metadata);
+
+    // Begin by initializing the value witness table; everything else is
+    // initialized by swift_initClassMetadata().
+#if SWIFT_OBJC_INTEROP
+    fullMetadata->ValueWitnesses =
+      (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting)
+         ? &VALUE_WITNESS_SYM(Bo)
+         : &VALUE_WITNESS_SYM(BO);
+#else
+    fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+  }
+
+  return metadata;
 }
 
 /// Copy the generic arguments into place in a newly-allocated metadata.

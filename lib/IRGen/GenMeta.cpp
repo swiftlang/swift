@@ -2478,17 +2478,6 @@ namespace {
       B.add(metadata);
     }
 
-    /// The runtime provides a value witness table for Builtin.NativeObject.
-    void addValueWitnessTable() {
-      ClassDecl *cls = Target;
-      
-      auto type = (cls->checkObjCAncestry() != ObjCClassKind::NonObjC
-                   ? IGM.Context.TheUnknownObjectType
-                   : IGM.Context.TheNativeObjectType);
-      auto wtable = IGM.getAddrOfValueWitnessTable(type);
-      B.add(wtable);
-    }
-
     void addDestructorFunction() {
       if (auto ptr = getAddrOfDestructorFunction(IGM, Target)) {
         B.add(*ptr);
@@ -2658,6 +2647,14 @@ namespace {
       B.addInt(IGM.SizeTy, getClassFieldOffset(IGM, baseType, var).getValue());
     }
 
+    void addValueWitnessTable() {
+      auto type = (Target->checkObjCAncestry() != ObjCClassKind::NonObjC
+                   ? IGM.Context.TheUnknownObjectType
+                   : IGM.Context.TheNativeObjectType);
+      auto wtable = IGM.getAddrOfValueWitnessTable(type);
+      B.add(wtable);
+    }
+
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
@@ -2689,6 +2686,11 @@ namespace {
       // Field offsets are either copied from the superclass or calculated
       // at runtime.
       B.addInt(IGM.SizeTy, 0);
+    }
+
+    void addValueWitnessTable() {
+      // The runtime fills in the value witness table for us.
+      B.add(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
     }
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
