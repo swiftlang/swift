@@ -1318,9 +1318,8 @@ public:
 /// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
 /// until we have fully switched to 'jvp' and 'vjp'.
 ///
-/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, they do
-/// not get lowered to the sil differentiable attribute, and the core AD pass
-/// does not use them. We are incrementally adding support for them.
+/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
+/// AD pass does not use them. We are incrementally adding support for them.
 ///
 /// For example:
 ///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)

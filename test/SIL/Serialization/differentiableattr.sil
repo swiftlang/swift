@@ -1,0 +1,17 @@
+// SWIFT_ENABLE_TENSORFLOW
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil -assume-parsing-unqualified-ownership-sil -emit-sib -parse-as-library -parse-stdlib -module-name DifferentiableAttr -o %t/DifferentiableAttr.sib %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/DifferentiableAttr.sib -o - -emit-sorted-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK: [differentiable source 0 wrt 0 primal @function1primal adjoint @function1adjoint jvp @function1jvp vjp @function1vjp]
+sil hidden [differentiable source 0 wrt 0 primal @function1primal adjoint @function1adjoint jvp @function1jvp vjp @function1vjp] @function1 : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %3 = struct $Float (%2 : $Builtin.FPIEEE32)
+  return %3 : $Float
+}

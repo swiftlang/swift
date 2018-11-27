@@ -1109,11 +1109,11 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Parse a `reverse_differentiable` attribute, e.g.
-/// `[reverse_differentiable wrt 0, 1 adjoint @other]`.
+/// Parse a `differentiable` attribute, e.g.
+/// `[differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
-static bool parseReverseDifferentiableAttr(
-  SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
+static bool parseDifferentiableAttr(
+  SmallVectorImpl<SILDifferentiableAttr *> &DAs, SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
   // Parse 'source'.
@@ -1171,14 +1171,26 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     adjointIsPrimitive = true;
   }
+  // Parse optional 'jvp'.
+  Identifier JVPName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
+    P.consumeToken();
+    if (parseFnName(JVPName)) return true;
+  }
+  // Parse optional 'vjp'.
+  Identifier VJPName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
+    P.consumeToken();
+    if (parseFnName(VJPName)) return true;
+  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
-  // Create an AdjointAttr and we are done.
-  auto *Attr = SILReverseDifferentiableAttr::create(
+  // Create a SILDifferentiableAttr and we are done.
+  auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsPrimitive);
+      adjointIsPrimitive, JVPName.str(), VJPName.str());
   DAs.push_back(Attr);
   return false;
 }
@@ -1194,7 +1206,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  // SWIFT_ENABLE_TENSORFLOW
-                    SmallVectorImpl<SILReverseDifferentiableAttr *> *RDiffAttrs,
+                          SmallVectorImpl<SILDifferentiableAttr *> *DiffAttrs,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -1289,9 +1301,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       continue;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    else if (RDiffAttrs && SP.P.Tok.getText() == "reverse_differentiable") {
+    else if (DiffAttrs && SP.P.Tok.getText() == "differentiable") {
       SP.P.consumeToken(tok::identifier);
-      if (parseReverseDifferentiableAttr(*RDiffAttrs, SP))
+      if (parseDifferentiableAttr(*DiffAttrs, SP))
         return true;
       continue;
     }
@@ -5849,7 +5861,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   // SWIFT_ENABLE_TENSORFLOW
-  SmallVector<SILReverseDifferentiableAttr *, 4> RDiffAttrs;
+  SmallVector<SILDifferentiableAttr *, 4> DiffAttrs;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5858,7 +5870,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &isWithoutActuallyEscapingThunk,
                            // SWIFT_ENABLE_TENSORFLOW
-                           &Semantics, &SpecAttrs, &RDiffAttrs,
+                           &Semantics, &SpecAttrs, &DiffAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5891,8 +5903,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto &Attr : RDiffAttrs)
-      FunctionState.F->addReverseDifferentiableAttr(Attr);
+    for (auto &Attr : DiffAttrs)
+      FunctionState.F->addDifferentiableAttr(Attr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);

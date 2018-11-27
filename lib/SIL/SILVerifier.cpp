@@ -4577,9 +4577,9 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Verify the [reverse_differentiable] attribute.
-  void verifyReverseDifferentiableAttr(SILFunction *F,
-                                       SILReverseDifferentiableAttr &Attr) {
+  /// Verify the [differentiable] attribute.
+  void verifyDifferentiableAttr(SILFunction *F,
+                                       SILDifferentiableAttr &Attr) {
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
@@ -4957,8 +4957,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *RDiffAttr : F->getReverseDifferentiableAttrs())
-      verifyReverseDifferentiableAttr(F, *RDiffAttr);
+    for (auto *RDiffAttr : F->getDifferentiableAttrs())
+      verifyDifferentiableAttr(F, *RDiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

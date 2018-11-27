@@ -307,10 +307,10 @@ public:
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
 
-    // Invoker by a `[reverse_differentiable]` attribute in SIL **without**
-    // being lined to a Swift AST attribute. This case has an associated
-    // `[reverse_differentiable]` attribute.
-    SILReverseDifferentiableAttribute
+    // Invoker by a `[differentiable]` attribute in SIL **without** being lined
+    // to a Swift AST attribute. This case has an associated `[differentiable]`
+    // attribute.
+    SILDifferentiableAttribute
   };
 
 private:
@@ -337,12 +337,12 @@ private:
     Value(DifferentiableAttr *attr, FuncDecl *fd)
         : differentiableAttribute({attr, fd}) {}
 
-    /// The `[reverse_differentiable]` attribute associated with the
-    /// `SILReverseDifferentiableAttribute` case.
-    std::pair<SILReverseDifferentiableAttr *, SILFunction *>
-        silReverseDifferentiableAttribute;
-    Value(SILReverseDifferentiableAttr *attr, SILFunction *f)
-        : silReverseDifferentiableAttribute({attr, f}) {}
+    /// The `[differentiable]` attribute associated with the
+    /// `SILDifferentiableAttribute` case.
+    std::pair<SILDifferentiableAttr *, SILFunction *>
+        silDifferentiableAttribute;
+    Value(SILDifferentiableAttr *attr, SILFunction *f)
+        : silDifferentiableAttribute({attr, f}) {}
   } value;
 
   /*implicit*/
@@ -357,8 +357,8 @@ public:
       : kind(Kind::DifferentialOperator), value(expr) {}
   DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
       : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
-  DifferentiationInvoker(SILReverseDifferentiableAttr *attr, SILFunction *f)
-      : kind(Kind::SILReverseDifferentiableAttribute), value(attr, f) {}
+  DifferentiationInvoker(SILDifferentiableAttr *attr, SILFunction *f)
+      : kind(Kind::SILDifferentiableAttribute), value(attr, f) {}
 
   Kind getKind() const { return kind; }
 
@@ -384,10 +384,10 @@ public:
     return value.differentiableAttribute;
   }
 
-  std::pair<SILReverseDifferentiableAttr *, SILFunction *>
-  getSILReverseDifferentiableAttribute() const {
-    assert(kind == Kind::SILReverseDifferentiableAttribute);
-    return value.silReverseDifferentiableAttribute;
+  std::pair<SILDifferentiableAttr *, SILFunction *>
+  getSILDifferentiableAttribute() const {
+    assert(kind == Kind::SILDifferentiableAttribute);
+    return value.silDifferentiableAttribute;
   }
 
   bool isAnyDifferentialOperator() const {
@@ -643,12 +643,12 @@ public:
 };
 
 /// A differentiation task, specifying the original function and the
-/// `[reverse_differentiable]` attribute on the function. PrimalGen and
-/// AdjointGen will synthesize the primal and the adjoint for this task, filling
-/// the primal and adjoint fields in the attribute.
+/// `[differentiable]` attribute on the function. PrimalGen and AdjointGen
+/// will synthesize the primal and the adjoint for this task, filling the primal
+/// and adjoint fields in the attribute.
 ///
-/// NOTE: A task instance manages a `[reverse_differentiable]` SIL attribute and
-/// shall be the only one that modifies this attribute.
+/// NOTE: A task instance manages a `[differentiable]` SIL attribute and shall
+/// be the only one that modifies this attribute.
 class DifferentiationTask {
   friend llvm::DenseMapInfo<DifferentiationTask>;
   friend class ADContext;
@@ -657,12 +657,12 @@ private:
   /// The original function to be differentiated.
   SILFunction *original;
 
-  /// The `[reverse_differentiable]` attribute on the original function. Since
-  /// attribute synthesis is part of differentiation, a
-  /// `[reverse_differentiable]` attribute must be available when a
-  /// `DifferentiationTask` is created. The AD configuration resides within the
-  /// attribute. This is guaranteed to be non-null.
-  SILReverseDifferentiableAttr *attr;
+  /// The `[differentiable]` attribute on the original function. Since
+  /// attribute synthesis is part of differentiation, a `[differentiable]`
+  /// attribute must be available when a `DifferentiationTask` is created. The
+  /// AD configuration resides within the attribute. This is guaranteed to be
+  /// non-null.
+  SILDifferentiableAttr *attr;
 
   /// The invoker of this differentiation task.
   DifferentiationInvoker invoker;
@@ -685,11 +685,11 @@ protected:
   /// Create a differentiation task.
   ///
   /// @param original The original function to be differentiated.
-  /// @param attr The [reverse_differentiable] attribute to take control of.
+  /// @param attr The [differentiable] attribute to take control of.
   /// @param invoker The invoker of this differentiation task.
   /// @param module The module where differentiation happens.
   explicit DifferentiationTask(SILFunction *original,
-                               SILReverseDifferentiableAttr *&&attr,
+                               SILDifferentiableAttr *&&attr,
                                SILModule &module,
                                DifferentiationInvoker invoker)
       : original(original), attr(attr), invoker(invoker) {
@@ -704,7 +704,7 @@ public:
   DifferentiationTask &operator=(const DifferentiationTask &) = delete;
 
   SILFunction *getOriginal() const { return original; }
-  SILReverseDifferentiableAttr *getAttribute() const { return attr; }
+  SILDifferentiableAttr *getAttribute() const { return attr; }
   DifferentiationInvoker getInvoker() const { return invoker; }
 
   PrimalInfo *getPrimalInfo() const { return primalInfo.get(); }
@@ -779,9 +779,9 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     os << ") func_decl=" << diffAttr.second->getFullName();
     break;
   }
-  case Kind::SILReverseDifferentiableAttribute: {
-    auto diffAttr = getSILReverseDifferentiableAttribute();
-    os << "sil_reverse_differentiable_attribute=(attr=(";
+  case Kind::SILDifferentiableAttribute: {
+    auto diffAttr = getSILDifferentiableAttribute();
+    os << "sil_differentiable_attribute=(attr=(";
     diffAttr.first->print(os);
     os << ") function=" << diffAttr.second->getName();
     break;
@@ -851,7 +851,7 @@ private:
   /// A mapping from functions and AD configurations to gradient functions.
   ///
   /// NOTE: The parameter index array is hashed by reference, which is expected
-  /// to point to [reverse_differentiable wrt ...]'s trailing index storage.
+  /// to point to [differentiable wrt ...]'s trailing index storage.
   DenseMap<GradientLookUpKey, SILFunction *> gradientMap;
   /// Canonical gradients to be filled.
   SmallVector<std::pair<GradientLookUpKey, SILFunction *>, 32>
@@ -961,40 +961,40 @@ public:
     return lookUpGradient({task->original, task->getMasterConfig()});
   }
 
-  /// Finds the `[reverse_differentiable]` attribute on the specified original
-  /// function corresponding to the specified parameter indices. Returns nullptr
-  /// if it does not exist.
+  /// Finds the `[differentiable]` attribute on the specified original function
+  /// corresponding to the specified parameter indices. Returns nullptr if it
+  /// does not exist.
   ///
   /// TODO: Currently we are doing a O(n) lookup. This could be improved by
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
-  SILReverseDifferentiableAttr *lookUpReverseDifferentiableAttr(
+  SILDifferentiableAttr *lookUpDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    for (auto *attr : original->getReverseDifferentiableAttrs())
+    for (auto *attr : original->getDifferentiableAttrs())
       if (attr->getIndices() == indices)
         return attr;
     return nullptr;
   }
 
-  SILReverseDifferentiableAttr *createReverseDifferentiableAttr(
+  SILDifferentiableAttr *createDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    assert(!lookUpReverseDifferentiableAttr(original, indices));
+    assert(!lookUpDifferentiableAttr(original, indices));
     auto *attr =
-        SILReverseDifferentiableAttr::create(getModule(), indices,
+        SILDifferentiableAttr::create(getModule(), indices,
                                              /*primalName*/ StringRef(),
                                              /*adjointName*/ StringRef(),
                                              /*primitive*/ false);
-    original->addReverseDifferentiableAttr(attr);
+    original->addDifferentiableAttr(attr);
     return attr;
   }
 
-  /// Finds or creates a `[reverse_differentiable]` attribute on the specified
+  /// Finds or creates a `[differentiable]` attribute on the specified
   /// original function corresponding to the specified parameter indices.
-  SILReverseDifferentiableAttr *getOrCreateReverseDifferentiableAttr(
+  SILDifferentiableAttr *getOrCreateDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) {
-    if (auto *attr = lookUpReverseDifferentiableAttr(original, indices))
+    if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
-    return createReverseDifferentiableAttr(original, indices);
+    return createDifferentiableAttr(original, indices);
   }
 
   /// Finds a differentiation task on a function such that the task produces
@@ -1018,7 +1018,7 @@ public:
                                    const SILAutoDiffIndices &indices) {
     auto supersetParamIndices = llvm::SmallBitVector();
     const auto &indexSet = indices.parameters;
-    for (auto *rda : original->getReverseDifferentiableAttrs()) {
+    for (auto *rda : original->getDifferentiableAttrs()) {
       const auto &rdaIndexSet = rda->getIndices().parameters;
       // If all indices in indexSet are in rdaIndexSet, and it has fewer
       // indices than our current candidate and a primitive adjoint, rda is our
@@ -1037,8 +1037,8 @@ public:
   }
 
   /// Register a differentiation task in the global worklist. This will ensure
-  /// that a `[reverse_differentiable]` attribute will be generated for the
-  /// specified indices, and that primal/adjoint synthesis will be run in the
+  /// that a `[differentiable]` attribute will be generated for the specified
+  /// indices, and that primal/adjoint synthesis will be run in the
   /// Differentiation pass.
   ///
   /// The function must either be a definition or be serialized.
@@ -1049,7 +1049,7 @@ public:
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
     // Make sure this function either has a body or has a
-    // `[reverse_differentiable]` attribute that is a superset of all the
+    // `[differentiable]` attribute that is a superset of all the
     if (original->isExternalDeclaration()) {
       // If it's serialized, deserialize it.
       assert(original->isSerialized() &&
@@ -1058,7 +1058,7 @@ public:
       assert(deserializedFn && "Cannot deserialize original function");
       (void)deserializedFn;
     }
-    auto *attr = getOrCreateReverseDifferentiableAttr(original, indices);
+    auto *attr = getOrCreateDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
     differentiationTasks.push_back(std::move(task));
@@ -1117,11 +1117,11 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              << "\n"
              << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
-  // For a gradient instruction or a `[reverse_differentiable]` attribute that
-  // is not associated with any source location, we emit a diagnostic at the
+  // For a gradient instruction or a `[differentiable]` attribute that is not
+  // associated with any source location, we emit a diagnostic at the
   // instruction source location.
   case DifferentiationInvoker::Kind::GradientInst:
-  case DifferentiationInvoker::Kind::SILReverseDifferentiableAttribute:
+  case DifferentiationInvoker::Kind::SILDifferentiableAttribute:
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
@@ -4444,17 +4444,16 @@ void Differentiation::run() {
   auto &astCtx = module.getASTContext();
   debugDump(module);
 
-  // Collect [reverse_differentiable] attributes and gradient instructions to
-  // process.
+  // Collect [differentiable] attributes and gradient instructions to process.
   SmallVector<std::pair<SILFunction *,
-                        SILReverseDifferentiableAttr *>, 8> diffAttrs;
+                        SILDifferentiableAttr *>, 8> diffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
-  // Handle each `gradient` instruction and each `reverse_differentiable`
+  // Handle each `gradient` instruction and each `differentiable`
   // attribute in the module.
   for (SILFunction &f : module) {
-    // If `f` has a `[reverse_differentiable]` attribute, it should become a
+    // If `f` has a `[differentiable]` attribute, it should become a
     // differentiation task.
-    for (auto *diffAttr : f.getReverseDifferentiableAttrs()) {
+    for (auto *diffAttr : f.getDifferentiableAttrs()) {
       if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()) {
         diffAttrs.push_back({&f, diffAttr});
         continue;
@@ -4477,8 +4476,8 @@ void Differentiation::run() {
     }
   }
 
-  // If there's no `gradient` instruction or no `[reverse_differentiable]`
-  // attributes, there's no AD to do.
+  // If there's no `gradient` instruction or no `[differentiable]` attributes,
+  // there's no AD to do.
   if (gradInsts.empty() && diffAttrs.empty())
     return;
 
@@ -4493,9 +4492,9 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
-  // For every `[reverse_differentiable]` attribute, create a differentiation
-  // task. If the attribute has a primal and adjoint, this task will not
-  // synthesize anything, but it's still needed as a lookup target.
+  // For every `[differentiable]` attribute, create a differentiation task. If
+  // the attribute has a primal and adjoint, this task will not synthesize
+  // anything, but it's still needed as a lookup target.
   for (auto &fnAndAttr : diffAttrs) {
     context.registerDifferentiationTask(
         fnAndAttr.first, fnAndAttr.second->getIndices(),
