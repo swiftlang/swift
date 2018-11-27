@@ -4777,6 +4777,72 @@ static void diagnoseAndIgnoreObservers(Parser &P,
   }
 }
 
+/// Gets the storage info of the provided storage decl if it has the
+/// @_hasStorage attribute and it's not in SIL mode.
+///
+/// In this case, we say the decl is:
+///
+/// Read:
+///   - Stored, always
+/// Write:
+///   - Stored, if the decl is a 'var'.
+///   - StoredWithObservers, if the decl has a setter
+///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
+///   - InheritedWithObservers, if the decl has a setter and is an overridde.
+///   - Immutable, if the decl is a 'let' or it does not have a setter.
+/// ReadWrite:
+///   - Stored, if the decl has no accessors listed.
+///   - Immutable, if the decl is a 'let' or it does not have a setter.
+///   - MaterializeToTemporary, if the decl has a setter.
+static StorageImplInfo classifyWithHasStorageAttr(
+  Parser::ParsedAccessors &accessors, ASTContext &ctx,
+  AbstractStorageDecl *storage, const DeclAttributes &attrs) {
+
+  // Determines if the storage is immutable, either by declaring itself as a
+  // `let` or by omitting a setter.
+  auto isImmutable = [&]() {
+    if (auto varDecl = dyn_cast<VarDecl>(storage))
+      return varDecl->isImmutable();
+    if (accessors.Set == nullptr) return true;
+    return false;
+  };
+
+  // Determines if the storage had a private setter, i.e. it's not a 'let' and
+  // it had a setter.
+  auto isPrivateSet = [&]() {
+    if (auto varDecl = dyn_cast<VarDecl>(storage))
+      return !varDecl->isImmutable() && accessors.Set == nullptr;
+    return false;
+  };
+
+  // Default to stored writes.
+  WriteImplKind writeImpl = WriteImplKind::Stored;
+  ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Stored;
+
+  if (accessors.Get && accessors.Set) {
+    // If we see `@_hasStorage var x: T { get set }`, then our property has
+    // willSet/didSet observers.
+    writeImpl = attrs.hasAttribute<OverrideAttr>() ?
+      WriteImplKind::InheritedWithObservers :
+      WriteImplKind::StoredWithObservers;
+    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+  } else if (isImmutable()) {
+    writeImpl = WriteImplKind::Immutable;
+    readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  if (isPrivateSet()) {
+    // If we saw a 'var' with no setter, that means it was
+    // private/internal(set). Honor that with a synthesized attribute.
+    storage->getAttrs().add(
+      new (ctx) SetterAccessAttr(
+        SourceLoc(), SourceLoc(), AccessLevel::Private, /*implicit: */true));
+  }
+
+  // Always force Stored reads if @_hasStorage is present.
+  return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
+}
+
 StorageImplInfo
 Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                                   bool invalid, ParseDeclOptions flags,
@@ -4935,10 +5001,26 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     readWriteImpl = ReadWriteImplKind::Immutable;
   }
 
-  // Allow the _hasStorage attribute to override all the accessors we parsed
+  // Allow the @_hasStorage attribute to override all the accessors we parsed
   // when making the final classification.
   if (attrs.hasAttribute<HasStorageAttr>()) {
-    return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
+    // The SIL rules for @_hasStorage are slightly different from the non-SIL
+    // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
+    // and the only thing that determines mutability is the existence of the
+    // setter.
+    //
+    // FIXME: SIL should not be special cased here. The behavior should be
+    //        consistent between SIL and non-SIL.
+    //        The strategy here should be to keep track of all opaque accessors
+    //        along with enough information to access the storage trivially
+    //        if allowed. This could be a representational change to
+    //        StorageImplInfo such that it keeps a bitset of listed accessors
+    //        and dynamically determines the access strategy from that.
+    if (P.isInSILMode())
+      return StorageImplInfo::getSimpleStored(
+        StorageIsMutable_t(Set != nullptr));
+
+    return classifyWithHasStorageAttr(*this, P.Context, storage, attrs);
   }
 
   return StorageImplInfo(readImpl, writeImpl, readWriteImpl);

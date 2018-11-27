@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
 
 // CHECK: final class Rect
-// CHECK: @_hasStorage @_hasInitialValue final var orgx: Double
+// CHECK: @_hasInitialValue @_hasStorage final var orgx: Double
 final class Rect {
   var orgx = 0.0
 }

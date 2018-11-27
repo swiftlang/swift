@@ -4057,6 +4057,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *VD = cast<VarDecl>(D);
     auto *PBD = VD->getParentPatternBinding();
 
+    // Add the '@_hasStorage' attribute if this property is stored.
+    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
+      VD->getAttrs().add(new (Context) HasStorageAttr(/*isImplicit=*/true));
+
     // Note that we need to handle the fact that some VarDecls don't
     // have a PatternBindingDecl, for example the iterator in a
     // 'for ... in ...' loop.

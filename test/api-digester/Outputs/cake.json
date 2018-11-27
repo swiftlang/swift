@@ -335,7 +335,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "ownership": 1,
           "hasStorage": true
@@ -401,7 +402,8 @@
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
-            "ReferenceOwnership"
+            "ReferenceOwnership",
+            "HasStorage"
           ],
           "ownership": 2,
           "hasStorage": true
@@ -807,7 +809,8 @@
           "usr": "s:4cake17fixedLayoutStructV1aSivp",
           "moduleName": "cake",
           "declAttributes": [
-            "HasInitialValue"
+            "HasInitialValue",
+            "HasStorage"
           ],
           "hasStorage": true
         }
@@ -1084,7 +1087,8 @@
       "usr": "s:4cake9GlobalVarSivp",
       "moduleName": "cake",
       "declAttributes": [
-        "HasInitialValue"
+        "HasInitialValue",
+        "HasStorage"
       ],
       "isLet": true,
       "hasStorage": true
