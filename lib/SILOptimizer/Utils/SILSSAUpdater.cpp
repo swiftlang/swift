@@ -34,9 +34,9 @@ void SILSSAUpdater::deallocateSentinel(SILUndef *D) {
   AlignedFree(D);
 }
 
-SILSSAUpdater::SILSSAUpdater(SmallVectorImpl<SILPhiArgument *> *PHIs)
+SILSSAUpdater::SILSSAUpdater(SILModule &M, SmallVectorImpl<SILPhiArgument *> *PHIs)
     : AV(nullptr), PHISentinel(nullptr, deallocateSentinel),
-      InsertedPHIs(PHIs) {}
+      InsertedPHIs(PHIs), M(M) {}
 
 SILSSAUpdater::~SILSSAUpdater() = default;
 
@@ -44,7 +44,7 @@ void SILSSAUpdater::Initialize(SILType Ty) {
   ValType = Ty;
 
   PHISentinel = std::unique_ptr<SILUndef, void (*)(SILUndef *)>(
-      SILUndef::getSentinelValue(Ty, this), SILSSAUpdater::deallocateSentinel);
+      SILUndef::getSentinelValue(Ty, M, this), SILSSAUpdater::deallocateSentinel);
 
   if (!AV)
     AV.reset(new AvailableValsTy());

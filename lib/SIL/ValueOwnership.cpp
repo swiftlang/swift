@@ -280,8 +280,8 @@ ValueOwnershipKindClassifier::visitUncheckedOwnershipConversionInst(
   return I->getConversionOwnershipKind();
 }
 
-ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *Arg) {
-  return ValueOwnershipKind::Any;
+ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
+  return arg->getOwnershipKind();
 }
 
 ValueOwnershipKind

@@ -207,7 +207,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
+  SILSSAUpdater SSAUp(SrcBB->getParent()->getModule());
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
     if (Inst->use_empty())

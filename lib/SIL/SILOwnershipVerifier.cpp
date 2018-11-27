@@ -669,9 +669,6 @@ void SILInstruction::verifyOperandOwnership() const {
       continue;
     SILValue opValue = op.get();
 
-    // Skip any SILUndef that we see.
-    if (isa<SILUndef>(opValue))
-      continue;
     auto operandOwnershipKindMap = op.getOwnershipKindMap();
     auto valueOwnershipKind = opValue.getOwnershipKind();
     if (operandOwnershipKindMap.canAcceptKind(valueOwnershipKind))
@@ -700,11 +697,6 @@ void SILValue::verifyOwnership(SILModule &mod,
                                DeadEndBlocks *deadEndBlocks) const {
 #ifndef NDEBUG
   if (DisableOwnershipVerification)
-    return;
-
-  // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
-  // the SILUndef will make sure that the matching checks out.
-  if (isa<SILUndef>(*this))
     return;
 
   // Since we do not have SILUndef, we now know that getFunction() should return
@@ -742,11 +734,6 @@ bool OwnershipChecker::checkValue(SILValue value) {
   regularUsers.clear();
   lifetimeEndingUsers.clear();
   liveBlocks.clear();
-
-  // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
-  // the SILUndef will make sure that the matching checks out.
-  if (isa<SILUndef>(value))
-    return false;
 
   // Since we do not have SILUndef, we now know that getFunction() should return
   // a real function. Assert in case this assumption is no longer true.

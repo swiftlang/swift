@@ -30,14 +30,6 @@
 
 using namespace swift;
 
-SILUndef *SILUndef::get(SILType ty, SILModule &m) {
-  // Unique these.
-  SILUndef *&entry = m.UndefValues[ty];
-  if (entry == nullptr)
-    entry = new (m) SILUndef(ty);
-  return entry;
-}
-
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
