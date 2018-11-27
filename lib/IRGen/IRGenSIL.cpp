@@ -1978,7 +1978,15 @@ void IRGenSILFunction::visitGradientInst(GradientInst *i) {
 }
 
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  // The original function can be thin or thick.
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  // Associated functions must have the same context as the original function.
+  // If it's are thick, only add the function pointer to the lowered explosion.
+  for (auto &assocFnOp : i->getAssociatedFunctions())
+    e.add(getLoweredExplosion(assocFnOp.get()).claimAll()[0]);
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::

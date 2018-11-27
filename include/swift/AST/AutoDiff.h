@@ -396,6 +396,8 @@ unsigned
 getOffsetForAutoDiffAssociatedFunction(unsigned order,
                                        AutoDiffAssociatedFunctionKind kind);
 
+unsigned
+getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
 } // end namespace autodiff
 
 class BuiltinFloatType;

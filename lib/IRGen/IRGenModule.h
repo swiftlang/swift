@@ -770,6 +770,9 @@ public:
   llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::StructType *getAutoDiffFunctionStorageType(
+      unsigned differentiationOrder, SILFunctionTypeRepresentation originalRep);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);

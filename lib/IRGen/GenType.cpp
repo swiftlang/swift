@@ -2068,6 +2068,24 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// getAutoDiffFunctionStorageType - Obtain the storage type for an @autodiff
+/// function.
+llvm::StructType *
+IRGenModule::getAutoDiffFunctionStorageType(
+    unsigned differentiationOrder, SILFunctionTypeRepresentation originalRep) {
+  assert(differentiationOrder > 0 && "Differentiation order must be positive");
+  assert(originalRep != SILFunctionTypeRepresentation::Block &&
+         "Block functions cannot be @autodiff");
+  SmallVector<llvm::Type *, 4> eltTypes {Int8PtrTy};
+  if (originalRep == SILFunctionTypeRepresentation::Thick)
+    eltTypes.push_back(RefCountedPtrTy);
+  auto numAssocFns =
+      autodiff::getNumAutoDiffAssociatedFunctions(differentiationOrder);
+  eltTypes.append(differentiationOrder * numAssocFns, Int8PtrTy);
+  return llvm::StructType::get(getLLVMContext(), eltTypes);
+}
+
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
   if (it != SpareBitsForTypes.end())

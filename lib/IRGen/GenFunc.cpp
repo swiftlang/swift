@@ -498,6 +498,216 @@ namespace {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
     }
   };
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The @autodiff @thin function type-info class.
+  class AutoDiffThinFuncTypeInfo
+      : public ScalarTypeInfo<AutoDiffThinFuncTypeInfo, LoadableTypeInfo>,
+        public FuncSignatureInfo {
+    unsigned differentiationOrder;
+
+    AutoDiffThinFuncTypeInfo(CanSILFunctionType formalType,
+                             llvm::StructType *storageType,
+                             unsigned differentiationOrder, Size size,
+                             Alignment align, const SpareBitVector &spareBits)
+        : ScalarTypeInfo(storageType, size, spareBits, align, IsPOD,
+                         IsFixedSize),
+          FuncSignatureInfo(formalType),
+          differentiationOrder(differentiationOrder) {
+    }
+
+  public:
+    static const AutoDiffThinFuncTypeInfo *create(
+        CanSILFunctionType formalType, unsigned differentiationOrder,
+        llvm::StructType *storageType, Size size, Alignment align,
+        const SpareBitVector &spareBits) {
+      return new AutoDiffThinFuncTypeInfo(formalType, storageType,
+                                          differentiationOrder, size, align,
+                                          spareBits);
+    }
+
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
+
+    unsigned getDifferentiationOrder() const {
+      return differentiationOrder;
+    }
+
+    unsigned getExplosionSize() const override {
+      return /*original*/ 1 +
+          autodiff::getNumAutoDiffAssociatedFunctions(differentiationOrder);
+    }
+
+    void getSchema(ExplosionSchema &schema) const override {
+      llvm::StructType *structTy = getStorageType();
+      for (unsigned i : range(getExplosionSize()))
+        schema.add(
+            ExplosionSchema::Element::forScalar(structTy->getElementType(i)));
+    }
+
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      auto ptrSize = IGM.getPointerSize();
+      llvm::StructType *structTy = getStorageType();
+      for (unsigned i : range(getExplosionSize())) {
+        addScalarToAggLowering(IGM, lowering, structTy->getElementType(i),
+                               offset, ptrSize);
+        offset += ptrSize;
+      }
+    }
+
+    void loadAsCopy(IRGenFunction &IGF, Address address,
+                    Explosion &e) const override {
+      // Load the function.
+      Address fnAddr = projectOriginalFunction(IGF, address);
+      StringRef loadSuffix = ".load";
+      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName() + loadSuffix));
+      for (unsigned i : range(1, differentiationOrder + 1)) {
+        Address jvpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::JVP, i);
+        e.add(IGF.Builder.CreateLoad(jvpAddr, jvpAddr->getName() + loadSuffix));
+        Address vjpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::VJP, i);
+        e.add(IGF.Builder.CreateLoad(vjpAddr, vjpAddr->getName() + loadSuffix));
+      }
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address addr,
+                    Explosion &e) const override {
+      loadAsCopy(IGF, addr, e);
+    }
+
+    void assign(IRGenFunction &IGF, Explosion &e, Address address,
+                bool isOutlined) const override {
+      // Store the function pointer.
+      Address fnAddr = projectOriginalFunction(IGF, address);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
+      for (unsigned i : range(1, differentiationOrder + 1)) {
+        Address jvpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::JVP, i);
+        IGF.Builder.CreateStore(e.claimNext(), jvpAddr);
+        Address vjpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::VJP, i);
+        IGF.Builder.CreateStore(e.claimNext(), vjpAddr);
+      }
+    }
+
+    Address projectOriginalFunction(IRGenFunction &IGF, Address address) const {
+      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
+                                         address->getName() + ".orig");
+    }
+
+    Address projectAssociatedFunction(IRGenFunction &IGF, Address address,
+                                      AutoDiffAssociatedFunctionKind kind,
+                                      unsigned order) const {
+      assert(order > 0);
+      std::string name = address->getName().str();
+      unsigned offset = 1 + order * (getDifferentiationOrder() - 1) * 2;
+      switch (kind) {
+      case swift::AutoDiffAssociatedFunctionKind::JVP:
+        name += ".jvp.";
+        break;
+      case swift::AutoDiffAssociatedFunctionKind::VJP:
+        name += ".vjp.";
+        offset += 1;
+        break;
+      }
+      name += llvm::itostr(order);
+      return IGF.Builder.CreateStructGEP(
+          address, offset, IGF.IGM.getPointerSize(), name);
+    }
+
+    void initialize(IRGenFunction &IGF, Explosion &e, Address address,
+                    bool isOutlined) const override {
+      // Store the function pointer.
+      Address fnAddr = projectOriginalFunction(IGF, address);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
+      for (auto i : range(getDifferentiationOrder())) {
+        auto jvpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::JVP, i);
+        IGF.Builder.CreateStore(e.claimNext(), jvpAddr);
+        auto vjpAddr = projectAssociatedFunction(
+            IGF, address, AutoDiffAssociatedFunctionKind::VJP, i);
+        IGF.Builder.CreateStore(e.claimNext(), vjpAddr);
+      }
+    }
+
+    void copy(IRGenFunction &IGF, Explosion &src,
+              Explosion &dest, Atomicity atomicity) const override {
+      src.transferInto(dest, getExplosionSize());
+    }
+
+    void consume(IRGenFunction &IGF, Explosion &src,
+                 Atomicity atomicity) const override {
+      src.markClaimed(getExplosionSize());
+    }
+
+    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
+      src.claimNext();
+      IGF.emitFixLifetime(src.claimNext());
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      /* nop */
+    }
+
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &payload,
+                             Explosion &src,
+                             unsigned offset) const override {
+      payload.insertValue(IGF, src.claimNext(), offset);
+      payload.insertValue(IGF, src.claimNext(),
+                          offset + IGF.IGM.getPointerSize().getValueInBits());
+    }
+
+    void unpackFromEnumPayload(IRGenFunction &IGF,
+                               const EnumPayload &payload,
+                               Explosion &dest,
+                               unsigned offset) const override {
+      auto storageTy = getStorageType();
+      dest.add(payload.extractValue(IGF, storageTy->getElementType(0), offset));
+      dest.add(payload.extractValue(IGF, storageTy->getElementType(1),
+                                    offset + IGF.IGM.getPointerSize().getValueInBits()));
+    }
+
+    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+      return true;
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+      return getFunctionPointerExtraInhabitantCount(IGM);
+    }
+
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                       unsigned bits,
+                                       unsigned index) const override {
+      return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
+    }
+
+    llvm::Value *getExtraInhabitantIndex(
+        IRGenFunction &IGF, Address src, SILType T,
+        bool isOutlined) const override {
+      src = projectOriginalFunction(IGF, src);
+      return getFunctionPointerExtraInhabitantIndex(IGF, src);
+    }
+
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      // Only the original function pointer value is used for extra inhabitants.
+      auto pointerSize = IGM.getPointerSize().getValueInBits();
+      APInt bits = APInt::getAllOnesValue(pointerSize);
+      bits = bits.zext(pointerSize * 2);
+      return bits;
+    }
+
+    void storeExtraInhabitant(
+        IRGenFunction &IGF, llvm::Value *index, Address dest, SILType T,
+        bool isOutlined) const override {
+      dest = projectOriginalFunction(IGF, dest);
+      return storeFunctionPointerExtraInhabitant(IGF, index, dest);
+    }
+  };
 } // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
@@ -550,8 +760,12 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
+  // SWIFT_ENABLE_TENSORFLOW
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(T->isDifferentiable() &&
+           "Block functions cannot be @autodiff yet");
     return new BlockTypeInfo(CanSILFunctionType(T),
                              IGM.ObjCBlockPtrTy,
                              IGM.getPointerSize(),
@@ -566,11 +780,27 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Closure:
   // SWIFT_ENABLE_TENSORFLOW
   case SILFunctionType::Representation::TensorFlow:
-    return ThinFuncTypeInfo::create(CanSILFunctionType(T),
-                                    IGM.FunctionPtrTy,
-                                    IGM.getPointerSize(),
-                                    IGM.getPointerAlignment(),
-                                    IGM.getFunctionPointerSpareBits());
+    if (T->isDifferentiable()) {
+      // TODO(rxwei): Get the diff order from the function type once it's in
+      // there.
+      auto differentiationOrder = 1;
+      auto numFnPtrs =
+          1 + autodiff::getNumAutoDiffAssociatedFunctions(differentiationOrder);
+      SpareBitVector spareBits;
+      for (unsigned i = 0; i < numFnPtrs; ++i)
+        spareBits.append(IGM.getFunctionPointerSpareBits());
+      return AutoDiffThinFuncTypeInfo::create(
+          CanSILFunctionType(T), differentiationOrder,
+          IGM.getAutoDiffFunctionStorageType(1, T->getRepresentation()),
+          IGM.getPointerSize() * numFnPtrs, IGM.getPointerAlignment(),
+          spareBits);
+    }
+    else
+      return ThinFuncTypeInfo::create(CanSILFunctionType(T),
+                                      IGM.FunctionPtrTy,
+                                      IGM.getPointerSize(),
+                                      IGM.getPointerAlignment(),
+                                      IGM.getFunctionPointerSpareBits());
 
   case SILFunctionType::Representation::Thick: {
     SpareBitVector spareBits;
@@ -580,7 +810,9 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // contexts into the pointer value, so let's not take any spare bits from
     // it.
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(!T->isDifferentiable() &&
+           "Thick @autodiff functions are not supported yet");
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
       return FuncTypeInfo::create(

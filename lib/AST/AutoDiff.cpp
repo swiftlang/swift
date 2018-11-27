@@ -84,7 +84,12 @@ Differentiability::Differentiability(AutoDiffMode mode,
 
 unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
     unsigned order, AutoDiffAssociatedFunctionKind kind) {
-  return (order - 1) * 2 + kind.rawValue;
+  return (order - 1) * getNumAutoDiffAssociatedFunctions(order) + kind.rawValue;
+}
+
+unsigned
+autodiff::getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder) {
+  return differentiationOrder * 2;
 }
 
 /// If `isMethod` is true, returns the non-self part of `functionType`. (e.g.
