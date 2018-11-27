@@ -45,7 +45,6 @@ extension StringProtocol {
 }
 
 extension _StringGutsSlice {
-  @usableFromInline // @opaque
   @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
     if self.isNFCFastUTF8 {

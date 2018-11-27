@@ -483,6 +483,23 @@ Protocol _NSEnumerator has been removed
 Protocol _NSFastEnumeration has been removed
 Protocol _ShadowProtocol has been removed
 
+Constructor _StringGutsSlice.init(_:) has been removed
+Constructor _StringGutsSlice.init(_:_:) has been removed
+Func _StringGutsSlice._normalizedHash(into:) has been removed
+Func _StringGutsSlice.compare(with:expecting:) has been removed
+Func _StringGutsSlice.withFastUTF8(_:) has been removed
+Struct _StringGutsSlice is now without @_fixed_layout
+Var StringProtocol._gutsSlice has been removed
+Var _StringGutsSlice._guts has been removed
+Var _StringGutsSlice._offsetRange has been removed
+Var _StringGutsSlice.count has been removed
+Var _StringGutsSlice.end has been removed
+Var _StringGutsSlice.isASCII has been removed
+Var _StringGutsSlice.isFastUTF8 has been removed
+Var _StringGutsSlice.isNFCFastUTF8 has been removed
+Var _StringGutsSlice.range has been removed
+Var _StringGutsSlice.start has been removed
+
 Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
 Func _sanityCheck(_:_:file:line:) has been removed
 Func _sanityCheckFailure(_:file:line:) has been removed
