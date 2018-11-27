@@ -1363,7 +1363,7 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (bool, bool))
 ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
-      "type referenced from a stored property in a @_fixed_layout struct must "
+      "type referenced from a stored property in a '@_fixed_layout' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
@@ -1380,7 +1380,7 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         (bool, bool, Type))
 ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "@_fixed_layout struct must be '@usableFromInline' or public",
+      "'@_fixed_layout' struct must be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
