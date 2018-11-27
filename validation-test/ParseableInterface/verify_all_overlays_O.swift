@@ -1,6 +1,9 @@
+// Note that this test should still "pass" when no swiftinterfaces have been
+// generated.
+
 // RUN: %empty-directory(%t)
-// RUN: for x in %platform-sdk-overlay-dir/*.swiftinterface; do [[ $(basename "$x") = Swift.swiftinterface || $(basename "$x") = simd.swiftinterface || $(basename "$x") = SwiftLang.swiftinterface ]] && continue; %target-swift-frontend "$x" -emit-module -o %t/$(basename "$x" .swiftinterface).swiftmodule -disable-objc-attr-requires-foundation-module -enable-resilience -Fsystem %sdk/System/Library/PrivateFrameworks/ -swift-version 4 -O || echo '%target-os:' $(basename "$x") >> %t/failures.txt; done
-// RUN: diff <(grep '%target-os:' %s) <(sort -f %t/failures.txt)
+// RUN: for x in %platform-sdk-overlay-dir/*.swiftinterface; do [[ $(basename "$x") = Swift.swiftinterface || $(basename "$x") = simd.swiftinterface || $(basename "$x") = SwiftLang.swiftinterface || $(basename "$x") = '*.swiftinterface' ]] && continue; %target-swift-frontend "$x" -emit-module -o %t/$(basename "$x" .swiftinterface).swiftmodule -disable-objc-attr-requires-foundation-module -enable-resilience -Fsystem %sdk/System/Library/PrivateFrameworks/ -swift-version 4 -O || echo '%target-os:' $(basename "$x") >> %t/failures.txt; done
+// RUN: test ! -e %t/failures.txt || diff <(grep '%target-os:' %s) <(sort -f %t/failures.txt)
 
 // REQUIRES: nonexecutable_test
 
