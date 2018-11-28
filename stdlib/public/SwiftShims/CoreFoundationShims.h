@@ -134,7 +134,7 @@ _swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t
 _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
-                                         _swift_shims_UInt8 *buffer,
+                                         _swift_shims_UInt8 *_Nonnull buffer,
                                          _swift_shims_CFIndex maxLength,
                                          unsigned long encoding);
   
