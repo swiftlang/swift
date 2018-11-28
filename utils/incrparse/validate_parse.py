@@ -16,12 +16,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description='Utility for testing incremental syntax parsing',
         epilog='''
-    Based of a single template the utility generates a pre-edit and a post-edit 
-    file. It then verifies that incrementally parsing the post-edit file base 
-    on the pre-edit file results in the same syntax tree as reparsing the 
+    Based of a single template the utility generates a pre-edit and a post-edit
+    file. It then verifies that incrementally parsing the post-edit file base
+    on the pre-edit file results in the same syntax tree as reparsing the
     post-edit file from scratch.
 
-    To generate the pre-edit and the post-edit file from the template, it 
+    To generate the pre-edit and the post-edit file from the template, it
     operates on markers of the form:
 
         <<test_case<pre|||post>>>
@@ -70,33 +70,33 @@ def main():
 
     # Generate the syntax tree once incrementally and once from scratch
     try:
-        serializeIncrParseMarkupFile(test_file=test_file, 
-                                     test_case=test_case, 
-                                     mode='incremental', 
+        serializeIncrParseMarkupFile(test_file=test_file,
+                                     test_case=test_case,
+                                     mode='incremental',
                                      serialization_mode='full',
                                      serialization_format='json',
                                      omit_node_ids=True,
-                                     output_file=incremental_serialized_file, 
-                                     temp_dir=temp_dir + '/temp', 
-                                     swift_syntax_test=swift_syntax_test, 
+                                     output_file=incremental_serialized_file,
+                                     temp_dir=temp_dir + '/temp',
+                                     swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=visual_reuse_info)
         if visual_reuse_info:
-            # If we just want the reuse info, we don't need to parse the file 
+            # If we just want the reuse info, we don't need to parse the file
             # from scratch or validate it
             sys.exit(0)
 
-        serializeIncrParseMarkupFile(test_file=test_file, 
-                                     test_case=test_case, 
-                                     mode='post-edit', 
+        serializeIncrParseMarkupFile(test_file=test_file,
+                                     test_case=test_case,
+                                     mode='post-edit',
                                      serialization_mode='full',
                                      serialization_format='json',
                                      omit_node_ids=True,
-                                     output_file=post_edit_serialized_file, 
-                                     temp_dir=temp_dir + '/temp', 
-                                     swift_syntax_test=swift_syntax_test, 
+                                     output_file=post_edit_serialized_file,
+                                     temp_dir=temp_dir + '/temp',
+                                     swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=visual_reuse_info)
     except TestFailedError as e:
-        print('Test case "%s" of %s FAILed' % (test_case, test_file), 
+        print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print(e.message, file=sys.stderr)
         sys.exit(1)
@@ -110,7 +110,7 @@ def main():
                 post_edit_serialized_file
             ])
     except subprocess.CalledProcessError as e:
-        print('Test case "%s" of %s FAILed' % (test_case, test_file), 
+        print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print('Syntax tree of incremental parsing does not match '
               'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
