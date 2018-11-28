@@ -9,6 +9,11 @@
   -(void) someOptionalFunctionFromProt;
 @end
 
+@protocol AnotherObjcProt
+  -(void) anotherFunctionFromProt;
+  -(void) anotherFunctionFromProt2;
+@end
+
 @interface ClangInterface: NSObject <ObjcProt>
 - (void)someFunction;
 @end
