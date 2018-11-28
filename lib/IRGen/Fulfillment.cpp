@@ -125,13 +125,12 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     }
 
     // If the type is an archetype consider its super class bound.
-    if (isa<ArchetypeType>(type))
-      if (metadataState == MetadataState::Complete) {
-        if (auto superclassTy = keys.getSuperclassBound(type)) {
-          hadFulfillment |= searchNominalTypeMetadata(
-              IGM, superclassTy, metadataState, source, std::move(path), keys);
-        }
+    if (metadataState == MetadataState::Complete) {
+      if (auto superclassTy = keys.getSuperclassBound(type)) {
+        hadFulfillment |= searchNominalTypeMetadata(
+            IGM, superclassTy, metadataState, source, std::move(path), keys);
       }
+    }
 
     // Add the fulfillment.
     hadFulfillment |= addFulfillment({type, nullptr},
