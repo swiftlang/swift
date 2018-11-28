@@ -89,6 +89,10 @@ public func compare_Comparables<T:Comparable>(_ x: T, _ y: T) -> Bool {
   return x < y
 }
 
+public func compare_FauxtingPoint<T:FauxtingPoint>(_ x: T, _ y: T) -> Bool {
+  return x < y
+}
+
 public func compare_Fauxts(_ x: Fauxt, _ y: Fauxt) -> Bool {
   return x < y
 }
@@ -102,6 +106,16 @@ public func main() {
   // CHECK: compared as Comparables
   assert(!compare_Comparables(Fauxt.nan, Fauxt.one))
   assert(comparedAsComparablesCount == 3)
+  // CHECK: compared as Comparables
+
+  assert(compare_FauxtingPoint(Fauxt.one, Fauxt.two))
+  assert(comparedAsComparablesCount == 4)
+  // CHECK: compared as Comparables
+  assert(compare_FauxtingPoint(Fauxt.one, Fauxt.nan))
+  assert(comparedAsComparablesCount == 5)
+  // CHECK: compared as Comparables
+  assert(!compare_FauxtingPoint(Fauxt.nan, Fauxt.one))
+  assert(comparedAsComparablesCount == 6)
   // CHECK: compared as Comparables
 
   assert(compare_Fauxts(Fauxt.one, Fauxt.two))
