@@ -289,7 +289,7 @@ namespace swift {
 
     DiagnosticFormatOptions()
         : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
-          AKAFormatString("'%1$s' (aka '%2$s')") {}
+          AKAFormatString("'%s' (aka '%s')") {}
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
