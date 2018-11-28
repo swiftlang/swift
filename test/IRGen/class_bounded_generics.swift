@@ -285,8 +285,8 @@ func takes_metatype<T>(_: T.Type) {}
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC.1* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK:      call swiftcc void @"$s22class_bounded_generics14takes_metatypeyyxmlF"(%swift.type* %T, %swift.type* %T)
-// CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
-// CHECK-NEXT: [[U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
+// CHECK-NEXT: [[T:%.*]] = bitcast %swift.type* %T to %swift.type**
+// CHECK-NEXT: [[U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T]], i64 10
 // CHECK-NEXT: [[U:%.*]] = load %swift.type*, %swift.type** [[U_ADDR]]
 // CHECK:      call swiftcc void @"$s22class_bounded_generics14takes_metatypeyyxmlF"(%swift.type* %U, %swift.type* %U)
 // CHECK:      ret void
