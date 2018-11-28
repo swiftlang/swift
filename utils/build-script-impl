@@ -1181,6 +1181,7 @@ SKSTRESSTESTER_SOURCE_DIR="${WORKSPACE}/swift-stress-tester/SourceKitStressTeste
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
@@ -1223,6 +1224,9 @@ fi
 # products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
+     if [[ -z "${SKIP_BUILD_SWIFT_STATIC_LIBDISPATCH}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" libdispatch_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
@@ -1570,7 +1574,7 @@ function build_directory_bin() {
             foundation)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
@@ -1715,7 +1719,7 @@ function cmake_config_opt() {
             foundation)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
@@ -2286,7 +2290,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
@@ -2662,7 +2665,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 )
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -2726,6 +2729,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
                     -DENABLE_TESTING=YES
+                    -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
                 ;;
                 esac
@@ -3282,6 +3286,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
+            libdispatch_static)
+              # FIXME: merge with libdispatch once the unit tests work with
+              # libdispatch_static
+              continue
+            ;;
             libicu)
                 if [[ "${SKIP_TEST_LIBICU}" ]]; then
                     continue
@@ -3526,7 +3535,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
                     continue
                 fi
