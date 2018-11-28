@@ -1,7 +1,7 @@
 import textwrap
-from AttributeNodes import ATTRIBUTE_NODES
-from AvailabilityNodes import AVAILABILITY_NODES
-import Classification
+from AttributeNodes import ATTRIBUTE_NODES  # noqa: I201
+from AvailabilityNodes import AVAILABILITY_NODES  # noqa: I201
+import Classification  # noqa: I201
 from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
 from ExprNodes import EXPR_NODES  # noqa: I201
@@ -22,7 +22,7 @@ SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
-verify_syntax_node_serialization_codes(SYNTAX_NODES, 
+verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)
 
 

@@ -25,9 +25,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
 from collections import namedtuple
 from operator import attrgetter
+
 import gyb
+
 from jobstats import load_stats_dir, merge_all_jobstats
 
 
