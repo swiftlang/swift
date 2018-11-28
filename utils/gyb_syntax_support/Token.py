@@ -1,6 +1,6 @@
 from Classification import classification_by_name
-from Node import error
-from kinds import lowercase_first_word
+from Node import error  # noqa: I201
+from kinds import lowercase_first_word  # noqa: I201
 
 
 class Token(object):
