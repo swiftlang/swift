@@ -30,6 +30,7 @@ import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
+import Breadcrumbs
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -146,7 +147,6 @@ import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
-import StringBreadcrumbs
 import StringBuilder
 import StringComparison
 import StringEdits
@@ -196,6 +196,7 @@ registerBenchmark(BinaryFloatingPointPropertiesBinade)
 registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
+registerBenchmark(Breadcrumbs)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
@@ -320,7 +321,6 @@ registerBenchmark(StackPromo)
 registerBenchmark(StaticArrayTest)
 registerBenchmark(StrComplexWalk)
 registerBenchmark(StrToInt)
-registerBenchmark(StringBreadcrumbs)
 registerBenchmark(StringBuilder)
 registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)

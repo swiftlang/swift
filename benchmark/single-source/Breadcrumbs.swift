@@ -1,4 +1,4 @@
-//===--- StringBreadcrumbs.swift ------------------------------*- swift -*-===//
+//===--- Breadcrumbs.swift ------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,24 +12,28 @@
 
 import TestsUtils
 
-public let StringBreadcrumbs: [BenchmarkInfo] = [
-  UTF16ToIndex(workload: longASCIIWorkload, count: 5_000).info,
-  UTF16ToIndex(workload: longMixedWorkload, count: 5_000).info,
-  IndexToUTF16(workload: longASCIIWorkload, count: 5_000).info,
-  IndexToUTF16(workload: longMixedWorkload, count: 5_000).info,
+// Tests the performance of String's memoized UTF-8 to UTF-16 index conversion
+// breadcrumbs. These are used to speed up range- and positional access through
+// conventional NSString APIs.
 
-  UTF16ToIndexRange(workload: longASCIIWorkload, count: 1_000).info,
-  UTF16ToIndexRange(workload: longMixedWorkload, count: 1_000).info,
-  IndexToUTF16Range(workload: longASCIIWorkload, count: 1_000).info,
-  IndexToUTF16Range(workload: longMixedWorkload, count: 1_000).info,
+public let Breadcrumbs: [BenchmarkInfo] = [
+  UTF16ToIdx(workload: longASCIIWorkload, count: 5_000).info,
+  UTF16ToIdx(workload: longMixedWorkload, count: 5_000).info,
+  IdxToUTF16(workload: longASCIIWorkload, count: 5_000).info,
+  IdxToUTF16(workload: longMixedWorkload, count: 5_000).info,
 
-  CopyUTF16CodeUnits(workload: shortASCIIWorkload, count: 500).info,
-  CopyUTF16CodeUnits(workload: shortMixedWorkload, count: 500).info,
+  UTF16ToIdxRange(workload: longASCIIWorkload, count: 1_000).info,
+  UTF16ToIdxRange(workload: longMixedWorkload, count: 1_000).info,
+  IdxToUTF16Range(workload: longASCIIWorkload, count: 1_000).info,
+  IdxToUTF16Range(workload: longMixedWorkload, count: 1_000).info,
 
-  MutatedUTF16ToIndex(workload: shortASCIIWorkload, count: 50).info,
-  MutatedUTF16ToIndex(workload: shortMixedWorkload, count: 50).info,
-  MutatedIndexToUTF16(workload: shortASCIIWorkload, count: 50).info,
-  MutatedIndexToUTF16(workload: shortMixedWorkload, count: 50).info,
+  CopyUTF16CodeUnits(workload: asciiWorkload, count: 500).info,
+  CopyUTF16CodeUnits(workload: mixedWorkload, count: 500).info,
+
+  MutatedUTF16ToIdx(workload: asciiWorkload, count: 50).info,
+  MutatedUTF16ToIdx(workload: mixedWorkload, count: 50).info,
+  MutatedIdxToUTF16(workload: asciiWorkload, count: 50).info,
+  MutatedIdxToUTF16(workload: mixedWorkload, count: 50).info,
 ]
 
 extension String {
@@ -204,8 +208,8 @@ let asciiBase = #"""
     Illegal instruction: 4
 
   """#
-let shortASCIIWorkload = Workload(
-  name: "shortASCII",
+let asciiWorkload = Workload(
+  name: "ASCII",
   string: asciiBase)
 let longASCIIWorkload = Workload(
   name: "longASCII",
@@ -230,8 +234,8 @@ let mixedBase = """
     Worst thing about working on String is that it breaks *everything*. Asserts, debuggers, and *especially* printf-style debugging 😭
 
   """
-let shortMixedWorkload = Workload(
-  name: "shortMixed",
+let mixedWorkload = Workload(
+  name: "Mixed",
   string: mixedBase)
 let longMixedWorkload = Workload(
   name: "longMixed",
@@ -243,14 +247,14 @@ let longMixedWorkload = Workload(
 //==============================================================================
 
 /// Convert `count` random UTF-16 offsets into String indices.
-class UTF16ToIndex: BenchmarkBase {
+class UTF16ToIdx: BenchmarkBase {
   let count: Int
   var inputOffsets: [Int] = []
   var outputIndices: [String.Index] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
-    super.init(name: "StringBreadcrumbs.UTF16ToIndex", workload: workload)
+    super.init(name: "Breadcrumbs.UTF16ToIdx", workload: workload)
   }
 
   override func setUp() {
@@ -277,14 +281,14 @@ class UTF16ToIndex: BenchmarkBase {
 }
 
 /// Convert `count` random String indices into UTF-16 offsets.
-class IndexToUTF16: BenchmarkBase {
+class IdxToUTF16: BenchmarkBase {
   let count: Int
   var inputIndices: [String.Index] = []
   var outputOffsets: [Int] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
-    super.init(name: "StringBreadcrumbs.IndexToUTF16", workload: workload)
+    super.init(name: "Breadcrumbs.IdxToUTF16", workload: workload)
   }
 
   override func setUp() {
@@ -311,14 +315,14 @@ class IndexToUTF16: BenchmarkBase {
 
 /// Split a string into `count` random slices and convert their UTF-16 offsets
 /// into String index ranges.
-class UTF16ToIndexRange: BenchmarkBase {
+class UTF16ToIdxRange: BenchmarkBase {
   let count: Int
   var inputOffsets: [Range<Int>] = []
   var outputIndices: [Range<String.Index>] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
-    super.init(name: "StringBreadcrumbs.UTF16ToIndexRange", workload: workload)
+    super.init(name: "Breadcrumbs.UTF16ToIdxRange", workload: workload)
   }
 
   override func setUp() {
@@ -347,14 +351,14 @@ class UTF16ToIndexRange: BenchmarkBase {
 
 /// Split a string into `count` random slices and convert their index ranges
 /// into into UTF-16 offset pairs.
-class IndexToUTF16Range: BenchmarkBase {
+class IdxToUTF16Range: BenchmarkBase {
   let count: Int
   var inputIndices: [Range<String.Index>] = []
   var outputOffsets: [Range<Int>] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
-    super.init(name: "StringBreadcrumbs.IndexToUTF16Range", workload: workload)
+    super.init(name: "Breadcrumbs.IdxToUTF16Range", workload: workload)
   }
 
   override func setUp() {
@@ -387,7 +391,7 @@ class CopyUTF16CodeUnits: BenchmarkBase {
 
   init(workload: Workload, count: Int) {
     self.count = count
-    super.init(name: "StringBreadcrumbs.CopyUTF16CodeUnits", workload: workload)
+    super.init(name: "Breadcrumbs.CopyUTF16CodeUnits", workload: workload)
   }
 
   override func setUp() {
@@ -417,9 +421,9 @@ class CopyUTF16CodeUnits: BenchmarkBase {
   }
 }
 
-/// This is like `UTF16ToIndex` but appends to the string after every index
+/// This is like `UTF16ToIdx` but appends to the string after every index
 /// conversion. In effect, this tests breadcrumb creation performance.
-class MutatedUTF16ToIndex: BenchmarkBase {
+class MutatedUTF16ToIdx: BenchmarkBase {
   let count: Int
   var inputOffsets: [Int] = []
   var outputIndices: [String.Index] = []
@@ -427,7 +431,7 @@ class MutatedUTF16ToIndex: BenchmarkBase {
   init(workload: Workload, count: Int) {
     self.count = count
     super.init(
-      name: "StringBreadcrumbs.MutatedUTF16ToIndex",
+      name: "Breadcrumbs.MutatedUTF16ToIdx",
       workload: workload)
   }
 
@@ -456,9 +460,9 @@ class MutatedUTF16ToIndex: BenchmarkBase {
 }
 
 
-/// This is like `UTF16ToIndex` but appends to the string after every index
+/// This is like `UTF16ToIdx` but appends to the string after every index
 /// conversion. In effect, this tests breadcrumb creation performance.
-class MutatedIndexToUTF16: BenchmarkBase {
+class MutatedIdxToUTF16: BenchmarkBase {
   let count: Int
   var inputIndices: [String.Index] = []
   var outputOffsets: [Int] = []
@@ -466,7 +470,7 @@ class MutatedIndexToUTF16: BenchmarkBase {
   init(workload: Workload, count: Int) {
     self.count = count
     super.init(
-      name: "StringBreadcrumbs.MutatedIndexToUTF16",
+      name: "Breadcrumbs.MutatedIdxToUTF16",
       workload: workload)
   }
 
