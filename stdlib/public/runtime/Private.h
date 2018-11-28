@@ -510,9 +510,9 @@ public:
   /// Determine whether the given type conforms to the given Swift protocol,
   /// returning the appropriate protocol conformance descriptor when it does.
   const ProtocolConformanceDescriptor *
-  _conformsToSwiftProtocol(const Metadata * const type,
-                           const ProtocolDescriptor *protocol,
-                           StringRef module);
+  swift_conformsToSwiftProtocol(const Metadata * const type,
+                                const ProtocolDescriptor *protocol,
+                                StringRef module);
 
   /// Retrieve an associated type witness from the given witness table.
   ///
