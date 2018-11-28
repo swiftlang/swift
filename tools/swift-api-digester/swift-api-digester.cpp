@@ -2208,8 +2208,11 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
     StringRef Line;
     std::tie(Line, BufferText) = BufferText.split('\n');
     Line = Line.trim();
-    if (!Line.empty())
-      Lines.insert(Line);
+    if (Line.empty())
+      continue;
+    if (Line.startswith("// ")) // comment.
+      continue;
+    Lines.insert(Line);
   }
   return 0;
 }
