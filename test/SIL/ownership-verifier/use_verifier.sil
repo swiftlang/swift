@@ -1050,6 +1050,7 @@ sil @class_method_undef_test : $@convention(thin) () -> () {
 bb0:
   %0 = unchecked_ref_cast undef : $Builtin.NativeObject to $SuperKlass
   %1 = class_method %0 : $SuperKlass, #SuperKlass.d!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
+  destroy_value %0 : $SuperKlass
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1058,6 +1059,7 @@ sil @forwarding_instruction_undef_test : $@convention(thin) () -> () {
 bb0:
   %0 = unchecked_ref_cast undef : $Builtin.NativeObject to $SuperKlass
   %1 = unchecked_ref_cast %0 : $SuperKlass to $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

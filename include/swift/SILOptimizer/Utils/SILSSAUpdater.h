@@ -51,12 +51,15 @@ class SILSSAUpdater {
   // If not null updated with inserted 'phi' nodes (SILArgument).
   SmallVectorImpl<SILPhiArgument *> *InsertedPHIs;
 
+  SILModule &M;
+
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
   SILSSAUpdater(const SILSSAUpdater &) = delete;
 
 public:
   explicit SILSSAUpdater(
+      SILModule &M,
       SmallVectorImpl<SILPhiArgument *> *InsertedPHIs = nullptr);
   ~SILSSAUpdater();
 

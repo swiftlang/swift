@@ -1619,7 +1619,7 @@ protected:
   }
 
   void updateSSAForm() {
-    SILSSAUpdater SSAUp;
+    SILSSAUpdater SSAUp(StartBB->getParent()->getModule());
     for (auto *origBB : originalPreorderBlocks()) {
       // Update outside used phi values.
       for (auto *arg : origBB->getArguments())
