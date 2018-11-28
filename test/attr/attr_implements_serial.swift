@@ -13,15 +13,15 @@
 import AttrImplFP
 
 public func client() {
-  precondition(compare_Comparables(Fauxt.one, Fauxt.two))
-  precondition(comparedAsComparablesCount == 1)
-  // CHECK: compared as Comparables
-  precondition(compare_Comparables(Fauxt.one, Fauxt.nan))
-  precondition(comparedAsComparablesCount == 2)
-  // CHECK: compared as Comparables
-  precondition(!compare_Comparables(Fauxt.nan, Fauxt.one))
-  precondition(comparedAsComparablesCount == 3)
-  // CHECK: compared as Comparables
+  precondition(compare_Cauxmparables(Fauxt.one, Fauxt.two))
+  precondition(comparedAsCauxmparablesCount == 1)
+  // CHECK: compared as Cauxmparables
+  precondition(compare_Cauxmparables(Fauxt.one, Fauxt.nan))
+  precondition(comparedAsCauxmparablesCount == 2)
+  // CHECK: compared as Cauxmparables
+  precondition(!compare_Cauxmparables(Fauxt.nan, Fauxt.one))
+  precondition(comparedAsCauxmparablesCount == 3)
+  // CHECK: compared as Cauxmparables
 
   precondition(compare_Fauxts(Fauxt.one, Fauxt.two))
   precondition(comparedAsFauxtsCount == 1)

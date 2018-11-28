@@ -10,10 +10,14 @@
 // when only known to be comparable".
 
 // Could calls to the different comparison operators.
-public var comparedAsComparablesCount : Int = 0
+public var comparedAsCauxmparablesCount : Int = 0
 public var comparedAsFauxtsCount : Int = 0
 
-public protocol FauxtingPoint : Comparable {
+public protocol Cauxmparable {
+  static func < (lhs: Self, rhs: Self) -> Bool
+}
+
+public protocol FauxtingPoint : Cauxmparable {
   static var nan: Self { get }
   static var one: Self { get }
   static var two: Self { get }
@@ -24,11 +28,11 @@ public protocol BinaryFauxtingPoint: FauxtingPoint {
 }
 
 public extension BinaryFauxtingPoint {
-  // This version of < will be called in a context that only knows it has a Comparable.
-  @_implements(Comparable, <(_:_:))
-  static func _ComparableLessThan(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
-    print("compared as Comparables")
-    comparedAsComparablesCount += 1
+  // This version of < will be called in a context that only knows it has a Cauxmparable.
+  @_implements(Cauxmparable, <(_:_:))
+  static func _CauxmparableLessThan(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
+    print("compared as Cauxmparables")
+    comparedAsCauxmparablesCount += 1
     return lhs.bitPattern < rhs.bitPattern
   }
 }
@@ -73,7 +77,7 @@ public extension Fauxt {
   // This version of < will be called in a context that knows it has a Fauxt.
   // It is inside an extension of Fauxt rather than the declaration of Fauxt
   // itself in order to avoid a warning about near-matches with the defaulted
-  // requirement from Comparable.< up above.
+  // requirement from Cauxmparable.< up above.
   static func <(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
     print("compared as Fauxts")
     comparedAsFauxtsCount += 1
@@ -85,7 +89,7 @@ public extension Fauxt {
   }
 }
 
-public func compare_Comparables<T:Comparable>(_ x: T, _ y: T) -> Bool {
+public func compare_Cauxmparables<T:Cauxmparable>(_ x: T, _ y: T) -> Bool {
   return x < y
 }
 
@@ -98,25 +102,25 @@ public func compare_Fauxts(_ x: Fauxt, _ y: Fauxt) -> Bool {
 }
 
 public func main() {
-  assert(compare_Comparables(Fauxt.one, Fauxt.two))
-  assert(comparedAsComparablesCount == 1)
-  // CHECK: compared as Comparables
-  assert(compare_Comparables(Fauxt.one, Fauxt.nan))
-  assert(comparedAsComparablesCount == 2)
-  // CHECK: compared as Comparables
-  assert(!compare_Comparables(Fauxt.nan, Fauxt.one))
-  assert(comparedAsComparablesCount == 3)
-  // CHECK: compared as Comparables
+  assert(compare_Cauxmparables(Fauxt.one, Fauxt.two))
+  assert(comparedAsCauxmparablesCount == 1)
+  // CHECK: compared as Cauxmparables
+  assert(compare_Cauxmparables(Fauxt.one, Fauxt.nan))
+  assert(comparedAsCauxmparablesCount == 2)
+  // CHECK: compared as Cauxmparables
+  assert(!compare_Cauxmparables(Fauxt.nan, Fauxt.one))
+  assert(comparedAsCauxmparablesCount == 3)
+  // CHECK: compared as Cauxmparables
 
   assert(compare_FauxtingPoint(Fauxt.one, Fauxt.two))
-  assert(comparedAsComparablesCount == 4)
-  // CHECK: compared as Comparables
+  assert(comparedAsCauxmparablesCount == 4)
+  // CHECK: compared as Cauxmparables
   assert(compare_FauxtingPoint(Fauxt.one, Fauxt.nan))
-  assert(comparedAsComparablesCount == 5)
-  // CHECK: compared as Comparables
+  assert(comparedAsCauxmparablesCount == 5)
+  // CHECK: compared as Cauxmparables
   assert(!compare_FauxtingPoint(Fauxt.nan, Fauxt.one))
-  assert(comparedAsComparablesCount == 6)
-  // CHECK: compared as Comparables
+  assert(comparedAsCauxmparablesCount == 6)
+  // CHECK: compared as Cauxmparables
 
   assert(compare_Fauxts(Fauxt.one, Fauxt.two))
   assert(comparedAsFauxtsCount == 1)
