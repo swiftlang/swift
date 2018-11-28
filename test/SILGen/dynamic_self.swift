@@ -17,7 +17,7 @@ class X : P, CP {
   func f() -> Self { return self }
 
   // CHECK-LABEL: sil hidden @$s12dynamic_self1XC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick X.Type) -> @owned X
-  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @trivial $@thick X.Type):
+  // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
   // CHECK: [[DYNAMIC_SELF:%[0-9]+]] = unchecked_trivial_bit_cast [[SELF]] : $@thick X.Type to $@thick @dynamic_self X.Type
   // CHECK: [[STATIC_SELF:%[0-9]+]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self X.Type to $@thick X.Type
   // CHECK: [[CTOR:%[0-9]+]] = class_method [[STATIC_SELF]] : $@thick X.Type, #X.init!allocator.1 : (X.Type) -> (Int) -> X, $@convention(method) (Int, @thick X.Type) -> @owned X
@@ -61,7 +61,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
 
 // CHECK-LABEL: sil hidden @$s12dynamic_self21testArchetypeDispatch{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P> (@in_guaranteed T) -> ()
 func testArchetypeDispatch<T: P>(t: T) {
-  // CHECK: bb0([[T:%[0-9]+]] : @trivial $*T):
+  // CHECK: bb0([[T:%[0-9]+]] : $*T):
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
   // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : {{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[ARCHETYPE_F]]<T>([[T_RESULT]], [[T]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -70,7 +70,7 @@ func testArchetypeDispatch<T: P>(t: T) {
 
 // CHECK-LABEL: sil hidden @$s12dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
-// CHECK: bb0([[P:%[0-9]+]] : @trivial $*P):
+// CHECK: bb0([[P:%[0-9]+]] : $*P):
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P to $*@opened([[N:".*"]]) P
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]]) P, #P.f!1 : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -100,7 +100,7 @@ func testExistentialDispatchClass(cp: CP) {
 func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: dynamic_method_br [[O_OBJ:%[0-9]+]] : $@opened({{.*}}) AnyObject, #ObjC.method!1.foreign, bb1, bb2
 
-  // CHECK: bb1([[METHOD:%[0-9]+]] : @trivial $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
+  // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
   // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
   // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
   var _ = o.method
@@ -115,7 +115,7 @@ class ObjCInit {
 
 // CHECK-LABEL: sil hidden @$s12dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
-// CHECK: bb0([[THICK_META:%[0-9]+]] : @trivial $@thick ObjCInit.Type):
+// CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
 // CHECK:   [[INIT:%[0-9]+]] = objc_method [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
@@ -276,7 +276,7 @@ class FactoryFactory {
 
   // CHECK-LABEL: sil hidden @$s12dynamic_self07FactoryC0C11newInstanceACXDyFZ : $@convention(method) (@thick FactoryFactory.Type) -> @owned FactoryFactory
   static func newInstance() -> Self {
-    // CHECK: bb0(%0 : @trivial $@thick FactoryFactory.Type):
+    // CHECK: bb0(%0 : $@thick FactoryFactory.Type):
 
     // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick FactoryFactory.Type to $@thick @dynamic_self FactoryFactory.Type
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, [[DYNAMIC_SELF]] : $@thick @dynamic_self FactoryFactory.Type

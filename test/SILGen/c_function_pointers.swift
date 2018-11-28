@@ -4,7 +4,7 @@ func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int
   return arg
 }
 // CHECK-LABEL: sil hidden @$s19c_function_pointers6valuesyS2iXCS2iXCF
-// CHECK:       bb0(%0 : @trivial $@convention(c) (Int) -> Int):
+// CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
 @discardableResult
@@ -12,7 +12,7 @@ func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 // CHECK-LABEL: sil hidden @$s19c_function_pointers5callsyS3iXC_SitF
-// CHECK:       bb0(%0 : @trivial $@convention(c) @noescape (Int) -> Int, %1 : @trivial $Int):
+// CHECK:       bb0(%0 : $@convention(c) @noescape (Int) -> Int, %1 : $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
 
@@ -27,7 +27,7 @@ func no_args() -> Int { return 42 }
 
 // CHECK-LABEL: sil hidden @$s19c_function_pointers0B19_to_swift_functionsyySiF
 func pointers_to_swift_functions(_ x: Int) {
-// CHECK: bb0([[X:%.*]] : @trivial $Int):
+// CHECK: bb0([[X:%.*]] : $Int):
 
   func local(_ y: Int) -> Int { return y }
 

@@ -491,7 +491,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // thunk.
 
 // CHECK-LABEL: sil private @$s7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
-// CHECK: bb0(%0 : @trivial $*Int, %1 : @guaranteed $ConcreteDerived):
+// CHECK: bb0(%0 : $*Int, %1 : @guaranteed $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @$s7dynamic15ConcreteDerivedC6methodyySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
 // CHECK-NEXT:  apply [[DYNAMIC_THUNK]]([[VALUE]], %1) : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()

@@ -78,8 +78,7 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getOwnershipKind() == ValueOwnershipKind::Trivial ||
-           getOwnershipKind() == ValueOwnershipKind::Any;
+    return getOwnershipKind() == ValueOwnershipKind::Any;
   }
 
   OperandOwnershipKindMap visitForwardingInst(SILInstruction *i,
@@ -165,68 +164,68 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AddressToPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginAccess)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BeginUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, BindMemory)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, CheckedCastAddrBranch)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, CondFail)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, CopyAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocStack)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DebugValueAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeinitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DestroyAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndAccess)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndApply)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, EndUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IndexRawPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitBlockStorageHeader)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InjectEnumAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUnique)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkUninitializedBehavior)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ObjCExistentialMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ObjCMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ObjCToThickMetatype)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, OpenExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, OpenExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, PointerToAddress)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, PointerToThinFunction)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ProjectBlockStorage)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ProjectValueBuffer)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, RawPointerToRef)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, SelectEnumAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, SelectValue)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, StructElementAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, SwitchEnumAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, SwitchValue)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, TailAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ThickToObjCMetatype)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ThinFunctionToPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ThinToThickFunction)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, TupleElementAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedRefCastAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedTakeEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnconditionalCheckedCastAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AllocValueBuffer)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AddressToPointer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginAccess)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BindMemory)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CheckedCastAddrBranch)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CondFail)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CopyAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeallocStack)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DebugValueAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeinitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DestroyAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndAccess)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndApply)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IndexAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IndexRawPointer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitBlockStorageHeader)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InjectEnumAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IsUnique)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Load)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, MarkFunctionEscape)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, MarkUninitializedBehavior)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCToThickMetatype)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, OpenExistentialAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, OpenExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, PointerToAddress)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, PointerToThinFunction)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ProjectBlockStorage)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ProjectValueBuffer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, RawPointerToRef)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SelectEnumAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SelectValue)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, StructElementAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SwitchEnumAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SwitchValue)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, TailAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThickToObjCMetatype)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThinFunctionToPointer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, TupleElementAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedAddrCast)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedRefCastAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedTakeEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UnconditionalCheckedCastAddr)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AllocValueBuffer)
+CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeallocValueBuffer)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load##Name)
+  CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, Name##Release)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")                              \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Name##ToRef)
+  CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
 #undef CONSTANT_OWNERSHIP_INST
 
@@ -237,9 +236,8 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
     return Map::compatibilityMap(                                              \
-        {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},     \
-         {ValueOwnershipKind::OWNERSHIP,                                       \
-          UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT}});                   \
+        ValueOwnershipKind::OWNERSHIP,                                         \
+        UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
                                    CheckedCastValueBranch)
@@ -277,11 +275,7 @@ ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    if (getType().is<AnyMetatypeType>()) {                                     \
-      return Map::compatibilityMap(ValueOwnershipKind::Trivial,                \
-                                   UseLifetimeConstraint::MustBeLive);         \
-    }                                                                          \
-    return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);          \
+    return Map::allLive();                                                     \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
@@ -294,7 +288,7 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, SuperMethod)
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);          \
+    return Map::allLive();                                                     \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ClassifyBridgeObject)
@@ -324,33 +318,23 @@ OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
   assert(isOwnershipForwardingInst(i) &&
          "Expected to have an ownership forwarding inst");
 
-  // Find the first index where we have a non-trivial value.
-  auto iter = find_if(ops, [&i](const Operand &op) -> bool {
-    if (i->isTypeDependentOperand(op))
-      return false;
-    return op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
-  });
+  // Merge all of the ownership of our operands. If we get back a .none from the
+  // merge, then we return an empty compatibility map. This ensures that we will
+  // not be compatible with /any/ input triggering a special error in the
+  // ownership verifier.
+  Optional<ValueOwnershipKind> optionalKind =
+      ValueOwnershipKind::merge(makeOptionalTransformRange(
+          ops, [&i](const Operand &op) -> Optional<ValueOwnershipKind> {
+            if (i->isTypeDependentOperand(op))
+              return None;
+            return op.get().getOwnershipKind();
+          }));
+  if (!optionalKind)
+    return Map();
 
-  // If we do not find a non-trivial value, then we know for sure that we have a
-  // trivial value.
-  if (iter == ops.end()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
-  }
-
-  // Ok, we have at least a single non-trivial value. Grab the type of the
-  // operand and see if it is trivial or non-trivial. If the type of the operand
-  // is trivial, then return that we accept trivial here. Otherwise, return the
-  // base ownership kind.
-  if (getType().isTrivial(mod))
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
-
-  // Otherwise, return the value ownership kind and forwarding lifetime
-  // constraint of the first non-trivial operand. This will ensure that all
-  // non-trivial operands have the same ownership kind.
-  unsigned index = std::distance(ops.begin(), iter);
-  ValueOwnershipKind kind = ops[index].get().getOwnershipKind();
+  auto kind = optionalKind.getValue();
+  if (kind == ValueOwnershipKind::Any)
+    return Map::allLive();
   auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
   return Map::compatibilityMap(kind, lifetimeConstraint);
 }
@@ -386,7 +370,6 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
     assert(isGuaranteedForwardingInst(i) &&                                    \
            "Expected an ownership forwarding inst");                           \
     OperandOwnershipKindMap map;                                               \
-    map.add(ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive);   \
     map.addCompatibilityConstraint(                                            \
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
@@ -405,8 +388,7 @@ OperandOwnershipKindClassifier::visitDeallocPartialRefInst(
                                  UseLifetimeConstraint::MustBeInvalidated);
   }
 
-  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                               UseLifetimeConstraint::MustBeLive);
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap
@@ -422,8 +404,7 @@ OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitAllocRefInst(AllocRefInst *i) {
   assert(i->getNumOperands() != 0 &&
          "If we reach this point, we must have a tail operand");
-  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                               UseLifetimeConstraint::MustBeLive);
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap
@@ -431,8 +412,7 @@ OperandOwnershipKindClassifier::visitAllocRefDynamicInst(
     AllocRefDynamicInst *i) {
   assert(i->getNumOperands() != 0 &&
          "If we reach this point, we must have a tail operand");
-  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                               UseLifetimeConstraint::MustBeLive);
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap
@@ -465,8 +445,7 @@ OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
   // If our conditional branch is the condition, it is trivial. Check that the
   // ownership kind is trivial.
   if (cbi->isConditionOperandIndex(getOperandIndex()))
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
 
   // Otherwise, make sure that our operand matches the ownership of the relevant
   // argument.
@@ -493,90 +472,40 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // If our passed in type is trivial, we shouldn't have any non-trivial
   // successors. Just bail early returning trivial.
   if (opTy.isTrivial(mod))
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
 
-  // Otherwise, go through the cases of the enum. If we have any cases with
-  // trivial payload or no payload cases, add trivial as a base ownership kind
-  // we can accept.
-  OperandOwnershipKindMap map;
+  // Otherwise, go through the ownership constraints of our successor arguments
+  // and merge them.
+  auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
+      sei->getSuccessorBlockArguments(),
+      [&](PhiArgumentArrayRef array) -> ValueOwnershipKind {
+        // If the array is empty, we have a non-payloaded case. Return any.
+        if (array.empty())
+          return ValueOwnershipKind::Any;
 
-  bool foundNonTrivialCase = false;
+        // Otherwise, we should have a single element since a payload is
+        // a tuple.
+        assert(std::distance(array.begin(), array.end()) == 1);
+        SILPhiArgument *arg = array.front();
+        return arg->getOwnershipKind();
+      }));
 
-  auto *enumDecl = opTy.getEnumOrBoundGenericEnum();
-  assert(enumDecl);
-  for (auto *eltDecl : enumDecl->getAllElements()) {
-    // If we have a no-payload case add that we support trivial and continue.
-    if (!eltDecl->hasAssociatedValues()) {
-      map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
-                                     UseLifetimeConstraint::MustBeLive);
-      continue;
-    }
-
-    // If we have a completely trivial payload case, then add that we support
-    // trivial and continue.
-    if (opTy.getEnumElementType(eltDecl, mod).isTrivial(mod)) {
-      map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
-                                     UseLifetimeConstraint::MustBeLive);
-      continue;
-    }
-
-    // Otherwise, we have a non-trivial case. Set foundNonTrivialCase to
-    // true. We will need to check the arguments of the switch_enum's successors
-    // for the ownership kind that we can accept.
-    foundNonTrivialCase = true;
-  }
-
-  // If we didn't find a non-trivial case, return the map we have constructed so
-  // far.
-  if (!foundNonTrivialCase)
-    return map;
-
-  // Otherwise, we want to find the ownership constraint of our successor
-  // arguments.
-  Optional<ValueOwnershipKind> nonTrivialKind;
-  for (auto argArray : sei->getSuccessorBlockArguments()) {
-    if (argArray.empty())
-      continue;
-    SILValue arg = argArray[getOperandIndex()];
-    if (arg->getType().isTrivial(mod))
-      continue;
-
-    // If we haven't found a non-trivial kind yet, stash the kind we find.
-    if (!nonTrivialKind) {
-      nonTrivialKind = arg.getOwnershipKind();
-      continue;
-    }
-
-    // Otherwise if we /do/ have a non trivial kind and the argument's ownership
-    // kind is compatible, merge in case the first value we saw had Any
-    // ownership.
-    auto newKind = nonTrivialKind->merge(arg.getOwnershipKind());
-    if (newKind) {
-      nonTrivialKind = newKind;
-      continue;
-    }
-
-    // Otherwise, we have inconsistent ownership in between our successors. To
-    // be sure that we error, return an empty map.
+  // If we failed to merge, return an empty map so we will fail to pattern match
+  // with any operand. This is a known signal to the verifier that we failed to
+  // merge in a forwarding context.
+  if (!mergedKind)
     return Map();
-  }
-
-  // We should never have an enum with a non-trivial case where we do not have
-  // at least one successor with a proper ownership qualifier since we either
-  // switch over the entire enum implying we visit that case, or we go through
-  // the default which will have our enum type as its type and thus some form of
-  // non-trivial ownership. So it is correct to use the optional here without
-  // checking.
-  auto lifetimeConstraint = nonTrivialKind->getForwardingLifetimeConstraint();
-  map.addCompatibilityConstraint(*nonTrivialKind, lifetimeConstraint);
-
-  return map;
+  auto kind = mergedKind.getValue();
+  if (kind == ValueOwnershipKind::Any)
+    return Map::allLive();
+  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
     CheckedCastBranchInst *ccbi) {
+  // TODO: Simplify this using ValueOwnershipKind::merge.
   Optional<OperandOwnershipKindMap> map;
   for (auto argArray : ccbi->getSuccessorBlockArguments()) {
     assert(!argArray.empty());
@@ -603,57 +532,41 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
   return map.getValue();
 }
 
+//// FIX THIS HERE
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *ri) {
+  // If we have a trivial value, return allLive().
   bool isTrivial = ri->getOperand()->getType().isTrivial(mod);
-  SILFunctionConventions fnConv = ri->getFunction()->getConventions();
-  auto results = fnConv.getDirectSILResults();
-  // FIXME: Shouldn't we return an empty OperandOwnershipKindMap here if we do
-  // not have any results?
-  if (results.empty() || isTrivial) {
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+  if (isTrivial) {
+    return Map::allLive();
   }
+
+  SILFunctionConventions fnConv = ri->getFunction()->getConventions();
+
+  auto results = fnConv.getDirectSILResults();
+  if (results.empty())
+    return Map();
 
   CanGenericSignature sig = fnConv.funcTy->getGenericSignature();
+  auto ownershipKindRange = makeTransformRange(results,
+                                               [&](const SILResultInfo &info) {
+                                                 return info.getOwnershipKind(mod, sig);
+                                               });
 
-  // Find the first index where we have a trivial value.
-  auto iter = find_if(results, [this, &sig](const SILResultInfo &info) -> bool {
-    return info.getOwnershipKind(mod, sig) != ValueOwnershipKind::Trivial;
-  });
+  // Then merge all of our ownership kinds. If we fail to merge, return an empty
+  // map so we fail on all operands.
+  auto mergedBase = ValueOwnershipKind::merge(ownershipKindRange);
+  if (!mergedBase)
+    return Map();
 
-  // If we have all trivial, then we must be trivial. Why wasn't our original
-  // type trivial? This is a hard error since this is a logic error in our code
-  // here.
-  if (iter == results.end())
-    llvm_unreachable("Should have already checked a trivial type?!");
+  auto base = *mergedBase;
 
-  ValueOwnershipKind base = iter->getOwnershipKind(mod, sig);
-
-  for (const SILResultInfo &resultInfo :
-       SILFunctionConventions::DirectSILResultRange(std::next(iter),
-                                                    results.end())) {
-    auto rKind = resultInfo.getOwnershipKind(mod, sig);
-    // Ignore trivial types.
-    if (rKind.merge(ValueOwnershipKind::Trivial))
-      continue;
-
-    auto mergedValue = base.merge(rKind);
-    // If we fail to merge all types in, bail. We can not come up with a proper
-    // result type. We assert here since this is a hard error in the normal
-    // SILVerifier since the return type of the function would not match its
-    // terminator.
-    assert(mergedValue.hasValue() &&
-           "Failed to merge all types in on a return?!");
-    // In case Base is Any.
-    base = mergedValue.getValue();
-  }
-
+  // TODO: This may not be needed once trivial is any.
   if (getType().getEnumOrBoundGenericEnum()) {
     return visitEnumArgument(base);
   }
 
-  return Map::compatibilityMap(base, UseLifetimeConstraint::MustBeInvalidated);
+  return Map::compatibilityMap(base, base.getForwardingLifetimeConstraint());
 }
 
 OperandOwnershipKindMap
@@ -699,8 +612,7 @@ OperandOwnershipKindClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::MustBeLive);
   }
-  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                               UseLifetimeConstraint::MustBeLive);
+  return Map::allLive();
 }
 
 // FIXME: Why not use SILArgumentConvention here?
@@ -729,8 +641,7 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
                                  UseLifetimeConstraint::MustBeInvalidated);
   case ParameterConvention::Direct_Guaranteed:
     if (substCalleeType->isNoEscape())
-      return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                   UseLifetimeConstraint::MustBeLive);
+      return Map::allLive();
     // We want to accept guaranteed/owned in this position since we
     // treat the use of an owned parameter as an instantaneously
     // borrowed value for the duration of the call.
@@ -753,13 +664,8 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
 // apply %f(%val) : (@owned Optional<SomeClass>)    // owned argument
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitEnumArgument(
     ValueOwnershipKind requiredKind) {
-  // If this value is already categorized as a trivial ownership kind,
-  // it is safe to pass to any argument convention. This is ok since
-  // we know that the enum type must match up as checked by the
-  // ownership verifier.
+  // Begin with an empty map.
   OperandOwnershipKindMap map;
-  map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
 
   // The operand has a non-trivial ownership kind. It must match the argument
   // convention.
@@ -810,8 +716,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
 
   // Indirect return arguments are address types.
   if (apply.isIndirectResultOperand(op)) {
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
   }
 
   unsigned argIndex = apply.getCalleeArgIndex(op);
@@ -828,29 +733,21 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_In: {
     // This expects an @trivial if we have lowered addresses and @
     if (conv.useLoweredAddresses()) {
-      return visitApplyParameter(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+      return Map::allLive();
     }
     // TODO: Once trivial is subsumed in any, this goes away.
     auto map = visitApplyParameter(ValueOwnershipKind::Owned,
                                    UseLifetimeConstraint::MustBeInvalidated);
-    map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
-                                   UseLifetimeConstraint::MustBeLive);
     return map;
   }
 
   case ParameterConvention::Indirect_In_Guaranteed: {
     // This expects an @trivial if we have lowered addresses and @
     if (conv.useLoweredAddresses()) {
-      return visitApplyParameter(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+      return Map::allLive();
     }
-    // TODO: Once trivial is subsumed in any, this goes away.
-    auto map = visitApplyParameter(ValueOwnershipKind::Guaranteed,
-                                   UseLifetimeConstraint::MustBeLive);
-    map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
-                                   UseLifetimeConstraint::MustBeLive);
-    return map;
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
+                               UseLifetimeConstraint::MustBeLive);
   }
 
   // The following conventions should take address types and thus be
@@ -858,8 +755,7 @@ OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
-    return visitApplyParameter(ValueOwnershipKind::Trivial,
-                               UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
 
   case ParameterConvention::Direct_Guaranteed:
     // A +1 value may be passed to a guaranteed argument. From the caller's
@@ -890,9 +786,8 @@ OperandOwnershipKindClassifier::visitTryApplyInst(TryApplyInst *i) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *i) {
   return Map::compatibilityMap(
-      {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
        // All non-trivial types should be captured.
-       {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated}});
+       ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);
 }
 
 // TODO: FIX THIS
@@ -902,8 +797,7 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
   //
   // TODO: Change this to check if this operand is an indirect result
   if (isAddressOrTrivialType())
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
 
   auto fnType = i->getFunction()->getLoweredFunctionType();
   auto yieldInfo = fnType->getYields()[getOperandIndex()];
@@ -931,27 +825,21 @@ OperandOwnershipKindClassifier::visitYieldInst(YieldInst *i) {
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
   if (getValue() != i->getSrc()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
   }
 
-  return Map::compatibilityMap({
-      {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
-      {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated},
-  });
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
 }
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitStoreInst(StoreInst *i) {
   if (getValue() != i->getSrc()) {
-    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
-                                 UseLifetimeConstraint::MustBeLive);
+    return Map::allLive();
   }
 
-  return Map::compatibilityMap({
-      {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
-      {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated},
-  });
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
 }
 
 OperandOwnershipKindMap
@@ -963,7 +851,7 @@ OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
                                  UseLifetimeConstraint::MustBeInvalidated);
   }
 
-  return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);
+  return Map::allLive();
 }
 
 OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
@@ -989,8 +877,7 @@ OperandOwnershipKindClassifier::visitKeyPathInst(KeyPathInst *I) {
   // KeyPath moves the value in memory out of address operands, but the
   // ownership checker doesn't reason about that yet.
   return Map::compatibilityMap(
-      {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
-       {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated}});
+       ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1008,7 +895,7 @@ struct OperandOwnershipKindBuiltinClassifier
                                              llvm::Intrinsic::ID id) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    return {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive};
+    return Map::allLive();
   }
 
   // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
@@ -1037,119 +924,119 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, UnexpectedError)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, WillThrow)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AShr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Add)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Alignof)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AllocRaw)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, And)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssertConf)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayNoAlias)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayFrontToBack)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayBackToFront)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignTakeArray)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssumeNonNegative)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssumeTrue)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicLoad)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicRMW)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicStore)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, BitCast)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, CanBeObjCClass)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, CmpXChg)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, CondUnreachable)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, CopyArray)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, DeallocRaw)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, DestroyArray)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ExactSDiv)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ExactUDiv)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ExtractElement)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FAdd)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_OEQ)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_OGE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_OGT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_OLE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_OLT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_ONE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_ORD)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_UEQ)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_UGE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_UGT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_ULE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_ULT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_UNE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FCMP_UNO)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FDiv)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FMul)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FNeg)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FPExt)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FPToSI)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FPToUI)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FPTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FRem)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, FSub)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Fence)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, GetObjCTypeEncoding)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_EQ)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_NE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_SGE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_SGT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_SLE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_SLT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_UGE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_UGT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_ULE)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ICMP_ULT)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, InsertElement)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IntToFPWithOverflow)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IntToPtr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsOptionalType)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsPOD)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsBitwiseTakable)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsSameMetatype)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, LShr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Mul)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, OnFastPath)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Once)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, OnceWithContext)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Or)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PtrToInt)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SAddOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SDiv)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SExt)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SExtOrBitCast)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SIToFP)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SMulOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SRem)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SSubOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SToSCheckedTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, SToUCheckedTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Shl)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Sizeof)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, StaticReport)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Strideof)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, StringObjectOr)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Sub)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayNoAlias)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayBackToFront)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TakeArrayFrontToBack)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Trunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TruncOrBitCast)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TSanInoutAccess)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UAddOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UDiv)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UIToFP)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UMulOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, URem)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, USubOver)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UToSCheckedTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UToUCheckedTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Unreachable)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, UnsafeGuaranteedEnd)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Xor)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExt)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExtOrBitCast)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZeroInitializer)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Swift3ImplicitObjCEntrypoint)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AShr)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Add)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Alignof)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AllocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, And)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssertConf)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssignCopyArrayNoAlias)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssignCopyArrayFrontToBack)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssignCopyArrayBackToFront)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssignTakeArray)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AssumeTrue)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AtomicLoad)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AtomicRMW)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, AtomicStore)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, BitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, CanBeObjCClass)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, CmpXChg)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, CondUnreachable)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, CopyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, DeallocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, DestroyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ExactSDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ExactUDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ExtractElement)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FAdd)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_OEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_OGE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_OGT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_OLE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_OLT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_ONE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_ORD)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_UEQ)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_UNE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FCMP_UNO)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FMul)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FNeg)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FPExt)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FPToSI)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FPToUI)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FPTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FRem)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, FSub)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Fence)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, GetObjCTypeEncoding)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_EQ)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_NE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_SGE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_SGT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_SLE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_SLT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_UGE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_UGT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_ULE)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ICMP_ULT)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, InsertElement)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IntToFPWithOverflow)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IntToPtr)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IsOptionalType)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IsBitwiseTakable)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, IsSameMetatype)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, LShr)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Mul)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, OnFastPath)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Once)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, OnceWithContext)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Or)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, PtrToInt)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SExt)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SRem)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SSubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, SToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Shl)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Sizeof)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, StaticReport)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Strideof)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, StringObjectOr)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Sub)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, TakeArrayNoAlias)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, TakeArrayBackToFront)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, TakeArrayFrontToBack)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Trunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, TruncOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, TSanInoutAccess)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UAddOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UDiv)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UIToFP)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UMulOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, URem)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, USubOver)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UToSCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UToUCheckedTrunc)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Unreachable)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, UnsafeGuaranteedEnd)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Xor)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ZExt)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ZExtOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, ZeroInitializer)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Swift3ImplicitObjCEntrypoint)
+CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, PoundAssert)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

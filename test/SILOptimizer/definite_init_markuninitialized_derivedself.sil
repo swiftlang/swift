@@ -244,7 +244,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // }
 //
 sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
-bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Int):
+bb0(%0 : @owned $DerivedClassWithIVars, %i : $Int):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars

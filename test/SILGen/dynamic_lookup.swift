@@ -81,7 +81,7 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   dynamic_method_br [[OBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign, [[HASBB:[a-zA-z0-9]+]], [[NOBB:[a-zA-z0-9]+]]
 
   // Has method BB:
-  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : @trivial $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
+  // CHECK: [[HASBB]]([[UNCURRIED:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()):
   // CHECK:   [[OBJ_SELF_COPY:%.*]] = copy_value [[OBJ_SELF]]
   // CHECK:   [[PARTIAL:%[0-9]+]] = partial_apply [callee_guaranteed] [[UNCURRIED]]([[OBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   [[THUNK_PAYLOAD:%.*]] = init_enum_data_addr [[OPT_TMP]]
@@ -151,7 +151,7 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[METHOD:%[0-9]+]] : @trivial $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
+  // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
   // CHECK:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int
   // CHECK:   [[B:%.*]] = begin_borrow [[BOUND_METHOD]]
@@ -180,7 +180,7 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // GUARANTEED:   dynamic_method_br [[RAWOBJ_SELF]] : $@opened({{.*}}) AnyObject, #X.value!getter.1.foreign, bb1, bb2
 
-  // GUARANTEED: bb1([[METHOD:%[0-9]+]] : @trivial $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
+  // GUARANTEED: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> Int):
   // GUARANTEED:   [[RAWOBJ_SELF_COPY:%.*]] = copy_value [[RAWOBJ_SELF]]
   // GUARANTEED:   [[BOUND_METHOD:%[0-9]+]] = partial_apply [callee_guaranteed] [[METHOD]]([[RAWOBJ_SELF_COPY]])
   // GUARANTEED:   [[BEGIN_BORROW:%.*]] = begin_borrow [[BOUND_METHOD]]
@@ -196,7 +196,7 @@ func opt_to_property(_ obj: AnyObject) {
 func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
-  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -214,7 +214,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : @trivial $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
   // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK:   [[B:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
@@ -230,7 +230,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
 // CHECK: } // end sil function '$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F'
 
 // GUARANTEED-LABEL: sil hidden @$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
-  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : @trivial $Int):
+  // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -248,7 +248,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // GUARANTEED:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // GUARANTEED: bb1([[GETTER:%[0-9]+]] : @trivial $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
+  // GUARANTEED: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // GUARANTEED:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
   // GUARANTEED:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]])
   // GUARANTEED:   [[BORROW:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
@@ -264,7 +264,7 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
 func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var obj = obj
   var i = i
-  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
@@ -280,7 +280,7 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK:   [[OPTTEMP:%.*]] = alloc_stack $Optional<Int>
   // CHECK:   dynamic_method_br [[OBJ_REF]] : $@opened({{.*}}) AnyObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-  // CHECK: bb1([[GETTER:%[0-9]+]] : @trivial $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
+  // CHECK: bb1([[GETTER:%[0-9]+]] : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int):
   // CHECK:   [[OBJ_REF_COPY:%.*]] = copy_value [[OBJ_REF]]
   // CHECK:   [[GETTER_WITH_SELF:%[0-9]+]] = partial_apply [callee_guaranteed] [[GETTER]]([[OBJ_REF_COPY]]) : $@convention(objc_method) (Int, @opened({{.*}}) AnyObject) -> Int
   // CHECK:   [[B:%.*]] = begin_borrow [[GETTER_WITH_SELF]]
@@ -321,7 +321,7 @@ func downcast(_ obj: AnyObject) -> X {
 // CHECK:        [[BOX:%.*]] = alloc_stack $Optional<Juice>
 // CHECK:        dynamic_method_br [[SELF:%.*]] : $@opened("{{.*}}") Fruit, #Fruit.juice!getter.1.foreign, bb1, bb2
 
-// CHECK: bb1([[FN:%.*]] : @trivial $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
+// CHECK: bb1([[FN:%.*]] : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[SELF_COPY]]) : $@convention(objc_method) (@opened("{{.*}}") Fruit) -> @autoreleased Juice
 // CHECK:   [[B:%.*]] = begin_borrow [[METHOD]]

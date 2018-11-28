@@ -30,7 +30,7 @@ func set(holder holder: inout Holder) {
 }
 
 // CHECK-LABEL: sil hidden @$ss3set6holderys6HolderVz_tF : $@convention(thin) (@inout Holder) -> () {
-// CHECK: bb0([[ADDR:%.*]] : @trivial $*Holder):
+// CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK:        [[T0:%.*]] = function_ref @$ss1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
 // CHECK-NEXT:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ADDR]] : $*Holder
@@ -45,7 +45,7 @@ func get(holder holder: inout Holder) -> C {
   return holder.value
 }
 // CHECK-LABEL: sil hidden @$ss3get6holders1CCs6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C {
-// CHECK: bb0([[ADDR:%.*]] : @trivial $*Holder):
+// CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*Holder
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[READ]] : $*Holder, #Holder.value
@@ -59,7 +59,7 @@ func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
 // CHECK-LABEL: sil hidden @$ss7project2fns1CCs6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C {
-// CHECK: bb0([[FN:%.*]] : @trivial $@noescape @callee_guaranteed () -> Holder):
+// CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value

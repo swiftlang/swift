@@ -8,7 +8,7 @@
 // CHECK-LABEL: sil hidden @$s13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_opaque_archetype<T>(_ x: Any?) -> T {
   return x as! T
-  // CHECK: bb0([[RET:%.*]] : @trivial $*T, {{%.*}} : @trivial $*Optional<Any>):
+  // CHECK: bb0([[RET:%.*]] : $*T, {{%.*}} : $*Optional<Any>):
   // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in [[RET]] : $*T
 }
 

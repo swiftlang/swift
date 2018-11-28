@@ -950,7 +950,7 @@ enum LabeledScalarPayload {
 func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
-  // CHECK: bb1([[TUPLE:%.*]] : @trivial $(name: Int)):
+  // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
   // CHECK:   [[X:%.*]] = destructure_tuple [[TUPLE]]
   // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
   // CHECK:   store [[X]] to [trivial] [[ANY_X_ADDR]]
@@ -982,7 +982,7 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : @trivial $Int):
+  // CHECK: [[SOMEBB]](%3 : $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
@@ -1004,7 +1004,7 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   case let x?:
     return 0
 
-  // CHECK: [[SOMEBB]](%3 : @trivial $Int):
+  // CHECK: [[SOMEBB]](%3 : $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
@@ -1022,7 +1022,7 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
     
   case (.some(let base), .some(let filter)):
-    // CHECK: bb2(%10 : @trivial $Int):
+    // CHECK: bb2(%10 : $Int):
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
     // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
     print("both: \(base), \(filter)")
@@ -1031,11 +1031,11 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
     // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
     // CHECK-NEXT: br bb6(%8 : $Int)
 
-    // CHECK: bb5([[OTHER_BASE:%.*]] : @trivial $Int)
+    // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
     // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
     // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
     
-    // CHECK: bb6([[ARG:%.*]] : @trivial $Int):
+    // CHECK: bb6([[ARG:%.*]] : $Int):
     print("single: \(base)")
   default:
     print("default")
@@ -1050,7 +1050,7 @@ func myFatalError() -> MyNever { fatalError("asdf") }
 
 func testUninhabitedSwitchScrutinee() {
   func test1(x : MyNever) {
-    // CHECK: bb0(%0 : @trivial $MyNever):
+    // CHECK: bb0(%0 : $MyNever):
     // CHECK-NEXT: debug_value %0 : $MyNever, let, name "x"
     // CHECK-NEXT: unreachable
     switch x {
@@ -1060,7 +1060,7 @@ func testUninhabitedSwitchScrutinee() {
     }
   }
   func test2(x : Never) {
-    // CHECK: bb0(%0 : @trivial $Never):
+    // CHECK: bb0(%0 : $Never):
     // CHECK-NEXT: debug_value %0 : $Never, let, name "x"
     // CHECK-NEXT: unreachable
     switch (x, x) {}

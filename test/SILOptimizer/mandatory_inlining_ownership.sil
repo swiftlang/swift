@@ -72,7 +72,7 @@ bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error)
   try_apply %fn(%0) : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error), normal bb1, error bb2
 
-bb1(%4 : @trivial $Builtin.Int64):
+bb1(%4 : $Builtin.Int64):
   destroy_value %0 : $C
   return %4 : $Builtin.Int64
 

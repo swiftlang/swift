@@ -31,7 +31,7 @@ sil @makesInt : $@convention(thin) () -> Builtin.Int32
 //  return (t, a)
 //}
 sil @used_by_inout : $@convention(thin) (Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
-bb0(%0 : @trivial $Builtin.Int32):
+bb0(%0 : $Builtin.Int32):
   %91 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %91a = project_box %91 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %1 = mark_uninitialized [var] %91a : $*Builtin.Int32
@@ -68,7 +68,7 @@ bb0:
 }
 
 sil @copy_addr1 : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   %4 = mark_uninitialized [var] %3a : $*T
@@ -85,7 +85,7 @@ sil @getSomeClass : $@convention(thin) () -> @owned SomeClass
 sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
 sil @assign_test_trivial : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
-bb0(%0 : @trivial $Builtin.Int32):
+bb0(%0 : $Builtin.Int32):
   %7 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
   %1 = mark_uninitialized [var] %7a : $*Builtin.Int32
@@ -123,7 +123,7 @@ bb0:
 
 
 sil @assign_test_addressonly : $@convention(thin) <T> (@in T) -> @out T {
-bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+bb0(%0 : $*T, %1 : $*T):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <T>, 0
   %2 = mark_uninitialized [var] %ba : $*T
@@ -169,7 +169,7 @@ struct ContainsNativeObject {
 }
 
 sil @test_struct : $@convention(thin) (@inout ContainsNativeObject) -> () {
-bb0(%0 : @trivial $*ContainsNativeObject):
+bb0(%0 : $*ContainsNativeObject):
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <ContainsNativeObject>, 0
   %c = mark_uninitialized [var] %ba : $*ContainsNativeObject
@@ -182,13 +182,13 @@ bb0(%0 : @trivial $*ContainsNativeObject):
 }
 
 sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
-bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
+bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
   return %9 : $()
 }
 sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
-bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
   return %9 : $()
@@ -245,7 +245,7 @@ bb0:
 }
 
 sil @init_existential_with_class : $@convention(thin) (@inout C) -> () {
-entry(%a : @trivial $*C):
+entry(%a : $*C):
   %p = alloc_stack $P
   %b = mark_uninitialized [var] %p : $*P
   %q = init_existential_addr %b : $*P, $C
@@ -258,7 +258,7 @@ entry(%a : @trivial $*C):
 }
 
 sil @conditional_init : $@convention(thin) (Bool) -> () {
-bb0(%0 : @trivial $Bool):
+bb0(%0 : $Bool):
   %2 = alloc_stack $SomeClass
   %3 = mark_uninitialized [var] %2 : $*SomeClass
   %5 = integer_literal $Builtin.Int1, 1
@@ -278,7 +278,7 @@ bb2:
 }
 
 sil @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+bb0(%0 : $Builtin.Int1):
   %5 = alloc_stack $SomeClass
   %6 = mark_uninitialized [var] %5 : $*SomeClass
   cond_br %0, bb1, bb2
@@ -308,7 +308,7 @@ class RootClassWithIVars {
 
 /// Root class tests.
 sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
+bb0(%0 : @owned $RootClassWithIVars, %1 : $Builtin.Int32):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
   %4 = begin_borrow %3 : $RootClassWithIVars
   %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
@@ -366,7 +366,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 struct MyStruct : P {}
 
 sil @self_init_assert_instruction : $@convention(thin) (Builtin.Int32, @thin MyStruct.Type) -> MyStruct {
-bb0(%0 : @trivial $Builtin.Int32, %1 : @trivial $@thin MyStruct.Type):
+bb0(%0 : $Builtin.Int32, %1 : $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct
   %6 = function_ref @selfinit : $@convention(thin) () -> MyStruct
@@ -388,7 +388,7 @@ struct MyStruct2 {
 sil @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2
 
 sil @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
-bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
+bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   %2 = alloc_stack $MyStruct2, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
   %6 = metatype $@thin MyStruct2.Type
@@ -500,7 +500,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 }
 
 sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Builtin.Int32) -> @owned DerivedClassWithIVars {
-bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
+bb0(%0 : @owned $DerivedClassWithIVars, %i : $Builtin.Int32):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
   %3 = mark_uninitialized [derivedself] %1a : $*DerivedClassWithIVars
@@ -534,7 +534,7 @@ struct MyStruct3 {
 sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 
 sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+bb0(%0 : $Builtin.Int1):
   %2 = alloc_stack $MyStruct3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
   cond_br %0, bb1, bb2
@@ -557,7 +557,7 @@ class MyClass3 {
 sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 
 sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+bb0(%0 : $Builtin.Int1):
   %2 = alloc_stack $MyClass3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyClass3
   cond_br %0, bb1, bb2

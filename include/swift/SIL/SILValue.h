@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -86,17 +87,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 /// have.
 struct ValueOwnershipKind {
   enum innerty : uint8_t {
-    /// A SILValue with Trivial ownership kind is an independent value that can
-    /// not be owned. Ownership does not place any constraints on how a SILValue
-    /// with Trivial ownership kind can be used. Other side effects (e.g. Memory
-    /// dependencies) must still be respected. A SILValue with Trivial ownership
-    /// kind must be of Trivial SILType (i.e. SILType::isTrivial(SILModule &)
-    /// must return true).
-    ///
-    /// Some examples of SIL types with Trivial ownership are: Builtin.Int32,
-    /// Builtin.RawPointer, aggregates containing all trivial types.
-    Trivial,
-
     /// A SILValue with `Unowned` ownership kind is an independent value that
     /// has a lifetime that is only guaranteed to last until the next program
     /// visible side-effect. To maintain the lifetime of an unowned value, it
@@ -127,10 +117,11 @@ struct ValueOwnershipKind {
     /// instruction exactly once along any path through the program.
     Guaranteed,
 
-    /// A SILValue with undefined ownership. It can pair with /Any/ ownership
-    /// kinds. This means that it could take on /any/ ownership semantics. This
-    /// is meant only to model SILUndef and to express certain situations where
-    /// we use unqualified ownership. Expected to tighten over time.
+    /// A SILValue with Any ownership kind is an independent value outside of
+    /// the ownership system. It is used to model trivially typed values as well
+    /// as trivial cases of non-trivial enums. Naturally Any can be merged with
+    /// any ValueOwnershipKind allowing us to naturally model merge and branch
+    /// points in the SSA graph.
     Any,
 
     LastValueOwnershipKind = Any,
@@ -162,10 +153,6 @@ struct ValueOwnershipKind {
 
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
 
-  bool isTrivialOr(ValueOwnershipKind Kind) const {
-    return Value == Trivial || Value == Kind;
-  }
-
   /// Given that there is an aggregate value (like a struct or enum) with this
   /// ownership kind, and a subobject of type Proj is being projected from the
   /// aggregate, return Trivial if Proj has trivial type and the aggregate's
@@ -180,7 +167,6 @@ struct ValueOwnershipKind {
   /// kinds.
   UseLifetimeConstraint getForwardingLifetimeConstraint() const {
     switch (Value) {
-    case ValueOwnershipKind::Trivial:
     case ValueOwnershipKind::Any:
     case ValueOwnershipKind::Guaranteed:
     case ValueOwnershipKind::Unowned:
@@ -199,12 +185,16 @@ struct ValueOwnershipKind {
     return merge(other).hasValue();
   }
 
-  /// Returns true if \p Other is compatible with ValueOwnershipKind::Trivial or
-  /// this. See isCompatibleWith for more information on what "compatibility"
-  /// means.
-  bool isTrivialOrCompatibleWith(ValueOwnershipKind other) const {
-    return isCompatibleWith(ValueOwnershipKind::Trivial) ||
-           isCompatibleWith(other);
+  template <typename RangeTy>
+  static Optional<ValueOwnershipKind> merge(RangeTy &&r) {
+    auto initial = Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
+    return accumulate(
+        std::forward<RangeTy>(r), initial,
+        [](Optional<ValueOwnershipKind> acc, ValueOwnershipKind x) {
+          if (!acc)
+            return acc;
+          return acc.getValue().merge(x);
+        });
   }
 };
 

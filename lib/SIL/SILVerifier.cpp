@@ -1691,7 +1691,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(SI->getModule()) ||
-              Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+              Src.getOwnershipKind() == ValueOwnershipKind::Any,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -4656,7 +4656,7 @@ public:
             llvm::all_of(CBI->getTrueArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Trivial;
+                                  ValueOwnershipKind::Any;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }
@@ -4665,7 +4665,7 @@ public:
             llvm::all_of(CBI->getFalseArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Trivial;
+                                  ValueOwnershipKind::Any;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }

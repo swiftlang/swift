@@ -42,18 +42,18 @@ class SomeClass {
   // -- Instance methods use 'method' cc
 
   // CHECK-LABEL: sil hidden @$s9functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
-  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @trivial $@thick SomeClass.Type):
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
 
   // CHECK-LABEL: sil hidden @$s9functions9SomeClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
-  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @owned $SomeClass):
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : @owned $SomeClass):
   init(x:Int, y:Int) {}
 
   // CHECK-LABEL: sil hidden @$s9functions9SomeClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> () 
-  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @guaranteed $SomeClass):
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : @guaranteed $SomeClass):
   func method(_ x: Int) {}
 
   // CHECK-LABEL: sil hidden @$s9functions9SomeClassC13static_method{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Builtin.Int64, @thick SomeClass.Type) -> ()
-  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $@thick SomeClass.Type):
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
   class func static_method(_ x: Int) {}
 
   var someProperty: Int {
@@ -101,7 +101,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   var i = i
   var j = j
   var k = k
-  // CHECK: bb0(%0 : @trivial $Builtin.Int64, %1 : @trivial $Builtin.Int64, %2 : @trivial $Builtin.Int64):
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
   // CHECK: [[IADDR:%.*]] = project_box [[IBOX]]
   // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }

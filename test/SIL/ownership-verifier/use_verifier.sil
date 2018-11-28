@@ -142,14 +142,14 @@ bb0(%0 : @guaranteed $NonTrivialStructWithTrivialField):
 }
 
 sil @trivial_struct_extract_from_trivial : $@convention(thin) (TrivialStruct) -> () {
-bb0(%0 : @trivial $TrivialStruct):
+bb0(%0 : $TrivialStruct):
   %1 = struct_extract %0 : $TrivialStruct, #TrivialStruct.f1
   %9999 = tuple()
   return %9999 : $()
 }
 
 sil @in_address_arg : $@convention(thin) (@in Builtin.NativeObject) -> () {
-bb0(%0 : @trivial $*Builtin.NativeObject):
+bb0(%0 : $*Builtin.NativeObject):
   destroy_addr %0 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -194,7 +194,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 sil @alloc_value_buffer_dealloc_value_buffer : $@convention(thin) (@inout Builtin.UnsafeValueBuffer, Builtin.Int32) -> () {
-bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
+bb0(%0 : $*Builtin.UnsafeValueBuffer, %1 : $Builtin.Int32):
   %2 = alloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
   store %1 to [trivial] %2 : $*Builtin.Int32
   dealloc_value_buffer $Builtin.Int32 in %0 : $*Builtin.UnsafeValueBuffer
@@ -203,7 +203,7 @@ bb0(%0 : @trivial $*Builtin.UnsafeValueBuffer, %1 : @trivial $Builtin.Int32):
 }
 
 sil @builtins_test : $@convention(thin) (@owned Error, Builtin.Int1, Builtin.RawPointer, Builtin.Word) -> ((), @error Error) {
-bb0(%0 : @owned $Error, %1 : @trivial $Builtin.Int1, %2 : @trivial $Builtin.RawPointer, %3 : @trivial $Builtin.Word):
+bb0(%0 : @owned $Error, %1 : $Builtin.Int1, %2 : $Builtin.RawPointer, %3 : $Builtin.Word):
   %4 = metatype $@thick Builtin.Int32.Type
   builtin "willThrow"(%0 : $Error) : $()
   builtin "onFastPath"() : $()
@@ -238,7 +238,7 @@ bb0(%0 : @owned $SomeError):
 }
 
 sil @tail_allocated_alloc_ref : $@convention(thin) (Builtin.Word, Builtin.Word, @thick SuperKlass.Type) -> () {
-bb0(%0 : @trivial $Builtin.Word, %1 : @trivial $Builtin.Word, %2 : @trivial $@thick SuperKlass.Type):
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick SuperKlass.Type):
   %3 = alloc_ref [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $SuperKlass
   dealloc_ref %3 : $SuperKlass
 
@@ -252,7 +252,7 @@ bb0(%0 : @trivial $Builtin.Word, %1 : @trivial $Builtin.Word, %2 : @trivial $@th
 
 // All of these uses should not be consuming except for the destroy.
 sil @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @owned Builtin.NativeObject, Optional<Builtin.Int32>, @owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : @owned $Builtin.NativeObject, %2 : @trivial $Optional<Builtin.Int32>, %3 : @owned $Builtin.NativeObject):
+bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : @owned $Builtin.NativeObject, %2 : $Optional<Builtin.Int32>, %3 : @owned $Builtin.NativeObject):
   %4 = integer_literal $Builtin.Int32, 2
   select_enum %0 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: %4, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt.1: %4, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt.1: %4 : $Builtin.Int32
   %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt.1: %3 : $Builtin.NativeObject
@@ -272,7 +272,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 sil @existential_metatype_test : $@convention(thin) (@owned SwiftKlassP, @in SwiftKlassP) -> () {
-bb0(%0 : @owned $SwiftKlassP, %1 : @trivial $*SwiftKlassP):
+bb0(%0 : @owned $SwiftKlassP, %1 : $*SwiftKlassP):
   %2 = existential_metatype $@thick SwiftKlassP.Type, %0 : $SwiftKlassP
   %3 = existential_metatype $@thick SwiftKlassP.Type, %1 : $*SwiftKlassP
   destroy_value %0 : $SwiftKlassP
@@ -282,7 +282,7 @@ bb0(%0 : @owned $SwiftKlassP, %1 : @trivial $*SwiftKlassP):
 }
 
 sil @value_metatype_test : $@convention(thin) (@owned Ref, @in Ref) -> () {
-bb0(%0 : @owned $Ref, %1 : @trivial $*Ref):
+bb0(%0 : @owned $Ref, %1 : $*Ref):
   %2 = value_metatype $@thick Ref.Type, %0 : $Ref
   %3 = value_metatype $@thick Ref.Type, %1 : $*Ref
   destroy_value %0 : $Ref
@@ -367,7 +367,7 @@ bb0(%0 : @owned $@convention(block) () -> ()):
 }
 
 sil @class_method_metatype_test : $@convention(thin) (@thick SuperKlass.Type) -> () {
-bb0(%0 : @trivial $@thick SuperKlass.Type):
+bb0(%0 : $@thick SuperKlass.Type):
   %1 = class_method %0 : $@thick SuperKlass.Type, #SuperKlass.d!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
   %9999 = tuple()
   return %9999 : $()
@@ -393,7 +393,7 @@ bb0:
 }
 
 sil @test_store_weak : $@convention(thin) (@owned Optional<SuperKlass>, @in @sil_weak Optional<SuperKlass>, @guaranteed Optional<SuperKlass>) -> () {
-bb0(%0 : @owned $Optional<SuperKlass>, %1 : @trivial $*@sil_weak Optional<SuperKlass>, %2 : @guaranteed $Optional<SuperKlass>):
+bb0(%0 : @owned $Optional<SuperKlass>, %1 : $*@sil_weak Optional<SuperKlass>, %2 : @guaranteed $Optional<SuperKlass>):
   store_weak %0 to %1 : $*@sil_weak Optional<SuperKlass>
   store_weak %2 to %1 : $*@sil_weak Optional<SuperKlass>
   destroy_value %0 : $Optional<SuperKlass>
@@ -423,11 +423,11 @@ bb1:
   %1 = integer_literal $Builtin.Int32, 0
   br bb2(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
 
-bb2(%2 : @trivial $Builtin.Int32, %3 : @trivial $Builtin.Int32):
+bb2(%2 : $Builtin.Int32, %3 : $Builtin.Int32):
   // Branch with mixed trivial and owned argument
   br bb3(%1 : $Builtin.Int32, %0 : $Builtin.NativeObject, %2 : $Builtin.Int32)
 
-bb3(%4 : @trivial $Builtin.Int32, %5 : @owned $Builtin.NativeObject, %6 : @trivial $Builtin.Int32):
+bb3(%4 : $Builtin.Int32, %5 : @owned $Builtin.NativeObject, %6 : $Builtin.Int32):
   destroy_value %5 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -613,7 +613,7 @@ bb3:
 //
 // The reason why this is interesting is that we do a loop over enum cases to
 // determine if we have all trivial cases. If we do, then we only accept a
-// @trivial ownership kind to the switch enum. Otherwise, we only accept an
+// ownership kind to the switch enum. Otherwise, we only accept an
 // @owned trivial ownership kind. When we do the loop, we first skip over all
 // trivial enums and then process only the non-trivial enums. That is why we
 // need to make sure we handle all 3 cases.
@@ -632,7 +632,7 @@ bb2(%10 : @owned $Builtin.NativeObject):
   destroy_value %10 : $Builtin.NativeObject
   br bb5
 
-bb3(%11 : @trivial $Builtin.Int32):
+bb3(%11 : $Builtin.Int32):
   br bb5
 
 bb4:
@@ -647,7 +647,7 @@ bb6(%12 : @owned $Builtin.NativeObject):
   destroy_value %12 : $Builtin.NativeObject
   br bb9
 
-bb7(%13 : @trivial $Builtin.Int32):
+bb7(%13 : $Builtin.Int32):
   br bb9
 
 bb8:
@@ -662,7 +662,7 @@ bb10(%14 : @owned $Builtin.NativeObject):
   destroy_value %14 : $Builtin.NativeObject
   br bb13
 
-bb11(%15 : @trivial $Builtin.Int32):
+bb11(%15 : $Builtin.Int32):
   br bb13
 
 bb12:
@@ -676,7 +676,7 @@ bb16(%17 : @owned $Builtin.NativeObject):
   destroy_value %17 : $Builtin.NativeObject
   br bb21
 
-bb18(%19 : @trivial $Builtin.Int32):
+bb18(%19 : $Builtin.Int32):
   br bb21
 
 bb20:
@@ -689,7 +689,7 @@ bb22(%23 : @owned $Builtin.NativeObject):
   destroy_value %23 : $Builtin.NativeObject
   br bb27
 
-bb24(%25 : @trivial $Builtin.Int32):
+bb24(%25 : $Builtin.Int32):
   br bb27
 
 bb26:
@@ -702,7 +702,7 @@ bb28(%29 : @owned $Builtin.NativeObject):
   destroy_value %29 : $Builtin.NativeObject
   br bb33
 
-bb30(%31 : @trivial $Builtin.Int32):
+bb30(%31 : $Builtin.Int32):
   br bb33
 
 bb32:
@@ -716,7 +716,7 @@ bb34(%35 : @owned $Builtin.NativeObject):
   destroy_value %35 : $Builtin.NativeObject
   br bb39
 
-bb36(%37 : @trivial $Builtin.Int32):
+bb36(%37 : $Builtin.Int32):
   br bb39
 
 bb38:
@@ -729,7 +729,7 @@ bb40(%41 : @owned $Builtin.NativeObject):
   destroy_value %41 : $Builtin.NativeObject
   br bb45
 
-bb42(%43 : @trivial $Builtin.Int32):
+bb42(%43 : $Builtin.Int32):
   br bb45
 
 bb44:
@@ -742,7 +742,7 @@ bb46(%47 : @owned $Builtin.NativeObject):
   destroy_value %47 : $Builtin.NativeObject
   br bb51
 
-bb48(%49 : @trivial $Builtin.Int32):
+bb48(%49 : $Builtin.Int32):
   br bb51
 
 bb50:
@@ -770,10 +770,10 @@ bb3:
   %3 = metatype $@thick SuperKlass.Type
   checked_cast_br %3 : $@thick SuperKlass.Type to $@thick SubKlass.Type, bb4, bb5
 
-bb4(%4 : @trivial $@thick SubKlass.Type):
+bb4(%4 : $@thick SubKlass.Type):
   br bb6
 
-bb5(%5 : @trivial $@thick SuperKlass.Type):
+bb5(%5 : $@thick SuperKlass.Type):
   br bb6
 
 bb6:
@@ -793,12 +793,12 @@ bb9:
 }
 
 sil @dynamic_method_br_test : $@convention(thin) (@owned AnyObject, @thick AnyObject.Type) -> () {
-bb0(%0 : @owned $AnyObject, %1 : @trivial $@thick AnyObject.Type):
+bb0(%0 : @owned $AnyObject, %1 : $@thick AnyObject.Type):
   %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
   %3 = unchecked_ref_cast %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
   dynamic_method_br %3 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
-bb1(%4 : @trivial $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb1(%4 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
   br bb3
 
 bb2:
@@ -809,7 +809,7 @@ bb3:
   %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type
   dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type, #X.g!1.foreign, bb4, bb5
 
-bb4(%6 : @trivial $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type) -> ()):
+bb4(%6 : $@convention(objc_method) (@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type) -> ()):
   br bb6
 
 bb5:
@@ -1083,7 +1083,7 @@ bb3:
 }
 
 sil @super_method_metatype_test : $@convention(thin) (@thick SubKlass.Type) -> () {
-bb0(%0 : @trivial $@thick SubKlass.Type):
+bb0(%0 : $@thick SubKlass.Type):
   %1 = upcast %0 : $@thick SubKlass.Type to $@thick SuperKlass.Type
   %2 = class_method %1 : $@thick SuperKlass.Type, #SuperKlass.f!1 : (SuperKlass.Type) -> () -> (), $@convention(method) (@thick SuperKlass.Type) -> ()
   apply %2(%1) : $@convention(method) (@thick SuperKlass.Type) -> ()

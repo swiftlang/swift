@@ -5023,7 +5023,7 @@ class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
       : InstructionBase(DebugLoc, ResultTy,
                         Operand
                             ? Operand.getOwnershipKind()
-                            : ValueOwnershipKind(ValueOwnershipKind::Trivial)),
+                            : ValueOwnershipKind(ValueOwnershipKind::Any)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
