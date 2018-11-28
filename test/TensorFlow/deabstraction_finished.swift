@@ -3,6 +3,13 @@ import TensorFlow
 
 // FIXME: This should not build with -O.
 
+// CHECK-LABEL: --- TFDeabstraction Result: {{.*}}reproduceSR9365{{.*}}
+// CHECK: graph_op "Reproduce SR-9365"() {test: [$String: ], 
+@TensorFlowGraph
+func reproduceSR9365() {
+   let _: () = #tfop("Reproduce SR-9365", test: Array<String>())
+}
+
 public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
   let b = a.toAccelerator()
   return b+b
