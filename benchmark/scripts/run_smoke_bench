@@ -62,6 +62,9 @@ def main():
         '-skip-performance', action='store_true',
         help="Don't report performance differences")
     argparser.add_argument(
+        '-skip-check-added', action='store_true',
+        help="Don't validate newly added benchmarks")
+    argparser.add_argument(
         '-o', type=str,
         help='In addition to stdout, write the results into a markdown file')
     argparser.add_argument(
@@ -80,10 +83,6 @@ def main():
     argparser.add_argument(
         'newbuilddir', nargs=1, type=str,
         help='new benchmark build directory')
-    argparser.add_argument(
-        '-check-added', action='store_const',
-        help="Run BenchmarkDoctor's check on newly added benchmarks",
-        const=lambda args: check_added(args), dest='func')
     argparser.set_defaults(func=test_opt_levels)
     args = argparser.parse_args()
     VERBOSE = args.verbose
@@ -119,7 +118,8 @@ def test_opt_levels(args):
                             args.platform, output_file):
             changes = True
 
-    check_added(args, output_file)
+    if not args.skip_check_added:
+        check_added(args, output_file)
 
     if output_file:
         if changes:
