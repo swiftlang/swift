@@ -1,0 +1,1 @@
+Foo: Func ObjcProt.someFunctionFromProt2() has been added as a protocol requirement
