@@ -168,6 +168,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  context.Args.AddAllArgValues(Arguments, options::OPT_Xclang_linker);
 
   // Run clang++ in verbose mode if "-v" is set
   if (context.Args.hasArg(options::OPT_v)) {
