@@ -7,7 +7,7 @@ func foo<T>(_ x: T) -> () {
   // CHECK-SAME:               metadata ![[T1:.*]], metadata !DIExpression())
   // CHECK: %[[X:.*]] = alloca %swift.opaque*
   // CHECK: call void @llvm.dbg.declare(metadata %swift.opaque** %[[X]],
-  // CHECK-SAME:               metadata ![[X1:.*]], metadata !DIExpression())
+  // CHECK-SAME: metadata ![[X1:.*]], metadata !DIExpression(DW_OP_deref))
   // CHECK: store %swift.type* %T, %swift.type** %[[T]],
   // CHECK: store %swift.opaque* %0, %swift.opaque** %[[X]],
   // CHECK: ![[T1]] = !DILocalVariable(name: "$\CF\84_0_0",
