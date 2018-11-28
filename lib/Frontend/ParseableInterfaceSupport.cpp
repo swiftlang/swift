@@ -344,10 +344,12 @@ static bool buildSwiftModuleFromSwiftInterface(
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Serializing " << OutPath << "\n");
+    FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.SerializeAllSIL = true;
+    SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SmallVector<FileDependency, 16> Deps;
     if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
                                     Deps, Diags, OuterTracker)) {
