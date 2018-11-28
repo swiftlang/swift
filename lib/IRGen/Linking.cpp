@@ -55,7 +55,9 @@ UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
                                            bool isWholeModule)
     : IsELFObject(triple.isOSBinFormatELF()),
-      UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
+      UseDLLStorage(useDllStorage(triple)),
+      SupportsWeakLinkage(!triple.isOSBinFormatCOFF()),
+      HasMultipleIGMs(hasMultipleIGMs),
       IsWholeModule(isWholeModule) {}
 
 /// Mangle this entity into the given buffer.
@@ -854,7 +856,11 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   }
 }
 
-bool LinkEntity::isWeakImported(ModuleDecl *module) const {
+bool LinkEntity::isWeakImported(ModuleDecl *module,
+                                const UniversalLinkageInfo &LI) const {
+  if (!LI.SupportsWeakLinkage)
+    return false;
+
   switch (getKind()) {
   case Kind::SILGlobalVariable:
     if (getSILGlobalVariable()->getDecl())

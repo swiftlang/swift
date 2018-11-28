@@ -43,6 +43,7 @@ class UniversalLinkageInfo {
 public:
   bool IsELFObject;
   bool UseDLLStorage;
+  bool SupportsWeakLinkage;
 
   /// True iff are multiple llvm modules.
   bool HasMultipleIGMs;
@@ -1001,7 +1002,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module) const;
+  bool isWeakImported(ModuleDecl *module, const UniversalLinkageInfo &LI) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.

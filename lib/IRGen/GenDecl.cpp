@@ -1509,8 +1509,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
   auto IRL =
-      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
-                   ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
+      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
+                   entity.isWeakImported(IGM.getSwiftModule(), linkInfo));
   ApplyIRLinkage(IRL).to(global);
 
   // Everything externally visible is considered used in Swift.
@@ -1545,8 +1545,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
       ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
-  result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
-                            isDefinition, entity.isWeakImported(swiftModule));
+  result.IRL =
+      getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
+                   isDefinition, entity.isWeakImported(swiftModule, linkInfo));
   result.ForDefinition = isDefinition;
   return result;
 }
