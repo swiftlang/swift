@@ -709,6 +709,8 @@ void SILValue::verifyOwnership(SILModule &mod,
   if (!f->hasQualifiedOwnership() || !f->shouldVerifyOwnership())
     return;
 
+  assert(getOwnershipKind() != ValueOwnershipKind::Any &&
+         "No values should have any ownership anymore");
   ErrorBehaviorKind errorBehavior;
   if (IsSILOwnershipVerifierTestingEnabled) {
     errorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
