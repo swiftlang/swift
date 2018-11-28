@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import superclass_reorder_methods
+import class_resilient_superclass_reorder_methods
 
 
 var SuperclassReorderMethodsTest = TestSuite("SuperclassReorderMethods")

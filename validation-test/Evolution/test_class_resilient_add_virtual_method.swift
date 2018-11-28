@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import class_add_virtual_method
+import class_resilient_add_virtual_method
 
 
 var ClassAddVirtualMethodTest = TestSuite("ClassAddVirtualMethod")

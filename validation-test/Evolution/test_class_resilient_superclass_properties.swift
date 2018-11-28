@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import superclass_properties
+import class_resilient_superclass_properties
 
 
 var SuperclassPropertiesTest = TestSuite("SuperclassProperties")

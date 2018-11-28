@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import class_add_override
+import class_resilient_add_override
 
 
 var ClassAddOverrideTest = TestSuite("ClassAddOverride")
