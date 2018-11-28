@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import superclass_methods
+import class_resilient_superclass_methods
 
 
 var SuperclassMethodsTest = TestSuite("SuperclassMethods")

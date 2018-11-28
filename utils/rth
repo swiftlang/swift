@@ -33,7 +33,7 @@ class ResilienceTest(object):
 
     def __init__(self, target_build_swift, target_run, target_codesign,
                  target_nm, tmp_dir, test_dir, test_src, lib_prefix,
-                 lib_suffix, additional_compile_flags_library,
+                 lib_suffix, additional_compile_flags,
                  no_backward_deployment, no_symbol_diff):
         self.target_build_swift = shlex.split(target_build_swift)
         self.target_run = shlex.split(target_run)
@@ -44,8 +44,7 @@ class ResilienceTest(object):
         self.test_src = test_src
         self.lib_prefix = lib_prefix
         self.lib_suffix = lib_suffix
-        self.additional_compile_flags_library = \
-            shlex.split(additional_compile_flags_library)
+        self.additional_compile_flags = shlex.split(additional_compile_flags)
 
         self.before_dir = os.path.join(self.tmp_dir, 'before')
         self.after_dir = os.path.join(self.tmp_dir, 'after')
@@ -95,7 +94,8 @@ class ResilienceTest(object):
                                    os.path.join('@rpath', lib_file)]
 
             command = self.target_build_swift + \
-                self.additional_compile_flags_library + compiler_flags
+                self.additional_compile_flags + \
+                compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
@@ -143,7 +143,9 @@ class ResilienceTest(object):
                               '-Xfrontend', '-enable-class-resilience',
                               '-I', self.config_dir_map[config],
                               '-o', output_obj]
-            command = self.target_build_swift + compiler_flags
+            command = self.target_build_swift + \
+                self.additional_compile_flags + \
+                compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
@@ -218,7 +220,7 @@ def main():
     parser.add_argument('--s', required=True)
     parser.add_argument('--lib-prefix', required=True)
     parser.add_argument('--lib-suffix', required=True)
-    parser.add_argument('--additional-compile-flags-library', default='')
+    parser.add_argument('--additional-compile-flags', default='')
     parser.add_argument('--no-backward-deployment', default=False,
                         action='store_true')
     parser.add_argument('--no-symbol-diff', default=False,
@@ -230,7 +232,7 @@ def main():
                                      args.target_codesign, args.target_nm,
                                      args.t, args.S, args.s, args.lib_prefix,
                                      args.lib_suffix,
-                                     args.additional_compile_flags_library,
+                                     args.additional_compile_flags,
                                      args.no_backward_deployment,
                                      args.no_symbol_diff)
 
