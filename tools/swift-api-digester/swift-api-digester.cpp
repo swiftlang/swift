@@ -64,6 +64,10 @@ ModuleList("module-list-file",
            llvm::cl::desc("File containing a new-line separated list of modules"));
 
 static llvm::cl::opt<std::string>
+ProtReqWhiteList("protocol-requirement-white-list",
+           llvm::cl::desc("File containing a new-line separated list of protocol names"));
+
+static llvm::cl::opt<std::string>
 OutputFile("o", llvm::cl::desc("Output file"));
 
 static llvm::cl::opt<std::string>
@@ -927,6 +931,7 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
+  llvm::StringSet<> ProtocolReqWhitelist;
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
@@ -959,6 +964,10 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
 public:
   PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
+  PrunePass(SDKContext &Ctx, llvm::StringSet<> prWhitelist):
+    Ctx(Ctx),
+    UpdateMap(Ctx.getNodeUpdateMap()),
+    ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
     if (options::Verbose)
@@ -984,6 +993,12 @@ public:
           if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
             if (ATD->getDefault())
               ShouldComplain = false;
+          }
+          if (ShouldComplain &&
+              ProtocolReqWhitelist.count(D->getParent()->getAs<SDKNodeDecl>()->getFullyQualifiedName())) {
+            // Ignore protocol requirement additions if the protocol has been added
+            // to the whitelist.
+            ShouldComplain = false;
           }
           if (ShouldComplain)
             Ctx.getDiags().diagnose(SourceLoc(), diag::protocol_req_added,
@@ -2027,7 +2042,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 StringRef OutputPath,
-                                CheckerOptions Opts) {
+                                CheckerOptions Opts,
+                                llvm::StringSet<> ProtocolReqWhitelist) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2055,7 +2071,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   auto RightModule = RightCollector.getSDKRoot();
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx);
+  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
@@ -2182,7 +2198,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening file: "
+    llvm::errs() << "error opening file '" << Path << "': "
       << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
@@ -2347,11 +2363,16 @@ int main(int argc, char *argv[]) {
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
   case ActionType::CompareSDKs:
-  case ActionType::DiagnoseSDKs:
+  case ActionType::DiagnoseSDKs: {
     if (options::SDKJsonPaths.size() != 2) {
       llvm::errs() << "Only two SDK versions can be compared\n";
       llvm::cl::PrintHelpMessage();
       return 1;
+    }
+    llvm::StringSet<> protocolWhitelist;
+    if (!options::ProtReqWhiteList.empty()) {
+      if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
+          return 1;
     }
     if (options::Action == ActionType::CompareSDKs)
       return compareSDKs(options::SDKJsonPaths[0], options::SDKJsonPaths[1],
@@ -2359,7 +2380,9 @@ int main(int argc, char *argv[]) {
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
-                                  options::OutputFile, Opts);
+                                  options::OutputFile, Opts,
+                                  std::move(protocolWhitelist));
+  }
   case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
     if (options::SDKJsonPaths.size() != 1) {
