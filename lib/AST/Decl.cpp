@@ -1819,7 +1819,7 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return isResilient() && M != getModuleContext();
+    return M != getModuleContext() && isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -2915,7 +2915,7 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return isResilient() && M != getModuleContext();
+    return M != getModuleContext() && isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }
