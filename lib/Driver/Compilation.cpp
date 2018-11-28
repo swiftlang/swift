@@ -206,8 +206,9 @@ namespace driver {
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
 
-    /// Jobs in the initial set with Condition::Always, or lacking existing
+    /// Jobs in the initial set with Condition::Always, and having an existing
     /// .swiftdeps files.
+    /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
     SmallVector<const Job *, 16> InitialOutOfDateCommands;
 
     /// Dependency graph for deciding which jobs are dirty (need running)
@@ -382,7 +383,7 @@ namespace driver {
       DeferredCommands.clear();
     }
 
-    /// Helper that attmepts to reload a job's .swiftdeps file after the job
+    /// Helper that attempts to reload a job's .swiftdeps file after the job
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
@@ -679,6 +680,11 @@ namespace driver {
     }
 
     /// Schedule all jobs we can from the initial list provided by Compilation.
+    ///
+    /// It would probably be safe and simpler to markTransitive on the start
+    /// nodes in the "Always" condition from the start instead of using
+    /// markIntransitive and having later functions call markTransitive. That
+    /// way markInstransitive would be an implemenation detail.
     void scheduleInitialJobs() {
       for (const Job *Cmd : Comp.getJobs()) {
         if (!Comp.getIncrementalBuildEnabled()) {
@@ -715,7 +721,9 @@ namespace driver {
         switch (Condition) {
         case Job::Condition::Always:
           if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
+            // Ensure dependents will get recompiled.
             InitialOutOfDateCommands.push_back(Cmd);
+            // Mark this job as cascading.
             DepGraph.markIntransitive(Cmd);
           }
           LLVM_FALLTHROUGH;

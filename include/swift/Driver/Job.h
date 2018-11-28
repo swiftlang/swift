@@ -230,9 +230,17 @@ public:
 class Job {
 public:
   enum class Condition {
+    // There was no input map, or the map makred this Job as dirty
+    // but the input didn't change.
+    // Be maximally conservative with dependencies.
     Always,
+    // The input changed, or this job was private or [it was not dirty but
+    // primary output was missing].
     RunWithoutCascading,
+    // The best case: input didn't change, output exists.
+    // Only run if it depends on some other thing that changed.
     CheckDependencies,
+    // Pessimal: run no matter what.
     NewlyAdded
   };
 
