@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'client()' >%t/main.swift
-// RUN: %target-build-swift-dylib(%t/libAttrImplFP.%target-dylib-extension) -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule %S/attr_implements_fp.swift
+// RUN: %target-build-swift-dylib(%t/libAttrImplFP.%target-dylib-extension) -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule %S/attr_implements_fp.swift -Xfrontend -enable-operator-designated-types -Xfrontend -solver-enable-operator-designated-types
 // RUN: %target-build-swift -I %t -o %t/a.out %s %t/main.swift -L %t -Xlinker -rpath -Xlinker %t -lAttrImplFP
 // RUN: %target-codesign %t/a.out
 // RUN: %target-codesign %t/libAttrImplFP.%target-dylib-extension
