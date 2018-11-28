@@ -123,9 +123,6 @@ private:
     if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
       return;
 
-    // Add vtable entries.
-    asImpl().addVTableEntries(theClass);
-
     // A class only really *needs* a field-offset vector in the
     // metadata if:
     //   - it's in a generic context and
@@ -145,6 +142,9 @@ private:
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
+
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
   }
   
 private:

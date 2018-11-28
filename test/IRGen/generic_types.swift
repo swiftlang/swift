@@ -26,7 +26,7 @@
 // -- num fields
 // CHECK-SAME:   i32 1,
 // -- field offset vector offset
-// CHECK-SAME:   i32 16,
+// CHECK-SAME:   i32 11,
 // -- instantiation cache
 // CHECK-SAME:   @"$s13generic_types1ACMI"
 // -- instantiation pattern
