@@ -246,7 +246,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvg",
+              "usr": "s:4cake2C1C3InsACSgvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -279,7 +279,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C3InsACSgXwvs",
+              "usr": "s:4cake2C1C3InsACSgvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -288,7 +288,7 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgXwvp",
+          "usr": "s:4cake2C1C3InsACSgvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
@@ -322,7 +322,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovg",
+              "usr": "s:4cake2C1C4Ins2ACvg",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -347,7 +347,7 @@
                 }
               ],
               "declKind": "Accessor",
-              "usr": "s:4cake2C1C4Ins2ACXovs",
+              "usr": "s:4cake2C1C4Ins2ACvs",
               "moduleName": "cake",
               "implicit": true,
               "declAttributes": [
@@ -356,7 +356,7 @@
             }
           ],
           "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACXovp",
+          "usr": "s:4cake2C1C4Ins2ACvp",
           "moduleName": "cake",
           "declAttributes": [
             "HasInitialValue",
