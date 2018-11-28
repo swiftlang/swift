@@ -279,6 +279,7 @@ static bool buildSwiftModuleFromSwiftInterface(
     StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
+    (void)llvm::sys::fs::create_directory(ModuleCachePath);
 
     llvm::BumpPtrAllocator SubArgsAlloc;
     llvm::StringSaver SubArgSaver(SubArgsAlloc);
