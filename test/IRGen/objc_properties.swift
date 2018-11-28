@@ -235,10 +235,10 @@ class Class17127126 {
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties4Tree =
 // CHECK:    i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(parent)", i64 0, i64 0),
 // CHECK:    i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:    i8* bitcast (%2* (%2*, i8*)* @"$s15objc_properties4TreeC6parentACSgXwvgTo" to i8*)
+// CHECK:    i8* bitcast (%2* (%2*, i8*)* @"$s15objc_properties4TreeC6parentACSgvgTo" to i8*)
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(setParent:)", i64 0, i64 0),
 // CHECK:    i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:    i8* bitcast (void (%2*, i8*, %2*)* @"$s15objc_properties4TreeC6parentACSgXwvsTo" to i8*)
+// CHECK:    i8* bitcast (void (%2*, i8*, %2*)* @"$s15objc_properties4TreeC6parentACSgvsTo" to i8*)
 
 // CHECK: @_PROTOCOL__TtP15objc_properties5Proto_ = private constant { {{.+}} } {
 // CHECK:   i8* null,
