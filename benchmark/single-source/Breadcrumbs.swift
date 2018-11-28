@@ -120,10 +120,10 @@ class BenchmarkBase {
   var info: BenchmarkInfo {
     return BenchmarkInfo(
       name: self.label,
-      runFunction: { self.run(iterations: $0) },
+      runFunction: self.run(iterations:),
       tags: [.validation, .api, .String],
-      setUpFunction: { self.setUp() },
-      tearDownFunction: { self.tearDown() })
+      setUpFunction: self.setUp,
+      tearDownFunction: self.tearDown)
   }
 }
 
@@ -444,18 +444,17 @@ class MutatedUTF16ToIdx: BenchmarkBase {
         blackHole(string._toUTF16Index(offset))
         if flag {
           string.append(" ")
-          flag = false
         } else {
           string.removeLast()
-          flag = true
         }
+        flag.toggle()
       }
     }
   }
 }
 
 
-/// This is like `UTF16ToIdx` but appends to the string after every index
+/// This is like `IdxToUTF16` but appends to the string after every index
 /// conversion. In effect, this tests breadcrumb creation performance.
 class MutatedIdxToUTF16: BenchmarkBase {
   let count: Int
