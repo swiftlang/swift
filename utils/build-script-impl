@@ -1180,6 +1180,7 @@ SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SKSTRESSTESTER_SOURCE_DIR="${WORKSPACE}/swift-stress-tester/SourceKitStressTester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
@@ -1230,6 +1231,9 @@ if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+     if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" foundation_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
@@ -1571,7 +1575,7 @@ function build_directory_bin() {
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
             libdispatch|libdispatch_static)
@@ -1716,7 +1720,7 @@ function cmake_config_opt() {
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
             libdispatch|libdispatch_static)
@@ -2604,7 +2608,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # The configuration script requires knowing about XCTest's
                 # location for building and running the tests. Note that XCTest
                 # is not yet built at this point.
@@ -2625,8 +2629,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -2662,6 +2670,8 @@ for host in "${ALL_HOSTS[@]}"; do
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
                   -DENABLE_TESTING:BOOL=NO
+
+                  -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
                 )
 
                 ;;
@@ -3225,8 +3235,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -3266,6 +3280,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 results_targets=( "test" )
                 executable_target=("TestFoundation")
                 ;;
+            foundation_static)
+              continue
+            ;;
             libdispatch)
                 if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
                     continue
@@ -3518,7 +3535,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
                     echo "Skipping Foundation on OS X -- use the Xcode project instead"
