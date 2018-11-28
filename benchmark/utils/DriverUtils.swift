@@ -198,23 +198,24 @@ struct TestConfig {
       """)
     }
 
-    if verbose {
-      let testList = tests.map({ $0.1.name }).joined(separator: ", ")
-      print("""
-            --- CONFIG ---
-            NumSamples: \(numSamples ?? 0)
-            Verbose: \(verbose)
-            LogMemory: \(logMemory)
-            SampleTime: \(sampleTime)
-            NumIters: \(numIters ?? 0)
-            Quantile: \(quantile ?? 0)
-            Delimiter: \(String(reflecting: delim))
-            Tests Filter: \(c.tests ?? [])
-            Tests to run: \(testList)
+    // We always prepare the configuration string and call the print to have
+    // the same memory usage baseline between verbose and normal mode.
+    let testList = tests.map({ $0.1.name }).joined(separator: ", ")
+    let configuration = """
+        --- CONFIG ---
+        NumSamples: \(numSamples ?? 0)
+        Verbose: \(verbose)
+        LogMemory: \(logMemory)
+        SampleTime: \(sampleTime)
+        NumIters: \(numIters ?? 0)
+        Quantile: \(quantile ?? 0)
+        Delimiter: \(String(reflecting: delim))
+        Tests Filter: \(c.tests ?? [])
+        Tests to run: \(testList)
 
-            --- DATA ---\n
-            """)
-    }
+        --- DATA ---\n
+        """
+    print(verbose ? configuration : "", terminator:"")
   }
 
   /// Returns the list of tests to run.
