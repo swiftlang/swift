@@ -411,7 +411,6 @@ class CopyUTF16CodeUnits: BenchmarkBase {
   @inline(never)
   override func run() {
     for range in inputIndices {
-      print(range)
       outputBuffer.withUnsafeMutableBufferPointer { buffer in
         inputString._copyUTF16CodeUnits(
           into: UnsafeMutableBufferPointer(rebasing: buffer[range]),
