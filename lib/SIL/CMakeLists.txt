@@ -37,6 +37,7 @@ add_swift_host_library(swiftSIL STATIC
   SILProfiler.cpp
   SILSuccessor.cpp
   SILType.cpp
+  SILUndef.cpp
   SILValue.cpp
   SILVerifier.cpp
   SILOwnershipVerifier.cpp

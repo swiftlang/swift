@@ -537,7 +537,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
 
   // If we have an available value, then we want to extract the subelement from
   // the borrowed aggregate before each insertion point.
-  SILSSAUpdater Updater;
+  SILSSAUpdater Updater(B.getModule());
   Updater.Initialize(LoadTy);
   for (auto *I : Val.getInsertionPoints()) {
     // Use the scope and location of the store at the insertion point.
