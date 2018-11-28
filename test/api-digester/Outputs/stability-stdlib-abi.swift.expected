@@ -515,3 +515,5 @@ Func LazyCollectionProtocol.map(_:) has been removed
 Func LazyCollectionProtocol.prefix(while:) has been removed
 Func LazyCollectionProtocol.reversed() has been removed
 Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<τ_0_0.Elements> to LazySequence<τ_0_0.Elements>
+
+Func Sequence.reduce(into:_:) has parameter 0 changing from Default to Owned
