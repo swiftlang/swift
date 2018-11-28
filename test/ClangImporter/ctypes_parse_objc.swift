@@ -70,8 +70,17 @@ func testImportMacTypes() {
 }
 
 func testImportCFTypes() {
-  let t1_unqual: Int = CFIndex_test
-  _ = t1_unqual as CoreFoundation.CFIndex
+  let t1_unqual: UInt = CFTypeID_test
+  _ = t1_unqual as CoreFoundation.CFTypeID
+
+  let t2_unqual: UInt = CFOptionFlags_test
+  _ = t2_unqual as CoreFoundation.CFOptionFlags
+
+  let t3_unqual: UInt = CFHashCode_test
+  _ = t3_unqual as CoreFoundation.CFHashCode
+
+  let t4_unqual: Int = CFIndex_test
+  _ = t4_unqual as CoreFoundation.CFIndex
 }
 
 func testImportSEL() {
