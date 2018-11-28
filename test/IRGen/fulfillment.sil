@@ -70,7 +70,7 @@ class K<T> : A2 where T : C {
 
 sil @callee : $@convention(method) <τ_0_0 where τ_0_0 : A2, τ_0_0.AssocTy : C> (@in_guaranteed τ_0_0) -> ()
 
-// CHECK-LABEL: define swiftcc void @caller(%T11fulfillment1KC** {{.*}}, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{.*}} swiftcc void @caller(%T11fulfillment1KC** {{.*}}, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK: entry:
 // CHECK:   %1 = bitcast %swift.type* %Self to i8***
 // CHECK:   %2 = getelementptr inbounds i8**, i8*** %1, i64 11
