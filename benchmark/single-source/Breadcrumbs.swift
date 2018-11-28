@@ -113,21 +113,17 @@ class BenchmarkBase {
     self.inputString = ""
   }
 
-  final func run(iterations: Int) {
-    for _ in 0 ..< iterations {
-      self.run()
-    }
+  func run(iterations: Int) {
+    fatalError("unimplemented abstract method")
   }
-
-  func run() {}
 
   var info: BenchmarkInfo {
     return BenchmarkInfo(
       name: self.label,
-      runFunction: self.run(iterations:),
+      runFunction: { self.run(iterations: $0) },
       tags: [.validation, .api, .String],
-      setUpFunction: self.setUp,
-      tearDownFunction: self.tearDown)
+      setUpFunction: { self.setUp() },
+      tearDownFunction: { self.tearDown() })
   }
 }
 
@@ -250,7 +246,6 @@ let longMixedWorkload = Workload(
 class UTF16ToIdx: BenchmarkBase {
   let count: Int
   var inputOffsets: [Int] = []
-  var outputIndices: [String.Index] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -262,8 +257,6 @@ class UTF16ToIdx: BenchmarkBase {
     var rng = LCRNG(seed: seed)
     let range = 0 ..< inputString.utf16.count
     inputOffsets = Array(range.shuffled(using: &rng).prefix(count))
-    outputIndices = []
-    outputIndices.reserveCapacity(inputOffsets.count)
   }
 
   override func tearDown() {
@@ -272,10 +265,11 @@ class UTF16ToIdx: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputIndices.removeAll(keepingCapacity: true)
-    for offset in inputOffsets {
-      outputIndices.append(inputString._toUTF16Index(offset))
+  override func run(iterations: Int) {
+    for _ in 0 ..< iterations {
+      for offset in inputOffsets {
+        blackHole(inputString._toUTF16Index(offset))
+      }
     }
   }
 }
@@ -284,7 +278,6 @@ class UTF16ToIdx: BenchmarkBase {
 class IdxToUTF16: BenchmarkBase {
   let count: Int
   var inputIndices: [String.Index] = []
-  var outputOffsets: [Int] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -295,8 +288,6 @@ class IdxToUTF16: BenchmarkBase {
     super.setUp()
     var rng = LCRNG(seed: seed)
     inputIndices = Array(inputString.indices.shuffled(using: &rng).prefix(count))
-    outputOffsets = []
-    outputOffsets.reserveCapacity(inputIndices.count)
   }
 
   override func tearDown() {
@@ -305,10 +296,11 @@ class IdxToUTF16: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputOffsets.removeAll(keepingCapacity: true)
-    for index in inputIndices {
-      outputOffsets.append(inputString._toUTF16Offset(index))
+  override func run(iterations: Int) {
+    for _ in 0 ..< iterations {
+      for index in inputIndices {
+        blackHole(inputString._toUTF16Offset(index))
+      }
     }
   }
 }
@@ -318,7 +310,6 @@ class IdxToUTF16: BenchmarkBase {
 class UTF16ToIdxRange: BenchmarkBase {
   let count: Int
   var inputOffsets: [Range<Int>] = []
-  var outputIndices: [Range<String.Index>] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -331,8 +322,6 @@ class UTF16ToIdxRange: BenchmarkBase {
     inputOffsets = (
       0 ..< inputString.utf16.count
     ).randomIndexRanges(count: count, using: &rng)
-    outputIndices = []
-    outputIndices.reserveCapacity(inputOffsets.count)
   }
 
   override func tearDown() {
@@ -341,10 +330,11 @@ class UTF16ToIdxRange: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputIndices.removeAll(keepingCapacity: true)
-    for range in inputOffsets {
-      outputIndices.append(inputString._toUTF16Indices(range))
+  override func run(iterations: Int) {
+    for _ in 0 ..< iterations {
+      for range in inputOffsets {
+        blackHole(inputString._toUTF16Indices(range))
+      }
     }
   }
 }
@@ -354,7 +344,6 @@ class UTF16ToIdxRange: BenchmarkBase {
 class IdxToUTF16Range: BenchmarkBase {
   let count: Int
   var inputIndices: [Range<String.Index>] = []
-  var outputOffsets: [Range<Int>] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -365,8 +354,6 @@ class IdxToUTF16Range: BenchmarkBase {
     super.setUp()
     var rng = LCRNG(seed: seed)
     inputIndices = self.inputString.randomIndexRanges(count: count, using: &rng)
-    outputOffsets = []
-    outputOffsets.reserveCapacity(inputIndices.count)
   }
 
   override func tearDown() {
@@ -375,10 +362,11 @@ class IdxToUTF16Range: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputOffsets.removeAll(keepingCapacity: true)
-    for range in inputIndices {
-      outputOffsets.append(inputString._toUTF16Offsets(range))
+  override func run(iterations: Int) {
+    for _ in 0 ..< iterations {
+      for range in inputIndices {
+        blackHole(inputString._toUTF16Offsets(range))
+      }
     }
   }
 }
@@ -409,12 +397,14 @@ class CopyUTF16CodeUnits: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    for range in inputIndices {
-      outputBuffer.withUnsafeMutableBufferPointer { buffer in
-        inputString._copyUTF16CodeUnits(
-          into: UnsafeMutableBufferPointer(rebasing: buffer[range]),
-          range: range)
+  override func run(iterations: Int) {
+    outputBuffer.withUnsafeMutableBufferPointer { buffer in
+      for _ in 0 ..< iterations {
+        for range in inputIndices {
+          inputString._copyUTF16CodeUnits(
+            into: UnsafeMutableBufferPointer(rebasing: buffer[range]),
+            range: range)
+        }
       }
     }
   }
@@ -425,7 +415,6 @@ class CopyUTF16CodeUnits: BenchmarkBase {
 class MutatedUTF16ToIdx: BenchmarkBase {
   let count: Int
   var inputOffsets: [Int] = []
-  var outputIndices: [String.Index] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -439,8 +428,6 @@ class MutatedUTF16ToIdx: BenchmarkBase {
     var generator = LCRNG(seed: seed)
     let range = 0 ..< inputString.utf16.count
     inputOffsets = Array(range.shuffled(using: &generator).prefix(count))
-    outputIndices = []
-    outputIndices.reserveCapacity(inputOffsets.count)
   }
 
   override func tearDown() {
@@ -449,11 +436,20 @@ class MutatedUTF16ToIdx: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputIndices.removeAll(keepingCapacity: true)
-    for offset in inputOffsets {
-      outputIndices.append(inputString._toUTF16Index(offset))
-      inputString.append(" ")
+  override func run(iterations: Int) {
+    var flag = true
+    for _ in 0 ..< iterations {
+      var string = inputString
+      for offset in inputOffsets {
+        blackHole(string._toUTF16Index(offset))
+        if flag {
+          string.append(" ")
+          flag = false
+        } else {
+          string.removeLast()
+          flag = true
+        }
+      }
     }
   }
 }
@@ -464,7 +460,6 @@ class MutatedUTF16ToIdx: BenchmarkBase {
 class MutatedIdxToUTF16: BenchmarkBase {
   let count: Int
   var inputIndices: [String.Index] = []
-  var outputOffsets: [Int] = []
 
   init(workload: Workload, count: Int) {
     self.count = count
@@ -477,8 +472,6 @@ class MutatedIdxToUTF16: BenchmarkBase {
     super.setUp()
     var rng = LCRNG(seed: seed)
     inputIndices = Array(inputString.indices.shuffled(using: &rng).prefix(count))
-    outputOffsets = []
-    outputOffsets.reserveCapacity(inputIndices.count)
   }
 
   override func tearDown() {
@@ -487,11 +480,20 @@ class MutatedIdxToUTF16: BenchmarkBase {
   }
 
   @inline(never)
-  override func run() {
-    outputOffsets.removeAll(keepingCapacity: true)
-    for index in inputIndices {
-      outputOffsets.append(inputString._toUTF16Offset(index))
-      inputString.append(" ")
+  override func run(iterations: Int) {
+    var flag = true
+    for _ in 0 ..< iterations {
+      var string = inputString
+      for index in inputIndices {
+        blackHole(string._toUTF16Offset(index))
+        if flag {
+          string.append(" ")
+          flag = false
+        } else {
+          string.removeLast()
+          flag = true
+        }
+      }
     }
   }
 }
