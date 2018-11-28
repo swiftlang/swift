@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'main()' >%t/main.swift
-// RUN: %target-swiftc_driver -o %t/a.out %s %t/main.swift
+// RUN: %target-swiftc_driver -o %t/a.out %s %t/main.swift -Xfrontend -enable-operator-designated-types -Xfrontend -solver-enable-operator-designated-types
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
@@ -13,7 +13,7 @@
 public var comparedAsCauxmparablesCount : Int = 0
 public var comparedAsFauxtsCount : Int = 0
 
-infix operator  .<  : ComparisonPrecedence
+infix operator  .<  : ComparisonPrecedence, BinaryFauxtingPoint, Cauxmparable
 
 public protocol Cauxmparable {
   static func .< (lhs: Self, rhs: Self) -> Bool
