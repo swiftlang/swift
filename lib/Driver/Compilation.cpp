@@ -680,11 +680,6 @@ namespace driver {
     }
 
     /// Schedule all jobs we can from the initial list provided by Compilation.
-    ///
-    /// It would probably be safe and simpler to markTransitive on the start
-    /// nodes in the "Always" condition from the start instead of using
-    /// markIntransitive and having later functions call markTransitive. That
-    /// way markInstransitive would be an implemenation detail.
     void scheduleInitialJobs() {
       for (const Job *Cmd : Comp.getJobs()) {
         if (!Comp.getIncrementalBuildEnabled()) {
@@ -724,6 +719,12 @@ namespace driver {
             // Ensure dependents will get recompiled.
             InitialOutOfDateCommands.push_back(Cmd);
             // Mark this job as cascading.
+            //
+            // It would probably be safe and simpler to markTransitive on the
+            // start nodes in the "Always" condition from the start instead of
+            // using markIntransitive and having later functions call
+            // markTransitive. That way markInstransitive would be an
+            // implementation detail.
             DepGraph.markIntransitive(Cmd);
           }
           LLVM_FALLTHROUGH;

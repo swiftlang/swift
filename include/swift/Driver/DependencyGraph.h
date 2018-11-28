@@ -127,10 +127,7 @@ private:
   /// In other words, this Job "cascades"; the need to recompile it causes other
   /// recompilations. It is possible that the current code marks things that do
   /// not need to be marked. Nothing would break if that were the case.
-  ///
-  /// "Marked" does NOT mean that any successors in the graph have been
-  /// processed. The traversal routines use "Visited" to avoid endless
-  /// "recursion".
+
   llvm::SmallPtrSet<const void *, 16> Marked;
 
   /// A list of all external dependencies that cannot be resolved from just this
@@ -163,11 +160,7 @@ protected:
     (void)newlyInserted;
   }
 
-  /// Starting at \p node, visit the transitive closure of every dependent node.
-  /// Assume that the starting node is "cascading"; that all dependencies must
-  /// be dirty if the start is dirty. Therefore, mark the start. For each
-  /// visited node, add it to visited, and mark it if it cascades. The start
-  /// node is NOT added to visited.
+  /// See DependencyGraph::markTransitive.
 
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node, MarkTracerImpl *tracer = nullptr);
@@ -280,6 +273,15 @@ public:
   ///
   /// If you want to see how each node gets added to \p visited, pass a local
   /// MarkTracer instance to \p tracer.
+  ///
+  /// Assumes that the starting node is "cascading"; that all dependencies must
+  /// be dirty if the start is dirty. Therefore, mark the start. For each
+  /// visited node, add it to visited, and mark it if it cascades. The start
+  /// node is NOT added to visited.
+  ///
+  /// Do not confused "Marked" with "Visited".
+  /// "Marked" does NOT influence the traversal. The traversal routines use
+  /// "Visited" to avoid endless "recursion".
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {
