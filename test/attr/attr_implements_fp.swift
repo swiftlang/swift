@@ -26,6 +26,8 @@ public protocol FauxtingPoint : Cauxmparable {
 }
 
 public protocol BinaryFauxtingPoint: FauxtingPoint {
+  @_nonoverride static func .< (lhs: Self, rhs: Self) -> Bool
+
   var bitPattern: UInt8 { get }
 }
 
