@@ -13,12 +13,12 @@
 import TestsUtils
 
 public let InsertCharacter = [
-  BenchmarkInfo(name: "InsertCharacterEndIndex", runFunction: run_InsertCharacterEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterTowardsEndIndex", runFunction: run_InsertCharacterTowardsEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterStartIndex", runFunction: run_InsertCharacterStartIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterEndIndexNonASCII", runFunction: run_InsertCharacterEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterTowardsEndIndexNonASCII", runFunction: run_InsertCharacterTowardsEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
-  BenchmarkInfo(name: "InsertCharacterStartIndexNonASCII", runFunction: run_InsertCharacterStartIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload)
+  BenchmarkInfo(name: "String.insert.ASCIIChar.EndIndex", runFunction: run_InsertCharacterEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "String.insert.ASCIIChar.NearEnd", runFunction: run_InsertCharacterTowardsEndIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "String.insert.ASCIIChar.StartIndex", runFunction: run_InsertCharacterStartIndex, tags: [.validation, .api], setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "String.insert.EmojiChar.EndIndex", runFunction: run_InsertCharacterEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "String.insert.EmojiChar.NearEnd", runFunction: run_InsertCharacterTowardsEndIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload),
+  BenchmarkInfo(name: "String.insert.EmojiChar.StartIndex", runFunction: run_InsertCharacterStartIndexNonASCII, tags: [.validation, .api], setUpFunction: buildWorkload)
 ]
 
 let str = String(repeating: "A very long ASCII string.", count: 200)
