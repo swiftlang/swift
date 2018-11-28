@@ -124,7 +124,7 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                            source, MetadataPath(path), keys);
     }
 
-    // If the type is an archetype consider its super class bound.
+    // Consider its super class bound.
     if (metadataState == MetadataState::Complete) {
       if (auto superclassTy = keys.getSuperclassBound(type)) {
         hadFulfillment |= searchNominalTypeMetadata(
