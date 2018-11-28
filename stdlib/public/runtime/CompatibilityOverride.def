@@ -130,6 +130,13 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , swift::
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToSwiftProtocol,
+                             const ProtocolConformanceDescriptor *, , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol,
+                              StringRef moduleName),
+                             (type, protocol, moduleName))
+
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))
