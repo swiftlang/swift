@@ -77,7 +77,7 @@ protocol P {}
 struct S : P {}
 
 // CHECK: sil hidden @$s5casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[IN:%.*]] : @trivial $*P):
+// CHECK: bb0([[IN:%.*]] : $*P):
 // CHECK:   [[COPY:%.*]] = alloc_stack $P
 // CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
@@ -94,7 +94,7 @@ struct S : P {}
 // CHECK:   dealloc_stack [[TMP]]
 // CHECK:   br bb3([[T0]] : $Optional<S>)
 //   Continuation block.
-// CHECK: bb3([[RESULT:%.*]] : @trivial $Optional<S>):
+// CHECK: bb3([[RESULT:%.*]] : $Optional<S>):
 // CHECK:   dealloc_stack [[COPY]]
 // CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {

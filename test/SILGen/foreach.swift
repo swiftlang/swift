@@ -59,7 +59,7 @@ protocol GenericCollection : Collection {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]([[VAR:%.*]] : @trivial $Int):
+// CHECK: [[SOME_BB]]([[VAR:%.*]] : $Int):
 // CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_END_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
@@ -120,7 +120,7 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]([[VAR:%.*]] : @trivial $Int):
+// CHECK: [[SOME_BB]]([[VAR:%.*]] : $Int):
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -471,7 +471,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 }
 
 // CHECK-LABEL: sil hidden @$s7foreach30genericCollectionContinueBreakyyxSlRzlF : $@convention(thin) <T where T : Collection> (@in_guaranteed T) -> () {
-// CHECK: bb0([[COLLECTION:%.*]] : @trivial $*T):
+// CHECK: bb0([[COLLECTION:%.*]] : $*T):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Collection> { var τ_0_0.Iterator } <T>, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $T, #Sequence.makeIterator!1
@@ -584,7 +584,7 @@ func tupleElements(_ xx: [(C, C)]) {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   switch_enum [[OPT_VAL:%.*]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]([[VAL:%.*]]  : @trivial $Int):
+// CHECK: [[SOME_BB]]([[VAL:%.*]]  : $Int):
 // CHECK:   [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_END_FUNC]]
 func unusedArgPattern(_ xx: [Int]) {

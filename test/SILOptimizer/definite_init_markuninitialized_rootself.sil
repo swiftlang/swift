@@ -26,7 +26,7 @@ sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 
 // CHECK-LABEL: sil @rootclass_test1
 sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+bb0(%0 : @owned $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %4 = begin_borrow %3 : $RootClassWithIVars
@@ -52,7 +52,7 @@ bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
 
 // CHECK-LABEL: sil @rootclass_test2
 sil @rootclass_test2 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+bb0(%0 : @owned $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %4 = begin_borrow %3 : $RootClassWithIVars
@@ -76,7 +76,7 @@ bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
 
 // CHECK-LABEL: sil @rootclass_test3
 sil @rootclass_test3 : $@convention(method) (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
-bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Int):
+bb0(%0 : @owned $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %4 = begin_borrow %3 : $RootClassWithIVars

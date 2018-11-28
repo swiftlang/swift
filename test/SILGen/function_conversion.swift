@@ -206,7 +206,7 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s19function_conversion1Q_pSgAA7TrivialVIegnd_AESgAA1P_pIegyr_TR
 // CHECK:         switch_enum
-// CHECK: bb1([[TRIVIAL:%.*]] : @trivial $Trivial):
+// CHECK: bb1([[TRIVIAL:%.*]] : $Trivial):
 // CHECK:         init_existential_addr
 // CHECK:         init_enum_data_addr
 // CHECK:         copy_addr
@@ -258,7 +258,7 @@ func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s19function_conversion1Q_pXmTSgAA7TrivialVXMtIegyd_AEXMtSgAA1P_pXmTIegyd_TR : $@convention(thin) (Optional<@thin Trivial.Type>, @guaranteed @callee_guaranteed (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
 // CHECK:         switch_enum %0 : $Optional<@thin Trivial.Type>
-// CHECK: bb1([[META:%.*]] : @trivial $@thin Trivial.Type):
+// CHECK: bb1([[META:%.*]] : $@thin Trivial.Type):
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick Q.Type
 // CHECK-NEXT:    enum $Optional<@thick Q.Type>
@@ -426,7 +426,7 @@ func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) ->
 // CHECK-NEXT: } // end sil function '$s19function_conversion25convTupleToOptionalDirectySi_SitSgSicSi_SitSicF'
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sS3iIegydd_S2i_SitSgIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> (Int, Int)) -> Optional<(Int, Int)>
-// CHECK:         bb0(%0 : @trivial $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> (Int, Int)):
+// CHECK:         bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> (Int, Int)):
 // CHECK:           [[RESULT:%.*]] = apply %1(%0)
 // CHECK-NEXT:      ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[RESULT]]
 // CHECK-NEXT:      [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Int)
@@ -447,7 +447,7 @@ func convTupleToOptionalDirect(_ f: @escaping (Int) -> (Int, Int)) -> (Int) -> (
 // CHECK-NEXT: } // end sil function '$s19function_conversion27convTupleToOptionalIndirectyx_xtSgxcx_xtxclF'
 
 // CHECK:       sil shared [transparent] [serializable] [reabstraction_thunk] @$sxxxIegnrr_xx_xtSgIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)) -> @out Optional<(T, T)>
-// CHECK:       bb0(%0 : @trivial $*Optional<(T, T)>, %1 : @trivial $*T, %2 : @guaranteed $@callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)):
+// CHECK:       bb0(%0 : $*Optional<(T, T)>, %1 : $*T, %2 : @guaranteed $@callee_guaranteed (@in_guaranteed T) -> (@out T, @out T)):
 // CHECK:         [[OPTIONAL:%.*]] = init_enum_data_addr %0 : $*Optional<(T, T)>, #Optional.some!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[OPTIONAL]] : $*(T, T), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[OPTIONAL]] : $*(T, T), 1

@@ -41,13 +41,13 @@ func PQtoP() {
 
 // CHECK-LABEL: sil hidden @$s19existential_erasure19openExistentialToP1yyAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
-// CHECK: bb0(%0 : @trivial $*P):
+// CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[FUNC:%.*]] = function_ref @$s19existential_erasure12throwingFuncSbyKF
 // CHECK:   try_apply [[FUNC]]()
 //
-// CHECK: bb1([[SUCCESS:%.*]] : @trivial $Bool):
+// CHECK: bb1([[SUCCESS:%.*]] : $Bool):
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.downgrade!1 : {{.*}}, [[OPEN]]
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
@@ -63,7 +63,7 @@ func openExistentialToP1(_ p: P) throws {
 
 // CHECK-LABEL: sil hidden @$s19existential_erasure19openExistentialToP2yyAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
-// CHECK: bb0(%0 : @trivial $*P):
+// CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.upgrade!1 : {{.*}}, [[OPEN]]

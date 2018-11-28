@@ -131,6 +131,6 @@ bb0(%0 : @owned $SwiftGizmo):
 }
 
 sil @$s12objc_dealloc10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
-bb0(%0 : @trivial $Int, %1 : @owned $SwiftGizmo):
+bb0(%0 : $Int, %1 : @owned $SwiftGizmo):
   unreachable
 }

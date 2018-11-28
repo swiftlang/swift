@@ -10,7 +10,7 @@ import ansible
 class Hoozit : Gizmo {
   @objc func typical(_ x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] @$s11objc_thunks6HoozitC7typical_1ySo5GizmoCSi_AGtFTo : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
-  // CHECK: bb0([[X:%.*]] : @trivial $Int, [[Y:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : @unowned $Gizmo, [[THIS:%.*]] : @unowned $Hoozit):
   // CHECK-NEXT:   [[Y_COPY:%.*]] = copy_value [[Y]]
   // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
   // CHECK-NEXT:   [[BORROWED_Y_COPY:%.*]] = begin_borrow [[Y_COPY]]
@@ -41,7 +41,7 @@ class Hoozit : Gizmo {
   // NS_CONSUMED 'gizmo' argument by inheritance
   override class func consume(_ gizmo: Gizmo?) { }
    // CHECK-LABEL: sil hidden [thunk] @$s11objc_thunks6HoozitC7consumeyySo5GizmoCSgFZTo : $@convention(objc_method) (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
-  // CHECK: bb0([[GIZMO:%.*]] : @owned $Optional<Gizmo>, [[THIS:%.*]] : @trivial $@objc_metatype Hoozit.Type):
+  // CHECK: bb0([[GIZMO:%.*]] : @owned $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[BORROWED_GIZMO:%.*]] = begin_borrow [[GIZMO]]
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
   // CHECK:   [[NATIVE:%.*]] = function_ref @$s11objc_thunks6HoozitC7consumeyySo5GizmoCSgFZ : $@convention(method) (@guaranteed Optional<Gizmo>, @thick Hoozit.Type) -> ()
@@ -381,7 +381,7 @@ class Hoozit : Gizmo {
   @objc subscript (i: Int) -> Hoozit {
   // Getter
   // CHECK-LABEL: sil hidden [thunk] @$s11objc_thunks6HoozitCyACSicigTo : $@convention(objc_method) (Int, Hoozit) -> @autoreleased Hoozit
-  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
+  // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Hoozit
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref
@@ -396,7 +396,7 @@ class Hoozit : Gizmo {
 
   // Setter
   // CHECK-LABEL: sil hidden [thunk] @$s11objc_thunks6HoozitCyACSicisTo : $@convention(objc_method) (Hoozit, Int, Hoozit) -> ()
-  // CHECK: bb0([[VALUE:%[0-9]+]] : @unowned $Hoozit, [[I:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
+  // CHECK: bb0([[VALUE:%[0-9]+]] : @unowned $Hoozit, [[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : @unowned $Hoozit):
   // CHECK:   [[VALUE_COPY:%.*]] = copy_value [[VALUE]] : $Hoozit
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Hoozit
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -578,7 +578,7 @@ func testObjCNoescapeThunk() {
 // Noescape verification relies on there not being a retain/release in order to
 // work in the presence of a objective c throwing implementation function.
 // CHECK: sil {{.*}} @$sIeg_IyB_TR
-// CHECK: bb0([[T0:%.*]] : @trivial $*@block_storage @callee_guaranteed () -> ()):
+// CHECK: bb0([[T0:%.*]] : $*@block_storage @callee_guaranteed () -> ()):
 // CHECK-NEXT:  [[T1:%.*]] = project_block_storage [[T0]]
 // CHECK-NEXT:  [[T2:%.*]] = load_borrow [[T1]]
 // CHECK-NEXT:  [[T3:%.*]] = apply [[T2]]()

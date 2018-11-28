@@ -186,7 +186,6 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 // CHECK: Conv: guaranteed
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  Yes. Liveness: MustBeLive
 // CHECK: unowned:  No.
 // CHECK: owned: Yes. Liveness: MustBeInvalidated
 // CHECK: guaranteed:  No.
@@ -214,7 +213,6 @@ bb3:
 // CHECK: Conv: owned
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  Yes. Liveness: MustBeLive
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
 // CHECK: guaranteed: Yes. Liveness: MustBeLive
@@ -269,7 +267,6 @@ bb3:
 // CHECK: Conv: guaranteed
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  No.
 // CHECK: unowned:  No.
 // CHECK: owned: Yes. Liveness: MustBeInvalidated
 // CHECK: guaranteed:  No.
@@ -344,7 +341,6 @@ bb3:
 // CHECK: Conv: owned
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
-// CHECK: trivial:  No.
 // CHECK: unowned:  No.
 // CHECK: owned:  No.
 // CHECK: guaranteed: Yes. Liveness: MustBeLive

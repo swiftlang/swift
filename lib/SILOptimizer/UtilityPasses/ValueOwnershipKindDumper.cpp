@@ -56,20 +56,9 @@ class ValueOwnershipKindDumper : public SILFunctionTransform {
           if (Kind == ValueOwnershipKind::Any)
             continue;
 
-          if (Kind == ValueOwnershipKind::Trivial) {
-            if (auto *EI = dyn_cast<EnumInst>(V)) {
-              checkEnumInstIsTrivial(EI);
-              continue;
-            }
-            SILType Ty = V->getType();
-            if (!Ty.isTrivial(M) && !Ty.isAddress()) {
-              llvm_unreachable("Error! Trivial ownership without trivial type\n");
-            }
-          } else {
-            if (V->getType().isTrivial(M)) {
-              llvm_unreachable(
-                  "Error! Non Trivial ownership with trivial type\n");
-            }
+          if (V->getType().isTrivial(M)) {
+            llvm_unreachable(
+                "Error! Non Trivial ownership with trivial type\n");
           }
         }
       }

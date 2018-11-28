@@ -26,7 +26,7 @@ bb0(%0 : @unowned $Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
 // CHECK-NOT: destroy_value
 // CHECK: return [[ARG1]]
 sil @copyvalue_test2 : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32) -> Builtin.NativeObject {
-bb0(%0 : @unowned $Builtin.NativeObject, %1 : @trivial $*Builtin.Int32):
+bb0(%0 : @unowned $Builtin.NativeObject, %1 : $*Builtin.Int32):
   %2 = copy_value %0 : $Builtin.NativeObject
   %3 = integer_literal $Builtin.Int32, 0
   store %3 to [trivial] %1 : $*Builtin.Int32

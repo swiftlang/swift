@@ -251,7 +251,7 @@ func downcasts(
   derived: Derived,
   baseAndPType: (Base<Int> & P).Type,
   derivedType: Derived.Type) {
-  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : @trivial $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : @trivial $@thick Derived.Type):
+  // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Base<Int> & P, [[ARG1:%.*]] : @guaranteed $Derived, [[ARG2:%.*]] : $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : $@thick Derived.Type):
   // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived
   let _ = baseAndP as? Derived
@@ -338,7 +338,7 @@ func archetypeDowncasts<S,
   baseTAndP_concrete: Base<T> & P,
   baseIntAndP_concrete: Base<Int> & P) {
 
-  // CHECK: ([[ARG0:%.*]] : @trivial $*S, [[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @trivial $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $Derived & R, [[ARG9:%.*]] : @guaranteed $Base<T> & P, [[ARG10:%.*]] : @guaranteed $Base<Int> & P)
+  // CHECK: ([[ARG0:%.*]] : $*S, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*PT, [[ARG3:%.*]] : @guaranteed $BaseT, [[ARG4:%.*]] : @guaranteed $BaseInt, [[ARG5:%.*]] : @guaranteed $BaseTAndP, [[ARG6:%.*]] : @guaranteed $BaseIntAndP, [[ARG7:%.*]] : @guaranteed $DerivedT, [[ARG8:%.*]] : @guaranteed $Derived & R, [[ARG9:%.*]] : @guaranteed $Base<T> & P, [[ARG10:%.*]] : @guaranteed $Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S

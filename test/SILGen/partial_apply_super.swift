@@ -71,7 +71,7 @@ class Child : Parent {
   }
 
   // CHECK-LABEL: sil hidden @$s19partial_apply_super5ChildC25callFinalSuperClassMethodyyFZ : $@convention(method) (@thick Child.Type) -> ()
-  // CHECK: bb0([[ARG:%.*]] : @trivial $@thick Child.Type):
+  // CHECK: bb0([[ARG:%.*]] : $@thick Child.Type):
   // CHECK:   [[CASTED_SELF:%.*]] = upcast [[ARG]] : $@thick Child.Type to $@thick Parent.Type
   // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s19partial_apply_super6ParentC16finalClassMethodyyFZTc : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
   // CHECK:   [[APPLIED_SELF:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()

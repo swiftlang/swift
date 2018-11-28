@@ -507,7 +507,7 @@ func unreachable() {
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins15reinterpretCast_1xBw_AA1DCAA1CCSgAGtAG_BwtF : $@convention(thin) (@guaranteed C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
-// CHECK:       bb0([[ARG1:%.*]] : @guaranteed $C, [[ARG2:%.*]] : @trivial $Builtin.Word):
+// CHECK:       bb0([[ARG1:%.*]] : @guaranteed $C, [[ARG2:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[ARG1_COPY1:%.*]] = copy_value [[ARG1]]
@@ -583,7 +583,7 @@ func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word 
 
 // NativeObject
 // CHECK-LABEL: sil hidden @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Optional<Builtin.NativeObject>):
+// CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Builtin.NativeObject>
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.NativeObject>
 // CHECK: return
@@ -593,7 +593,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // NativeObject nonNull
 // CHECK-LABEL: sil hidden @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.NativeObject):
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.NativeObject
 // CHECK: return
@@ -603,7 +603,7 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 
 // UnknownObject (ObjC)
 // CHECK-LABEL: sil hidden @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Optional<Builtin.UnknownObject>):
+// CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
 // CHECK: return
@@ -613,7 +613,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 
 // UnknownObject (ObjC) nonNull
 // CHECK-LABEL: sil hidden @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.UnknownObject):
+// CHECK: bb0(%0 : $*Builtin.UnknownObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
 // CHECK: return
@@ -623,7 +623,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 
 // BridgeObject nonNull
 // CHECK-LABEL: sil hidden @$s8builtins8isUnique{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.BridgeObject
 // CHECK: return
@@ -633,7 +633,7 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
 
 // BridgeObject nonNull native
 // CHECK-LABEL: sil hidden @$s8builtins15isUnique_native{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*Builtin.BridgeObject):
+// CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
 // CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: return
@@ -731,7 +731,7 @@ func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins19unsafeGuaranteedEnd{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @trivial $Builtin.Int8):
+// CHECK: bb0([[P:%.*]] : $Builtin.Int8):
 // CHECK:   builtin "unsafeGuaranteedEnd"([[P]] : $Builtin.Int8)
 // CHECK:   [[S:%.*]] = tuple ()
 // CHECK:   return [[S]] : $()
@@ -741,7 +741,7 @@ func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins10bindMemory{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @trivial $Builtin.RawPointer, [[I:%.*]] : @trivial $Builtin.Word, [[T:%.*]] : @trivial $@thick T.Type):
+// CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
 // CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
 // CHECK:   return {{%.*}} : $()
 // CHECK: }
@@ -808,7 +808,7 @@ func once(control: Builtin.RawPointer) {
 
 
 // CHECK-LABEL: sil hidden @$s8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
-// CHECK: bb0([[UINT:%.*]] : @trivial $UInt):
+// CHECK: bb0([[UINT:%.*]] : $UInt):
 // CHECK:   [[BI:%.*]] = struct_extract [[UINT]] : $UInt, #UInt._value
 // CHECK:   [[CAST:%.*]] = value_to_bridge_object [[BI]]
 // CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject

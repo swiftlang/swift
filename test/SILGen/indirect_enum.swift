@@ -9,7 +9,7 @@ indirect enum TreeA<T> {
 
 // CHECK-LABEL: sil hidden @$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed TreeA<T>, @guaranteed TreeA<T>) -> () {
 func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
-// CHECK: bb0([[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
+// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeA<T>, #TreeA.Nil!enumelt
 // CHECK-NOT:     destroy_value [[NIL]]
@@ -103,7 +103,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK-LABEL: sil hidden @$s13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF : $@convention(thin) (Int, @guaranteed TreeInt, @guaranteed TreeInt) -> ()
 func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
-// CHECK: bb0([[ARG1:%.*]] : @trivial $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeInt, #TreeInt.Nil!enumelt
 // CHECK-NOT:     destroy_value [[NIL]]
@@ -525,14 +525,14 @@ func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   //
   guard case .Direct(let foo) = x else { return }
 
-  // CHECK: [[YES]]({{%.*}} : @trivial $Int):
+  // CHECK: [[YES]]({{%.*}} : $Int):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   switch_enum [[ARG_COPY]] : $TrivialButIndirect, case #TrivialButIndirect.Indirect!enumelt.1:  [[YES:bb[0-9]+]], case #TrivialButIndirect.Direct!enumelt.1: [[NO2:bb[0-9]+]]
 
   // CHECK: [[YES]]([[BOX:%.*]] : @owned ${ var Int }):
   // CHECK:   destroy_value [[BOX]]
 
-  // CHECK: [[NO2]]({{%.*}} : @trivial $Int):
+  // CHECK: [[NO2]]({{%.*}} : $Int):
   // CHECK-NOT: destroy_value
 
   // CHECK: [[NO]]([[PAYLOAD:%.*]] : @owned ${ var Int }):

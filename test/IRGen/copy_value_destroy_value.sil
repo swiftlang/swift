@@ -16,11 +16,11 @@ struct Foo {
   var t3 : Builtin.Int32
 }
 
-// CHECK: define{{( protected)?}} swiftcc void @trivial(
+// CHECK: define{{( protected)?}} swiftcc void @trivial_arg(
 // CHECK-NEXT: entry
 // CHECK-NEXT: ret void
-sil @trivial : $@convention(thin) (Builtin.Int32) -> () {
-bb0(%0 : @trivial $Builtin.Int32):
+sil @trivial_arg : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
   %1 = copy_value %0 : $Builtin.Int32
   destroy_value %1 : $Builtin.Int32
   %2 = tuple()

@@ -220,9 +220,9 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
   if (getType().isTrivial(SGF.F.getModule()))
     return true;
 
-  // If we have an object and the object has trivial ownership, the same
+  // If we have an object and the object has any ownership, the same
   // property applies.
-  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Trivial)
+  if (getType().isObject() && getOwnershipKind() == ValueOwnershipKind::Any)
     return true;
 
   return hasCleanup();

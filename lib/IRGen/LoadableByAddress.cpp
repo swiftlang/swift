@@ -1326,7 +1326,7 @@ SILArgument *LoadableStorageAllocation::replaceArgType(SILBuilder &argBuilder,
                    arg) == pass.largeLoadableArgs.end());
 
   arg = arg->getParent()->replaceFunctionArgument(
-      arg->getIndex(), newSILType, ValueOwnershipKind::Trivial, arg->getDecl());
+      arg->getIndex(), newSILType, ValueOwnershipKind::Any, arg->getDecl());
 
   copyArg->replaceAllUsesWith(arg);
   copyArg->eraseFromParent();
@@ -1352,7 +1352,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
       ctx.getIdentifier("$return_value"),
       pass.F->getDeclContext());
   pass.F->begin()->insertFunctionArgument(0, resultStorageType.getAddressType(),
-                                          ValueOwnershipKind::Trivial, var);
+                                          ValueOwnershipKind::Any, var);
 }
 
 void LoadableStorageAllocation::convertIndirectFunctionArgs() {

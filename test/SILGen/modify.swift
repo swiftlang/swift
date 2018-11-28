@@ -59,7 +59,7 @@ protocol Abstractable {
 extension Derived : Abstractable {}
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$s6modify7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycvMTW
-// CHECK: bb0(%0 : @trivial $*Derived):
+// CHECK: bb0(%0 : $*Derived):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %0 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!modify.1
@@ -84,7 +84,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$s6modify7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycvMTW
-// CHECK: bb0(%0 : @trivial $*Derived):
+// CHECK: bb0(%0 : $*Derived):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %0 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
 // CHECK-NEXT: // function_ref
@@ -110,7 +110,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$s6modify7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycvMZTW
-// CHECK: bb0(%0 : @trivial $@thick Derived.Type):
+// CHECK: bb0(%0 : $@thick Derived.Type):
 // CHECK-NEXT: [[SELF:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[FN:%.*]] = function_ref @$s6modify4BaseC14staticFunctionSiycvMZ
@@ -283,7 +283,7 @@ struct Bill : Totalled {
 }
 
 // CHECK-LABEL: sil hidden [transparent] @$s6modify4BillV5totalSivM : $@yield_once @convention(method) (@inout Bill) -> @yields @inout Int {
-// CHECK: bb0([[SELF:%.*]] : @trivial $*Bill):
+// CHECK: bb0([[SELF:%.*]] : $*Bill):
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
 // CHECK:   [[T0:%.*]] = struct_element_addr [[ACCESS]] : $*Bill, #Bill.total
 // CHECK:   yield [[T0]]
@@ -291,7 +291,7 @@ struct Bill : Totalled {
 // CHECK: }
 
 // CHECK-LABEL:  sil private [transparent] [thunk] @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW : $@yield_once @convention(witness_method: Totalled) (@inout Bill) -> @yields @inout Int {
-// CHECK:        bb0([[SELF:%.*]] : @trivial $*Bill):
+// CHECK:        bb0([[SELF:%.*]] : $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @$s6modify4BillV5totalSivM
 // CHECK-NEXT:     ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[SELF]])
 // CHECK-NEXT:     yield [[T1]] : $*Int, resume bb1, unwind bb2

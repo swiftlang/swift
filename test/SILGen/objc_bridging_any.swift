@@ -475,7 +475,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  return [[RESULT]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$syXlIyBy_ypIegn_TR
-  // CHECK:     bb0([[ANY:%.*]] : @trivial $*Any, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (AnyObject) -> ()):
+  // CHECK:     bb0([[ANY:%.*]] : $*Any, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (AnyObject) -> ()):
   // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
 	// CHECK:   [[TMP:%.*]] = alloc_stack
   // CHECK:   copy_addr [[OPENED_ANY]] to [initialization] [[TMP]]
@@ -513,7 +513,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  return [[BLOCK]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sypIegn_yXlIeyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> (), AnyObject) -> ()
-  // CHECK:     bb0([[BLOCK_STORAGE:%.*]] : @trivial $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> (), [[ANY:%.*]] : @unowned $AnyObject):
+  // CHECK:     bb0([[BLOCK_STORAGE:%.*]] : $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> (), [[ANY:%.*]] : @unowned $AnyObject):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[ANY_COPY:%.*]] = copy_value [[ANY]]
@@ -554,7 +554,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  return [[RESULT]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$syXlIyBa_ypIegr_TR : $@convention(thin) (@guaranteed @convention(block) @noescape () -> @autoreleased AnyObject) -> @out Any
-  // CHECK:     bb0([[ANY_ADDR:%.*]] : @trivial $*Any, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape () -> @autoreleased AnyObject):
+  // CHECK:     bb0([[ANY_ADDR:%.*]] : $*Any, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape () -> @autoreleased AnyObject):
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BLOCK]]()
   // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[BRIDGED]]
   // CHECK-NEXT:  // function_ref
@@ -591,7 +591,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  return [[BLOCK]]
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sypIegr_yXlIeyBa_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> @out Any) -> @autoreleased AnyObject
-  // CHECK:     bb0(%0 : @trivial $*@block_storage @callee_guaranteed () -> @out Any):
+  // CHECK:     bb0(%0 : $*@block_storage @callee_guaranteed () -> @out Any):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage %0
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
@@ -640,7 +640,7 @@ func dynamicLookup(x: AnyObject) {
 extension GenericClass {
   // CHECK-LABEL: sil hidden @$sSo12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasure1xypx_tF :
   @objc func pseudogenericAnyErasure(x: T) -> Any {
-    // CHECK: bb0([[ANY_OUT:%.*]] : @trivial $*Any, [[ARG:%.*]] : @guaranteed $T, [[SELF:%.*]] : @guaranteed $GenericClass<T>
+    // CHECK: bb0([[ANY_OUT:%.*]] : $*Any, [[ARG:%.*]] : @guaranteed $T, [[SELF:%.*]] : @guaranteed $GenericClass<T>
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[ARG_COPY]] : $T : $T, $AnyObject
     // CHECK:   [[ANY_BUF:%.*]] = init_existential_addr [[ANY_OUT]] : $*Any, $AnyObject
