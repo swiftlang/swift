@@ -22,7 +22,7 @@ SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 SYNTAX_CLASSIFICATIONS = Classification.SYNTAX_CLASSIFICATIONS
 
-verify_syntax_node_serialization_codes(SYNTAX_NODES, 
+verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)
 
 

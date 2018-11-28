@@ -223,7 +223,7 @@ def obtain_additional_swift_sources(pool_args):
         print("Cloning '" + repo_name + "'")
 
         if skip_history:
-            shell.run(['git', 'clone', '--recursive', '--depth', '1', 
+            shell.run(['git', 'clone', '--recursive', '--depth', '1',
                        '--branch', repo_branch, remote, repo_name],
                       echo=True)
         else:
@@ -536,7 +536,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     # Quick check whether somebody is calling update in an empty directory
     directory_contents = os.listdir(SWIFT_SOURCE_ROOT)
-    if not ('cmark' in directory_contents or 
+    if not ('cmark' in directory_contents or
             'llvm' in directory_contents or
             'clang' in directory_contents):
         print("You don't have all swift sources. "

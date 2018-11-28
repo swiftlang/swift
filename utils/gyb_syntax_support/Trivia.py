@@ -3,7 +3,7 @@ from kinds import lowercase_first_word
 
 
 class Trivia(object):
-    def __init__(self, name, comment, serialization_code, characters=[], 
+    def __init__(self, name, comment, serialization_code, characters=[],
                  swift_characters=[], is_new_line=False, is_comment=False):
         self.name = name
         self.comment = comment
@@ -27,12 +27,12 @@ class Trivia(object):
 
 
 TRIVIAS = [
-    Trivia('Space', 'A space \' \' character.', characters=[' '], 
+    Trivia('Space', 'A space \' \' character.', characters=[' '],
            serialization_code=0),
-    Trivia('Tab', 'A tab \'\\t\' character.', characters=['\\t'], 
+    Trivia('Tab', 'A tab \'\\t\' character.', characters=['\\t'],
            serialization_code=1),
     Trivia('VerticalTab', 'A vertical tab \'\\v\' character.',
-           characters=['\\v'], swift_characters=['\\u{2B7F}'], 
+           characters=['\\v'], swift_characters=['\\u{2B7F}'],
            serialization_code=2),
     Trivia('Formfeed', 'A form-feed \'f\' character.', characters=['\\f'],
            swift_characters=['\\u{240C}'], serialization_code=3),
@@ -67,7 +67,7 @@ def verify_no_duplicate_serialization_codes(trivias):
     used_codes = set()
     for trivia in trivias:
         if trivia.serialization_code in used_codes:
-            error("Serialization code %d used twice for trivia" % 
+            error("Serialization code %d used twice for trivia" %
                   trivia.serialization_code)
         used_codes.add(trivia.serialization_code)
 

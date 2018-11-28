@@ -8,7 +8,7 @@ class Token(object):
     Represents the specification for a Token in the TokenSyntax file.
     """
 
-    def __init__(self, name, kind, serialization_code, unprefixed_kind=None, 
+    def __init__(self, name, kind, serialization_code, unprefixed_kind=None,
                  text=None, classification='None', is_keyword=False):
         self.name = name
         self.kind = kind
@@ -33,10 +33,10 @@ class Keyword(Token):
     Represents a keyword token.
     """
 
-    def __init__(self, name, text, serialization_code, 
+    def __init__(self, name, text, serialization_code,
                  classification='Keyword'):
-        Token.__init__(self, name, 'kw_' + text, serialization_code, 
-                       unprefixed_kind=text, text=text,  
+        Token.__init__(self, name, 'kw_' + text, serialization_code,
+                       unprefixed_kind=text, text=text,
                        classification=classification, is_keyword=True)
 
     def macro_name(self):
@@ -74,10 +74,10 @@ class SilKeyword(Keyword):
 
 
 class PoundKeyword(Token):
-    def __init__(self, name, kind, text, serialization_code, 
+    def __init__(self, name, kind, text, serialization_code,
                  classification='Keyword'):
         Token.__init__(self, name, 'pound_' + kind, serialization_code,
-                       unprefixed_kind=kind, text=text,  
+                       unprefixed_kind=kind, text=text,
                        classification=classification, is_keyword=True)
 
     def macro_name(self):
@@ -85,9 +85,9 @@ class PoundKeyword(Token):
 
 
 class PoundObjectLiteral(PoundKeyword):
-    def __init__(self, name, kind, text, serialization_code, description, 
+    def __init__(self, name, kind, text, serialization_code, description,
                  protocol, classification='ObjectLiteral'):
-        PoundKeyword.__init__(self, name, kind, text, serialization_code, 
+        PoundKeyword.__init__(self, name, kind, text, serialization_code,
                               classification)
         self.description = description
         self.protocol = protocol
@@ -102,9 +102,9 @@ class PoundConfig(PoundKeyword):
 
 
 class PoundDirectiveKeyword(PoundKeyword):
-    def __init__(self, name, kind, text, serialization_code, 
+    def __init__(self, name, kind, text, serialization_code,
                  classification='PoundDirectiveKeyword'):
-        PoundKeyword.__init__(self, name, kind, text, serialization_code, 
+        PoundKeyword.__init__(self, name, kind, text, serialization_code,
                               classification)
 
     def macro_name(self):
@@ -112,9 +112,9 @@ class PoundDirectiveKeyword(PoundKeyword):
 
 
 class PoundConditionalDirectiveKeyword(PoundDirectiveKeyword):
-    def __init__(self, name, kind, text, serialization_code, 
+    def __init__(self, name, kind, text, serialization_code,
                  classification='PoundDirectiveKeyword'):
-        PoundKeyword.__init__(self, name, kind, text, serialization_code, 
+        PoundKeyword.__init__(self, name, kind, text, serialization_code,
                               classification)
 
     def macro_name(self):
@@ -133,7 +133,7 @@ class Literal(Token):
 
 class Misc(Token):
     def macro_name(self):
-        return "MISC"    
+        return "MISC"
 
 
 SYNTAX_TOKENS = [
@@ -211,56 +211,56 @@ SYNTAX_TOKENS = [
     Punctuator('RightParen', 'r_paren', text=')', serialization_code=89),
     Punctuator('LeftBrace', 'l_brace', text='{', serialization_code=90),
     Punctuator('RightBrace', 'r_brace', text='}', serialization_code=91),
-    Punctuator('LeftSquareBracket', 'l_square', text='[', 
+    Punctuator('LeftSquareBracket', 'l_square', text='[',
                serialization_code=92),
-    Punctuator('RightSquareBracket', 'r_square', text=']', 
+    Punctuator('RightSquareBracket', 'r_square', text=']',
                serialization_code=93),
     Punctuator('LeftAngle', 'l_angle', text='<', serialization_code=94),
     Punctuator('RightAngle', 'r_angle', text='>', serialization_code=95),
 
     Punctuator('Period', 'period', text='.', serialization_code=85),
-    Punctuator('PrefixPeriod', 'period_prefix', text='.', 
+    Punctuator('PrefixPeriod', 'period_prefix', text='.',
                serialization_code=87),
     Punctuator('Comma', 'comma', text=',', serialization_code=84),
     Punctuator('Colon', 'colon', text=':', serialization_code=82),
     Punctuator('Semicolon', 'semi', text=';', serialization_code=83),
     Punctuator('Equal', 'equal', text='=', serialization_code=86),
-    Punctuator('AtSign', 'at_sign', text='@', classification='Attribute', 
+    Punctuator('AtSign', 'at_sign', text='@', classification='Attribute',
                serialization_code=80),
     Punctuator('Pound', 'pound', text='#', serialization_code=81),
 
-    Punctuator('PrefixAmpersand', 'amp_prefix', text='&', 
+    Punctuator('PrefixAmpersand', 'amp_prefix', text='&',
                serialization_code=96),
     Punctuator('Arrow', 'arrow', text='->', serialization_code=78),
 
 
     Punctuator('Backtick', 'backtick', text='`', serialization_code=79),
 
-    Punctuator('Backslash', 'backslash', text='\\\\', serialization_code=100),    
+    Punctuator('Backslash', 'backslash', text='\\\\', serialization_code=100),
 
-    Punctuator('ExclamationMark', 'exclaim_postfix', text='!', 
+    Punctuator('ExclamationMark', 'exclaim_postfix', text='!',
                serialization_code=99),
 
-    Punctuator('PostfixQuestionMark', 'question_postfix', text='?', 
+    Punctuator('PostfixQuestionMark', 'question_postfix', text='?',
                serialization_code=97),
-    Punctuator('InfixQuestionMark', 'question_infix', text='?', 
+    Punctuator('InfixQuestionMark', 'question_infix', text='?',
                serialization_code=98),
 
-    Punctuator('StringQuote', 'string_quote', text='\\\"', 
+    Punctuator('StringQuote', 'string_quote', text='\\\"',
                classification='StringLiteral', serialization_code=102),
     Punctuator('MultilineStringQuote', 'multiline_string_quote',
-               text='\\\"\\\"\\\"', classification='StringLiteral', 
+               text='\\\"\\\"\\\"', classification='StringLiteral',
                serialization_code=103),
 
     # Keywords prefixed with a '#'.
 
-    PoundKeyword('PoundKeyPath', 'keyPath', text='#keyPath', 
+    PoundKeyword('PoundKeyPath', 'keyPath', text='#keyPath',
                  serialization_code=74),
-    PoundKeyword('PoundLine', 'line', text='#line', 
+    PoundKeyword('PoundLine', 'line', text='#line',
                  serialization_code=69),
     PoundKeyword('PoundSelector', 'selector', text='#selector',
                  serialization_code=73),
-    PoundKeyword('PoundFile', 'file', text='#file', 
+    PoundKeyword('PoundFile', 'file', text='#file',
                  serialization_code=68),
     PoundKeyword('PoundColumn', 'column', text='#column',
                  serialization_code=70),
@@ -273,60 +273,60 @@ SYNTAX_TOKENS = [
 
     PoundDirectiveKeyword('PoundSourceLocation', 'sourceLocation',
                           text='#sourceLocation', serialization_code=65),
-    PoundDirectiveKeyword('PoundWarning', 'warning', text='#warning', 
+    PoundDirectiveKeyword('PoundWarning', 'warning', text='#warning',
                           serialization_code=66),
-    PoundDirectiveKeyword('PoundError', 'error', text='#error', 
+    PoundDirectiveKeyword('PoundError', 'error', text='#error',
                           serialization_code=67),
 
     PoundConditionalDirectiveKeyword('PoundIf', 'if', text='#if',
                                      serialization_code=64),
     PoundConditionalDirectiveKeyword('PoundElse', 'else', text='#else',
                                      serialization_code=62),
-    PoundConditionalDirectiveKeyword('PoundElseif', 'elseif', 
+    PoundConditionalDirectiveKeyword('PoundElseif', 'elseif',
                                      text='#elseif', serialization_code=63),
-    PoundConditionalDirectiveKeyword('PoundEndif', 'endif', 
+    PoundConditionalDirectiveKeyword('PoundEndif', 'endif',
                                      text='#endif', serialization_code=61),
 
     PoundConfig('PoundAvailable', 'available', text='#available',
                 serialization_code=60),
 
-    PoundObjectLiteral('PoundFileLiteral', 'fileLiteral', 
-                       text='#fileLiteral', serialization_code=76, 
-                       description='file reference', 
+    PoundObjectLiteral('PoundFileLiteral', 'fileLiteral',
+                       text='#fileLiteral', serialization_code=76,
+                       description='file reference',
                        protocol='ExpressibleByFileReferenceLiteral'),
-    PoundObjectLiteral('PoundImageLiteral', 'imageLiteral', 
-                       text='#imageLiteral', serialization_code=77, 
-                       description='image', 
+    PoundObjectLiteral('PoundImageLiteral', 'imageLiteral',
+                       text='#imageLiteral', serialization_code=77,
+                       description='image',
                        protocol='ExpressibleByImageLiteral'),
-    PoundObjectLiteral('PoundColorLiteral', 'colorLiteral', 
+    PoundObjectLiteral('PoundColorLiteral', 'colorLiteral',
                        text='#colorLiteral', serialization_code=75,
-                       description='color', 
+                       description='color',
                        protocol='ExpressibleByColorLiteral'),
 
-    Literal('IntegerLiteral', 'integer_literal', 
+    Literal('IntegerLiteral', 'integer_literal',
             classification='IntegerLiteral', serialization_code=111),
-    Literal('FloatingLiteral', 'floating_literal', 
+    Literal('FloatingLiteral', 'floating_literal',
             classification='FloatingLiteral', serialization_code=112),
     Literal('StringLiteral', 'string_literal',
             classification='StringLiteral', serialization_code=113),
 
     Misc('Unknown', 'unknown', serialization_code=115),
-    Misc('Identifier', 'identifier', classification=None, 
+    Misc('Identifier', 'identifier', classification=None,
          serialization_code=105),
-    Misc('UnspacedBinaryOperator', 'oper_binary_unspaced', 
+    Misc('UnspacedBinaryOperator', 'oper_binary_unspaced',
          serialization_code=107),
     Misc('SpacedBinaryOperator', 'oper_binary_spaced', serialization_code=108),
     Misc('PostfixOperator', 'oper_postfix', serialization_code=110),
     Misc('PrefixOperator', 'oper_prefix', serialization_code=109),
-    Misc('DollarIdentifier', 'dollarident', classification='DollarIdentifier', 
+    Misc('DollarIdentifier', 'dollarident', classification='DollarIdentifier',
          serialization_code=106),
 
-    Misc('ContextualKeyword', 'contextual_keyword', classification='Keyword', 
+    Misc('ContextualKeyword', 'contextual_keyword', classification='Keyword',
          serialization_code=114),
-    Misc('StringSegment', 'string_segment', classification='StringLiteral', 
+    Misc('StringSegment', 'string_segment', classification='StringLiteral',
          serialization_code=104),
     Misc('StringInterpolationAnchor', 'string_interpolation_anchor',
-         text=')', classification='StringInterpolationAnchor', 
+         text=')', classification='StringInterpolationAnchor',
          serialization_code=101),
     Misc('Yield', 'kw_yield', serialization_code=116, text='yield'),
 
@@ -339,7 +339,7 @@ def verify_no_duplicate_serialization_codes(tokens):
     used_codes = set()
     for token in tokens:
         if token.serialization_code in used_codes:
-            error("Serialization code %d used twice for tokens" % 
+            error("Serialization code %d used twice for tokens" %
                   token.serialization_code)
         used_codes.add(token.serialization_code)
 
