@@ -101,6 +101,10 @@ public func compare_FauxtingPoint<T:FauxtingPoint>(_ x: T, _ y: T) -> Bool {
   return x .< y
 }
 
+public func compare_BinaryFauxtingPoint<T:BinaryFauxtingPoint>(_ x: T, _ y: T) -> Bool {
+  return x .< y
+}
+
 public func compare_Fauxts(_ x: Fauxt, _ y: Fauxt) -> Bool {
   return x .< y
 }
@@ -135,4 +139,15 @@ public func main() {
   assert(!compare_Fauxts(Fauxt.nan, Fauxt.one))
   assert(comparedAsFauxtsCount == 3)
   // CHECK: compared as Fauxts
+
+  assert(compare_BinaryFauxtingPoint(Fauxt.one, Fauxt.two))
+  assert(comparedAsFauxtsCount == 4)
+  // CHECK: compared as Fauxts
+  assert(!compare_BinaryFauxtingPoint(Fauxt.one, Fauxt.nan))
+  assert(comparedAsFauxtsCount == 5)
+  // CHECK: compared as Fauxts
+  assert(!compare_BinaryFauxtingPoint(Fauxt.nan, Fauxt.one))
+  assert(comparedAsFauxtsCount == 6)
+  // CHECK: compared as Fauxts
+
 }
