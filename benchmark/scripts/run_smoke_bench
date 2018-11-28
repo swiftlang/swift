@@ -355,7 +355,7 @@ def check_added(args, output_file=None):
     added = set(new.tests).difference(set(old.tests))
     new.tests = list(added)
     doctor = BenchmarkDoctor(args, driver=new)
-    if output_file:
+    if added and output_file:
         doctor.log.addHandler(MarkdownReportHandler(output_file))
     doctor.check()
 
