@@ -13,8 +13,10 @@
 public var comparedAsCauxmparablesCount : Int = 0
 public var comparedAsFauxtsCount : Int = 0
 
+infix operator  .<  : ComparisonPrecedence
+
 public protocol Cauxmparable {
-  static func < (lhs: Self, rhs: Self) -> Bool
+  static func .< (lhs: Self, rhs: Self) -> Bool
 }
 
 public protocol FauxtingPoint : Cauxmparable {
@@ -28,8 +30,8 @@ public protocol BinaryFauxtingPoint: FauxtingPoint {
 }
 
 public extension BinaryFauxtingPoint {
-  // This version of < will be called in a context that only knows it has a Cauxmparable.
-  @_implements(Cauxmparable, <(_:_:))
+  // This version of .< will be called in a context that only knows it has a Cauxmparable.
+  @_implements(Cauxmparable, .<(_:_:))
   static func _CauxmparableLessThan(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
     print("compared as Cauxmparables")
     comparedAsCauxmparablesCount += 1
@@ -74,11 +76,11 @@ extension Fauxt: BinaryFauxtingPoint {
 }
 
 public extension Fauxt {
-  // This version of < will be called in a context that knows it has a Fauxt.
+  // This version of .< will be called in a context that knows it has a Fauxt.
   // It is inside an extension of Fauxt rather than the declaration of Fauxt
   // itself in order to avoid a warning about near-matches with the defaulted
-  // requirement from Cauxmparable.< up above.
-  static func <(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
+  // requirement from Cauxmparable..< up above.
+  static func .<(_ lhs: Fauxt, _ rhs: Fauxt) -> Bool {
     print("compared as Fauxts")
     comparedAsFauxtsCount += 1
     if lhs.state == .Nan || rhs.state == .Nan {
@@ -90,15 +92,15 @@ public extension Fauxt {
 }
 
 public func compare_Cauxmparables<T:Cauxmparable>(_ x: T, _ y: T) -> Bool {
-  return x < y
+  return x .< y
 }
 
 public func compare_FauxtingPoint<T:FauxtingPoint>(_ x: T, _ y: T) -> Bool {
-  return x < y
+  return x .< y
 }
 
 public func compare_Fauxts(_ x: Fauxt, _ y: Fauxt) -> Bool {
-  return x < y
+  return x .< y
 }
 
 public func main() {
