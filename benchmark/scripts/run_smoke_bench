@@ -83,11 +83,10 @@ def main():
     argparser.add_argument(
         'newbuilddir', nargs=1, type=str,
         help='new benchmark build directory')
-    argparser.set_defaults(func=test_opt_levels)
     args = argparser.parse_args()
     VERBOSE = args.verbose
 
-    return args.func(args)
+    return test_opt_levels(args)
 
 
 def test_opt_levels(args):
