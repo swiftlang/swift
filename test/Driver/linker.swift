@@ -49,6 +49,12 @@
 // RUN: %swiftc_driver -driver-print-jobs -target armv7-unknown-linux-gnueabihf -Xlinker -rpath -Xlinker customrpath -L foo %s 2>&1 > %t.linux.txt
 // RUN: %FileCheck -check-prefix LINUX-linker-order %s < %t.linux.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.linux.txt
+// RUN: %FileCheck -check-prefix LINUX-clang-linker-order %s < %t.linux.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Xclang-linker -foo -Xclang-linker foopath %s 2>&1 > %t.windows.txt
+// RUN: %FileCheck -check-prefix WINDOWS-clang-linker-order %s < %t.windows.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | %FileCheck -check-prefix DEBUG %s
 
 // RUN: %empty-directory(%t)
@@ -310,6 +316,20 @@
 // LINUX-linker-order: -Xlinker -rpath -Xlinker customrpath
 // LINUX-linker-order: -o {{.*}}
 
+// LINUX-clang-linker-order: swift
+// LINUX-clang-linker-order: -o [[OBJECTFILE:.*]]
+
+// LINUX-clang-linker-order: clang++{{"? }}
+// LINUX-clang-linker-order: -foo foopath
+// LINUX-clang-linker-order: -o {{.*}}
+
+// WINDOWS-clang-linker-order: swift
+// WINDOWS-clang-linker-order: -o [[OBJECTFILE:.*]]
+
+// WINDOWS-clang-linker-order: clang++{{"? }}
+// WINDOWS-clang-linker-order: -foo foopath
+// WINDOWS-clang-linker-order: -o {{.*}}
+
 // DEBUG: bin/swift
 // DEBUG-NEXT: bin/swift
 // DEBUG-NEXT: bin/ld{{"? }}
@@ -390,4 +410,3 @@
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
-
