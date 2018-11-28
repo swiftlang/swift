@@ -77,7 +77,8 @@ class Block(object):
                 for match in re.finditer(r'\bbb[0-9]+\b', self.last_line):
                     self.succs.append(match.group())
 
-                for match in re.finditer(r'\blabel %(\S+)\b', self.last_line):
+                it = re.finditer(r'\blabel %"?([^\s"]+)\b', self.last_line)
+                for match in it:
                     self.succs.append(match.group(1))
 
         return self.succs
@@ -95,7 +96,7 @@ def main():
     block_map = {}
     cur_block = None
     sil_block_pattern = re.compile(r'^(\S+)(\(.*\))?: *(\/\/ *Preds:(.*))?$')
-    llvm_block_pattern1 = re.compile(r'^(\S+): *; *preds =(.*)?$')
+    llvm_block_pattern1 = re.compile(r'^"?([^\s"]+)"?: *; *preds =(.*)?$')
     llvm_block_pattern2 = re.compile(r'^; <label>:(\d+):? *; *preds =(.*)?$')
 
     # Scan the input file.
