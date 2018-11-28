@@ -53,3 +53,33 @@ bb0(%0 : $A<A<T>>, %1 : $A<T>):
   %2 = tuple ()
   return %2 : $()
 }
+
+protocol A2 {
+  associatedtype AssocTy
+}
+
+protocol C {
+}
+
+extension A2 where Self.AssocTy : C {
+}
+
+class K<T> : A2 where T : C {
+  typealias AssocTy = T
+}
+
+sil @callee : $@convention(method) <τ_0_0 where τ_0_0 : A2, τ_0_0.AssocTy : C> (@in_guaranteed τ_0_0) -> ()
+
+// CHECK-LABEL: define swiftcc void @caller(%T11fulfillment1KC** {{.*}}, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK: entry:
+// CHECK:   %1 = bitcast %swift.type* %Self to i8***
+// CHECK:   %2 = getelementptr inbounds i8**, i8*** %1, i64 11
+// CHECK:   %"\CF\84_1_0.C" = load i8**, i8*** %2
+// CHECK:   call swiftcc void @callee(%swift.type* %Self, i8** %SelfWitnessTable, i8** %"\CF\84_1_0.C"
+sil @caller : $@convention(witness_method: A2) <τ_0_0><τ_1_0 where τ_0_0 : K<τ_1_0>, τ_1_0 : C> (@in_guaranteed τ_0_0) -> () {
+bb0(%0 : $*τ_0_0):
+  %1 = function_ref @callee : $@convention(method) <τ_0_0 where τ_0_0 : A2, τ_0_0.AssocTy : C> (@in_guaranteed τ_0_0) -> ()
+  %2 = apply %1<τ_0_0>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : A2, τ_0_0.AssocTy : C> (@in_guaranteed τ_0_0) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
