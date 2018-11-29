@@ -2055,6 +2055,9 @@ public:
 
   /// Emit the RValue.
   Optional<RValue> emit(SILGenFunction &SGF) {
+    // For now, never do this.
+    return None;
+
     // If we don't have a class or a struct, bail.
     if (!isa<ClassDecl>(Base) && !isa<StructDecl>(Base))
       return None;
