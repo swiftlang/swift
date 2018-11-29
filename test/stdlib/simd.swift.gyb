@@ -167,14 +167,6 @@ simdTestSuite.test("vector elements") {
 // ----
 %       vectype = ctype[type] + str(size)
 
-extension ${vectype}: Equatable {}
-public func ==(a: ${vectype}, b: ${vectype}) -> Bool {
-% for i in xrange(0, size):
-  if (a${component[i]} != b${component[i]}) { return false }
-% end
-  return true
-}
-
 simdTestSuite.test("${vectype} wrapping arithmetic") {
 
   expectEqual(${vectype}(.max) &+ ${vectype}(1),
@@ -194,30 +186,6 @@ simdTestSuite.test("${vectype} wrapping arithmetic") {
 %     end
 %   end
 % end
-
-
-simdTestSuite.test("vector debugDescription") {
-  var f2 = float2(1, 2)
-  expectEqual("float2(1.0, 2.0)", f2.debugDescription)
-  var f3 = float3(1, 2, 3)
-  expectEqual("float3(1.0, 2.0, 3.0)", f3.debugDescription)
-  var f4 = float4(1, 2, 3, 4)
-  expectEqual("float4(1.0, 2.0, 3.0, 4.0)", f4.debugDescription)
-
-  var d2 = double2(1, 2)
-  expectEqual("double2(1.0, 2.0)", d2.debugDescription)
-  var d3 = double3(1, 2, 3)
-  expectEqual("double3(1.0, 2.0, 3.0)", d3.debugDescription)
-  var d4 = double4(1, 2, 3, 4)
-  expectEqual("double4(1.0, 2.0, 3.0, 4.0)", d4.debugDescription)
-
-  var i2 = int2(1, 2)
-  expectEqual("int2(1, 2)", i2.debugDescription)
-  var i3 = int3(1, 2, 3)
-  expectEqual("int3(1, 2, 3)", i3.debugDescription)
-  var i4 = int4(1, 2, 3, 4)
-  expectEqual("int4(1, 2, 3, 4)", i4.debugDescription)
-}
 
 simdTestSuite.test("vector distance") {
 % for type in float_types:
