@@ -1,8 +1,8 @@
-add_swift_target_library(swiftSwiftPrivatePthreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftSwiftPrivateThreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
-  SwiftPrivatePthreadExtras.swift
-  PthreadBarriers.swift
+  SwiftPrivateThreadExtras.swift
+  ThreadBarriers.swift
 
   SWIFT_MODULE_DEPENDS_IOS Darwin
   SWIFT_MODULE_DEPENDS_OSX Darwin
@@ -13,6 +13,5 @@ add_swift_target_library(swiftSwiftPrivatePthreadExtras ${SWIFT_STDLIB_LIBRARY_B
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_COMPILE_FLAGS
-  TARGET_SDKS ALL_POSIX_PLATFORMS
   INSTALL_IN_COMPONENT stdlib-experimental)
 

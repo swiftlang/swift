@@ -12,7 +12,7 @@
 
 
 import SwiftPrivate
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

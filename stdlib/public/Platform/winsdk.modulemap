@@ -1,0 +1,34 @@
+//===--- WinSDK.modulemap -------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module WinSDK [system] [extern_c] {
+  module core {
+    // api-ms-win-core-handle-l1-1-0.dll
+    module handle {
+      header "handleapi.h"
+      export *
+    }
+
+    // api-ms-win-core-processthreads-l1-1-2.dll
+    module processthreads {
+      header "processthreadsapi.h"
+      export *
+    }
+
+    // api-ms-win-core-synch-l1-2-0.dll
+    module synch {
+      header "synchapi.h"
+      export *
+    }
+  }
+}
+

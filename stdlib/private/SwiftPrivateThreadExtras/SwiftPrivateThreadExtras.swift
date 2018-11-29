@@ -1,4 +1,4 @@
-//===--- SwiftPrivatePthreadExtras.swift ----------------------------------===//
+//===--- SwiftPrivateThreadExtras.swift ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,18 +19,21 @@
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
 #endif
 
 /// An abstract base class to encapsulate the context necessary to invoke
 /// a block from pthread_create.
-internal class PthreadBlockContext {
+internal class ThreadBlockContext {
   /// Execute the block, and return an `UnsafeMutablePointer` to memory
   /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
   /// block.
   func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
 }
 
-internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
+internal class ThreadBlockContextImpl<Argument, Result>: ThreadBlockContext {
   let block: (Argument) -> Result
   let arg: Argument
 
@@ -52,39 +55,17 @@ internal func invokeBlockContext(
   _ contextAsVoidPointer: UnsafeMutableRawPointer?
 ) -> UnsafeMutableRawPointer! {
   // The context is passed in +1; we're responsible for releasing it.
-  let context = Unmanaged<PthreadBlockContext>
+  let context = Unmanaged<ThreadBlockContext>
     .fromOpaque(contextAsVoidPointer!)
     .takeRetainedValue()
 
   return context.run()
 }
 
-#if os(Cygwin) || os(FreeBSD) || os(Haiku)
-public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t?>
+#if os(Windows)
+public typealias ThreadHandle = HANDLE
 #else
-public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t>
-#endif
-
-/// Block-based wrapper for `pthread_create`.
-public func _stdlib_pthread_create_block<Argument, Result>(
-  _ attr: _stdlib_pthread_attr_t?,
-  _ start_routine: @escaping (Argument) -> Result,
-  _ arg: Argument
-) -> (CInt, pthread_t?) {
-  let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
-  // We hand ownership off to `invokeBlockContext` through its void context
-  // argument.
-  let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
-
-  var threadID = _make_pthread_t()
-  let result = pthread_create(&threadID, attr,
-    { invokeBlockContext($0) }, contextAsVoidPointer)
-  if result == 0 {
-    return (result, threadID)
-  } else {
-    return (result, nil)
-  }
-}
+public typealias ThreadHandle = pthread_t
 
 #if os(Linux) || os(Android)
 internal func _make_pthread_t() -> pthread_t {
@@ -95,12 +76,61 @@ internal func _make_pthread_t() -> pthread_t? {
   return nil
 }
 #endif
+#endif
+
+/// Block-based wrapper for `pthread_create`.
+public func _stdlib_thread_create_block<Argument, Result>(
+  _ start_routine: @escaping (Argument) -> Result,
+  _ arg: Argument
+) -> (CInt, ThreadHandle?) {
+  let context = ThreadBlockContextImpl(block: start_routine, arg: arg)
+  // We hand ownership off to `invokeBlockContext` through its void context
+  // argument.
+  let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
+
+#if os(Windows)
+  var threadID =
+      _beginthreadex(nil, 0, { invokeBlockContext($0)!
+                                  .assumingMemoryBound(to: UInt32.self).pointee },
+                     contextAsVoidPointer, 0, nil)
+  if threadID == 0 {
+    return (errno, nil)
+  } else {
+    return (0, UnsafeMutablePointer<ThreadHandle>(&threadID).pointee)
+  }
+#else
+  var threadID = _make_pthread_t()
+  let result = pthread_create(&threadID, nil,
+    { invokeBlockContext($0) }, contextAsVoidPointer)
+  if result == 0 {
+    return (result, threadID)
+  } else {
+    return (result, nil)
+  }
+#endif
+}
 
 /// Block-based wrapper for `pthread_join`.
-public func _stdlib_pthread_join<Result>(
-  _ thread: pthread_t,
+public func _stdlib_thread_join<Result>(
+  _ thread: ThreadHandle,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
+#if os(Windows)
+  // TODO(compnerd) modularize rpc.h for INFINITE (0xffffffff)
+  let result = WaitForSingleObject(thread, 0xffffffff);
+  // TODO(compnerd) modularize WinBase.h for WAIT_OBJECT_0 (0)
+  if result == 0 {
+    let threadResult: DWORD = 0
+    GetExitCodeThread(thread, &threadResult)
+    CloseHandle(thread)
+
+    return (result,
+            UnsafeMutablePointer<DWORD>(&threadResult)
+                .withMemoryRebound(to: Result.self, capacity: 1){ $0.pointee })
+  } else {
+    return (result, nil)
+  }
+#else
   var threadResultRawPtr: UnsafeMutableRawPointer?
   let result = pthread_join(thread, &threadResultRawPtr)
   if result == 0 {
@@ -113,36 +143,37 @@ public func _stdlib_pthread_join<Result>(
   } else {
     return (result, nil)
   }
+#endif
 }
 
 public class _stdlib_Barrier {
-  var _pthreadBarrier: _stdlib_pthread_barrier_t
+  var _threadBarrier: _stdlib_thread_barrier_t
 
-  var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_pthread_barrier_t> {
+  var _threadBarrierPtr: UnsafeMutablePointer<_stdlib_thread_barrier_t> {
     return _getUnsafePointerToStoredProperties(self)
-      .assumingMemoryBound(to: _stdlib_pthread_barrier_t.self)
+      .assumingMemoryBound(to: _stdlib_thread_barrier_t.self)
   }
 
   public init(threadCount: Int) {
-    self._pthreadBarrier = _stdlib_pthread_barrier_t()
-    let ret = _stdlib_pthread_barrier_init(
-      _pthreadBarrierPtr, nil, CUnsignedInt(threadCount))
+    self._threadBarrier = _stdlib_thread_barrier_t()
+    let ret = _stdlib_thread_barrier_init(
+      _threadBarrierPtr, CUnsignedInt(threadCount))
     if ret != 0 {
-      fatalError("_stdlib_pthread_barrier_init() failed")
+      fatalError("_stdlib_thread_barrier_init() failed")
     }
   }
 
   deinit {
-    let ret = _stdlib_pthread_barrier_destroy(_pthreadBarrierPtr)
+    let ret = _stdlib_thread_barrier_destroy(_threadBarrierPtr)
     if ret != 0 {
-      fatalError("_stdlib_pthread_barrier_destroy() failed")
+      fatalError("_stdlib_thread_barrier_destroy() failed")
     }
   }
 
   public func wait() {
-    let ret = _stdlib_pthread_barrier_wait(_pthreadBarrierPtr)
-    if !(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD) {
-      fatalError("_stdlib_pthread_barrier_wait() failed")
+    let ret = _stdlib_thread_barrier_wait(_threadBarrierPtr)
+    if !(ret == 0 || ret == _stdlib_THREAD_BARRIER_SERIAL_THREAD) {
+      fatalError("_stdlib_thread_barrier_wait() failed")
     }
   }
 }
