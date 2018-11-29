@@ -2437,11 +2437,22 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      auto AssocTypePath = popAssocTypePath();
+      NodePointer ConformingType = nullptr;
+      if (auto Type = popNode(Node::Kind::Type)) {
+        if (Type->getChild(0) &&
+            Type->getChild(0)->getKind() ==
+            Node::Kind::DependentGenericParamType) {
+          ConformingType = Type;
+        } else {
+          pushNode(Type);
+        }
+      }
 
+      if (!ConformingType)
+        ConformingType = popAssocTypePath();
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
-                                Conf, AssocTypePath, ProtoTy);
+                                Conf, ConformingType, ProtoTy);
     }
     case 'O': {
       switch (nextChar()) {

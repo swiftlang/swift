@@ -955,7 +955,7 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   Out << "WT";
   assert(node->getNumChildren() == 3);
   mangleChildNode(node, 0); // protocol conformance
-  mangleChildNode(node, 1); // identifier
+  mangleChildNode(node, 1); // type
   mangleProtocolWithoutPrefix(node->begin()[2]); // type
 }
 

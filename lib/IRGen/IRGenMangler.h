@@ -266,8 +266,12 @@ public:
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(AssociatedType)) {
+      appendType(AssociatedType);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
+    }
     appendAnyGenericType(Proto);
     appendOperator("WT");
     return finalize();
