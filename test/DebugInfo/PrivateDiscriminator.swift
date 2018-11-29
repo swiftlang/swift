@@ -32,7 +32,7 @@ public class Outer {
     // CHECK: !DISubprogram(name: "getMember"
     // CHECK-SAME:          linkageName: "{{[^"]*}}[[DISCRIMINATOR]]
     // CHECK-SAME:          line: [[@LINE+2]]
-    // CHECK-SAME:          isLocal: true, isDefinition: true 
+    // CHECK-SAME:          spFlags: DISPFlagLocalToUnit | DISPFlagDefinition
     fileprivate func getMember() -> Int64 { return member.i }
   }
 }

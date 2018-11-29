@@ -21,7 +21,7 @@ func &&&&&(lhs: Bool, rhs: @autoclosure () -> Bool) -> Bool {
 func call_me(_ input: Int64) -> Void {
 // rdar://problem/14627460
 // An autoclosure should have a line number in the debug info and a scope line of 0.
-// CHECK-DAG: !DISubprogram({{.*}}linkageName: "$s11autoclosure7call_meyys5Int64VFSbyXEfu_",{{.*}} isLocal: true, isDefinition: true
+// CHECK-DAG: !DISubprogram({{.*}}linkageName: "$s11autoclosure7call_meyys5Int64VFSbyXEfu_",{{.*}} spFlags: DISPFlagLocalToUnit | DISPFlagDefinition
 // But not in the line table.
 // CHECK-DAG: ![[DBG]] = !DILocation(line: [[@LINE+1]],
   if input != 0 &&&&& ( get_truth (input * 2 + 1) > 0 ) {
