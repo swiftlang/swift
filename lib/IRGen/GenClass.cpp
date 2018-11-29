@@ -200,8 +200,8 @@ namespace {
     bool ClassHasGenericLayout = false;
 
     // Is this class or any of its superclasses resilient from the viewpoint
-    // of the current module? This means that their metadata can change size
-    // and field offsets, generic arguments and virtual methods must be
+    // of the current module? This means that their metadata can change size,
+    // hence field offsets, generic arguments and virtual methods must be
     // accessed relative to a metadata base global variable.
     bool ClassHasResilientAncestry = false;
 
@@ -261,14 +261,11 @@ namespace {
       return Elements;
     }
 
-    /// Does the class metadata have a completely known, static layout that
-    /// does not require initialization at runtime beyond registeration of
-    /// the class with the Objective-C runtime?
+    /// Do instances of the class have a completely known, static layout?
     bool isFixedSize() const {
       return !(ClassHasMissingMembers ||
                ClassHasResilientMembers ||
                ClassHasGenericLayout ||
-               ClassHasResilientAncestry ||
                ClassHasObjCAncestry);
     }
 
@@ -336,6 +333,7 @@ namespace {
           // If the class is resilient, don't walk over its fields; we have to
           // calculate the layout at runtime.
           ClassHasResilientAncestry = true;
+          ClassHasResilientMembers = true;
 
           // Furthermore, if the superclass is generic, we have to assume
           // that its layout depends on its generic parameters. But this only
@@ -358,6 +356,7 @@ namespace {
 
       if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
         ClassHasResilientAncestry = true;
+        ClassHasResilientMembers = true;
         return;
       }
 
