@@ -42,3 +42,32 @@ func driver() {
 }
 
 driver()
+
+// <rdar://problem/46322928> Failure to devirtualize a protocol method
+// applied to an opened existential blocks implemention of
+// DataProtocol.
+public protocol ContiguousBytes {
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+}
+
+extension Array : ContiguousBytes {}
+extension ContiguousArray : ContiguousBytes {}
+
+@inline(never)
+func takesPointer(_ p: UnsafeRawBufferPointer) {}
+
+// In specialized testWithUnsafeBytes<A>(_:), the conditional case and call to withUnsafeBytes must be eliminated.
+// CHECK-LABEL: sil shared [noinline] @$s30devirt_specialized_conformance19testWithUnsafeBytesyyxlFSayypG_Tg5 : $@convention(thin) (@guaranteed Array<Any>) -> () {
+// CHECK: bb0
+// CHECK-NOT: witness_method
+// CHECK: [[TAKES_PTR:%.*]] = function_ref @$s30devirt_specialized_conformance12takesPointeryySWF : $@convention(thin) (UnsafeRawBufferPointer) -> ()
+// CHECK: apply [[TAKES_PTR]](%{{.*}}) : $@convention(thin) (UnsafeRawBufferPointer) -> ()
+// CHECK-LABEL: } // end sil function '$s30devirt_specialized_conformance19testWithUnsafeBytesyyxlFSayypG_Tg5'
+@inline(never)
+func testWithUnsafeBytes<T>(_ t: T) {
+  if let cb = t as? ContiguousBytes {
+    cb.withUnsafeBytes { takesPointer($0) }
+  }
+}
+
+testWithUnsafeBytes([])

@@ -653,6 +653,51 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index){
   return B.createProjectBox(ABI->getLoc(), ABI, Index);
 }
 
+// Peek through trivial Enum initialization, typically for pointless
+// Optionals.
+//
+// Given an UncheckedTakeEnumDataAddrInst, check that there are no
+// other uses of the Enum value and return the address used to initialized the
+// enum's payload:
+//
+//   %stack_adr = alloc_stack
+//   %data_adr  = init_enum_data_addr %stk_adr
+//   %enum_adr  = inject_enum_addr %stack_adr
+//   %copy_src  = unchecked_take_enum_data_addr %enum_adr
+//   dealloc_stack %stack_adr
+//   (No other uses of %stack_adr.)
+InitEnumDataAddrInst *
+swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI) {
+  auto *ASI = dyn_cast<AllocStackInst>(UTEDAI->getOperand());
+  if (!ASI)
+    return nullptr;
+
+  SILInstruction *singleUser = nullptr;
+  for (auto use : ASI->getUses()) {
+    auto *user = use->getUser();
+    if (user == UTEDAI)
+      continue;
+
+    // As long as there's only one UncheckedTakeEnumDataAddrInst and one
+    // InitEnumDataAddrInst, we don't care how many InjectEnumAddr and
+    // DeallocStack users there are.
+    if (isa<InjectEnumAddrInst>(user) || isa<DeallocStackInst>(user))
+      continue;
+
+    if (singleUser)
+      return nullptr;
+
+    singleUser = user;
+  }
+  if (!singleUser)
+    return nullptr;
+
+  // Assume, without checking, that the returned InitEnumDataAddr dominates the
+  // given UncheckedTakeEnumDataAddrInst, because that's how SIL is defined. I
+  // don't know where this is actually verified.
+  return dyn_cast<InitEnumDataAddrInst>(singleUser);
+}
+
 //===----------------------------------------------------------------------===//
 //                       String Concatenation Optimizer
 //===----------------------------------------------------------------------===//

@@ -127,6 +127,13 @@ SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                                       SILValue Value,
                                       SILType SrcTy,
                                       SILType DestTy);
+/// Peek through trivial Enum initialization, typically for pointless
+/// Optionals.
+///
+/// The returned InitEnumDataAddr dominates the given
+/// UncheckedTakeEnumDataAddrInst.
+InitEnumDataAddrInst *
+findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
