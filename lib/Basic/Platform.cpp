@@ -55,21 +55,20 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
 }
 
 
-bool swift::tripleHasSwiftInTheOS(const llvm::Triple &triple) {
-  unsigned major, minor, revision;
+bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
-    triple.getMacOSXVersion(major, minor, revision);
-    return llvm::VersionTuple(major, minor, revision) >=
-      llvm::VersionTuple(10, 14, 4);
+    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
+    // rpath-based install name until 10.15.
+    return triple.isMacOSXVersionLT(10, 15);
+
   } else if (triple.isiOS()) {
-    triple.getiOSVersion(major, minor, revision);
-    return llvm::VersionTuple(major, minor, revision) >=
-      llvm::VersionTuple(12, 2);
+    return triple.isOSVersionLT(12, 2);
+
   } else if (triple.isWatchOS()) {
-    triple.getOSVersion(major, minor, revision);
-    return llvm::VersionTuple(major, minor, revision) >=
-      llvm::VersionTuple(5, 2);
+    return triple.isOSVersionLT(5, 2);
   }
+
+  // Other platforms don't have Swift installed as part of the OS by default.
   return false;
 }
 

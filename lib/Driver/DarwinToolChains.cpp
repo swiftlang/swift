@@ -401,7 +401,7 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       Arguments.push_back("-rpath");
       Arguments.push_back(context.Args.MakeArgString(path));
     }
-  } else if (tripleHasSwiftInTheOS(getTriple()) ||
+  } else if (!tripleRequiresRPathForSwiftInOS(getTriple()) ||
              context.Args.hasArg(options::OPT_no_stdlib_rpath)) {
     // If targeting an OS with Swift in /usr/lib/swift, the LC_ID_DYLIB
     // install_name the stdlib will be an absolute path like
