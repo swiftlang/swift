@@ -72,7 +72,7 @@ extension Tensor : AdditiveArithmetic where Scalar : Numeric {
   /// Adds two tensors and produces their sum.
   /// - Note: `+` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
+  @differentiable(reverse, adjoint: _adjointAdd(_:_:_:_:))
   public static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.add(lhs, rhs)
   }
@@ -80,7 +80,7 @@ extension Tensor : AdditiveArithmetic where Scalar : Numeric {
   /// Subtracts one tensor from another and produces their difference.
   /// - Note: `-` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
+  @differentiable(reverse, adjoint: _adjointSubtract(_:_:_:_:))
   public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.sub(lhs, rhs)
   }
@@ -167,7 +167,7 @@ public extension Tensor where Scalar : Numeric {
   /// Multiplies two tensors and produces their product.
   /// - Note: `*` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
+  @differentiable(reverse, adjoint: _adjointMultiply(_:_:_:_:))
   static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.mul(lhs, rhs)
   }
@@ -195,7 +195,7 @@ public extension Tensor where Scalar : Numeric {
   /// Returns the quotient of dividing the first tensor by the second.
   /// - Note: `/` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
+  @differentiable(reverse, adjoint: _adjointDivide(_:_:_:_:))
   static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.div(lhs, rhs)
   }
@@ -271,7 +271,7 @@ public extension Tensor where Scalar : Numeric {
 /// Performs matrix multiplication with another tensor and produces the
 /// result.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMatmul(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointMatmul(_:_:_:_:))
 public func matmul<Scalar : Numeric>(
   _ left: Tensor<Scalar>, _ right: Tensor<Scalar>
 ) -> Tensor<Scalar> {
@@ -289,7 +289,7 @@ public extension Tensor where Scalar : Numeric {
   /// result.
   @inlinable @inline(__always)
   @differentiable(reverse,
-                  adjoint: _adjointMatmulOperator(lhs:rhs:originalValue:seed:))
+                  adjoint: _adjointMatmulOperator(seed:originalValue:lhs:rhs:))
   static func • (lhs: Tensor, rhs: Tensor) -> Tensor {
     return matmul(lhs, rhs)
   }
@@ -492,7 +492,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self),
-    adjoint: _adjointTransposed(_:originalValue:seed:)
+    adjoint: _adjointTransposed(_:_:_:)
   )
   func transposed(
     withPermutations permutations: Tensor<Int32>
@@ -595,7 +595,7 @@ public extension Tensor {
 public extension Tensor where Scalar : SignedNumeric {
   /// Computes the negation of the specified tensor element-wise.
   @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointNegate(_:originalValue:seed:))
+  @differentiable(reverse, adjoint: _adjointNegate(_:_:_:))
   static prefix func - (rhs: Tensor) -> Tensor {
     return Raw.neg(rhs)
   }
@@ -609,91 +609,91 @@ public func abs<T : SignedNumeric>(_ x: Tensor<T>) -> Tensor<T> {
 
 /// Computes the natural logarithm of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointLog(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointLog(_:_:_:))
 public func log<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.log(x)
 }
 
 /// Computes `sin` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointSin(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointSin(_:_:_:))
 public func sin<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.sin(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointCos(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointCos(_:_:_:))
 public func cos<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.cos(x)
 }
 
 /// Computes `tan` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointTan(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointTan(_:_:_:))
 public func tan<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.tan(x)
 }
 
 /// Computes `sinh` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointSinh(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointSinh(_:_:_:))
 public func sinh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.sinh(x)
 }
 
 /// Computes `cosh` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointCosh(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointCosh(_:_:_:))
 public func cosh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.cosh(x)
 }
 
 /// Computes `tanh` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointTanh(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointTanh(_:_:_:))
 public func tanh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.tanh(x)
 }
 
 /// Computes the square root of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointSqrt(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointSqrt(_:_:_:))
 public func sqrt<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.sqrt(x)
 }
 
 /// Computes the inverse square root of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointRsqrt(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointRsqrt(_:_:_:))
 public func rsqrt<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.rsqrt(x)
 }
 
 /// Computes `exp` of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointExp(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointExp(_:_:_:))
 public func exp<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.exp(x)
 }
 
 /// Computes the ceiling of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointCeil(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointCeil(_:_:_:))
 public func ceil<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.ceil(x)
 }
 
 /// Computes the floor of the specified tensor element-wise.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointFloor(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointFloor(_:_:_:))
 public func floor<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.floor(x)
 }
 
 /// Computes the power of the first tensor to the second tensor.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointPow(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointPow(_:_:_:_:))
 public func pow<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : BinaryFloatingPoint {
   return Raw.pow(lhs, rhs)
@@ -716,7 +716,7 @@ public func pow<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 /// Computes the element-wise maximum of two tensors.
 /// - Note: `max` supports broadcasting.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointMinMax(_:_:_:_:))
 public func max<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
   return Raw.maximum(lhs, rhs)
@@ -741,7 +741,7 @@ public func max<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 /// Computes the element-wise minimum of two tensors.
 /// - Note: `min` supports broadcasting.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointMinMax(_:_:_:_:))
 public func min<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
   return Raw.minimum(lhs, rhs)
@@ -1367,7 +1367,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self, .0),
-    adjoint: _adjointConvolved2D(filter:strides:padding:originalValue:seed:)
+    adjoint: _adjointConvolved2D(seed:originalValue:filter:strides:padding:)
   )
   func convolved2D(
     withFilter filter: Tensor,
@@ -1392,7 +1392,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self),
-    adjoint: _adjointMaxPooled(kernelSize:strides:padding:originalValue:seed:)
+    adjoint: _adjointMaxPooled(seed:originalValue:kernelSize:strides:padding:)
   )
   func maxPooled(
     kernelSize: (Int32, Int32, Int32, Int32),
@@ -1417,7 +1417,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self),
-    adjoint: _adjointAveragePooled(kernelSize:strides:padding:originalValue:seed:)
+    adjoint: _adjointAveragePooled(seed:originalValue:kernelSize:strides:padding:)
   )
   func averagePooled(
     kernelSize: (Int32, Int32, Int32, Int32),

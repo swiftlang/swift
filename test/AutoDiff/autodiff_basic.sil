@@ -41,7 +41,7 @@ bb0(%0 : @trivial $Float):
 // CHECK:   %2 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
 // CHECK:   %4 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
-// CHECK:   %5 = apply %4(%0, %3, %1) : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK:   %5 = apply %4(%1, %3, %0) : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   %6 = tuple (%3 : $Float, %5 : $Float)
 // CHECK:   return %6 : $(Float, Float)
 // CHECK: }

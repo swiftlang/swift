@@ -13,7 +13,7 @@ func mulxy(_ x: Float, _ y: Float) -> Float {
   }
   return x * y
 }
-func dmulxy(_ x: Float, _ y: Float, primal: Float, seed: Float)
+func dmulxy(_ seed: Float, _ primal: Float, _ x: Float, _ y: Float)
   -> (Float, Float) {
   return (y * seed, x * seed)
 }

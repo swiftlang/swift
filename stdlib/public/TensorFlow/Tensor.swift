@@ -796,7 +796,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self),
-    adjoint: _adjointReshaped(toShape:originalValue:seed:)
+    adjoint: _adjointReshaped(seed:originalValue:toShape:)
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return Raw.reshape(self, shape: newShape)
@@ -820,7 +820,7 @@ public extension Tensor {
   @inlinable @inline(__always)
   @differentiable(
     reverse, wrt: (self),
-    adjoint: _adjointExpandingShape(at:originalValue:seed:)
+    adjoint: _adjointExpandingShape(seed:originalValue:at:)
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
