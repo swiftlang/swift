@@ -972,7 +972,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
-      binding->getDeclContext()->isExtensionContext()) {
+      isa<ExtensionDecl>(binding->getDeclContext())) {
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
@@ -1117,7 +1117,7 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
 /// constraints before doing so.
 ///
 /// \returns true if it can be made dynamic, false otherwise.
-static bool makeDynamic(ValueDecl *decl) {
+static bool makeObjCDynamic(ValueDecl *decl) {
   // Only  members of classes can be dynamic.
   auto classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl) {
@@ -1127,7 +1127,7 @@ static bool makeDynamic(ValueDecl *decl) {
     return false;
   }
 
-  // 'dynamic' is only supported through the Objective-C runtime.
+  // '@objc dynamic' is only supported through the Objective-C runtime.
   if (!decl->isObjC()) {
     decl->diagnose(diag::dynamic_requires_objc,
                    decl->getDescriptiveKind(), decl->getFullName())
@@ -1145,20 +1145,94 @@ static bool makeDynamic(ValueDecl *decl) {
   return true;
 }
 
+static llvm::Expected<bool> isStorageDynamic(Evaluator &evaluator,
+                                             AccessorDecl *accessor) {
+  auto isDynamicResult = evaluator(IsDynamicRequest{accessor->getStorage()});
+
+  if (!isDynamicResult)
+    return isDynamicResult;
+
+  return *isDynamicResult;
+}
+
+/// Runtime-replacable accessors are dynamic when their storage declaration
+/// is dynamic and they were explicitly defined or they are implicitly defined
+/// getter/setter because no accessor was defined.
+static llvm::Expected<bool>
+doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
+  auto kind = accessor->getAccessorKind();
+  auto storage = accessor->getStorage();
+  bool isObjC = storage->isObjC();
+
+  switch (kind) {
+  case AccessorKind::Get: {
+    auto readImpl = storage->getReadImpl();
+    if (!isObjC &&
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
+      return false;
+    return isStorageDynamic(evaluator, accessor);
+  }
+  case AccessorKind::Set: {
+    auto writeImpl = storage->getWriteImpl();
+    if (!isObjC && (writeImpl == WriteImplKind::Modify ||
+                    writeImpl == WriteImplKind::MutableAddress ||
+                    writeImpl == WriteImplKind::StoredWithObservers))
+      return false;
+    return isStorageDynamic(evaluator, accessor);
+  }
+  case AccessorKind::Read:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  case AccessorKind::Modify: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::MutableAddress: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::MutableAddress)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::Address: {
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::Address)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::DidSet:
+  case AccessorKind::WillSet:
+    if (!isObjC &&
+        storage->getWriteImpl() == WriteImplKind::StoredWithObservers)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+}
+
 llvm::Expected<bool>
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
 
+  // Add dynamic if -enable-implicit-dynamic was requested.
+  TypeChecker::addImplicitDynamicAttribute(decl);
+
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    return makeDynamic(decl);
+    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
+      return true;
+    return makeObjCDynamic(decl);
   }
 
-  // Runtime-replacable accessors are dynamic when their storage declaration
-  // is dynamic. Other accessors are never dynamic.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    // Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
+    // is dynamic and they were explicitly defined or they are implicitly defined
+    // getter/setter because no accessor was defined.
+    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
+      return doesAccessorNeedDynamicAttribute(accessor, evaluator);
+
+    // Pre Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
+    // is dynamic. Other accessors are never dynamic.
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
     case AccessorKind::Set: {
@@ -1169,7 +1243,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         return isDynamicResult;
 
       if (*isDynamicResult)
-        return makeDynamic(decl);
+        return makeObjCDynamic(decl);
 
       return false;
     }
@@ -1186,7 +1260,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // FIXME: Use a semantic check for NSManaged rather than looking for the
   // attribute (which could be ill-formed).
   if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
-    return makeDynamic(decl);
+    return makeObjCDynamic(decl);
   }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
@@ -1205,7 +1279,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
-    return makeDynamic(decl);
+    return makeObjCDynamic(decl);
   }
 
   // If any of the declarations overridden by this declaration are dynamic
@@ -1216,11 +1290,13 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto overriddenDecls = evaluateOrDefault(evaluator,
     OverriddenDeclsRequest{decl}, {});
   for (auto overridden : overriddenDecls) {
-    if (overridden->isDynamic())
-      return makeDynamic(decl);
+    if (overridden->isDynamic() &&
+        (!decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5) ||
+         overridden->isObjC()))
+      return makeObjCDynamic(decl);
 
     if (overridden->hasClangNode())
-      return makeDynamic(decl);
+      return makeObjCDynamic(decl);
   }
 
   return false;
@@ -2268,8 +2344,16 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   llvm_unreachable("bad storage kind");
 }
 
+static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
+                                        AbstractStorageDecl *storage) {
+  return storage->getAttrs().hasAttribute<BorrowedAttr>();
+}
+
 static void validateAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
+  if (shouldUseOpaqueReadAccessor(TC, storage))
+    storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
+
   // isGetterMutating and isSetterMutating are part of the signature
   // of a storage declaration and need to be validated immediately.
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
@@ -2458,25 +2542,6 @@ public:
             unimplementedStatic(Classes);
         }
       }
-    }
-
-    // Reject variable if it is a stored property with an uninhabited type
-    if (VD->hasStorage() && 
-        VD->getInterfaceType()->isStructurallyUninhabited()) {
-      auto uninhabitedTypeDiag = diag::pattern_no_uninhabited_type;
-      
-      if (VD->getInterfaceType()->is<TupleType>()) {
-        uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
-      } else {
-        assert((VD->getInterfaceType()->is<EnumType>() || 
-                VD->getInterfaceType()->is<BoundGenericEnumType>()) && 
-          "unknown structurally uninhabited type");
-      }
-          
-      TC.diagnose(VD->getLoc(), uninhabitedTypeDiag, VD->isLet(),
-                  VD->isInstanceMember(), VD->getName(),
-                  VD->getInterfaceType());
-      VD->markInvalid();
     }
 
     if (!checkOverrides(VD)) {
@@ -2689,6 +2754,9 @@ public:
     }
 
     triggerAccessorSynthesis(TC, SD);
+    if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(SD);
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3069,6 +3137,7 @@ public:
     if (!PD->hasValidSignature())
       return;
 
+    auto *SF = PD->getParentSourceFile();
     {
       // Check for circular inheritance within the protocol.
       SmallVector<ProtocolDecl *, 8> path;
@@ -3076,7 +3145,7 @@ public:
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        DescriptiveDeclKind::Protocol, path);
 
-      if (auto *SF = PD->getParentSourceFile()) {
+      if (SF) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate =
               (PD->getFormalAccess() > AccessLevel::FilePrivate);
@@ -3098,7 +3167,8 @@ public:
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
-      TC.inferDefaultWitnesses(PD);
+      if (!SF || SF->Kind != SourceFileKind::Interface)
+        TC.inferDefaultWitnesses(PD);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -3130,6 +3200,12 @@ public:
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
+
+    // Except if there is a dynamic replacement attribute.
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.validateDecl(VD);
+      TC.checkDynamicReplacementAttribute(VD);
+    }
   }
 
   /// Determine whether the given declaration requires a definition.
@@ -3201,6 +3277,10 @@ public:
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
+    }
+
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(FD);
     }
   }
 
@@ -3397,6 +3477,10 @@ public:
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
     } else {
       TC.definedFunctions.push_back(CD);
+    }
+
+    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(CD);
     }
   }
 
@@ -3714,37 +3798,7 @@ Type buildAddressorResultType(TypeChecker &TC,
     (addressor->getAccessorKind() == AccessorKind::Address)
       ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
       : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
-  if (!pointerType) return Type();
-
-  switch (addressor->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("addressor without addressor kind");
-
-  // For unsafe addressors, it's just the pointer type.
-  case AddressorKind::Unsafe:
-    return pointerType;
-
-  // For non-native owning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
-  case AddressorKind::Owning: {
-    TupleTypeElt elts[] = {
-      pointerType,
-      TC.Context.getAnyObjectType()
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-
-  // For native owning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-  case AddressorKind::NativeOwning: {
-    TupleTypeElt elts[] = {
-      pointerType,
-      TC.Context.TheNativeObjectType
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-  }
-  llvm_unreachable("bad addressor kind");
+  return pointerType;
 }
 
 static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
@@ -4089,7 +4143,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
-        FD->getDeclContext()->isExtensionContext()) {
+        isa<ExtensionDecl>(FD->getDeclContext())) {
       if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {

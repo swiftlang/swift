@@ -71,6 +71,20 @@ static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
   return scope.isPublic();
 }
 
+static bool isPublicOrUsableFromInline(Type ty) {
+  // Note the double negative here: we're looking for any referenced decls that
+  // are *not* public-or-usableFromInline.
+  return !ty.findIf([](Type typePart) -> bool {
+    // FIXME: If we have an internal typealias for a non-internal type, we ought
+    // to be able to print it by desugaring.
+    if (auto *aliasTy = dyn_cast<NameAliasType>(typePart.getPointer()))
+      return !isPublicOrUsableFromInline(aliasTy->getDecl());
+    if (auto *nominal = typePart->getAnyNominal())
+      return !isPublicOrUsableFromInline(nominal);
+    return false;
+  });
+}
+
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   auto *DC = ASD->getDeclContext()->getAsDecl();
   if (!DC) return false;
@@ -118,8 +132,21 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
           return false;
-        // FIXME: We also need to check the generic signature for constraints
-        // that we can't reference.
+        for (const Requirement &req : ED->getGenericRequirements()) {
+          if (!isPublicOrUsableFromInline(req.getFirstType()))
+            return false;
+
+          switch (req.getKind()) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Superclass:
+          case RequirementKind::SameType:
+            if (!isPublicOrUsableFromInline(req.getSecondType()))
+              return false;
+            break;
+          case RequirementKind::Layout:
+            break;
+          }
+        }
       }
 
       // Skip typealiases that just redeclare generic parameters.
@@ -1568,26 +1595,6 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
   case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID)
 #include "swift/AST/AccessorKinds.def"
-
-  case AccessorKind::Address:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
-
-  case AccessorKind::MutableAddress:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -2351,12 +2358,12 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
-  // Print @sil_stored when the attribute is not already
+  // Print @_hasStorage when the attribute is not already
   // on, decl has storage and it is on a class.
   if (Options.PrintForSIL && decl->hasStorage() &&
       isStructOrClassContext(decl->getDeclContext()) &&
-      !decl->getAttrs().hasAttribute<SILStoredAttr>())
-    Printer << "@sil_stored ";
+      !decl->getAttrs().hasAttribute<HasStorageAttr>())
+    Printer << "@_hasStorage ";
   printAttributes(decl);
   printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
@@ -3030,6 +3037,11 @@ void PrintAST::visitYieldStmt(YieldStmt *stmt) {
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   Printer << tok::kw_throw << " ";
+  // FIXME: print expression.
+}
+
+void PrintAST::visitPoundAssertStmt(PoundAssertStmt *stmt) {
+  Printer << tok::pound_assert << " ";
   // FIXME: print expression.
 }
 
@@ -4365,6 +4377,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
        << " module " << normal->getDeclContext()->getParentModule()->getName();
     break;
   }
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(this);
+    os << self->getProtocol()->getName()
+       << " module " << self->getDeclContext()->getParentModule()->getName();
+    break;
+  }
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
@@ -4440,12 +4458,18 @@ swift::getInheritedForPrinting(const Decl *decl,
     inherited = ed->getInherited();
   }
 
-  // Collect explicit inheritted types.
+  // Collect explicit inherited types.
   for (auto TL: inherited) {
-    if (auto Ty = TL.getType()) {
-      if (auto NTD = Ty->getAnyNominal())
-        if (!shouldPrint(NTD))
-          continue;
+    if (auto ty = TL.getType()) {
+      bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
+        if (auto aliasTy = dyn_cast<NameAliasType>(subTy.getPointer()))
+          return !shouldPrint(aliasTy->getDecl());
+        if (auto NTD = subTy->getAnyNominal())
+          return !shouldPrint(NTD);
+        return false;
+      });
+      if (foundUnprintable)
+        continue;
     }
     Results.push_back(TL);
   }

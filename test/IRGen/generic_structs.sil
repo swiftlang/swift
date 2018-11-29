@@ -215,7 +215,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // Check that we directly delegate buffer witnesses to a single dynamic field:
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
@@ -256,14 +256,10 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
 // CHECK: [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
 // CHECK: [[T1:%.*]] = bitcast i8* [[T0]] to i8**
-// CHECK: [[T4:%.*]] = call %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.HasAssociatedType, %swift.type* %T, %swift.protocol_requirement* @"$s15generic_structs17HasAssociatedTypeTL", %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
+// CHECK: [[T4:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.HasAssociatedType, %swift.type* %T, %swift.protocol_requirement* @"$s15generic_structs17HasAssociatedTypeTL", %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
 
 // CHECK: %T.Assoc = extractvalue %swift.metadata_response [[T4]], 0
+// CHECK:   %T.Assoc.HasAssociatedType = call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** %T.ParentHasAssociatedType, %swift.type* %T, %swift.type* %T.Assoc,
 
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 2
-// CHECK:   [[T1:%.*]] = load i8*, i8** [[T0]],
-// CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
-// CHECK:   %T.Assoc.HasAssociatedType = call swiftcc i8** [[T2]](%swift.type* %T.Assoc, %swift.type* %T, i8** %T.ParentHasAssociatedType)
-
-// CHECK:   [[T2:%.*]] = call %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.Assoc.HasAssociatedType, %swift.type* %T.Assoc, %swift.protocol_requirement* @"$s15generic_structs17HasAssociatedTypeTL", %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
+// CHECK:   [[T2:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.Assoc.HasAssociatedType, %swift.type* %T.Assoc, %swift.protocol_requirement* @"$s15generic_structs17HasAssociatedTypeTL", %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
 // CHECK:   %T.Assoc.Assoc = extractvalue %swift.metadata_response [[T2]], 0

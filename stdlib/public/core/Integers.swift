@@ -110,9 +110,88 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 }
 
 //===----------------------------------------------------------------------===//
+//===--- AdditiveArithmetic -----------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+// FIXME: Add doc comment.
+public protocol AdditiveArithmetic : Equatable {
+  /// The zero value.
+  ///
+  /// - Note: Zero is the identity element for addition; for any value,
+  ///   `x + .zero == x` and `.zero + x == x`.
+  static var zero: Self { get }
+
+  /// Adds two values and produces their sum.
+  ///
+  /// The addition operator (`+`) calculates the sum of its two arguments. For
+  /// example:
+  ///
+  ///     1 + 2                   // 3
+  ///     -10 + 15                // 5
+  ///     -15 + -5                // -20
+  ///     21.5 + 3.25             // 24.75
+  ///
+  /// You cannot use `+` with arguments of different types. To add values of
+  /// different types, convert one of the values to the other value's type.
+  ///
+  ///     let x: Int8 = 21
+  ///     let y: Int = 1000000
+  ///     Int(x) + y              // 1000021
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  static func +(lhs: Self, rhs: Self) -> Self
+
+  /// Adds two values and stores the result in the left-hand-side variable.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  static func +=(lhs: inout Self, rhs: Self)
+
+  /// Subtracts one value from another and produces their difference.
+  ///
+  /// The subtraction operator (`-`) calculates the difference of its two
+  /// arguments. For example:
+  ///
+  ///     8 - 3                   // 5
+  ///     -10 - 5                 // -15
+  ///     100 - -5                // 105
+  ///     10.5 - 100.0            // -89.5
+  ///
+  /// You cannot use `-` with arguments of different types. To subtract values
+  /// of different types, convert one of the values to the other value's type.
+  ///
+  ///     let x: UInt8 = 21
+  ///     let y: UInt = 1000000
+  ///     y - UInt(x)             // 999979
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  static func -(lhs: Self, rhs: Self) -> Self
+
+  /// Subtracts the second value from the first and stores the difference in the
+  /// left-hand-side variable.
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  static func -=(lhs: inout Self, rhs: Self)
+}
+
+public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
+  static var zero: Self {
+    return 0
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //===--- Numeric ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+// FIXME: Update comment based on the `AdditiveArithmetic` change.
 /// Declares methods backing binary arithmetic operators--such as `+`, `-` and
 /// `*`--and their mutating counterparts.
 ///
@@ -147,7 +226,6 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 /// the required mutating methods. Extensions to `Numeric` provide default
 /// implementations for the protocol's nonmutating methods based on the
 /// mutating variants.
-// SWIFT_ENABLE_TENSORFLOW
 public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
@@ -1458,8 +1536,6 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 
 extension BinaryInteger {
-  @usableFromInline
-  @_transparent
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
@@ -3059,6 +3135,7 @@ extension FixedWidthInteger {
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
@@ -3300,6 +3377,7 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
+  @inlinable // FIXME(inline-always)
   public var magnitude: Self {
     @inline(__always)
     get { return self }
@@ -3308,6 +3386,7 @@ extension UnsignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `false` for unsigned integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return false }
@@ -3335,6 +3414,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3365,6 +3445,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -3409,6 +3490,7 @@ extension SignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `true` for signed integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return true }
@@ -3436,6 +3518,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3468,6 +3551,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer

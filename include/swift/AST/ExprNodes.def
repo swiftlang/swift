@@ -188,14 +188,14 @@ EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
+EXPR(Tap, Expr)
 // SWIFT_ENABLE_TENSORFLOW
 ABSTRACT_EXPR(ReverseAutoDiff, Expr)
   EXPR(Gradient, ReverseAutoDiffExpr)
   EXPR(ChainableGradient, ReverseAutoDiffExpr)
   EXPR(ValueAndGradient, ReverseAutoDiffExpr)
 EXPR(Adjoint, Expr)
-EXPR(PoundAssert, Expr)
-LAST_EXPR(PoundAssert)
+LAST_EXPR(Adjoint)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

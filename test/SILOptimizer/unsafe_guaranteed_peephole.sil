@@ -375,7 +375,7 @@ bb0(%0 : $Foo):
 }
 
 struct MyInt {
-  @sil_stored var val: Builtin.Int32
+  @_hasStorage var val: Builtin.Int32
 }
 
 // CHECK-LABEL: sil @testUnsafeGuaranteed_sideeffectfree_inst

@@ -84,6 +84,7 @@ namespace swift {
   class NominalTypeDecl;
   class NormalProtocolConformance;
   class InheritedProtocolConformance;
+  class SelfProtocolConformance;
   class SpecializedProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
@@ -767,6 +768,10 @@ public:
                          SourceLoc loc,
                          AbstractStorageDecl *storage,
                          ProtocolConformanceState state);
+
+  /// Produce a self-conformance for the given protocol.
+  SelfProtocolConformance *
+  getSelfConformance(ProtocolDecl *protocol);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

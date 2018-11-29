@@ -80,9 +80,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
            class_getName(*getIndirectObjCClass()));
     break;
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor:
-    printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor:
+    printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
   }
   
@@ -112,8 +112,8 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
     return reinterpret_cast<const ClassMetadata *>(
               objc_lookUpClass(getDirectObjCClassName(kind)));
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor:
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor:
     return nullptr;
   }
 
@@ -139,12 +139,16 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 #endif
     return nullptr;
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
-    auto type = getTypeContextDescriptor();
-    if (!type->isGeneric()) {
-      if (auto accessFn = type->getAccessFunction())
-        return accessFn(MetadataState::Abstract).Value;
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor: {
+    auto anyType = getTypeDescriptor();
+    if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
+      if (!type->isGeneric()) {
+        if (auto accessFn = type->getAccessFunction())
+          return accessFn(MetadataState::Abstract).Value;
+      }
+    } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
+      return _getSimpleProtocolTypeMetadata(protocol);
     }
 
     return nullptr;
@@ -456,42 +460,74 @@ recur:
     return ConformanceCacheResult::cacheMiss();
 }
 
-/// Checks if a given candidate is a type itself, one of its
-/// superclasses or a related generic type.
-///
-/// This check is supposed to use the same logic that is used
-/// by searchInConformanceCache.
-///
-/// \param candidate Pointer to a Metadata or a NominalTypeDescriptor.
-///
-static
-bool isRelatedType(const Metadata *type, const void *candidate,
-                   bool candidateIsMetadata) {
+namespace {
+  /// Describes a protocol conformance "candidate" that can be checked
+  /// against the
+  class ConformanceCandidate {
+    const void *candidate;
+    bool candidateIsMetadata;
 
-  while (true) {
-    // Check whether the types match.
-    if (candidateIsMetadata && type == candidate)
-      return true;
+  public:
+    ConformanceCandidate() : candidate(0), candidateIsMetadata(false) { }
 
-    // Check whether the nominal type descriptors match.
-    if (!candidateIsMetadata) {
-      const auto *description = type->getTypeContextDescriptor();
-      auto candidateDescription =
-        static_cast<const TypeContextDescriptor *>(candidate);
-      if (description && equalContexts(description, candidateDescription))
+    ConformanceCandidate(const ProtocolConformanceDescriptor &conformance)
+      : ConformanceCandidate()
+    {
+      if (auto metadata = conformance.getCanonicalTypeMetadata()) {
+        candidate = metadata;
+        candidateIsMetadata = true;
+        return;
+      }
+
+      if (auto description = conformance.getTypeDescriptor()) {
+        candidate = description;
+        candidateIsMetadata = false;
+        return;
+      }
+    }
+
+    /// Retrieve the conforming type as metadata, or NULL if the candidate's
+    /// conforming type is described in another way (e.g., a nominal type
+    /// descriptor).
+    const Metadata *getConformingTypeAsMetadata() const {
+      return candidateIsMetadata ? static_cast<const Metadata *>(candidate)
+                                 : nullptr;
+    }
+
+    /// Whether the conforming type exactly matches the conformance candidate.
+    bool matches(const Metadata *conformingType) const {
+      // Check whether the types match.
+      if (candidateIsMetadata && conformingType == candidate)
         return true;
+
+      // Check whether the nominal type descriptors match.
+      if (!candidateIsMetadata) {
+        const auto *description = conformingType->getTypeContextDescriptor();
+        auto candidateDescription =
+          static_cast<const ContextDescriptor *>(candidate);
+        if (description && equalContexts(description, candidateDescription))
+          return true;
+      }
+
+      return false;
     }
 
-    // If there is a superclass, look there.
-    if (auto superclass = _swift_class_getSuperclass(type)) {
-      type = superclass;
-      continue;
+    /// Retrieve the type that matches the conformance candidate, which may
+    /// be a superclass of the given type. Returns null if this type does not
+    /// match this conformance.
+    const Metadata *getMatchingType(const Metadata *conformingType) const {
+      while (conformingType) {
+        // Check for a match.
+        if (matches(conformingType))
+          return conformingType;
+
+        // Look for a superclass.
+        conformingType = _swift_class_getSuperclass(conformingType);
+      }
+
+      return nullptr;
     }
-
-    break;
-  }
-
-  return false;
+  };
 }
 
 static const WitnessTable *
@@ -541,38 +577,18 @@ swift_conformsToProtocolImpl(const Metadata * const type,
     for (const auto &record : section) {
       auto &descriptor = *record.get();
 
-      // If the record applies to a specific type, cache it.
-      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
-        auto P = descriptor.getProtocol();
+      // We only care about conformances for this protocol.
+      if (descriptor.getProtocol() != protocol)
+        continue;
 
-        // Look for an exact match.
-        if (protocol != P)
-          continue;
+      // If there's a matching type, record the positive result.
+      ConformanceCandidate candidate(descriptor);
+      if (candidate.getMatchingType(type)) {
+        const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
+        if (!matchingType)
+          matchingType = type;
 
-        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
-          continue;
-
-        // Record the witness table.
-        recordWitnessTable(descriptor, metadata);
-
-      // TODO: "Nondependent witness table" probably deserves its own flag.
-      // An accessor function might still be necessary even if the witness table
-      // can be shared.
-      } else if (descriptor.getTypeKind()
-                   == TypeReferenceKind::DirectNominalTypeDescriptor ||
-                 descriptor.getTypeKind()
-                  == TypeReferenceKind::IndirectNominalTypeDescriptor) {
-        auto R = descriptor.getTypeContextDescriptor();
-        auto P = descriptor.getProtocol();
-
-        // Look for an exact match.
-        if (protocol != P)
-          continue;
-
-        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
-          continue;
-
-        recordWitnessTable(descriptor, type);
+        recordWitnessTable(descriptor, matchingType);
       }
     }
   }
@@ -589,13 +605,13 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   }
 }
 
-const TypeContextDescriptor *
+const ContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
-      if (auto ntd = record->getTypeContextDescriptor()) {
+      if (auto ntd = record->getTypeDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node))
           return ntd;
       }
@@ -604,49 +620,21 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   return nullptr;
 }
 
-/// Resolve a reference to a generic parameter to type metadata.
-static const Metadata *resolveGenericParamRef(
-                            const GenericParamRef &param,
-                            SubstFlatGenericParameterFn substFlatGenericParam) {
-  // Resolve the root generic parameter.
-  const Metadata *current = substFlatGenericParam(param.getRootParamIndex());
-  if (!current) return nullptr;
-
-  // Follow the associated type path.
-  for (const auto &assocTypeRef : param) {
-    // Look for the witness table.
-    auto witnessTable =
-      swift_conformsToProtocol(current, assocTypeRef.Protocol);
-    if (!witnessTable) return nullptr;
-
-    // Retrieve the associated type.
-    auto assocTypeReq = assocTypeRef.Requirement.get();
-    current = swift_getAssociatedTypeWitness(
-                                    MetadataState::Abstract,
-                                    const_cast<WitnessTable *>(witnessTable),
-                                    current,
-                                    assocTypeRef.Protocol
-                                      ->getRequirementBaseDescriptor(),
-                                    assocTypeReq).Value;
-    if (!current) return nullptr;
-  }
-
-  return current;
-}
-
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       std::vector<const void *> &extraArguments,
-                      SubstFlatGenericParameterFn substFlatGenericParam,
-                      SubstGenericParameterFn substGenericParam) {
+                      SubstGenericParameterFn substGenericParam,
+                      SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
     if (!req.hasKnownKind()) return true;
 
     // Resolve the subject generic parameter.
-    auto subjectType =
-      resolveGenericParamRef(req.getParam(), substFlatGenericParam);
-    if (!subjectType) return true;
+    const Metadata *subjectType =
+      swift_getTypeByMangledName(req.getParam(), substGenericParam,
+                                 substWitnessTable);
+    if (!subjectType)
+      return true;
 
     // Check the requirement.
     switch (req.getKind()) {
@@ -668,7 +656,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::SameType: {
       // Demangle the second type under the given substitutions.
       auto otherType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!otherType) return true;
 
       assert(!req.getFlags().hasExtraArgument());
@@ -694,7 +683,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!baseType) return true;
 
       // Check whether it's dynamically castable, which works as a superclass
@@ -721,18 +711,13 @@ bool swift::_checkGenericRequirements(
 }
 
 const Metadata *swift::findConformingSuperclass(
-                                          const Metadata *type,
-                                          const ProtocolDescriptor *protocol) {
-  const Metadata *conformingType = type;
-  while (true) {
-    const Metadata *superclass = _swift_class_getSuperclass(conformingType);
-    if (!superclass)
-      break;
-    if (!swift_conformsToProtocol(superclass, protocol))
-      break;
-    conformingType = superclass;
-  }
+                            const Metadata *type,
+                            const ProtocolConformanceDescriptor *conformance) {
+  // Figure out which type we're looking for.
+  ConformanceCandidate candidate(*conformance);
 
+  const Metadata *conformingType = candidate.getMatchingType(type);
+  assert(conformingType);
   return conformingType;
 }
 

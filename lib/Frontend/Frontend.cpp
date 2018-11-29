@@ -36,9 +36,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/HeaderSearch.h"
 
 using namespace swift;
 
@@ -144,7 +141,7 @@ CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &
   // so only serialize them if the module isn't going to be shipped to
   // the public.
   serializationOpts.SerializeOptionsForDebugging =
-      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+      opts.SerializeOptionsForDebugging.getValueOr(!moduleIsPublic);
 
   return serializationOpts;
 }
@@ -308,20 +305,8 @@ bool CompilerInstance::setUpModuleLoaders() {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
     }
-    // Capture the specified-or-defaulted -module-cache-path that winds up in
-    // the clang importer, for reuse as the .swiftmodule cache path when
-    // building the ParseableInterfaceModuleLoader below.
-    //
-    // The returned-from-clang module cache path includes a suffix directory
-    // that is specific to the clang version and invocation; we want the
-    // directory above that.
     auto const &Clang = clangImporter->getClangInstance();
-    if (Clang.hasPreprocessor()) {
-      std::string SpecificModuleCachePath = Clang.getPreprocessor()
-                                                .getHeaderSearchInfo()
-                                                .getModuleCachePath();
-      ModuleCachePath = llvm::sys::path::parent_path(SpecificModuleCachePath);
-    }
+    ModuleCachePath = getModuleCachePathFromClang(Clang);
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
   if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
@@ -501,6 +486,10 @@ ModuleDecl *CompilerInstance::getMainModule() {
     MainModule = ModuleDecl::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
+    if (Invocation.getFrontendOptions().EnablePrivateImports)
+      MainModule->setPrivateImportsEnabled();
+    if (Invocation.getFrontendOptions().EnableImplicitDynamic)
+      MainModule->setImplicitDynamicEnabled();
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
@@ -510,22 +499,24 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
 static void addAdditionalInitialImportsTo(
     SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
-  using ImportPair =
-      std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
-  SmallVector<ImportPair, 4> additionalImports;
+  SmallVector<SourceFile::ImportedModuleDesc, 4> additionalImports;
 
   if (implicitImports.objCModuleUnderlyingMixedFramework)
-    additionalImports.push_back(
-        {{/*accessPath=*/{},
-          implicitImports.objCModuleUnderlyingMixedFramework},
-         SourceFile::ImportFlags::Exported});
+    additionalImports.push_back(SourceFile::ImportedModuleDesc(
+        ModuleDecl::ImportedModule(
+            /*accessPath=*/{},
+            implicitImports.objCModuleUnderlyingMixedFramework),
+        SourceFile::ImportFlags::Exported));
   if (implicitImports.headerModule)
-    additionalImports.push_back(
-        {{/*accessPath=*/{}, implicitImports.headerModule},
-         SourceFile::ImportFlags::Exported});
+    additionalImports.push_back(SourceFile::ImportedModuleDesc(
+        ModuleDecl::ImportedModule(/*accessPath=*/{},
+                                   implicitImports.headerModule),
+        SourceFile::ImportFlags::Exported));
   if (!implicitImports.modules.empty()) {
     for (auto &importModule : implicitImports.modules) {
-      additionalImports.push_back({{/*accessPath=*/{}, importModule}, {}});
+      additionalImports.push_back(SourceFile::ImportedModuleDesc(
+          ModuleDecl::ImportedModule(/*accessPath=*/{}, importModule),
+          SourceFile::ImportOptions()));
     }
   }
 

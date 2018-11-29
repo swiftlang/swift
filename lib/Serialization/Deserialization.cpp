@@ -473,6 +473,14 @@ ProtocolConformanceRef ModuleFile::readConformance(
     return ProtocolConformanceRef(proto);
   }
 
+  case SELF_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    SelfProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto conformance = getContext().getSelfConformance(proto);
+    return ProtocolConformanceRef(conformance);
+  }
+
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
     SubstitutionMapID substitutionMapID;
@@ -652,39 +660,19 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
+  lastRecordOffset.reset();
 
   SmallVector<GenericTypeParamDecl *, 8> params;
 
-  while (true) {
-    lastRecordOffset.reset();
-    bool shouldContinue = true;
-
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      break;
-
-    scratch.clear();
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                  &blobData);
-    switch (recordID) {
-    case GENERIC_PARAM: {
-      DeclID paramDeclID;
-      GenericParamLayout::readRecord(scratch, paramDeclID);
-      auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID));
-      params.push_back(genericParam);
-      break;
-    }
-    default:
-      // This record is not part of the GenericParamList.
-      shouldContinue = false;
-      break;
-    }
-
-    if (!shouldContinue)
-      break;
+  ArrayRef<uint64_t> paramIDs;
+  GenericParamListLayout::readRecord(scratch, paramIDs);
+  for (DeclID nextParamID : paramIDs) {
+    auto genericParam = cast<GenericTypeParamDecl>(getDecl(nextParamID));
+    params.push_back(genericParam);
   }
 
-  // Don't create empty generic parameter lists.
+  // Don't create empty generic parameter lists. (This should never happen in
+  // practice, but it doesn't hurt to be defensive.)
   if (params.empty())
     return nullptr;
 
@@ -2047,22 +2035,6 @@ getActualOptionalTypeKind(uint8_t raw) {
   return None;
 }
 
-static Optional<swift::AddressorKind>
-getActualAddressorKind(uint8_t raw) {
-  switch (serialization::AddressorKind(raw)) {
-  case serialization::AddressorKind::NotAddressor:
-    return swift::AddressorKind::NotAddressor;
-  case serialization::AddressorKind::Unsafe:
-    return swift::AddressorKind::Unsafe;
-  case serialization::AddressorKind::Owning:
-    return swift::AddressorKind::Owning;
-  case serialization::AddressorKind::NativeOwning:
-    return swift::AddressorKind::NativeOwning;
-  }
-
-  return None;
-}
-
 static Optional<swift::SelfAccessKind>
 getActualSelfAccessKind(uint8_t raw) {
   switch (serialization::SelfAccessKind(raw)) {
@@ -2258,6 +2230,15 @@ ModuleFile::getDeclChecked(DeclID DID) {
   return deserialized;
 }
 
+template <typename DERIVED>
+static bool attributeChainContains(DeclAttribute *attr) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attr);
+  static_assert(std::is_trivially_destructible<DeclAttributes>::value,
+                "must not try to destroy the attribute chain");
+  return tempAttrs.hasAttribute<DERIVED>();
+}
+
 Expected<Decl *>
 ModuleFile::getDeclCheckedImpl(DeclID DID) {
   if (DID == 0)
@@ -2334,9 +2315,33 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     }
   };
 
+  class FilenameForPrivateRAII {
+    Serialized<Decl *> &declOrOffset;
+
+  public:
+    Identifier filename;
+
+    FilenameForPrivateRAII(Serialized<Decl *> &decl) : declOrOffset(decl) {}
+    ~FilenameForPrivateRAII() {
+      if (filename.empty())
+        return;
+      if (!declOrOffset.isComplete())
+        return;
+      auto *valueDecl = dyn_cast<ValueDecl>(declOrOffset.get());
+      if (!valueDecl)
+        return;
+      auto *loadedFile = dyn_cast<LoadedFile>(
+          valueDecl->getDeclContext()->getModuleScopeContext());
+      if (!loadedFile)
+        return;
+      loadedFile->addFilenameForPrivateDecl(valueDecl, filename);
+    }
+  };
+
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
   DeserializingEntityRAII deserializingEntity(*this);
+  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
@@ -2610,6 +2615,29 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         Attr = diffAttr;
         break;
       }
+      case decls_block::DynamicReplacement_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
+        DeclID replacedFunID;
+        serialization::decls_block::DynamicReplacementDeclAttrLayout::
+            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
+
+        auto replacedFunDecl = getDeclChecked(replacedFunID);
+        if (!replacedFunDecl)
+          return replacedFunDecl.takeError();
+        auto baseName = getDeclBaseName(rawPieceIDs[0]);
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs.slice(1))
+          pieces.push_back(getIdentifier(pieceID));
+
+        assert(numArgs != 0);
+        assert(!isImplicit && "Need to update for implicit");
+        Attr = DynamicReplacementAttr::create(
+            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
+            cast<AbstractFunctionDecl>(*replacedFunDecl));
+        break;
+      }
 
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
@@ -2642,6 +2670,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       unsigned discriminator;
       decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
       localDiscriminatorRAII.discriminator = discriminator;
+    } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
+      IdentifierID filenameID;
+      decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
+      filenameForPrivate.filename = getIdentifier(filenameID);
     } else {
       break;
     }
@@ -2720,7 +2752,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                                         index);
 
     // Always create GenericTypeParamDecls in the associated module;
-    // maybeReadGenericParams() will reparent them.
+    // the real context will reparent them.
     auto DC = getAssociatedModule();
     auto genericParam = createDecl<GenericTypeParamDecl>(DC,
                                                          getIdentifier(nameID),
@@ -2946,8 +2978,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
+    if (auto *overridden = ctor->getOverriddenDecl()) {
+      if (!attributeChainContains<RequiredAttr>(DAttrs) ||
+          !overridden->isRequired()) {
+        AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+      }
+    }
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
             rawDefaultArgumentResilienceExpansion)) {
@@ -3083,12 +3122,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     unsigned rawSpecifier;
     TypeID interfaceTypeID;
     bool isVariadic;
+    bool isAutoClosure;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isVariadic,
-                                         rawDefaultArg);
+                                         isAutoClosure, rawDefaultArg);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3119,6 +3159,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     param->setInterfaceType(paramTy);
     param->setVariadic(isVariadic);
+    param->setAutoClosure(isAutoClosure);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -3138,7 +3179,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind, rawAddressorKind;
+    uint8_t rawAccessorKind;
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
@@ -3172,7 +3213,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           resultInterfaceTypeID,
                                           overriddenID,
                                           accessorStorageDeclID,
-                                          rawAccessorKind, rawAddressorKind,
+                                          rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
@@ -3186,7 +3227,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
     AccessorKind accessorKind;
-    AddressorKind addressorKind;
     if (isAccessor) {
       auto storageResult = getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -3199,13 +3239,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
       if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind)) {
         accessorKind = *accessorKindResult;
-      } else {
-        error();
-        return nullptr;
-      }
-
-      if (auto addressorKindResult = getActualAddressorKind(rawAddressorKind)) {
-        addressorKind = *addressorKindResult;
       } else {
         error();
         return nullptr;
@@ -3282,7 +3315,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     } else {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-        accessorKind, addressorKind, storage,
+        accessorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);
@@ -3982,9 +4015,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams))
+    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+      // We do this repeatedly to set up the correct DeclContexts for the
+      // GenericTypeParamDecls in the list.
+      extension->setGenericParams(genericParams);
       outerParams = genericParams;
-    extension->setGenericParams(outerParams);
+    }
 
     configureGenericEnvironment(extension, genericEnvID);
 
@@ -4490,14 +4526,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     TypeID resultID;
     // SWIFT_ENABLE_TENSORFLOW
     uint8_t rawRepresentation, rawDifferentiability;
-    
-    bool autoClosure = false, noescape = false, throws = false;
+    bool noescape = false, throws;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
-                                                  autoClosure,
                                                   noescape,
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
@@ -4528,9 +4562,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
     
-    auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
-                                      // SWIFT_ENABLE_TENSORFLOW
-                                      throws, *diffability);
+    // SWIFT_ENABLE_TENSORFLOW
+    auto info = FunctionType::ExtInfo(*representation, noescape, throws,
+                                      *diffability);
 
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)
@@ -5275,10 +5309,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   using namespace decls_block;
 
   PrettyStackTraceModuleFile traceModule("While reading from", *this);
-  PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                             "finishing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(getAssociatedModule()->getASTContext(),
+                                    "finishing conformance for",
+                                    conformance);
   ++NumNormalProtocolConformancesCompleted;
 
   assert(conformance->isComplete());

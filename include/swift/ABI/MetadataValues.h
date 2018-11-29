@@ -380,12 +380,12 @@ enum : unsigned {
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  DirectNominalTypeDescriptor = 0x00,
+  /// getTypeDescriptor() points to the type context descriptor.
+  DirectTypeDescriptor = 0x00,
 
   /// The conformance is for a nominal type referenced indirectly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  IndirectNominalTypeDescriptor = 0x01,
+  /// getTypeDescriptor() points to the type context descriptor.
+  IndirectTypeDescriptor = 0x01,
 
   /// The conformance is for an Objective-C class that should be looked up
   /// by class name.
@@ -402,7 +402,7 @@ enum class TypeReferenceKind : unsigned {
 
   // We only reserve three bits for this in the various places we store it.
 
-  First_Kind = DirectNominalTypeDescriptor,
+  First_Kind = DirectTypeDescriptor,
   Last_Kind = IndirectObjCClass,
 };
 
@@ -1537,6 +1537,45 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+class GenericEnvironmentFlags {
+  uint32_t Value;
+
+  enum : uint32_t {
+    NumGenericParameterLevelsMask = 0xFFF,
+    NumGenericRequirementsShift = 12,
+    NumGenericRequirementsMask = 0xFFFF << NumGenericRequirementsShift,
+  };
+
+  constexpr explicit GenericEnvironmentFlags(uint32_t value) : Value(value) { }
+
+public:
+  constexpr GenericEnvironmentFlags() : Value(0) { }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericParameterLevels(uint16_t numGenericParameterLevels) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+                                   | numGenericParameterLevels);
+  }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericRequirements(uint16_t numGenericRequirements) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericRequirementsMask)
+             | (numGenericRequirements << NumGenericRequirementsShift));
+  }
+
+  constexpr unsigned getNumGenericParameterLevels() const {
+    return Value & NumGenericParameterLevelsMask;
+  }
+
+  constexpr unsigned getNumGenericRequirements() const {
+    return (Value & NumGenericRequirementsMask) >> NumGenericRequirementsShift;
+  }
+
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
 };
 
 /// Flags used by generic metadata patterns.

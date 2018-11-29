@@ -381,6 +381,93 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   return *NSErrorConformanceToError;
 }
 
+SILFunction *
+SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
+                                            KeyPathTypeKind typeKind) {
+  bool isBaseInout;
+  bool isResultInout;
+  StringRef functionName;
+  NominalTypeDecl *keyPathDecl;
+  if (isReadAccess) {
+    assert(typeKind == KPTK_KeyPath ||
+           typeKind == KPTK_WritableKeyPath ||
+           typeKind == KPTK_ReferenceWritableKeyPath);
+    functionName = "swift_readAtKeyPath";
+    isBaseInout = false;
+    isResultInout = false;
+    keyPathDecl = getASTContext().getKeyPathDecl();
+  } else if (typeKind == KPTK_WritableKeyPath) {
+    functionName = "swift_modifyAtWritableKeyPath";
+    isBaseInout = true;
+    isResultInout = true;
+    keyPathDecl = getASTContext().getWritableKeyPathDecl();
+  } else if (typeKind == KPTK_ReferenceWritableKeyPath) {
+    functionName = "swift_modifyAtReferenceWritableKeyPath";
+    isBaseInout = false;
+    isResultInout = true;
+    keyPathDecl = getASTContext().getReferenceWritableKeyPathDecl();
+  } else {
+    llvm_unreachable("bad combination");
+  }
+
+  auto fn = M.lookUpFunction(functionName);
+  if (fn) return fn;
+
+  auto rootType = CanGenericTypeParamType::get(0, 0, getASTContext());
+  auto valueType = CanGenericTypeParamType::get(0, 1, getASTContext());
+
+  // Build the generic signature <A, B>.
+  auto sig = GenericSignature::get({rootType, valueType}, {});
+
+  auto keyPathTy = BoundGenericType::get(keyPathDecl, Type(),
+                                         { rootType, valueType })
+    ->getCanonicalType();
+
+  // (@in_guaranteed/@inout Root, @guaranteed KeyPath<Root, Value>)
+  SILParameterInfo params[] = {
+    { rootType,
+      isBaseInout ? ParameterConvention::Indirect_Inout
+                  : ParameterConvention::Indirect_In_Guaranteed },
+    { keyPathTy, ParameterConvention::Direct_Guaranteed },
+  };
+
+  // -> @yields @in_guaranteed/@inout Value
+  SILYieldInfo yields[] = {
+    { valueType,
+      isResultInout ? ParameterConvention::Indirect_Inout
+                    : ParameterConvention::Indirect_In_Guaranteed },
+  };
+
+  auto extInfo =
+    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
+                             /*pseudogeneric*/false,
+                             /*non-escaping*/false);
+
+  auto functionTy = SILFunctionType::get(sig, extInfo,
+                                         SILCoroutineKind::YieldOnce,
+                                         ParameterConvention::Direct_Unowned,
+                                         params,
+                                         yields,
+                                         /*results*/ {},
+                                         /*error result*/ {},
+                                         getASTContext());
+
+  auto env = sig->createGenericEnvironment();
+
+  SILGenFunctionBuilder builder(*this);
+  fn = builder.createFunction(SILLinkage::PublicExternal,
+                              functionName,
+                              functionTy,
+                              env,
+                              /*location*/ None,
+                              IsNotBare,
+                              IsNotTransparent,
+                              IsNotSerialized,
+                              IsNotDynamic);
+
+  return fn;
+}
+
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
@@ -441,8 +528,8 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   SILGenFunctionBuilder builder(*this);
   return builder.createFunction(
       SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
-      Loc, IsBare, IsNotTransparent, IsNotSerialized, ProfileCounter(),
-      IsNotThunk, SubclassScope::NotApplicable);
+      Loc, IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
 }
 
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
@@ -507,7 +594,7 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   // distinct files. For extensions, just pass in the constructor, because
   // there are no stored property initializers to visit.
   Decl *decl = nullptr;
-  if (ctx->isExtensionContext())
+  if (isa<ExtensionDecl>(ctx))
     decl = cd;
   else
     decl = ctx->getSelfNominalTypeDecl();
@@ -1114,9 +1201,9 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   SILGenFunctionBuilder builder(*this);
-  auto *f = builder.createFunction(SILLinkage::Private, funcName, initSILType,
-                                   nullptr, SILLocation(binding), IsNotBare,
-                                   IsNotTransparent, IsNotSerialized);
+  auto *f = builder.createFunction(
+      SILLinkage::Private, funcName, initSILType, nullptr, SILLocation(binding),
+      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   auto dc = binding->getDeclContext();
   SILGenFunction(*this, *f, dc).emitLazyGlobalInitializer(binding, pbdEntry);
@@ -1261,26 +1348,58 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  if (vd->getImplInfo().isSimpleStored()) {
-    // If the global variable has storage, it might also have synthesized
-    // accessors. Emit them here, since they won't appear anywhere else.
-    vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-      auto accessor = vd->getAccessor(kind);
-      if (accessor)
-        emitFunction(accessor);
-    });
-  }
+  // Emit the variable's opaque accessors.
+  vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    auto accessor = vd->getAccessor(kind);
+    if (!accessor) return;
+
+    // Only emit the accessor if it wasn't added to the surrounding decl
+    // list by the parser.  We can test that easily by looking at the impl
+    // info, since all of these accessors have a corresponding access kind
+    // whose impl should definitely point at the accessor if it was parsed.
+    //
+    // This is an unfortunate formation rule, but it's easier than messing
+    // with the invariants for now.
+    bool shouldEmit = [&] {
+      auto impl = vd->getImplInfo();
+      switch (kind) {
+      case AccessorKind::Get:
+        return impl.getReadImpl() != ReadImplKind::Get;
+      case AccessorKind::Read:
+        return impl.getReadImpl() != ReadImplKind::Read;
+      case AccessorKind::Set:
+        return impl.getWriteImpl() != WriteImplKind::Set;
+      case AccessorKind::Modify:
+        return impl.getReadWriteImpl() != ReadWriteImplKind::Modify;
+#define ACCESSOR(ID) \
+      case AccessorKind::ID:
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#include "swift/AST/AccessorKinds.def"
+        llvm_unreachable("not an opaque accessor");
+      }
+    }();
+    if (!shouldEmit) return;
+
+    emitFunction(accessor);
+  });
 
   tryEmitPropertyDescriptor(vd);
 }
 
 bool
-TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
+SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                                  ResilienceExpansion expansion) {
+  // If the declaration is resilient, we have to treat the component as
+  // computed.
+  if (decl->isResilient(M.getSwiftModule(), expansion))
+    return false;
+
   auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
                                           decl->supportsMutation()
                                             ? AccessKind::ReadWrite
                                             : AccessKind::Read,
-                                          M.getSwiftModule());
+                                          M.getSwiftModule(),
+                                          expansion);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     // Keypaths rely on accessors to handle the special behavior of weak or
@@ -1293,9 +1412,9 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = getSubstitutedStorageType(decl, componentObjTy);
+    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
     
     return storageTy.getAddressType() == opaqueTy.getAddressType();
   }
@@ -1309,7 +1428,7 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   llvm_unreachable("unhandled strategy");
 }
 
-static bool canStorageUseTrivialDescriptor(SILModule &M,
+static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
                                            AbstractStorageDecl *decl) {
   // A property can use a trivial property descriptor if the key path component
   // that an external module would form given publicly-exported information
@@ -1317,10 +1436,11 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
   // key path.
   // This means that the property isn't stored (without promising to be always
   // stored) and doesn't have a setter with less-than-public visibility.
-  
-  switch (M.getSwiftModule()->getResilienceStrategy()) {
+  auto expansion = ResilienceExpansion::Maximal;
+
+  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Default: {
-    if (M.Types.canStorageUseStoredKeyPathComponent(decl)) {
+    if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
@@ -1348,7 +1468,7 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
     // or a fixed-layout type may not have been.
     // Without availability information, only get-only computed properties
     // can resiliently use trivial descriptors.
-    return !M.Types.canStorageUseStoredKeyPathComponent(decl)
+    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
       && decl->getSetter() == nullptr;
   }
   }
@@ -1356,9 +1476,6 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
-    return;
-  
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
@@ -1388,7 +1505,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
   
-  if (canStorageUseTrivialDescriptor(M, decl)) {
+  if (canStorageUseTrivialDescriptor(*this, decl)) {
     (void)SILProperty::create(M, /*serialized*/ false, decl, None);
     return;
   }
@@ -1399,6 +1516,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
+                                               ResilienceExpansion::Maximal,
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),

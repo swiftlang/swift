@@ -536,6 +536,9 @@ BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoi
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
+/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
+BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
 // SWIFT_ENABLE_TENSORFLOW
 /// tensorflowSend_X has type <T> (T) -> ().  The X in the name is an integer
 /// ID number that allows matching sends and receives.
@@ -554,9 +557,6 @@ BUILTIN_MISC_OPERATION(AutoDiffPushToTape, "autodiffPushToTape", "", Special)
 BUILTIN_MISC_OPERATION(AutoDiffPopFromTape, "autodiffPopFromTape", "", Special)
 /// autodiffDestroyTape has type <T> (Builtin.AutoDiffTape<T>) -> ().
 BUILTIN_MISC_OPERATION(AutoDiffDestroyTape, "autodiffDestroyTape", "", Special)
-
-/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
-BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

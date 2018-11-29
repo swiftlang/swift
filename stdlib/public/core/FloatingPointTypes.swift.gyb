@@ -83,7 +83,11 @@ extension ${Self} : CustomStringConvertible {
     if isNaN {
       return "nan"
     } else {
-      return _float${bits}ToString(self, debug: false)
+      var (buffer, length) = _float${bits}ToString(self, debug: false)
+      return buffer.withBytes { (bufferPtr) in
+        String._fromASCII(
+          UnsafeBufferPointer(start: bufferPtr, count: length))
+      }
     }
   }
 }
@@ -91,7 +95,21 @@ extension ${Self} : CustomStringConvertible {
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
-    return _float${bits}ToString(self, debug: true)
+    var (buffer, length) = _float${bits}ToString(self, debug: true)
+    return buffer.withBytes { (bufferPtr) in
+      String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: length))
+    }
+  }
+}
+
+extension ${Self} : TextOutputStreamable {
+  public func write<Target>(to target: inout Target) where Target : TextOutputStream {
+    var (buffer, length) = _float${bits}ToString(self, debug: true)
+    buffer.withBytes { (bufferPtr) in
+      let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
+      target._writeASCII(bufPtr)
+    }
   }
 }
 
@@ -157,24 +175,24 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   //  Implementation details.
-  @usableFromInline
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _infinityExponent: UInt {
     @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
-  @usableFromInline
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _exponentBias: UInt {
     @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
-  @usableFromInline
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount) - 1
     }
   }
 
-  @usableFromInline
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount - 1)
@@ -1085,6 +1103,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// `formRemainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
     self = _stdlib_remainder${cFuncSuffix}(self, other)
@@ -1119,6 +1138,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formTruncatingRemainder(dividingBy other: ${Self}) {
     _value = Builtin.frem_FPIEEE${bits}(self._value, other._value)
@@ -1240,6 +1260,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// A *normal* value is a finite number that uses the full precision
   /// available to values of a type. Zero is neither a normal nor a subnormal
   /// number.
+  @inlinable // FIXME(inline-always)
   public var isNormal: Bool {
     @inline(__always)
     get {
@@ -1251,6 +1272,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// All values other than NaN and infinity are considered finite, whether
   /// normal or subnormal.
+  @inlinable // FIXME(inline-always)
   public var isFinite: Bool {
     @inline(__always)
     get {
@@ -1267,6 +1289,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///     let x = -0.0
   ///     x.isZero        // true
   ///     x == 0.0        // true
+  @inlinable // FIXME(inline-always)
   public var isZero: Bool {
     @inline(__always)
     get {
@@ -1283,6 +1306,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// Zero is neither a normal nor a subnormal number. Subnormal numbers are
   /// often called *denormal* or *denormalized*---these are different names
   /// for the same concept.
+  @inlinable // FIXME(inline-always)
   public var isSubnormal:  Bool {
     @inline(__always)
     get {
@@ -1294,6 +1318,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// Note that `isFinite` and `isInfinite` do not form a dichotomy, because
   /// they are not total: If `x` is `NaN`, then both properties are `false`.
+  @inlinable // FIXME(inline-always)
   public var isInfinite:  Bool {
     @inline(__always)
     get {
@@ -1324,6 +1349,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // Prints "true"
   ///
   /// This property is `true` for both quiet and signaling NaNs.
+  @inlinable // FIXME(inline-always)
   public var isNaN:  Bool {
     @inline(__always)
     get {
@@ -1335,6 +1361,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// Signaling NaNs typically raise the Invalid flag when used in general
   /// computing operations.
+  @inlinable // FIXME(inline-always)
   public var isSignalingNaN: Bool {
     @inline(__always)
     get {
@@ -1429,6 +1456,7 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // x == 21.25
   ///
   /// - Parameter value: The new floating-point value.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init(floatLiteral value: ${Self}) {
     self = value
@@ -1572,6 +1600,7 @@ extension ${Self} {
   ///     // Use 'abs(_:)' instead of 'magnitude'
   ///     print("Missed the target by \(abs(margin)) meters.")
   ///     // Prints "Missed the target by 0.25 meters."
+  @inlinable // FIXME(inline-always)
   public var magnitude: ${Self} {
     @inline(__always)
     get {
@@ -1596,13 +1625,16 @@ extension ${Self} {
 
   // We "shouldn't" need this, but the typechecker barfs on an expression
   // in the test suite without it.
-  @inline(__always)
+  // If replaced with @inline(__always) the init no longer gets
+  // inlined in -Onone and this breaks the abi_v7k test in a subtle way.
+  @_transparent
   public init(_ v: Int) {
     _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
 
   // Fast-path for conversion when the source is representable as a 64-bit int,
   // falling back on the generic _convert operation otherwise.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<Source : BinaryInteger>(_ value: Source) {
     if value.bitWidth <= ${word_bits} {
@@ -1648,6 +1680,7 @@ extension ${Self} {
   ///     // z.isNaN == true
   ///
   /// - Parameter other: The value to use for the new instance.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init(_ other: ${That}) {
 %   if srcBits > bits:
@@ -1881,8 +1914,8 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal func _isEqual(to box: _AnyHashableBox) -> Bool? {
-    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
-    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(Int64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(UInt64(exactly: _value) == nil, "self isn't canonical")
     if let box = box as? _${Self}AnyHashableBox {
       return _value == box._value
     }
@@ -1894,8 +1927,8 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal func _hash(into hasher: inout Hasher) {
-    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
-    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(Int64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(UInt64(exactly: _value) == nil, "self isn't canonical")
     hasher.combine(_value)
   }
 

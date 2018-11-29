@@ -10,7 +10,7 @@ func baz(a1: @autoclosure () -> Int,
          a2: () -> Int,
          b1: () throws -> Int,
          b2: () -> Int) {
-  // CHECK: function_ref @$s12rdar371606793fooyySiyXKF
+  // CHECK: function_ref @$s12rdar371606793fooyySiyXEF
   foo(a1)
   // CHECK: function_ref @$s12rdar371606793fooyySiyXEF
   foo(a2)

@@ -314,6 +314,31 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
+
+/// Return true if the given storage objects have identical storage locations.
+///
+/// This compares only the AccessedStorage base class bits, ignoring the
+/// subclass bits.
+inline bool accessingIdenticalLocations(AccessedStorage LHS,
+                                        AccessedStorage RHS) {
+  if (LHS.getKind() != RHS.getKind())
+    return false;
+
+  switch (LHS.getKind()) {
+  case swift::AccessedStorage::Box:
+  case swift::AccessedStorage::Stack:
+  case swift::AccessedStorage::Nested:
+  case swift::AccessedStorage::Yield:
+  case swift::AccessedStorage::Unidentified:
+    return LHS.getValue() == RHS.getValue();
+  case swift::AccessedStorage::Argument:
+    return LHS.getParamIndex() == RHS.getParamIndex();
+  case swift::AccessedStorage::Global:
+    return LHS.getGlobal() == RHS.getGlobal();
+  case swift::AccessedStorage::Class:
+    return LHS.getObjectProjection() == RHS.getObjectProjection();
+  }
+}
 } // end namespace swift
 
 namespace llvm {
@@ -355,24 +380,7 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
   }
 
   static bool isEqual(swift::AccessedStorage LHS, swift::AccessedStorage RHS) {
-    if (LHS.getKind() != RHS.getKind())
-      return false;
-
-    switch (LHS.getKind()) {
-    case swift::AccessedStorage::Box:
-    case swift::AccessedStorage::Stack:
-    case swift::AccessedStorage::Nested:
-    case swift::AccessedStorage::Yield:
-    case swift::AccessedStorage::Unidentified:
-      return LHS.getValue() == RHS.getValue();
-    case swift::AccessedStorage::Argument:
-      return LHS.getParamIndex() == RHS.getParamIndex();
-    case swift::AccessedStorage::Global:
-      return LHS.getGlobal() == RHS.getGlobal();
-    case swift::AccessedStorage::Class:
-        return LHS.getObjectProjection() == RHS.getObjectProjection();
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
+    return swift::accessingIdenticalLocations(LHS, RHS);
   }
 };
 

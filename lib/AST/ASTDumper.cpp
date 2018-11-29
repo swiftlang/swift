@@ -85,8 +85,7 @@ namespace {
     PrintWithColorRAII(raw_ostream &os, TerminalColor color)
     : OS(os), ShowColors(false)
     {
-      if (&os == &llvm::errs() || &os == &llvm::outs())
-        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+      ShowColors = os.has_colors();
 
       if (ShowColors)
         OS.changeColor(color.Color, color.Bold);
@@ -318,8 +317,6 @@ static StringRef getAccessorKindString(AccessorKind value) {
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"
-  case AccessorKind::Address: return "address";
-  case AccessorKind::MutableAddress: return "mutableAddress";
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -421,13 +418,9 @@ namespace {
   public:
     raw_ostream &OS;
     unsigned Indent;
-    bool ShowColors;
 
     explicit PrintPattern(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent), ShowColors(false) {
-      if (&os == &llvm::errs() || &os == &llvm::outs())
-        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-    }
+      : OS(os), Indent(indent) { }
 
     void printRec(Decl *D) { D->dump(OS, Indent + 2); }
     void printRec(Expr *E) { E->dump(OS, Indent + 2); }
@@ -549,13 +542,9 @@ namespace {
   public:
     raw_ostream &OS;
     unsigned Indent;
-    bool ShowColors;
 
     explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent), ShowColors(false) {
-      if (&os == &llvm::errs() || &os == &llvm::outs())
-        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-    }
+      : OS(os), Indent(indent) { }
     
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->dump(OS, Indent+2); }
@@ -772,6 +761,12 @@ namespace {
         OS << " @objc";
       if (VD->isDynamic())
         OS << " dynamic";
+      if (auto *attr =
+              VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+        OS << " @_dynamicReplacement(for: \"";
+        OS << attr->getReplacedFunctionName();
+        OS << "\")";
+      }
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name,
@@ -979,6 +974,9 @@ namespace {
 
       if (P->isVariadic())
         OS << " variadic";
+
+      if (P->isAutoClosure())
+        OS << " autoclosure";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
         printField("default_arg",
@@ -1651,6 +1649,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPoundAssertStmt(PoundAssertStmt *S) {
+    printCommon(S, "pound_assert");
+    OS << " message=" << QuotedString(S->getMessage()) << "\n";
+    printRec(S->getCondition());
+    OS << ")";
+  }
+
   void visitDoCatchStmt(DoCatchStmt *S) {
     printCommon(S, "do_catch_stmt") << '\n';
     printRec(S->getBody());
@@ -1841,10 +1846,10 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    for (auto Segment : E->getSegments()) {
-      OS << '\n';
-      printRec(Segment);
-    }
+    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+      << E->getLiteralCapacity() << " interpolation_count="
+      << E->getInterpolationCount() << '\n';
+    printRec(E->getAppendingExpr());
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2694,12 +2699,17 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitPoundAssertExpr(PoundAssertExpr *E) {
-    printCommon(E, "pound_assert");
-    OS << " message=" << QuotedString(E->getMessage()) << "\n";
-    printRec(E->getCondition());
-    OS << ")";
+  void visitTapExpr(TapExpr *E) {
+    printCommon(E, "tap_expr");
+    PrintWithColorRAII(OS, DeclColor) << " var=";
+    printDeclRef(E->getVar());
+    OS << '\n';
+
+    printRec(E->getSubExpr());
+    OS << '\n';
+
+    printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 
@@ -2743,13 +2753,9 @@ class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr> {
 public:
   raw_ostream &OS;
   unsigned Indent;
-  bool ShowColors;
 
   PrintTypeRepr(raw_ostream &os, unsigned indent)
-    : OS(os), Indent(indent), ShowColors(false) {
-    if (&os == &llvm::errs() || &os == &llvm::outs())
-      ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
-  }
+    : OS(os), Indent(indent) { }
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->dump(OS, Indent + 2); }
@@ -3005,6 +3011,11 @@ static void dumpProtocolConformanceRec(
       out.indent(indent + 2);
       out << "(conditional requirements unable to be computed)";
     }
+    break;
+  }
+
+  case ProtocolConformanceKind::Self: {
+    printCommon("self");
     break;
   }
 
@@ -3469,7 +3480,6 @@ namespace {
         printField("representation",
                    getSILFunctionTypeRepresentationString(representation));
 
-      printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 

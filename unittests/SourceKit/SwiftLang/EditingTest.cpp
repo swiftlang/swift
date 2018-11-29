@@ -266,7 +266,8 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   close(DocName);
 }
 
-TEST_F(EditTest, DiagsAfterCloseAndReopen) {
+// This test is failing occassionally in CI: rdar://45644449
+TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:
   // * the 2nd open happens before the first AST starts building

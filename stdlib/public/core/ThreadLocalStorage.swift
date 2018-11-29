@@ -15,8 +15,33 @@ import SwiftShims
 // For testing purposes, a thread-safe counter to guarantee that destructors get
 // called by pthread.
 #if INTERNAL_CHECKS_ENABLED
+internal class _TLSAtomicInt {
+  internal var value: Int
+  internal init() { self.value = 0 }
+
+  internal var valuePtr: UnsafeMutablePointer<Int> {
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Int.self)
+  }
+
+  internal func increment() {
+    _ = _swift_stdlib_atomicFetchAddInt(
+      object: valuePtr,
+      operand: 1)
+  }
+
+  internal func load() -> Int {
+    return _swift_stdlib_atomicLoadInt(object: valuePtr)
+  }
+}
+
+internal let _destroyTLSCounter = _TLSAtomicInt()
+
 public // @testable
-let _destroyTLSCounter = _stdlib_AtomicInt()
+func _loadDestroyTLSCounter() -> Int {
+  return _destroyTLSCounter.load()
+}
+
 #endif
 
 // Thread local storage for all of the Swift standard library
@@ -71,14 +96,40 @@ internal struct _ThreadLocalStorage {
   }
 
   internal static func getUBreakIterator(
-    start: UnsafePointer<UTF16.CodeUnit>,
-    count: Int32
+    _ bufPtr: UnsafeBufferPointer<UTF16.CodeUnit>
   ) -> OpaquePointer {
     let tlsPtr = getPointer()
     let brkIter = tlsPtr[0].uBreakIterator
+    let utext = tlsPtr[0].uText
 
     var err = __swift_stdlib_U_ZERO_ERROR
-    __swift_stdlib_ubrk_setText(brkIter, start, count, &err)
+
+    let start = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    _ = __swift_stdlib_utext_openUChars(
+      utext, start, Int64(bufPtr.count), &err)
+    _precondition(err.isSuccess, "Unexpected utext_openUChars failure")
+
+    __swift_stdlib_ubrk_setUText(brkIter, utext, &err)
+    _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
+
+    return brkIter
+  }
+
+  internal static func getUBreakIterator(
+    _ bufPtr: UnsafeBufferPointer<UTF8.CodeUnit>
+  ) -> OpaquePointer {
+    let tlsPtr = getPointer()
+    let brkIter = tlsPtr[0].uBreakIterator
+    let utext = tlsPtr[0].uText
+
+    var err = __swift_stdlib_U_ZERO_ERROR
+
+    let start = bufPtr.baseAddress._unsafelyUnwrappedUnchecked._asCChar
+    _ = __swift_stdlib_utext_openUTF8(
+      utext, start, Int64(bufPtr.count), &err)
+    _precondition(err.isSuccess, "Unexpected utext_openUChars failure")
+
+    __swift_stdlib_ubrk_setUText(brkIter, utext, &err)
     _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
 
     return brkIter
@@ -89,7 +140,7 @@ internal struct _ThreadLocalStorage {
 // owned.
 @_silgen_name("_stdlib_destroyTLS")
 internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
-  _sanityCheck(ptr != nil,
+  _internalInvariant(ptr != nil,
     "_destroyTLS was called, but with nil...")
   let tlsPtr = ptr!.assumingMemoryBound(to: _ThreadLocalStorage.self)
   __swift_stdlib_ubrk_close(tlsPtr[0].uBreakIterator)
@@ -98,7 +149,7 @@ internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
 
 #if INTERNAL_CHECKS_ENABLED
   // Log the fact we've destroyed our storage
-  _destroyTLSCounter.fetchAndAdd(1)
+  _destroyTLSCounter.increment()
 #endif
 }
 

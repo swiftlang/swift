@@ -78,8 +78,6 @@ extension LazyDropWhileSequence.Iterator: IteratorProtocol {
 }
 
 extension LazyDropWhileSequence: Sequence {
-  public typealias SubSequence = AnySequence<Element> // >:(
-
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
@@ -119,140 +117,45 @@ extension LazySequenceProtocol {
 ///   performance given by the `Collection` protocol. Be aware, therefore,
 ///   that general operations on lazy collections may not have the
 ///   documented complexity.
-@_fixed_layout // lazy-performance
-public struct LazyDropWhileCollection<Base: Collection> {
-  public typealias Element = Base.Element
-  
-  @inlinable // lazy-performance
-  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
-    self._base = _base
-    self._predicate = predicate
-  }
-
-  @usableFromInline // lazy-performance
-  internal var _base: Base
-  @usableFromInline // lazy-performance
-  internal let _predicate: (Element) -> Bool
-}
-
-extension LazyDropWhileCollection: Sequence {
-  public typealias Iterator = LazyDropWhileSequence<Base>.Iterator
-  
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  @inlinable // lazy-performance
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_base: _base.makeIterator(), predicate: _predicate)
-  }
-}
-
-extension LazyDropWhileCollection {
-  public typealias SubSequence = Slice<LazyDropWhileCollection<Base>>
-
-  /// A position in a `LazyDropWhileCollection` or
-  /// `LazyDropWhileBidirectionalCollection` instance.
-  @_fixed_layout // lazy-performance
-  public struct Index {
-    /// The position corresponding to `self` in the underlying collection.
-    public let base: Base.Index
-
-    @inlinable // lazy-performance
-    internal init(_base: Base.Index) {
-      self.base = _base
-    }
-  }
-}
-
-extension LazyDropWhileCollection.Index: Equatable, Comparable {
-  @inlinable // lazy-performance
-  public static func == (
-    lhs: LazyDropWhileCollection<Base>.Index,
-    rhs: LazyDropWhileCollection<Base>.Index
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  @inlinable // lazy-performance
-  public static func < (
-    lhs: LazyDropWhileCollection<Base>.Index,
-    rhs: LazyDropWhileCollection<Base>.Index
-  ) -> Bool {
-    return lhs.base < rhs.base
-  }
-}
-
-extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
-  /// The hash value.
-  @inlinable
-  public var hashValue: Int {
-    return base.hashValue
-  }
-
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
-  @inlinable
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(base)
-  }
-}
+public typealias LazyDropWhileCollection<T: Collection> = LazyDropWhileSequence<T>
 
 extension LazyDropWhileCollection: Collection {
+  public typealias SubSequence = Slice<LazyDropWhileCollection<Base>>
+  public typealias Index = Base.Index
+
   @inlinable // lazy-performance
   public var startIndex: Index {
     var index = _base.startIndex
     while index != _base.endIndex && _predicate(_base[index]) {
       _base.formIndex(after: &index)
     }
-    return Index(_base: index)
+    return index
   }
 
   @inlinable // lazy-performance
   public var endIndex: Index {
-    return Index(_base: _base.endIndex)
+    return _base.endIndex
   }
 
   @inlinable // lazy-performance
   public func index(after i: Index) -> Index {
-    _precondition(i.base < _base.endIndex, "Can't advance past endIndex")
-    return Index(_base: _base.index(after: i.base))
+    _precondition(i < _base.endIndex, "Can't advance past endIndex")
+    return _base.index(after: i)
   }
-
 
   @inlinable // lazy-performance
   public subscript(position: Index) -> Element {
-    return _base[position.base]
+    return _base[position]
   }
 }
-
-extension LazyDropWhileCollection: LazyCollectionProtocol { }
 
 extension LazyDropWhileCollection: BidirectionalCollection 
 where Base: BidirectionalCollection {
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {
     _precondition(i > startIndex, "Can't move before startIndex")
-    return Index(_base: _base.index(before: i.base))
+    return _base.index(before: i)
   }
 }
 
-extension LazyCollectionProtocol {
-  /// Returns a lazy collection that skips any initial elements that satisfy
-  /// `predicate`.
-  ///
-  /// - Parameter predicate: A closure that takes an element of the collection
-  ///   as its argument and returns `true` if the element should be skipped or
-  ///   `false` otherwise. Once `predicate` returns `false` it will not be
-  ///   called again.
-  @inlinable // lazy-performance
-  public __consuming func drop(
-    while predicate: @escaping (Elements.Element) -> Bool
-  ) -> LazyDropWhileCollection<Self.Elements> {
-    return LazyDropWhileCollection(
-      _base: self.elements, predicate: predicate)
-  }
-}
-
+extension LazyDropWhileCollection: LazyCollectionProtocol { }

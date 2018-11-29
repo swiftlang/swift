@@ -185,6 +185,75 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
+llvm::Constant *IRGenModule::getMangledAssociatedConformance(
+                                  const NormalProtocolConformance *conformance,
+                                  const AssociatedConformance &requirement) {
+  // Figure out the name of the symbol to be used for the conformance.
+  IRGenMangler mangler;
+  auto symbolName =
+    mangler.mangleSymbolNameForAssociatedConformanceWitness(
+      conformance, requirement.getAssociation(),
+      requirement.getAssociatedRequirement());
+
+  // See if we emitted the constant already.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return entry.second;
+  }
+
+  // Get the accessor for this associated conformance.
+  llvm::Function *accessor;
+  unsigned char kind;
+  if (conformance) {
+    kind = 7;
+    accessor = getAddrOfAssociatedTypeWitnessTableAccessFunction(conformance,
+                                                                requirement);
+  } else {
+    kind = 8;
+    accessor = getAddrOfDefaultAssociatedConformanceAccessor(requirement);
+  }
+
+  // Form the mangled name with its relative reference.
+  ConstantInitBuilder B(*this);
+  auto S = B.beginStruct();
+  S.setPacked(true);
+  S.add(llvm::ConstantInt::get(Int8Ty, 255));
+  S.add(llvm::ConstantInt::get(Int8Ty, kind));
+  S.addRelativeAddress(accessor);
+
+  // And a null terminator!
+  S.addInt(Int8Ty, 0);
+
+  auto finished = S.finishAndCreateFuture();
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+                  llvm::GlobalValue::HiddenVisibility,
+                  llvm::GlobalValue::DefaultStorageClass})
+      .to(var);
+  var->setAlignment(2);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+
+  // Set the low bit.
+  unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
+  auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
+  addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+
+  // Update the entry.
+  entry = {var, addr};
+
+  return addr;
+}
+
 class ReflectionMetadataBuilder {
 protected:
   IRGenModule &IGM;
@@ -202,21 +271,16 @@ protected:
       if (IGM.getSwiftModule()->isStdlibModule() && isa<BuiltinType>(t))
         IGM.BuiltinTypes.insert(t);
 
-      // We need size/alignment information for imported value types,
-      // so emit builtin descriptors for them.
+      // We need size/alignment information for imported structs and
+      // enums, so emit builtin descriptors for them.
       //
       // In effect they're treated like an opaque blob, which is OK
       // for now, at least until we want to import C++ types or
       // something like that.
-      //
-      // Classes and protocols go down a different path.
       if (auto Nominal = t->getAnyNominal())
         if (Nominal->hasClangNode()) {
-          if (auto CD = dyn_cast<ClassDecl>(Nominal))
-            IGM.ImportedClasses.insert(CD);
-          else if (auto PD = dyn_cast<ProtocolDecl>(Nominal))
-            IGM.ImportedProtocols.insert(PD);
-          else
+          if (isa<StructDecl>(Nominal) ||
+              isa<EnumDecl>(Nominal))
             IGM.OpaqueTypes.insert(Nominal);
         }
     });
@@ -386,14 +450,6 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(uint16_t(kind));
     B.addInt16(fieldRecordSize);
 
-    // Imported classes don't need field descriptors
-    if (NTD->hasClangNode() && isa<ClassDecl>(NTD)) {
-      B.addInt32(0);
-      return;
-    }
-
-    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
-
     auto properties = NTD->getStoredProperties();
     B.addInt32(std::distance(properties.begin(), properties.end()));
     for (auto property : properties)
@@ -439,11 +495,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layoutProtocol() {
-    auto protocolDecl = cast<ProtocolDecl>(NTD);
+    auto PD = cast<ProtocolDecl>(NTD);
     FieldDescriptorKind Kind;
-    if (protocolDecl->isObjC())
+    if (PD->isObjC())
       Kind = FieldDescriptorKind::ObjCProtocol;
-    else if (protocolDecl->requiresClass())
+    else if (PD->requiresClass())
       Kind = FieldDescriptorKind::ClassProtocol;
     else
       Kind = FieldDescriptorKind::Protocol;
@@ -453,18 +509,17 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    if (NTD->hasClangNode() &&
-        !isa<ClassDecl>(NTD) &&
-        !isa<StructDecl>(NTD) &&
-        !isa<ProtocolDecl>(NTD))
-      return;
+    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     addNominalRef(NTD);
 
     auto *CD = dyn_cast<ClassDecl>(NTD);
+    auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
       addTypeRef(CD->getSuperclass()->getCanonicalType());
+    } else if (PD && PD->getDeclaredType()->getSuperclass()) {
+      addTypeRef(PD->getDeclaredType()->getSuperclass()->getCanonicalType());
     } else {
       B.addInt32(0);
     }
@@ -532,7 +587,13 @@ public:
     addTypeRef(type);
 
     B.addInt32(ti->getFixedSize().getValue());
-    B.addInt32(ti->getFixedAlignment().getValue());
+
+    auto alignment = ti->getFixedAlignment().getValue();
+    unsigned bitwiseTakable =
+      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+       ? 1 : 0);
+    B.addInt32(alignment | (bitwiseTakable << 16));
+
     B.addInt32(ti->getFixedStride().getValue());
     B.addInt32(ti->getFixedExtraInhabitantCount(IGM));
   }
@@ -900,7 +961,11 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
 }
 
 void IRGenModule::
-emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
+emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
+  auto normalConf = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normalConf)
+    return;
+
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
@@ -916,14 +981,14 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
     return false;
   };
 
-  Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.
   if (AssociatedTypes.empty())
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Conformance, AssociatedTypes);
+  AssociatedTypeMetadataBuilder builder(*this, normalConf, AssociatedTypes);
   builder.emit();
 }
 
@@ -948,12 +1013,6 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
       Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
-
-  for (auto CD : ImportedClasses)
-    emitFieldMetadataRecord(CD);
-
-  for (auto PD : ImportedProtocols)
-    emitFieldMetadataRecord(PD);
 
   for (auto SD : ImportedStructs)
     emitFieldMetadataRecord(SD);
@@ -994,7 +1053,7 @@ void IRGenModule::emitReflectionMetadataVersion() {
                                           llvm::GlobalValue::LinkOnceODRLinkage,
                                           Init,
                                           "__swift_reflection_version");
-  Version->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(Version);
   addUsedGlobal(Version);
 }
 

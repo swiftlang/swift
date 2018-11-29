@@ -41,7 +41,6 @@ set(SWIFTLIB_ESSENTIAL
   Builtin.swift
   BuiltinMath.swift.gyb
   Character.swift
-  CharacterUnicodeScalars.swift
   CocoaArray.swift
   Codable.swift.gyb
   Collection.swift
@@ -49,6 +48,7 @@ set(SWIFTLIB_ESSENTIAL
   Comparable.swift
   CompilerProtocols.swift
   ContiguousArray.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
@@ -124,7 +124,6 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift
   Sequence.swift
   SequenceAlgorithms.swift
-  SequenceWrapper.swift
   Set.swift
   SetAlgebra.swift
   SetAnyHashableExtensions.swift
@@ -136,18 +135,22 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallBuffer.swift
   SmallString.swift
   Sort.swift
   StaticString.swift
   Stride.swift
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
+  StringBreadcrumbs.swift
   StringBridge.swift
   StringCharacterView.swift
   StringComparable.swift
   StringComparison.swift
   StringCreate.swift
   StringGuts.swift
+  StringGutsSlice.swift
+  StringGutsRangeReplaceable.swift
   StringGutsVisitor.swift
   StringObject.swift
   StringProtocol.swift
@@ -163,6 +166,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   StringUTF16View.swift
   StringUTF8View.swift
+  StringUTF8Validation.swift
   StringVariant.swift
   Substring.swift
   SwiftNativeNSArray.swift
@@ -170,8 +174,10 @@ set(SWIFTLIB_ESSENTIAL
   UIntBuffer.swift
   UnavailableStringAPIs.swift.gyb
   UnicodeEncoding.swift
+  UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
+  CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -233,7 +239,7 @@ else()
     list(APPEND swift_core_private_link_libraries
       ICU_UC ICU_I18N)
   else()
-    list(APPEND swift_core_private_link_libraries -licui18n -licuuc -licudata)
+    list(APPEND swift_core_private_link_libraries -licui18nswift -licuucswift -licudataswift)
   endif()
 endif()
 

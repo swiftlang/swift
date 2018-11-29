@@ -325,6 +325,37 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(-1.0, allocated[count-1])
 }
 
+UnsafeMutableBufferPointerTestSuite.test("_withUnsafeMutableBufferPointerIfSupported") {
+  let count = 4
+  let allocated = UnsafeMutablePointer<Int>.allocate(capacity: count)
+  defer { allocated.deallocate() }
+  allocated.initialize(repeating: 1, count: count)
+
+  var buffer = UnsafeMutableBufferPointer(start: allocated, count: count)
+  let result = buffer._withUnsafeMutableBufferPointerIfSupported { buffer in
+    return buffer.reduce(0, +)
+  }
+  expectEqual(count, result)
+}
+
+UnsafeMutableBufferPointerTestSuite.test("sort") {
+  var values = (0..<1000).map({ _ in Int.random(in: 0..<100) })
+  let sortedValues = values.sorted()
+  values.withUnsafeMutableBufferPointer { buffer in
+    buffer.sort()
+  }
+  expectEqual(values, sortedValues)
+}
+
+UnsafeMutableBufferPointerTestSuite.test("partition") {
+  var values = (0..<1000).map({ _ in Int.random(in: 0..<100) })
+  let partitionIndex = values.withUnsafeMutableBufferPointer { buffer in
+    return buffer.partition(by: { $0 % 2 == 0 })
+  }
+  expectTrue(values[..<partitionIndex].allSatisfy({ $0 % 2 != 0 }))
+  expectTrue(values[partitionIndex...].allSatisfy({ $0 % 2 == 0 }))
+}
+
 let bufCount = 4
 let sliceRange: Range = 1..<bufCount-1
 % for mutable in [True, False]:

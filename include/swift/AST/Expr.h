@@ -59,6 +59,7 @@ namespace swift {
   class PatternBindingDecl;
   class ParameterList;
   class EnumElementDecl;
+  class CallExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -171,6 +172,12 @@ protected:
     Encoding : 3,
     IsSingleUnicodeScalar : 1,
     IsSingleExtendedGraphemeCluster : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
+    : NumPadBits,
+    InterpolationCount : 20,
+    LiteralCapacity : 32
   );
 
   SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2,
@@ -923,6 +930,42 @@ public:
   }
 };
 
+/// \brief Runs a series of statements which use or modify \c SubExpr
+/// before it is given to the rest of the expression.
+///
+/// \c Body should begin with a \c VarDecl; this defines the variable
+/// \c TapExpr will initialize at the beginning and read a result
+/// from at the end. \c TapExpr creates a separate scope, then
+/// assigns the result of \c SubExpr to the variable and runs \c Body
+/// in it, returning the value of the variable after the \c Body runs.
+///
+/// (The design here could be a bit cleaner, particularly where the VarDecl
+/// is concerned.)
+class TapExpr : public Expr {
+  Expr *SubExpr;
+  BraceStmt *Body;
+
+public:
+  TapExpr(Expr *SubExpr, BraceStmt *Body);
+
+  Expr * getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr * se) { SubExpr = se; }
+
+  /// \brief The variable which will be accessed and possibly modified by
+  /// the \c Body. This is the first \c ASTNode in the \c Body.
+  VarDecl * getVar() const;
+
+  BraceStmt * getBody() const { return Body; }
+  void setBody(BraceStmt * b) { Body = b; }
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Tap;
+  }
+};
+
 /// InterpolatedStringLiteral - An interpolated string literal.
 ///
 /// An interpolated string literal mixes expressions (which are evaluated and
@@ -934,16 +977,37 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
-  MutableArrayRef<Expr *> Segments;
+  TapExpr *AppendingExpr;
   Expr *SemanticExpr;
   
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc, MutableArrayRef<Expr *> Segments)
-    : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-      Loc(Loc), Segments(Segments), SemanticExpr() { }
-  
-  MutableArrayRef<Expr *> getSegments() { return Segments; }
-  ArrayRef<Expr *> getSegments() const { return Segments; }
+  InterpolatedStringLiteralExpr(SourceLoc Loc, unsigned LiteralCapacity, 
+                                unsigned InterpolationCount,
+                                TapExpr *AppendingExpr)
+      : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
+        Loc(Loc), AppendingExpr(AppendingExpr), SemanticExpr() {
+    Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
+    Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
+  }
+
+  /// \brief Retrieve the value of the literalCapacity parameter to the
+  /// initializer.
+  unsigned getLiteralCapacity() const {
+    return Bits.InterpolatedStringLiteralExpr.LiteralCapacity;
+  }
+
+  /// \brief Retrieve the value of the interpolationCount parameter to the
+  /// initializer.
+  unsigned getInterpolationCount() const {
+    return Bits.InterpolatedStringLiteralExpr.InterpolationCount;
+  }
+
+  /// \brief A block containing expressions which call
+  /// \c StringInterpolationProtocol methods to append segments to the
+  /// string interpolation. The first node in \c Body should be an uninitialized
+  /// \c VarDecl; the other statements should append to it.
+  TapExpr * getAppendingExpr() const { return AppendingExpr; }
+  void setAppendingExpr(TapExpr * AE) { AppendingExpr = AE; }
   
   /// \brief Retrieve the expression that actually evaluates the resulting
   /// string, typically with a series of '+' operations.
@@ -958,6 +1022,10 @@ public:
     // token, so the range should be (Start == End).
     return Loc;
   }
+
+  /// \brief Call the \c callback with information about each segment in turn.
+  void forEachSegment(ASTContext &Ctx,
+                      llvm::function_ref<void(bool, CallExpr *)> callback);
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::InterpolatedStringLiteral;

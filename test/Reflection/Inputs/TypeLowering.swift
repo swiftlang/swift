@@ -60,11 +60,17 @@ public struct ReferenceStruct {
 
   public let strongRefTuple: (C, C)
   public let optionalStrongRefTuple: (C, C)?
+}
 
+public struct UnownedReferenceStruct {
   public unowned let unownedRef: C
+}
 
+public struct WeakReferenceStruct {
   public weak var weakRef: C?
+}
 
+public struct UnmanagedReferenceStruct {
   public unowned(unsafe) let unmanagedRef: C
 }
 
@@ -85,6 +91,8 @@ public protocol P3 {}
 
 public protocol CP1 : class {}
 public protocol CP2 : CP1 {}
+public protocol CP3 : C {}
+public protocol CP4 where Self : C {}
 
 public struct ExistentialStruct {
   public let any: Any
@@ -111,10 +119,26 @@ public struct ExistentialStruct {
   public let anyClassBoundProtoComposition2: P1 & CP2
   public let optionalAnyClassBoundProtoComposition2: (P1 & CP2)?
   
+  public let classConstrainedP1: C & P1
+}
+
+public struct UnownedExistentialStruct {
+  public unowned var unownedRef: CP1
+}
+
+public struct UnownedNativeExistentialStruct {
+  public unowned var unownedRef1: C & CP1
+  public unowned var unownedRef2: CP3
+  public unowned var unownedRef3: CP4
+}
+
+public struct WeakExistentialStruct {
   public weak var weakAnyObject: AnyObject?
   public weak var weakAnyClassBoundProto: CP1?
+}
 
-  public let classConstrainedP1: C & P1
+public struct UnmanagedExistentialStruct {
+  public unowned(unsafe) var unmanagedRef: CP1
 }
 
 public struct MetadataHolder<T, U> {
@@ -144,13 +168,7 @@ public struct MetatypeStruct {
   public let abstractMetatype: MetadataHolder<BasicStruct.Type, BasicStruct>
 }
 
-// We don't allow stored properties to have uninhabited types now, but make a
-// wrapper over one to continue testing this 
 public enum EmptyEnum {}
-
-public struct EmptyEnumWrapper<T> {
-  public var value: T
-}
 
 public enum NoPayloadEnum {
   case A
@@ -200,7 +218,7 @@ public enum MultiPayloadGenericDynamic<T, U> {
 }
 
 public struct EnumStruct {
-  public let empty: EmptyEnumWrapper<EmptyEnum>
+  public let empty: EmptyEnum
   public let noPayload: NoPayloadEnum
   public let sillyNoPayload: SillyNoPayloadEnum
   public let singleton: SingletonEnum
@@ -217,4 +235,19 @@ public struct EnumStruct {
   // Double-optional raw pointer needs an extra
   // tag byte
   public let optionalOptionalPtr: UnsafePointer<Int>??
+}
+
+public enum MultiPayloadConcreteNotBitwiseTakable {
+  case Left(WeakReferenceStruct)
+  case Right(WeakReferenceStruct)
+}
+
+public enum MultiPayloadGenericNotBitwiseTakable<T> {
+  case Left(WeakReferenceStruct)
+  case Right(T)
+}
+
+public struct EnumStructWithOwnership {
+  public let multiPayloadConcrete: MultiPayloadConcreteNotBitwiseTakable
+  public let multiPayloadGeneric: MultiPayloadGenericNotBitwiseTakable<Int8>
 }

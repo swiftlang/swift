@@ -555,7 +555,16 @@ public:
 
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
-  
+
+  /// Given that the current token is a string literal,
+  /// - if it is not interpolated, returns the contents;
+  /// - otherwise, diagnoses and returns None.
+  ///
+  /// \param Loc where to diagnose.
+  /// \param DiagText name for the string literal in the diagnostic.
+  Optional<StringRef>
+  getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -1249,8 +1258,11 @@ public:
   StringRef copyAndStripUnderscores(StringRef text);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
-                                   SmallVectorImpl<Expr*> &Exprs,
-                                   Token EntireTok);
+                                   Token EntireTok,
+                                   VarDecl *InterpolationVar,
+                                   SmallVectorImpl<ASTNode> &Stmts,
+                                   unsigned &LiteralCapacity,
+                                   unsigned &InterpolationCount);
 
   /// Parse an argument label `identifier ':'`, if it exists.
   ///
@@ -1274,7 +1286,8 @@ public:
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag,
                                     bool allowOperators=false,
-                                    bool allowZeroArgCompoundNames=false);
+                                    bool allowZeroArgCompoundNames=false,
+                                    bool allowDeinitAndSubscript=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1352,6 +1365,7 @@ public:
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
@@ -1393,6 +1407,7 @@ public:
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
+  ParserResult<Stmt> parseStmtPoundAssert();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

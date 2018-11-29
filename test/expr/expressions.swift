@@ -584,9 +584,9 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
-  var e = Empty(f) // expected-error {{variable 'e' cannot have enum type 'Empty' with no cases}}
+  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
-  var e3 = Empty(Float(d)) // expected-error {{variable 'e3' cannot have enum type 'Empty' with no cases}}
+  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
 }
 
 struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
@@ -739,8 +739,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
-[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
+[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

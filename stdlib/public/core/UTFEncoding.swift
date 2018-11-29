@@ -22,13 +22,13 @@ public protocol _UTFParser {
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
   
-  var _buffer: _UIntBuffer<UInt32, Encoding.CodeUnit> { get set }
+  var _buffer: _UIntBuffer<Encoding.CodeUnit> { get set }
 }
 
 extension _UTFParser
 where Encoding.EncodedScalar : RangeReplaceableCollection {
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I
@@ -66,9 +66,9 @@ where Encoding.EncodedScalar : RangeReplaceableCollection {
 
     // Find one unicode scalar.
     let (isValid, scalarBitCount) = _parseMultipleCodeUnits()
-    _sanityCheck(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
-    _sanityCheck(1...4 ~= scalarBitCount / 8)
-    _sanityCheck(scalarBitCount <= _buffer._bitCount)
+    _internalInvariant(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
+    _internalInvariant(1...4 ~= scalarBitCount / 8)
+    _internalInvariant(scalarBitCount <= _buffer._bitCount)
     
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
     let encodedScalar = _bufferedScalar(bitCount: scalarBitCount)

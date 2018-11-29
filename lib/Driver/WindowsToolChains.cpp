@@ -147,6 +147,10 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
     if (context.OI.SelectedSanitizers & SanitizerKind::Address)
       addLinkRuntimeLib(context.Args, Arguments,
                         sanitizerRuntimeLibName("asan"));
+
+    if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+      addLinkRuntimeLib(context.Args, Arguments,
+                        sanitizerRuntimeLibName("ubsan"));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {

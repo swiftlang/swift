@@ -320,14 +320,21 @@ extension MutableCollection where Self : BidirectionalCollection {
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> Int in
-      let unsafeBufferPivot = try bufferPointer.partition(
+      let unsafeBufferPivot = try bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
-      return index(startIndex, offsetBy: numericCast(offset))
+      return index(startIndex, offsetBy: offset)
+    } else {
+      return try _partitionImpl(by: belongsInSecondPartition)
     }
-
+  }
+  
+  @usableFromInline
+  internal mutating func _partitionImpl(
+    by belongsInSecondPartition: (Element) throws -> Bool
+  ) rethrows -> Index {
     var lo = startIndex
     var hi = endIndex
 
@@ -445,16 +452,15 @@ extension MutableCollection where Self : RandomAccessCollection {
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
-    let count = self.count
     guard count > 1 else { return }
     var amount = count
     var currentIndex = startIndex
     while amount > 1 {
-      let random = generator.next(upperBound: UInt(amount))
+      let random = Int.random(in: 0 ..< amount, using: &generator)
       amount -= 1
       swapAt(
         currentIndex,
-        index(currentIndex, offsetBy: numericCast(random))
+        index(currentIndex, offsetBy: random)
       )
       formIndex(after: &currentIndex)
     }

@@ -18,6 +18,15 @@ fileprivate struct Foo {
   }
 }
 
+public struct Wibble<T> { }
+
+extension Wibble {
+  fileprivate struct Inner: P {
+    fileprivate struct Innermost { }
+    typealias A = (Innermost, T)
+  }
+}
+
 func getP_A<T: P>(_: T.Type) -> Any.Type {
   return T.A.self
 }
@@ -27,6 +36,7 @@ let AssociatedTypeDemangleTests = TestSuite("AssociatedTypeDemangle")
 
 AssociatedTypeDemangleTests.test("private types") {
   expectEqual(Foo.Inner.Innermost.self, getP_A(Foo.Inner.self))
+  expectEqual((Wibble<Float>.Inner.Innermost, Float).self, getP_A(Wibble<Float>.Inner.self))
 }
 
 private protocol P2 {

@@ -957,6 +957,24 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) {
+  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createDynamicFunctionRef(
+                                    getOpLocation(Inst->getLoc()), OpFunction));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitPreviousDynamicFunctionRefInst(
+    PreviousDynamicFunctionRefInst *Inst) {
+  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createPreviousDynamicFunctionRef(
+                                    getOpLocation(Inst->getLoc()), OpFunction));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitAllocGlobalInst(AllocGlobalInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

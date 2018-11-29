@@ -423,7 +423,7 @@ class TestLoggingReportFormatter(unittest.TestCase):
 
 def _PTR(min=700, mem_pages=1000, setup=None):
     """Create PerformanceTestResult Stub."""
-    return Stub(min=min, mem_pages=mem_pages, setup=setup)
+    return Stub(samples=Stub(min=min), mem_pages=mem_pages, setup=setup)
 
 
 def _run(test, num_samples=None, num_iters=None, verbose=None,
@@ -483,7 +483,8 @@ class TestBenchmarkDoctor(unittest.TestCase):
         """
         driver = BenchmarkDriverMock(tests=['B1'], responses=([
             # calibration run, returns a stand-in for PerformanceTestResult
-            (_run('B1', num_samples=3, num_iters=1), _PTR(min=300))] +
+            (_run('B1', num_samples=3, num_iters=1,
+                  verbose=True), _PTR(min=300))] +
             # 5x i1 series, with 300 μs runtime its possible to take 4098
             # samples/s, but it should be capped at 2k
             ([(_run('B1', num_samples=2048, num_iters=1,

@@ -2166,7 +2166,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
                                   // SWIFT_ENABLE_TENSORFLOW
                                   fnRepr->throws(),
@@ -2329,6 +2328,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       variadic = true;
     }
 
+    bool autoclosure = false;
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
+      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
+
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
     if (!ty) return true;
 
@@ -2394,7 +2397,8 @@ bool TypeResolver::resolveASTFunctionTypeParams(
 
     // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
-        ParameterTypeFlags::fromParameterType(ty, variadic, ownership, nondiff);
+        ParameterTypeFlags::fromParameterType(ty, variadic, autoclosure,
+                                              ownership, nondiff);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -3406,6 +3410,17 @@ public:
       });
     }
   }
+
+  void visitRequirements(ArrayRef<RequirementRepr> reqts) {
+    for (auto reqt : reqts) {
+      if (reqt.getKind() == RequirementReprKind::SameType) {
+        if (auto *repr = reqt.getFirstTypeLoc().getTypeRepr())
+          repr->walk(*this);
+        if (auto *repr = reqt.getSecondTypeLoc().getTypeRepr())
+          repr->walk(*this);
+      }
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -3414,12 +3429,22 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
-  // Type declarations are okay.
-  if (isa<TypeDecl>(decl))
-    return;
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
+    checkUnsupportedProtocolType(protocolDecl->getTrailingWhereClause());
+  else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
+    checkUnsupportedProtocolType(genericDecl->getGenericParams());
+  else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
+    checkUnsupportedProtocolType(assocType->getTrailingWhereClause());
+  else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
+    checkUnsupportedProtocolType(extDecl->getTrailingWhereClause());
+  else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
+    checkUnsupportedProtocolType(subscriptDecl->getGenericParams());
+  else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!isa<AccessorDecl>(funcDecl))
+      checkUnsupportedProtocolType(funcDecl->getGenericParams());
+  }
 
-  // Extensions are okay.
-  if (isa<ExtensionDecl>(decl))
+  if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
@@ -3432,4 +3457,20 @@ void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/true);
   stmt->walk(visitor);
+}
+
+void TypeChecker::checkUnsupportedProtocolType(TrailingWhereClause *whereClause) {
+  if (whereClause == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(whereClause->getRequirements());
+}
+
+void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) {
+  if (genericParams  == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(genericParams->getRequirements());
 }

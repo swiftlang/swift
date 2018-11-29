@@ -80,6 +80,15 @@ enum class FixKind : uint8_t {
   /// and assume that types are related.
   SkipSuperclassRequirement,
 
+  /// Fix up one of the sides of conversion to make it seem
+  /// like the types are aligned.
+  ContextualMismatch,
+
+  /// Fix up @autoclosure argument to the @autoclosure parameter,
+  /// to for a call to be able to foward it properly, since
+  /// @autoclosure conversions are unsupported starting from
+  /// Swift version 5.
+  AutoClosureForwarding,
 };
 
 class ConstraintFix {
@@ -345,6 +354,58 @@ public:
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+/// For example: Sometimes type returned from the body of the
+/// closure doesn't match expected contextual type:
+///
+/// func foo(_: () -> Int) {}
+/// foo { "ultimate question" }
+///
+/// Body of the closure produces `String` type when `Int` is expected
+/// by the context.
+class ContextualMismatch : public ConstraintFix {
+  Type LHS, RHS;
+
+protected:
+  ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override { return "fix contextual mismatch"; }
+
+  Type getFromType() const { return LHS; }
+  Type getToType() const { return RHS; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                    ConstraintLocator *locator);
+};
+
+/// Detect situations when argument of the @autoclosure parameter is itself
+/// marked as @autoclosure and is not applied. Form a fix which suggests a
+/// proper way to forward such arguments, e.g.:
+///
+/// ```swift
+/// func foo(_ fn: @autoclosure () -> Int) {}
+/// func bar(_ fn: @autoclosure () -> Int) {
+///   foo(fn) // error - fn should be called
+/// }
+/// ```
+class AutoClosureForwarding final : public ConstraintFix {
+public:
+  AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
+
+  std::string getName() const override { return "fix @autoclosure forwarding"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AutoClosureForwarding *create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator);
 };
 
 } // end namespace constraints

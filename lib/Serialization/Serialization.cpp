@@ -41,12 +41,14 @@
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
@@ -720,6 +722,12 @@ std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
   return {iter->getKey(), LastUniquedStringID};
 }
 
+IdentifierID Serializer::addFilename(StringRef filename) {
+  assert(!filename.empty() && "Attemping to add an empty filename");
+
+  return addUniquedString(filename).second;
+}
+
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == this->M)
     return CURRENT_MODULE_ID;
@@ -813,6 +821,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
   BLOCK_RECORD(options_block, IS_TESTABLE);
+  BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
 
   BLOCK(INPUT_BLOCK);
@@ -822,6 +831,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, IMPORTED_HEADER_CONTENTS);
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
+  BLOCK_RECORD(input_block, FILE_DEPENDENCY);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -900,6 +910,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::SELF_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
@@ -909,8 +921,6 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::PROTOCOL_CONFORMANCE_XREF);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_PARAM_LIST);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -968,6 +978,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);
+      }
+
+      if (M->arePrivateImportsEnabled()) {
+        options_block::ArePrivateImportsEnabledLayout PrivateImports(Out);
+        PrivateImports.emit(ScratchRecord);
       }
 
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
@@ -1030,6 +1045,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
+  input_block::FileDependencyLayout FileDependency(Out);
 
   if (options.SerializeOptionsForDebugging) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
@@ -1040,6 +1056,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                       framepath.Path);
     for (auto &path : searchPathOpts.ImportSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
+  }
+
+  for (auto const &dep : options.Dependencies) {
+    FileDependency.emit(ScratchRecord, dep.Size, dep.Hash, dep.Path);
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
@@ -1138,20 +1158,6 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
     return serialization::MetatypeRepresentation::MR_ObjC;
   }
   llvm_unreachable("bad representation");
-}
-
-static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
-  switch (kind) {
-  case swift::AddressorKind::NotAddressor:
-    return uint8_t(serialization::AddressorKind::NotAddressor);
-  case swift::AddressorKind::Unsafe:
-    return uint8_t(serialization::AddressorKind::Unsafe);
-  case swift::AddressorKind::Owning:
-    return uint8_t(serialization::AddressorKind::Owning);
-  case swift::AddressorKind::NativeOwning:
-    return uint8_t(serialization::AddressorKind::NativeOwning);
-  }
-  llvm_unreachable("bad addressor kind");
 }
 
 static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
@@ -1354,23 +1360,19 @@ void Serializer::writeInlinableBodyTextIfNeeded(
   InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
 }
 
-bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
+void Serializer::writeGenericParams(const GenericParamList *genericParams) {
   using namespace decls_block;
 
   // Don't write anything if there are no generic params.
   if (!genericParams)
-    return true;
+    return;
+
+  SmallVector<DeclID, 4> paramIDs;
+  for (auto next : genericParams->getParams())
+    paramIDs.push_back(addDeclRef(next));
 
   unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
-  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode);
-
-  abbrCode = DeclTypeAbbrCodes[GenericParamLayout::Code];
-  for (auto next : genericParams->getParams()) {
-    GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addDeclRef(next));
-  }
-
-  return true;
+  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);
 }
 
 void Serializer::writeGenericSignature(const GenericSignature *sig) {
@@ -1636,6 +1638,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
         addDeclRef(normal->getType()->getAnyNominal()),
         addModuleRef(normal->getDeclContext()->getParentModule()));
     }
+    break;
+  }
+
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[SelfProtocolConformanceLayout::Code];
+    auto protocolID = addDeclRef(self->getProtocol());
+    SelfProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              protocolID);
     break;
   }
 
@@ -2180,6 +2191,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
   case DAK_ClangImporterSynthesizedType:
+  case DAK_PrivateImport:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:
@@ -2390,6 +2402,19 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     // TODO: Serialize trailing where clause.
     // Type-checking where clause should be done first (mimicking the
     // @_specialize attribute).
+
+  case DAK_DynamicReplacement: {
+    auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
+    auto theAttr = cast<DynamicReplacementAttr>(DA);
+    auto replacedFun = theAttr->getReplacedFunctionName();
+    SmallVector<IdentifierID, 4> pieces;
+    pieces.push_back(addDeclBaseNameRef(replacedFun.getBaseName()));
+    for (auto argName : replacedFun.getArgumentNames())
+      pieces.push_back(addDeclBaseNameRef(argName));
+    assert(theAttr->getReplacedFunction());
+    DynamicReplacementDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, false, /*implicit flag*/
+        addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
     return;
   }
   }
@@ -2702,17 +2727,36 @@ void Serializer::writeDecl(const Decl *D) {
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     if (value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
-      // FIXME: We shouldn't need to encode this for /all/ private decls.
-      // In theory we can follow the same rules as mangling and only include
-      // the outermost private context.
       auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+        // FIXME: We shouldn't need to encode this for /all/ private decls.
+        // In theory we can follow the same rules as mangling and only include
+        // the outermost private context.
         Identifier discriminator =
           enclosingFile->getDiscriminatorForPrivateValue(value);
         unsigned abbrCode =
           DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
         PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(discriminator));
+        auto getFilename = [](FileUnit *enclosingFile,
+                              const ValueDecl *decl) -> StringRef {
+          if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
+            return llvm::sys::path::filename(SF->getFilename());
+          } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
+            return LF->getFilenameForPrivateDecl(decl);
+          }
+          return StringRef();
+        };
+        // Only if compiled with -enable-private-imports.
+        if (M->arePrivateImportsEnabled()) {
+          auto filename = getFilename(enclosingFile, value);
+          if (!filename.empty()) {
+            auto filenameID = addFilename(filename);
+            FilenameForPrivateLayout::emitRecord(
+                Out, ScratchRecord,
+                DeclTypeAbbrCodes[FilenameForPrivateLayout::Code], filenameID);
+          }
+        }
       }
     }
 
@@ -3250,6 +3294,7 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
+        param->isAutoClosure(),
         getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
         defaultArgumentText);
 
@@ -3331,8 +3376,6 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAccessorKind =
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
-    uint8_t rawAddressorKind =
-      getRawStableAddressorKind(fn->getAddressorKind());
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
@@ -3360,7 +3403,6 @@ void Serializer::writeDecl(const Decl *D) {
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
-                               rawAddressorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
                                rawDefaultArgumentResilienceExpansion,
@@ -3888,14 +3930,12 @@ void Serializer::writeType(Type ty) {
       FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
              addTypeRef(fnTy->getResult()),
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
              // SWIFT_ENABLE_TENSORFLOW
              fnTy->throws(),
              getRawStableFunctionTypeDifferentiability(
                  fnTy->getDifferentiability()));
     } else {
-      assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
 
       auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
@@ -4165,10 +4205,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TypedPatternLayout>();
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
-  registerDeclTypeAbbr<GenericParamLayout>();
+  registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<LayoutRequirementLayout>();
-  registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
   registerDeclTypeAbbr<SubstitutionMapLayout>();
 
@@ -4188,6 +4227,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
+  registerDeclTypeAbbr<SelfProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
@@ -4198,6 +4238,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
+  registerDeclTypeAbbr<FilenameForPrivateLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 

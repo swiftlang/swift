@@ -21,7 +21,7 @@ reflect(object: obj)
 // CHECK-64: (class reflect_empty_class.EmptyClass)
 
 // CHECK-64: Type info:
-// CHECK-64: (class_instance size=16 alignment=1 stride=16 num_extra_inhabitants=0)
+// CHECK-64: (class_instance size=16 alignment=1 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -29,7 +29,7 @@ reflect(object: obj)
 // CHECK-32: (class reflect_empty_class.EmptyClass)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=8 alignment=1 stride=8 num_extra_inhabitants=0)
+// CHECK-32: (class_instance size=8 alignment=1 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
 
 doneReflecting()
 

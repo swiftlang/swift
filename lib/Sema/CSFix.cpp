@@ -190,3 +190,26 @@ SkipSuperclassRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator())
       SkipSuperclassRequirement(cs, lhs, rhs, locator);
 }
+
+bool ContextualMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = ContextualFailure(root, getConstraintSystem(), getFromType(),
+                                   getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
+                                               Type rhs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
+}
+
+bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
+  auto failure =
+      AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
+                                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}

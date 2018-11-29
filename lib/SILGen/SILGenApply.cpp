@@ -152,8 +152,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
   
   // Extension methods currently must be statically dispatched, unless they're
   // @objc or dynamic.
-  if (funcDecl->getDeclContext()->isExtensionContext()
-      && !constant.isForeign)
+  if (isa<ExtensionDecl>(funcDecl->getDeclContext()) && !constant.isForeign)
     return true;
 
   // We cannot form a direct reference to a method body defined in
@@ -209,7 +208,7 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
   }
 
   // Otherwise, we have a non-metatype. Use a borrow+unchecked_ref_cast.
-  return SGF.B.createUncheckedRefCast(loc, self.borrow(SGF, loc),
+  return SGF.B.createUncheckedRefCast(loc, self.formalAccessBorrow(SGF, loc),
                                       originalSelfType);
 }
 
@@ -228,7 +227,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
   if (isForCoroutine && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
     if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
                                        param.isIndirectInGuaranteed())) {
-      return value.borrow(SGF, loc);
+      return value.formalAccessBorrow(SGF, loc);
     }
   }
 
@@ -266,6 +265,10 @@ public:
     /// A direct standalone function call, referenceable by a FunctionRefInst.
     StandaloneFunction,
 
+    /// A direct standalone function call, referenceable by a
+    /// PreviousDynamicFunctionRefInst.
+    StandaloneFunctionDynamicallyReplaceableImpl,
+
     /// Enum case constructor call.
     EnumElement,
 
@@ -282,7 +285,7 @@ public:
     DynamicMethod,
   };
 
-  const Kind kind;
+  Kind kind;
 
   // Move, don't copy.
   Callee(const Callee &) = delete;
@@ -346,17 +349,16 @@ private:
 
   /// Constructor for Callee::forDirect.
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
-         AbstractionPattern origFormalType,
-         CanAnyFunctionType substFormalType,
-         SubstitutionMap subs, SILLocation l)
-    : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
-      OrigFormalInterfaceType(origFormalType),
-      SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
-                                                           subs)),
-      Substitutions(subs),
-      Loc(l)
-  {
-  }
+         AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
+         SubstitutionMap subs, SILLocation l,
+         bool callDynamicallyReplaceableImpl = false)
+      : kind(callDynamicallyReplaceableImpl
+                 ? Kind::StandaloneFunctionDynamicallyReplaceableImpl
+                 : Kind::StandaloneFunction),
+        Constant(standaloneFunction), OrigFormalInterfaceType(origFormalType),
+        SubstFormalInterfaceType(
+            getSubstFormalInterfaceType(substFormalType, subs)),
+        Substitutions(subs), Loc(l) {}
 
   /// Constructor called by all for* factory methods except forDirect and
   /// forIndirect.
@@ -379,10 +381,13 @@ public:
   }
   static Callee forDirect(SILGenFunction &SGF, SILDeclRef c,
                           SubstitutionMap subs,
-                          SILLocation l) {
+                          SILLocation l,
+                          bool callPreviousDynamicReplaceableImpl = false) {
     auto &ci = SGF.getConstantInfo(c);
-    return Callee(SGF, c, ci.FormalPattern, ci.FormalType, subs, l);
+    return Callee(SGF, c, ci.FormalPattern, ci.FormalType, subs, l,
+                  callPreviousDynamicReplaceableImpl);
   }
+
   static Callee forEnumElement(SILGenFunction &SGF, SILDeclRef c,
                                SubstitutionMap subs,
                                SILLocation l) {
@@ -487,6 +492,7 @@ public:
       return 1;
 
     case Kind::StandaloneFunction:
+    case Kind::StandaloneFunctionDynamicallyReplaceableImpl:
     case Kind::EnumElement:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
@@ -502,6 +508,7 @@ public:
     switch (kind) {
     case Kind::IndirectValue:
     case Kind::StandaloneFunction:
+    case Kind::StandaloneFunctionDynamicallyReplaceableImpl:
     case Kind::EnumElement:
       return false;
     case Kind::WitnessMethod:
@@ -588,13 +595,19 @@ public:
       SILValue ref = SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo);
       return ManagedValue::forUnmanaged(ref);
     }
+    case Kind::StandaloneFunctionDynamicallyReplaceableImpl: {
+      auto constantInfo = SGF.getConstantInfo(*constant);
+      SILValue ref =
+          SGF.emitGlobalFunctionRef(Loc, *constant, constantInfo, true);
+      return ManagedValue::forUnmanaged(ref);
+    }
     case Kind::EnumElement:
       llvm_unreachable("Should have been curried");
     case Kind::ClassMethod: {
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
 
       // Otherwise, do the dynamic dispatch inline.
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
 
       SILValue methodVal;
       if (!constant->isForeign) {
@@ -605,12 +618,13 @@ public:
             Loc, borrowedSelf->getValue(), *constant,
             SILType::getPrimitiveObjectType(methodTy));
       }
+      S.pop();
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {
       assert(!constant->isCurried);
 
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
       ManagedValue castValue = borrowedCastToOriginalSelfType(
         SGF, Loc, *borrowedSelf);
 
@@ -618,13 +632,16 @@ public:
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
 
+      ManagedValue fn;
       if (!constant->isForeign) {
-        return SGF.B.createSuperMethod(Loc, castValue, *constant,
-                                       constantInfo.getSILType());
+        fn = SGF.B.createSuperMethod(Loc, castValue, *constant,
+                                     constantInfo.getSILType());
       } else {
-        return SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
-                                           constantInfo.getSILType());
+        fn = SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
+                                         constantInfo.getSILType());
       }
+      S.pop();
+      return fn;
     }
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -634,10 +651,10 @@ public:
       auto lookupType = selfType.subst(Substitutions)->getCanonicalType();
       auto conformance = *Substitutions.lookupConformance(selfType, proto);
 
+      ArgumentScope S(SGF, Loc);
+
       SILValue fn;
-
       if (!constant->isForeign) {
-
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -645,17 +662,18 @@ public:
         fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),
                                     *constant, constantInfo.getSILType());
       }
-
+      S.pop();
       return ManagedValue::forUnmanaged(fn);
     }
     case Kind::DynamicMethod: {
       auto closureType = getDynamicMethodLoweredType(
           SGF.SGM.M, *constant, getSubstFormalType());
 
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
       SILValue fn = SGF.B.createObjCMethod(
           Loc, borrowedSelf->getValue(), *constant,
           closureType);
+      S.pop();
       return ManagedValue::forUnmanaged(fn);
     }
     }
@@ -682,6 +700,7 @@ public:
       assert(Substitutions.empty());
       return createCalleeTypeInfo(SGF, constant, IndirectValue.getType());
 
+    case Kind::StandaloneFunctionDynamicallyReplaceableImpl:
     case Kind::StandaloneFunction: {
       auto constantInfo = SGF.getConstantInfo(*constant);
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
@@ -734,6 +753,7 @@ public:
     case Kind::SuperMethod:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
+    case Kind::StandaloneFunctionDynamicallyReplaceableImpl:
       return None;
     }
     llvm_unreachable("bad callee kind");
@@ -741,6 +761,22 @@ public:
 };
 
 } // end anonymous namespace
+
+/// Is this a call to the dynamically replaced function inside of a
+/// '@_dynamicReplacement(for:)' function.
+bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,
+                                          AbstractFunctionDecl *afd,
+                                          bool &isObjCReplacementSelfCall) {
+  if (auto *func =
+          dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl())) {
+    auto *repl = func->getAttrs().getAttribute<DynamicReplacementAttr>();
+    if (repl && repl->getReplacedFunction() == afd) {
+      isObjCReplacementSelfCall = afd->isObjC();
+      return true;
+    }
+  }
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 //                           SILGenApply ASTVisitor
@@ -1028,6 +1064,26 @@ public:
       setSelfParam(std::move(selfArgSource), thisCallSite);
     }
 
+    // Directly dispatch to calls of the replaced function inside of
+    // '@_dynamicReplacement(for:)' methods.
+    bool isObjCReplacementCall = false;
+    if (isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
+        thisCallSite->getArg()->isSelfExprOf(
+            cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false)) {
+      auto constant = SILDeclRef(afd, kind).asForeign(
+          !isObjCReplacementCall && requiresForeignEntryPoint(e->getDecl()));
+      auto subs = e->getDeclRef().getSubstitutions();
+      if (isObjCReplacementCall)
+        setCallee(Callee::forDirect(SGF, constant, subs, e));
+      else
+        setCallee(Callee::forDirect(
+            SGF,
+            SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
+                       kind),
+            subs, e, true));
+      return;
+    }
+
     auto constant = SILDeclRef(afd, kind)
                         .asForeign(requiresForeignEntryPoint(afd));
 
@@ -1079,8 +1135,27 @@ public:
         !captureInfo.hasGenericParamCaptures())
       subs = SubstitutionMap();
 
-    setCallee(Callee::forDirect(SGF, constant, subs, e));
-    
+    // Check whether we have to dispatch to the original implementation of a
+    // dynamically_replaceable inside of a dynamic_replacement(for:) function.
+    ApplyExpr *thisCallSite = callSites.back();
+    bool isObjCReplacementSelfCall = false;
+    bool isSelfCallToReplacedInDynamicReplacement =
+        isCallToReplacedInDynamicReplacement(
+            SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
+            isObjCReplacementSelfCall) &&
+        (afd->getDeclContext()->isModuleScopeContext() ||
+         thisCallSite->getArg()->isSelfExprOf(
+             cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false));
+
+    if (isSelfCallToReplacedInDynamicReplacement && !isObjCReplacementSelfCall)
+      setCallee(Callee::forDirect(
+          SGF,
+          SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
+                     constant.kind),
+          subs, e, true));
+    else
+      setCallee(Callee::forDirect(SGF, constant, subs, e));
+
     // If the decl ref requires captures, emit the capture params.
     if (!captureInfo.getCaptures().empty()) {
       SmallVector<ManagedValue, 4> captures;
@@ -1390,7 +1465,17 @@ public:
                          ? SILDeclRef::Kind::Allocator
                          : SILDeclRef::Kind::Initializer);
 
-    constant = constant.asForeign(requiresForeignEntryPoint(ctorRef->getDecl()));
+    bool isObjCReplacementSelfCall = false;
+    bool isSelfCallToReplacedInDynamicReplacement =
+        isCallToReplacedInDynamicReplacement(
+            SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
+            isObjCReplacementSelfCall) &&
+        arg->isSelfExprOf(
+            cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false);
+
+    constant =
+        constant.asForeign(!isObjCReplacementSelfCall &&
+                           requiresForeignEntryPoint(ctorRef->getDecl()));
 
     // Determine the callee. This is normally the allocating
     // entry point, unless we're delegating to an ObjC initializer.
@@ -1399,15 +1484,24 @@ public:
       setCallee(Callee::forWitnessMethod(
           SGF, self.getType().getASTType(),
           constant, subs, expr));
-    } else if ((useAllocatingCtor || constant.isForeign)
-            && getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
+    } else if ((useAllocatingCtor || constant.isForeign) &&
+               !isSelfCallToReplacedInDynamicReplacement &&
+               getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class) {
       // Dynamic dispatch to the initializer.
       Scope S(SGF, expr);
       setCallee(Callee::forClassMethod(
           SGF, constant, subs, fn));
     } else {
       // Directly call the peer constructor.
-      setCallee(Callee::forDirect(SGF, constant, subs, fn));
+      if (isObjCReplacementSelfCall ||
+          !isSelfCallToReplacedInDynamicReplacement)
+        setCallee(Callee::forDirect(SGF, constant, subs, fn));
+      else
+        setCallee(Callee::forDirect(
+            SGF,
+            SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
+                       constant.kind),
+            subs, fn, true));
     }
 
     setSelfParam(std::move(selfArgSource), expr);
@@ -1484,6 +1578,8 @@ public:
     auto *fd = dyn_cast<FuncDecl>(memberRef.getDecl());
     if (!fd || !fd->isObjC())
       return false;
+
+    FormalEvaluationScope writebackScope(SGF);
 
     // Local function that actually emits the dynamic member reference.
     auto emitDynamicMemberRef = [&] {
@@ -1619,7 +1715,8 @@ static void emitRawApply(SILGenFunction &SGF,
   bool isUnowned = substFnType->isCalleeUnowned();
   SILValue fnValue =
       isUnowned ? fn.getValue()
-                : isConsumed ? fn.forward(SGF) : fn.borrow(SGF, loc).getValue();
+                : isConsumed ? fn.forward(SGF)
+                             : fn.formalAccessBorrow(SGF, loc).getValue();
 
   SmallVector<SILValue, 4> argValues;
 
@@ -3004,6 +3101,14 @@ private:
 
       // Otherwise, just use the default logic.
       value = SGF.emitRValueAsSingleValue(expr, contexts.FinalContext);
+
+      // We want any borrows done by the ownership-convention adjustment to
+      // happen outside of the formal-evaluation scope we pushed for the
+      // expression evaluation, but any copies to be done inside of it.
+      // Copies are only done if the parameter is consumed.
+      if (!param.isConsumed())
+        S.pop();
+
       Args.push_back(convertOwnershipConvention(value));
       return;
     }
@@ -4241,10 +4346,21 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   auto fnValue = callee.getFnValue(SGF, isCurried, borrowedSelf);
 
-  // Emit the uncurried call.
+  return SGF.emitBeginApply(uncurriedLoc.getValue(), fnValue,
+                            callee.getSubstitutions(), uncurriedArgs,
+                            calleeTypeInfo.substFnType, options, yields);
+}
+
+CleanupHandle
+SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
+                               SubstitutionMap subs,
+                               ArrayRef<ManagedValue> args,
+                               CanSILFunctionType substFnType,
+                               ApplyOptions options,
+                               SmallVectorImpl<ManagedValue> &yields) {
+  // Emit the call.
   SmallVector<SILValue, 4> rawResults;
-  emitRawApply(SGF, uncurriedLoc.getValue(), fnValue, callee.getSubstitutions(),
-               uncurriedArgs, calleeTypeInfo.substFnType, options,
+  emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                /*indirect results*/ {}, rawResults);
 
   auto token = rawResults.pop_back_val();
@@ -4252,11 +4368,11 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
-  SGF.Cleanups.pushCleanup<EndCoroutineApply>(token);
-  auto endApplyHandle = SGF.getTopCleanup();
+  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  auto endApplyHandle = getTopCleanup();
 
   // Manage all the yielded values.
-  auto yieldInfos = calleeTypeInfo.substFnType->getYields();
+  auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
@@ -4264,7 +4380,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
-      yields.push_back(SGF.emitManagedRValueWithCleanup(value));
+      yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isDirectGuaranteed()) {
       yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
@@ -4453,7 +4569,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   auto functionTy = constantInfo.getSILType();
   ManagedValue superMethod;
   {
-    Scope S(SGF, loc);
+    ArgumentScope S(SGF, loc);
     ManagedValue castValue =
         borrowedCastToOriginalSelfType(SGF, loc, upcastedSelf);
     if (!constant.isForeign) {
@@ -4463,6 +4579,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
       superMethod = SGF.B.createObjCSuperMethod(loc, castValue, constant,
                                                 functionTy);
     }
+    S.pop();
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
@@ -5011,11 +5128,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
 }
 
-SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                                   SILType substFnType,
-                                                   SubstitutionMap subs,
-                                                   ArrayRef<SILValue> args,
-                                            SmallVectorImpl<SILValue> &yields) {
+std::pair<SILValue, CleanupHandle>
+SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                          SILType substFnType,
+                                          SubstitutionMap subs,
+                                          ArrayRef<SILValue> args,
+                                          SmallVectorImpl<SILValue> &yields) {
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
@@ -5024,7 +5142,12 @@ SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   auto yieldResults = beginApply->getYieldedValues();
   yields.append(yieldResults.begin(), yieldResults.end());
 
-  return beginApply->getTokenResult();
+  auto token = beginApply->getTokenResult();
+
+  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  auto abortCleanup = Cleanups.getTopCleanup();
+
+  return { token, abortCleanup };
 }
 
 void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc, SILValue token) {
@@ -5525,8 +5648,19 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
-                                         SubstitutionMap subs) {
+                                         SubstitutionMap subs,
+                                         bool isOnSelfParameter) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
+
+  bool isObjCReplacementSelfCall = false;
+  if (isOnSelfParameter && isCallToReplacedInDynamicReplacement(
+                               SGF, decl, isObjCReplacementSelfCall)) {
+    return Callee::forDirect(
+        SGF,
+        SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
+                   constant.kind),
+        subs, loc, true);
+  }
 
   // The accessor might be a local function that does not capture any
   // generic parameters, in which case we don't want to pass in any
@@ -5583,13 +5717,14 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    SubstitutionMap substitutions,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
-                                   bool isDirectUse)
+                                   bool isDirectUse,
+                                   bool isOnSelfParameter)
 {
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
-                                             substitutions);
+                                             substitutions, isOnSelfParameter);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5721,7 +5856,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
 
   // We need to produce the value at +1 if it's going to be consumed.
   if (selfParam.isConsumed() && !base.hasCleanup()) {
-    base = base.formalAccessCopyUnmanaged(SGF, loc);
+    base = base.copyUnmanaged(SGF, loc);
   }
 
   // If the parameter is indirect, we need to drop the value into
@@ -5875,18 +6010,18 @@ SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor) {
 }
 
 /// Emit a call to a getter.
-RValue SILGenFunction::
-emitGetAccessor(SILLocation loc, SILDeclRef get,
-                SubstitutionMap substitutions,
-                ArgumentSource &&selfValue,
-                bool isSuper, bool isDirectUse,
-                PreparedArguments &&subscriptIndices, SGFContext c) {
+RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
+                                       SubstitutionMap substitutions,
+                                       ArgumentSource &&selfValue, bool isSuper,
+                                       bool isDirectUse,
+                                       PreparedArguments &&subscriptIndices,
+                                       SGFContext c, bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
-  Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
-                                                     substitutions, selfValue,
-                                                     isSuper, isDirectUse);
+  Callee getter = emitSpecializedAccessorFunctionRef(
+      *this, loc, get, substitutions, selfValue, isSuper, isDirectUse,
+      isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
@@ -5912,13 +6047,14 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      PreparedArguments &&subscriptIndices,
-                                     ArgumentSource &&setValue) {
+                                     ArgumentSource &&setValue,
+                                     bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
-  Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
-                                                     substitutions, selfValue,
-                                                     isSuper, isDirectUse);
+  Callee setter = emitSpecializedAccessorFunctionRef(
+      *this, loc, set, substitutions, selfValue, isSuper, isDirectUse,
+      isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
@@ -5954,23 +6090,18 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
 /// Emit a call to an addressor.
 ///
-/// The first return value is the address, which will always be an
-/// l-value managed value.  The second return value is the owner
-/// pointer, if applicable.
-std::pair<ManagedValue, ManagedValue> SILGenFunction::
-emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                      SubstitutionMap substitutions,
-                      ArgumentSource &&selfValue,
-                      bool isSuper, bool isDirectUse,
-                      PreparedArguments &&subscriptIndices,
-                      SILType addressType) {
+/// Returns an l-value managed value.
+ManagedValue SILGenFunction::emitAddressorAccessor(
+    SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
+    ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
+    PreparedArguments &&subscriptIndices, SILType addressType,
+    bool isOnSelfParameter) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
-  Callee callee =
-    emitSpecializedAccessorFunctionRef(*this, loc, addressor,
-                                       substitutions, selfValue,
-                                       isSuper, isDirectUse);
+  Callee callee = emitSpecializedAccessorFunctionRef(
+      *this, loc, addressor, substitutions, selfValue, isSuper, isDirectUse,
+      isOnSelfParameter);
   bool hasSelf = (bool)selfValue;
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
@@ -5994,23 +6125,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
-  SILValue pointer;
-  ManagedValue owner;
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    assert(results.size() == 1);
-    pointer = results[0].getUnmanagedValue();
-    owner = ManagedValue();
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    assert(results.size() == 2);
-    pointer = results[0].getUnmanagedValue();
-    owner = results[1];
-    break;
-  }
+  assert(results.size() == 1);
+  auto pointer = results[0].getUnmanagedValue();
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
@@ -6027,20 +6143,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                               /*isStrict*/ true,
                                               /*isInvariant*/ false);
 
-  // Mark dependence as necessary.
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    // TODO: we should probably mark dependence on the base.
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    address = B.createMarkDependence(loc, address, owner.getValue());
-    break;
-  }
-
-  return { ManagedValue::forLValue(address), owner };
+  return ManagedValue::forLValue(address);
 }
 
 CleanupHandle
@@ -6049,11 +6152,12 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
                                       ArgumentSource &&selfValue,
                                       bool isSuper, bool isDirectUse,
                                       PreparedArguments &&subscriptIndices,
-                                      SmallVectorImpl<ManagedValue> &yields) {
+                                      SmallVectorImpl<ManagedValue> &yields,
+                                      bool isOnSelfParameter) {
   Callee callee =
     emitSpecializedAccessorFunctionRef(*this, loc, accessor,
                                        substitutions, selfValue,
-                                       isSuper, isDirectUse);
+                                       isSuper, isDirectUse, isOnSelfParameter);
 
   // We're already in a full formal-evaluation scope.
   // Make a dead writeback scope; applyCoroutine won't try to pop this.

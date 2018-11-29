@@ -54,7 +54,9 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME:   i32 1,
 // CHECK-SAME:   i32 0,
 // AnyObject layout constraint
-// CHECK-SAME:   i32 31, i32 0, i32 0
+// CHECK-SAME:   i32 31,
+// CHECK-SAME:   @"symbolic x"
+// CHECK-SAME:   i32 0
 // CHECK-SAME: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
@@ -76,11 +78,13 @@ protocol ABO : A, B, O { func abo() }
 // CHECK-SAME:   i32 2, i32 3, i32 0
 
 // Inheritance from A
-// CHECK-SAME:   i32 128, i32 0
+// CHECK-SAME:   i32 128,
+// CHECK-SAME:   @"symbolic x"
 // CHECK-SAME: @"$s17protocol_metadata1AMp"
 
 // Inheritance from B
-// CHECK-SAME:   i32 128, i32 0
+// CHECK-SAME:   i32 128,
+// CHECK-SAME:   @"symbolic x"
 // CHECK-SAME:   @"$s17protocol_metadata1BMp"
 // CHECK: }
 

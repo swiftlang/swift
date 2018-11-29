@@ -82,6 +82,9 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
+void swift::initializeDynamicReplacementLookup() {
+}
+
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =
@@ -106,6 +109,13 @@ void swift_addNewDSOImage(const void *addr) {
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
     addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+
+  const auto &dynamic_replacements = sections->swift5_repl;
+  const auto *replacements =
+      reinterpret_cast<void *>(dynamic_replacements.start);
+  if (dynamic_replacements.length)
+    addImageDynamicReplacementBlockCallback(replacements, dynamic_replacements.length);
+
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

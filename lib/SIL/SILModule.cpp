@@ -111,8 +111,10 @@ SILModule::~SILModule() {
   // need to worry about sil_witness_tables since witness tables reference each
   // other via protocol conformances and sil_vtables don't reference each other
   // at all.
-  for (SILFunction &F : *this)
+  for (SILFunction &F : *this) {
     F.dropAllReferences();
+    F.dropDynamicallyReplacedFunction();
+  }
 }
 
 std::unique_ptr<SILModule>
@@ -149,10 +151,9 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
   if (!C)
     return nullptr;
 
-  // Extract the base NormalProtocolConformance.
-  NormalProtocolConformance *NormalC = C->getRootNormalConformance();
-
-  return SILWitnessTable::create(*this, linkage, NormalC);
+  // Extract the root conformance.
+  auto rootC = C->getRootConformance();
+  return SILWitnessTable::create(*this, linkage, rootC);
 }
 
 SILWitnessTable *
@@ -171,9 +172,9 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
                               bool deserializeLazily) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  const NormalProtocolConformance *NormalC = C->getRootNormalConformance();
+  auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(NormalC);
+  auto found = WitnessTableMap.find(rootC);
   if (found == WitnessTableMap.end()) {
 #ifndef NDEBUG
     // Make sure that all witness tables are in the witness table lookup
@@ -184,7 +185,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
     // is the potential for a conformance without a witness table to be passed
     // to this function.
     for (SILWitnessTable &WT : witnessTables)
-      assert(WT.getConformance() != NormalC &&
+      assert(WT.getConformance() != rootC &&
              "Found witness table that is not"
              " in the witness table lookup cache.");
 #endif
@@ -258,7 +259,7 @@ SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
 }
 
 void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
-  NormalProtocolConformance *Conf = Wt->getConformance();
+  auto Conf = Wt->getConformance();
   assert(lookUpWitnessTable(Conf, false) == Wt);
   WitnessTableMap.erase(Conf);
   witnessTables.erase(Wt);
@@ -436,6 +437,7 @@ void SILModule::eraseFunction(SILFunction *F) {
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
   F->dropAllReferences();
+  F->dropDynamicallyReplacedFunction();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {

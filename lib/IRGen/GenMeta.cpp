@@ -513,8 +513,8 @@ namespace {
     }
   
     ConstantReference getParent() {
-      return {IGM.getAddrOfModuleContextDescriptor(DC->getParentModule()),
-              ConstantReference::Direct};
+      return IGM.getAddrOfParentContextDescriptor(
+               DC, /*fromAnonymousContext=*/true);
     }
     
     ContextDescriptorKind getContextKind() {
@@ -565,7 +565,8 @@ namespace {
     }
 
     ConstantReference getParent() {
-      return IGM.getAddrOfParentContextDescriptor(Proto);
+      return IGM.getAddrOfParentContextDescriptor(
+               Proto, /*fromAnonymousContext=*/false);
     }
 
     ContextDescriptorKind getContextKind() {
@@ -788,15 +789,15 @@ namespace {
           continue;
 
         auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
-        return getDefaultAssociatedConformanceAccessFunction(
-                 AssociatedConformance(Proto, association, requirement),
-                 witness);
+        AssociatedConformance conformance(Proto, association, requirement);
+        defineDefaultAssociatedConformanceAccessFunction(conformance, witness);
+        return IGM.getMangledAssociatedConformance(nullptr, conformance);
       }
 
       return nullptr;
     }
 
-    llvm::Constant *getDefaultAssociatedConformanceAccessFunction(
+    void defineDefaultAssociatedConformanceAccessFunction(
                       AssociatedConformance requirement,
                       ProtocolConformanceRef conformance) {
       auto accessor =
@@ -839,7 +840,7 @@ namespace {
                                                     conformance.getConcrete());
         auto returnValue = conformanceI->getTable(IGF, &associatedTypeMetadata);
         IGF.Builder.CreateRet(returnValue);
-        return accessor;
+        return;
       }
 
       // For an abstract table, emit a reference to the witness table.
@@ -852,7 +853,7 @@ namespace {
             cast<ArchetypeType>(associatedTypeInContext),
             associatedProtocol);
       IGF.Builder.CreateRet(returnValue);
-      return accessor;
+      return;
     }
 
     void addAssociatedTypeNames() {
@@ -1014,7 +1015,8 @@ namespace {
     }
     
     ConstantReference getParent() {
-      return IGM.getAddrOfParentContextDescriptor(Type);
+      return IGM.getAddrOfParentContextDescriptor(
+               Type, /*fromAnonymousContext=*/false);
     }
     
     GenericSignature *getGenericSignature() {
@@ -1511,7 +1513,7 @@ namespace {
       auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Remember if the declaration was dynamic.
-      if (func->isDynamic())
+      if (func->isObjCDynamic())
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?
@@ -4042,12 +4044,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::ExpressibleByTensorFlowOp:
   case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
@@ -4057,6 +4057,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CodingKey:
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
+  case KnownProtocolKind::StringInterpolationProtocol:
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::AdditiveArithmetic:
@@ -4119,31 +4120,6 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 // Generic requirements.
 //===----------------------------------------------------------------------===//
 
-/// Add a generic parameter reference to the given constant struct builder.
-static void addGenericParamRef(IRGenModule &IGM, ConstantStructBuilder &B,
-                               GenericSignature *sig, CanType type) {
-  // type should be either a generic parameter or dependent member type
-  // thereof.
-
-  if (auto genericParam = dyn_cast<GenericTypeParamType>(type)) {
-    // We can encode the ordinal of a direct type parameter reference
-    // inline.
-    auto ordinal = sig->getGenericParamOrdinal(genericParam);
-    B.addInt32(ordinal << 1);
-    return;
-  }
-
-  if (auto dmt = dyn_cast<DependentMemberType>(type)) {
-    // We have to encode the associated type path out-of-line.
-    auto assocTypeRecord = IGM.getAddrOfAssociatedTypeGenericParamRef(sig, dmt);
-
-    B.addTaggedRelativeOffset(IGM.Int32Ty, assocTypeRecord, 1);
-    return;
-  }
-
-  llvm_unreachable("not a generic parameter");
-}
-
 /// Add a generic requirement to the given constant struct builder.
 static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
                                   GenericRequirementsMetadata &metadata,
@@ -4157,7 +4133,9 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
     ++metadata.NumGenericExtraArguments;
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
-  addGenericParamRef(IGM, B, sig, paramType->getCanonicalType());
+  auto typeName =
+    IGM.getTypeRef(paramType->getCanonicalType(), MangledTypeRefRole::Metadata);
+  B.addRelativeAddress(typeName);
   addReference();
 }
 

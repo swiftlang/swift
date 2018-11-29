@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
 import Swift
 

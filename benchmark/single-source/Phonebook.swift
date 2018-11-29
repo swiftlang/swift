@@ -17,9 +17,11 @@ import TestsUtils
 public let Phonebook = BenchmarkInfo(
   name: "Phonebook",
   runFunction: run_Phonebook,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  setUpFunction: { blackHole(names) }
+)
 
-var words = [
+let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
@@ -34,6 +36,17 @@ var words = [
   "Jordan", "Russell", "Alan", "Philip", "Randy", "Juan", "Howard", "Vincent",
   "Bobby", "Dylan", "Johnny", "Phillip", "Craig"
 ]
+let names: [Record] = {
+  // The list of names in the phonebook.
+  var names = [Record]()
+  names.reserveCapacity(words.count * words.count)
+  for first in words {
+    for last in words {
+      names.append(Record(first, last))
+    }
+  }
+  return names
+}()
 
 // This is a phone book record.
 struct Record : Comparable {
@@ -66,15 +79,8 @@ func <(lhs: Record, rhs: Record) -> Bool {
 
 @inline(never)
 public func run_Phonebook(_ N: Int) {
-  // The list of names in the phonebook.
-  var Names : [Record] = []
-  for first in words {
-    for last in words {
-      Names.append(Record(first, last))
-    }
-  }
   for _ in 1...N {
-    var t = Names
+    var t = names
     t.sort()
   }
 }

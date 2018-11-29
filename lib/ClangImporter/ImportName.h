@@ -61,7 +61,9 @@ public:
     // importing of names.  We treat that with a rawValue of 5, and treat
     // all major values of 5 or higher as being rawValue = majorversion + 1.
     const auto &version = langOpts.EffectiveLanguageVersion;
-    if (version.size() > 1 && version[0] == 4 && version[1] == 2) {
+    // If the effective version is 4.x, where x >= 2, the import version
+    // is 4.2.
+    if (version.size() > 1 && version[0] == 4 && version[1] >= 2) {
       return ImportNameVersion::swift4_2();
     }
     unsigned major = version[0];

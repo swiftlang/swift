@@ -1416,8 +1416,9 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  if (storage->isDynamic())
+  if (storage->isObjCDynamic())
     return true;
+
 
   // Imported declarations behave like they are dynamic, even if they're
   // not marked as such explicitly.
@@ -1535,14 +1536,25 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
+getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+static AccessStrategy
+getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+
+static AccessStrategy
 getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   switch (storage->getReadWriteImpl()) {
   case ReadWriteImplKind::Immutable:
     assert(isa<VarDecl>(storage) && cast<VarDecl>(storage)->isLet() &&
            "mutation of a immutable variable that isn't a let");
     return AccessStrategy::getStorage();
-  case ReadWriteImplKind::Stored:
+  case ReadWriteImplKind::Stored: {
+    // If the storage isDynamic (and not @objc) use the accessors.
+    if (storage->isNativeDynamic())
+      return AccessStrategy::getMaterializeToTemporary(
+          getOpaqueReadAccessStrategy(storage, false),
+          getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
+  }
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
@@ -1559,6 +1571,8 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 
 static AccessStrategy
 getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->requiresOpaqueReadCoroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -1594,7 +1608,8 @@ getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
 AccessStrategy
 AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                                        AccessKind accessKind,
-                                       DeclContext *accessFromDC) const {
+                                       ModuleDecl *module,
+                                       ResilienceExpansion expansion) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     assert(hasStorage());
@@ -1609,9 +1624,12 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
 
-      // If the storage is resilient to the given use DC (perhaps because
-      // it's @_transparent and we have to be careful about it being inlined
-      // across module lines), we cannot use direct access.
+      if (isNativeDynamic())
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
+
+      // If the storage is resilient from the given module and resilience
+      // expansion, we cannot use direct access.
+      //
       // If we end up here with a stored property of a type that's resilient
       // from some resilience domain, we cannot do direct access.
       //
@@ -1623,9 +1641,8 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
       bool resilient;
-      if (accessFromDC)
-        resilient = isResilient(accessFromDC->getParentModule(),
-                                accessFromDC->getResilienceExpansion());
+      if (module)
+        resilient = isResilient(module, expansion);
       else
         resilient = isResilient();
 
@@ -1656,7 +1673,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     case AccessKind::Read:
     case AccessKind::ReadWrite:
       return getAccessStrategy(AccessSemantics::Ordinary,
-                               accessKind, accessFromDC);
+                               accessKind, module, expansion);
     }
   }
   llvm_unreachable("bad access semantics");
@@ -1696,16 +1713,11 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   // Dynamic storage suppresses the modify coroutine.
   // If we add a Swift-native concept of `dynamic`, this should be restricted
   // to the ObjC-supported concept.
-  if (isDynamic())
-    return false;
-
-  // We only need the modify coroutine in type contexts.
-  // TODO: resilient global variables?
-  auto *dc = getDeclContext();
-  if (!dc->isTypeContext())
+  if (isObjCDynamic())
     return false;
 
   // Requirements of ObjC protocols don't support the modify coroutine.
+  auto *dc = getDeclContext();
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
       return false;
@@ -1772,17 +1784,17 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
-  // Private and (unversioned) internal variables always have a
-  // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
-    return false;
-
   // If we're an instance property of a nominal type, query the type.
   auto *dc = getDeclContext();
   if (!isStatic())
     if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
+
+  // Non-public global and static variables always have a
+  // fixed layout.
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return false;
 
   return true;
 }
@@ -1810,6 +1822,34 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
     return isResilient() && M != getModuleContext();
   }
   llvm_unreachable("bad resilience expansion");
+}
+
+static bool isValidKeyPathComponent(AbstractStorageDecl *decl) {
+  // If this property or subscript is not an override, we can reference it
+  // from a keypath component.
+  auto base = decl->getOverriddenDecl();
+  if (!base)
+    return true;
+
+  // Otherwise, we can only reference it if the type is not ABI-compatible
+  // with the type of the base.
+  //
+  // If the type is ABI compatible with the type of the base, we have to
+  // reference the base instead.
+  auto baseInterfaceTy = base->getInterfaceType();
+  auto derivedInterfaceTy = decl->getInterfaceType();
+
+  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
+
+  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
+      base, decl, baseInterfaceTy);
+
+  return !derivedInterfaceTy->matches(overrideInterfaceTy,
+                                      TypeMatchFlags::AllowABICompatible);
+}
+
+void AbstractStorageDecl::computeIsValidKeyPathComponent() {
+  setIsValidKeyPathComponent(::isValidKeyPathComponent(this));
 }
 
 bool ValueDecl::isInstanceMember() const {
@@ -2031,7 +2071,6 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfo()
       .withRepresentation(info.getRepresentation())
-      .withIsAutoClosure(info.isAutoClosure())
       .withThrows(info.throws());
 }
 
@@ -2409,7 +2448,7 @@ bool ValueDecl::isUsableFromInline() const {
 
 /// Return the access level of an internal or public declaration
 /// that's been testably imported.
-static AccessLevel getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2441,11 +2480,13 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return AccessLevel::Public;
   }
 
-  if (useDC && (access == AccessLevel::Internal ||
-                access == AccessLevel::Public)) {
-    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-      if (useSF->hasTestableImport(VD->getModuleContext()))
-        return getTestableAccess(VD);
+  if (useDC) {
+    // Check whether we need to modify the access level based on
+    // @testable/@_private import attributes.
+    auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+    if (!useSF) return access;
+    if (useSF->hasTestableOrPrivateImport(access, VD))
+      return getTestableOrPrivateImportsAccess(VD);
   }
 
   return access;
@@ -2465,19 +2506,24 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true);
 
-  // Handle @testable.
+  // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
   case AccessLevel::Open:
     break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
-    if (getModuleContext()->isTestingEnabled())
-      effectiveAccess = getTestableAccess(this);
+    if (getModuleContext()->isTestingEnabled() ||
+        getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::FilePrivate:
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   }
 
@@ -2655,18 +2701,30 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
   switch (access) {
   case AccessLevel::Private:
+    if (useDC != sourceDC) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+    }
     return (useDC == sourceDC ||
       AccessScope::allowsPrivateAccess(useDC, sourceDC));
   case AccessLevel::FilePrivate:
-    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
+    if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+      return false;
+    }
+    return true;
   case AccessLevel::Internal: {
     const ModuleDecl *sourceModule = sourceDC->getParentModule();
     const DeclContext *useFile = useDC->getModuleScopeContext();
     if (useFile->getParentModule() == sourceModule)
       return true;
-    if (auto *useSF = dyn_cast<SourceFile>(useFile))
-      if (useSF->hasTestableImport(sourceModule))
-        return true;
+    auto *useSF = dyn_cast<SourceFile>(useFile);
+    if (!useSF) return false;
+    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
+      return true;
     return false;
   }
   case AccessLevel::Public:
@@ -3000,6 +3058,8 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   // Add to the end of the list.
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
+
+  addedExtension(extension);
 }
 
 auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
@@ -3026,6 +3086,18 @@ NominalTypeDecl::getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const {
     if (varDecl->getAttrs().hasAttribute<TFParameterAttr>())
       result.push_back(varDecl);
   }
+}
+
+Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
+  auto &ctx = getASTContext();
+#define CASE(NAME) if (this == ctx.get##NAME##Decl()) return KPTK_##NAME;
+  CASE(KeyPath)
+  CASE(WritableKeyPath)
+  CASE(ReferenceWritableKeyPath)
+  CASE(AnyKeyPath)
+  CASE(PartialKeyPath)
+#undef CASE
+  return None;
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -3212,22 +3284,36 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
-  auto overridden = getOverriddenDecls();
+namespace {
+static AssociatedTypeDecl *getAssociatedTypeAnchor(
+                      const AssociatedTypeDecl *ATD,
+                      llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
+  auto overridden = ATD->getOverriddenDecls();
 
   // If this declaration does not override any other declarations, it's
   // the anchor.
-  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(this);
+  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(ATD);
 
-  // Find the best anchor among the anchors of the overridden decls.
+  // Find the best anchor among the anchors of the overridden decls and avoid
+  // reentrancy when erroneous cyclic protocols exist.
   AssociatedTypeDecl *bestAnchor = nullptr;
   for (auto assocType : overridden) {
-    auto anchor = assocType->getAssociatedTypeAnchor();
-    if (!bestAnchor || compare(anchor, bestAnchor) < 0)
+    if (!searched.insert(assocType).second)
+      continue;
+    auto anchor = getAssociatedTypeAnchor(assocType, searched);
+    if (!anchor)
+      continue;
+    if (!bestAnchor || AbstractTypeParamDecl::compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
   }
 
   return bestAnchor;
+}
+};
+
+AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
+  llvm::SmallSet<const AssociatedTypeDecl *, 8> searched;
+  return ::getAssociatedTypeAnchor(this, searched);
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -3612,7 +3698,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Testably imported enums are exhaustive, on the grounds that only the author
   // of the original library can import it testably.
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(containingModule))
+    if (useSF->hasTestableOrPrivateImport(AccessLevel::Internal,
+                                          containingModule))
       return true;
 
   // Otherwise, the enum is non-exhaustive.
@@ -4306,7 +4393,8 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(supportsMutation() && "adding setter to immutable storage");
   assert(isAccessor(accessor, AccessorKind::Set, this));
 
@@ -4315,7 +4403,8 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(getSetter() && "declaration doesn't already have setter!");
   assert(supportsMutation() && "adding modify to immutable storage");
   assert(!getModifyCoroutine() && "already has a modify accessor");
@@ -4767,7 +4856,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
+    DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
   Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
   Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
@@ -4863,19 +4952,19 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 }
 
 void ParamDecl::setDefaultValue(Expr *E) {
-  if (!DefaultValueAndIsVariadic.getPointer()) {
+  if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
 
-    DefaultValueAndIsVariadic.setPointer(
-      getASTContext().Allocate<StoredDefaultArgument>());
+    DefaultValueAndFlags.setPointer(
+        getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndIsVariadic.getPointer()->DefaultArg = E;
+  DefaultValueAndFlags.getPointer()->DefaultArg = E;
 }
 
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
-  assert(DefaultValueAndIsVariadic.getPointer());
-  DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
+  assert(DefaultValueAndFlags.getPointer());
+  DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
 StringRef
@@ -4885,10 +4974,9 @@ ParamDecl::getDefaultValueStringRepresentation(
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
   case DefaultArgumentKind::Normal: {
-    assert(DefaultValueAndIsVariadic.getPointer() &&
+    assert(DefaultValueAndFlags.getPointer() &&
            "default value not provided yet");
-    auto existing =
-      DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
     if (!existing.empty())
       return existing;
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
@@ -4915,12 +5003,12 @@ ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
   assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal);
   assert(!stringRepresentation.empty());
 
-  if (!DefaultValueAndIsVariadic.getPointer()) {
-    DefaultValueAndIsVariadic.setPointer(
-      getASTContext().Allocate<StoredDefaultArgument>());
+  if (!DefaultValueAndFlags.getPointer()) {
+    DefaultValueAndFlags.setPointer(
+        getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndIsVariadic.getPointer()->StringRepresentation =
+  DefaultValueAndFlags.getPointer()->StringRepresentation =
       stringRepresentation;
 }
 
@@ -5072,8 +5160,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-std::pair<DefaultArgumentKind, Type>
-swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
+const ParamDecl *swift::getParameterAt(ValueDecl *source, unsigned index) {
   const ParameterList *paramList;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
     paramList = AFD->getParameters();
@@ -5081,8 +5168,7 @@ swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
     paramList = cast<EnumElementDecl>(source)->getParameterList();
   }
 
-  auto param = paramList->get(Index);
-  return { param->getDefaultArgumentKind(), param->getInterfaceType() };
+  return paramList->get(index);
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -5299,11 +5385,14 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
 }
 
 static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
+  if (!isa<ClassDecl>(decl->getDeclContext()))
+    return true;
+
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
     return false;
   
   // Initializers are not normally inherited, but required initializers can
@@ -5326,7 +5415,8 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   }
 
   auto base = decl->getOverriddenDecl();
-  if (!base || base->hasClangNode() || base->isDynamic())
+
+  if (!base || base->hasClangNode() || base->isObjCDynamic())
     return true;
   
   // As above, convenience initializers are not formally overridable in Swift
@@ -5584,7 +5674,6 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,
                                        SourceLoc accessorKeywordLoc,
                                        AccessorKind accessorKind,
-                                       AddressorKind addressorKind,
                                        AbstractStorageDecl *storage,
                                        SourceLoc staticLoc,
                                        StaticSpellingKind staticSpelling,
@@ -5599,7 +5688,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   void *buffer = allocateMemoryForDecl<AccessorDecl>(ctx, size,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
-      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind, addressorKind,
+      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
                    storage, staticLoc, staticSpelling, throws, throwsLoc,
                    hasImplicitSelfDecl, genericParams, parent);
   if (clangNode)
@@ -5614,7 +5703,6 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                SourceLoc declLoc,
                                                SourceLoc accessorKeywordLoc,
                                                AccessorKind accessorKind,
-                                               AddressorKind addressorKind,
                                                AbstractStorageDecl *storage,
                                                SourceLoc staticLoc,
                                               StaticSpellingKind staticSpelling,
@@ -5622,7 +5710,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                GenericParamList *genericParams,
                                                DeclContext *parent) {
   return createImpl(ctx, declLoc, accessorKeywordLoc, accessorKind,
-                    addressorKind, storage, staticLoc, staticSpelling,
+                    storage, staticLoc, staticSpelling,
                     throws, throwsLoc, genericParams, parent,
                     ClangNode());
 }
@@ -5631,7 +5719,6 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    SourceLoc declLoc,
                                    SourceLoc accessorKeywordLoc,
                                    AccessorKind accessorKind,
-                                   AddressorKind addressorKind,
                                    AbstractStorageDecl *storage,
                                    SourceLoc staticLoc,
                                    StaticSpellingKind staticSpelling,
@@ -5642,7 +5729,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    DeclContext *parent,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
-      ctx, declLoc, accessorKeywordLoc, accessorKind, addressorKind, storage,
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
       staticLoc, staticSpelling, throws, throwsLoc,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);
@@ -5853,9 +5940,14 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<FunctionType>();
-  return AnyFunctionType::composeInput(funcTy->getASTContext(),
-                                       funcTy->getParams(),
-                                       /*canonicalVararg=*/false);
+
+  auto &ctx = getASTContext();
+  SmallVector<TupleTypeElt, 4> elements;
+  for (const auto &param : funcTy->getParams()) {
+    Type eltType = param.getParameterType(/*canonicalVararg=*/false, &ctx);
+    elements.emplace_back(eltType, param.getLabel());
+  }
+  return TupleType::get(elements, ctx);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {

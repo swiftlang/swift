@@ -77,6 +77,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1652,8 +1653,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
   auto descriptorFields = builder.beginStruct();
-  descriptorFields.addInt(IGF.IGM.IntPtrTy, 0);
-  descriptorFields.addInt(IGF.IGM.IntPtrTy,
+
+  const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
+  llvm::IntegerType *UnsignedLongTy =
+      llvm::IntegerType::get(IGF.IGM.LLVMContext,
+                             ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
+  descriptorFields.addInt(UnsignedLongTy, 0);
+  descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
   
   if (!isPOD) {

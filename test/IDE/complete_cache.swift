@@ -39,13 +39,20 @@
 // Check the individual cache item.
 // RUN: %target-swift-ide-test -dump-completion-cache %t.ccp/macros-dot-* | %FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2
 
+// Qualified private with dot.
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_STRING -completion-cache-path=%t.ccp > %t.string.ccp1.compl.txt
+// RUN: %FileCheck %s -check-prefix=CLANG_QUAL_STRING  < %t.string.ccp1.compl.txt
+
+
 // Ensure the testable import showed up mangled correctly.
 // RUN: ls %t.ccp/Darwin-testable*
+// RUN: ls %t.ccp/AppKit-private*
 // REQUIRES: executable_test
 
 import macros
 import ctypes
 @testable import Darwin
+@_private(sourceFile: "AppKit.swift") import AppKit
 
 // CLANG_CTYPES: Begin completions
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/keyword[Foo1, Struct1]:    FooStruct1[#FooStruct1#]{{; name=.+$}}
@@ -105,4 +112,11 @@ func testCompleteModuleQualifiedMacros2() {
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .UTF8_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .VERSION_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2: End completions
+}
+
+func testPrivate() {
+  String.#^CLANG_QUAL_STRING^#
+// CLANG_QUAL_STRING: Begin completions
+// CLANG_QUAL_STRING: name=someMethod()
+// CLANG_QUAL_STRING: End completions
 }

@@ -308,27 +308,6 @@ bool Parser::parseTopLevel() {
   return FoundTopLevelCodeToExecute;
 }
 
-static Optional<StringRef>
-getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
-                                  StringRef DiagText) {
-  // FIXME: Support extended escaping string literal.
-  if (Tok.getCustomDelimiterLen()) {
-    P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
-    return None;
-  }
-
-  SmallVector<Lexer::StringSegment, 1> Segments;
-  P.L->getStringLiteralSegments(Tok, Segments);
-  if (Segments.size() != 1 ||
-      Segments.front().Kind == Lexer::StringSegment::Expr) {
-   P.diagnose(Loc, diag::attr_interpolated_string, DiagText);
-   return None;
-  }
-
-  return P.SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
-                                                 Segments.front().Length));
-}
-
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     SourceLoc AtLoc, SourceLoc AttrLoc, StringRef AttrName) {
   // Check 'Tok', return false if ':' or '=' cannot be found.
@@ -440,8 +419,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
         break;
       }
 
-      auto Value = getStringLiteralIfNotInterpolated(*this, AttrLoc, Tok,
-                                                     ArgumentKindStr);
+      auto Value = getStringLiteralIfNotInterpolated(
+          AttrLoc, ("'" + ArgumentKindStr + "'").str());
       consumeToken();
       if (!Value) {
         AnyArgumentInvalid = true;
@@ -1404,8 +1383,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    Optional<StringRef> AsmName =
-      getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+    Optional<StringRef> AsmName = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
 
     consumeToken(tok::string_literal);
 
@@ -1518,7 +1497,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    auto Value = getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+    auto Value = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
 
     consumeToken(tok::string_literal);
 
@@ -1667,7 +1647,58 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     break;
   }
+  case DAK_PrivateImport: {
+    // Parse the leading '('.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+    Optional<StringRef> filename;
+    {
+      SyntaxParsingContext ContentContext(
+          SyntaxContext, SyntaxKind::NamedAttributeStringArgument);
 
+      // Parse 'sourceFile'.
+      if (Tok.getText() != "sourceFile") {
+        diagnose(LParenLoc, diag::attr_private_import_expected_sourcefile);
+        return false;
+      }
+      auto ForLoc = consumeToken();
+
+      // Parse ':'.
+      if (Tok.getKind() != tok::colon) {
+        diagnose(ForLoc, diag::attr_private_import_expected_colon);
+        return false;
+      }
+      auto ColonLoc = consumeToken(tok::colon);
+
+      // Parse '"'function-name'"'
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
+        return false;
+      }
+      filename = getStringLiteralIfNotInterpolated(Loc, "_private");
+      if (!filename.hasValue()) {
+        diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
+        return false;
+      }
+      consumeToken(tok::string_literal);
+    }
+    // Parse the matching ')'.
+    SourceLoc RParenLoc;
+    bool Invalid = parseMatchingToken(tok::r_paren, RParenLoc,
+                                      diag::attr_private_import_expected_rparen,
+                                      LParenLoc);
+    if (Invalid)
+      return false;
+    auto *attr = PrivateImportAttr::create(Context, AtLoc, Loc, LParenLoc,
+                                           *filename, RParenLoc);
+    Attributes.add(attr);
+
+    break;
+  }
   case DAK_ObjC: {
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {
@@ -1709,6 +1740,62 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       attr = ObjCAttr::createSelector(Context, AtLoc, Loc, LParenLoc,
                                       NameLocs, Names, RParenLoc);
     }
+    Attributes.add(attr);
+    break;
+  }
+
+
+  case DAK_DynamicReplacement: {
+    // Parse the leading '('.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+    DeclName replacedFunction;
+    {
+      SyntaxParsingContext ContentContext(
+          SyntaxContext, SyntaxKind::NamedAttributeStringArgument);
+
+      // Parse 'for'.
+      if (Tok.getText() != "for") {
+        diagnose(Loc, diag::attr_dynamic_replacement_expected_for);
+        return false;
+      }
+      auto ForLoc = consumeToken();
+
+      // Parse ':'.
+      if (Tok.getText() != ":") {
+        diagnose(ForLoc, diag::attr_dynamic_replacement_expected_colon);
+        return false;
+      }
+      consumeToken(tok::colon);
+      {
+        SyntaxParsingContext ContentContext(SyntaxContext,
+                                            SyntaxKind::DeclName);
+
+        DeclNameLoc loc;
+        replacedFunction = parseUnqualifiedDeclName(
+            true, loc, diag::attr_dynamic_replacement_expected_function,
+            /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
+            /*allowDeinitAndSubscript*/ true);
+      }
+    }
+
+    // Parse the matching ')'.
+    SourceLoc RParenLoc;
+    bool Invalid = parseMatchingToken(
+        tok::r_paren, RParenLoc, diag::attr_dynamic_replacement_expected_rparen,
+        LParenLoc);
+    if (Invalid) {
+      return false;
+    }
+
+
+    DynamicReplacementAttr *attr = DynamicReplacementAttr::create(
+        Context, AtLoc, Loc, LParenLoc, replacedFunction, RParenLoc);
     Attributes.add(attr);
     break;
   }
@@ -3120,7 +3207,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
   if (auto SF = CurDeclContext->getParentSourceFile()) {
     if (!getScopeInfo().isInactiveConfigBlock()) {
       for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+        if (isa<ObjCAttr>(Attr) ||
+            /* Pre Swift 5 dymamic implied @objc */
+            (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+             isa<DynamicAttr>(Attr)))
           SF->AttrsRequiringFoundation.insert(Attr);
       }
     }
@@ -3918,7 +4008,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
 
       Filename =
-          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#sourceLocation");
+          getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
       if (!Filename.hasValue())
         return makeParserError();
       consumeToken(tok::string_literal);
@@ -3979,8 +4069,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       return makeParserError();
     }
     
-    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                 "#line");
+    Filename = getStringLiteralIfNotInterpolated(Loc, "'#line'");
     if (!Filename.hasValue())
       return makeParserError();
   }
@@ -4228,7 +4317,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
-                                    AddressorKind addressorKind,
                                     AbstractStorageDecl *storage,
                                     Parser *P, SourceLoc AccessorKeywordLoc) {
   // First task, set up the value argument list.  This is the "newValue" name
@@ -4264,6 +4352,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      storageParam->getName(),
                                      P->CurDeclContext);
         accessorParam->setVariadic(storageParam->isVariadic());
+        accessorParam->setAutoClosure(storageParam->isAutoClosure());
 
         // The cloned parameter is implicit.
         accessorParam->setImplicit();
@@ -4292,7 +4381,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   auto *D = AccessorDecl::create(P->Context,
                                  /*FIXME FuncLoc=*/DeclLoc,
                                  AccessorKeywordLoc,
-                                 Kind, addressorKind, storage,
+                                 Kind, storage,
                                  StaticLoc, StaticSpellingKind::None,
                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                  (GenericParams
@@ -4419,7 +4508,6 @@ static unsigned skipBracedBlock(Parser &P,
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              AddressorKind addressorKind,
                                               bool article) {
   switch (accessorKind) {
   case AccessorKind::Get:
@@ -4445,13 +4533,11 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
 static StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor,
                                               bool article) {
   return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      accessor->getAddressorKind(),
                                       article);
 }
 
 static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorKind accessorKind,
-                                       AddressorKind addressorKind,
                                        bool isSubscript,
                                        AccessorDecl *previous) {
   assert(accessorKind == previous->getAccessorKind());
@@ -4526,7 +4612,6 @@ struct Parser::ParsedAccessors {
 static bool parseAccessorIntroducer(Parser &P,
                                     DeclAttributes &Attributes,
                                     AccessorKind &Kind,
-                                    AddressorKind &addressorKind,
                                     SourceLoc &Loc) {
   assert(Attributes.isEmpty());
   bool FoundCCToken;
@@ -4556,11 +4641,6 @@ static bool parseAccessorIntroducer(Parser &P,
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
-  }
-#define ANY_ADDRESSOR(ID, ADDRESSOR_ID, KEYWORD)                               \
-  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
-    Kind = AccessorKind::ID;                                                   \
-    addressorKind = AddressorKind::ADDRESSOR_ID;                               \
   }
 #include "swift/AST/AccessorKinds.def"
   else {
@@ -4614,8 +4694,8 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     auto getter =
         createAccessorFunc(Tok.getLoc(), /*ValueNamePattern*/ nullptr,
                            GenericParams, Indices, ElementTy, StaticLoc, Flags,
-                           AccessorKind::Get, AddressorKind::NotAddressor,
-                           storage, this, /*AccessorKeywordLoc*/ SourceLoc());
+                           AccessorKind::Get, storage, this,
+                           /*AccessorKeywordLoc*/ SourceLoc());
     accessors.add(getter);
     parseAbstractFunctionBody(getter);
     accessors.RBLoc = getter->getEndLoc();
@@ -4636,10 +4716,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     // Parse introducer if possible.
     DeclAttributes Attributes;
     AccessorKind Kind = AccessorKind::Get;
-    AddressorKind addressorKind = AddressorKind::NotAddressor;
     SourceLoc Loc;
     bool NotAccessor = parseAccessorIntroducer(
-        *this, Attributes, Kind, addressorKind, Loc);
+        *this, Attributes, Kind, Loc);
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
@@ -4653,8 +4732,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
                 Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
-                AddressorKind::NotAddressor, storage, this,
-                /*AccessorKeywordLoc*/ SourceLoc());
+                storage, this, /*AccessorKeywordLoc*/ SourceLoc());
             accessors.add(getter);
             CodeCompletion->setParsedDecl(getter);
           } else {
@@ -4711,12 +4789,12 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     // Set up a function declaration.
     auto accessor = createAccessorFunc(Loc, ValueNamePattern, GenericParams,
                                        Indices, ElementTy, StaticLoc, Flags,
-                                       Kind, addressorKind, storage, this, Loc);
+                                       Kind, storage, this, Loc);
     accessor->getAttrs() = Attributes;
 
     // Collect this accessor and detect conflicts.
     if (auto existingAccessor = accessors.add(accessor)) {
-      diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
+      diagnoseRedundantAccessors(*this, Loc, Kind,
                                  /*subscript*/Indices != nullptr,
                                  existingAccessor);
     }
@@ -4905,7 +4983,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   }
 
   // Reject accessors on 'let's after parsing them (for better recovery).
-  if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
+  if (PrimaryVar->isLet() && !Attributes.hasAttribute<HasStorageAttr>()) {
     Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
       DiagID = diag::let_cannot_be_observing_property;
@@ -5026,7 +5104,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     // We never use this to create addressors.
     assert(kind != AccessorKind::Address &&
            kind != AccessorKind::MutableAddress);
-    auto addressorKind = AddressorKind::NotAddressor;
 
     // Create the paramter list for a setter.
     ParameterList *argList = nullptr;
@@ -5041,7 +5118,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
 
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
-                                       staticLoc, flags, kind, addressorKind,
+                                       staticLoc, flags, kind,
                                        storage, &P, SourceLoc());
     accessor->setImplicit();
     add(accessor);
@@ -5169,9 +5246,9 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     readWriteImpl = ReadWriteImplKind::Immutable;
   }
 
-  // Allow the sil_stored attribute to override all the accessors we parsed
+  // Allow the _hasStorage attribute to override all the accessors we parsed
   // when making the final classification.
-  if (attrs.hasAttribute<SILStoredAttr>()) {
+  if (attrs.hasAttribute<HasStorageAttr>()) {
     return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
   }
 

@@ -241,6 +241,10 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
   case ValueKind::FunctionRefInst:
     return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
 
+  case ValueKind::DynamicFunctionRefInst:
+  case ValueKind::PreviousDynamicFunctionRefInst:
+    return CalleeList(); // Don't know the dynamic target.
+
   case ValueKind::PartialApplyInst:
     return getCalleeListForCalleeKind(
         cast<PartialApplyInst>(Callee)->getCallee());

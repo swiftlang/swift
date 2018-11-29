@@ -324,7 +324,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -338,7 +338,12 @@ protected:
     SupportsMutation : 1,
 
     /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2
+    OpaqueReadOwnership : 2,
+
+    /// Whether a keypath component can directly reference this storage,
+    /// or if it must use the overridden declaration instead.
+    HasComputedValidKeyPathComponent : 1,
+    ValidKeyPathComponent : 1
   );
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
@@ -431,12 +436,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
     /// The kind of accessor this is.
-    AccessorKind : 4,
-
-    /// The kind of addressor this is.
-    AddressorKind : 3
+    AccessorKind : 4
   );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
@@ -573,7 +575,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -586,7 +588,13 @@ protected:
     RawResilienceStrategy : 1,
 
     /// Whether all imports have been resolved. Used to detect circular imports.
-    HasResolvedImports : 1
+    HasResolvedImports : 1,
+
+    // If the module was or is being compiled with `-enable-private-imports`.
+    PrivateImportsEnabled : 1,
+
+    // If the module is compiled with `-enable-implicit-dynamic`.
+    ImplicitDynamicEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2590,6 +2598,14 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  bool isObjCDynamic() const {
+    return isObjC() && isDynamic();
+  }
+
+  bool isNativeDynamic() const {
+    return !isObjC() && isDynamic();
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 
@@ -3015,6 +3031,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
+enum KeyPathTypeKind : unsigned char {
+  KPTK_AnyKeyPath,
+  KPTK_PartialKeyPath,
+  KPTK_KeyPath,
+  KPTK_WritableKeyPath,
+  KPTK_ReferenceWritableKeyPath
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -3051,15 +3075,25 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// The table itself is lazily constructed and updated when
   /// lookupDirect() is called. The bit indicates whether the lookup
   /// table has already added members by walking the declarations in
-  /// scope.
+  /// scope; it should be manipulated through \c isLookupTablePopulated()
+  /// and \c setLookupTablePopulated().
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
   void prepareLookupTable(bool ignoreNewExtensions);
 
+  /// True if the entries in \c LookupTable are complete--that is, if a
+  /// name is present, it contains all members with that name.
+  bool isLookupTablePopulated() const;
+  void setLookupTablePopulated(bool value);
+
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
+
+  /// Note that we have added an extension into the nominal type,
+  /// so that its members can eventually be added to the lookup table.
+  void addedExtension(ExtensionDecl *ext);
 
   /// \brief A lookup table used to find the protocol conformances of
   /// a given nominal type.
@@ -3225,6 +3259,9 @@ public:
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
+
+  /// Is this a key path type?
+  Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Retrieve all parameters of the nominal type (instance stored properties
@@ -4236,6 +4273,8 @@ protected:
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
   }
 
+  void computeIsValidKeyPathComponent();
+
 public:
 
   /// \brief Should this declaration be treated as if annotated with transparent
@@ -4476,7 +4515,8 @@ public:
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind,
-                                   DeclContext *accessFromDC = nullptr) const;
+                                   ModuleDecl *module,
+                                   ResilienceExpansion expansion) const;
 
   /// \brief Should this declaration behave as if it must be accessed
   /// resiliently, even when we're building a non-resilient module?
@@ -4514,7 +4554,20 @@ public:
   BehaviorRecord *getMutableBehavior() {
     return BehaviorInfo.getPointer();
   }
-  
+
+  void setIsValidKeyPathComponent(bool value) {
+    Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent = true;
+    Bits.AbstractStorageDecl.ValidKeyPathComponent = value;
+  }
+
+  /// True if the storage can be referenced by a keypath directly.
+  /// Otherwise, its override must be referenced.
+  bool isValidKeyPathComponent() const {
+    if (!Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent)
+      const_cast<AbstractStorageDecl *>(this)->computeIsValidKeyPathComponent();
+    return Bits.AbstractStorageDecl.ValidKeyPathComponent;
+  }
+
   /// True if the storage exports a property descriptor for key paths in
   /// other modules.
   bool exportsPropertyDescriptor() const;
@@ -4827,9 +4880,18 @@ class ParamDecl : public VarDecl {
     StringRef StringRepresentation;
   };
 
-  /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
-  
+  enum class Flags : uint8_t {
+    /// Whether or not this parameter is vargs.
+    IsVariadic = 1 << 0,
+
+    /// Whether or not this parameter is `@autoclosure`.
+    IsAutoClosure = 1 << 1,
+  };
+
+  /// The default value, if any, along with flags.
+  llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
+      DefaultValueAndFlags;
+
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4869,7 +4931,7 @@ public:
   }
   
   Expr *getDefaultValue() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg;
     return nullptr;
   }
@@ -4877,7 +4939,7 @@ public:
   void setDefaultValue(Expr *E);
 
   Initializer *getDefaultArgumentInitContext() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->InitContext;
     return nullptr;
   }
@@ -4911,9 +4973,25 @@ public:
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
-  bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
-  void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
-  
+  bool isVariadic() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+  }
+  void setVariadic(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
+                                      : flags - Flags::IsVariadic);
+  }
+
+  /// Whether or not this parameter is marked with `@autoclosure`.
+  bool isAutoClosure() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsAutoClosure);
+  }
+  void setAutoClosure(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
+                                      : flags - Flags::IsAutoClosure);
+  }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".
@@ -5671,8 +5749,7 @@ class AccessorDecl final : public FuncDecl {
   AbstractStorageDecl *Storage;
 
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
-               AccessorKind accessorKind, AddressorKind addressorKind,
-               AbstractStorageDecl *storage,
+               AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool throws, SourceLoc throwsLoc,
                unsigned numParameterLists, GenericParamList *genericParams,
@@ -5684,14 +5761,12 @@ class AccessorDecl final : public FuncDecl {
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
-    Bits.AccessorDecl.AddressorKind = unsigned(addressorKind);
   }
 
   static AccessorDecl *createImpl(ASTContext &ctx,
                                   SourceLoc declLoc,
                                   SourceLoc accessorKeywordLoc,
                                   AccessorKind accessorKind,
-                                  AddressorKind addressorKind,
                                   AbstractStorageDecl *storage,
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
@@ -5705,7 +5780,6 @@ public:
                               SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5716,7 +5790,6 @@ public:
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5734,10 +5807,6 @@ public:
 
   AccessorKind getAccessorKind() const {
     return AccessorKind(Bits.AccessorDecl.AccessorKind);
-  }
-
-  AddressorKind getAddressorKind() const {
-    return AddressorKind(Bits.AccessorDecl.AddressorKind);
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
@@ -6786,12 +6855,6 @@ inline const GenericContext *Decl::getAsGenericContext() const {
   }
 }
 
-inline bool DeclContext::isExtensionContext() const {
-  if (auto D = getAsDecl())
-    return ExtensionDecl::classof(D);
-  return false;
-}
-
 inline bool DeclContext::classof(const Decl *D) {
   switch (D->getKind()) { //
   default: return false;
@@ -6830,16 +6893,8 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Determine the default argument kind and type for the given argument index
-/// in this declaration, which must be a function or constructor.
-///
-/// \param Index The index of the argument for which we are querying the
-/// default argument.
-///
-/// \returns the default argument kind and, if there is a default argument,
-/// the type of the corresponding parameter.
-std::pair<DefaultArgumentKind, Type>
-getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+/// Retrieve parameter declaration from the given source at given index.
+const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

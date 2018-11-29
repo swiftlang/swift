@@ -104,12 +104,40 @@ _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithBytes(
 SWIFT_RUNTIME_STDLIB_API
 const char *_Nullable _swift_stdlib_CFStringGetCStringPtr(
     _swift_shims_CFStringRef _Nonnull theString,
-
     _swift_shims_CFStringEncoding encoding);
 
 SWIFT_RUNTIME_STDLIB_API
 _swift_shims_CFStringRef _Nonnull _swift_stdlib_objcDebugDescription(
     id _Nonnull nsObject);
+  
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_CFComparisonResult _swift_stdlib_CFStringCompare(
+    _swift_shims_CFStringRef _Nonnull string,
+    _swift_shims_CFStringRef _Nonnull string2);
+  
+SWIFT_RUNTIME_STDLIB_API
+__swift_uint8_t _swift_stdlib_isNSString(id _Nonnull obj);
+
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_CFHashCode _swift_stdlib_CFStringHashNSString(id _Nonnull obj);
+
+SWIFT_RUNTIME_STDLIB_API
+_swift_shims_CFHashCode
+_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
+                                  _swift_shims_CFIndex length);
+
+SWIFT_RUNTIME_STDLIB_API
+const __swift_uint8_t * _Nullable
+_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
+                                                     unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_uint8_t
+_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
+                                         _swift_shims_UInt8 *buffer,
+                                         _swift_shims_CFIndex maxLength,
+                                         unsigned long encoding);
+  
 #endif // __OBJC2__
 
 #ifdef __cplusplus

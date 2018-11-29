@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   /// The result of attempting to parse a `T` from some input.
-  @_frozen // FIXME(sil-serialize-all)
+  @_frozen
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
   case valid(T)
@@ -22,17 +22,16 @@ extension Unicode {
   /// An encoding error was detected.
   ///
   /// `length` is the number of underlying code units consumed by this
-  /// error (the length of the longest prefix of a valid encoding
-  /// sequence that could be recognized).
+  /// error, guaranteed to be greater than 0.
   case error(length: Int)
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal var _valid: T? {
       if case .valid(let result) = self { return result }
       return nil
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal var _error: Int? {
       if case .error(let result) = self { return result }
       return nil
@@ -57,79 +56,6 @@ public protocol _UnicodeParser {
   where I.Element == Encoding.CodeUnit
 }
 
-extension _UnicodeParser {
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  @discardableResult
-  internal static func _parse<I: IteratorProtocol>(
-    _ input: inout I,
-    repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (Encoding.EncodedScalar)->Void
-  ) -> Int
-  where I.Element == Encoding.CodeUnit
-  {
-    var errorCount = 0
-    var d = Self()
-    while true {
-      switch d.parseScalar(from: &input) {
-      case let .valid(scalarContent):
-        output(scalarContent)
-      case .error:
-        if _slowPath(!makeRepairs) { return 1 }
-        errorCount += 1
-        output(Encoding.encodedReplacementCharacter)
-      case .emptyInput:
-        return errorCount
-      }
-    }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  @discardableResult
-  public static func _decode<I: IteratorProtocol>(
-    _ input: inout I,
-    repairingIllFormedSequences makeRepairs: Bool,
-    into output: (Unicode.Scalar)->Void
-  ) -> Int
-  where I.Element == Encoding.CodeUnit
-  {
-    return _parse(&input, repairingIllFormedSequences: makeRepairs) {
-      output(Encoding.decode($0))
-    }
-  }
-}
-
 extension Unicode {
   public typealias Parser = _UnicodeParser
-}
-
-extension Unicode {
-  @_fixed_layout
-  public // @testable
-  struct _ParsingIterator<
-    CodeUnitIterator : IteratorProtocol, 
-    Parser: Unicode.Parser
-  > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
-    @inline(__always)
-    @inlinable
-    public init(codeUnits: CodeUnitIterator, parser: Parser) {
-      self.codeUnits = codeUnits
-      self.parser = parser
-    }
-    public var codeUnits: CodeUnitIterator
-    public var parser: Parser
-  }
-}
-
-extension Unicode._ParsingIterator : IteratorProtocol, Sequence {
-  @inline(__always)
-  @inlinable
-  public mutating func next() -> Parser.Encoding.EncodedScalar? {
-    switch parser.parseScalar(from: &codeUnits) {
-    case let .valid(scalarContent): return scalarContent
-    case .error: return Parser.Encoding.encodedReplacementCharacter
-    case .emptyInput: return nil
-    }
-  }
 }

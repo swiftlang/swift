@@ -31,6 +31,18 @@ using namespace swift;
 using namespace irgen;
 using namespace Mangle;
 
+const IRLinkage IRLinkage::InternalLinkOnceODR = {
+  llvm::GlobalValue::LinkOnceODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::Internal = {
+  llvm::GlobalValue::InternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
 }
@@ -200,7 +212,7 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
-                   cast<NormalProtocolConformance>(getProtocolConformance()));
+                                                  getRootProtocolConformance());
 
   case Kind::EnumCase:
     return mangler.mangleEnumCase(getDecl());
@@ -208,8 +220,8 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::FieldOffset:
     return mangler.mangleFieldOffset(getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
-    return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
+  case Kind::ProtocolWitnessTable:
+    return mangler.mangleWitnessTable(getRootProtocolConformance());
 
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -264,8 +276,65 @@ std::string LinkEntity::mangleAsString() const {
     return Result;
   }
 
-  case Kind::SILFunction:
-    return getSILFunction()->getName();
+  case Kind::SILFunction: {
+    std::string Result(getSILFunction()->getName());
+    if (isDynamicallyReplaceable()) {
+      Result.append("TI");
+    }
+    return Result;
+  }
+  case Kind::DynamicallyReplaceableFunctionImpl: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result = mangler.mangleConstructorEntity(Constructor, true,
+                                               /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("TI");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionVariable: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("TX");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionKey: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("Tx");
+    return Result;
+  }
+
+
+  case Kind::DynamicallyReplaceableFunctionVariableAST: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result = mangler.mangleConstructorEntity(Constructor, true,
+                                               /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("TX");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionKeyAST: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result = mangler.mangleConstructorEntity(Constructor, true,
+                                               /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("Tx");
+    return Result;
+  }
+
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getName();
 
@@ -280,29 +349,11 @@ std::string LinkEntity::mangleAsString() const {
   llvm_unreachable("bad entity kind!");
 }
 
-/// Get SIL-linkage for something that's not required to be visible
-/// and doesn't actually need to be uniqued.
-static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
-                                         ForDefinition_t forDefinition) {
-  switch (linkage) {
-  case FormalLinkage::PublicUnique:
-  case FormalLinkage::PublicNonUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
-
-  case FormalLinkage::HiddenUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
-
-  case FormalLinkage::Private:
-    return SILLinkage::Private;
-  }
-  llvm_unreachable("bad formal linkage");
-}
-
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
     return getLinkageForProtocolConformance(
-        getProtocolConformance()->getRootNormalConformance(), forDefinition);
+        getProtocolConformance()->getRootConformance(), forDefinition);
   };
 
   switch (getKind()) {
@@ -389,9 +440,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     llvm_unreachable("bad kind");
 
   // ...but we don't actually expose individual value witnesses (right now).
-  case Kind::ValueWitness:
-    return getNonUniqueSILLinkage(getDeclLinkage(getType().getAnyNominal()),
-                                  forDefinition);
+  case Kind::ValueWitness: {
+    auto *nominal = getType().getAnyNominal();
+    if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+      return SILLinkage::Shared;
+    return forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal;
+  }
 
   // Foreign type metadata candidates are always shared; the runtime
   // does the uniquing.
@@ -465,9 +519,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getAssociatedType()->getProtocol()),
                          forDefinition);
 
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return getLinkageAsConformance();
+    return getLinkageForProtocolConformance(getRootProtocolConformance(),
+                                            forDefinition);
 
   case Kind::ProtocolWitnessTablePattern:
     if (getLinkageAsConformance() == SILLinkage::Shared)
@@ -491,8 +546,19 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
 
+  case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
+
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+
+
+  case Kind::DynamicallyReplaceableFunctionVariable:
+    return getSILFunction()->getEffectiveSymbolLinkage();
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();
@@ -517,6 +583,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Shared;
   }
   llvm_unreachable("bad link entity kind");
+}
+
+static bool isAvailableExternally(IRGenModule &IGM, SILFunction *F) {
+  // TODO
+  return true;
 }
 
 static bool isAvailableExternally(IRGenModule &IGM, const DeclContext *dc) {
@@ -602,9 +673,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::EnumCase:
     return ::isAvailableExternally(IGM, getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
+    return ::isAvailableExternally(IGM,
+                             getRootProtocolConformance()->getDeclContext());
 
   case Kind::ProtocolWitnessTablePattern:
   case Kind::ObjCClassRef:
@@ -618,22 +690,36 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadataPattern:
   case Kind::DefaultAssociatedConformanceAccessor:
     return false;
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+    return true;
 
+  case Kind::SILFunction:
+    return ::isAvailableExternally(IGM, getSILFunction());
+
+  case Kind::FieldOffset: {
+    return ::isAvailableExternally(IGM,
+                                   cast<VarDecl>(getDecl())
+                                     ->getDeclContext()
+                                     ->getInnermostTypeContext());
+  }
+  
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
-  case Kind::SILFunction:
   case Kind::SILGlobalVariable:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::CoroutineContinuationPrototype:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -699,7 +785,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ReflectionAssociatedTypeDescriptor:
     return IGM.FieldDescriptorTy;
   case Kind::ValueWitnessTable:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
     return IGM.WitnessTableTy;
   case Kind::FieldOffset:
@@ -714,7 +800,10 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
     return IGM.MethodDescriptorStructTy;
-    
+  case Kind::DynamicallyReplaceableFunctionKey:
+    return IGM.DynamicReplacementKeyTy;
+  case Kind::DynamicallyReplaceableFunctionVariable:
+    return IGM.DynamicReplacementLinkEntryTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -751,10 +840,12 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ValueWitnessTable:
   case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
     return IGM.getPointerAlignment();
   case Kind::SILFunction:
     return Alignment(1);
@@ -769,7 +860,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     if (getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     return false;
-
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction: {
     // For imported functions check the Clang declaration.
     if (auto clangOwner = getSILFunction()->getClangNodeOwner())
@@ -820,6 +912,9 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ProtocolDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::AssociatedTypeDescriptor:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
     return getDecl()->isWeakImported(module);
 
   // TODO: Revisit some of the below, for weak conformances.
@@ -830,7 +925,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::TypeMetadataCompletionFunction:
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
@@ -892,12 +987,17 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
   case Kind::DefaultAssociatedConformanceAccessor:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
     sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
     if (!sf)
       return nullptr;
     break;
   
   case Kind::SILFunction:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
     sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
     if (!sf)
       return nullptr;
@@ -913,16 +1013,22 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
     }
     break;
     
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+    sf = getSourceFileForDeclContext(
+                              getRootProtocolConformance()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::ReflectionAssociatedTypeDescriptor:
-  case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
     sf = getSourceFileForDeclContext(
-      getProtocolConformance()->getRootNormalConformance()->getDeclContext());
+      getProtocolConformance()->getRootConformance()->getDeclContext());
     if (!sf)
       return nullptr;
     break;

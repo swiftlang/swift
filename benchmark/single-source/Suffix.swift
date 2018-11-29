@@ -21,12 +21,13 @@ import TestsUtils
 let sequenceCount = 4096
 let suffixCount = 1024
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 
 public let Suffix = [
   BenchmarkInfo(
     name: "SuffixCountableRange",
     runFunction: run_SuffixCountableRange,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "SuffixSequence",
     runFunction: run_SuffixSequence,
@@ -50,11 +51,12 @@ public let Suffix = [
   BenchmarkInfo(
     name: "SuffixArray",
     runFunction: run_SuffixArray,
-    tags: [.validation, .api, .Array, .unstable]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "SuffixCountableRangeLazy",
     runFunction: run_SuffixCountableRangeLazy,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "SuffixSequenceLazy",
     runFunction: run_SuffixSequenceLazy,
@@ -78,7 +80,8 @@ public let Suffix = [
   BenchmarkInfo(
     name: "SuffixArrayLazy",
     runFunction: run_SuffixArrayLazy,
-    tags: [.validation, .api, .Array, .unstable]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -149,7 +152,7 @@ public func run_SuffixAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_SuffixArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.suffix(suffixCount) {
@@ -226,7 +229,7 @@ public func run_SuffixAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_SuffixArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.suffix(suffixCount) {

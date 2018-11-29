@@ -10,7 +10,7 @@ enum E { case A, B }
 enum E3 { case A, B, C }
 
 class C {
-  @sil_stored var x : Builtin.Int64
+  @_hasStorage var x : Builtin.Int64
   init()
 }
 

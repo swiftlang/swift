@@ -2244,48 +2244,6 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   return false;
 }
 
-/// Try to add a fix-it when converting between a collection and its slice type,
-/// such as String <-> Substring or (eventually) Array <-> ArraySlice
-static bool trySequenceSubsequenceConversionFixIts(InFlightDiagnostic &diag,
-                                                   ConstraintSystem &CS,
-                                                   Type fromType, Type toType,
-                                                   Expr *expr) {
-  if (CS.TC.Context.getStdlibModule() == nullptr)
-    return false;
-
-  auto String = CS.TC.getStringType(CS.DC);
-  auto Substring = CS.TC.getSubstringType(CS.DC);
-
-  if (!String || !Substring)
-    return false;
-
-  /// FIXME: Remove this flag when void subscripts are implemented.
-  /// Make this unconditional and remove the if statement.
-  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
-    // String -> Substring conversion
-    // Add '[]' void subscript call to turn the whole String into a Substring
-    if (fromType->isEqual(String)) {
-      if (toType->isEqual(Substring)) {
-        diag.fixItInsertAfter(expr->getEndLoc (), "[]");
-        return true;
-      }
-    }
-  }
-
-  // Substring -> String conversion
-  // Wrap in String.init
-  if (fromType->isEqual(Substring)) {
-    if (toType->isEqual(String)) {
-      auto range = expr->getSourceRange();
-      diag.fixItInsert(range.Start, "String(");
-      diag.fixItInsertAfter(range.End, ")");
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Attempts to add fix-its for these two mistakes:
 ///
 /// - Passing an integer with the right type but which is getting wrapped with a
@@ -2412,7 +2370,7 @@ bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
   InFlightDiagnostic note = CS.TC.diagnose(
       paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
 
-  if (!srcFT->isAutoClosure()) {
+  if (!paramDecl->isAutoClosure()) {
     note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
                      "@escaping ");
   } // TODO: add in a fixit for autoclosure
@@ -2754,10 +2712,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // Try to convert between a sequence and its subsequence, notably
   // String <-> Substring.
-  if (trySequenceSubsequenceConversionFixIts(diag, CS, exprType, contextualType,
-                                             expr)) {
+  if (ContextualFailure::trySequenceSubsequenceFixIts(diag, CS, exprType,
+                                                      contextualType, expr))
     return true;
-  }
 
   // Attempt to add a fixit for the error.
   switch (CTP) {
@@ -3030,7 +2987,13 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // punt on passing down the type information, since type checking the
     // subexpression won't be able to find the default argument provider.
     if (argType) {
-      if (auto argTT = argType->getAs<TupleType>()) {
+      if (auto *PT = dyn_cast<ParenType>(argType.getPointer())) {
+        const auto &flags = PT->getParameterFlags();
+        if (flags.isAutoClosure()) {
+          auto resultTy = PT->castTo<FunctionType>()->getResult();
+          argType = ParenType::get(PT->getASTContext(), resultTy);
+        }
+      } else if (auto argTT = argType->getAs<TupleType>()) {
         if (auto scalarElt = getElementForScalarInitOfArg(argTT, candidates)) {
           // If we found the single argument being initialized, use it.
           auto &arg = argTT->getElement(*scalarElt);
@@ -3040,6 +3003,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           // the individual varargs argument, not the overall array type.
           if (arg.isVararg())
             argType = arg.getVarargBaseTy();
+          else if (arg.isAutoClosure())
+            argType = arg.getType()->castTo<FunctionType>()->getResult();
           else
             argType = arg.getType();
         } else if (candidatesHaveAnyDefaultValues(candidates)) {
@@ -3106,6 +3071,11 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
         // Look at each of the arguments assigned to this parameter.
         auto currentParamType = param.getOldType();
+
+        if (param.isAutoClosure())
+          currentParamType =
+              currentParamType->castTo<FunctionType>()->getResult();
+
         for (auto inArgNo : paramBindings[paramIdx]) {
           // Determine the argument type.
           auto currentArgType = TE->getElement(inArgNo);
@@ -3772,9 +3742,8 @@ public:
       Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
-    if (auto FT = param.getOldType()->getAs<AnyFunctionType>())
-      if (FT->isAutoClosure())
-        Ty = FT->getResult();
+    if (param.isAutoClosure())
+      Ty = param.getPlainType()->castTo<FunctionType>()->getResult();
     insertText << "<#" << Ty << "#>";
     if (argIdx == 0 && insertableEndIdx != 0)
       insertText << ", ";
@@ -5372,11 +5341,28 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
   if (!isUnresolvedOrTypeVarType(fnType) &&
-      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()
-      // SWIFT_ENABLE_TENSORFLOW
-      && !CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
-    
+      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
+
     auto arg = callExpr->getArg();
+
+    // Diagnose @dynamicCallable errors.
+    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
+      auto dynamicCallableMethods =
+        CS.DynamicCallableCache[fnType->getCanonicalType()];
+
+      // Diagnose dynamic calls with keywords on @dynamicCallable types that
+      // don't define the `withKeywordArguments` method.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        bool hasArgLabel = llvm::any_of(
+          tuple->getElementNames(), [](Identifier i) { return !i.empty(); });
+        if (hasArgLabel &&
+            dynamicCallableMethods.keywordArgumentsMethods.empty()) {
+          diagnose(callExpr->getFn()->getStartLoc(),
+                   diag::missing_dynamic_callable_kwargs_method, fnType);
+          return true;
+        }
+      }
+    }
 
     if (fnType->is<ExistentialMetatypeType>()) {
       auto diag = diagnose(arg->getStartLoc(),
@@ -6727,10 +6713,16 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                            : defaultUnqualifiedLookupOptions),
                                corrections);
 
-      if (currentType)
-        TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
-                    currentType, componentName);
-      else
+      if (currentType) {
+        if (currentType->is<TupleType>()) {
+          TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
+          isInvalid = true;
+          break;
+        }
+        else
+          TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
+                      currentType, componentName);
+      } else
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
 
@@ -7147,7 +7139,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
   assert(constrName);
-  ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+  auto constrs = protocol->lookupDirect(constrName);
   if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
     return false;
   auto *constr = cast<ConstructorDecl>(constrs.front());
@@ -7961,12 +7953,6 @@ FailureDiagnosis::validateContextualType(Type contextualType,
                                          ContextualTypePurpose CTP) {
   if (!contextualType)
     return {contextualType, CTP};
-
-  // If we're asked to convert to an autoclosure, then we really want to
-  // convert to the result of it.
-  if (auto *FT = contextualType->getAs<AnyFunctionType>())
-    if (FT->isAutoClosure())
-      contextualType = FT->getResult();
 
   // Since some of the contextual types might be tuples e.g. subscript argument
   // is a tuple or paren wrapping a tuple, it's required to recursively check

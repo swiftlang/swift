@@ -323,17 +323,12 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (!funcAccess.isPublic())
         break;
 
-      // Bodies of public transparent and always-inline functions are
-      // serialized, so use conservative access patterns.
+      // If the function is public, @_transparent implies @inlinable.
       if (AFD->isTransparent())
         return ResilienceExpansion::Minimal;
 
       if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
-
-      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
-        if (attr->getKind() == InlineKind::Always)
-          return ResilienceExpansion::Minimal;
 
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.

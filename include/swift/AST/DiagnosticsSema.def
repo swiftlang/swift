@@ -510,6 +510,8 @@ ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
 ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
+ERROR(expr_keypath_unimplemented_tuple,none,
+      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -804,6 +806,10 @@ ERROR(ambiguous_decl_in_module,none,
 ERROR(module_not_testable,none,
       "module %0 was not compiled for testing", (Identifier))
 
+ERROR(module_not_compiled_for_private_import,none,
+      "module %0 was not compiled for private import", (Identifier))
+
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
@@ -1011,6 +1017,10 @@ ERROR(extra_address_of,none,
 ERROR(extra_address_of_unsafepointer,none,
       "'&' is not allowed passing array value as %0 argument",
       (Type))
+ERROR(cannot_pass_inout_arg_to_subscript,none,
+      "cannot pass an inout argument to a subscript; use "
+      "'withUnsafeMutablePointer' to explicitly convert argument "
+      "to a pointer", ())
 
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
@@ -1083,22 +1093,18 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
-// SWIFT_ENABLE_TENSORFLOW
 ERROR(invalid_dynamic_callable_type,none,
-      "@dynamicCallable attribute requires %0 to have either a valid, "
-      "non-generic 'dynamicallyCall(withArguments:)' method or "
+      "@dynamicCallable attribute requires %0 to have either a valid "
+      "'dynamicallyCall(withArguments:)' method or "
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
 ERROR(missing_dynamic_callable_kwargs_method,none,
       "@dynamicCallable type %0 cannot be applied with keyword arguments; "
-      "missing `dynamicCall(withKeywordArguments:)` method",
-      (Type))
-ERROR(ambiguous_dynamic_callable_method,none,
-      "@dynamicCallable attribute does not support ambiguous method %0",
-      (DeclName))
+      "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
 
-ERROR(type_invalid_dml,none,
+ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
-      "'subscript(dynamicMember:)' member with a string index", (Type))
+      "'subscript(dynamicMember:)' method with an "
+      "'ExpressibleByStringLiteral' parameter", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1125,6 +1131,8 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
+ERROR(invalid_autoclosure_forwarding,none,
+      "add () to forward @autoclosure parameter", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -1429,15 +1437,6 @@ ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
-
-ERROR(pattern_no_uninhabited_type,none,
-      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
-      "enum type %3 with no cases",
-      (bool, bool, Identifier, Type))
-ERROR(pattern_no_uninhabited_tuple_type,none,
-      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
-      "tuple type %3 containing enum with no cases",
-      (bool, bool, Identifier, Type))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
@@ -1750,6 +1749,14 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(witness_not_usable_from_inline,none,
+      "%0 %1 must be declared '@usableFromInline' because "
+      "because it matches a requirement in protocol %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(witness_not_usable_from_inline_warn,none,
+        "%0 %1 should be declared '@usableFromInline' because "
+        "because it matches a requirement in protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
@@ -1966,6 +1973,22 @@ NOTE(req_near_match_nonobjc,none,
 NOTE(req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
      "warning", (DeclName, AccessLevel))
+
+// appendInterpolation methods
+ERROR(missing_append_interpolation,none,
+      "type conforming to 'StringInterpolationProtocol' does not implement "
+      "a valid 'appendInterpolation' method", ())
+WARNING(append_interpolation_static,none,
+      "'appendInterpolation' method will never be used because it is static",
+      ())
+WARNING(append_interpolation_void_or_discardable,none,
+      "'appendInterpolation' method does not return 'Void' or have a "
+      "discardable result", ())
+WARNING(append_interpolation_access_control,none,
+      "'appendInterpolation' method is %select{private|fileprivate|internal|"
+      "public|open}0, but %1 is %select{private|fileprivate|internal|public|"
+      "open}2",
+      (AccessLevel, DeclName, AccessLevel))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
@@ -2905,10 +2928,10 @@ ERROR(optional_used_as_boolean,none,
      "test for '!= nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
-      "string interpolation requires the protocol '_ExpressibleByStringInterpolation' to be defined",
+      "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
       ())
 ERROR(interpolation_broken_proto,none,
-      "protocol '_ExpressibleByStringInterpolation' is broken",
+      "protocol 'ExpressibleByStringInterpolation' is broken",
       ())
 
 ERROR(object_literal_broken_proto,none,
@@ -2967,8 +2990,6 @@ ERROR(builtin_unicode_scalar_literal_broken_proto,none,
 ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
-ERROR(builtin_utf16_extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol '_ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,none,
@@ -3444,6 +3465,12 @@ ERROR(ambiguous_enum_pattern_type,none,
 WARNING(type_inferred_to_undesirable_type,none,
         "%select{variable|constant}2 %0 inferred to have type %1, "
         "which may be unexpected", (Identifier, Type, bool))
+WARNING(type_inferred_to_uninhabited_type,none,
+        "%select{variable|constant}2 %0 inferred to have type %1, "
+        "which is an enum with no cases", (Identifier, Type, bool))
+WARNING(type_inferred_to_uninhabited_tuple_type,none,
+        "%select{variable|constant}2 %0 inferred to have type %1, "
+        "which contains an enum with no cases", (Identifier, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 
@@ -3520,6 +3547,8 @@ ERROR(throw_in_illegal_context,none,
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
+ERROR(throwing_interpolation_without_try,none,
+      "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
@@ -4020,6 +4049,16 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
+// MARK: @_borrowed
+//------------------------------------------------------------------------------
+ERROR(borrowed_with_objc_dynamic,none,
+      "%0 cannot be '@_borrowed' if it is '@objc dynamic'",
+      (DescriptiveDeclKind))
+ERROR(borrowed_on_objc_protocol_requirement,none,
+      "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
+      (DescriptiveDeclKind))
+
+//------------------------------------------------------------------------------
 // MARK: dynamic
 //------------------------------------------------------------------------------
 
@@ -4031,9 +4070,38 @@ ERROR(dynamic_with_final,none,
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())
+ERROR(dynamic_with_transparent,none,
+      "a declaration cannot be both '@_tranparent' and 'dynamic'",
+      ())
 ERROR(dynamic_requires_objc,none,
       "'dynamic' %0 %1 must also be '@objc'",
       (DescriptiveDeclKind, DeclName))
+
+//------------------------------------------------------------------------------
+// MARK: @_dynamicReplacement(for:)
+//------------------------------------------------------------------------------
+
+ERROR(dynamic_replacement_accessor_type_mismatch, none,
+      "replaced accessor %0's type does not match", (DeclName))
+ERROR(dynamic_replacement_accessor_not_dynamic, none,
+      "replaced accessor for %0 is not marked dynamic", (DeclName))
+ERROR(dynamic_replacement_accessor_not_explicit, none,
+      "replaced accessor %select{get|set|_read|_modify|willSet|didSet|unsafeAddress|addressWithOwner|addressWithNativeOwner|unsafeMutableAddress|mutableAddressWithOwner|}0 for %1 is not explicitly defined",
+      (unsigned, DeclName))
+ERROR(dynamic_replacement_function_not_dynamic, none,
+      "replaced function %0 is not marked dynamic", (DeclName))
+ERROR(dynamic_replacement_function_not_found, none,
+     "replaced function %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_not_found, none,
+      "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_function_of_type_not_found, none,
+      "replaced function %0 of type %1 could not be found", (DeclName, Type))
+NOTE(dynamic_replacement_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
+ERROR(dynamic_replacement_not_in_extension, none,
+      "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
+ERROR(dynamic_replacement_must_not_be_dynamic, none,
+      "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available
@@ -4191,7 +4259,6 @@ ERROR(usable_from_inline_attr_in_protocol,none,
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
-  "an '@inline(__always)' function|" \
   "an '@inlinable' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
@@ -4220,7 +4287,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@inlinable|%error}1' and must "
+      "'%select{@_transparent|@inlinable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,

@@ -12,6 +12,7 @@ add_swift_host_library(swiftAST STATIC
   AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
+  ASTDemangler.cpp
   ASTDumper.cpp
   ASTMangler.cpp
   ASTNode.cpp

@@ -1,0 +1,76 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-interop | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+// CHECK: @test_dynamically_replaceableTX = global %swift.dyn_repl_link_entry { i8* bitcast (void ()* @test_dynamically_replaceableTI to i8*), %swift.dyn_repl_link_entry* null }
+// CHECK: @test_dynamically_replaceableTx = constant %swift.dyn_repl_key { i32{{.*}}%swift.dyn_repl_link_entry* @test_dynamically_replaceableTX{{.*}}, i32 0 }, section "__TEXT,__const"
+// CHECK: @test_replacementTX = global %swift.dyn_repl_link_entry zeroinitializer
+
+// CHECK: @"\01l_unnamed_dynamic_replacements" = private constant { i32, i32, [1 x { i32, i32, i32, i32 }] }
+// CHECK: { i32 0,
+// CHECK:   i32 1,
+// CHECK:  [1 x { i32, i32, i32, i32 }]
+// CHECK:  [{ i32, i32, i32, i32 }
+// CHECK:  %swift.dyn_repl_key* @test_dynamically_replaceableTx
+// CHECK:  @test_replacement
+// CHECK:  %swift.dyn_repl_link_entry* @test_replacementTX
+// CHECK:  i32 0 }] }, section "__TEXT,__const"
+
+// CHECK: @"\01l_auto_dynamic_replacements" = private constant { i32, i32, [1 x i32] }
+// CHECK: { i32 0, i32 1,
+// CHECK: [1 x i32] [{{.*}}@"\01l_unnamed_dynamic_replacements"{{.*}}]
+// CHECK: }, section "__TEXT, __swift5_replace, regular, no_dead_strip"
+
+// CHECK-LABEL: define swiftcc void @test_dynamically_replaceable()
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[FUN_PTR:%.*]] = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @test_dynamically_replaceableTX, i32 0, i32 0)
+// CHECK-NEXT:   [[TYPED_PTR:%.*]] = bitcast i8* [[FUN_PTR]] to void ()*
+// CHECK-NEXT:   call swiftcc void [[TYPED_PTR]]()
+// CHECK-NEXT:   ret void
+// CHECK-NEXT: }
+
+// CHECK-LABEL: define swiftcc void @test_dynamically_replaceableTI()
+// CHECK: entry:
+// CHECK:   ret void
+// CHECK: }
+
+sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: define swiftcc void @test_replacement()
+// CHECK: entry:
+// CHECK:   call swiftcc void @test_replacementTI()
+// CHECK:   ret void
+// CHECK: }
+
+// The thunk that implement the prev_dynamic_function_ref lookup.
+// CHECK-LABEL: define swiftcc void @test_replacementTI()
+// CHECK: entry:
+// CHECK:   [[FUN_PTR:%.*]] = load i8*, i8** getelementptr inbounds (%swift.dyn_repl_link_entry, %swift.dyn_repl_link_entry* @test_replacementTX, i32 0, i32 0)
+// CHECK:   [[TYPED_PTR:%.*]] = bitcast i8* [[FUN_PTR]] to void ()*
+// CHECK:   call swiftcc void [[TYPED_PTR]]()
+// CHECK:   ret void
+// CHECK: }
+sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_replacement : $@convention(thin) () -> () {
+bb0:
+  %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: define swiftcc void @test_dynamic_call()
+// CHECK: entry:
+// CHECK:   call swiftcc void @test_dynamically_replaceable()
+// CHECK:   ret void
+// CHECK: }
+sil @test_dynamic_call : $@convention(thin) () -> () {
+bb0:
+  %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}

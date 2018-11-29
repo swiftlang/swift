@@ -329,9 +329,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
       if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
         addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "tsan", *this);
 
+      if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+        addLinkSanitizerLibArgsForLinux(context.Args, Arguments, "ubsan", *this);
+
       if (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer)
         addLinkRuntimeLib(context.Args, Arguments,
                           sanitizerRuntimeLibName("fuzzer"));
+
     }
   }
 

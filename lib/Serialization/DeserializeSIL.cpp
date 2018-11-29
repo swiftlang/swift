@@ -463,20 +463,21 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
+  IdentifierID replacedFunctionID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
       optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
-      hasQualifiedOwnership, isWeakLinked;
+      hasQualifiedOwnership, isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
       optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
-      hasQualifiedOwnership, isWeakLinked, funcTyID, genericEnvID,
-      clangNodeOwnerID, SemanticsIDs);
+      hasQualifiedOwnership, isWeakLinked, isDynamic, funcTyID,
+      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -497,6 +498,17 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     LLVM_DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     MF->error();
     return nullptr;
+  }
+
+  SILFunction *replacedFunction = nullptr;
+  Identifier replacedObjectiveCFunc;
+  if (replacedFunctionID &&
+      ty.getAs<SILFunctionType>()->getExtInfo().getRepresentation() !=
+          SILFunctionTypeRepresentation::ObjCMethod) {
+    replacedFunction =
+        getFuncForReference(MF->getIdentifier(replacedFunctionID).str());
+  } else if (replacedFunctionID) {
+    replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
   }
 
   auto linkage = fromStableSILLinkage(rawLinkage);
@@ -553,6 +565,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+    if (fn->isDynamicallyReplaceable() != isDynamic) {
+      LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      MF->error();
+      return nullptr;
+    }
   } else {
     // Otherwise, create a new function.
     SILSerializationFunctionBuilder builder(SILMod);
@@ -567,6 +584,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
+    fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
+    if (replacedFunction)
+      fn->setDynamicallyReplacedFunction(replacedFunction);
+    if (!replacedObjectiveCFunc.empty())
+      fn->setObjCReplacement(replacedObjectiveCFunc);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -1580,9 +1602,25 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::FunctionRefInst: {
     auto Ty = MF->getType(TyID);
     StringRef FuncName = MF->getIdentifierText(ValID);
-    ResultVal = Builder.createFunctionRef(Loc,
-        getFuncForReference(FuncName,
-                            getSILType(Ty, (SILValueCategory)TyCategory)));
+    ResultVal = Builder.createFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    auto Ty = MF->getType(TyID);
+    StringRef FuncName = MF->getIdentifierText(ValID);
+    ResultVal = Builder.createDynamicFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst: {
+    auto Ty = MF->getType(TyID);
+    StringRef FuncName = MF->getIdentifierText(ValID);
+    ResultVal = Builder.createPreviousDynamicFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case SILInstructionKind::MarkDependenceInst: {
@@ -2575,20 +2613,21 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // linkage to avoid re-reading it from the bitcode each time?
   DeclID clangOwnerID;
   TypeID funcTyID;
+  IdentifierID replacedFunctionID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
       optimizationMode, effect, numSpecAttrs, numDifferentiableAttrs,
-      hasQualifiedOwnership, isWeakLinked;
+      hasQualifiedOwnership, isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs,
       // SWIFT_ENABLE_TENSORFLOW
-      numDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked,
-      funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
+      numDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked, isDynamic,
+      funcTyID, replacedFunctionID, genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
@@ -3006,13 +3045,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
-  auto theConformance = cast<NormalProtocolConformance>(
+  auto theConformance = cast<RootProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
 
-  PrettyStackTraceType trace(SILMod.getASTContext(),
-                             "deserializing SIL witness table for",
-                             theConformance->getType());
-  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
+  PrettyStackTraceConformance trace(SILMod.getASTContext(),
+                                    "deserializing SIL witness table for",
+                                    theConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);

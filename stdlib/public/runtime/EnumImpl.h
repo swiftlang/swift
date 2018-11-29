@@ -16,6 +16,8 @@
 #ifndef SWIFT_RUNTIME_ENUMIMPL_H
 #define SWIFT_RUNTIME_ENUMIMPL_H
 
+#include "swift/ABI/Enum.h"
+
 namespace swift {
 
 /// This is a small and fast implementation of memcpy with a constant count. It
@@ -59,29 +61,6 @@ static inline void small_memset(void *dest, uint8_t value, unsigned count) {
   }
 }
 
-inline unsigned getNumTagBytes(size_t size, unsigned emptyCases,
-                               unsigned payloadCases) {
-  // We can use the payload area with a tag bit set somewhere outside of the
-  // payload area to represent cases. See how many bytes we need to cover
-  // all the empty cases.
-
-  unsigned numTags = payloadCases;
-  if (emptyCases > 0) {
-    if (size >= 4)
-      // Assume that one tag bit is enough if the precise calculation overflows
-      // an int32.
-      numTags += 1;
-    else {
-      unsigned bits = size * 8U;
-      unsigned casesPerTagBitValue = 1U << bits;
-      numTags += ((emptyCases + (casesPerTagBitValue-1U)) >> bits);
-    }
-  }
-  return (numTags <=    1 ? 0 :
-          numTags <   256 ? 1 :
-          numTags < 65536 ? 2 : 4);
-}
-
 inline unsigned getEnumTagSinglePayloadImpl(
     const OpaqueValue *enumAddr, unsigned emptyCases, const Metadata *payload,
     size_t payloadSize, size_t payloadNumExtraInhabitants,
@@ -93,8 +72,9 @@ inline unsigned getEnumTagSinglePayloadImpl(
     auto *extraTagBitAddr = valueAddr + payloadSize;
     unsigned extraTagBits = 0;
     unsigned numBytes =
-        getNumTagBytes(payloadSize, emptyCases - payloadNumExtraInhabitants,
-                       1 /*payload case*/);
+        getEnumTagCounts(payloadSize,
+                         emptyCases - payloadNumExtraInhabitants,
+                         1 /*payload case*/).numTagBytes;
 
 #if defined(__BIG_ENDIAN__)
     small_memcpy(reinterpret_cast<uint8_t *>(&extraTagBits) + 4 - numBytes,
@@ -154,8 +134,9 @@ inline void storeEnumTagSinglePayloadImpl(
   auto *extraTagBitAddr = valueAddr + payloadSize;
   unsigned numExtraTagBytes =
       emptyCases > payloadNumExtraInhabitants
-          ? getNumTagBytes(payloadSize, emptyCases - payloadNumExtraInhabitants,
-                           1 /*payload case*/)
+          ? getEnumTagCounts(payloadSize,
+                             emptyCases - payloadNumExtraInhabitants,
+                             1 /*payload case*/).numTagBytes
           : 0;
 
   // For payload or extra inhabitant cases, zero-initialize the extra tag bits,

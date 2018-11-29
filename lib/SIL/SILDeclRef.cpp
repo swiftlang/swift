@@ -41,8 +41,9 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   auto dc = method->getDeclContext();
 
   if (dc->getSelfClassDecl()) {
-    if (method->isDynamic())
+    if (method->isObjCDynamic()) {
       return MethodDispatch::Class;
+    }
 
     // Final methods can be statically referenced.
     if (method->isFinal())
@@ -87,8 +88,9 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   assert(!isa<AbstractStorageDecl>(vd));
 
-  if (vd->isDynamic())
+  if (vd->isObjCDynamic()) {
     return true;
+  }
 
   if (vd->isObjC() && isa<ProtocolDecl>(vd->getDeclContext()))
     return true;
@@ -526,26 +528,47 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   return IsNotSerialized;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has an @inline(never) attribute.
 bool SILDeclRef::isNoinline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Never)
+
+  auto *decl = getDecl();
+  if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Never)
       return true;
-  if (auto *semanticsA = getDecl()->getAttrs().getAttribute<SemanticsAttr>())
-    if (semanticsA->Value.equals("keypath.entry"))
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Never)
+        return true;
+  }
+
+  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
+    if (attr->Value.equals("keypath.entry"))
       return true;
+
   return false;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has the @inline(__always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Always)
+
+  auto *decl = getDecl();
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Always)
       return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Always)
+        return true;
+  }
+
   return false;
 }
 
@@ -704,7 +727,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::GlobalAccessor:
     assert(!isCurried);
     return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
-                                        AddressorKind::Unsafe,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
                                         SKind);
@@ -777,7 +799,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
-    if (overridden.getDecl()->isDynamic()) {
+    if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }
     
@@ -785,8 +807,9 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
       auto *asd = accessor->getStorage();
       if (asd->hasClangNode())
         return SILDeclRef();
-      if (asd->isDynamic())
+      if (asd->isObjCDynamic()) {
         return SILDeclRef();
+      }
     }
 
     // If we overrode a decl from an extension, it won't be in a vtable
@@ -870,17 +893,21 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     return SubclassScope::NotApplicable;
 
   // If this declaration is a function which goes into a vtable, then it's
-  // symbol must be as visible as its class. Derived classes even have to put
+  // symbol must be as visible as its class, because derived classes have to put
   // all less visible methods of the base class into their vtables.
 
-  auto *FD = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (auto *CD = dyn_cast<ConstructorDecl>(getDecl()))
+    if (!CD->isRequired())
+      return SubclassScope::NotApplicable;
+
+  auto *FD = dyn_cast<FuncDecl>(getDecl());
   if (!FD)
     return SubclassScope::NotApplicable;
 
   DeclContext *context = FD->getDeclContext();
 
   // Methods from extensions don't go into vtables (yet).
-  if (context->isExtensionContext())
+  if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
   // Various forms of thunks don't either.
@@ -900,6 +927,9 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 
   assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
+
+  if (classType->isResilient())
+    return SubclassScope::Resilient;
 
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
@@ -932,4 +962,21 @@ unsigned SILDeclRef::getParameterListCount() const {
   } else {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
+}
+
+bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (isStoredPropertyInitializer())
+    return false;
+
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::Initializer ||
+      kind == SILDeclRef::Kind::GlobalAccessor) {
+    return false;
+  }
+
+  if (!hasDecl())
+    return false;
+
+  auto decl = getDecl();
+  return decl->isNativeDynamic();
 }

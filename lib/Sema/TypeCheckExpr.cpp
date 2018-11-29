@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -189,12 +190,73 @@ TypeChecker::lookupPrecedenceGroupForInfixOperator(DeclContext *DC, Expr *E) {
     return lookupPrecedenceGroupForInfixOperator(DC, binaryExpr->getFn());
   }
 
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E)) {
+    return lookupPrecedenceGroupForInfixOperator(DC, DSCE->getFn());
+  }
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    Identifier name = MRE->getDecl().getDecl()->getBaseName().getIdentifier();
+    return lookupPrecedenceGroupForOperator(*this, DC, name, MRE->getLoc());
+  }
+
   // If E is already an ErrorExpr, then we've diagnosed it as invalid already,
   // otherwise emit an error.
   if (!isa<ErrorExpr>(E))
     diagnose(E->getLoc(), diag::unknown_binop);
 
   return nullptr;
+}
+
+/// Find LHS as if we append binary operator to existing pre-folded expresion.
+/// Returns found expression, or \c nullptr if the operator is not applicable.
+///
+/// For example, given '(== R (* A B))':
+/// 'findLHS(DC, expr, "+")' returns '(* A B)'.
+/// 'findLHS(DC, expr, "<<")' returns 'B'.
+/// 'findLHS(DC, expr, '==')' returns nullptr.
+Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
+  auto right = lookupPrecedenceGroupForOperator(*this, DC, name, E->getEndLoc());
+  while (true) {
+
+    // Look through implicit conversions.
+    if (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSyntacticSubExpr();
+      continue;
+    }
+    if (auto ACE = dyn_cast<AutoClosureExpr>(E)) {
+      E = ACE->getSingleExpressionBody();
+      continue;
+    }
+
+    auto left = lookupPrecedenceGroupForInfixOperator(DC, E);
+    if (!left)
+      // LHS is not binary expression.
+      return E;
+    switch (Context.associateInfixOperators(left, right)) {
+      case swift::Associativity::None:
+        return nullptr;
+      case swift::Associativity::Left:
+        return E;
+      case swift::Associativity::Right:
+        break;
+    }
+    // Find the RHS of the current binary expr.
+    if (auto *assignExpr = dyn_cast<AssignExpr>(E)) {
+      E = assignExpr->getSrc();
+    } else if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
+      E = ifExpr->getElseExpr();
+    } else if (auto *binaryExpr = dyn_cast<BinaryExpr>(E)) {
+      auto *Args = dyn_cast<TupleExpr>(binaryExpr->getArg());
+      if (!Args || Args->getNumElements() != 2)
+        return nullptr;
+      E = Args->getElement(1);
+    } else {
+      // E.g. 'fn() as Int << 2'.
+      // In this case '<<' has higher precedence than 'as', but the LHS should
+      // be 'fn() as Int' instead of 'Int'.
+      return E;
+    }
+  }
 }
 
 // The way we compute isEndOfSequence relies on the assumption that
@@ -537,6 +599,38 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                                     functionRefKind,
                                                     Implicit);
   return result;
+}
+
+Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                        FunctionType *closureType) {
+  bool isInDefaultArgumentContext = false;
+  if (auto *init = dyn_cast<Initializer>(DC))
+    isInDefaultArgumentContext =
+        init->getInitializerKind() == InitializerKind::DefaultArgument;
+
+  auto info = closureType->getExtInfo();
+  auto newClosureType = closureType;
+
+  if (isInDefaultArgumentContext && info.isNoEscape())
+    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
+                         ->castTo<FunctionType>();
+
+  auto *closure = new (Context) AutoClosureExpr(
+      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+
+  closure->setParameterList(ParameterList::createEmpty(Context));
+
+  ClosuresWithUncomputedCaptures.push_back(closure);
+
+  if (!newClosureType->isEqual(closureType)) {
+    assert(isInDefaultArgumentContext);
+    assert(newClosureType
+               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
+               ->isEqual(closureType));
+    return new (Context) FunctionConversionExpr(closure, closureType);
+  }
+
+  return closure;
 }
 
 static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,

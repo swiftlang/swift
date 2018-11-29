@@ -561,6 +561,10 @@ func foo() {}
 
 "abc \( } ) def"
 
+#assert(true)
+#assert(false)
+#assert(true, "hello world")
+
 // SWIFT_ENABLE_TENSORFLOW
 @differentiable(reverse, adjoint: foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float { return 1 }
@@ -583,6 +587,3 @@ func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 #adjoint(foo(_:_:))
 #adjoint(A.B.foo(_:))
 #adjoint(Tensor<Float>.+)
-
-#assert(true)
-#assert(1 == 2, "Error message")

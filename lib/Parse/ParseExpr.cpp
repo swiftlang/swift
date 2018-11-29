@@ -1111,6 +1111,18 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Result.isNull())
       return Result;
 
+    if (Result.hasCodeCompletion() &&
+        SourceMgr.getCodeCompletionLoc() == PreviousLoc) {
+      // Don't parse suffixes if the expression ended with code completion
+      // token. Because, for example, given:
+      //   [.foo(), .bar()]
+      // If user want to insert another element in between:
+      //   [.foo(), <HERE> .bar()]
+      // '.bar()' is probably not a part of the inserting element. Moreover,
+      // having suffixes doesn't help type inference in any way.
+      return Result;
+    }
+
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     if (Tok.is(tok::period) || Tok.is(tok::period_prefix)) {
@@ -1802,13 +1814,25 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 
 ParserStatus Parser::
 parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
-                    SmallVectorImpl<Expr*> &Exprs,
-                    Token EntireTok) {
+                    Token EntireTok,
+                    VarDecl *InterpolationVar,
+                    /* remaining parameters are outputs: */
+                    SmallVectorImpl<ASTNode> &Stmts,
+                    unsigned &LiteralCapacity,
+                    unsigned &InterpolationCount) {
   SourceLoc Loc = EntireTok.getLoc();
   ParserStatus Status;
   Trivia EmptyTrivia;
   bool First = true;
+
+  DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
+  DeclName appendInterpolation(Context.Id_appendInterpolation);
+
   for (auto Segment : Segments) {
+    auto InterpolationVarRef =
+      new (Context) DeclRefExpr(InterpolationVar,
+                                DeclNameLoc(Segment.Loc), /*implicit=*/true);
+
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
 
@@ -1816,8 +1840,21 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       SourceLoc EndLoc = EntireTok.getLoc().getAdvancedLoc(EntireTok.getLength());
 
       auto TokenLoc = First ? Loc : Segment.Loc;
-      Exprs.push_back(
-          createStringLiteralExprFromSegment(Context, L, Segment, TokenLoc));
+      auto Literal = createStringLiteralExprFromSegment(Context, L, Segment,
+                                                        TokenLoc);
+
+      LiteralCapacity += Literal->getValue().size();
+
+      auto AppendLiteralRef =
+        new (Context) UnresolvedDotExpr(InterpolationVarRef,
+                                        /*dotloc=*/SourceLoc(),
+                                        appendLiteral,
+                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*Implicit=*/true);
+      auto AppendLiteralCall =
+        CallExpr::createImplicit(Context, AppendLiteralRef, {Literal}, {});
+      Stmts.push_back(AppendLiteralCall);
+
       // Since the string is already parsed, Tok already points to the first
       // token after the whole string, but PreviousLoc is not exactly correct.
       PreviousLoc = TokenLoc;
@@ -1871,8 +1908,31 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       assert(Tok.is(tok::l_paren));
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::string_interpolation_anchor);
-      ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren,
-                                           SyntaxKind::Unknown);
+
+      SourceLoc lParen, rParen;
+      SmallVector<Expr *, 4> args;
+      SmallVector<Identifier, 4> argLabels;
+      SmallVector<SourceLoc, 4> argLabelLocs;
+      Expr *trailingClosureNeverPresent;
+      ParserStatus S =
+          parseExprList(tok::l_paren, tok::r_paren,
+                        /*isPostfix=*/false, /*isExprBasic=*/true,
+                        lParen, args, argLabels, argLabelLocs, rParen,
+                        trailingClosureNeverPresent,
+                        SyntaxKind::Unknown);
+      assert(!trailingClosureNeverPresent);
+
+      Status |= S;
+      // If there was an error parsing a parameter, add an ErrorExpr to
+      // represent it. Prevents spurious errors about a nonexistent
+      // appendInterpolation() overload.
+      if (S.isError() && args.size() == 0)
+        args.push_back(new (Context) ErrorExpr(SourceRange(lParen, rParen)));
+      
+      while (argLabels.size() < args.size())
+        argLabels.push_back(Identifier());
+      while (argLabelLocs.size() < args.size())
+        argLabelLocs.push_back(SourceLoc());
 
       // If we stopped parsing the expression before the expression segment is
       // over, eat the remaining tokens into a token list
@@ -1886,28 +1946,60 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                  L->getLocForEndOfToken(SourceMgr, Tok.getLoc()));
       }
 
-      Status |= E;
-      if (auto expr = E.getPtrOrNull()) {
-        if (auto tuple = dyn_cast<TupleExpr>(expr)) {
-          // This needs to be wrapped in a ParenExpr so it won't be interpreted
-          // as an argument list.
-          // FIXME: Do we want to warn/error about any of these cases?
-          expr = new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
-                                         /*hasTrailingClosure=*/false);
-          expr->setImplicit();
+      InterpolationCount += 1;
+      
+      // In Swift 4.2 and earlier, a single argument with a label would ignore
+      // the label (at best), and multiple arguments would form a tuple.
+      if (!Context.isSwiftVersionAtLeast(5)) {
+        if (args.size() > 1) {
+          diagnose(args[1]->getLoc(), diag::string_interpolation_list_changing)
+            .highlightChars(args[1]->getLoc(), rParen);
+          diagnose(args[1]->getLoc(),
+                   diag::string_interpolation_list_insert_parens)
+            .fixItInsertAfter(lParen, "(")
+            .fixItInsert(rParen, ")");
+          
+          args = {
+            TupleExpr::create(Context,
+                              lParen, args, argLabels, argLabelLocs, rParen,
+                              /*hasTrailingClosure=*/false,
+                              /*Implicit=*/false)
+          };
+          argLabels = { Identifier() };
+          argLabelLocs = { SourceLoc() };
         }
-        
-        Exprs.push_back(expr);
+        else if (args.size() == 1 && argLabels[0] != Identifier()) {
+          diagnose(argLabelLocs[0], diag::string_interpolation_label_changing)
+            .highlightChars(argLabelLocs[0], args[0]->getStartLoc());
+          diagnose(argLabelLocs[0], diag::string_interpolation_remove_label,
+                   argLabels[0])
+            .fixItRemoveChars(argLabelLocs[0], args[0]->getStartLoc());
+          
+          argLabels[0] = Identifier();
+        }
+      }
+      
+      auto AppendInterpolationRef =
+        new (Context) UnresolvedDotExpr(InterpolationVarRef,
+                                        /*dotloc=*/SourceLoc(),
+                                        appendInterpolation,
+                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*Implicit=*/true);
+      auto AppendInterpolationCall =
+        CallExpr::create(Context, AppendInterpolationRef,
+                         lParen, args, argLabels, argLabelLocs, rParen,
+                         /*trailingClosure=*/nullptr, /*implicit=*/false);
+      
+      Stmts.push_back(AppendInterpolationCall);
 
-        if (!Tok.is(tok::eof)) {
-          diagnose(Tok, diag::string_interpolation_extra);
-        } else if (Tok.getText() == ")") {
-          Tok.setKind(tok::string_interpolation_anchor);
-          // We don't allow trailing trivia for this anchor, because the
-          // trivia is a part of the next string segment.
-          TrailingTrivia.clear();
-          consumeToken();
-        }
+      if (!Tok.is(tok::eof)) {
+        diagnose(Tok, diag::string_interpolation_extra);
+      } else if (Tok.getText() == ")") {
+        Tok.setKind(tok::string_interpolation_anchor);
+        // We don't allow trailing trivia for this anchor, because the
+        // trivia is a part of the next string segment.
+        TrailingTrivia.clear();
+        consumeToken();
       }
       break;
     }
@@ -1930,6 +2022,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
+  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
@@ -1966,26 +2059,60 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<Trivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<Trivia> SavedTrailingTrivia(TrailingTrivia);
 
-  SmallVector<Expr*, 4> Exprs;
+  // We're not in a place where an interpolation would be valid.
+  if (!CurLocalContext) {
+    // Return an error, but include an empty InterpolatedStringLiteralExpr 
+    // so that parseDeclPoundDiagnostic() can figure out why this string 
+    // literal was bad.
+    return makeParserErrorResult(
+        new (Context) InterpolatedStringLiteralExpr(Loc, 0, 0, nullptr));
+  }
+
+  unsigned LiteralCapacity = 0;
+  unsigned InterpolationCount = 0;
+  TapExpr * AppendingExpr;
+
   ParserStatus Status;
   {
+    Scope S(this, ScopeKind::Brace);
+    SmallVector<ASTNode, 4> Stmts;
+
+    // Make the variable which will contain our temporary value.
+    auto InterpolationVar =
+      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Specifier::Var,
+                            /*IsCaptureList=*/false, /*NameLoc=*/SourceLoc(),
+                            Context.Id_dollarInterpolation, CurDeclContext);
+    InterpolationVar->setImplicit(true);
+    InterpolationVar->setHasNonPatternBindingInit(true);
+    InterpolationVar->setUserAccessible(false);
+    addToScope(InterpolationVar);
+    setLocalDiscriminator(InterpolationVar);
+    
+    Stmts.push_back(InterpolationVar);
+
     // Collect all string segments.
     SyntaxParsingContext SegmentsCtx(SyntaxContext,
                                      SyntaxKind::StringInterpolationSegments);
-    Status = parseStringSegments(Segments, Exprs, EntireTok);
+    Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
+                                 Stmts, LiteralCapacity, InterpolationCount);
+
+    auto Body = BraceStmt::create(Context, Loc, Stmts, EndLoc,
+                                  /*implicit=*/false);
+    AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
 
   // Add the close quote the context; the quote should have a void leading trivia
   // and the trailing trivia of the entire string token.
   SyntaxContext->addToken(CloseQuote, EmptyTrivia, EntireTrailingTrivia);
 
-  if (Exprs.empty()) {
+  if (AppendingExpr->getBody()->getNumElements() == 1) {
     Status.setIsParseError();
     return makeParserResult(Status, new (Context) ErrorExpr(Loc));
   }
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
-                                      Loc, Context.AllocateCopy(Exprs)));
+                                      Loc, LiteralCapacity, InterpolationCount,
+                                      AppendingExpr));
 }
 
 void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
@@ -2016,7 +2143,8 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
                                           DeclNameLoc &loc,
                                           const Diagnostic &diag,
                                           bool allowOperators,
-                                          bool allowZeroArgCompoundNames) {
+                                          bool allowZeroArgCompoundNames,
+                                          bool allowDeinitAndSubscript) {
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2031,6 +2159,10 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     // not as a keyword.
     if (Tok.is(tok::kw_init))
       baseName = DeclBaseName::createConstructor();
+    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_deinit))
+      baseName = DeclBaseName::createDestructor();
+    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_subscript))
+      baseName = DeclBaseName::createSubscript();
     else
       baseName = Context.getIdentifier(Tok.getText());
     Tok.setKind(tok::identifier);

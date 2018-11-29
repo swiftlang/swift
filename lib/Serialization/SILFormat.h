@@ -185,7 +185,6 @@ namespace sil_block {
     INHERITED_PROTOCOL_CONFORMANCE
       = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
     INVALID_PROTOCOL_CONFORMANCE = decls_block::INVALID_PROTOCOL_CONFORMANCE,
-    GENERIC_PARAM = decls_block::GENERIC_PARAM,
     GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
     LAYOUT_REQUIREMENT = decls_block::LAYOUT_REQUIREMENT,
   };
@@ -296,7 +295,9 @@ namespace sil_block {
                      BCVBR<8>,    // number of reverse differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
+                     BCFixed<1>,  // is dynamically replacable
                      TypeIDField, // SILFunctionType
+                     DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute

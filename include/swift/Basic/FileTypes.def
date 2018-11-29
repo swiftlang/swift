@@ -41,6 +41,7 @@ TYPE("sil",                 SIL,                       "sil",             "")
 TYPE("sib",                 SIB,                       "sib",             "")
 
 // Output types
+TYPE("ast-dump",            ASTDump,                   "ast",             "")
 TYPE("image",               Image,                     "out",             "")
 TYPE("object",              Object,                    "o",               "")
 TYPE("dSYM",                dSYM,                      "dSYM",            "")
@@ -50,8 +51,6 @@ TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
 TYPE("swiftinterface",      SwiftParseableInterfaceFile, \
                                                        "swiftinterface",  "")
-TYPE("swiftinterfacedeps",  SwiftParseableInterfaceDeps, \
-                                                       "sid",             "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
 TYPE("raw-sib",             RawSIB,                    "sib",             "")

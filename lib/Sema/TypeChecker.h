@@ -870,6 +870,14 @@ public:
   /// Check for unsupported protocol types in the given statement.
   void checkUnsupportedProtocolType(Stmt *stmt);
 
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
@@ -1080,6 +1088,12 @@ public:
 
   bool typeCheckClosureBody(ClosureExpr *closure);
 
+  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+
+  Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
+                                 Type paramType, bool isAutoClosure = false,
+                                 bool canFail = true);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
@@ -1089,7 +1103,9 @@ public:
   void typeCheckDecl(Decl *D);
 
   void checkDeclAttributesEarly(Decl *D);
+  static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
+  void checkDynamicReplacementAttribute(ValueDecl *D);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
 
   void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
@@ -1388,16 +1404,12 @@ public:
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  bool typeCheckCompletionSequence(Expr *&expr, DeclContext *DC);
-
-  /// \brief Type check the given expression assuming that its children
-  /// have already been fully type-checked.
-  ///
-  /// \param expr The expression to type-check, which will be modified in
-  /// place.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
+  /// \brief Return the type of operator function for specified LHS, or a null
+  /// \c Type on error.
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Check the key-path expression.
   ///
@@ -1691,7 +1703,7 @@ public:
                     ProtocolDecl *protocol,
                     ProtocolConformanceRef conformance,
                     DeclName name,
-                    MutableArrayRef<Expr *> arguments,
+                    ArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
 
   /// \brief Determine whether the given type contains the given protocol.
@@ -1756,7 +1768,8 @@ public:
   void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance);
+  void checkConformanceRequirements(NormalProtocolConformance *conformance)
+         override ;
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
@@ -1877,6 +1890,10 @@ public:
   PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
                                              SourceLoc nameLoc);
 
+  /// Given an pre-folded expression, find LHS from the expression if a binary
+  /// operator \c name appended to the expression.
+  Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
+
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
 
@@ -1907,6 +1924,11 @@ public:
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
                      FunctionRefKind functionRefKind);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                             FunctionType *closureType);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.
@@ -1951,7 +1973,6 @@ public:
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
-    InlineAlways,
     Inlinable,
     DefaultArgument,
     PropertyInitializer
@@ -2181,20 +2202,18 @@ public:
   const StringRef Message;
 };
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns true if a method is an valid implementation of a @dynamicCallable
-/// attribute requirement. The method is given to be defined as one of the
-/// following: `dynamicallyCall(withArguments:)` or
+/// Returns true if the given method is an valid implementation of a
+/// @dynamicCallable attribute requirement. The method is given to be defined
+/// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
                                   TypeChecker &TC, bool hasKeywordArguments);
 
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                              DeclContext *DC,
-                                              TypeChecker &TC);
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)`.
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
+                                         TypeChecker &TC);
 
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

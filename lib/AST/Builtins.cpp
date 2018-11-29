@@ -1971,6 +1971,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
 
+  case BuiltinValueKind::PoundAssert:
+    return getPoundAssert(Context, Id);
+
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);
 

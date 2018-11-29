@@ -2,8 +2,10 @@
 // swift-module-flags: 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -o %t/Conformances.swiftmodule %s
-// RUN: %target-swift-frontend -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-resilience -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
+// RUN: %FileCheck -check-prefix CHECK-MODULE %s < %t/Conformances.sil
+// RUN: %FileCheck -check-prefix NEGATIVE-MODULE %s < %t/Conformances.sil
+// RUN: %target-swift-frontend -enable-objc-interop -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
 
 public protocol MyProto {
   init()
@@ -11,6 +13,15 @@ public protocol MyProto {
   var prop: Int { get set }
   subscript(index: Int) -> Int { get set }
 }
+extension MyProto {
+  public func method() {}
+}
+
+// Make sure there's no default witness table. (But also make sure we printed at
+// least some regular witness tables, or we'll have to change the test.)
+// CHECK-MODULE: sil_witness_table{{.+}}: MyProto module Conformances
+// NEGATIVE-MODULE-NOT: sil_default_witness_table{{.+}}MyProto
+
 
 @_fixed_layout // allow conformance devirtualization
 public struct FullStructImpl: MyProto {
@@ -31,7 +42,29 @@ public struct OpaqueStructImpl: MyProto {}
 
 // CHECK-LABEL: sil @$s16ConformancesUser10testOpaqueSiyF
 // CHECK: function_ref @$s12Conformances7MyProtoPxycfC
-// CHECK: function_ref @$s12Conformances7MyProtoP6methodyyF
+// Note the default implementation is filled in here.
+// CHECK: function_ref @$s12Conformances7MyProtoPAAE6methodyyF
 // CHECK: function_ref @$s12Conformances7MyProtoP4propSivs
 // CHECK: function_ref @$s12Conformances7MyProtoPyS2icig
 // CHECK: end sil function '$s16ConformancesUser10testOpaqueSiyF'
+
+
+@objc public protocol OptionalReqs {
+  @objc optional func method()
+}
+@_fixed_layout
+public final class OptionalReqsPresent: OptionalReqs {
+  public func method () {}
+}
+@_fixed_layout
+public final class OptionalReqsAbsent: OptionalReqs {}
+
+// It would be okay if this one got optimized...
+// CHECK-LABEL: sil @$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF
+// CHECK: dynamic_method_br %0 : $OptionalReqsPresent, #OptionalReqs.method!1.foreign
+// CHECK: end sil function '$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF'
+
+// ...but not this one, because the method that's currently absent might get added.
+// CHECK-LABEL: sil @$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF
+// CHECK: dynamic_method_br %0 : $OptionalReqsAbsent, #OptionalReqs.method!1.foreign
+// CHECK: end sil function '$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF'

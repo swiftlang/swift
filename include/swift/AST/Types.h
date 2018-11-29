@@ -281,7 +281,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 
 protected:
   // SWIFT_ENABLE_TENSORFLOW
-  enum { NumAFTExtInfoBits = 10 };
+  enum { NumAFTExtInfoBits = 9 };
   enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
@@ -1753,8 +1753,8 @@ public:
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   // SWIFT_ENABLE_TENSORFLOW
-  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership,
-                    bool isNonDifferentiable);
+  fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
+                    ValueOwnership ownership, bool isNonDifferentiable);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2889,18 +2889,17 @@ public:
     // and NumMaskBits must be updated, and they must match.
     //
     //   SWIFT_ENABLE_TENSORFLOW
-    //   |representation|isAutoClosure|noEscape|throws|differentiability|
-    //   |    0 .. 3    |      4      |    5   |   6  |      7 .. 9     |
+    //   |representation|noEscape|throws|differentiability|
+    //   |    0 .. 3    |    4   |   5  |      6 .. 8     |
     //
     enum : unsigned {
       RepresentationMask     = 0xF << 0,
-      AutoClosureMask        = 1 << 4,
-      NoEscapeMask           = 1 << 5,
-      ThrowsMask             = 1 << 6,
+      NoEscapeMask           = 1 << 4,
+      ThrowsMask             = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityOffset = 7,
+      DifferentiabilityOffset = 6,
       DifferentiabilityMask  = 0b111 << DifferentiabilityOffset,
-      NumMaskBits            = 10
+      NumMaskBits            = 9
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2924,18 +2923,16 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
-            bool IsAutoClosure, bool IsNoEscape,
+            bool IsNoEscape,
             // SWIFT_ENABLE_TENSORFLOW
             bool Throws, Differentiability Diff)
       : ExtInfo(Rep, Throws) {
-      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
       Bits |=
           (((unsigned)Diff << DifferentiabilityOffset) & DifferentiabilityMask);
     }
 
-    bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
@@ -2997,13 +2994,6 @@ public:
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
-    }
-    LLVM_NODISCARD
-    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
-      if (IsAutoClosure)
-        return ExtInfo(Bits | AutoClosureMask);
-      else
-        return ExtInfo(Bits & ~AutoClosureMask);
     }
     LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
@@ -3121,12 +3111,6 @@ public:
   AnyFunctionType *
   getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
                                  const TupleType *primalResultTy);
-
-  /// \brief True if this type allows an implicit conversion from a function
-  /// argument expression of type T to a function of type () -> T.
-  bool isAutoClosure() const {
-    return getExtInfo().isAutoClosure();
-  }
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
@@ -5474,11 +5458,10 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      bool isAutoClosure,
                                       // SWIFT_ENABLE_TENSORFLOW
                                       ValueOwnership ownership,
                                       bool isNonDifferentiable) {
-  bool autoclosure = paramTy->is<AnyFunctionType>() &&
-                     paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   // FIXME(Remove InOut): The last caller that needs this is argument
@@ -5491,7 +5474,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
     ownership = ValueOwnership::InOut;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  return {isVariadic, autoclosure, escaping, ownership, isNonDifferentiable};
+  return {isVariadic, isAutoClosure, escaping, ownership, isNonDifferentiable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

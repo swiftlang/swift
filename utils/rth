@@ -32,12 +32,13 @@ def verbose_print_command(command):
 class ResilienceTest(object):
 
     def __init__(self, target_build_swift, target_run, target_codesign,
-                 tmp_dir, test_dir, test_src, lib_prefix, lib_suffix,
-                 additional_compile_flags_library,
-                 no_backward_deployment):
+                 target_nm, tmp_dir, test_dir, test_src, lib_prefix,
+                 lib_suffix, additional_compile_flags_library,
+                 no_backward_deployment, no_symbol_diff):
         self.target_build_swift = shlex.split(target_build_swift)
         self.target_run = shlex.split(target_run)
         self.target_codesign = shlex.split(target_codesign)
+        self.target_nm = shlex.split(target_nm)
         self.tmp_dir = tmp_dir
         self.test_dir = test_dir
         self.test_src = test_src
@@ -56,10 +57,12 @@ class ResilienceTest(object):
         self.lib_src = os.path.join(self.test_dir, 'Inputs', self.lib_src_name)
 
         self.no_backward_deployment = no_backward_deployment
+        self.no_symbol_diff = no_symbol_diff
 
     def run(self):
         self.set_up()
         self.compile_library()
+        self.compare_symbols()
         self.compile_main()
         self.link()
         self.execute()
@@ -101,6 +104,37 @@ class ResilienceTest(object):
             verbose_print_command(codesign_cmd)
             returncode = subprocess.call(codesign_cmd)
             assert returncode == 0, str(codesign_cmd)
+
+            if not self.no_symbol_diff:
+                # Global symbols only, don't display address or type, don't
+                # display undefined symbols
+                nm_cmd = self.target_nm + ["-gjU", output_dylib]
+                verbose_print_command(nm_cmd)
+
+                symbol_file = os.path.join(self.config_dir_map[config],
+                                           self.lib_name + ".symbols")
+
+                with open(symbol_file, "w") as handle:
+                    returncode = subprocess.call(nm_cmd, stdout=handle)
+                assert returncode == 0, str(nm_cmd)
+
+    def compare_symbols(self):
+        if self.no_symbol_diff:
+            return
+
+        before_symbol_file = os.path.join(self.config_dir_map["BEFORE"],
+                                          self.lib_name + ".symbols")
+        after_symbol_file = os.path.join(self.config_dir_map["AFTER"],
+                                         self.lib_name + ".symbols")
+
+        diff_cmd = ["diff",
+                    "--changed-group-format=%<",
+                    "--unchanged-group-format=",
+                    before_symbol_file, after_symbol_file]
+        try:
+            subprocess.check_output(diff_cmd)
+        except subprocess.CalledProcessError as e:
+            assert len(e.output) == 0, "Removed symbols:\n" + e.output
 
     def compile_main(self):
         for config in self.config_dir_map:
@@ -165,7 +199,8 @@ class ResilienceTest(object):
             config2_lower = config2.lower()
             output_obj = os.path.join(self.tmp_dir,
                                       config1_lower + '_' + config2_lower)
-            tmp_dir_contents = glob.glob(os.path.join(self.tmp_dir, '*', '*'))
+            tmp_dir_contents = glob.glob(
+                os.path.join(self.tmp_dir, self.config_dir_map[config1], '*'))
             command = self.target_run + [output_obj] + tmp_dir_contents
             verbose_print_command(command)
             returncode = subprocess.call(command)
@@ -177,6 +212,7 @@ def main():
     parser.add_argument('--target-build-swift', required=True)
     parser.add_argument('--target-run', required=True)
     parser.add_argument('--target-codesign', default='echo')
+    parser.add_argument('--target-nm', default='nm')
     parser.add_argument('--t', required=True)
     parser.add_argument('--S', required=True)
     parser.add_argument('--s', required=True)
@@ -185,15 +221,18 @@ def main():
     parser.add_argument('--additional-compile-flags-library', default='')
     parser.add_argument('--no-backward-deployment', default=False,
                         action='store_true')
+    parser.add_argument('--no-symbol-diff', default=False,
+                        action='store_true')
 
     args = parser.parse_args()
 
     resilience_test = ResilienceTest(args.target_build_swift, args.target_run,
-                                     args.target_codesign,
+                                     args.target_codesign, args.target_nm,
                                      args.t, args.S, args.s, args.lib_prefix,
                                      args.lib_suffix,
                                      args.additional_compile_flags_library,
-                                     args.no_backward_deployment)
+                                     args.no_backward_deployment,
+                                     args.no_symbol_diff)
 
     return resilience_test.run()
 
