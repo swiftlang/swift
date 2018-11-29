@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'main()' >%t/main.swift
-// RUN: %target-swiftc_driver -o %t/a.out %s %t/main.swift -Xfrontend -enable-operator-designated-types -Xfrontend -solver-enable-operator-designated-types
+// RUN: %target-build-swift -o %t/a.out %s %t/main.swift -Xfrontend -enable-operator-designated-types -Xfrontend -solver-enable-operator-designated-types
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
