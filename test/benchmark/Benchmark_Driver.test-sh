@@ -1,5 +1,4 @@
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
 // REQUIRES: benchmark
 // REQUIRES: CMAKE_GENERATOR=Ninja
 

@@ -1,6 +1,5 @@
 <!--
 REQUIRES: OS=macosx
-REQUIRES: asserts
 REQUIRES: benchmark
 REQUIRES: CMAKE_GENERATOR=Ninja
 -->
@@ -15,11 +14,12 @@ as a verification of this public API to prevent its accidental breakage.
 [BD]: https://github.com/apple/swift/blob/master/benchmark/scripts/Benchmark_Driver
 [Testing]: https://github.com/apple/swift/blob/master/docs/Testing.md
 
-Note: Following tests use *Ackermann* as an example of a benchmark that is
+Note: Following tests use *HashQuadratic* as an example of a benchmark that is
 excluded from the default "pre-commit" list because it is marked `unstable` and
-the default skip-tags (`unstable,skip`) will exclude it. It's also
-alphabetically the first benchmark in the test suite (used to verify running by
-index). If these assumptions change, the test must be adapted.
+the default skip-tags (`unstable,skip`) will exclude it.  The *Ackermann* and
+*AngryPhonebook* are alphabetically the first two benchmarks in the test suite
+(used to verify running by index). If these assumptions change, the test must be
+adapted.
 
 ## List Format
 ````
@@ -27,7 +27,7 @@ RUN: %Benchmark_O --list | %FileCheck %s \
 RUN:                      --check-prefix LISTPRECOMMIT \
 RUN:                      --check-prefix LISTTAGS
 LISTPRECOMMIT: #,Test,[Tags]
-LISTPRECOMMIT-NOT: Ackermann
+LISTPRECOMMIT-NOT: HashQuadratic
 LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
 LISTTAGS-SAME: ,[
 LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
@@ -35,14 +35,14 @@ LISTTAGS-SAME: String, api, validation
 LISTTAGS-SAME: ]
 ````
 
-Verify Ackermann is listed when skip-tags are explicitly empty and that it is
-marked unstable:
+Verify HashQuadratic is listed when skip-tags are explicitly empty and that it
+is marked unstable:
 
 ````
 RUN: %Benchmark_O --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
-LISTALL: Ackermann
-LISTALL-SAME: unstable
 LISTALL: AngryPhonebook
+LISTALL: HashQuadratic
+LISTALL-SAME: unstable
 ````
 
 ## Benchmark Selection
@@ -54,8 +54,8 @@ It provides us with ability to do a "dry run".
 Run benchmark by name (even if its tags match the skip-tags) or test number:
 
 ````
-RUN: %Benchmark_O Ackermann --list | %FileCheck %s --check-prefix NAMEDSKIP
-NAMEDSKIP: Ackermann
+RUN: %Benchmark_O HashQuadratic --list | %FileCheck %s --check-prefix NAMEDSKIP
+NAMEDSKIP: HashQuadratic
 
 RUN: %Benchmark_O 1 --list | %FileCheck %s --check-prefix RUNBYNUMBER
 RUNBYNUMBER: Ackermann
