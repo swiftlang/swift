@@ -219,6 +219,29 @@ extension UInt {
 }
 
 /// A wrapper around a C `va_list` pointer.
+#if arch(arm64) && os(Linux)
+@_fixed_layout
+public struct CVaListPointer {
+  @usableFromInline // unsafe-performance
+  internal var value: (__stack: UnsafeMutablePointer<Int>?,
+                       __gr_top: UnsafeMutablePointer<Int>?,
+                       __vr_top: UnsafeMutablePointer<Int>?,
+                       __gr_off: Int32,
+                       __vr_off: Int32)
+
+  @inlinable // unsafe-performance
+  public // @testable
+  init(__stack: UnsafeMutablePointer<Int>?,
+       __gr_top: UnsafeMutablePointer<Int>?,
+       __vr_top: UnsafeMutablePointer<Int>?,
+       __gr_off: Int32,
+       __vr_off: Int32) {
+    value = (__stack, __gr_top, __vr_top, __gr_off, __vr_off)
+  }
+}
+
+#else
+
 @_fixed_layout
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
@@ -237,6 +260,8 @@ extension CVaListPointer : CustomDebugStringConvertible {
     return _value.debugDescription
   }
 }
+
+#endif
 
 @inlinable
 internal func _memcpy(
