@@ -329,20 +329,21 @@ namespace {
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
 
-        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
-          // If the class is resilient, don't walk over its fields; we have to
-          // calculate the layout at runtime.
+        if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal))
           ClassHasResilientAncestry = true;
+
+        // If the superclass has resilient storage, don't walk its fields.
+        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
           ClassHasResilientMembers = true;
 
-          // Furthermore, if the superclass is generic, we have to assume
-          // that its layout depends on its generic parameters. But this only
-          // propagates down to subclasses whose superclass type depends on the
-          // subclass's generic context.
+          // If the superclass is generic, we have to assume that its layout
+          // depends on its generic parameters. But this only propagates down to
+          // subclasses whose superclass type depends on the subclass's generic
+          // context.
           if (superclassType.hasArchetype())
             ClassHasGenericLayout = true;
         } else {
-          // Otherwise, we have total knowledge of the class and its
+          // Otherwise, we are allowed to have total knowledge of the superclass
           // fields, so walk them to compute the layout.
           addFieldsForClass(superclassDecl, superclassType, /*superclass=*/true);
         }
@@ -354,8 +355,10 @@ namespace {
       if (classHasIncompleteLayout(IGM, theClass))
         ClassHasMissingMembers = true;
 
-      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
+      if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
         ClassHasResilientAncestry = true;
+
+      if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
         ClassHasResilientMembers = true;
         return;
       }

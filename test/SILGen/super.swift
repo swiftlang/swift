@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-emit-silgen -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 public class Parent {
   public final var finalProperty: String {
