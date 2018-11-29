@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/UnormalizedStrings.txt %S/Inputs/ExpectedCodeUnits.txt
+// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
