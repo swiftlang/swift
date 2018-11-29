@@ -72,6 +72,48 @@
 using namespace swift;
 using namespace metadataimpl;
 
+template<>
+Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
+    const TypeContextDescriptor *description) const {
+  // If this class has resilient ancestry, the size of the metadata is not known
+  // at compile time, so we allocate it dynamically, filling it in from a
+  // pattern.
+  if (hasResilientClassPattern(description)) {
+    auto *pattern = ResilientPattern.get();
+
+    // If there is a relocation function, call it.
+    if (auto *fn = ResilientPattern->RelocationFunction.get())
+      return fn(description, pattern);
+
+    // Otherwise, use the default behavior.
+    auto *classDescription = cast<ClassDescriptor>(description);
+    return swift_relocateClassMetadata(classDescription, pattern);
+  }
+
+  // Otherwise, we have a static template that we can initialize in-place.
+  auto *metadata = IncompleteMetadata.get();
+
+  // If this is a class, we have to initialize the value witness table early
+  // so that two-phase initialization can proceed as if this metadata is
+  // complete for layout purposes when it appears as part of an aggregate type.
+  if (auto *classMetadata = dyn_cast<ClassMetadata>(metadata)) {
+    auto *fullMetadata = asFullMetadata(metadata);
+
+    // Begin by initializing the value witness table; everything else is
+    // initialized by swift_initClassMetadata().
+#if SWIFT_OBJC_INTEROP
+    fullMetadata->ValueWitnesses =
+      (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting)
+         ? &VALUE_WITNESS_SYM(Bo)
+         : &VALUE_WITNESS_SYM(BO);
+#else
+    fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+  }
+
+  return metadata;
+}
+
 /// Copy the generic arguments into place in a newly-allocated metadata.
 static void installGenericArguments(Metadata *metadata,
                                     const TypeContextDescriptor *description,
@@ -2024,8 +2066,8 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 }
 
 ClassMetadata *
-swift::swift_relocateClassMetadata(ClassDescriptor *description,
-                                   ResilientClassMetadataPattern *pattern) {
+swift::swift_relocateClassMetadata(const ClassDescriptor *description,
+                                   const ResilientClassMetadataPattern *pattern) {
   auto bounds = description->getMetadataBounds();
 
   auto metadata = reinterpret_cast<ClassMetadata *>(
@@ -2695,7 +2737,7 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
 
 #ifndef NDEBUG
 static bool isAncestorOf(const ClassMetadata *metadata,
-                         ClassDescriptor *description) {
+                         const ClassDescriptor *description) {
   auto ancestor = metadata;
   while (ancestor && ancestor->isTypeMetadata()) {
     if (ancestor->getDescription() == description)
@@ -2707,9 +2749,9 @@ static bool isAncestorOf(const ClassMetadata *metadata,
 #endif
 
 void *
-swift::swift_lookUpClassMethod(ClassMetadata *metadata,
-                               MethodDescriptor *method,
-                               ClassDescriptor *description) {
+swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
+                               const MethodDescriptor *method,
+                               const ClassDescriptor *description) {
   assert(metadata->isTypeMetadata());
 
   assert(isAncestorOf(metadata, description));
@@ -2722,7 +2764,7 @@ swift::swift_lookUpClassMethod(ClassMetadata *metadata,
   assert(index < methods.size());
 
   auto vtableOffset = vtable->getVTableOffset(description) + index;
-  auto *words = reinterpret_cast<void **>(metadata);
+  auto *words = reinterpret_cast<void * const *>(metadata);
 
   return *(words + vtableOffset);
 }
