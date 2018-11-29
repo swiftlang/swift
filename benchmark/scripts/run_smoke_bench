@@ -62,6 +62,9 @@ def main():
         '-skip-performance', action='store_true',
         help="Don't report performance differences")
     argparser.add_argument(
+        '-skip-check-added', action='store_true',
+        help="Don't validate newly added benchmarks")
+    argparser.add_argument(
         '-o', type=str,
         help='In addition to stdout, write the results into a markdown file')
     argparser.add_argument(
@@ -80,15 +83,10 @@ def main():
     argparser.add_argument(
         'newbuilddir', nargs=1, type=str,
         help='new benchmark build directory')
-    argparser.add_argument(
-        '-check-added', action='store_const',
-        help="Run BenchmarkDoctor's check on newly added benchmarks",
-        const=lambda args: check_added(args), dest='func')
-    argparser.set_defaults(func=test_opt_levels)
     args = argparser.parse_args()
     VERBOSE = args.verbose
 
-    return args.func(args)
+    return test_opt_levels(args)
 
 
 def test_opt_levels(args):
@@ -118,6 +116,9 @@ def test_opt_levels(args):
                             args.newbuilddir[0],
                             args.platform, output_file):
             changes = True
+
+    if not args.skip_check_added:
+        check_added(args, output_file)
 
     if output_file:
         if changes:
@@ -339,7 +340,7 @@ class DriverArgs(object):
         self.optimization = 'O'
 
 
-def check_added(args):
+def check_added(args, output_file=None):
     from imp import load_source
     # import Benchmark_Driver  # doesn't work because it misses '.py' extension
     Benchmark_Driver = load_source(
@@ -348,12 +349,15 @@ def check_added(args):
     # from Benchmark_Driver import BenchmarkDriver, BenchmarkDoctor
     BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
     BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
+    MarkdownReportHandler = Benchmark_Driver.MarkdownReportHandler
 
     old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0]))
     new = BenchmarkDriver(DriverArgs(args.newbuilddir[0]))
     added = set(new.tests).difference(set(old.tests))
     new.tests = list(added)
     doctor = BenchmarkDoctor(args, driver=new)
+    if added and output_file:
+        doctor.log.addHandler(MarkdownReportHandler(output_file))
     doctor.check()
 
 
