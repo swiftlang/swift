@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs | %FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation

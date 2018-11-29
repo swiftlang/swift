@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
-// FIXME: This test uses IRGen with -enable-source-import; it may fail with -g.
+// FIXME: This test uses IRGen with -enable-source-import (via
+// %clang-importer-sdk); it may fail with -g.
 
 import Properties
 

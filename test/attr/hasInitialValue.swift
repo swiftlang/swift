@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -swift-version 4 -enable-source-import -I %S/Inputs | %FileCheck %s
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -swift-version 4 | %FileCheck %s
 
 // CHECK-LABEL: {{^}}class C {
 class C {
