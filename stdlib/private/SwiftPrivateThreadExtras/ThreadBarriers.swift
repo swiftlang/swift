@@ -1,4 +1,4 @@
-//===--- PthreadBarriers.swift --------------------------------------------===//
+//===--- ThreadBarriers.swift --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,6 +14,9 @@
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
 #endif
 
 //
@@ -22,28 +25,15 @@ import Glibc
 // (OS X does not implement them.)
 //
 
-public struct _stdlib_pthread_barrierattr_t {
-  public init() {}
-}
-
-public func _stdlib_pthread_barrierattr_init(
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
-) -> CInt {
-  return 0
-}
-
-public func _stdlib_pthread_barrierattr_destroy(
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
-) -> CInt {
-  return 0
-}
-
-public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
+public var _stdlib_THREAD_BARRIER_SERIAL_THREAD: CInt {
   return 1
 }
 
-public struct _stdlib_pthread_barrier_t {
-#if os(Cygwin) || os(FreeBSD)
+public struct _stdlib_thread_barrier_t {
+#if os(Windows)
+  var mutex: UnsafeMutablePointer<SRWLOCK>?
+  var cond: UnsafeMutablePointer<CONDITION_VARIABLE>?
+#elseif os(Cygwin) || os(FreeBSD)
   var mutex: UnsafeMutablePointer<pthread_mutex_t?>?
   var cond: UnsafeMutablePointer<pthread_cond_t?>?
 #else
@@ -62,16 +52,22 @@ public struct _stdlib_pthread_barrier_t {
   public init() {}
 }
 
-public func _stdlib_pthread_barrier_init(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>,
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>?,
+public func _stdlib_thread_barrier_init(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>,
   _ count: CUnsignedInt
 ) -> CInt {
-  barrier.pointee = _stdlib_pthread_barrier_t()
+  barrier.pointee = _stdlib_thread_barrier_t()
   if count == 0 {
     errno = EINVAL
     return -1
   }
+#if os(Windows)
+  barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
+  InitializeSRWLock(barrier.pointee.mutex!)
+
+  barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
+  InitializeConditionVariable(barrier.pointee.cond!)
+#else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
   if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
     // FIXME: leaking memory.
@@ -82,13 +78,18 @@ public func _stdlib_pthread_barrier_init(
     // FIXME: leaking memory, leaking a mutex.
     return -1
   }
+#endif
   barrier.pointee.count = count
   return 0
 }
 
-public func _stdlib_pthread_barrier_destroy(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
+public func _stdlib_thread_barrier_destroy(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
+#if os(Windows)
+  // Condition Variables do not need to be explicitly destroyed
+  // Mutexes do not need to be explicitly destroyed
+#else
   if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
     // FIXME: leaking memory, leaking a mutex.
     return -1
@@ -97,40 +98,61 @@ public func _stdlib_pthread_barrier_destroy(
     // FIXME: leaking memory.
     return -1
   }
+#endif
   barrier.pointee.cond!.deinitialize(count: 1)
   barrier.pointee.cond!.deallocate()
+
   barrier.pointee.mutex!.deinitialize(count: 1)
   barrier.pointee.mutex!.deallocate()
+
   return 0
 }
 
-public func _stdlib_pthread_barrier_wait(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
+public func _stdlib_thread_barrier_wait(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
+#if os(Windows)
+  AcquireSRWLockExclusive(barrier.pointee.mutex!)
+#else
   if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
     return -1
   }
+#endif
   barrier.pointee.numThreadsWaiting += 1
   if barrier.pointee.numThreadsWaiting < barrier.pointee.count {
     // Put the thread to sleep.
+#if os(Windows)
+    // TODO(compnerd) modularize rpc.h to get INFIITE (0xffffffff)
+    if SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
+                                 0xffffffff, 0) == 0 {
+      return -1
+    }
+    ReleaseSRWLockExclusive(barrier.pointee.mutex!)
+#else
     if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
       return -1
     }
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
+#endif
     return 0
   } else {
     // Reset thread count.
     barrier.pointee.numThreadsWaiting = 0
 
     // Wake up all threads.
+#if os(Windows)
+    WakeAllConditionVariable(barrier.pointee.cond!)
+    ReleaseSRWLockExclusive(barrier.pointee.mutex!)
+#else
     if pthread_cond_broadcast(barrier.pointee.cond!) != 0 {
       return -1
     }
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
-    return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD
+#endif
+    return _stdlib_THREAD_BARRIER_SERIAL_THREAD
   }
 }
