@@ -1922,6 +1922,9 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   
 #if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class:
   if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
+    // Release the source if we need to.
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      srcType->vw_destroy(src);
     return true;
   }
 #endif
