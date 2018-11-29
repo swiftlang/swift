@@ -724,6 +724,26 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   return result;
 }
 
+static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
+                                    ConstraintSystem &CS) {
+  // Look for a literal-conformance constraint on the type variable.
+  llvm::SetVector<Constraint *> constraints;
+  CS.getConstraintGraph().gatherConstraints(
+      typeVar, constraints,
+      ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *constraint) -> bool {
+        return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+          constraint->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral);
+      });
+
+  for (auto constraint : constraints)
+    if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
+      return true;
+
+  return false;
+}
+
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.
 ///
@@ -731,6 +751,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
                                                     Type type,
                                                     bool *isNilLiteral) {
+  if (isNilLiteral)
+    *isNilLiteral = false;
+
   if (!type)
     return None;
 
@@ -755,28 +778,9 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   }
 
   // If the type is a type variable itself, don't permit the binding.
-  if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
-    if (isNilLiteral) {
-      *isNilLiteral = false;
-
-      // Look for a literal-conformance constraint on the type variable.
-      llvm::SetVector<Constraint *> constraints;
-      getConstraintGraph().gatherConstraints(
-          bindingTypeVar, constraints,
-          ConstraintGraph::GatheringKind::EquivalenceClass,
-          [](Constraint *constraint) -> bool {
-            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-                   constraint->getProtocol()->isSpecificProtocol(
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-          });
-
-      for (auto constraint : constraints) {
-        if (simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
-          *isNilLiteral = true;
-          break;
-        }
-      }
-    }
+  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
+    if (isNilLiteral)
+      *isNilLiteral = hasNilLiteralConstraint(bindingTypeVar, *this);
 
     return None;
   }
