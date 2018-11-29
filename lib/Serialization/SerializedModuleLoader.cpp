@@ -59,8 +59,14 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   // If there are no buffers to load into, simply check for the existence of
   // the module file.
   if (!(ModuleBuffer || ModuleDocBuffer)) {
-    return llvm::sys::fs::access(StringRef(Scratch.data(), Scratch.size()),
-                                 llvm::sys::fs::AccessMode::Exist);
+    llvm::ErrorOr<clang::vfs::Status> statResult = FS.status(Scratch);
+    if (!statResult)
+      return statResult.getError();
+    if (!statResult->exists())
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    // FIXME: clang::vfs::FileSystem doesn't give us information on whether or
+    // not we can /read/ the file without actually trying to do so.
+    return std::error_code();
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
@@ -91,29 +97,23 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
                                                      StringRef moduleName,
                                                      StringRef archName,
                                                      StringRef directoryPath) {
+  clang::vfs::FileSystem &fs = *ctx.SourceMgr.getFileSystem();
 
   std::error_code errorCode;
-  llvm::sys::fs::directory_iterator directoryIterator(directoryPath, errorCode,
-                                                      true);
-  llvm::sys::fs::directory_iterator endIterator;
-
-  if (errorCode) {
-    return;
-  }
-
   std::string foundArchs;
-  for (; directoryIterator != endIterator;
+  for (clang::vfs::directory_iterator directoryIterator =
+           fs.dir_begin(directoryPath, errorCode), endIterator;
+       directoryIterator != endIterator;
        directoryIterator.increment(errorCode)) {
-    if (errorCode) {
+    if (errorCode)
       return;
-    }
-    auto entry = *directoryIterator;
-    StringRef filePath(entry.path());
+    StringRef filePath = directoryIterator->getName();
     StringRef extension = llvm::sys::path::extension(filePath);
     if (file_types::lookupTypeForExtension(extension) ==
           file_types::TY_SwiftModuleFile) {
-      foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
-                   llvm::sys::path::stem(filePath).str();
+      if (!foundArchs.empty())
+        foundArchs += ", ";
+      foundArchs += llvm::sys::path::stem(filePath).str();
     }
   }
 
@@ -191,8 +191,10 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
       currPath = frameworkPath;
       llvm::sys::path::append(currPath, moduleFramework.str());
+
       // Check if the framework directory exists
-      if (!llvm::sys::fs::is_directory(currPath)) {
+      auto &fs = *Ctx.SourceMgr.getFileSystem();
+      if (!fs.exists(currPath)) {
         return false;
       }
 
