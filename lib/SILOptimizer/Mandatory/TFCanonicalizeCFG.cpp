@@ -385,15 +385,10 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
 namespace {
 
 class BasicBlockCloner : public SILClonerWithScopes<BasicBlockCloner> {
-private:
-  /// The flag to track if  this cloner was used to clone any blocks.
-  bool cloned;
-
 public:
-  BasicBlockCloner(SILFunction &F)
-      : SILClonerWithScopes(F), cloned(false) {}
+  BasicBlockCloner(SILFunction &F) : SILClonerWithScopes(F) {}
 
-  bool hasCloned() const { return cloned; }
+  bool hasCloned() const { return !BBMap.empty(); }
 
   SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
     auto bbIt = BBMap.find(bb);
@@ -526,8 +521,6 @@ private:
     auto bbIt = BBMap.find(bb);
     if (bbIt != BBMap.end())
       return bbIt->second;
-
-    cloned = true;
 
     SILFunction &F = getBuilder().getFunction();
     SILBasicBlock *newBB = F.createBasicBlock();
