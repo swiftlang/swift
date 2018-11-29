@@ -49,8 +49,12 @@ constants.""")
         replacement, pattern = s.split('=', 1)
         stdin = stdin.replace(pattern, replacement)
 
-    p = subprocess.Popen(
-        [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
+    if sys.version_info[0] > 2:
+        p = subprocess.Popen(
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE, text=True)
+    else:
+        p = subprocess.Popen(
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
     stdout, stderr = p.communicate(stdin)
     if stdout is not None:
         print(stdout)
