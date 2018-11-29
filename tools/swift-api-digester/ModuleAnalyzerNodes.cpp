@@ -1,3 +1,4 @@
+#include "llvm/ADT/STLExtras.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -1535,7 +1536,11 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        ExtensionMap[Ext->getExtendedNominal()].push_back(Ext);
+        auto *NTD = Ext->getExtendedNominal();
+        // Check if the extension is from other modules.
+        if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
+          ExtensionMap[NTD].push_back(Ext);
+        }
       }
     }
   }

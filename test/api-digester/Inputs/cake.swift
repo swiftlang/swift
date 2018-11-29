@@ -96,3 +96,7 @@ infix operator ..*..
 class UsableFromInlineClass {
   private var Prop = 1
 }
+
+class InternalType {}
+
+extension InternalType {}
