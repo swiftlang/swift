@@ -121,12 +121,6 @@ private:
   llvm::StringMap<std::pair<std::vector<DependencyEntryTy>, DependencyMaskTy>> Dependencies;
 
   /// The set of marked nodes.
-  /// "Marked" means that everything provided by this node (i.e. Job) is
-  /// dirty. Thus any file using any of these provides must be recompiled.
-  /// (Only non-private entities are output as provides.)
-  /// In other words, this Job "cascades"; the need to recompile it causes other
-  /// recompilations. It is possible that the current code marks things that do
-  /// not need to be marked. Nothing would break if that were the case.
 
   llvm::SmallPtrSet<const void *, 16> Marked;
 
@@ -263,7 +257,7 @@ public:
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
   /// that get transitively marked into \p visited.
   ///
-  /// Nodes that have been previously marked are not included in \p newlyMarked,
+  /// Nodes that have been previously marked are not included in \p visited,
   /// nor are their successors traversed, <em>even if their "provides" set has
   /// been updated since it was marked.</em> (However, nodes that depend on the
   /// given \p node are always traversed.)
@@ -279,9 +273,8 @@ public:
   /// visited node, add it to visited, and mark it if it cascades. The start
   /// node is NOT added to visited.
   ///
-  /// Do not confused "Marked" with "Visited".
-  /// "Marked" does NOT influence the traversal. The traversal routines use
-  /// "Visited" to avoid endless "recursion".
+  /// The traversal routines use
+  /// \p visited to avoid endless recursion.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {

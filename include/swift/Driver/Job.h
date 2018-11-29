@@ -231,19 +231,19 @@ class Job {
 public:
   enum class Condition {
     // There was no information about the previous build (i.e., an input map),
-    // or the map marked this Job as dirty
-    // but the input didn't change.
+    // or the map marked this Job as dirty or needing a cascading build.
     // Be maximally conservative with dependencies.
     Always,
-    // The input changed, or this job was non-cascading or [it was not dirty but
-    // primary output was missing].
-    // In other words, this job was scheduled as non-cascading in the last build
+    // The input changed, or this job was scheduled as non-cascading in the last
+    // build
     // but didn't get to run.
+    // The scheduled-but-didn't-run condition is detected when the job was not
+    // dirty but its primary output was missing.
     RunWithoutCascading,
     // The best case: input didn't change, output exists.
     // Only run if it depends on some other thing that changed.
     CheckDependencies,
-    // Pessimal: Run no matter what (but may or may not cascade).
+    // Run no matter what (but may or may not cascade).
     NewlyAdded
   };
 
