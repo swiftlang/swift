@@ -132,8 +132,10 @@ extension _AbstractStringStorage {
           return _nativeIsEqual(_unsafeUncheckedDowncast(other, to: _StringStorage.self))
         case .shared:
           return _nativeIsEqual(_unsafeUncheckedDowncast(other, to: _SharedStringStorage.self))
+#if !(arch(i386) || arch(arm))
         case .tagged:
           fallthrough
+#endif
         case .cocoa:
           //we're allowed to crash, but for compatibility reasons NSCFString allows non-strings here
           if _isNSString(other) != 1 {
@@ -188,7 +190,7 @@ final internal class _StringStorage: __SwiftNativeNSString, _AbstractStringStora
 
   internal var _reserved: UInt16
 
-  override internal var count: Int {
+  internal var count: Int {
     @inline(__always) get { return _count }
     @inline(__always) set { _count = newValue }
   }
