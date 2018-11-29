@@ -95,7 +95,7 @@ private:
       if (superclassDecl->hasClangNode()) {
         // Nothing to do; Objective-C classes do not add new members to
         // Swift class metadata.
-      } else if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal)) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
@@ -142,6 +142,11 @@ private:
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
+
+    // If the class has resilient metadata, we cannot make any assumptions
+    // about its metadata layout, so skip the rest of this method.
+    if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
+      return;
 
     // Add vtable entries.
     asImpl().addVTableEntries(theClass);

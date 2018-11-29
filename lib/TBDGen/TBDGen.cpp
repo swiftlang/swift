@@ -313,11 +313,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   auto hasResilientAncestor =
-      CD->isResilient(SwiftModule, ResilienceExpansion::Minimal);
+      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
   auto ancestor = CD->getSuperclassDecl();
   while (ancestor && !hasResilientAncestor) {
     hasResilientAncestor |=
-        ancestor->isResilient(SwiftModule, ResilienceExpansion::Maximal);
+        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
     ancestor = ancestor->getSuperclassDecl();
   }
 
@@ -338,7 +338,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
 
-      if (CD->isResilient()) {
+      if (CD->hasResilientMetadata()) {
         if (FirstTime) {
           FirstTime = false;
 

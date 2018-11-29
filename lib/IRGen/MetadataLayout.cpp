@@ -280,7 +280,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
         Layout.StartOfImmediateMembers = getNextOffset();
 
         if (Layout.HasResilientSuperclass ||
-            IGM.isResilient(forClass, ResilienceExpansion::Maximal)) {
+            IGM.hasResilientMetadata(forClass, ResilienceExpansion::Maximal)) {
           assert(!DynamicOffsetBase);
           DynamicOffsetBase = NextOffset;
         }
