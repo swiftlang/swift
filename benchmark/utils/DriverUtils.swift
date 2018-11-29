@@ -514,7 +514,7 @@ final class TestRunner {
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
       c.numIters ?? calibrateMeasurements())
 
-    let numSamples = c.numSamples ?? min(2000, // Cap the number of samples
+    let numSamples = c.numSamples ?? min(200, // Cap the number of samples
       c.numIters == nil ? 1 : calibrateMeasurements())
 
     samples.reserveCapacity(numSamples)
