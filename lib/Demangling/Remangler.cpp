@@ -596,7 +596,7 @@ void Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node) {
 }
 
 void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
-  mangleChildNodes(node); // protocol conformance, identifier, type
+  mangleChildNodes(node); // protocol conformance, type, protocol
   Buffer << "WT";
 }
 
