@@ -151,6 +151,14 @@ class TestMeasurement : TestMeasurementSuper {
         expectTrue(fiveKM <= fiveThousandM)
     }
 
+    func testHashing() {
+        let m1 = Measurement<UnitLength>(value: 1, unit: .inches)
+        let m2 = m1.converted(to: .millimeters)
+
+        expectTrue(m1 == m2)
+        expectTrue(m1.hashValue == m2.hashValue)
+    }
+
     func test_AnyHashableContainingMeasurement() {
         let values: [Measurement<UnitLength>] = [
           Measurement(value: 100, unit: UnitLength.meters),
@@ -190,6 +198,7 @@ if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
     MeasurementTests.test("testMeasurementFormatter") { TestMeasurement().testMeasurementFormatter() }
     MeasurementTests.test("testEquality") { TestMeasurement().testEquality() }
     MeasurementTests.test("testComparison") { TestMeasurement().testComparison() }
+    MeasurementTests.test("testHashing") { TestMeasurement().testHashing() }
     MeasurementTests.test("test_AnyHashableContainingMeasurement") { TestMeasurement().test_AnyHashableContainingMeasurement() }
   MeasurementTests.test("test_AnyHashableCreatedFromNSMeasurement") { TestMeasurement().test_AnyHashableCreatedFromNSMeasurement() }
     runAllTests()
