@@ -36,7 +36,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
     abort()
   }
 
-  public static func fakeAdj(lhs: Vector, rhs: Vector, y: Vector, seed: Vector) -> (Vector, Vector) {
+  public static func fakeAdj(seed: Vector, y: Vector, lhs: Vector, rhs: Vector) -> (Vector, Vector) {
     abort()
   }
 }

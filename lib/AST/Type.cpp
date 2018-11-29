@@ -4127,9 +4127,9 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   // Compute the adjoint parameters.
   SmallVector<AnyFunctionType::Param, 8> adjointParams;
 
-  // The first parameters are the same as those of the original function.
-  for (auto &param : unwrapped->getParams())
-    adjointParams.push_back(param);
+  // The first parameter is the seed, which has the same type as the original
+  // return type.
+  adjointParams.push_back(AnyFunctionType::Param(unwrapped->getResult()));
 
   // If the primal exists, the checkpoints type is the primal result type.
   if (primalResultTy) {
@@ -4137,9 +4137,12 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     adjointParams.push_back(AnyFunctionType::Param(checkpointsTy));
   }
 
-  // The original result and the seed have the same type as the original
-  // return type.
-  adjointParams.append(2, AnyFunctionType::Param(unwrapped->getResult()));
+  // The original result has the same type as the original return type.
+  adjointParams.push_back(AnyFunctionType::Param(unwrapped->getResult()));
+
+  // The last parameters are the parameters of the original function.
+  for (auto &param : unwrapped->getParams())
+    adjointParams.push_back(param);
 
   // Build the adjoint type.
   AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams, retTy);

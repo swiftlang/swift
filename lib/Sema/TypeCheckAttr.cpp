@@ -2180,6 +2180,9 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
       overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
 
+  if (!candidate)
+    return nullptr;
+
   if (checkAccessControl(candidate))
     return nullptr;
 

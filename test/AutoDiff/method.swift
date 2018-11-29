@@ -130,7 +130,7 @@ extension CustomParameter {
     return x * x
   }
 
-  func dSquared(origVal: Float, seed: Float) -> CustomParameter {
+  func dSquared(seed: Float, origVal: Float) -> CustomParameter {
     return CustomParameter(x: (2 * x).clamped(to: -10.0...10.0) * seed)
   }
 
@@ -139,7 +139,7 @@ extension CustomParameter {
     return p.x * p.x
   }
 
-  static func dSquared(_ p: CustomParameter, origVal: Float, seed: Float)
+  static func dSquared(_ seed: Float, _ origVal: Float, _ p: CustomParameter)
       -> CustomParameter {
      return CustomParameter(x: (2 * p.x).clamped(to: -10.0...10.0) * seed)
   }
@@ -162,20 +162,20 @@ extension CustomParameter {
     return x * other
   }
 
-  func dMultiplied_wrtAll(with other: Float, origVal: Float, seed: Float)
+  func dMultiplied_wrtAll(seed: Float, origVal: Float, with other: Float)
       -> (CustomParameter, Float) {
     return (CustomParameter(x: other.clamped(to: -10.0...10.0) * seed),
             x.clamped(to: -10.0...10.0) * seed)
   }
 
-  func dMultiplied_wrtOther(with other: Float, origVal: Float, seed: Float)
+  func dMultiplied_wrtOther(seed: Float, origVal: Float, with other: Float)
       -> Float {
-    return dMultiplied_wrtAll(with: other, origVal: origVal, seed: seed).1
+    return dMultiplied_wrtAll(seed: seed, origVal: origVal, with: other).1
   }
 
-  func dMultiplied_wrtSelf(with other: Float, origVal: Float, seed: Float)
+  func dMultiplied_wrtSelf(seed: Float, origVal: Float, with other: Float)
       -> CustomParameter {
-    return dMultiplied_wrtAll(with: other, origVal: origVal, seed: seed).0
+    return dMultiplied_wrtAll(seed: seed, origVal: origVal, with: other).0
   }
 
   @differentiable(reverse, adjoint: dMultiply_wrtAll)
@@ -196,23 +196,23 @@ extension CustomParameter {
     return lhs.x * rhs.x
   }
 
-  static func dMultiply_wrtAll(_ lhs: CustomParameter,_ rhs: CustomParameter,
-                               origValue: Float, seed: Float)
+  static func dMultiply_wrtAll(_ seed: Float, _ origVal: Float,
+                               _ lhs: CustomParameter,_ rhs: CustomParameter)
       -> (CustomParameter, CustomParameter) {
     return (CustomParameter(x: rhs.x.clamped(to: -10.0...10.0) * seed),
             CustomParameter(x: lhs.x.clamped(to: -10.0...10.0) * seed))
   }
 
-  static func dMultiply_wrtLhs(_ lhs: CustomParameter,_ rhs: CustomParameter,
-                               origValue: Float, seed: Float)
+  static func dMultiply_wrtLhs(_ seed: Float, _ origVal: Float,
+                               _ lhs: CustomParameter, _ rhs: CustomParameter)
       -> CustomParameter {
-    return dMultiply_wrtAll(lhs, rhs, origValue: origValue, seed: seed).0
+    return dMultiply_wrtAll(seed, origVal, lhs, rhs).0
   }
 
-  static func dMultiply_wrtRhs(_ lhs: CustomParameter, _ rhs: CustomParameter,
-                               origValue: Float, seed: Float)
+  static func dMultiply_wrtRhs(_ seed: Float, _ origVal: Float,
+                               _ lhs: CustomParameter, _ rhs: CustomParameter)
       -> CustomParameter {
-    return dMultiply_wrtAll(lhs, rhs, origValue: origValue, seed: seed).1
+    return dMultiply_wrtAll(seed, origVal, lhs, rhs).1
   }
 }
 
