@@ -390,6 +390,11 @@ extension CGFloat : Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(native)
   }
+
+  @inlinable @_transparent
+  public func _rawHashValue(seed: Int) -> Int {
+    return native._rawHashValue(seed: seed)
+  }
 }
 
 % for dst_ty in all_integer_types(word_bits):
