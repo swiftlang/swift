@@ -189,7 +189,6 @@ final internal class _StringStorage: _AbstractStringStorage {
 
   internal var _reserved: UInt16
 
-  @inlinable
   override internal var count: Int {
     @inline(__always) get { return _count }
     @inline(__always) set { _count = newValue }
