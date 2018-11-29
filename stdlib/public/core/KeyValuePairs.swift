@@ -121,7 +121,9 @@ extension KeyValuePairs : RandomAccessCollection {
   /// - Returns: The key-value pair at position `position`.
   @inlinable // trivial-implementation
   public subscript(position: Index) -> Element {
-    return _elements[position]
+    _read {
+      yield _elements[position]
+    }
   }
 }
 

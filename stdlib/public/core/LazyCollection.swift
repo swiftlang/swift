@@ -74,7 +74,9 @@ extension LazyCollection : Collection {
   ///   `position != endIndex`.
   @inlinable
   public subscript(position: Index) -> Element {
-    return _base[position]
+    _read {
+      yield _base[position]      
+    }
   }
 
   /// A Boolean value indicating whether the collection is empty.
