@@ -20,6 +20,8 @@
 namespace swift {
 class ModuleFile;
 
+/// Spceifies how to load modules when both a parseable interface and serialized
+/// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
   PreferParseable,
   PreferSerialized,
@@ -55,6 +57,18 @@ protected:
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch);
+
+  /// If the module loader subclass knows that all options have been tried for
+  /// loading an architecture-specific file out of a swiftmodule bundle, try
+  /// to list the architectures that \e are present.
+  ///
+  /// \returns true if an error diagnostic was emitted
+  virtual bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
+                                                 StringRef moduleName,
+                                                 StringRef archName,
+                                                 StringRef directoryPath) {
+    return false;
+  }
 
 public:
   virtual ~SerializedModuleLoaderBase();
@@ -113,6 +127,18 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
                          ModuleLoadingMode loadMode)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode)
   {}
+
+  std::error_code
+  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+                  StringRef ModuleDocFilename,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  llvm::SmallVectorImpl<char> &Scratch) override;
+
+  bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
+                                         StringRef moduleName,
+                                         StringRef archName,
+                                         StringRef directoryPath) override;
 
 public:
   virtual ~SerializedModuleLoader();

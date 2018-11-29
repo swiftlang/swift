@@ -367,6 +367,17 @@ static bool buildSwiftModuleFromSwiftInterface(
   return !RunSuccess || SubError;
 }
 
+static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
+                                                  StringRef ModPath) {
+  auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
+                                    /*RequiresNullTerminator=*/false);
+  if (!ModBuf)
+    return ModBuf.getError() != std::errc::no_such_file_or_directory;
+
+  auto VI = serialization::validateSerializedAST(ModBuf.get()->getBuffer());
+  return VI.status == serialization::Status::Valid;
+}
+
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
@@ -397,16 +408,12 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // Next, if we're in the load mode that prefers .swiftmodules, see if there's
   // one here we can _likely_ load (validates OK). If so, bail early with
   // errc::not_supported, so the next (serialized) loader in the chain will load
+  // it. Alternately, if there's a .swiftmodule present but we can't even read
+  // it (for whatever reason), we should let the other module loader diagnose
   // it.
-  if (LoadMode == ModuleLoadingMode::PreferSerialized) {
-    if (FS.exists(ModPath)) {
-      auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
-                                        /*RequiresNullTerminator=*/false);
-      auto VI = serialization::validateSerializedAST(ModBuf.get()->getBuffer());
-      if (VI.status == serialization::Status::Valid) {
-        return std::make_error_code(std::errc::not_supported);
-      }
-    }
+  if (LoadMode == ModuleLoadingMode::PreferSerialized &&
+      serializedASTLooksValidOrCannotBeRead(FS, ModPath)) {
+    return std::make_error_code(std::errc::not_supported);
   }
 
   // At this point we're either in PreferParseable mode or there's no credible
