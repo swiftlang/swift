@@ -2944,8 +2944,11 @@ ERROR(closure_implicit_capture_without_noescape,none,
       "escaping closures can only capture inout parameters explicitly by value",
       ())
 ERROR(closure_implicit_capture_mutating_self,none,
-      "closure cannot implicitly capture a mutating self parameter",
+      "escaping closure cannot capture a mutating self parameter",
       ())
+NOTE(create_mutating_copy_or_capture_self,none,
+     "create a mutating copy of self, or explicitly capture self for immutability",
+     ())
 ERROR(nested_function_with_implicit_capture_argument,none,
       "nested function with %select{an |}0implicitly captured inout "
       "parameter%select{|s}0 can only be used as a non-escaping argument", (bool))
