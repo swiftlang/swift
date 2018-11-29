@@ -51,13 +51,13 @@ extension SCNVector3 {
   }
 }
 
-extension float3 {
+extension SIMD3 where Scalar == Float {
   public init(_ v: SCNVector3) {
     self.init(Float(v.x), Float(v.y), Float(v.z))
   }
 }
 
-extension double3 {
+extension SIMD3 where Scalar == Double {
   public init(_ v: SCNVector3) {
     self.init(Double(v.x), Double(v.y), Double(v.z))
   }
@@ -86,13 +86,13 @@ extension SCNVector4 {
   }
 }
 
-extension float4 {
+extension SIMD4 where Scalar == Float {
   public init(_ v: SCNVector4) {
     self.init(Float(v.x), Float(v.y), Float(v.z), Float(v.w))
   }
 }
 
-extension double4 {
+extension SIMD4 where Scalar == Double {
   public init(_ v: SCNVector4) {
     self.init(Double(v.x), Double(v.y), Double(v.z), Double(v.w))
   }
