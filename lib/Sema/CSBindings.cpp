@@ -724,6 +724,73 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   return result;
 }
 
+/// \brief Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns the type to bind to, if the binding is okay.
+Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
+                                                    Type type,
+                                                    bool *isNilLiteral) {
+  if (!type)
+    return None;
+
+  // Simplify the type.
+  type = simplifyType(type);
+
+  // If the type references the type variable, don't permit the binding.
+  SmallVector<TypeVariableType *, 4> referencedTypeVars;
+  type->getTypeVariables(referencedTypeVars);
+  if (count(referencedTypeVars, typeVar))
+    return None;
+
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  if (!typeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return None;
+    }
+  }
+
+  // If the type is a type variable itself, don't permit the binding.
+  if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
+    if (isNilLiteral) {
+      *isNilLiteral = false;
+
+      // Look for a literal-conformance constraint on the type variable.
+      llvm::SetVector<Constraint *> constraints;
+      getConstraintGraph().gatherConstraints(
+          bindingTypeVar, constraints,
+          ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) -> bool {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+                   constraint->getProtocol()->isSpecificProtocol(
+                       KnownProtocolKind::ExpressibleByNilLiteral);
+          });
+
+      for (auto constraint : constraints) {
+        if (simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
+          *isNilLiteral = true;
+          break;
+        }
+      }
+    }
+
+    return None;
+  }
+
+  // Don't bind to a dependent member type, even if it's currently
+  // wrapped in any number of optionals, because binding producer
+  // might unwrap and try to attempt it directly later.
+  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    return None;
+
+  // Okay, allow the binding (with the simplified type).
+  return type;
+}
+
 // Given a possibly-Optional type, return the direct superclass of the
 // (underlying) type wrapped in the same number of optional levels as
 // type.
