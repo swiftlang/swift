@@ -563,3 +563,63 @@ bb8:
 bb9(%18 : $Builtin.Int32):
   return %18 : $Builtin.Int32
 }
+
+
+// This example makes sure we can even unroll loop body even if critical edges are introduced during canonicalization.
+// Consider the following CFG:
+//    [0]
+//     |
+// +->[1]-->[3]
+// |   |
+// +--[2]
+//
+// This loop needs to be canonicalized as [1] contains side-effecting operations (sendToHost here). After the
+// canonicalization the CFG looks like below:
+//    [0]
+//     |
+// +->[NH]-->[3]
+// |   |
+// |  [1]--+
+// |   |   |
+// |  [2]  |
+// |   |   |
+// +--[L]<-+
+//
+// Note that the edge [1] -> [L] is a critical edge. It also happens that this loop needs to be unrolled once.
+// This example checks that such loops are unrolled correctly.
+//
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithCriticalEdgesRequiringUnrolling{{.*}}
+// CHECK: [sequence
+// --> The following condition region is the unrolled loop body.
+// CHECK:   {condition Header: {{bb[0-9]+}}
+// CHECK:     block {{bb[0-9]+}}
+// CHECK:     block {{bb[0-9]+}}}
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: {{bb[0-9]+}}
+// CHECK:     [sequence
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block {{bb[0-9]+}}]
+//
+sil private @testLoopWithCriticalEdgesRequiringUnrolling : $@convention(thin) @callee_owned () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0          // user: %3
+  %1 = integer_literal $Builtin.Int32, 10         // user: %6
+  %2 = integer_literal $Builtin.Int32, 1          // user: %5
+  br bb1(%0 : $Builtin.Int32)                     // id: %3
+
+// %4                                             // user: %5
+bb1(%4 : $Builtin.Int32):                         // Preds: bb2 bb0
+  %5 =  integer_literal $Builtin.Int32, 10
+  %6 = builtin "cmp_slt_Int32"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // users: %8, %7
+  %7 = graph_op "tfc.SendToHost"(%6 : $Builtin.Int1) {tensorId: i32 1, __device: "/device:CPU:0"} : $()
+  cond_br %6, bb2, bb3                            // id: %8
+
+bb2:                                              // Preds: bb1
+  %8 =  integer_literal $Builtin.Int32, 10
+  br bb1(%8 : $Builtin.Int32)                     // id: %9
+
+bb3:                                              // Preds: bb1
+  return %5 : $Builtin.Int32                      // id: %10
+}
