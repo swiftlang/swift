@@ -55,6 +55,8 @@ enum class WellKnownFunction {
   AssertionFailure,
   // Array._allocateUninitializedArray
   AllocateUninitializedArray,
+  // Array.init()
+  ArrayInitEmpty,
 };
 
 static WellKnownFunction classifyFunction(SILFunction *fn) {
@@ -64,6 +66,8 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
   StringRef mangledName = fn->getName();
   if (mangledName == "$sS2SycfC")
     return WellKnownFunction::StringInitEmpty;
+  if (mangledName == "$sS2ayxGycfC")
+    return WellKnownFunction::ArrayInitEmpty;
 
   if (mangledName.contains("_assertionFailure"))
     return WellKnownFunction::AssertionFailure;
@@ -848,6 +852,23 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
         byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
       break;
     setValue(apply, literal);
+    return None;
+  }
+  case WellKnownFunction::ArrayInitEmpty: { // Array.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array.init() signature");
+
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::Metatype)
+      break;
+
+    auto literalType = literal.getMetatypeValue();
+
+    auto arrayVal = SymbolicValue::getArray(
+        {}, getArrayElementType(literalType)->getCanonicalType(),
+        evaluator.getAllocator());
+    setValue(apply, arrayVal);
     return None;
   }
   case WellKnownFunction::AllocateUninitializedArray: {
