@@ -1846,6 +1846,24 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
+      
+  case TypeReprKind::OpaqueReturn: {
+    // Only valid as the return type of a function, which should be handled
+    // during function decl type checking.
+    auto opaqueRepr = cast<OpaqueReturnTypeRepr>(repr);
+    if (!(options & TypeResolutionFlags::SilenceErrors)) {
+      diagnose(opaqueRepr->getOpaqueLoc(),
+               diag::unsupported_opaque_type);
+    }
+    
+    // Try to resolve the constraint upper bound type as a placeholder.
+    options |= TypeResolutionFlags::SilenceErrors;
+    auto constraintType = resolveType(opaqueRepr->getConstraint(),
+                                      options);
+    
+    return constraintType && !constraintType->hasError()
+      ? ErrorType::get(constraintType) : ErrorType::get(Context);
+  }
 
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();

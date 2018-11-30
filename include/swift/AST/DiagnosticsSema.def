@@ -3514,6 +3514,10 @@ ERROR(unsupported_convention,none,
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
 
+// Opaque types
+ERROR(unsupported_opaque_type,none,
+      "'opaque' types are only implemented for the declared type of properties or the return type of functions", ())
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
