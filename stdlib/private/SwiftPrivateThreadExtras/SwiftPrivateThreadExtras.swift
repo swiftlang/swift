@@ -120,15 +120,15 @@ public func _stdlib_thread_join<Result>(
   let result = WaitForSingleObject(thread, 0xffffffff);
   // TODO(compnerd) modularize WinBase.h for WAIT_OBJECT_0 (0)
   if result == 0 {
-    let threadResult: DWORD = 0
+    var threadResult: DWORD = 0
     GetExitCodeThread(thread, &threadResult)
     CloseHandle(thread)
 
-    return (result,
+    return (CInt(result),
             UnsafeMutablePointer<DWORD>(&threadResult)
                 .withMemoryRebound(to: Result.self, capacity: 1){ $0.pointee })
   } else {
-    return (result, nil)
+    return (CInt(result), nil)
   }
 #else
   var threadResultRawPtr: UnsafeMutableRawPointer?
