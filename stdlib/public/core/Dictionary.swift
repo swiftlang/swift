@@ -794,44 +794,7 @@ extension Dictionary {
       }
     }
     _modify {
-      // FIXME: This code should be moved to _variant, with Dictionary.subscript
-      // yielding `&_variant[key]`.
-
-      let (bucket, found) = _variant.mutatingFind(key)
-
-      // FIXME: Mark this entry as being modified in hash table metadata
-      // so that lldb can recognize it's not valid.
-
-      // Move the old value (if any) out of storage, wrapping it into an
-      // optional before yielding it.
-      let native = _variant.asNative
-      if found {
-        var value: Value? = (native._values + bucket.offset).move()
-        yield &value
-        if let value = value {
-          // **Mutation**
-          //
-          // Initialize storage to new value.
-          (native._values + bucket.offset).initialize(to: value)
-        } else {
-          // **Removal**
-          //
-          // We've already deinitialized the value; deinitialize the key too and
-          // register the removal.
-          (native._keys + bucket.offset).deinitialize(count: 1)
-          native._delete(at: bucket)
-        }
-      } else {
-        var value: Value? = nil
-        yield &value
-        if let value = value {
-          // **Insertion**
-          //
-          // Insert the new entry at the correct place.  Note that
-          // `mutatingFind` already ensured that we have enough capacity.
-          native._insert(at: bucket, key: key, value: value)
-        }
-      }
+      yield &_variant[key]
       _fixLifetime(self)
     }
   }
