@@ -1381,7 +1381,7 @@ namespace {
                                   RequireMetadata_t requireMetadata)
       : super(IGM, Type, requireMetadata),
         VTable(IGM.getSILModule().lookUpVTable(getType())),
-        Resilient(IGM.isResilient(Type, ResilienceExpansion::Minimal)) {
+        Resilient(IGM.hasResilientMetadata(Type, ResilienceExpansion::Minimal)) {
 
       if (getType()->isForeign()) return;
 
@@ -1485,7 +1485,7 @@ namespace {
 
       // Only emit a method lookup function if the class is resilient
       // and has a non-empty vtable.
-      if (IGM.isResilient(getType(), ResilienceExpansion::Minimal))
+      if (IGM.hasResilientMetadata(getType(), ResilienceExpansion::Minimal))
         IGM.emitMethodLookupFunction(getType());
 
       auto offset = MetadataLayout->hasResilientSuperclass()
@@ -2250,7 +2250,7 @@ static void emitClassMetadataBaseOffset(IRGenModule &IGM,
   // Only classes defined in resilient modules, or those that have
   // a resilient superclass need this.
   if (!layout.hasResilientSuperclass() &&
-      !IGM.isResilient(classDecl, ResilienceExpansion::Minimal)) {
+      !IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Minimal)) {
     return;
   }
 

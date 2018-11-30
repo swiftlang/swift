@@ -1,6 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_struct -o %t %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -enable-resilience -I %t -module-name resilient_class -o %t %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -I %t -o %t %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -I %t -o %t %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
@@ -11,6 +18,7 @@ import Builtin
 import Swift
 import SwiftShims
 import resilient_class
+import fixed_layout_class
 
 public class ChildToResilientParent : ResilientOutsideParent {
   public override func method()
@@ -99,11 +107,11 @@ bb0(%0 : $ChildToFixedParent):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s5super18ChildToFixedParentC6methodyyF"(%T5super18ChildToFixedParentC* swiftself)
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class13OutsideParentCMa"([[INT]] 0)
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18fixed_layout_class13OutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class13OutsideParentC*)**
-// CHECK: [[VTABLE_SLOT:%.*]] = getelementptr inbounds void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
-// CHECK: [[FN_PTR:%.*]] = load void (%T15resilient_class13OutsideParentC*)*, void (%T15resilient_class13OutsideParentC*)** [[VTABLE_SLOT]]
+// CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T18fixed_layout_class13OutsideParentC*)**
+// CHECK: [[VTABLE_SLOT:%.*]] = getelementptr inbounds void (%T18fixed_layout_class13OutsideParentC*)*, void (%T18fixed_layout_class13OutsideParentC*)** [[OPAQUE_SUPER_METADATA]]
+// CHECK: [[FN_PTR:%.*]] = load void (%T18fixed_layout_class13OutsideParentC*)*, void (%T18fixed_layout_class13OutsideParentC*)** [[VTABLE_SLOT]]
 // CHECK: call swiftcc void
 
 // static super.ChildToFixedParent.classMethod () -> ()
@@ -120,7 +128,7 @@ bb0(%0 : $@thick ChildToFixedParent.Type):
 
 // ChildToFixedParent is in our resilience domain - load super metadata directly.
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s5super18ChildToFixedParentC11classMethodyyFZ"(%swift.type* swiftself)
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class13OutsideParentCMa"([[INT]] 0)
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18fixed_layout_class13OutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
 // CHECK: [[VTABLE_SLOT:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[OPAQUE_SUPER_METADATA]]

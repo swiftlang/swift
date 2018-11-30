@@ -16,6 +16,9 @@ SuperclassMethodsTest.test("AddInterposingMethod") {
       override class func classMethod() -> String {
         return super.classMethod()
       }
+      func newMethod() -> String {
+        return "still works"
+      }
     }
     if getVersion() == 0 {
       expectEqual(Leaf().method(), "Base.method()")
@@ -24,6 +27,7 @@ SuperclassMethodsTest.test("AddInterposingMethod") {
       expectEqual(Leaf().method(), "AddInterposingMethod.method()")
       expectEqual(Leaf.classMethod(), "AddInterposingMethod.classMethod()")
     }
+    expectEqual(Leaf().newMethod(), "still works")
   }
 }
 
@@ -36,6 +40,9 @@ SuperclassMethodsTest.test("RemoveInterposingMethod") {
       override class func classMethod() -> String {
         return super.classMethod()
       }
+      func newMethod() -> String {
+        return "still works"
+      }
     }
     if getVersion() == 0 {
       expectEqual(Leaf().method(), "RemoveInterposingMethod.method()")
@@ -44,6 +51,7 @@ SuperclassMethodsTest.test("RemoveInterposingMethod") {
       expectEqual(Leaf().method(), "Base.method()")
       expectEqual(Leaf.classMethod(), "Base.classMethod()")
     }
+    expectEqual(Leaf().newMethod(), "still works")
   }
 }
 
@@ -56,6 +64,9 @@ SuperclassMethodsTest.test("InsertSuperclass") {
       override class func classMethod() -> String {
         return super.classMethod()
       }
+      func newMethod() -> String {
+        return "still works"
+      }
     }
     if getVersion() == 0 {
       expectEqual(Leaf().method(), "Base.method()")
@@ -66,6 +77,7 @@ SuperclassMethodsTest.test("InsertSuperclass") {
       expectEqual(Leaf().nonOverriddenMethod(), "Base.nonOverriddenMethod()")
       expectEqual(Leaf.classMethod(), "InBetween.classMethod()")
     }
+    expectEqual(Leaf().newMethod(), "still works")
   }
 }
 
