@@ -310,31 +310,27 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   // Check whether we can perform this binding.
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-  bool isNilLiteral = false;
-  bool *isNilLiteralPtr = nullptr;
   if (auto boundType = checkTypeOfBinding(typeVar, type)) {
     type = *boundType;
     if (type->hasTypeVariable())
       result.InvolvesTypeVariables = true;
   } else {
-    if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
-      isNilLiteralPtr = &isNilLiteral;
+    auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
-    if (isNilLiteralPtr) {
-      if (auto *bindingTypeVar =
-              type->getRValueType()->getAs<TypeVariableType>())
-        *isNilLiteralPtr = hasNilLiteralConstraint(bindingTypeVar, *this);
-      else
-        *isNilLiteralPtr = false;
-    }
-
-    // If the bound is a 'nil' literal type, add optional supertype bindings.
-    if (isNilLiteral) {
-      addOptionalSupertypeBindings = true;
+    if (!bindingTypeVar)
       return None;
-    }
 
     result.InvolvesTypeVariables = true;
+
+    // If we've already set addOptionalSupertypeBindings, or we aren't
+    // allowing supertype bindings, we're done.
+    if (addOptionalSupertypeBindings || kind != AllowedBindingKind::Supertypes)
+      return None;
+
+    // If the bound is a 'nil' literal type, add optional supertype bindings.
+    if (hasNilLiteralConstraint(bindingTypeVar, *this))
+      addOptionalSupertypeBindings = true;
+
     return None;
   }
 
