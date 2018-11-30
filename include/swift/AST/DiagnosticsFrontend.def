@@ -276,6 +276,9 @@ ERROR(missing_dependency_of_parseable_module_interface,none,
 ERROR(error_extracting_dependencies_from_cached_module,none,
       "error extracting dependencies from cached module '%0'",
       (StringRef))
+ERROR(unknown_forced_module_loading_mode,none,
+      "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
+      (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

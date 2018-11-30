@@ -20,6 +20,15 @@
 namespace swift {
 class ModuleFile;
 
+/// Spceifies how to load modules when both a parseable interface and serialized
+/// AST are present, or whether to disallow one format or the other altogether.
+enum class ModuleLoadingMode {
+  PreferParseable,
+  PreferSerialized,
+  OnlyParseable,
+  OnlySerialized
+};
+
 /// Common functionality shared between \c SerializedModuleLoader and
 /// \c ParseableInterfaceModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
@@ -32,7 +41,9 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
   ASTContext &Ctx;
-  SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker);
+  ModuleLoadingMode LoadMode;
+  SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
+                             ModuleLoadingMode LoadMode);
 
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   bool findModule(AccessPathElem moduleID,
@@ -46,6 +57,18 @@ protected:
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch);
+
+  /// If the module loader subclass knows that all options have been tried for
+  /// loading an architecture-specific file out of a swiftmodule bundle, try
+  /// to list the architectures that \e are present.
+  ///
+  /// \returns true if an error diagnostic was emitted
+  virtual bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
+                                                 StringRef moduleName,
+                                                 StringRef archName,
+                                                 StringRef directoryPath) {
+    return false;
+  }
 
 public:
   virtual ~SerializedModuleLoaderBase();
@@ -100,9 +123,22 @@ public:
 /// Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public SerializedModuleLoaderBase {
 
-  SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker)
-    : SerializedModuleLoaderBase(ctx, tracker)
+  SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
+                         ModuleLoadingMode loadMode)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode)
   {}
+
+  std::error_code
+  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+                  StringRef ModuleDocFilename,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  llvm::SmallVectorImpl<char> &Scratch) override;
+
+  bool maybeDiagnoseArchitectureMismatch(SourceLoc sourceLocation,
+                                         StringRef moduleName,
+                                         StringRef archName,
+                                         StringRef directoryPath) override;
 
 public:
   virtual ~SerializedModuleLoader();
@@ -120,9 +156,10 @@ public:
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
-  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker)
+      new SerializedModuleLoader(ctx, tracker, loadMode)
     };
   }
 };

@@ -35,8 +35,9 @@ namespace {
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(ASTContext &ctx,
-                                                       DependencyTracker *tracker)
-  : ModuleLoader(tracker), Ctx(ctx) {}
+                                                       DependencyTracker *tracker,
+                                                       ModuleLoadingMode loadMode)
+  : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 
 SerializedModuleLoader::~SerializedModuleLoader() = default;
@@ -59,8 +60,14 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   // If there are no buffers to load into, simply check for the existence of
   // the module file.
   if (!(ModuleBuffer || ModuleDocBuffer)) {
-    return llvm::sys::fs::access(StringRef(Scratch.data(), Scratch.size()),
-                                 llvm::sys::fs::AccessMode::Exist);
+    llvm::ErrorOr<clang::vfs::Status> statResult = FS.status(Scratch);
+    if (!statResult)
+      return statResult.getError();
+    if (!statResult->exists())
+      return std::make_error_code(std::errc::no_such_file_or_directory);
+    // FIXME: clang::vfs::FileSystem doesn't give us information on whether or
+    // not we can /read/ the file without actually trying to do so.
+    return std::error_code();
   }
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleOrErr =
@@ -86,34 +93,40 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   return std::error_code();
 }
 
-static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
-                                                     SourceLoc sourceLocation,
-                                                     StringRef moduleName,
-                                                     StringRef archName,
-                                                     StringRef directoryPath) {
+std::error_code SerializedModuleLoader::openModuleFiles(
+    StringRef DirName, StringRef ModuleFilename, StringRef ModuleDocFilename,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+    llvm::SmallVectorImpl<char> &Scratch) {
+  if (LoadMode == ModuleLoadingMode::OnlyParseable)
+    return std::make_error_code(std::errc::not_supported);
+
+  return SerializedModuleLoaderBase::openModuleFiles(DirName, ModuleFilename,
+                                                     ModuleDocFilename,
+                                                     ModuleBuffer,
+                                                     ModuleDocBuffer, Scratch);
+}
+
+bool SerializedModuleLoader::maybeDiagnoseArchitectureMismatch(
+    SourceLoc sourceLocation, StringRef moduleName, StringRef archName,
+    StringRef directoryPath) {
+  clang::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
 
   std::error_code errorCode;
-  llvm::sys::fs::directory_iterator directoryIterator(directoryPath, errorCode,
-                                                      true);
-  llvm::sys::fs::directory_iterator endIterator;
-
-  if (errorCode) {
-    return;
-  }
-
   std::string foundArchs;
-  for (; directoryIterator != endIterator;
+  for (clang::vfs::directory_iterator directoryIterator =
+           fs.dir_begin(directoryPath, errorCode), endIterator;
+       directoryIterator != endIterator;
        directoryIterator.increment(errorCode)) {
-    if (errorCode) {
-      return;
-    }
-    auto entry = *directoryIterator;
-    StringRef filePath(entry.path());
+    if (errorCode)
+      return false;
+    StringRef filePath = directoryIterator->getName();
     StringRef extension = llvm::sys::path::extension(filePath);
     if (file_types::lookupTypeForExtension(extension) ==
           file_types::TY_SwiftModuleFile) {
-      foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
-                   llvm::sys::path::stem(filePath).str();
+      if (!foundArchs.empty())
+        foundArchs += ", ";
+      foundArchs += llvm::sys::path::stem(filePath).str();
     }
   }
 
@@ -121,11 +134,12 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
     // Maybe this swiftmodule directory only contains swiftinterfaces, or
     // maybe something else is going on. Regardless, we shouldn't emit a
     // possibly incorrect diagnostic.
-    return;
+    return false;
   }
 
-  ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
+  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
                      archName, foundArchs);
+  return true;
 }
 
 bool
@@ -157,29 +171,43 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
   }
 
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  isFramework = false;
+
+  // Declare some reusable buffers up front; if we end up spilling onto the
+  // heap once, we're likely to do so again.
   llvm::SmallString<128> scratch;
   llvm::SmallString<128> currPath;
-  isFramework = false;
   for (auto path : Ctx.SearchPathOpts.ImportSearchPaths) {
-    auto err = openModuleFiles(path,
+    std::error_code result;
+
+    currPath = path;
+    llvm::sys::path::append(currPath, moduleFilename.str());
+    llvm::ErrorOr<clang::vfs::Status> statResult = fs.status(currPath);
+
+    if (statResult && statResult->isDirectory()) {
+      // A .swiftmodule directory contains architecture-specific files.
+      result = openModuleFiles(currPath,
+                               archFile.str(), archDocFile.str(),
+                               moduleBuffer, moduleDocBuffer,
+                               scratch);
+
+      if (result == std::errc::no_such_file_or_directory) {
+        if (maybeDiagnoseArchitectureMismatch(moduleID.second, moduleName,
+                                              archName, currPath)) {
+          return false;
+        }
+      }
+
+    } else {
+      // We can't just return the error; the path we're looking for might not
+      // be "Foo.swiftmodule".
+      result = openModuleFiles(path,
                                moduleFilename.str(), moduleDocFilename.str(),
                                moduleBuffer, moduleDocBuffer,
                                scratch);
-    if (err == std::errc::is_a_directory) {
-      currPath = path;
-      llvm::sys::path::append(currPath, moduleFilename.str());
-      err = openModuleFiles(currPath,
-                            archFile.str(), archDocFile.str(),
-                            moduleBuffer, moduleDocBuffer,
-                            scratch);
-
-      if (err == std::errc::no_such_file_or_directory) {
-        addDiagnosticInfoForArchitectureMismatch(
-            Ctx, moduleID.second, moduleName, archName, currPath);
-        return false;
-      }
     }
-    if (!err)
+    if (!result)
       return true;
   }
 
@@ -191,19 +219,23 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
     auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
       currPath = frameworkPath;
       llvm::sys::path::append(currPath, moduleFramework.str());
+
       // Check if the framework directory exists
-      if (!llvm::sys::fs::is_directory(currPath)) {
+      if (!fs.exists(currPath)) {
         return false;
       }
 
+      // Frameworks always use architecture-specific files within a .swiftmodule
+      // directory.
       llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer, scratch);
 
       if (err == std::errc::no_such_file_or_directory) {
-        addDiagnosticInfoForArchitectureMismatch(
-            Ctx, moduleID.second, moduleName, archName, currPath);
-        return false;
+        if (maybeDiagnoseArchitectureMismatch(moduleID.second, moduleName,
+                                              archName, currPath)) {
+          return false;
+        }
       }
 
       return !err;
