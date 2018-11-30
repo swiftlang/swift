@@ -484,7 +484,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     auto linkage = getDeclLinkage(varDecl);
 
-    // Resilient classes don't expose field offset symbols.
+    // Classes with resilient storage don't expose field offset symbols.
     if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");

@@ -95,7 +95,7 @@ private:
       if (superclassDecl->hasClangNode()) {
         // Nothing to do; Objective-C classes do not add new members to
         // Swift class metadata.
-      } else if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      } else if (IGM.hasResilientMetadata(superclassDecl, ResilienceExpansion::Maximal)) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
@@ -118,13 +118,10 @@ private:
     // This must always be the first item in the immediate members.
     asImpl().addGenericFields(theClass, theClass);
 
-    // If the class is resilient, we cannot make any assumptions about its
-    // member layout at all, so skip the rest of this method.
+    // If the class has resilient storage, we cannot make any assumptions about
+    // its storage layout, so skip the rest of this method.
     if (IGM.isResilient(theClass, ResilienceExpansion::Maximal))
       return;
-
-    // Add vtable entries.
-    asImpl().addVTableEntries(theClass);
 
     // A class only really *needs* a field-offset vector in the
     // metadata if:
@@ -145,6 +142,14 @@ private:
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
+
+    // If the class has resilient metadata, we cannot make any assumptions
+    // about its metadata layout, so skip the rest of this method.
+    if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal))
+      return;
+
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
   }
   
 private:
