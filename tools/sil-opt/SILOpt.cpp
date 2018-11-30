@@ -214,6 +214,11 @@ static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
     llvm::cl::desc("Assume that the input module was compiled with "
                    "-disable-guaranteed-normal-arguments enabled"));
 
+static llvm::cl::opt<bool>
+EnableExperimentalStaticAssert(
+    "enable-experimental-static-assert", llvm::cl::Hidden,
+    llvm::cl::init(false), llvm::cl::desc("Enable experimental #assert"));
+
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
 /// will emit a diagnostic.
@@ -324,6 +329,9 @@ int main(int argc, char **argv) {
       createOptRemarkRegex(PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
+
+  Invocation.getLangOptions().EnableExperimentalStaticAssert =
+      EnableExperimentalStaticAssert;
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
