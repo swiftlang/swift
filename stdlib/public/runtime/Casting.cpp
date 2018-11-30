@@ -635,23 +635,13 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
 
   // If we do find one, the cast succeeds.
 
-  // The intrinsic wants the value at +1, so we have to copy it into
-  // a temporary.
-  ValueBuffer buffer;
-  bool mustDeallocBuffer = false;
-  if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
-    auto *valueAddr = sourceType->allocateBufferIn(&buffer);
-    source = sourceType->vw_initializeWithCopy(valueAddr, source);
-    mustDeallocBuffer = true;
-  }
-
   // Initialize the destination.
   _swift_convertToAnyHashableIndirect(source, destination,
                                       sourceType, hashableConformance);
 
-  // Deallocate the buffer if we used it.
-  if (mustDeallocBuffer) {
-    sourceType->deallocateBufferIn(&buffer);
+  // Destroy the value if requested.
+  if (flags & DynamicCastFlags::TakeOnSuccess) {
+    sourceType->vw_destroy(source);
   }
 
   // The cast succeeded.
@@ -1932,6 +1922,9 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   
 #if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class:
   if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
+    // Release the source if we need to.
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      srcType->vw_destroy(src);
     return true;
   }
 #endif
