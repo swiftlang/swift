@@ -5,6 +5,16 @@ infix operator .<= : ComparisonPrecedence
 infix operator .> : ComparisonPrecedence
 infix operator .>= : ComparisonPrecedence
 
+//  Not used in the stdlib, but declared here so the declarations are always
+//  visible.
+infix operator .& : LogicalConjunctionPrecedence
+infix operator .^ : LogicalDisjunctionPrecedence
+infix operator .| : LogicalDisjunctionPrecedence
+infix operator .&= : AssignmentPrecedence
+infix operator .^= : AssignmentPrecedence
+infix operator .|= : AssignmentPrecedence
+prefix operator .!
+
 /// A SIMD vector type that may not have any computational operations.
 ///
 /// This protocol only defines a storage layout and provides elementwise

@@ -1,11 +1,3 @@
-infix operator .& : LogicalConjunctionPrecedence
-infix operator .^ : LogicalDisjunctionPrecedence
-infix operator .| : LogicalDisjunctionPrecedence
-infix operator .&= : AssignmentPrecedence
-infix operator .^= : AssignmentPrecedence
-infix operator .|= : AssignmentPrecedence
-prefix operator .!
-
 //  Implementations of integer operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 public extension SIMD where Scalar : FixedWidthInteger {
