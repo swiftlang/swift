@@ -146,6 +146,9 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
