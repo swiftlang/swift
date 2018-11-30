@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typo-correction-limit 22
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 23
 // RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
@@ -190,4 +190,10 @@ func test_underscored_match() {
   let _eggs = 4 // expected-note {{'_eggs' declared here}}
   _ = _fggs + 1
   // expected-error@-1 {{use of unresolved identifier '_fggs'; did you mean '_eggs'?}}
+}
+
+// Don't show values before declaration.
+func testFwdRef() {
+  let _ = forward_refX + 1 // expected-error {{use of unresolved identifier 'forward_refX'}}
+  let forward_ref1 = 4
 }
