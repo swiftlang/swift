@@ -47,6 +47,7 @@ using namespace reflection;
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
+#include <dlfcn.h>
 #endif
 
 /// Produce a Demangler value suitable for resolving runtime type metadata
@@ -1283,6 +1284,63 @@ swift_stdlib_getTypeByMangledName(
 
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
+
+#if SWIFT_OBJC_INTEROP
+
+// Return the ObjC class for the given type name.
+// This gets installed as a callback from libobjc.
+
+// FIXME: delete this #if and dlsym once we don't
+// need to build with older libobjc headers
+#if !OBJC_GETCLASSHOOK_DEFINED
+using objc_hook_getClass =  BOOL(*)(const char * _Nonnull name,
+                                    Class _Nullable * _Nonnull outClass);
+#endif
+static objc_hook_getClass OldGetClassHook;
+
+static BOOL
+getObjCClassByMangledName(const char * _Nonnull typeName,
+                          Class _Nullable * _Nonnull outClass) {
+  auto metadata = swift_stdlib_getTypeByMangledName(typeName, strlen(typeName),
+                                                    /* no substitutions */
+                                                    nullptr, nullptr);
+  if (metadata) {
+    auto objcClass =
+      reinterpret_cast<Class>(
+        const_cast<ClassMetadata *>(
+          swift_getObjCClassFromMetadataConditional(metadata)));
+
+    if (objcClass) {
+      *outClass = objcClass;
+      return YES;
+    }
+  }
+
+  return OldGetClassHook(typeName, outClass);
+}
+
+__attribute__((constructor))
+static void installGetClassHook() {
+  // FIXME: delete this #if and dlsym once we don't
+  // need to build with older libobjc headers
+#if !OBJC_GETCLASSHOOK_DEFINED
+  using objc_hook_getClass =  BOOL(*)(const char * _Nonnull name,
+                                      Class _Nullable * _Nonnull outClass);
+  auto objc_setHook_getClass =
+    (void(*)(objc_hook_getClass _Nonnull,
+             objc_hook_getClass _Nullable * _Nonnull))
+    dlsym(RTLD_DEFAULT, "objc_setHook_getClass");
+#endif
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+  if (objc_setHook_getClass) {
+    objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook);
+  }
+#pragma clang diagnostic pop
+}
+
+#endif
 
 unsigned SubstGenericParametersFromMetadata::
 buildDescriptorPath(const ContextDescriptor *context) const {
