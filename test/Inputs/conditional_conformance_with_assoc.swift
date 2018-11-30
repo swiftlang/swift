@@ -234,13 +234,3 @@ extension X: Base where T: Base { }
 extension X: Sub where T: Sub, T.S == T {
    typealias S = X<T>
 }
-
-// Make sure we can recover the type metadata from X<T>.Type.
-// CHECK: define internal void @"$s34conditional_conformance_with_assoc1XVyxGAA3SubA2aERz1SQzRszlWI"(i8**, %swift.type* %"X<T>", i8**)
-// CHECK: entry:
-// CHECK:   [[XT_TYPE:%.*]] = bitcast %swift.type* %"X<T>" to %swift.type**
-// CHECK:   [[ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[XT_TYPE]], i64 2
-// CHECK:   [[T:%.*]] = load %swift.type*, %swift.type** [[ADDR]]
-// CHECK:   %T.Base = call swiftcc i8** @swift_getAssociatedConformanceWitness(i8** {{.*}}, %swift.type* %T, %swift.type* %T
-// CHECK:   ret void
-// CHECK: }

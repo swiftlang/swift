@@ -1346,29 +1346,18 @@ public:
         return;
       }
 
-      // If this isn't a conditional conformance, we can emit a mangled name.
-      // FIXME: Conditional conformances won't currently work because the
-      // witness tables for conditional requirements won't have been written
-      // into the private area yet.
-      if (SILConditionalConformances.empty()) {
-        if (isDependentConformance(astConf->getRootConformance(),
-                                   /*considerResilience=*/false))
-          RequiresSpecialization = true;
+      // Emit a mangled name.
+      if (isDependentConformance(astConf->getRootConformance(),
+                                 /*considerResilience=*/false))
+        RequiresSpecialization = true;
 
-        auto proto = Conformance.getProtocol();
-        CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
-        AssociatedConformance requirement(proto, selfType, baseProto);
-        llvm::Constant *witnessEntry =
-          getAssociatedConformanceWitness(requirement, ConcreteType,
-                                          ProtocolConformanceRef(astConf));
-        Table.addBitCast(witnessEntry, IGM.Int8PtrTy);
-        return;
-      }
-
-      // Otherwise, we'll need to derive it at instantiation time.
-      RequiresSpecialization = true;
-      SpecializedBaseConformances.push_back({Table.size(), &conf});
-      Table.addNullPointer(IGM.Int8PtrTy);
+      auto proto = Conformance.getProtocol();
+      CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
+      AssociatedConformance requirement(proto, selfType, baseProto);
+      llvm::Constant *witnessEntry =
+        getAssociatedConformanceWitness(requirement, ConcreteType,
+                                        ProtocolConformanceRef(astConf));
+      Table.addBitCast(witnessEntry, IGM.Int8PtrTy);
     }
 
     void addMethod(SILDeclRef requirement) {
