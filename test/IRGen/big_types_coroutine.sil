@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -loadable-address -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -loadable-address -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx
@@ -57,8 +57,8 @@ unwind:
 // CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_constant BigStruct
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
 //   TODO: this isn't very efficient
-// CHECK-NEXT:    [[T0:%.*]] = load [trivial] [[ADDR]] : $*BigStruct
-// CHECK-NEXT:    store [[T0]] to [trivial] [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    [[T0:%.*]] = load [[ADDR]] : $*BigStruct
+// CHECK-NEXT:    store [[T0]] to [[TEMP]] : $*BigStruct
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_constant BigStruct) -> ()
 // CHECK-NEXT:    apply [[USE]]([[TEMP]])
@@ -75,4 +75,25 @@ entry:
   end_apply %token
   %ret = tuple ()
   return %ret : $()
+}
+
+sil @yield_fun_ptr2 : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+
+// CHECK-LABEL: sil @yield_funptr : $
+// CHECK: (%1, %2) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@in_guaranteed BigStruct) -> ()>
+// CHECK: yield %1
+sil @yield_funptr : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()> {
+bb0:
+  %2 = function_ref @yield_fun_ptr2 : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+  (%3, %4) = begin_apply %2() : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+  yield %3 : $*Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>, resume bb1, unwind bb2
+
+bb1:
+  end_apply %4
+  %7 = tuple ()
+  return %7 : $()
+
+bb2:
+  abort_apply %4
+  unwind
 }
