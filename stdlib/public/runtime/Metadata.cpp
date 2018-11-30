@@ -4087,6 +4087,26 @@ WitnessTableCacheEntry::allocate(
     table[i] = pattern[i];
   }
 
+  // Copy any instantiation arguments that correspond to conditional
+  // requirements into the private area.
+  {
+    unsigned currentInstantiationArg = 0;
+    auto copyNextInstantiationArg = [&] {
+      assert(currentInstantiationArg < privateSizeInWords);
+      table[-1 - (int)currentInstantiationArg] =
+        const_cast<void *>(instantiationArgs[currentInstantiationArg]);
+      ++currentInstantiationArg;
+    };
+
+    for (const auto &conditionalRequirement
+          : conformance->getConditionalRequirements()) {
+      if (conditionalRequirement.Flags.hasKeyArgument())
+        copyNextInstantiationArg();
+      if (conditionalRequirement.Flags.hasExtraArgument())
+        copyNextInstantiationArg();
+    }
+  }
+
   // Fill in any default requirements.
   initializeResilientWitnessTable(conformance, genericTable, table);
   auto castTable = reinterpret_cast<WitnessTable*>(table);

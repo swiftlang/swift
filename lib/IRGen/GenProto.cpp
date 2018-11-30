@@ -1489,6 +1489,7 @@ public:
 
   private:
     void addConditionalConformances() {
+      assert(NextPrivateDataIndex == 0);
       for (auto conditional : SILConditionalConformances) {
         // We don't actually need to know anything about the specific
         // conformances here, just make sure we get right private data slots.
@@ -1788,10 +1789,9 @@ void WitnessTableBuilder::collectResilientWitnesses(
 }
 
 llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
-  // We need an instantiation function if the base conformance
+  // We need an instantiation function if any base conformance
   // is non-dependent.
-  if (SpecializedBaseConformances.empty() &&
-      ConditionalRequirementPrivateDataIndices.empty())
+  if (SpecializedBaseConformances.empty())
     return nullptr;
 
   assert(isa<NormalProtocolConformance>(Conformance) &&
@@ -1819,19 +1819,12 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
                                 IGF.IGM.WitnessTablePtrPtrTy),
       PointerAlignment);
 
-  /// Run through the conditional conformance witness tables, pulling them out
-  /// of the slice and putting them into the private data of the witness table.
+  // Register local type data for the conditional conformance witness tables.
   for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
     Address conditionalTablePtr =
         IGF.Builder.CreateConstArrayGEP(conditionalTables, idx, PointerSize);
-    Address slot = getAddressOfPrivateDataSlot(
-        IGF, wtable, ConditionalRequirementPrivateDataIndices[idx]);
     auto conditionalTable = IGF.Builder.CreateLoad(conditionalTablePtr);
-    auto coercedSlot =
-        IGF.Builder.CreateElementBitCast(slot, conditionalTable->getType());
-    IGF.Builder.CreateStore(conditionalTable, coercedSlot);
 
-    // Register local type data for the conditional conformance witness table.
     const auto &condConformance = SILConditionalConformances[idx];
     CanType reqTypeInContext =
       Conformance.getDeclContext()
