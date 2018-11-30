@@ -499,6 +499,9 @@ Var _StringGutsSlice.isNFCFastUTF8 has been removed
 Var _StringGutsSlice.range has been removed
 Var _StringGutsSlice.start has been removed
 
+Struct String.UTF16View has type witness type for Collection.Iterator changing from IndexingIterator<String.UTF16View> to String.UTF16View.Iterator
+Struct String.UTF16View has type witness type for Sequence.Iterator changing from IndexingIterator<String.UTF16View> to String.UTF16View.Iterator
+
 Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
 Func _sanityCheck(_:_:file:line:) has been removed
 Func _sanityCheckFailure(_:file:line:) has been removed
