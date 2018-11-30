@@ -265,6 +265,59 @@ extension String.UTF16View: BidirectionalCollection {
     }
   }
 }
+
+extension String.UTF16View {
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _guts: _StringGuts
+
+    @usableFromInline
+    internal var _position: Int = 0
+
+    @usableFromInline
+    internal var _end: Int
+
+    // If non-nil, return this value for `next()` (and set it to nil).
+    //
+    // This is set when visiting a non-BMP scalar: the leading surrogate is
+    // returned, this field is set with the value of the trailing surrogate, and
+    // `_position` is advanced to the start of the next scalar.
+    @usableFromInline
+    internal var _nextIsTrailingSurrogate: UInt16? = nil
+
+    @inlinable
+    internal init(_ guts: _StringGuts) {
+      self._end = guts.count
+      self._guts = guts
+    }
+
+    @inlinable
+    public mutating func next() -> UInt16? {
+      if _slowPath(_nextIsTrailingSurrogate != nil) {
+        let trailing = self._nextIsTrailingSurrogate._unsafelyUnwrappedUnchecked
+        self._nextIsTrailingSurrogate = nil
+        return trailing
+      }
+      guard _fastPath(_position < _end) else { return nil }
+
+      let (scalar, len) = _guts.errorCorrectedScalar(startingAt: _position)
+      _position &+= len
+
+      if _slowPath(scalar.value > UInt16.max) {
+        self._nextIsTrailingSurrogate = scalar.utf16[1]
+        return scalar.utf16[0]
+      }
+      return UInt16(truncatingIfNeeded: scalar.value)
+    }
+  }
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_guts)
+  }
+}
+
+
 extension String.UTF16View: CustomStringConvertible {
  @inlinable
  public var description: String {
