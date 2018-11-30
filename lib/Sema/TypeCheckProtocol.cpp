@@ -23,6 +23,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -2474,11 +2475,46 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
     if (auto nominal = DC->getSelfNominalTypeDecl()) {
-      // FIXME: Ideally this would use the protocol's access too---that is,
-      // a typealias added for an internal protocol shouldn't need to be
-      // public---but that can be problematic if the same type conforms to two
-      // protocols with different access levels.
-      aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
+      AccessScope requiredAccessScope = getRequiredAccessScope();
+
+      if (!TC.Context.isSwiftVersionAtLeast(5) &&
+          DC->getParentModule()->getResilienceStrategy() !=
+              ResilienceStrategy::Resilient) {
+        // HACK: In pre-Swift-5, these typealiases were synthesized with the
+        // same access level as the conforming type, which might be more
+        // visible than the associated type witness. Preserve that behavior
+        // when the underlying type has sufficient access, but only in
+        // non-resilient modules.
+        Optional<AccessScope> underlyingTypeScope =
+            TypeAccessScopeChecker::getAccessScope(type, DC,
+                                                   /*usableFromInline*/false);
+        assert(underlyingTypeScope.hasValue() &&
+               "the type is already invalid and we shouldn't have gotten here");
+
+        AccessScope nominalAccessScope = nominal->getFormalAccessScope(DC);
+        Optional<AccessScope> widestPossibleScope =
+            underlyingTypeScope->intersectWith(nominalAccessScope);
+        assert(widestPossibleScope.hasValue() &&
+               "we found the nominal and the type witness, didn't we?");
+        requiredAccessScope = widestPossibleScope.getValue();
+      }
+
+      // An associated type witness can never be less than fileprivate, since
+      // it must always be at least as visible as the enclosing type.
+      AccessLevel requiredAccess =
+          std::max(requiredAccessScope.accessLevelForDiagnostics(),
+                   AccessLevel::FilePrivate);
+
+      aliasDecl->setAccess(requiredAccess);
+      if (isUsableFromInlineRequired()) {
+        auto *attr = new (TC.Context) UsableFromInlineAttr(/*implicit=*/true);
+        aliasDecl->getAttrs().add(attr);
+      }
+
+      bool unused;
+      assert(TC.Context.hadError() ||
+             !checkWitnessAccess(assocType, aliasDecl, &unused));
+      (void)unused;
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);
