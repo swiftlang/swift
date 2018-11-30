@@ -123,6 +123,16 @@ AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
 }
 % end
 
+AnyHashableCasts.test("Casting to AnyHashable doesn't leak") {
+  do {
+    let tracked = LifetimeTracked(42)
+    let anyHashable = AnyHashable(tracked)
+    let anyObject = anyHashable as AnyObject
+    _ = anyObject as? AnyHashable
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
 #if _runtime(_ObjC)
 // A wrapper type around Int that bridges to NSNumber.
 struct IntWrapper1: _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
