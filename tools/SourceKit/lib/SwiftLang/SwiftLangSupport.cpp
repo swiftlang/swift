@@ -545,21 +545,24 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
     return UID_FOR(TypeAlias);
 
   case SymbolKind::Function:
+  case SymbolKind::StaticMethod:
     if (sym.SubKind == SymbolSubKind::SwiftPrefixOperator)
       return UID_FOR(FunctionPrefixOperator);
     if (sym.SubKind == SymbolSubKind::SwiftPostfixOperator)
       return UID_FOR(FunctionPostfixOperator);
     if (sym.SubKind == SymbolSubKind::SwiftInfixOperator)
       return UID_FOR(FunctionInfixOperator);
-    return UID_FOR(FunctionFree);
+    if (sym.Kind == SymbolKind::StaticMethod) {
+      return UID_FOR(MethodStatic);
+    } else {
+      return UID_FOR(FunctionFree);
+    }
   case SymbolKind::Variable:
     return UID_FOR(VarGlobal);
   case SymbolKind::InstanceMethod:
     return UID_FOR(MethodInstance);
   case SymbolKind::ClassMethod:
     return UID_FOR(MethodClass);
-  case SymbolKind::StaticMethod:
-    return UID_FOR(MethodStatic);
   case SymbolKind::InstanceProperty:
     if (sym.SubKind == SymbolSubKind::SwiftSubscript)
       return UID_FOR(Subscript);
