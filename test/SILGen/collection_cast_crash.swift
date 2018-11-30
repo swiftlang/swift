@@ -6,7 +6,7 @@
 class MyClass {}
 
 class KeyClass : Hashable {
-	var hashValue : Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 func ==(lhs: KeyClass, rhs: KeyClass) -> Bool { return true }
 

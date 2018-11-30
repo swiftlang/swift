@@ -178,6 +178,27 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   return lhs.rawValue != rhs.rawValue
 }
 
+// Ensure that any RawRepresentable types that conform to Hashable without
+// providing explicit implementations get hashing that's consistent with the ==
+// definition above. (Compiler-synthesized hashing is based on stored properties
+// rather than rawValue; the difference is subtle, but it can be fatal.)
+extension RawRepresentable where RawValue: Hashable, Self: Hashable {
+  @inlinable // trivial
+  public var hashValue: Int {
+    return rawValue.hashValue
+  }
+
+  @inlinable // trivial
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawValue)
+  }
+
+  @inlinable // trivial
+  public func _rawHashValue(seed: Int) -> Int {
+    return rawValue._rawHashValue(seed: seed)
+  }
+}
+
 /// A type that provides a collection of all of its values.
 ///
 /// Types that conform to the `CaseIterable` protocol are typically

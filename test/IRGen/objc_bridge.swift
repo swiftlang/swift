@@ -191,7 +191,7 @@ class Bas : NSObject {
 
   deinit { var x = 10 }
 
-  override var hashValue: Int { return 0 }
+  override var hash: Int { return 0 }
 
   @objc func acceptSet(_ set: Set<Bas>) { }
 }
