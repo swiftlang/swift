@@ -82,9 +82,6 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
                                     const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
-  if (Options.EnableMandatorySemanticARCOpts) {
-    P.addSemanticARCOpts();
-  }
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
 
@@ -95,6 +92,9 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+  if (Options.EnableMandatorySemanticARCOpts) {
+    P.addSemanticARCOpts();
+  }
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
