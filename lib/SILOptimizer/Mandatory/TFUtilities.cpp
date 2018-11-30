@@ -28,6 +28,7 @@
 #include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
+#include "tensorflow/c/c_api_experimental.h"
 #endif
 
 using namespace swift;
@@ -256,6 +257,27 @@ SILLocation tf::getUserSourceLocation(const SILInstruction *inst) {
   }
 
   return getUserSourceLocation(inst->getDebugLocation());
+}
+
+bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
+  StringRef mangledName = graphOp->getName().str();
+  // Is this a known stateful op used in partitioning?
+  if (mangledName.startswith("tfc.SendToHost") ||
+      mangledName.startswith("tfc.RecvFromHost")) {
+    return true;
+  }
+  // Is this a stateful TensorFlow op?
+  std::unique_ptr<TF_Status, decltype(&TF_DeleteStatus)> status(
+    TF_NewStatus(), TF_DeleteStatus);
+  std::string opName = mangledName.substr(0, mangledName.find(','));
+  int isStateful = TF_OpIsStateful(opName.c_str(), status.get());
+  TF_Code statusCode = TF_GetCode(status.get());
+  // FIXME(SR-9388): we should actually fail if statusCode != TF_OK. However,
+  // the current tests use arbitrary strings in graph_op. Therefore, we will
+  // just allow TF_NOT_FOUND for now to avoid changing too many tests.
+  assert((statusCode == TF_OK || statusCode == TF_NOT_FOUND) &&
+         "Error checking if a TensorFlow op is stateful.");
+  return (statusCode == TF_OK && isStateful);
 }
 
 /// Create a "Const" tensor operation containing the specified scalars, with
