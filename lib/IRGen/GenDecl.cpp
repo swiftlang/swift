@@ -3859,6 +3859,20 @@ bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion)
   return D->isResilient(getSwiftModule(), expansion);
 }
 
+/// Do we have to use resilient access patterns when working with this
+/// class?
+///
+/// For classes, this means that virtual method calls use dispatch thunks
+/// rather than accessing metadata members directly.
+bool IRGenModule::hasResilientMetadata(ClassDecl *D,
+                                       ResilienceExpansion expansion) {
+  if (expansion == ResilienceExpansion::Maximal &&
+      Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
+    return false;
+  }
+  return D->hasResilientMetadata(getSwiftModule(), expansion);
+}
+
 // The most general resilience expansion where the given declaration is visible.
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {

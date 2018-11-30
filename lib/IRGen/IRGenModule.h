@@ -784,6 +784,7 @@ public:
   clang::CodeGen::CodeGenModule &getClangCGM() const;
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
+  bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);

@@ -31,11 +31,11 @@ func testSymbols() {
 
 // CHECK-IR-LABEL: define{{.*}} void @"$s8typedefs18testVTableBuilding4usery3Lib4UserC_tF
 public func testVTableBuilding(user: User) {
-  // The important thing in this CHECK line is the "i64 30", which is the offset
+  // The important thing in this CHECK line is the "i64 28", which is the offset
   // for the vtable slot for 'lastMethod()'. If the layout here
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 26|i32 29}}
+  // CHECK-IR: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 

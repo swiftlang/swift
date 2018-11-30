@@ -928,6 +928,9 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
+  // FIXME: This is too narrow. Any class with resilient metadata should
+  // probably have this, at least for method overrides that don't add new
+  // vtable entries.
   if (classType->isResilient())
     return SubclassScope::Resilient;
 

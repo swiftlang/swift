@@ -24,8 +24,8 @@ class A {}
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
+// CHECK-32-SAME: i32 13,
+// CHECK-64-SAME: i32 10,
 //   V-table offset.
 // CHECK-32-SAME: i32 13,
 // CHECK-64-SAME: i32 10,

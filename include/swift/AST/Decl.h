@@ -3584,6 +3584,17 @@ public:
     return SourceRange(ClassLoc, getBraces().End);
   }
 
+  /// Determine whether the member area of this class's metadata (which consists
+  /// of field offsets and vtable entries) is to be considered opaque by clients.
+  ///
+  /// Note that even @_fixed_layout classes have resilient metadata if they are
+  /// in a resilient module.
+  bool hasResilientMetadata() const;
+
+  /// Determine whether this class has resilient metadata when accessed from the
+  /// given module and resilience expansion.
+  bool hasResilientMetadata(ModuleDecl *M, ResilienceExpansion expansion) const;
+
   /// Determine whether this class has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
