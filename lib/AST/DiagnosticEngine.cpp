@@ -206,6 +206,12 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     if (isspace(extractCharBefore(SM, charRange.getStart())))
       Str = Str.drop_front();
   }
+  
+  if (!Str.empty()) {
+      size_t dotPos = Str.find('.');
+      if (extractCharBefore(SM, charRange.getStart()) == '.' && dotPos != StringRef::npos)
+          charRange = toCharSourceRange(SM, SourceRange(R.Start.getAdvancedLoc(-1), R.End));
+  }
 
   Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, Str));
   return *this;
