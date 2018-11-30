@@ -21,12 +21,12 @@
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
-  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
+  var builder = _DictionaryBuilder<BaseKey, BaseValue>(count: source.count)
 
   for (k, v) in source {
-    result[k as! BaseKey] = (v as! BaseValue)
+    builder.add(key:k as! BaseKey, value: v as! BaseValue)
   }
-  return result
+  return builder.take()
 }
 
 /// Called by the casting machinery.
@@ -98,11 +98,11 @@ public func _dictionaryDownCastConditional<
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
 
-  var result = Dictionary<DerivedKey, DerivedValue>()
+  var builder = _DictionaryBuilder<DerivedKey, DerivedValue>(count: source.count)
   for (k, v) in source {
     guard let k1 = k as? DerivedKey, let v1 = v as? DerivedValue
     else { return nil }
-    result[k1] = v1
+    builder.add(key: k1, value: v1)
   }
-  return result
+  return builder.take()
 }
