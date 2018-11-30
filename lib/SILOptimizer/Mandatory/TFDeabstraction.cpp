@@ -2609,6 +2609,22 @@ void TFDeabstractionHelper::deabstractAcceleratorOnlyFunctions() {
   }
 }
 
+bool TFDeabstractionHelper::isSpecialNoInlineCallee(FullApplySite site,
+                                            const SILFunction &callee) {
+  // Check for array internals which we could be inlined, but prefer to
+  // leave in abstracted form for easier analysis.  For things like
+  // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
+  // construction calls beacuse we end up removing them anyway.
+  if (isArrayUninitialized(site.getInstruction()))
+    return true;
+
+  // Never inline _allocateUninitializedArray (even of Tensors).  It is the
+  // entrypoint used by SILGen to represent array allocations.
+  if (callee.getName().contains("_allocateUninitializedArray"))
+    return true;
+  return false;
+}
+
 namespace {
   struct TFDeabstractionPass : public SILModuleTransform {
     /// The entry point to the transformation, runs deabstraction on an entire

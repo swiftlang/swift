@@ -25,6 +25,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "../lib/SILOptimizer/Mandatory/TFDeabstraction.h"
+
 using namespace swift;
 
 STATISTIC(NumFunctionsInlined, "Number of functions inlined");
@@ -875,6 +878,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::PerformanceInline,
                        AI.getSubstitutionMap(), OpenedArchetypesTracker);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    if (swift::tf::TFDeabstractionHelper::isSpecialNoInlineCallee(AI, *Callee))
+      continue;
 
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.

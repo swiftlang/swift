@@ -19,6 +19,7 @@
 
 #include "TFConstExpr.h"
 #include "TFUtilities.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -39,6 +40,9 @@ public:
 
   /// Deabstract all tensorflow convention functions.
   void deabstractAcceleratorOnlyFunctions();
+
+  /// Returns true if this is special callee that should not be inlined for TF analysis.
+  static bool isSpecialNoInlineCallee(FullApplySite site, const SILFunction& callee);
 
 private:
   SILTransform &transform;
