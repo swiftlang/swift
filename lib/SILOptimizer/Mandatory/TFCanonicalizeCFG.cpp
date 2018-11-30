@@ -1228,6 +1228,11 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
                                            /*bitwidth*/ 1, stayInLoop));
     appendArguments(src->getTerminator(), newTgt, newArgs);
   }
+  // Split any critical edges that were introduced when patching edges.
+  for (const auto &edge : edgesToFix) {
+    SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
+    splitIfCriticalEdge(src, latchBlock, /*DI*/ nullptr, LI);
+  }
   return exitIndices;
 }
 
@@ -1546,13 +1551,13 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //      cloned predecessor whenever needed.
   for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
     auto predTermInst = dyn_cast<BranchInst>(pred->getTerminator());
-    assert(predTermInst && "Preheader of a loop has a non-branch terminator");
+    assert(predTermInst && "Found a critical edge to the latch block.");
     for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
       // Check if the argument of *cloned* predecessor needs patching.
       SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
       auto clonedPredTermInst = dyn_cast<BranchInst>(clonedPred->getTerminator());
       assert(clonedPredTermInst &&
-             "Preheader of a loop has a non-branch terminator");
+             "Found a critical edge to the latch block.");
       auto arg = clonedPredTermInst->getArg(argIndex);
       // Skip if this is not an argument of the `newHeader`.
       if (!isa<SILArgument>(arg) ||
