@@ -3,8 +3,8 @@
 class C : Hashable {
 	var x = 0
 
-  var hashValue: Int {
-    return x
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
   }
 }
 

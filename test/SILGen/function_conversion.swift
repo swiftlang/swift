@@ -605,10 +605,8 @@ func rdar35702810() {
 
 protocol X: Hashable {}
 class B: X {
-  var hashValue: Int { return 42 }
-  static func == (lhs: B, rhs: B) -> Bool {
-    return lhs.hashValue == rhs.hashValue
-  }
+  func hash(into hasher: inout Hasher) {}
+  static func == (lhs: B, rhs: B) -> Bool { return true }
 }
 
 func bar_arr<T: X>(type: T.Type, _ fn: ([T]?) -> Void) {}

@@ -10,7 +10,7 @@ struct S: Hashable {
   let y: String
   var z: C
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: S, y: S) -> Bool
 }
 class C: Hashable {
@@ -23,7 +23,7 @@ class C: Hashable {
     get set
   }
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: C, y: C) -> Bool
 }
 

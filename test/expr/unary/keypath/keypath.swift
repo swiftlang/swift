@@ -2,11 +2,11 @@
 
 struct Sub: Hashable {
   static func ==(_: Sub, _: Sub) -> Bool { return true }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 struct OptSub: Hashable {
   static func ==(_: OptSub, _: OptSub) -> Bool { return true }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 struct NonHashableSub {}
 
@@ -33,7 +33,7 @@ struct A: Hashable {
   subscript(sub: Sub) -> A { get { return self } set { } }
 
   static func ==(_: A, _: A) -> Bool { fatalError() }
-  var hashValue: Int { fatalError() }
+  func hash(into hasher: inout Hasher) { fatalError() }
 }
 struct B {}
 struct C<T> {
@@ -486,7 +486,7 @@ func testStaticKeyPathComponent() {
 
 class Bass: Hashable {
   static func ==(_: Bass, _: Bass) -> Bool { return false }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 
 class Treble: Bass { }

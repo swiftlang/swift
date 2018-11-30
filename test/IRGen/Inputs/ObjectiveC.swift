@@ -47,7 +47,7 @@ public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
 }
 
 extension NSObject : Hashable {
-  @objc open var hashValue: Int { return 0 }
+  public func hash(into hasher: inout Hasher) {}
 }
 public func ==(x: NSObject, y: NSObject) -> Bool { return x === y }
 

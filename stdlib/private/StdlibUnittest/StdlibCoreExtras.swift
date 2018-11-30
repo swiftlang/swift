@@ -110,14 +110,20 @@ public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
 }
 
 public struct TypeIdentifier : Hashable, Comparable {
+  public var value: Any.Type
+
   public init(_ value: Any.Type) {
     self.value = value
   }
 
   public var hashValue: Int { return objectID.hashValue }
-  public var value: Any.Type
-  
-  internal var objectID : ObjectIdentifier { return ObjectIdentifier(value) }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(objectID)
+  }
+
+  internal var objectID : ObjectIdentifier {
+    return ObjectIdentifier(value)
+  }
 }
 
 public func < (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {

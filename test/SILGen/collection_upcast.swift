@@ -21,7 +21,7 @@ class BridgedObjC : NSObject { }
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
 struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 
   func _bridgeToObjectiveC() -> BridgedObjC {
     return BridgedObjC()

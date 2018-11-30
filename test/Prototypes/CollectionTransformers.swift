@@ -206,8 +206,8 @@ import Dispatch
 public struct _stdlib_pthread_t : Equatable, Hashable {
   internal let _value: pthread_t
 
-  public var hashValue: Int {
-    return _value.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_value)
   }
 }
 
