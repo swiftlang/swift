@@ -11,13 +11,13 @@ There are two supported ways to build Swift on Windows, they are
 
 `clang-cl` is recommended over MSVC for building Swift on Windows.
 Although it is possible to build the compiler and the standard library with
-MSVC, and use those built products to compile a Swift program, it won't be
-possible to run the binary without seperately obtaining the Swift runtime. On
+MSVC and to use those built products to compile a Swift program, it won't be
+possible to run the binary without separately obtaining the Swift runtime. On
 the other hand, `clang-cl` is able to build the runtime, which makes it
 possible to build and run all the components required for Swift natively on
 Windows.
 
-clang should be 7.0 or newer.  Visual Studio 2017 is needed in all cases as
+clang should be 7.0 or newer. Visual Studio 2017 is needed in all cases as
 it provides some of the needed headers and libraries.
 
 ## `clang-cl`
