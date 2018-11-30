@@ -954,7 +954,7 @@ def create_argument_parser():
     option('--tensorflow-host-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so and libtensorflow_framework.so). '
+                '(libtensorflow.so). '
                 'Used for linking swiftc.')
     option('--tensorflow-host-include-dir', store_path,
            default=None,
@@ -963,7 +963,7 @@ def create_argument_parser():
     option('--tensorflow-target-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so and libtensorflow_framework.so). '
+                '(libtensorflow.so). '
                 'Used for linking Swift programs.')
     option('--tensorflow-target-include-dir', store_path,
            default=None,

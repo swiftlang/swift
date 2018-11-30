@@ -147,7 +147,7 @@ Below is more information about TensorFlow-related build arguments.
     * Default: None.
 * `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
     * Default value: None.
-* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
+* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so`).
     * Default value: None.
 * `tensorflow-swift-bindings`: A generated TensorFlow Swift bindings file (`RawOpsGenerated.swift`) obtained from [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings).
     * Default value: `tensorflow-swift-bindings/RawOpsGenerated.swift` if the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository is cloned. Otherwise, none.
