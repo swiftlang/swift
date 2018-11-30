@@ -1,6 +1,7 @@
 silopt_register_sources(
   ARCCodeMotion.cpp
   AccessEnforcementDom.cpp
+  AccessEnforcementGlobalHoisting.cpp
   AccessEnforcementOpts.cpp
   AccessEnforcementReleaseSinking.cpp 
   AccessEnforcementWMO.cpp

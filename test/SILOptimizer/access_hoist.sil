@@ -1,0 +1,55 @@
+// RUN: %target-sil-opt -access-enforcement-global -assume-parsing-unqualified-ownership-sil %s -enable-sil-verify-all | %FileCheck %s --check-prefix=TESTPASS
+// RUN: %target-sil-opt -access-enforcement-global -licm -assume-parsing-unqualified-ownership-sil %s -enable-sil-verify-all | %FileCheck %s --check-prefix=TESTALL
+//
+// Test the AccessEnforcementHoistGlobal pass in isolation.
+// This ensures that no upstream passes have removed SIL-level access markers
+// that are required to ensure the pass is not overly optimistic.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct X {
+  @_hasStorage var i: Int64 { get set }
+  init(i: Int64)
+  init()
+}
+
+var globalX: X
+
+sil_global hidden @globalX : $X
+
+sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+
+// TESTPASS-LABEL: sil @testHoistGlobal : $@convention(thin) () -> () {
+// TESTPASS: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// TESTPASS-NEXT: br bb1
+// TESTPASS-LABEL: } // end sil function 'testHoistGlobal'
+
+
+// TESTALL-LABEL: sil @testHoistGlobal : $@convention(thin) () -> () {
+// TESTALL: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// TESTALL-NEXT: integer_literal
+// TESTALL-NEXT: begin_access
+// TESTALL-NEXT: br bb1
+// TESTALL: bb2
+// TESTALL: end_access
+// TESTALL-LABEL: } // end sil function 'testHoistGlobal'
+sil @testHoistGlobal : $@convention(thin) () -> () {
+bb0:
+  br bb1
+  
+bb1:
+  %global = global_addr @globalX: $*X
+  %4 = begin_access [read] [dynamic] %global : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+
+bb2:
+  %7 = tuple ()
+  return %7 : $()
+}
