@@ -960,9 +960,6 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
 
-  if (observer)
-    observer->performedSemanticAnalysis(Instance);
-
   if (Stats)
     countStatsPostSema(*Stats, Instance);
 
@@ -1051,10 +1048,6 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
   } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
     if (runSILDiagnosticPasses(*SM))
       return true;
-
-    if (observer) {
-      observer->performedSILDiagnostics(*SM);
-    }
   } else {
     // Even if we are not supposed to run the diagnostic passes, we still need
     // to run the ownership evaluator.
@@ -1154,9 +1147,6 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
 
-  if (observer)
-    observer->aboutToRunImmediately(Instance);
-
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
@@ -1243,9 +1233,6 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  if (observer)
-    observer->performedSILGeneration(*SM);
-
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1300,9 +1287,6 @@ static bool performCompileStepsPostSILGen(
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
   performSILOptimizations(Invocation, SM.get());
-
-  if (observer)
-    observer->performedSILOptimization(*SM);
 
   if (Stats)
     countStatsPostSILOpt(*Stats, *SM);
@@ -1873,8 +1857,3 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
 void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
-void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
-void FrontendObserver::performedSILGeneration(SILModule &module) {}
-void FrontendObserver::performedSILDiagnostics(SILModule &module) {}
-void FrontendObserver::performedSILOptimization(SILModule &module) {}
-void FrontendObserver::aboutToRunImmediately(CompilerInstance &instance) {}
