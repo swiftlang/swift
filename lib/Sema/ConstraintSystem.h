@@ -2984,8 +2984,7 @@ private:
     }
   };
 
-  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
-                                    bool *isNilLiteral = nullptr);
+  Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type);
   Optional<PotentialBindings> determineBestBindings();
   Optional<ConstraintSystem::PotentialBinding>
   getPotentialBindingForRelationalConstraint(

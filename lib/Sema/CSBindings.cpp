@@ -206,6 +206,25 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
+static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
+                                    ConstraintSystem &CS) {
+  // Look for a literal-conformance constraint on the type variable.
+  llvm::SetVector<Constraint *> constraints;
+  CS.getConstraintGraph().gatherConstraints(
+      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *constraint) -> bool {
+        return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+               constraint->getProtocol()->isSpecificProtocol(
+                   KnownProtocolKind::ExpressibleByNilLiteral);
+      });
+
+  for (auto constraint : constraints)
+    if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
+      return true;
+
+  return false;
+}
+
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
@@ -291,22 +310,27 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
   // Check whether we can perform this binding.
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-  bool isNilLiteral = false;
-  bool *isNilLiteralPtr = nullptr;
-  if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
-    isNilLiteralPtr = &isNilLiteral;
-  if (auto boundType = checkTypeOfBinding(typeVar, type, isNilLiteralPtr)) {
+  if (auto boundType = checkTypeOfBinding(typeVar, type)) {
     type = *boundType;
     if (type->hasTypeVariable())
       result.InvolvesTypeVariables = true;
   } else {
-    // If the bound is a 'nil' literal type, add optional supertype bindings.
-    if (isNilLiteral) {
-      addOptionalSupertypeBindings = true;
+    auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
+
+    if (!bindingTypeVar)
       return None;
-    }
 
     result.InvolvesTypeVariables = true;
+
+    // If we've already set addOptionalSupertypeBindings, or we aren't
+    // allowing supertype bindings, we're done.
+    if (addOptionalSupertypeBindings || kind != AllowedBindingKind::Supertypes)
+      return None;
+
+    // If the bound is a 'nil' literal type, add optional supertype bindings.
+    if (hasNilLiteralConstraint(bindingTypeVar, *this))
+      addOptionalSupertypeBindings = true;
+
     return None;
   }
 
@@ -722,6 +746,46 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   }
 
   return result;
+}
+
+/// \brief Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns the type to bind to, if the binding is okay.
+Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
+                                                    Type type) {
+  // Simplify the type.
+  type = simplifyType(type);
+
+  // If the type references the type variable, don't permit the binding.
+  SmallVector<TypeVariableType *, 4> referencedTypeVars;
+  type->getTypeVariables(referencedTypeVars);
+  if (count(referencedTypeVars, typeVar))
+    return None;
+
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  if (!typeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return None;
+    }
+  }
+
+  // If the type is a type variable itself, don't permit the binding.
+  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>())
+    return None;
+
+  // Don't bind to a dependent member type, even if it's currently
+  // wrapped in any number of optionals, because binding producer
+  // might unwrap and try to attempt it directly later.
+  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    return None;
+
+  // Okay, allow the binding (with the simplified type).
+  return type;
 }
 
 // Given a possibly-Optional type, return the direct superclass of the
