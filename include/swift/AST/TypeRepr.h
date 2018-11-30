@@ -1010,6 +1010,45 @@ public:
   TypeRepr *getFieldType() const { return FieldTypeAndMutable.getPointer(); }
   bool isMutable() const { return FieldTypeAndMutable.getInt(); }
 };
+  
+/// TypeRepr for opaque return types.
+///
+/// This can occur in the return position of a function declaration, or the
+/// top-level type of a property, to specify that the concrete return type
+/// should be abstracted from callers, given a set of generic constraints that
+/// the concrete return type satisfies:
+///
+/// func foo() -> opaque Collection { return [1,2,3] }
+/// var bar: opaque SignedInteger = 1
+///
+/// It is currently illegal for this to appear in any other position.
+class OpaqueReturnTypeRepr : public TypeRepr {
+  /// The type repr for the immediate constraints on the opaque type.
+  /// In valid code this must resolve to a class, protocol, or composition type.
+  TypeRepr *Constraint;
+  SourceLoc OpaqueLoc;
+  
+public:
+  OpaqueReturnTypeRepr(SourceLoc opaqueLoc, TypeRepr *constraint)
+    : TypeRepr(TypeReprKind::OpaqueReturn), Constraint(constraint),
+      OpaqueLoc(opaqueLoc)
+  {}
+  
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getOpaqueLoc() const { return OpaqueLoc; }
+  
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::OpaqueReturn;
+  }
+  static bool classof(const OpaqueReturnTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return OpaqueLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return OpaqueLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
 
 /// SIL-only TypeRepr for box types.
 ///
@@ -1108,6 +1147,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
+  case TypeReprKind::OpaqueReturn:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
