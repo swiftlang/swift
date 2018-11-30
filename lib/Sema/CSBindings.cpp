@@ -206,6 +206,25 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
+static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
+                                    ConstraintSystem &CS) {
+  // Look for a literal-conformance constraint on the type variable.
+  llvm::SetVector<Constraint *> constraints;
+  CS.getConstraintGraph().gatherConstraints(
+      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *constraint) -> bool {
+        return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+               constraint->getProtocol()->isSpecificProtocol(
+                   KnownProtocolKind::ExpressibleByNilLiteral);
+      });
+
+  for (auto constraint : constraints)
+    if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
+      return true;
+
+  return false;
+}
+
 Optional<ConstraintSystem::PotentialBinding>
 ConstraintSystem::getPotentialBindingForRelationalConstraint(
     PotentialBindings &result, Constraint *constraint,
@@ -293,13 +312,22 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // FIXME: this has a super-inefficient extraneous simplifyType() in it.
   bool isNilLiteral = false;
   bool *isNilLiteralPtr = nullptr;
-  if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
-    isNilLiteralPtr = &isNilLiteral;
-  if (auto boundType = checkTypeOfBinding(typeVar, type, isNilLiteralPtr)) {
+  if (auto boundType = checkTypeOfBinding(typeVar, type)) {
     type = *boundType;
     if (type->hasTypeVariable())
       result.InvolvesTypeVariables = true;
   } else {
+    if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
+      isNilLiteralPtr = &isNilLiteral;
+
+    if (isNilLiteralPtr) {
+      if (auto *bindingTypeVar =
+              type->getRValueType()->getAs<TypeVariableType>())
+        *isNilLiteralPtr = hasNilLiteralConstraint(bindingTypeVar, *this);
+      else
+        *isNilLiteralPtr = false;
+    }
+
     // If the bound is a 'nil' literal type, add optional supertype bindings.
     if (isNilLiteral) {
       addOptionalSupertypeBindings = true;
@@ -724,39 +752,12 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   return result;
 }
 
-static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
-                                    ConstraintSystem &CS) {
-  // Look for a literal-conformance constraint on the type variable.
-  llvm::SetVector<Constraint *> constraints;
-  CS.getConstraintGraph().gatherConstraints(
-      typeVar, constraints,
-      ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *constraint) -> bool {
-        return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-          constraint->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral);
-      });
-
-  for (auto constraint : constraints)
-    if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
-      return true;
-
-  return false;
-}
-
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.
 ///
 /// \returns the type to bind to, if the binding is okay.
 Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
-                                                    Type type,
-                                                    bool *isNilLiteral) {
-  if (isNilLiteral)
-    *isNilLiteral = false;
-
-  if (!type)
-    return None;
-
+                                                    Type type) {
   // Simplify the type.
   type = simplifyType(type);
 
@@ -778,12 +779,8 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
   }
 
   // If the type is a type variable itself, don't permit the binding.
-  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
-    if (isNilLiteral)
-      *isNilLiteral = hasNilLiteralConstraint(bindingTypeVar, *this);
-
+  if (auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>())
     return None;
-  }
 
   // Don't bind to a dependent member type, even if it's currently
   // wrapped in any number of optionals, because binding producer
