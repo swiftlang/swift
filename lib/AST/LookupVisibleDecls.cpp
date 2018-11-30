@@ -942,11 +942,10 @@ static void lookupVisibleMemberDecls(
     Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }
 
-void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                               const DeclContext *DC,
-                               LazyResolver *TypeResolver,
-                               bool IncludeTopLevel,
-                               SourceLoc Loc) {
+static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
+                                   const DeclContext *DC,
+                                   LazyResolver *TypeResolver,
+                                   bool IncludeTopLevel, SourceLoc Loc) {
   const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
   auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
@@ -1065,6 +1064,65 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     if (auto SF = dyn_cast<SourceFile>(DC))
       SF->cacheVisibleDecls(std::move(moduleResults));
   }
+}
+
+void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
+                               const DeclContext *DC,
+                               LazyResolver *TypeResolver,
+                               bool IncludeTopLevel,
+                               SourceLoc Loc) {
+  if (Loc.isInvalid()) {
+    lookupVisibleDeclsImpl(Consumer, DC, TypeResolver, IncludeTopLevel, Loc);
+    return;
+  }
+
+  // Filtering out unusable values.
+  class LocalConsumer : public VisibleDeclConsumer {
+    const SourceManager &SM;
+    SourceLoc Loc;
+    VisibleDeclConsumer &Consumer;
+
+    bool isUsableValue(ValueDecl *VD, DeclVisibilityKind Reason) {
+
+      // Check "use within its own initial value" case.
+      if (auto *varD = dyn_cast<VarDecl>(VD))
+        if (auto *PBD = varD->getParentPatternBinding())
+          if (!PBD->isImplicit() &&
+              SM.rangeContainsTokenLoc(PBD->getSourceRange(), Loc))
+            return false;
+
+      switch (Reason) {
+      case DeclVisibilityKind::LocalVariable:
+        // Use of 'TypeDecl's before declaration is allowed.
+        if (isa<TypeDecl>(VD))
+          return true;
+
+        return SM.isBeforeInBuffer(VD->getLoc(), Loc);
+
+      case DeclVisibilityKind::VisibleAtTopLevel:
+        // TODO: Implement forward reference rule for script mode? Currently,
+        // it's not needed because the rest of the file hasn't been parsed.
+        // See: https://bugs.swift.org/browse/SR-284 for the rule.
+        return true;
+
+      default:
+        // Other visibility kind are always usable.
+        return true;
+      }
+    }
+
+  public:
+    LocalConsumer(const SourceManager &SM, SourceLoc Loc,
+                  VisibleDeclConsumer &Consumer)
+        : SM(SM), Loc(Loc), Consumer(Consumer) {}
+
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+      if (isUsableValue(VD, Reason))
+        Consumer.foundDecl(VD, Reason);
+    }
+  } LocalConsumer(DC->getASTContext().SourceMgr, Loc, Consumer);
+
+  lookupVisibleDeclsImpl(LocalConsumer, DC, TypeResolver, IncludeTopLevel, Loc);
 }
 
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
