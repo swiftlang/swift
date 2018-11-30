@@ -12,9 +12,33 @@
 
 module WinSDK [system] [extern_c] {
   module core {
+    // api-ms-win-core-errhandling-l1-1-0.dll
+    module errhandling {
+      header "errhandlingapi.h"
+      export *
+    }
+
+    // api-ms-win-core-file-l1-1-0.dll
+    module file {
+      header "fileapi.h"
+      export *
+    }
+
     // api-ms-win-core-handle-l1-1-0.dll
     module handle {
       header "handleapi.h"
+      export *
+    }
+
+    // api-ms-win-core-libloader-l1-1-0.dll
+    module libloader {
+      header "libloaderapi.h"
+      export *
+    }
+
+    // api-ms-win-core-namedpipe-l1-1-2-0.dll
+    module namedpipe {
+      header "namedpipeapi.h"
       export *
     }
 
