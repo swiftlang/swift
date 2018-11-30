@@ -38,6 +38,16 @@ class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
+enum class Bridgeability : unsigned {
+  /// This context does not permit bridging at all.  For example, the
+  /// target of a C pointer.
+  None,
+
+  /// This context permits all kinds of bridging.  For example, the
+  /// imported result of a method declaration.
+  Full
+};
+
 /// Records dependencies on files outside of the current module;
 /// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
