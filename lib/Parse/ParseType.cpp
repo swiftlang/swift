@@ -37,8 +37,9 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        VarDecl::Specifier specifier,
                                        SourceLoc specifierLoc) {
   // Apply those attributes that do apply.
-  if (!attrs.empty())
+  if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
+  }
 
   // Apply 'inout' or '__shared' or '__owned'
   if (specifierLoc.isValid()) {
@@ -357,8 +358,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition '->' type
-///     type-composition 'throws' '->' type
+///     type-composition 'throws'? '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                          bool HandleCodeCompletion,
@@ -670,19 +670,40 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
 /// parseTypeSimpleOrComposition
 ///
 ///   type-composition:
-///     type-simple
+///     '__opaque'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                      bool HandleCodeCompletion) {
+  // Check for the opaque modifier.
+  // This is only semantically allowed in certain contexts, but we parse it
+  // generally for diagnostics and recovery.
+  SourceLoc opaqueLoc;
+  if (Context.LangOpts.EnableOpaqueResultTypes
+      && Tok.is(tok::identifier)
+      && Tok.getRawText() == "__opaque") {
+    opaqueLoc = consumeToken();
+  }
+  
+  auto applyOpaque = [&](TypeRepr *type) -> TypeRepr* {
+    if (opaqueLoc.isValid()) {
+      type = new (Context) OpaqueReturnTypeRepr(opaqueLoc, type);
+    }
+    return type;
+  };
+  
   SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID,
                                                      HandleCodeCompletion);
   if (FirstType.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
-  if (FirstType.isNull() || !Tok.isContextualPunctuator("&"))
+  if (FirstType.isNull())
     return FirstType;
+  if (!Tok.isContextualPunctuator("&")) {
+    return makeParserResult(ParserStatus(FirstType),
+                            applyOpaque(FirstType.get()));
+  }
 
   SmallVector<TypeRepr *, 4> Types;
   ParserStatus Status(FirstType);
@@ -719,6 +740,19 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     } else {
       consumeToken(); // consume '&'
     }
+    
+    // Diagnose invalid `__opaque` after an ampersand.
+    if (Context.LangOpts.EnableOpaqueResultTypes
+        && Tok.is(tok::identifier)
+        && Tok.getRawText() == "__opaque") {
+      auto badLoc = consumeToken();
+      
+      // TODO: Fixit to move to beginning of composition.
+      diagnose(badLoc, diag::opaque_mid_composition);
+      
+      if (opaqueLoc.isInvalid())
+        opaqueLoc = badLoc;
+    }
 
     // Parse next type.
     ParserResult<TypeRepr> ty =
@@ -738,8 +772,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
   
-  return makeParserResult(Status, CompositionTypeRepr::create(
-    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc}));
+  return makeParserResult(Status, applyOpaque(CompositionTypeRepr::create(
+    Context, Types, FirstTypeLoc, {FirstAmpersandLoc, PreviousLoc})));
 }
 
 ParserResult<CompositionTypeRepr>
