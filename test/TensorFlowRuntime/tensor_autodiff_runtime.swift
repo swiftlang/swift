@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 //
 // TODO(SR-9110): Make this pass in dynamic compilation mode.
 // %target-run-dynamic-compilation-swift

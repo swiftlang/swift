@@ -2843,15 +2843,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   }
 
   // Set the device.
-  opDevice = deviceInfo->handleDevicePlacement(opInfo.getOperationName(),
-                                               opDevice, i->getAttributes());
-  assert(!opDevice.empty());
-  if (opDevice != TF_ALL_DEVICES) {
-    auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
-    auto device = IGM.getAddrOfGlobalString(opDevice);
-    Builder.CreateCall(setDeviceFn, {op, device, status});
-    checkOk(status);
-  }
+  Builder.CreateCall(IGM.getTFC_OpSetDeviceFromScopeFn(), {op, status});
+  checkOk(status);
 
   // If we have any opaque TensorGroup results, then we need to do extra runtime
   // work to determine the number of TensorFlow outputs and to allocate space

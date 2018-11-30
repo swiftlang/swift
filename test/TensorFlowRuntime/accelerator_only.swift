@@ -1,4 +1,4 @@
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-swift-frontend -emit-sil -O %s -verify | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
