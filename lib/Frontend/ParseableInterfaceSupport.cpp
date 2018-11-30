@@ -367,7 +367,7 @@ static bool buildSwiftModuleFromSwiftInterface(
   return !RunSuccess || SubError;
 }
 
-static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
+static bool serializedASTLooksValidOrCannotBeRead(llvm::vfs::FileSystem &FS,
                                                   StringRef ModPath) {
   auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
                                     /*RequiresNullTerminator=*/false);
