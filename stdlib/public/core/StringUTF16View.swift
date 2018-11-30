@@ -117,7 +117,8 @@ extension String.UTF16View {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    // TODO: Ensure start/end are not sub-scalr UTF-8 transcoded indices
+    _internalInvariant(
+      startIndex.transcodedOffset == 0 && endIndex.transcodedOffset == 0)
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -143,9 +144,8 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
-    // TODO(String performance) known-ASCII fast path
-
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: i) }
+    if _guts.isASCII { return i.nextEncoded }
 
     // For a BMP scalar (1-3 UTF-8 code units), advance past it. For a non-BMP
     // scalar, use a transcoded offset first.
@@ -159,9 +159,8 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     precondition(!i.isZeroPosition)
-    // TODO(String performance) known-ASCII fast path
-
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: i) }
+    if _guts.isASCII { return i.priorEncoded }
 
     if i.transcodedOffset != 0 {
       _internalInvariant(i.transcodedOffset == 1)
@@ -181,8 +180,6 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
-    // TODO(String performance) known-ASCII fast path
-    
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
@@ -195,7 +192,6 @@ extension String.UTF16View: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
-    // TODO(String performance) known-ASCII fast path
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
@@ -217,7 +213,6 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
-    // TODO(String performance) known-ASCII fast path
     if _slowPath(_guts.isForeign) {
       return _foreignDistance(from: start, to: end)
     }
@@ -250,7 +245,6 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable
   public subscript(i: Index) -> UTF16.CodeUnit {
     @inline(__always) get {
-      // TODO(String performance) known-ASCII fast path
       String(_guts)._boundsCheck(i)
 
       if _fastPath(_guts.isFastUTF8) {
@@ -267,16 +261,16 @@ extension String.UTF16View: BidirectionalCollection {
   }
 }
 extension String.UTF16View: CustomStringConvertible {
- @inlinable
- public var description: String {
-   @inline(__always) get { return String(_guts) }
- }
+  @inlinable
+  public var description: String {
+    @inline(__always) get { return String(_guts) }
+  }
 }
 
 extension String.UTF16View: CustomDebugStringConvertible {
- public var debugDescription: String {
-   return "StringUTF16(\(self.description.debugDescription))"
- }
+  public var debugDescription: String {
+    return "StringUTF16(\(self.description.debugDescription))"
+  }
 }
 
 extension String {
@@ -462,8 +456,11 @@ extension String.UTF16View {
     // Trivial and common: start
     if idx == startIndex { return 0 }
 
-    if _guts.isASCII { return idx.encodedOffset }
-    
+    if _guts.isASCII {
+      _internalInvariant(idx.transcodedOffset == 0)
+      return idx.encodedOffset
+    }
+
     if idx.encodedOffset < _shortHeuristic || !_guts.hasBreadcrumbs {
       return _distance(from: startIndex, to: idx)
     }
@@ -483,7 +480,9 @@ extension String.UTF16View {
   internal func _nativeGetIndex(for offset: Int) -> Index {
     // Trivial and common: start
     if offset == 0 { return startIndex }
-    
+
+    if _guts.isASCII { return Index(encodedOffset: offset) }
+
     if offset < _shortHeuristic || !_guts.hasBreadcrumbs {
       return _index(startIndex, offsetBy: offset)
     }
@@ -542,11 +541,25 @@ extension String {
 
     if _slowPath(range.isEmpty) { return }
 
+    let isASCII = _guts.isASCII
     return _guts.withFastUTF8 { utf8 in
       var writeIdx = 0
       let writeEnd = buffer.count
       var readIdx = range.lowerBound.encodedOffset
       let readEnd = range.upperBound.encodedOffset
+
+      if isASCII {
+        _internalInvariant(range.lowerBound.transcodedOffset == 0)
+        _internalInvariant(range.upperBound.transcodedOffset == 0)
+        while readIdx < readEnd {
+          _internalInvariant(utf8[readIdx] < 0x80)
+          buffer[_unchecked: writeIdx] = UInt16(
+            truncatingIfNeeded: utf8[_unchecked: readIdx])
+          readIdx &+= 1
+          writeIdx &+= 1
+        }
+        return
+      }
 
       // Handle mid-transcoded-scalar initial index
       if _slowPath(range.lowerBound.transcodedOffset != 0) {
