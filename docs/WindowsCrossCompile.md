@@ -4,6 +4,12 @@ This document describes how to cross compile Swift for Windows on a non-Windows
 host. For more context on the status of Swift on Windows in general, see
 [Getting Started with Swift on Windows](./Windows.md)
 
+## 1. Clone
+
+## Get WinSDK
+
+## ICU (same as windoge build)
+
 ## 1. Set up Visual Studio environment variables
 Building for Windows requires that the Visual Studio environment variables are
 setup similar to the values on Windows. Currently, the runtime has been tested
@@ -11,17 +17,35 @@ to build against the Windows 10 SDK at revision 10.10.586.
 
 ```bash
 # Visual Studio 2015 does not have VCToolsInstallDir, use VCINSTALLDIR's value
-export UCRTVersion=10.0.10586.0
+export UCRTVersion=10.0.10586.0 // TODO(asb): the versions used for the next 3 lines
 export UniversalCRTSdkDir=".../Windows Kits/10"
 export VCToolsInstallDir=".../Microsoft Visual Studio/2017/Community"
 ```
 
-## 2. Set up the `visualc` and `ucrt` modules
-The `ucrt.modulemap` located at
-`swift/stdlib/public/Platform/ucrt.modulemap` needs to be copied into
-`${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`. The
-`visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap`
-needs to be copied into `${VCToolsInstallDir}/include` as `module.modulemap`
+
+## 2. Get ICU
+Find out where to download source to compile this binary: https://www.npcglib.org/~stathis/blog/precompiled-icu/
+
+## 2. Set up the `ucrt`, `visualc`, and `WinSDK` modules
+
+download the WinSDK from https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk (get the ISO)
+
+```
+mkdir -p ${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt
+ln -s /home/ubuntu/swift-source/swift/stdlib/public/Platform/ucrt.modulemap ${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt/module.modulemap
+
+mkdir -p ${VCToolsInstallDir}/include
+ln -s /home/ubuntu/swift-source/swift/stdlib/public/Platform/visualc.modulemap ${VCToolsInstallDir}/include/module.modulemap
+
+mkdir -p ${UniversalCRTSdkDir}/Include/10.0.107663/um
+ln -s /home/ubuntu/swift-source/swift/stdlib/public/Platform/winsdk.modulemap ${UniversalCRTSdkDir}/Include/10.0.107663/um/module.modulemap
+```
+
+- Set up the `ucrt`, `visualc`, and `WinSDK` modules by copying  `ucrt.modulemap` located at
+  `swift/stdlib/public/Platform/ucrt.modulemap` into
+  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as 
+  `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/10.0.107663/um`
+
 
 ## 3. Configure the runtime to be built with the just built `clang`
 Ensure that we use the tools from the just built LLVM and `clang` tools to 
