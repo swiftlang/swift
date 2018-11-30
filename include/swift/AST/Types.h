@@ -3115,9 +3115,16 @@ public:
     return getExtInfo().getDifferentiability();
   }
 
+  /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
+  /// of the corresponding autodiff associated function.
+  ///
+  /// Pass `selfUncurried = true` when the function type is for a method whose
+  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       const AutoDiffParameterIndices &indices, unsigned differentiationOrder,
-      AutoDiffAssociatedFunctionKind kind);
+      AutoDiffAssociatedFunctionKind kind,
+      LookupConformanceFn lookupConformance, bool selfUncurried = false);
+
   AnyFunctionType *
   getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
                                  const TupleType *primalResultTy);
@@ -4155,7 +4162,8 @@ public:
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
       const SmallBitVector &parameterIndices, unsigned differentiationOrder,
-      AutoDiffAssociatedFunctionKind kind, SILModule &module);
+      AutoDiffAssociatedFunctionKind kind, SILModule &module,
+      LookupConformanceFn lookupConformance);
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for

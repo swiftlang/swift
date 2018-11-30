@@ -176,14 +176,26 @@ void AutoDiffParameterIndices::setSelfParameter() {
 ///   if "Self" and "C" are in the set,
 ///   ==> pushes {Self, C} to `paramTypes`.
 ///
+/// Pass `selfUncurried = true` when the function type is for a method whose
+/// self parameter has been uncurried as in (A, B, C, Self) -> R.
+///
 void AutoDiffParameterIndices::getSubsetParameterTypes(
-    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes) const {
-  AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
-  if (isMethodFlag && indices[indices.size() - 1])
-    paramTypes.push_back(functionType->getParams()[0].getPlainType());
-  for (unsigned paramIndex : range(unwrapped->getNumParams()))
-    if (indices[paramIndex])
-      paramTypes.push_back(unwrapped->getParams()[paramIndex].getPlainType());
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes,
+    bool selfUncurried) const {
+  if (selfUncurried && isMethodFlag) {
+    if (isMethodFlag && indices[indices.size() - 1])
+      paramTypes.push_back(functionType->getParams()[functionType->getNumParams() - 1].getPlainType());
+    for (unsigned paramIndex : range(functionType->getNumParams() - 1))
+      if (indices[paramIndex])
+        paramTypes.push_back(functionType->getParams()[paramIndex].getPlainType());
+  } else {
+    AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
+    if (isMethodFlag && indices[indices.size() - 1])
+      paramTypes.push_back(functionType->getParams()[0].getPlainType());
+    for (unsigned paramIndex : range(unwrapped->getNumParams()))
+      if (indices[paramIndex])
+        paramTypes.push_back(unwrapped->getParams()[paramIndex].getPlainType());
+  }
 }
 
 static unsigned countNumFlattenedElementTypes(Type type) {
@@ -214,10 +226,16 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 ///   ==> returns 1110
 ///   (because the lowered SIL type is (A, B, C, D) -> R)
 ///
+/// Pass `selfUncurried = true` when the function type is a for method whose
+/// self parameter has been uncurried as in (A, B, C, Self) -> R.
+///
 llvm::SmallBitVector
-AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
+AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
+                                     bool selfUncurried) const {
   // Calculate the lowered sizes of all the parameters.
-  AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
+  AnyFunctionType *unwrapped = selfUncurried
+      ? functionType
+      : unwrapSelfParameter(functionType, isMethodFlag);
   SmallVector<unsigned, 8> paramLoweredSizes;
   unsigned totalLoweredSize = 0;
   auto addLoweredParamInfo = [&](Type type) {
@@ -227,7 +245,7 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
   };
   for (auto &param : unwrapped->getParams())
     addLoweredParamInfo(param.getPlainType());
-  if (isMethodFlag)
+  if (isMethodFlag && !selfUncurried)
     addLoweredParamInfo(functionType->getParams()[0].getPlainType());
 
   // Construct the result by setting each range of bits that corresponds to each

@@ -2514,7 +2514,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (attr->getJVP()) {
     AnyFunctionType *expectedJVPFnTy =
         originalFnTy->getAutoDiffAssociatedFunctionType(
-            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::JVP);
+            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::JVP,
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -2539,7 +2540,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (attr->getVJP()) {
     AnyFunctionType *expectedVJPFnTy =
         originalFnTy->getAutoDiffAssociatedFunctionType(
-            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::VJP);
+            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::VJP,
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);

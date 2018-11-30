@@ -171,8 +171,12 @@ public:
   ///   if "Self" and "C" are in the set,
   ///   ==> pushes {Self, C} to `paramTypes`.
   ///
+  /// Pass `selfUncurried = true` when the function type is for a method whose
+  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
+  ///
   void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes) const;
+                               SmallVectorImpl<Type> &paramTypes,
+                               bool selfUncurried = false) const;
 
   /// Returns a bitvector for the SILFunction parameters corresponding to the
   /// parameters in this set. In particular, this explodes tuples and puts the
@@ -193,7 +197,11 @@ public:
   ///   ==> returns 1110
   ///   (because the lowered SIL type is (A, B, C, D) -> R)
   ///
-  llvm::SmallBitVector getLowered(AnyFunctionType *functionType) const;
+  /// Pass `selfUncurried = true` when the function type is for a method whose
+  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
+  ///
+  llvm::SmallBitVector getLowered(AnyFunctionType *functionType,
+                                  bool selfUncurried = false) const;
 };
 
 /// Differentiability of a function specifies the differentiation mode,

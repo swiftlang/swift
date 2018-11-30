@@ -1270,7 +1270,8 @@ public:
                 "The JVP function must not be @autodiff");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::JVP, F.getModule());
+            AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedJVPType == jvpType, "Unexpected JVP function type");
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
         require(vjpType, "The VJP function must have a function type");
@@ -1278,7 +1279,8 @@ public:
                 "The VJP function must not be @autodiff");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::VJP, F.getModule());
+            AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedVJPType == vjpType, "Unexpected VJP function type");
       }
     }
