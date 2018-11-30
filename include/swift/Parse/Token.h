@@ -165,6 +165,10 @@ public:
       if (getRawText().equals("__shared") ||
           getRawText().equals("__owned"))
         return false;
+      
+      // ...or __opaque
+      if (getRawText().equals("__opaque"))
+        return false;
 
       return true;
     }

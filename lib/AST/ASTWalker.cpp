@@ -1759,6 +1759,10 @@ bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+  return doIt(T->getConstraint());
+}
+
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
   return false;
 }

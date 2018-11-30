@@ -2301,6 +2301,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     'inout' attribute-list-clause attribute-list
 ///     '__shared' attribute-list-clause attribute-list
 ///     '__owned' attribute-list-clause attribute-list
+///     '__opaque' attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
