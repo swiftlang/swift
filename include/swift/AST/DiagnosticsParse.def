@@ -784,6 +784,10 @@ ERROR(sil_box_expected_r_brace,none,
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
+// Opaque types
+ERROR(opaque_mid_composition,none,
+      "'opaque' should appear at the beginning of a composition", ())
+
 //------------------------------------------------------------------------------
 // MARK: Layout constraint diagnostics
 //------------------------------------------------------------------------------
