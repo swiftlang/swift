@@ -392,7 +392,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   auto *entryBB = Builder.GetInsertBlock();
   llvm::Value *size = asSizeConstant(IGM, fixedSize);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
-  size = Builder.CreateTrunc(size, int32Ty); // We know size < 4.
+  size = Builder.CreateZExtOrTrunc(size, int32Ty); // We know size < 4.
 
   auto *two = llvm::ConstantInt::get(int32Ty, 2U);
   auto *four = llvm::ConstantInt::get(int32Ty, 4U);
@@ -487,7 +487,7 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
 
   Builder.emitBlock(extraTagBitsBB);
 
-  auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
+  auto *truncSize = Builder.CreateZExtOrTrunc(size, IGM.Int32Ty);
   Address caseIndexFromValueSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
   Builder.CreateStore(zero, caseIndexFromValueSlot);
 
@@ -683,7 +683,7 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
   auto *caseIndex =
       Builder.CreateSub(nonPayloadElementIndex, numExtraInhabitants);
-  auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
+  auto *truncSize = Builder.CreateZExtOrTrunc(size, IGM.Int32Ty);
   auto *isFourBytesPayload = Builder.CreateICmpUGE(truncSize, four);
   auto *payloadGE4BB = Builder.GetInsertBlock();
   auto *payloadLT4BB = llvm::BasicBlock::Create(Ctx);
