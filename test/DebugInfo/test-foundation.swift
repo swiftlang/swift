@@ -32,7 +32,7 @@ class MyObject : NSObject {
   }
 }
 
-// SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
+// SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} DISPFlagDefinition
 extension MyObject {
   @objc func blah() {
     var _ = MyObject()
@@ -40,7 +40,7 @@ extension MyObject {
 }
 
 // SANITY-DAG: ![[NSOBJECT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "$sSo8NSObjectC"
-// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[NSOBJECT]],{{.*}} isDefinition: true
+// SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[NSOBJECT]],{{.*}} DISPFlagDefinition
 var NsObj: NSObject
 NsObj = MyObject()
 var MyObj: MyObject
@@ -74,7 +74,7 @@ func useOptions(_ opt: URL.BookmarkCreationOptions)
 
 // LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "$s4main8MyObjectC0B3ArrSo7NSArrayCvgTo"
 // LOC-CHECK-NOT:                           line:
-// LOC-CHECK-SAME:                          isDefinition: true
+// LOC-CHECK-SAME:                          DISPFlagDefinition
 // LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])
 
 // These debug locations should all be in ordered by increasing line number.
