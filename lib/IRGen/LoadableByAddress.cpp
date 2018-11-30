@@ -2453,8 +2453,10 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
 
-      // For now, just replace the value with an immediate load.
-      if (oldValue->getType() != newValue->getType()) {
+      // For now, just replace the value with an immediate load if the old value
+      // was direct.
+      if (oldValue->getType() != newValue->getType() &&
+          !oldValue->getType().isAddress()) {
         LoadOwnershipQualifier ownership;
         if (!F->hasQualifiedOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;
