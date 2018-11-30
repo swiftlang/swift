@@ -82,6 +82,7 @@ import Histogram
 import InsertCharacter
 import Integrate
 import IterateData
+import JSON
 import Join
 import LazyFilter
 import LinkedList
@@ -254,6 +255,7 @@ registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
+registerBenchmark(JSON)
 registerBenchmark(Join)
 registerBenchmark(LazyFilter)
 registerBenchmark(LinkedList)
