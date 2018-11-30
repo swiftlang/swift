@@ -119,6 +119,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
         subscript.withPathElement(PathEltKind::SubscriptMember));
+  } else if (isa<MemberRefExpr>(anchor)) {
+    ConstraintLocatorBuilder memberRef(locator);
+    locator =
+        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
