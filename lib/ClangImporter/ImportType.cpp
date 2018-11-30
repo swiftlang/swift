@@ -482,8 +482,8 @@ namespace {
         return Type();
 
       auto size = type->getSize().getZExtValue();
-      // An array of size N is importat as an N-element tuple which
-      // takes very long to compile. We choose 4096 as the upper limit because
+      // An array of size N is imported as an N-element tuple which
+      // takes very long to compile. We chose 4096 as the upper limit because
       // we don't want to break arrays of size PATH_MAX. 
       if (size > 4096)
         return Type();
