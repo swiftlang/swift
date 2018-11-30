@@ -40,8 +40,8 @@ func test_infiniteLoop() {
 }
 
 func recursive(a: Int) -> Int {
-  if a == 0 { return 0 }     // expected-note {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
-  return recursive(a: a-1)
+   // expected-note@+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
+  return a == 0 ? 0 : recursive(a: a-1)
 }
 
 func test_recursive() {
