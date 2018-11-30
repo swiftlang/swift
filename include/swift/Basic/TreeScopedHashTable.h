@@ -150,10 +150,8 @@ class TreeScopedHashTableDetachedScope {
   const ImplTy *getImpl() { return DetachedImpl; }
 
 public:
-  TreeScopedHashTableDetachedScope &operator=(
-                            const TreeScopedHashTableDetachedScope &) = default;
-  TreeScopedHashTableDetachedScope &operator=(
-                                 TreeScopedHashTableDetachedScope &&) = default;
+  TreeScopedHashTableDetachedScope &
+  operator=(TreeScopedHashTableDetachedScope &&) = default;
 
   TreeScopedHashTableDetachedScope() : DetachedImpl(0) {}
 
