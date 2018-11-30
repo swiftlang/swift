@@ -36,6 +36,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 
 using namespace swift;
 
@@ -288,33 +289,54 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                   enableResilience,
                                                   getDependencyTracker()));
   }
-  {
-    auto SML = SerializedModuleLoader::create(*Context, getDependencyTracker());
-    this->SML = SML.get();
-    Context->addModuleLoader(std::move(SML));
+  auto MLM = ModuleLoadingMode::OnlySerialized;
+  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
+    MLM = ModuleLoadingMode::PreferSerialized;
   }
-  std::string ModuleCachePath;
-  {
-    // Wire up the Clang importer. If the user has specified an SDK, use it.
-    // Otherwise, we just keep it around as our interface to Clang's ABI
-    // knowledge.
-    auto clangImporter =
-        ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              Invocation.getPCHHash(), getDependencyTracker());
-    if (!clangImporter) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+  if (auto forceModuleLoadingMode =
+      llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
+    if (*forceModuleLoadingMode == "prefer-parseable")
+      MLM = ModuleLoadingMode::PreferParseable;
+    else if (*forceModuleLoadingMode == "prefer-serialized")
+      MLM = ModuleLoadingMode::PreferSerialized;
+    else if (*forceModuleLoadingMode == "only-parseable")
+      MLM = ModuleLoadingMode::OnlyParseable;
+    else if (*forceModuleLoadingMode == "only-serialized")
+      MLM = ModuleLoadingMode::OnlySerialized;
+    else {
+      Diagnostics.diagnose(SourceLoc(),
+                           diag::unknown_forced_module_loading_mode,
+                           *forceModuleLoadingMode);
       return true;
     }
-    auto const &Clang = clangImporter->getClangInstance();
-    ModuleCachePath = getModuleCachePathFromClang(Clang);
-    Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
-  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
+
+  std::unique_ptr<SerializedModuleLoader> SML =
+    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
+  this->SML = SML.get();
+
+  // Wire up the Clang importer. If the user has specified an SDK, use it.
+  // Otherwise, we just keep it around as our interface to Clang's ABI
+  // knowledge.
+  std::unique_ptr<ClangImporter> clangImporter =
+    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                          Invocation.getPCHHash(), getDependencyTracker());
+  if (!clangImporter) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+    return true;
+  }
+
+  if (MLM != ModuleLoadingMode::OnlySerialized) {
+    auto const &Clang = clangImporter->getClangInstance();
+    std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto PIML = ParseableInterfaceModuleLoader::create(*Context,
                                                        ModuleCachePath,
-                                                       getDependencyTracker());
+                                                       getDependencyTracker(),
+                                                       MLM);
     Context->addModuleLoader(std::move(PIML));
   }
+  Context->addModuleLoader(std::move(SML));
+  Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   return false;
 }
 

@@ -1,5 +1,4 @@
 // RUN: %empty-directory(%t)
-// RUN: %empty-directory(%t/modulecache)
 //
 // Test will build a module TestModule that depends on OtherModule and LeafModule (built from other.swift and leaf.swift).
 //
