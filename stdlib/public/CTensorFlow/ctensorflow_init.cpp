@@ -3,7 +3,6 @@
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/c/c_api_experimental.h"
 #include "tensorflow/c/eager/c_api.h"
-#include "tensorflow/core/platform/init_main.h"
 
 #include <assert.h>
 #include <vector>
@@ -31,7 +30,7 @@ void InitTensorFlowRuntime(unsigned char enable_debug_logging,
   int my_argc = my_argv.size();
   char** tmpArgv = my_argv.data();
   // Initialize GPU devices.
-  tensorflow::port::InitMain(/*usage=*/nullptr, &my_argc, &tmpArgv);
+  TF_InitMain(/*usage=*/nullptr, &my_argc, &tmpArgv);
 }
 
 static bool setValue(TF_DataType tfDtype, int64_t val, void *ptr) {
