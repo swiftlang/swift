@@ -693,13 +693,15 @@ getExtracteeType(SILValue function, Extractee extractee,
   case Extractee::JVP:
     resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
         SmallBitVector(originalFnTy->getNumParameters(), true),
-        differentiationOrder, AutoDiffAssociatedFunctionKind::JVP, module,
-         LookUpConformanceInModule(module.getSwiftModule()));
+        /*resultIndex*/ 0, differentiationOrder,
+        AutoDiffAssociatedFunctionKind::JVP, module,
+        LookUpConformanceInModule(module.getSwiftModule()));
     break;
   case Extractee::VJP:
     resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
         SmallBitVector(originalFnTy->getNumParameters(), true),
-        differentiationOrder, AutoDiffAssociatedFunctionKind::VJP, module,
+        /*resultIndex*/ 0, differentiationOrder,
+        AutoDiffAssociatedFunctionKind::VJP, module,
         LookUpConformanceInModule(module.getSwiftModule()));
     break;
   }

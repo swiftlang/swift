@@ -1270,7 +1270,7 @@ public:
         require(!jvpType->isDifferentiable(),
                 "The JVP function must not be @autodiff");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), order,
+            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
             LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedJVPType == jvpType, "Unexpected JVP function type");
@@ -1279,7 +1279,7 @@ public:
         require(!vjpType->isDifferentiable(),
                 "The VJP function must not be @autodiff");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), order,
+            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
             LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedVJPType == vjpType, "Unexpected VJP function type");

@@ -62,17 +62,17 @@ bb0(%0 : @trivial $Float):
 // CHECK:   return %3 : $Float
 // CHECK: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   return %0 : $Float
 // CHECK: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   return %0 : $Float
 // CHECK: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   return %0 : $Float
 // CHECK: }
@@ -85,16 +85,16 @@ bb0(%0 : @trivial $Float):
 // CHECK:   return %3 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
 // CHECK: }
 
+// CHECK-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
+// CHECK:   return %3 : $Float
+// CHECK: }
+
 // CHECK-LABEL: @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
 // CHECK: bb0(%0 : $Float):
 // CHECK:   %1 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%0 : $Float, %0 : $Float)
 // CHECK:   %2 = tuple (%1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %0 : $Float)
 // CHECK:   return %2 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
-// CHECK: }
-
-// CHECK-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
-// CHECK:   return %3 : $Float
 // CHECK: }
 
 // CHECK-LABEL: @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {

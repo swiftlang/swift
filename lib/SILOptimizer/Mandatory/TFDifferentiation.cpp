@@ -281,6 +281,7 @@ static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+class ADContext;
 class DifferentiationTask;
 
 /// The invoker of a differentiation task. It can be some user syntax, e.g.
@@ -643,6 +644,23 @@ public:
   }
 };
 
+/// Tracks the progress of primal/adjoint synthesis for a task.
+enum class FunctionSynthesisState {
+  /// We do not need to synthesize this function.
+  NotNeeded,
+
+  /// We need to synthesize this function.
+  Needed,
+
+  /// The function has been added to the PrimalGen/AdjointGen worklist, but not
+  /// yet synthesized.
+  Pending,
+
+  /// Synthesis is done: either the function has been synthesized, or an error
+  /// occurred durng synthesis.
+  Done
+};
+
 /// A differentiation task, specifying the original function and the
 /// `[differentiable]` attribute on the function. PrimalGen and AdjointGen
 /// will synthesize the primal and the adjoint for this task, filling the primal
@@ -655,6 +673,8 @@ class DifferentiationTask {
   friend class ADContext;
 
 private:
+  ADContext &context;
+
   /// The original function to be differentiated.
   SILFunction *original;
 
@@ -678,27 +698,60 @@ private:
   /// original function and differentiation indices.
   DenseMap<ApplyInst *, DifferentiationTask *> associatedTasks;
 
-  /// Cache for primal and adjoint.
+  /// Cache for associated functions.
   SILFunction *primal = nullptr;
   SILFunction *adjoint = nullptr;
+  SILFunction *vjp = nullptr;
+
+  /// Tracks the progress of primal synthesis for this task.
+  FunctionSynthesisState primalSynthesisState;
+
+  /// Tracks the progress of adjoint synthesis for this task.
+  FunctionSynthesisState adjointSynthesisState;
+
+  /// Asserts that a transition from one state to another is valid.
+  void validateTransition(FunctionSynthesisState from,
+                          FunctionSynthesisState to) {
+    switch (from) {
+    case FunctionSynthesisState::NotNeeded:
+      llvm_unreachable("should not change state from NotNeeded");
+    case FunctionSynthesisState::Needed:
+      assert(to == FunctionSynthesisState::Pending &&
+             "Needed must transition to Pending");
+      break;
+    case FunctionSynthesisState::Pending:
+      assert(to == FunctionSynthesisState::Done &&
+             "Pending must transition to Done");
+      break;
+    case FunctionSynthesisState::Done:
+      llvm_unreachable("should not change state from Done");
+    }
+  }
+
+  /// Creates an empty primal for this task.
+  void createEmptyPrimal();
+  /// Creates an empty adjoint for this task.
+  void createEmptyAdjoint();
+
+  /// Creates a VJP for this task. Primal and adjoint (possibly empty) must
+  /// exist.
+  void createVJP();
 
 protected:
   /// Create a differentiation task.
   ///
+  /// Creates empty primal and adjoint functions, if this task needs to
+  /// synthesize them. Creates fully-synthesized VJP if this task needs to
+  /// synthesize it.
+  ///
+  /// @param context The ADContext where differentiation happens.
   /// @param original The original function to be differentiated.
   /// @param attr The [differentiable] attribute to take control of.
   /// @param invoker The invoker of this differentiation task.
-  /// @param module The module where differentiation happens.
-  explicit DifferentiationTask(SILFunction *original,
+  explicit DifferentiationTask(ADContext &context,
+                               SILFunction *original,
                                SILDifferentiableAttr *&&attr,
-                               SILModule &module,
-                               DifferentiationInvoker invoker)
-      : original(original), attr(attr), invoker(invoker) {
-    if (attr->hasPrimal())
-      primal = lookUpOrLinkFunction(attr->getPrimalName(), module);
-    if (attr->hasAdjoint())
-      adjoint = lookUpOrLinkFunction(attr->getAdjointName(), module);
-  }
+                               DifferentiationInvoker invoker);
 
 public:
   DifferentiationTask(const DifferentiationTask &) = delete;
@@ -710,30 +763,28 @@ public:
 
   PrimalInfo *getPrimalInfo() const { return primalInfo.get(); }
 
-  /// Initialize primal info for primal synthesis.
-  void initializePrimalInfo(StructDecl *pvStruct, const SILModule &module) {
-    assert(!primalInfo && "Primal info was previously initialized");
-    primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(pvStruct, module));
-  }
-
   const SILAutoDiffIndices &getIndices() const {
     return attr->getIndices();
   }
 
+  FunctionSynthesisState getPrimalSynthesisState() const {
+    return primalSynthesisState;
+  }
+  void setPrimalSynthesisState(FunctionSynthesisState newState) {
+    validateTransition(primalSynthesisState, newState);
+    primalSynthesisState = newState;
+  }
+  FunctionSynthesisState getAdjointSynthesisState() const {
+    return adjointSynthesisState;
+  }
+  void setAdjointSynthesisState(FunctionSynthesisState newState) {
+    validateTransition(adjointSynthesisState, newState);
+    adjointSynthesisState = newState;
+  }
+
   SILFunction *getPrimal() const { return primal; }
   SILFunction *getAdjoint() const { return adjoint; }
-
-  void setPrimal(SILFunction *fn) {
-    assert(fn);
-    primal = fn;
-    attr->setPrimalName(fn->getName());
-  }
-
-  void setAdjoint(SILFunction *fn) {
-    assert(fn);
-    adjoint = fn;
-    attr->setAdjointName(fn->getName(), /*primitive*/ false);
-  }
+  SILFunction *getVJP() const { return vjp; }
 
   DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
     return associatedTasks;
@@ -1066,7 +1117,7 @@ public:
     }
     auto *attr = getOrCreateDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
-        new DifferentiationTask(original, std::move(attr), module, invoker));
+        new DifferentiationTask(*this, original, std::move(attr), invoker));
     differentiationTasks.push_back(std::move(task));
     enqueuedTaskIndices.insert(
         {{original, indices}, differentiationTasks.size() - 1});
@@ -1958,14 +2009,10 @@ public:
   bool run();
 
 protected:
-  /// Lazily create a task to synthesize the primal function.
-  SILFunction *lookUpPrimalOrScheduleSynthesis(DifferentiationTask *task);
+  /// Get the primal, and lazily schedule a task to synthesize its body.
+  SILFunction *lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task);
 
 private:
-  /// Creates an empty primal function, updating the primal info in the task.
-  std::pair<SILFunction *, StructDecl *>
-  createEmptyPrimal(DifferentiationTask *task);
-
   /// Processes a synthesis item. Returns true if any error occurs.
   bool performSynthesis(FunctionSynthesisItem task);
 };
@@ -2428,9 +2475,7 @@ public:
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
     // Get the primal function from the task. If the task was newly created,
     // then we need to schedule a synthesis item for the primal.
-    auto *primalFn = newTask->getPrimal();
-    if (!primalFn)
-      primalFn = primalGen.lookUpPrimalOrScheduleSynthesis(newTask);
+    auto *primalFn = primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
     // Now that we have the primal, get ready to call it.
     // But before calling it, we need to convert the primal function like how
     // the original function is converted.
@@ -2595,71 +2640,32 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   return cloner.run();
 }
 
-/// Creates a primal function.
-std::pair<SILFunction *, StructDecl *>
-PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
-  auto indices = task->getIndices();
-  auto *original = task->getOriginal();
-  auto &module = context.getModule();
-  std::string primalName =
-      "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
-  StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
-  task->initializePrimalInfo(primalValueStructDecl, module);
-  auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
-  auto objTy = SILType::getPrimitiveObjectType(pvType);
-  auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
-                                             : ResultConvention::Indirect;
-  auto origResults = original->getLoweredFunctionType()->getResults();
-  SmallVector<SILResultInfo, 8> results;
-  results.push_back({pvType, resultConv});
-  results.append(origResults.begin(), origResults.end());
-  // Create result info for checkpoints.
-  auto originalTy = original->getLoweredFunctionType();
-  auto primalTy = SILFunctionType::get(
-      originalTy->getGenericSignature(), originalTy->getExtInfo(),
-      originalTy->getCoroutineKind(), originalTy->getCalleeConvention(),
-      originalTy->getParameters(), originalTy->getYields(), results,
-      originalTy->getOptionalErrorResult(), context.getASTContext());
-  SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = original->getLinkage();
-  if (linkage == SILLinkage::Public)
-    linkage = SILLinkage::PublicNonABI;
-  auto *primal = fb.getOrCreateFunction(
-      original->getLocation(), primalName, linkage, primalTy,
-      original->isBare(), original->isTransparent(), original->isSerialized());
-  primal->setUnqualifiedOwnership();
-  LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
-                                << *primal << '\n');
-  task->setPrimal(primal);
-  return {primal, primalValueStructDecl};
-}
-
 SILFunction *
-PrimalGen::lookUpPrimalOrScheduleSynthesis(DifferentiationTask *task) {
-  // If the original function already has a primal, skip this task.
-  if (auto *existingPrimal = task->getPrimal())
-    return existingPrimal;
-  // Create a primal function.
-  SILFunction *newPrimal = nullptr;
-  StructDecl *primalStruct = nullptr;
-  std::tie(newPrimal, primalStruct) = createEmptyPrimal(task);
-  // Create a synthesis item and push it to the worklist.
-  FunctionSynthesisItem synthesis{task->getOriginal(), newPrimal,
-                                  task->getIndices(), task};
-  worklist.push_back(synthesis);
-  return newPrimal;
+PrimalGen::lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task) {
+  auto *primal = task->getPrimal();
+  assert(primal && "requesting primal from task without primal");
+
+  if (task->getPrimalSynthesisState() == FunctionSynthesisState::Needed) {
+    FunctionSynthesisItem synthesis{task->getOriginal(), primal,
+                                    task->getIndices(), task};
+    worklist.push_back(synthesis);
+    task->setPrimalSynthesisState(FunctionSynthesisState::Pending);
+  }
+
+  return primal;
 }
 
 bool PrimalGen::run() {
   // Push everything to the list of primal synthesis items.
   for (auto &task : context.getDifferentiationTasks())
-    lookUpPrimalOrScheduleSynthesis(task.get());
+    lookUpPrimalAndMaybeScheduleSynthesis(task.get());
   // Process each item until empty.
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
     errorOccurred |= performSynthesis(synthesis);
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
+    synthesis.task->setPrimalSynthesisState(FunctionSynthesisState::Done);
   }
   return errorOccurred;
 }
@@ -2693,110 +2699,28 @@ public:
   bool run();
 
 private:
-  /// Creates an empty adjoint function.
-  SILFunction *createEmptyAdjoint(DifferentiationTask *task);
   /// Do the synthesis item. Returns true if any error occurs.
   bool performSynthesis(FunctionSynthesisItem item);
-  /// Look up the adjoint function corresponding to this task. If it does not
-  /// exist, create an empty adjoint and schedule a synthesis item to be
-  /// processed later in AdjointGen.
-  SILFunction *lookUpAdjointOrScheduleSynthesis(DifferentiationTask *task);
 };
 } // end anonymous namespace
 
-SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
-  auto &module = context.getModule();
-  auto *original = task->getOriginal();
-  // Parameters of the adjoint are:
-  // - a seed,
-  // - a primal value struct,
-  // - original results, and
-  // - the original parameters.
-  // Results of the adjoint have the same type as the original parameters.
-  SmallVector<SILParameterInfo, 8> adjParams;
-  SmallVector<SILResultInfo, 8> adjResults;
-  auto origTy = original->getLoweredFunctionType();
-  auto origParams = origTy->getParameters();
-
-  // Add adjoint parameter for the seed.
-  adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[task->getIndices().source].getType(), module));
-
-  // If there's a generated primal, accept a primal value struct in the adjoint
-  // parameter list.
-  if (auto *pi = task->getPrimalInfo()) {
-    auto pvType = pi->getPrimalValueStruct()
-                      ->getDeclaredInterfaceType()
-                      ->getCanonicalType();
-    adjParams.push_back(getFormalParameterInfo(pvType, module));
-  }
-
-  // Add adjoint parameters for the original results.
-  for (auto &origRes : origTy->getResults())
-    adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
-
-  // Add adjoint parameters for the original parameters.
-  for (auto &param : origParams)
-    adjParams.push_back(param);
-
-  // Add adjoint result for the wrt self parameter, if it was requested.
-  auto selfParamIndex = origParams.size() - 1;
-  if (origTy->hasSelfParam() &&
-      task->getIndices().isWrtParameter(selfParamIndex))
-    adjResults.push_back(getFormalResultInfo(
-        origParams[selfParamIndex].getType(), module));
-
-  // Add adjoint results for the requested non-self wrt parameters.
-  for (auto i : task->getIndices().parameters.set_bits()) {
-    if (origTy->hasSelfParam() && i == selfParamIndex)
-      continue;
-    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
-  }
-
-  auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
-                 mangleADIndices(task->getIndices());
-  auto adjType = SILFunctionType::get(
-      origTy->getGenericSignature(), origTy->getExtInfo(),
-      origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
-      adjResults, None, original->getASTContext());
-  SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = original->getLinkage();
-  if (linkage == SILLinkage::Public)
-    linkage = SILLinkage::PublicNonABI;
-  auto *adjoint = fb.createFunction(linkage, adjName, adjType,
-      original->getGenericEnvironment(), original->getLocation(),
-      original->isBare(), original->isTransparent(), original->isSerialized());
-  adjoint->setUnqualifiedOwnership();
-  adjoint->setDebugScope(new (module)
-                             SILDebugScope(original->getLocation(), adjoint));
-  task->setAdjoint(adjoint);
-  return adjoint;
-}
-
-SILFunction *
-AdjointGen::lookUpAdjointOrScheduleSynthesis(DifferentiationTask *task) {
-  // If the original function already has an adjoint, skip this task.
-  if (auto *existingAdjoint = task->getAdjoint())
-    return existingAdjoint;
-  // Create an adjoint function.
-  SILFunction *newAdjoint = createEmptyAdjoint(task);
-  // Create a synthesis item and push it to the worklist.
-  FunctionSynthesisItem synthesis{task->getOriginal(), newAdjoint,
-                                  task->getIndices(), task};
-  worklist.push_back(synthesis);
-  return newAdjoint;
-}
-
 bool AdjointGen::run() {
   // Push everything to the worklist.
-  for (auto &task : context.getDifferentiationTasks())
-    lookUpAdjointOrScheduleSynthesis(task.get());
+  for (auto &task : context.getDifferentiationTasks()) {
+    if (task->getAdjointSynthesisState() == FunctionSynthesisState::Needed) {
+      FunctionSynthesisItem synthesis{task->getOriginal(), task->getAdjoint(),
+                                      task->getIndices(), task.get()};
+      worklist.push_back(synthesis);
+      task->setAdjointSynthesisState(FunctionSynthesisState::Pending);
+    }
+  }
   // Iterate over the worklist, look up existing adjoint. If an adjoint exists
   // for the task, do nothing. Otherwise, create a function and process it.
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
     worklist.pop_back();
     errorOccurred |= performSynthesis(synthesis);
+    synthesis.task->setAdjointSynthesisState(FunctionSynthesisState::Done);
   }
   return errorOccurred;
 }
@@ -4094,6 +4018,279 @@ bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
                          *pdomAnalysis->get(item.original),
                          *loopAnalysis->get(item.original), *this);
   return emitter.run();
+}
+
+//===----------------------------------------------------------------------===//
+// DifferentiationTask
+//===----------------------------------------------------------------------===//
+
+DifferentiationTask::DifferentiationTask(ADContext &context,
+                                         SILFunction *original,
+                                         SILDifferentiableAttr *&&attr,
+                                         DifferentiationInvoker invoker)
+    : context(context), original(original), attr(attr), invoker(invoker) {
+  if (attr->hasPrimal())
+    primal = lookUpOrLinkFunction(attr->getPrimalName(), context.getModule());
+  if (attr->hasAdjoint())
+    adjoint = lookUpOrLinkFunction(attr->getAdjointName(), context.getModule());
+  if (attr->hasVJP())
+    vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
+
+  if (adjoint) {
+    // If we already have an adjoint, then we don't need to synthesize the
+    // primal or the adjoint.
+    primalSynthesisState = FunctionSynthesisState::NotNeeded;
+    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
+  } else {
+    assert(!attr->hasPrimal() &&
+           "[differentiable] attr without adjoint should not have primal");
+
+    // We don't have the primal or adjoint, so we need to synthesize them.
+    // TODO: Once the AD pass uses VJP, we don't need to synthesize primal or
+    // adjoint if VJP exists.
+    primalSynthesisState = FunctionSynthesisState::Needed;
+    adjointSynthesisState = FunctionSynthesisState::Needed;
+    createEmptyPrimal();
+    createEmptyAdjoint();
+  }
+
+  // If there is no VJP, synthesize it.
+  if (!vjp)
+    createVJP();
+}
+
+void DifferentiationTask::createEmptyPrimal() {
+  assert(primalSynthesisState == FunctionSynthesisState::Needed);
+  assert(!primalInfo);
+  assert(!primal);
+
+  auto indices = getIndices();
+  auto *original = getOriginal();
+  auto &module = context.getModule();
+  std::string primalName =
+      "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
+  StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
+  primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(primalValueStructDecl, module));
+  auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
+  auto objTy = SILType::getPrimitiveObjectType(pvType);
+  auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
+                                             : ResultConvention::Indirect;
+  auto origResults = original->getLoweredFunctionType()->getResults();
+  SmallVector<SILResultInfo, 8> results;
+  results.push_back({pvType, resultConv});
+  results.append(origResults.begin(), origResults.end());
+  // Create result info for checkpoints.
+  auto originalTy = original->getLoweredFunctionType();
+  auto primalTy = SILFunctionType::get(
+      originalTy->getGenericSignature(), originalTy->getExtInfo(),
+      originalTy->getCoroutineKind(), originalTy->getCalleeConvention(),
+      originalTy->getParameters(), originalTy->getYields(), results,
+      originalTy->getOptionalErrorResult(), context.getASTContext());
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
+  primal = fb.getOrCreateFunction(
+      original->getLocation(), primalName, linkage, primalTy,
+      original->isBare(), original->isTransparent(), original->isSerialized());
+  primal->setUnqualifiedOwnership();
+  LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
+                                << *primal << '\n');
+
+  attr->setPrimalName(primal->getName());
+}
+
+void DifferentiationTask::createEmptyAdjoint() {
+  // FIXME: Support generics.
+  if (getOriginal()->getLoweredFunctionType()->getGenericSignature())
+    return;
+
+  assert(adjointSynthesisState == FunctionSynthesisState::Needed);
+  assert(!adjoint);
+
+  auto &module = context.getModule();
+  auto *original = getOriginal();
+  // Parameters of the adjoint are:
+  // - a seed,
+  // - a primal value struct,
+  // - original results, and
+  // - the original parameters.
+  // Results of the adjoint have the same type as the original parameters.
+  SmallVector<SILParameterInfo, 8> adjParams;
+  SmallVector<SILResultInfo, 8> adjResults;
+  auto origTy = original->getLoweredFunctionType();
+  auto origParams = origTy->getParameters();
+
+  // Add adjoint parameter for the seed.
+  adjParams.push_back(getFormalParameterInfo(
+      origTy->getResults()[getIndices().source].getType(), module));
+
+  // If there's a generated primal, accept a primal value struct in the adjoint
+  // parameter list.
+  if (auto *pi = getPrimalInfo()) {
+    auto pvType = pi->getPrimalValueStruct()
+                    ->getDeclaredInterfaceType()
+                    ->getCanonicalType();
+    adjParams.push_back(getFormalParameterInfo(pvType, module));
+  }
+
+  // Add adjoint parameters for the original results.
+  for (auto &origRes : origTy->getResults())
+    adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
+
+  // Add adjoint parameters for the original parameters.
+  for (auto &param : origParams)
+    adjParams.push_back(param);
+
+  // Add adjoint result for the wrt self parameter, if it was requested.
+  auto selfParamIndex = origParams.size() - 1;
+  if (origTy->hasSelfParam() &&
+      getIndices().isWrtParameter(selfParamIndex))
+    adjResults.push_back(getFormalResultInfo(
+        origParams[selfParamIndex].getType(), module));
+
+  // Add adjoint results for the requested non-self wrt parameters.
+  for (auto i : getIndices().parameters.set_bits()) {
+    if (origTy->hasSelfParam() && i == selfParamIndex)
+      continue;
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+  }
+
+  auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
+                 mangleADIndices(getIndices());
+  auto adjType = SILFunctionType::get(
+      origTy->getGenericSignature(), origTy->getExtInfo(),
+      origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
+      adjResults, None, original->getASTContext());
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
+  adjoint = fb.createFunction(linkage, adjName, adjType,
+      original->getGenericEnvironment(), original->getLocation(),
+      original->isBare(), original->isTransparent(), original->isSerialized());
+  adjoint->setUnqualifiedOwnership();
+  adjoint->setDebugScope(new (module)
+                             SILDebugScope(original->getLocation(), adjoint));
+
+  attr->setAdjointName(adjoint->getName(), /*primitive*/ false);
+}
+
+void DifferentiationTask::createVJP() {
+  // FIXME: Support generics.
+  if (getOriginal()->getLoweredFunctionType()->getGenericSignature())
+    return;
+
+  assert(!vjp);
+  assert(adjoint);
+  assert(primal);
+
+  auto &module = context.getModule();
+  auto *original = getOriginal();
+  auto originalTy = original->getLoweredFunctionType();
+
+  // === Create an empty VJP. ===
+  auto vjpName = "AD__" + original->getName().str() + "__vjp_" +
+                 mangleADIndices(getIndices());
+  auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
+      getIndices().parameters, getIndices().source, 1,
+      AutoDiffAssociatedFunctionKind::VJP, module,
+      LookUpConformanceInModule(module.getSwiftModule()));
+
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto linkage = original->getLinkage();
+  vjp = fb.createFunction(
+      linkage, vjpName, vjpType, original->getGenericEnvironment(),
+      original->getLocation(), original->isBare(), original->isTransparent(),
+      original->isSerialized());
+  vjp->setUnqualifiedOwnership();
+  vjp->setDebugScope(new (module)
+                         SILDebugScope(original->getLocation(), vjp));
+
+  attr->setVJPName(vjp->getName());
+
+  // === Start filling in the VJP. ===
+  auto loc = vjp->getLocation();
+  auto *entry = vjp->createBasicBlock();
+  createEntryArguments(vjp);
+  SILBuilder builder(entry);
+
+  // === Call primal with original arguments. ===
+  auto primalTy = primal->getLoweredFunctionType();
+  SmallVector<SILValue, 8> primalArgs;
+  SmallVector<SILValue, 1> stackAllocsToCleanUp;
+
+  // Add indirect results.
+  for (auto indResInfo : primalTy->getIndirectFormalResults()) {
+    auto objTy = SILType::getPrimitiveObjectType(indResInfo.getType());
+    auto resultBuf = builder.createAllocStack(loc, objTy);
+    primalArgs.push_back(resultBuf);
+    stackAllocsToCleanUp.push_back(resultBuf);
+  }
+
+  // Add original parameters.
+  for (auto arg : vjp->getArgumentsWithoutIndirectResults())
+    primalArgs.push_back(arg);
+
+  // Get and call the primal.
+  auto *primalRef = builder.createFunctionRef(loc, primal);
+  auto *primalApply = builder.createApply(
+      loc, primalRef, vjp->getForwardingSubstitutionMap(), primalArgs,
+      /*isNonThrowing*/ false);
+
+  // Collect the primal's direct results.
+  SILFunctionConventions primalConv(primalTy, module);
+  SmallVector<SILValue, 8> primalDirectResults;
+  if (primalConv.getNumDirectSILResults() == 1)
+    primalDirectResults.push_back(primalApply);
+  else {
+    auto tupleSILTy = primalConv.getSILResultType();
+    for (unsigned i : range(primalConv.getNumDirectSILResults())) {
+      auto val = builder.createTupleExtract(loc, primalApply, i,
+                                            tupleSILTy.getTupleElementType(i));
+      primalDirectResults.push_back(val);
+    }
+  }
+
+  // === Partially apply the adjoint. ===
+  SmallVector<SILValue, 8> partialAdjointArgs;
+
+  // Add primal values and original results.
+  unsigned indResIdx = 0, dirResIdx = 0;
+  for (auto &resInfo : primalConv.getResults()) {
+    if (resInfo.isFormalDirect())
+      partialAdjointArgs.push_back(primalDirectResults[dirResIdx++]);
+    else
+      partialAdjointArgs.push_back(primalArgs[indResIdx++]);
+  }
+
+  // Add original parameters.
+  for (auto arg : vjp->getArgumentsWithoutIndirectResults())
+    partialAdjointArgs.push_back(arg);
+
+  // Get and partially apply the adjoint.
+  auto *adjointRef = builder.createFunctionRef(loc, adjoint);
+  auto *adjointPartialApply = builder.createPartialApply(
+      loc, adjointRef, vjp->getForwardingSubstitutionMap(), partialAdjointArgs,
+      ParameterConvention::Direct_Guaranteed);
+
+  // === Clean up the stack allocations. ===
+  for (auto alloc : reversed(stackAllocsToCleanUp))
+    builder.createDeallocStack(loc, alloc);
+
+  // === Return the original results and the partially applied adjoint. ===
+  // TODO: Indirect original results.
+  auto vjpTy = vjp->getLoweredFunctionType();
+  SILFunctionConventions originalConv(originalTy, module),
+                         vjpConv(vjpTy, module);
+  SmallVector<SILValue, 8> directResults;
+  auto originalDirectResults = ArrayRef<SILValue>(primalDirectResults)
+      .take_back(originalConv.getNumDirectSILResults());
+  for (auto originalDirectResult : originalDirectResults)
+    directResults.push_back(originalDirectResult);
+  directResults.push_back(adjointPartialApply);
+  auto tupleRet = builder.createTuple(loc, vjpConv.getSILResultType(), directResults);
+  builder.createReturn(loc, tupleRet);
 }
 
 //===----------------------------------------------------------------------===//
