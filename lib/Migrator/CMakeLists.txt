@@ -38,7 +38,7 @@ add_custom_target("symlink_migrator_data"
     DEPENDS "${output_dir}" "${outputs}"
     COMMENT "Symlinking migrator data to ${output_dir}")
 
-swift_install_in_component(compiler
+swift_install_in_component(compiler symlink-migrator-data
   FILES ${datafiles}
 DESTINATION "lib/swift/migrator")
 

@@ -1418,7 +1418,7 @@ function(add_swift_host_library name)
     INSTALL_IN_COMPONENT "dev"
     )
 
-  swift_install_in_component(dev
+  swift_install_in_component(dev ${name}
     TARGETS ${name}
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
     LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
@@ -2000,7 +2000,7 @@ function(add_swift_target_library name)
             WORLD_READ)
       endif()
 
-      swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+      swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" ${name}
           FILES "${UNIVERSAL_LIBRARY_NAME}"
           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
           PERMISSIONS ${file_permissions})
@@ -2008,7 +2008,7 @@ function(add_swift_target_library name)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
           if(TARGET ${name}-windows-${arch}_IMPLIB)
             get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
-            swift_install_in_component(${SWIFTLIB_INSTALL_IN_COMPONENT}
+            swift_install_in_component(${SWIFTLIB_INSTALL_IN_COMPONENT} ${import_library}
               FILES ${import_library}
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
               PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
@@ -2043,7 +2043,7 @@ function(add_swift_target_library name)
                                OUTPUT
                                  "${UNIVERSAL_LIBRARY_NAME}"
                                ${THIN_INPUT_TARGETS_STATIC})
-        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" ${name}
             FILES "${UNIVERSAL_LIBRARY_NAME}"
             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}"
             PERMISSIONS
@@ -2403,7 +2403,7 @@ function(add_swift_host_tool executable)
 
   # And then create the install rule if we are asked to.
   if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT} ${executable}
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
 

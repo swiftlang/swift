@@ -948,7 +948,7 @@ endif()
 
 add_subdirectory(cmake/modules)
 
-swift_install_in_component(license
+swift_install_in_component(license swift-license
   FILES "LICENSE.txt"
   DESTINATION "share/swift")
 

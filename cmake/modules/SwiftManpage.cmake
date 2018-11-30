@@ -11,7 +11,7 @@ find_program(POD2MAN pod2man)
 #     MAN_SECTION N
 #     INSTALL_IN_COMPONENT comp
 #     )
-function(manpage)
+function(manpage name)
   cmake_parse_arguments(
       MP # prefix
       "" # options
@@ -38,7 +38,7 @@ function(manpage)
       DEPENDS "${MP_SOURCE}"
       ALL)
 
-  swift_install_in_component("${MP_INSTALL_IN_COMPONENT}"
+  swift_install_in_component("${MP_INSTALL_IN_COMPONENT}" ${name}
       FILES "${output_file_name}"
       DESTINATION "share/man/man${MP_MAN_SECTION}")
 endfunction()

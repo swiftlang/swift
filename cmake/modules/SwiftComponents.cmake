@@ -87,6 +87,10 @@ macro(swift_configure_components)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     if(NOT SWIFT_INSTALL_EXCLUDE_${var_name_piece})
       set(SWIFT_INSTALL_${var_name_piece} TRUE)
+
+      # This is the high level install target that we use to create dependencies
+      # upon our llvm based install components.
+      add_custom_target(install-${component})
     endif()
   endforeach()
 endmacro()
@@ -108,22 +112,64 @@ function(swift_is_installing_component component result_var_name)
   endif()
 endfunction()
 
-# swift_install_in_component(<COMPONENT NAME>
+# swift_install_in_component(<COMPONENT NAME> <TARGET NAME>
 #   <same parameters as install()>)
 #
 # Executes the specified installation actions if the named component is
 # requested to be installed.
 #
-# This function accepts the same parameters as install().
-function(swift_install_in_component component)
-  precondition(component MESSAGE "Component name is required")
+# This function accepts the same parameters as install() except for TARGETS and
+# COMPONENT since we need to control these two parameters to install so we can
+# use LLVM's underlying install primitives.
+function(swift_install_in_component swift_component install_target_name)
+  precondition(swift_component MESSAGE "Component name is required")
+  precondition(install_target_name MESSAGE "Install target name is required")
 
-  swift_is_installing_component("${component}" is_installing)
+  # Make sure that we were not passed TARGETS
+  cmake_parse_arguments(
+    SIIC # prefix
+    "" # options
+    "" # single-value args
+    "COMPONENT;TARGETS" # multi-value args
+    ${ARGN})
+  precondition(SIIC_COMPONENT NEGATE MESSAGE "Must not specify COMPONENT as an arg")
+
+  # We do not support installing using the xcode generator.
+  if (NOT CMAKE_CONFIGURATION_TYPES)
+    return()
+  endif()
+
+  # First specify our install line swapping our install_target_name as our
+  # component.
+  install(COMPONENT ${install_target_name}-component ${SIIC_UNPARSED_ARGS})
+
+  # Then create the install-${install_target_name} target that invokes the given
+  # cmake component.  If we intercepted a TARGETS argument, add those targets as
+  # our dependencies. Otherwise, this expands to the empty string.
+  set(targets_to_depend_on)
+  if (SIIC_TARGETS)
+    set(targets_to_depend_on DEPENDS ${SICC_TARGETS})
+  endif()
+  add_llvm_install_targets(install-${install_target_name}
+    ${targets_to_depend_on}
+    COMPONENT ${install_target_name}-component)
+
+  # Ok, we now have setup a CMAKE component with the target
+  # install-${install_target_name} to trigger it. Now see if we were asked to
+  # install the specified ${swift_component}. If so, the variable
+  # install-${swift_component} will be defined and is expected to trigger the
+  # given CMAKE component. So in such a case make install-${swift_component}
+  # depend upon install-${install_target_name}.
+  swift_is_installing_component("${swift_component}" is_installing)
   if(NOT is_installing)
     return()
   endif()
 
-  install(${ARGN})
+  if (NOT TARGET install-${swift_component})
+    message(FATAL "The target install-${swift_component} does not exist for component: ${swift_component}?!")
+  endif()
+
+  add_dependency(install-${swift_component} install-${install_target_name})
 endfunction()
 
 function(swift_install_symlink_component component)

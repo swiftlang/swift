@@ -51,7 +51,7 @@ if(SWIFT_BUILD_STATIC_STDLIB)
           "${SWIFT_SOURCE_DIR}/utils/gen-static-stdlib-link-args")
 
       list(APPEND static_stdlib_lnk_file_list ${swift_static_stdlib_${sdk}_args})
-      swift_install_in_component(stdlib
+      swift_install_in_component(stdlib ${lowercase_sdk}-linkfile
         FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
         DESTINATION "lib/swift_static/${lowercase_sdk}")
     endif()

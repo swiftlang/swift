@@ -348,7 +348,7 @@ function(_compile_swift_files
     list(APPEND module_outputs "${interface_file}")
   endif()
 
-  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}" ${module_base}-module
     FILES ${module_outputs}
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
@@ -377,7 +377,7 @@ function(_compile_swift_files
     list(APPEND depends_create_apinotes "${apinote_input_file}")
 
     list(APPEND apinote_files "${apinote_file}")
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}" ${apinote_module}-apinotes
       FILES ${apinote_file}
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
   endforeach()

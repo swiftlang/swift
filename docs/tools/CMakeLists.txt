@@ -1,6 +1,7 @@
 include(SwiftManpage)
 
 manpage(
+    swift-pod
     SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/swift.pod"
     PAGE_HEADER "Swift Documentation"
     MAN_FILE_BASENAME swift

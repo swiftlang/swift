@@ -123,7 +123,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
         "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibrary})
-    swift_install_in_component(stdlib
+    swift_install_in_component(stdlib ${FragileSupportLibrary}
       FILES $<TARGET_FILE:${FragileSupportLibrary}>
       DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}")
   endforeach()
@@ -137,7 +137,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibraryPrimary})
-    swift_install_in_component(stdlib
+    swift_install_in_component(stdlib $<TARGET_FILE:${FragileSupportLibraryPrimary}>
       FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
       DESTINATION "lib/swift_static/${lowercase_sdk}")
 
@@ -154,7 +154,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${SWIFT_SOURCE_DIR}/utils/static-executable-args.lnk")
 
   list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
-  swift_install_in_component(stdlib
+  swift_install_in_component(stdlib ${lowercase_sdk}-linkfile
     FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
     DESTINATION "lib/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
@@ -230,14 +230,14 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
                                 DEPENDS
                                   "${swiftrtObject}")
       if(SWIFT_BUILD_DYNAMIC_STDLIB)
-        swift_install_in_component(stdlib
+        swift_install_in_component(stdlib swiftImageRegistration-${arch_suffix}-dynamic
                                    FILES
                                      "${shared_runtime_registrar}"
                                    DESTINATION
                                      "lib/swift/${arch_subdir}")
       endif()
       if(SWIFT_BUILD_STATIC_STDLIB)
-        swift_install_in_component(stdlib
+        swift_install_in_component(stdlib swiftImageRegistration-${arch_suffix}-static
                                    FILES
                                      "${static_runtime_registrar}"
                                    DESTINATION

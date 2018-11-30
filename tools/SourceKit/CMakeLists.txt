@@ -175,7 +175,7 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     add_dependencies(dispatch libdispatch-install)
     add_dependencies(BlocksRuntime libdispatch-install)
 
-    swift_install_in_component(sourcekit-inproc
+    swift_install_in_component(sourcekit-inproc sourcekit-inproc-dispatch-blocksruntime
                                FILES
                                  $<TARGET_FILE:dispatch>
                                  $<TARGET_FILE:BlocksRuntime>

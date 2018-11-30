@@ -1,4 +1,4 @@
-swift_install_in_component(editor-integration
+swift_install_in_component(editor-integration vim-editor-integration
     DIRECTORY
       ftdetect
       syntax

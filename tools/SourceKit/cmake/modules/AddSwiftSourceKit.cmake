@@ -196,12 +196,12 @@ macro(add_sourcekit_library name)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT dev)
     endif()
   endif()
-  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" ${name}
       TARGETS ${name}
       LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       RUNTIME DESTINATION "bin")
-  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" ${name}-headers
     FILES ${SOURCEKITLIB_HEADERS}
     DESTINATION "include/SourceKit")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
@@ -335,7 +335,7 @@ macro(add_sourcekit_framework name)
 
 
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
+    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name}
         TARGETS ${name}
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
@@ -354,7 +354,7 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
                           PUBLIC_HEADER "${headers}")
   else()
-    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
+    swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name}
         DIRECTORY ${framework_location}
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         USE_SOURCE_PERMISSIONS)
