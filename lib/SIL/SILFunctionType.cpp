@@ -221,7 +221,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   unsigned numParamsWithoutSelf = hasSelfParam() ? getNumParameters() - 1
-                                           : getNumParameters();
+                                                 : getNumParameters();
   auto testParamIndex = [&](unsigned index) -> bool {
     return index < parameterIndices.size()  && parameterIndices[index];
   };
