@@ -61,7 +61,7 @@ _ = #gradient(testOwnedVector)
 // The adjoint should not release primal values because they are passed in as @guaranteed.
 //
 // CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0({{%.*}} : $Vector, {{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, {{%.*}} : $Vector):
+// CHECK: bb0({{%.*}} : $Vector, [[PRIMAL_VALUES:%.*]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, {{%.*}} : $Vector, {{%.*}} : $Vector):
 // CHECK:   [[PV0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.v_0
 // CHECK-NOT:   release_value [[PV0]]
 // CHECK-NOT:   release_value [[PRIMAL_VALUES]]
