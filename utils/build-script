@@ -266,7 +266,7 @@ class BuildScriptInvocation(object):
 
         # SWIFT_ENABLE_TENSORFLOW
         if args.enable_tensorflow:
-            tensorflow_libs = ["libtensorflow.so"]
+            tensorflow_libs = ["libtensorflow.so", "libtensorflow_framework.so"]
             tensorflow_dirs = [
                 ("tensorflow_host_lib_dir", True),
                 ("tensorflow_host_include_dir", False),

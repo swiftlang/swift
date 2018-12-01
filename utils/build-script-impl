@@ -1318,7 +1318,7 @@ function verify_tensorflow_directories() {
 
                 # Check that "LIB" arguments contain the necessary libraries.
                 if [[ "dir_type" == "LIB" ]]; then
-                    for lib_name in tensorflow; do
+                    for lib_name in tensorflow tensorflow_framework; do
                         lib="lib${lib_name}.so"
                         if [[ ! -e "${!dir_name}/${lib}" ]]; then
                             echo "Error: '${lib}' does not exist in TensorFlow ${lower_platform} ${lower_dir_type} directory (was '${!dir_name}')"
@@ -1954,7 +1954,7 @@ function set_lldb_xcodebuild_options() {
         lldb_xcodebuild_options=(
             "${lldb_xcodebuild_options[@]}"
             ENABLE_TENSORFLOW=1
-            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow"
+            EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow -ltensorflow_framework"
         )
     fi
 }
@@ -2386,7 +2386,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     # Bazel-built libraries do not have write permission, which is
                     # problematic for overwriting/stripping symbols. Thus, write
                     # permission is added here.
-                    for lib_name in tensorflow; do
+                    for lib_name in tensorflow tensorflow_framework; do
                         lib="lib${lib_name}.so"
                         rm -f "${TF_LIB_DIR}/${lib}"
                         chmod +w "${TENSORFLOW_HOST_LIB_DIR}/${lib}"
@@ -2887,7 +2887,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Configure TensorFlow and build using bazel.
                 echo yes "" | "${source_dir}/configure"
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" //tensorflow:libtensorflow.so
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
 
                 # Set TensorFlow include/lib directories.
                 TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
