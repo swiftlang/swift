@@ -15,5 +15,6 @@ import D
 // CHECK-NEXT: {{^}}import B.B3{{$}}
 // CHECK-NEXT: {{^}}import C/*.c*/{{$}}
 // CHECK-NEXT: {{^}}import D{{$}}
+// CHECK-NEXT: {{^}}import Swift{{$}}
 // CHECK-NEXT: {{^}}@_exported import empty{{$}}
 // CHECK-NOT: import
