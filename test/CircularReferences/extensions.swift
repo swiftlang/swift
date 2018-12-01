@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-cycles > %t.log 2>&1
-// RUN: not grep "CYCLE DETECTED" %t.log | count 0
+// RUN: %target-typecheck-verify-swift -debug-cycles 2>&1 | %FileCheck --allow-empty %s
 
 // Verify that extension lookups don't cause cyclic dependencies.
 
@@ -7,3 +6,6 @@
 
 struct A { }
 extension A { }
+
+// CHECK-NOT: CYCLE DETECTED
+
