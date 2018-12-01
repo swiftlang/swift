@@ -146,6 +146,9 @@ public:
       // Look through closure capture lists.
       } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
         fn = captureList->getClosureBody();
+        // Look through optional evaluations.
+      } else if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(fn)) {
+        fn = optionalEval->getSubExpr()->getValueProvidingExpr();
       } else {
         break;
       }
@@ -710,7 +713,10 @@ private:
 
     // If it doesn't have function type, we must have invalid code.
     Type argType = fn.getType();
-    auto argFnType = (argType ? argType->getAs<AnyFunctionType>() : nullptr);
+    if (!argType) return Classification::forInvalidCode();
+
+    auto argFnType =
+        argType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!argFnType) return Classification::forInvalidCode();
 
     // If it doesn't throw, this argument does not cause the call to throw.
