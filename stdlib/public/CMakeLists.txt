@@ -68,8 +68,15 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(Platform)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
   if(SWIFT_BUILD_SDK_OVERLAY)
     add_subdirectory(SDK)
   endif()
 endif()
+
+if(SWIFT_BUILD_SDK_OVERLAY)
+  if(WINDOWS IN_LIST SWIFT_SDKS)
+    add_subdirectory(Windows)
+  endif()
+endif()
+
