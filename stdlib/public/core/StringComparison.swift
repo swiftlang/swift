@@ -136,7 +136,9 @@ internal func _stringCompare(
     let nfcQC = leftScalar._isNFCQCYes && rightScalar._isNFCQCYes
     let isSegmentEnd = left.hasNormalizationBoundary(before: idx + leftLen)
                     && right.hasNormalizationBoundary(before: idx + rightLen)
-    if _fastPath(nfcQC && isSegmentEnd) {
+    let isSegmentStart = leftScalar._hasNormalizationBoundaryBefore
+                      && rightScalar._hasNormalizationBoundaryBefore
+    if _fastPath(nfcQC && isSegmentEnd && isSegmentStart) {
       return expecting == _lexicographicalCompare(leftScalar, rightScalar)
     }
   }
