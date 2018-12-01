@@ -389,6 +389,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
+  bool sawNilLiteral = false;
   for (auto constraint : constraints) {
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
@@ -505,8 +506,10 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
       if (constraint->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral))
+              KnownProtocolKind::ExpressibleByNilLiteral)) {
+        sawNilLiteral = true;
         addOptionalSupertypeBindings = true;
+      }
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
@@ -743,6 +746,32 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       result.FullyBound = true;
     else
       result.Bindings.clear();
+  }
+
+  // Revise any optional-of-function-types we may try to nil literals
+  // to be non-throwing so they don't inadvertantly result in rethrows
+  // diagnostics.
+  if (sawNilLiteral) {
+    for (auto &binding : result.Bindings) {
+      auto nested = binding.BindingType->lookThroughAllOptionalTypes();
+      if (!nested)
+        continue;
+
+      if (!nested->is<FunctionType>())
+        continue;
+
+      // Remove throws from the nested function type.
+      binding.BindingType =
+          binding.BindingType.transform([&](Type inner) -> Type {
+            auto *fnTy = dyn_cast<FunctionType>(inner.getPointer());
+            if (!fnTy)
+              return inner;
+
+            auto extInfo = fnTy->getExtInfo().withThrows(false);
+            return FunctionType::get(fnTy->getParams(), fnTy->getResult(),
+                                     extInfo);
+          });
+    }
   }
 
   return result;
