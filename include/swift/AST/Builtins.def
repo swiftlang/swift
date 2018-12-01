@@ -478,14 +478,6 @@ BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
-/// Checked conversions for signed <-> unsigned integers of the same size.
-/// Returns a tuple containing the conversion result as well as
-/// the sign error / overflow bit.
-BUILTIN_MISC_OPERATION(SUCheckedConversion,
-                       "s_to_u_checked_conversion", "n", Special)
-BUILTIN_MISC_OPERATION(USCheckedConversion,
-                       "u_to_s_checked_conversion", "n", Special)
-
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 

@@ -674,9 +674,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
   assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
-         Builtin.ID == BuiltinValueKind::UToSCheckedTrunc ||
-         Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
-         Builtin.ID == BuiltinValueKind::USCheckedConversion);
+         Builtin.ID == BuiltinValueKind::UToSCheckedTrunc);
 
   // Check if we are converting a constant integer.
   OperandValueArrayRef Args = BI->getArguments();
@@ -688,11 +686,9 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
   auto SrcBitWidth = SrcVal.getBitWidth();
 
   bool DstTySigned = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
-                      Builtin.ID == BuiltinValueKind::UToSCheckedTrunc ||
-                      Builtin.ID == BuiltinValueKind::USCheckedConversion);
+                      Builtin.ID == BuiltinValueKind::UToSCheckedTrunc);
   bool SrcTySigned = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
-                      Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
-                      Builtin.ID == BuiltinValueKind::SUCheckedConversion);
+                      Builtin.ID == BuiltinValueKind::SToUCheckedTrunc);
 
   // Get source type and bit width.
   auto SrcTy = Builtin.Types[0]->castTo<AnyBuiltinIntegerType>();
@@ -705,44 +701,33 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
   bool OverflowError;
   Type DstTy;
 
-  // Process conversions signed <-> unsigned for same size integers.
-  if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
-      Builtin.ID == BuiltinValueKind::USCheckedConversion) {
-    DstTy = SrcTy;
+  assert(Builtin.Types.size() == 2);
+  DstTy = Builtin.Types[1];
+  uint32_t DstBitWidth =
+    DstTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
+
+  assert((DstBitWidth < SrcBitWidth || !SrcTy->getWidth().isFixedWidth()) &&
+         "preconditions on builtin trunc operations should prevent"
+         "fixed-width truncations that actually extend");
+
+  // The only way a true extension can overflow is if the value is
+  // negative and the result is unsigned.
+  if (DstBitWidth > SrcBitWidth) {
+    OverflowError = (SrcTySigned && !DstTySigned && SrcVal.isNegative());
+    Result = (SrcTySigned ? SrcVal.sext(DstBitWidth)
+                          : SrcVal.zext(DstBitWidth));
+
+  // A same-width change can overflow if the top bit disagrees.
+  } else if (DstBitWidth == SrcBitWidth) {
+    OverflowError = (SrcTySigned != DstTySigned && SrcVal.isNegative());
     Result = SrcVal;
-    // Report an error if the sign bit is set.
-    OverflowError = SrcVal.isNegative();
 
-  // Process the checked truncations.
+  // A truncation can overflow if the value changes.
   } else {
-    assert(Builtin.Types.size() == 2);
-    DstTy = Builtin.Types[1];
-    uint32_t DstBitWidth =
-      DstTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
-
-    assert((DstBitWidth < SrcBitWidth || !SrcTy->getWidth().isFixedWidth()) &&
-           "preconditions on builtin trunc operations should prevent"
-           "fixed-width truncations that actually extend");
-
-    // The only way a true extension can overflow is if the value is
-    // negative and the result is unsigned.
-    if (DstBitWidth > SrcBitWidth) {
-      OverflowError = (SrcTySigned && !DstTySigned && SrcVal.isNegative());
-      Result = (SrcTySigned ? SrcVal.sext(DstBitWidth)
-                            : SrcVal.zext(DstBitWidth));
-
-    // A same-width change can overflow if the top bit disagrees.
-    } else if (DstBitWidth == SrcBitWidth) {
-      OverflowError = (SrcTySigned != DstTySigned && SrcVal.isNegative());
-      Result = SrcVal;
-
-    // A truncation can overflow if the value changes.
-    } else {
-      Result = SrcVal.trunc(DstBitWidth);
-      APInt Ext = (DstTySigned ? Result.sext(SrcBitWidth)
-                               : Result.zext(SrcBitWidth));
-      OverflowError = (SrcVal != Ext);
-    }
+    Result = SrcVal.trunc(DstBitWidth);
+    APInt Ext = (DstTySigned ? Result.sext(SrcBitWidth)
+                             : Result.zext(SrcBitWidth));
+    OverflowError = (SrcVal != Ext);
   }
 
   // Check for overflow.
@@ -819,25 +804,19 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                  DstTySigned, DstTy, SrcAsString);
       }
     } else {
-      if (Builtin.ID == BuiltinValueKind::SUCheckedConversion) {
+      // Try to print user-visible types if they are available.
+      if (!UserSrcTy.isNull()) {
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                 diag::integer_conversion_sign_error,
-                 UserDstTy.isNull() ? DstTy : UserDstTy);
-      } else {
-        // Try to print user-visible types if they are available.
-        if (!UserSrcTy.isNull()) {
-          diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                   diag::integer_conversion_overflow,
-                   UserSrcTy, UserDstTy);
+                 diag::integer_conversion_overflow,
+                 UserSrcTy, UserDstTy);
 
-        // Otherwise, print the Builtin Types.
-        } else {
-          // Since builtin types are sign-agnostic, print the signedness
-          // separately.
-          diagnose(M.getASTContext(), Loc.getSourceLoc(),
-                   diag::integer_conversion_overflow_builtin_types,
-                   SrcTySigned, SrcTy, DstTySigned, DstTy);
-        }
+      // Otherwise, print the Builtin Types.
+      } else {
+        // Since builtin types are sign-agnostic, print the signedness
+        // separately.
+        diagnose(M.getASTContext(), Loc.getSourceLoc(),
+                 diag::integer_conversion_overflow_builtin_types,
+                 SrcTySigned, SrcTy, DstTySigned, DstTy);
       }
     }
 
@@ -1220,9 +1199,7 @@ case BuiltinValueKind::id:
   case BuiltinValueKind::SToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
-  case BuiltinValueKind::UToSCheckedTrunc:
-  case BuiltinValueKind::SUCheckedConversion:
-  case BuiltinValueKind::USCheckedConversion: {
+  case BuiltinValueKind::UToSCheckedTrunc: {
     return constantFoldAndCheckIntegerConversions(BI, Builtin, ResultsInError);
   }
 
