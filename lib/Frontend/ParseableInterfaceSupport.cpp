@@ -528,8 +528,7 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   for (auto import : allImports) {
-    if (import.second->isStdlibModule() ||
-        import.second->isOnoneSupportModule() ||
+    if (import.second->isOnoneSupportModule() ||
         import.second->isBuiltinModule()) {
       continue;
     }
