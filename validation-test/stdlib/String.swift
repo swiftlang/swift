@@ -2216,8 +2216,28 @@ StringTests.test("NormalizationCheck") {
   let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
   let nfcCodeUnits = str._nfcCodeUnits
   let expectedCodeUnits: [UInt8] = [0xCC, 0xB6, 0xCC, 0x88, 0xCC, 0x81, 0xCD, 0x97, 0xCC, 0x93, 0xCC, 0x94, 0xCD, 0x91, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x94, 0xCD, 0x97, 0xCC, 0x81, 0xCC, 0x88, 0xCC, 0x81, 0xCC, 0x95, 0xCD, 0xA0, 0x61]
+
+  expectEqual(expectedCodeUnits, nfcCodeUnits)
+}
+
+StringTests.test("NormalizationCheck/Opaque") {
+  let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
+  let opaqueString = NSSlowString(string: str) as String
+  let nfcCodeUnits = opaqueString._nfcCodeUnits
+  let expectedCodeUnits: [UInt8] = [0xCC, 0xB6, 0xCC, 0x88, 0xCC, 0x81, 0xCD, 0x97, 0xCC, 0x93, 0xCC, 0x94, 0xCD, 0x91, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x80, 0xCC, 0x94, 0xCD, 0x97, 0xCC, 0x81, 0xCC, 0x88, 0xCC, 0x81, 0xCC, 0x95, 0xCD, 0xA0, 0x61]
+
+  expectEqual(expectedCodeUnits, nfcCodeUnits)
+}
+
+StringTests.test("ABC") {
+  let str = "abcdefg"
+  let nfcCodeUnits = str._nfcCodeUnits
+  let expectedCodeUnits = Array(str.utf8)
   
   expectEqual(expectedCodeUnits, nfcCodeUnits)
+  
+  let opaqueString = NSSlowString(string: str) as String
+  expectEqual(expectedCodeUnits, opaqueString._nfcCodeUnits)
 }
 
 runAllTests()

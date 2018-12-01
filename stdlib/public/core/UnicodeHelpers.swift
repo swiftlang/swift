@@ -23,6 +23,7 @@ internal func _isTrailingSurrogate(_ cu: UInt16) -> Bool {
   return cu & _surrogateMask == _trailingSurrogateBias
 }
 @inline(__always)
+@usableFromInline
 internal func _isLeadingSurrogate(_ cu: UInt16) -> Bool {
   return cu & _surrogateMask == _leadingSurrogateBias
 }
@@ -82,6 +83,23 @@ internal func _decodeUTF8(
             | (_continuationPayload(z) &<< 6)
             | _continuationPayload(w)
   return Unicode.Scalar(_unchecked: value)
+}
+
+@inlinable
+internal func _decodeScalar(
+  _ utf16: UnsafeBufferPointer<UInt16>, startingAt i: Int
+) -> (Unicode.Scalar, scalarLength: Int) {
+  let high = utf16[i]
+  if i + 1 >= utf16.count {
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  }
+  
+  if !_isLeadingSurrogate(high) {
+    return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
+  }
+  
+  let low = utf16[i+1]
+  return (Unicode.Scalar(_unchecked: _decodeSurrogatePair(leading: high, trailing: low)), 2)
 }
 
 @inlinable
@@ -148,6 +166,7 @@ internal func _continuationPayload(_ x: UInt8) -> UInt32 {
 }
 
 @inline(__always)
+@usableFromInline
 internal func _decodeSurrogatePair(
   leading high: UInt16, trailing low: UInt16
 ) -> UInt32 {
