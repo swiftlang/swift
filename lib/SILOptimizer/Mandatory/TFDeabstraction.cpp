@@ -1394,7 +1394,12 @@ static SILValue explodeSILStructArgument(SILPhiArgument *arg) {
 
   // Ok, now that we've exploded the BB argument itself, we need to explode the
   // values passed in the predecessor blocks.
-  for (auto pi : argBB->getPredecessorBlocks()) {
+  //
+  // Collect all predecessor blocks before processing because we invalidate the
+  // iterator when we replace the branch at the end of the loop.
+  SmallPtrSet<SILBasicBlock *, 8> predBlocks(argBB->pred_begin(),
+                                             argBB->pred_end());
+  for (auto pi : predBlocks) {
     auto *br = cast<BranchInst>(pi->getTerminator());
     SmallVector<SILValue, 8> operands;
     for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
