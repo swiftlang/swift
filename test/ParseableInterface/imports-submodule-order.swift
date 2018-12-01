@@ -17,6 +17,7 @@
 // CHECK-NOT: import
 // CHECK: import X.Submodule{{$}}
 // CHECK-NEXT: import Y.Submodule{{$}}
+// CHECK-NEXT: {{^}}import Swift{{$}}
 // CHECK-NEXT: import X{{$}}
 // CHECK-NEXT: import Y{{$}}
 // CHECK-NOT: import
