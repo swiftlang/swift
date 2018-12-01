@@ -1258,11 +1258,26 @@ extension Unicode {
       self.rawValue = rawValue
     }
 
+    public static func == (
+      lhs: CanonicalCombiningClass,
+      rhs: CanonicalCombiningClass
+    ) -> Bool {
+      return lhs.rawValue == rhs.rawValue
+    }
+
     public static func < (
       lhs: CanonicalCombiningClass,
       rhs: CanonicalCombiningClass
     ) -> Bool {
       return lhs.rawValue < rhs.rawValue
+    }
+
+    public var hashValue: Int {
+      return rawValue.hashValue
+    }
+
+    public func hash(into hasher: inout Hasher) {
+      hasher.combine(rawValue)
     }
   }
 }

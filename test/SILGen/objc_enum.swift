@@ -9,7 +9,6 @@ import gizmo
 
 // CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV{{[_0-9a-zA-Z]*}}fC
 // CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV8rawValueSivg
-// CHECK-DAG: sil shared [serializable] @$sSo16NSRuncingOptionsV9hashValueSivg
 
 // Non-payload enum ctors don't need to be instantiated at all.
 // NEGATIVE-NOT: sil shared [transparent] @$sSo16NSRuncingOptionsV5MinceAbBmF
