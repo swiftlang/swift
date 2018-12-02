@@ -11,6 +11,7 @@ Func MutableCollection._partition(within:by:) has parameter 0 type change from R
 Func BinaryInteger._description(radix:uppercase:) has been removed
 Struct _Buffer32 has been removed
 Struct _Buffer72 has been removed
+Func _getBool(_:) has been removed
 Func _int64ToString(_:radix:uppercase:) has been removed
 Func _int64ToStringImpl(_:_:_:_:_:) has been removed
 Func _uint64ToStringImpl(_:_:_:_:_:) has been removed

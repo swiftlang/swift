@@ -3250,9 +3250,18 @@ namespace {
       }
 
       // SIL-generation magically turns this into a Bool; make sure it can.
-      if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
-        tc.diagnose(expr->getLoc(), diag::bool_intrinsics_not_found);
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
+                        { tc.Context.Id_builtinBooleanLiteral });
+      auto members = cs.getASTContext().getBoolDecl()->lookupDirect(initName);
+      
+      if (members.size() != 1) {
+        tc.diagnose(expr->getLoc(), diag::broken_bool);
         // Continue anyway.
+      } else {
+        if (!isa<ConstructorDecl>(members[0])) {
+          tc.diagnose(expr->getLoc(), diag::broken_bool);
+          // Continue anyway.
+        }
       }
 
       // Dig through the optionals in the from/to types.

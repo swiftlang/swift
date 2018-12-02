@@ -588,7 +588,7 @@ func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word 
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.NativeObject>
 // CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
-  return _getBool(Builtin.isUnique(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
 // NativeObject nonNull
@@ -598,7 +598,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.NativeObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
-  return _getBool(Builtin.isUnique(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
 // UnknownObject (ObjC)
@@ -608,7 +608,7 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Optional<Builtin.UnknownObject>
 // CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
-  return _getBool(Builtin.isUnique(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
 // UnknownObject (ObjC) nonNull
@@ -618,7 +618,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.UnknownObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
-  return _getBool(Builtin.isUnique(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
 // BridgeObject nonNull
@@ -628,7 +628,7 @@ func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
 // CHECK: [[BUILTIN:%.*]] = is_unique [[WRITE]] : $*Builtin.BridgeObject
 // CHECK: return
 func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return _getBool(Builtin.isUnique(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique(&ref))
 }
 
 // BridgeObject nonNull native
@@ -638,7 +638,7 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
 // CHECK: [[CAST:%.*]] = unchecked_addr_cast [[WRITE]] : $*Builtin.BridgeObject to $*Builtin.NativeObject
 // CHECK: return
 func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
-  return _getBool(Builtin.isUnique_native(&ref))
+  return Bool(_builtinBooleanLiteral: Builtin.isUnique_native(&ref))
 }
 
 // ----------------------------------------------------------------------------

@@ -1471,6 +1471,10 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
+  RValue emitApplyAllocatingInitializer(SILLocation loc, ConcreteDeclRef init,
+                                        RValue &&args, Type overriddenSelfType,
+                                        SGFContext ctx);
+
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
