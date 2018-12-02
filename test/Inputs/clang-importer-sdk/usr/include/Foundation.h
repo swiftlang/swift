@@ -281,6 +281,10 @@ __attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
                    error:(out NSError *_Nullable *)error;
 @end
 
+// An all-initials name like NSURL or NSUUID, but one that isn't bridged.
+@interface NSGUID : NSObject
+@end
+
 @interface NSAttributedString : NSString
 - (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
 @end
@@ -769,6 +773,8 @@ NSSet *setToSet(NSSet *dict);
 
 @interface NSExtensionContext : NSObject
 - (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;
+// Fake API, for testing initialisms.
+- (void)openGUID:(NSGUID *)GUID completionHandler:(void (^)(BOOL success))completionHandler;
 @end
 
 @interface NSProcessInfo : NSObject
@@ -962,12 +968,19 @@ __attribute__((availability(macosx, introduced = 10.52)))
 - (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
 - (nonnull NSString *)stringWithString:(nonnull NSString *)string;
 - (nullable NSURL *)URLWithAddedString:(nonnull NSString *)string;
+// Fake API for testing initialisms.
+- (nullable NSGUID *)GUIDWithAddedString:(nonnull NSString *)string;
 - (NSString *)stringForCalendarUnits:(NSCalendarUnit)units;
 @end
 
 @interface NSURL (Properties)
 @property (readonly, nullable) NSURL *URLByDeletingLastPathComponent;
 @property (readonly, nonnull) NSURL *URLWithHTTPS;
+@end
+
+@interface NSGUID (Properties)
+@property (readonly, nullable) NSGUID *GUIDByCanonicalizing;
+@property (readonly, nonnull) NSGUID *GUIDWithContext;
 @end
 
 typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
@@ -1054,6 +1067,7 @@ extern NSString *NSHTTPRequestKey;
 
 @interface NSString (URLExtraction)
 @property (nonnull,copy,readonly) NSArray<NSURL *> *URLsInText;
+@property (nonnull,copy,readonly) NSArray<NSGUID *> *GUIDsInText;
 @end
 
 @interface NSObject (Selectors)
