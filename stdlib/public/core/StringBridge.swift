@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -47,8 +47,8 @@ internal func _stdlib_binary_CFStringGetCharactersPtr(
     mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Copies a slice of a _CocoaString into contiguous storage of
-/// sufficient capacity.
+/// Copies a slice of a _CocoaString into contiguous storage of sufficient
+/// capacity.
 @_effects(releasenone)
 internal func _cocoaStringCopyCharacters(
   from source: _CocoaString,
@@ -81,54 +81,46 @@ internal func _cocoaStringCompare(
 @_effects(readonly)
 internal func _cocoaHashString(
   _ string: _CocoaString
-  ) -> UInt {
+) -> UInt {
   return _swift_stdlib_CFStringHashNSString(string)
 }
 
 @_effects(readonly)
 internal func _cocoaHashASCIIBytes(
-  _ bytes: UnsafePointer<UInt8>,
-  length: Int
-  ) -> UInt {
+  _ bytes: UnsafePointer<UInt8>, length: Int
+) -> UInt {
   return _swift_stdlib_CFStringHashCString(bytes, length)
 }
 
 // These "trampolines" are effectively objc_msgSend_super.
-// They bypass our implementations to use NSString's
+// They bypass our implementations to use NSString's.
 
 @_effects(readonly)
 internal func _cocoaCStringUsingEncodingTrampoline(
-  _ string: _CocoaString,
-  _ encoding: UInt)
-  -> UnsafePointer<UInt8>? {
-    return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(
-      string,
-      encoding)
+  _ string: _CocoaString, _ encoding: UInt
+) -> UnsafePointer<UInt8>? {
+  return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
-
-
-
 
 @_effects(releasenone)
 internal func _cocoaGetCStringTrampoline(
-                             _ string: _CocoaString,
-                             _ buffer: UnsafeMutablePointer<UInt8>,
-                             _ maxLength: Int,
-                             _ encoding: UInt)
-  -> Int8 {
-    return Int8(_swift_stdlib_NSStringGetCStringTrampoline(string,
-                                                    buffer,
-                                                    maxLength,
-                                                    encoding))
+  _ string: _CocoaString,
+  _ buffer: UnsafeMutablePointer<UInt8>,
+  _ maxLength: Int,
+  _ encoding: UInt
+) -> Int8 {
+  return Int8(_swift_stdlib_NSStringGetCStringTrampoline(
+    string, buffer, maxLength, encoding))
 }
 
 //
-// Conversion from NSString to Swift's native representation
+// Conversion from NSString to Swift's native representation.
 //
 
 private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
+
 private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
@@ -149,12 +141,12 @@ internal enum _KnownCocoaString {
   @inline(__always)
   init(_ str: _CocoaString) {
     
-    #if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
       self = .tagged
       return
     }
-    #endif
+#endif
     
     switch _unsafeAddressOfCocoaStringClass(str) {
     case unsafeBitCast(_StringStorage.self, to: UInt.self):
@@ -168,7 +160,7 @@ internal enum _KnownCocoaString {
 }
 
 #if !(arch(i386) || arch(arm))
-// Resiliently write a tagged cocoa string's contents into a buffer
+// Resiliently write a tagged _CocoaString's contents into a buffer.
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
@@ -223,16 +215,18 @@ private func _getCocoaStringPointer(
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   switch _KnownCocoaString(cocoaString) {
   case .storage:
-    return _unsafeUncheckedDowncast(cocoaString, to: _StringStorage.self).asString._guts
+    return _unsafeUncheckedDowncast(
+      cocoaString, to: _StringStorage.self).asString._guts
   case .shared:
-    return _unsafeUncheckedDowncast(cocoaString, to: _SharedStringStorage.self).asString._guts
+    return _unsafeUncheckedDowncast(
+      cocoaString, to: _SharedStringStorage.self).asString._guts
 #if !(arch(i386) || arch(arm))
   case .tagged:
-      return _StringGuts(_SmallString(taggedCocoa: cocoaString))
+    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
 #endif
   case .cocoa:
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
+    // "Copy" it into a value to be sure nobody will modify behind
+    // our backs. In practice, when value is already immutable, this
     // just does a retain.
     //
     // TODO: Only in certain circumstances should we emit this call:
@@ -240,15 +234,14 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //   2) If it's mutable with no associated information, then a copy must
     //      happen; might as well eagerly bridge it in.
     //   3) If it's mutable with associated information, must make the call
-    //
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
     
-    #if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }
-    #endif
+#endif
     
     let (fastUTF8, isASCII): (Bool, Bool)
     switch _getCocoaStringPointer(immutableCopy) {
