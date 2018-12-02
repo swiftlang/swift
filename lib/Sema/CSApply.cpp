@@ -4196,12 +4196,26 @@ namespace {
       // The declaration we found must be exposed to Objective-C.
       tc.validateDecl(method);
       if (!method->isObjC()) {
+				// This is to check if the method declaration lives in a protocol, so
+				// we can insert the @objc fix-it on the protocol declaration, instead
+				// of on the method declaration (as that's not allowed). This fixes an
+				// issue where you provide a default implementation of a method via a
+				// protocol extension and the fix-it ends up being on the method
+				// declaration on the protocol.
+				
+				// FIXME: Put the fix-it on the method declaration in the protocol
+				// extension, instead of the protocol itself?
+				auto methodContextDecl = foundDecl->getDeclContext()->getAsDecl();
+				bool isMethodDeclaredInProtocol = methodContextDecl->getKind() == DeclKind::Protocol;
+				
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
           .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
-          .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+				.fixItInsert(isMethodDeclaredInProtocol ?
+										 methodContextDecl->getStartLoc() :
+										 foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
         return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
