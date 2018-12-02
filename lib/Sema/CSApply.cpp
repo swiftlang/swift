@@ -4213,10 +4213,10 @@ namespace {
           .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
-	  .fixItInsert(isMethodDeclaredInProtocol ?
-		     methodContextDecl->getStartLoc() :
-		     foundDecl->getAttributeInsertionLoc(false),
-		     "@objc ");
+          .fixItInsert(isMethodDeclaredInProtocol ?
+                       methodContextDecl->getStartLoc() :
+                       foundDecl->getAttributeInsertionLoc(false),
+                       "@objc ");
         return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
         // If this attribute was inferred based on deprecated Swift 3 rules,
