@@ -4213,7 +4213,7 @@ namespace {
           .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
-	.fixItInsert(isMethodDeclaredInProtocol ?
+	  .fixItInsert(isMethodDeclaredInProtocol ?
 		     methodContextDecl->getStartLoc() :
 		     foundDecl->getAttributeInsertionLoc(false),
 		     "@objc ");
