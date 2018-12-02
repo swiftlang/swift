@@ -500,7 +500,10 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         let containerKey = _converted(key).stringValue
-        let dictionary = self.container[containerKey] as? NSMutableDictionary ?? NSMutableDictionary()
+        let existingContainer = self.container[containerKey]
+        precondition(existingContainer is NSMutableDictionary?,
+                     "Attempt to request for keyed container with the key that previously unkeyed container already requested.")
+        let dictionary = existingContainer as? NSMutableDictionary ?? NSMutableDictionary()
         self.container[containerKey] = dictionary
 
         self.codingPath.append(key)
@@ -512,7 +515,10 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
         let containerKey = _converted(key).stringValue
-        let array = self.container[containerKey] as? NSMutableArray ?? NSMutableArray()
+        let existingContainer = self.container[containerKey]
+        precondition(existingContainer is NSMutableArray?,
+                     "Attempt to request for unkeyed container with the key that previously keyed container already requested.")
+        let array = existingContainer as? NSMutableArray ?? NSMutableArray()
         self.container[containerKey] = array
 
         self.codingPath.append(key)
