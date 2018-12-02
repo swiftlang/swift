@@ -265,8 +265,9 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        let dictionary = NSMutableDictionary()
-        self.container[key.stringValue] = dictionary
+        let containerKey = key.stringValue
+        let dictionary = self.container[containerKey] as? NSMutableDictionary ?? NSMutableDictionary()
+        self.container[containerKey] = dictionary
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
@@ -276,8 +277,9 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
     }
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let array = NSMutableArray()
-        self.container[key.stringValue] = array
+        let containerKey = key.stringValue
+        let array = self.container[containerKey] as? NSMutableArray ?? NSMutableArray()
+        self.container[containerKey] = array
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
