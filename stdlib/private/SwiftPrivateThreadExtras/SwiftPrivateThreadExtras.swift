@@ -116,10 +116,8 @@ public func _stdlib_thread_join<Result>(
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
 #if os(Windows)
-  // TODO(compnerd) modularize rpc.h for INFINITE (0xffffffff)
-  let result = WaitForSingleObject(thread, 0xffffffff);
-  // TODO(compnerd) modularize WinBase.h for WAIT_OBJECT_0 (0)
-  if result == 0 {
+  let result = WaitForSingleObject(thread, INFINITE)
+  if result == WAIT_OBJECT_0 {
     var threadResult: DWORD = 0
     GetExitCodeThread(thread, &threadResult)
     CloseHandle(thread)
