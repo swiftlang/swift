@@ -1876,7 +1876,7 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   // Ensure it is actually an initializer
   assert(::isa<ConstructorDecl>(members[0]));
 
-  auto init = dyn_cast<ConstructorDecl>(members[0]);
+  auto init = cast<ConstructorDecl>(members[0]);
   Type builtinArgType = BuiltinIntegerType::get(1, ctx);
   RValue builtinArg(SGF, ManagedValue::forUnmanaged(isa),
                     builtinArgType->getCanonicalType());
@@ -1919,7 +1919,7 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
   // Ensure it is actually an initializer
   assert(::isa<ConstructorDecl>(members[0]));
 
-  auto init = dyn_cast<ConstructorDecl>(members[0]);
+  auto init = cast<ConstructorDecl>(members[0]);
   Type builtinArgType = BuiltinIntegerType::get(1, ctx);
   RValue builtinArg(SGF, ManagedValue::forUnmanaged(selected),
                     builtinArgType->getCanonicalType());
