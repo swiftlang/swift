@@ -29,10 +29,10 @@ func opaque_archetype_is_opaque_archetype
   // CHECK:   [[N:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK:   br [[CONT]]([[N]] : $Builtin.Int1)
   // CHECK: [[CONT]]([[I1:%.*]] : @trivial $Builtin.Int1):
-  // -- apply the _getBool library fn
-  // CHECK-NEXT:  function_ref Swift._getBool
-  // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @$ss8_getBoolySbBi1_F :
-  // CHECK-NEXT:  [[RES:%.*]] = apply [[GETBOOL]]([[I1]])
+  // CHECK-NEXT:  [[META:%.*]] = metatype $@thin Bool.Type
+  // CHECK-NEXT:  function_ref Swift.Bool.init(_builtinBooleanLiteral: Builtin.Int1)
+  // CHECK-NEXT:  [[BOOL:%.*]] = function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC :
+  // CHECK-NEXT:  [[RES:%.*]] = apply [[BOOL]]([[I1]], [[META]])
   // -- we don't consume the checked value
   // CHECK:   return [[RES]] : $Bool
 }

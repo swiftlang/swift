@@ -1864,13 +1864,27 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
                          E->getCastTypeLoc().getType(), E->getCastKind());
 
-  // Call the _getBool library intrinsic.
+  // Call the Bool(_builtinBooleanLiteral:) initializer
   ASTContext &ctx = SGF.getASTContext();
+  DeclName name(ctx, DeclBaseName::createConstructor(),
+                { ctx.Id_builtinBooleanLiteral });
+  auto members = ctx.getBoolDecl()->lookupDirect(name);
+  
+  // Ensure we just have one initializer
+  assert(members.size() == 1);
+
+  // Ensure it is actually an initializer
+  assert(::isa<ConstructorDecl>(members[0]));
+
+  auto init = dyn_cast<ConstructorDecl>(members[0]);
+  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
+  RValue builtinArg(SGF, ManagedValue::forUnmanaged(isa),
+                    builtinArgType->getCanonicalType());
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
-                                    SubstitutionMap(),
-                                    ManagedValue::forUnmanaged(isa),
-                                    C);
+    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
+                                       std::move(builtinArg), Type(),
+                                       C);
+
   return result;
 }
 
@@ -1894,12 +1908,25 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
                                       {{E->getEnumElement(), t}});
   }
   
-  // Call the _getBool library intrinsic.
+  // Call the Bool(_builtinBooleanLiteral:) initializer
+  DeclName name(ctx, DeclBaseName::createConstructor(),
+                { ctx.Id_builtinBooleanLiteral });
+  auto members = ctx.getBoolDecl()->lookupDirect(name);
+  
+  // Ensure we just have one initializer
+  assert(members.size() == 1);
+  
+  // Ensure it is actually an initializer
+  assert(::isa<ConstructorDecl>(members[0]));
+
+  auto init = dyn_cast<ConstructorDecl>(members[0]);
+  Type builtinArgType = BuiltinIntegerType::get(1, ctx);
+  RValue builtinArg(SGF, ManagedValue::forUnmanaged(selected),
+                    builtinArgType->getCanonicalType());
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
-                                    SubstitutionMap(),
-                                    ManagedValue::forUnmanaged(selected),
-                                    C);
+    SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
+                                       std::move(builtinArg), Type(),
+                                       C);
   return result;
 }
 

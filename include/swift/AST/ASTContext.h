@@ -513,9 +513,6 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics(LazyResolver *resolver) const;
 
-  /// Retrieve the declaration of Swift._getBool.
-  FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
-
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 

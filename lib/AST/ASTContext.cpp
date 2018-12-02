@@ -194,9 +194,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// func _getBool(Builtin.Int1) -> Bool
-  FuncDecl *GetBoolDecl = nullptr;
-  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -996,36 +993,6 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
   return nullptr;
 }
 
-/// Looks up the implementation (assumed to be singular) of a globally-defined
-/// standard library intrinsic function and passes the potential match to the
-/// given callback if it was found. If the callback returns true, then the
-/// match is returned; otherwise, nullptr is returned.
-/// \p ctx The AST context.
-/// \p name The name of the function.
-/// \p resolver The lazy resolver.
-/// \p callback A callback that takes as its two arguments the input type and
-///     result type of the candidate function declaration and returns true if
-///     the function matches the desired criteria.
-/// \return The matching function declaration, or nullptr if there was no match.
-static FuncDecl *
-lookupLibraryIntrinsicFunc(const ASTContext &ctx, StringRef name,
-                           LazyResolver *resolver,
-                           llvm::function_ref<bool(FunctionType *)> pred) {
-  Type inputType, resultType;
-  auto decl = findLibraryIntrinsic(ctx, name, resolver);
-  if (!decl)
-    return nullptr;
-
-  auto *funcTy = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
-  if (!funcTy)
-    return nullptr;
-
-  if (pred(funcTy))
-    return decl;
-
-  return nullptr;
-}
-
 FuncDecl *ASTContext::getEqualIntDecl() const {
   if (getImpl().EqualIntDecl)
     return getImpl().EqualIntDecl;
@@ -1044,22 +1011,6 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
     return type->getResult()->isEqual(boolType);
   });
   getImpl().EqualIntDecl = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
-  if (getImpl().GetBoolDecl)
-    return getImpl().GetBoolDecl;
-
-  auto boolType = getBoolDecl()->getDeclaredType();
-  auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool",
-                                         resolver, [=](FunctionType *type) {
-    // Look for the signature (Builtin.Int1) -> Bool
-    if (type->getParams().size() != 1) return false;
-    if (!isBuiltinInt1Type(type->getParams()[0].getOldType())) return false;
-    return type->getResult()->isEqual(boolType);
-  });
-  getImpl().GetBoolDecl = decl;
   return decl;
 }
 
