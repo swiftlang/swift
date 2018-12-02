@@ -266,9 +266,9 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
         let containerKey = key.stringValue
-				let existingContainer = self.container[containerKey]
+	let existingContainer = self.container[containerKey]
         precondition(existingContainer is NSMutableDictionary?,
-          "Attempt to request for keyed container with the key that previously unkeyed container already requested.")
+            "Attempt to request for keyed container with the key that previously unkeyed container already requested.")
         let dictionary = existingContainer as? NSMutableDictionary ?? NSMutableDictionary()
         self.container[containerKey] = dictionary
 
@@ -283,8 +283,8 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
         let containerKey = key.stringValue
         let existingContainer = self.container[containerKey]
         precondition(existingContainer is NSMutableArray?,
-					"Attempt to request for unkeyed container with the key that previously keyed container already requested.")
-				let array = existingContainer as? NSMutableArray ?? NSMutableArray()
+	    "Attempt to request for unkeyed container with the key that previously keyed container already requested.")
+        let array = existingContainer as? NSMutableArray ?? NSMutableArray()
         self.container[containerKey] = array
 
         self.codingPath.append(key)
