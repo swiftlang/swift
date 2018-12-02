@@ -3252,7 +3252,7 @@ namespace {
       // SIL-generation magically turns this into a Bool; make sure it can.
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_builtinBooleanLiteral });
-      auto members = cs.getASTContext().getBoolDecl()->lookupDirect(initName);
+      auto members = tc.Context.getBoolDecl()->lookupDirect(initName);
       
       if (members.size() != 1) {
         tc.diagnose(expr->getLoc(), diag::broken_bool);
