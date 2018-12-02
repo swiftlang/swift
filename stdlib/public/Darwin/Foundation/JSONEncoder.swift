@@ -499,8 +499,9 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     public mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
-        let dictionary = NSMutableDictionary()
-        self.container[_converted(key).stringValue] = dictionary
+        let containerKey = _converted(key).stringValue
+        let dictionary = self.container[containerKey] as? NSMutableDictionary ?? NSMutableDictionary()
+        self.container[containerKey] = dictionary
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
@@ -510,8 +511,9 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     public mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
-        let array = NSMutableArray()
-        self.container[_converted(key).stringValue] = array
+        let containerKey = _converted(key).stringValue
+        let array = self.container[containerKey] as? NSMutableArray ?? NSMutableArray()
+        self.container[containerKey] = array
 
         self.codingPath.append(key)
         defer { self.codingPath.removeLast() }
