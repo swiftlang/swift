@@ -39,9 +39,9 @@
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: {{ }}:{{ }}
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -enable-source-import -I %S/../Inputs/clang-importer-sdk/swift-modules/) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -enable-source-import -I %S/../Inputs/clang-importer-sdk/swift-modules/) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -enable-source-import -I %S/../Inputs/clang-importer-sdk/swift-modules/) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
@@ -91,8 +91,8 @@
 // CHECK-IMPORT-YAML-NOT: {{^-}}
 // CHECK-IMPORT-YAML-NOT: {{:$}}
 
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -typecheck %s | %FileCheck -check-prefix=CHECK-IMPORT %s
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -enable-source-import -I %S/../Inputs/clang-importer-sdk/swift-modules/) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -typecheck %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -enable-source-import -I %S/../Inputs/clang-importer-sdk/swift-modules/) -DERROR -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 
 import Foundation

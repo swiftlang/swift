@@ -1,0 +1,43 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Darwin -enable-resilience
+
+@_exported import Darwin // Clang module
+
+
+//===----------------------------------------------------------------------===//
+// MacTypes.h
+//===----------------------------------------------------------------------===//
+public let noErr: OSStatus
+
+/// The `Boolean` type declared in MacTypes.h and used throughout Core
+/// Foundation.
+///
+/// The C type is a typedef for `unsigned char`.
+@_fixed_layout
+public struct DarwinBoolean : ExpressibleByBooleanLiteral {
+  @_hasStorage @usableFromInline internal var value: UInt8
+
+  @inlinable public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
+
+  /// The value of `self`, expressed as a `Bool`.
+  @inlinable public var boolValue: Bool {
+    return value != 0
+  }
+
+  /// Create an instance initialized to `value`.
+  @_transparent
+  public init(booleanLiteral value: Bool) {
+    self.init(value)
+  }
+}
+
+@inlinable public // COMPILER_INTRINSIC
+func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
+  return DarwinBoolean(x)
+}
+@inlinable public // COMPILER_INTRINSIC
+func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
+  return x.boolValue
+}

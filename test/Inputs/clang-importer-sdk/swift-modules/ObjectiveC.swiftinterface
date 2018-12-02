@@ -1,0 +1,92 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name ObjectiveC -enable-resilience -disable-objc-attr-requires-foundation-module
+
+@_exported import ObjectiveC // Clang module
+
+// The iOS/arm64 target uses _Bool for Objective-C's BOOL.  We include
+// x86_64 here as well because the iOS simulator also uses _Bool.
+#if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
+@_fixed_layout
+public struct ObjCBool {
+  @usableFromInline internal var value : Bool
+
+  @inlinable public init(_ value: Bool) {
+    self.value = value
+  }
+
+  @inlinable public var boolValue: Bool {
+    return value
+  }
+}
+
+#else
+
+@_fixed_layout
+public struct ObjCBool {
+  @usableFromInline internal var value : UInt8
+
+  @inlinable public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
+
+  @inlinable public init(_ value: UInt8) {
+    self.value = value
+  }
+
+  @inlinable public var boolValue: Bool {
+    if value == 0 { return false }
+    return true
+  }
+}
+#endif
+
+extension ObjCBool : ExpressibleByBooleanLiteral {
+  @inlinable public init(booleanLiteral: Bool) {
+    self.init(booleanLiteral)
+  }
+}
+
+@_fixed_layout
+public struct Selector : ExpressibleByStringLiteral {
+  @usableFromInline internal var ptr : OpaquePointer
+
+  public init(_ value: String)
+
+  public init(unicodeScalarLiteral value: String)
+
+  public init(extendedGraphemeClusterLiteral value: String)
+
+  public init (stringLiteral value: String)
+
+  public var hashValue: Int { get }
+}
+
+extension Selector : Equatable, Hashable {}
+
+@inlinable public func ==(lhs: Selector, rhs: Selector) -> Bool {
+  return sel_isEqual(lhs, rhs)
+}
+
+@_fixed_layout
+public struct NSZone {
+  public var pointer : OpaquePointer
+}
+
+@inlinable public func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
+  return ObjCBool(x)
+}
+
+@inlinable public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
+  return x.boolValue
+}
+
+public func ~=(x: NSObject, y: NSObject) -> Bool
+
+extension NSObject : Equatable, Hashable {
+  @nonobjc public var hashValue: Int { get }
+
+  @inlinable public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+}
+
