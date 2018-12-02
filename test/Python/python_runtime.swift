@@ -7,6 +7,7 @@ import Python
 import StdlibUnittest
 
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
+PythonLibrary.useVersion(2, 7)
 
 PythonRuntimeTestSuite.test("CheckVersion") {
   let sysModule = Python.import("sys")

@@ -548,7 +548,7 @@ public extension PythonObject {
       guard let item = checking[key] else {
         fatalError("""
           Could not access PythonObject element corresponding to the specified \
-          key values
+          key values: \(key)
           """)
       }
       return item
