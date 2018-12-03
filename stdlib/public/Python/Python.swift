@@ -745,7 +745,7 @@ private func isType(_ object: PythonObject,
   defer { Py_DecRef(pyObject) }
 
   // Anything not equal to `Py_ZeroStruct` is truthy.
-  return !(pyObject == &_Py_ZeroStruct)
+  return !(pyObject == _Py_ZeroStruct)
 }
 
 extension Bool : PythonConvertible {
@@ -755,7 +755,7 @@ extension Bool : PythonConvertible {
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
-    self = pyObject == &_Py_TrueStruct
+    self = pyObject == _Py_TrueStruct
   }
 
   public var pythonObject: PythonObject {

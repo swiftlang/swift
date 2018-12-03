@@ -167,19 +167,19 @@ let PyString_FromStringAndSize: @convention(c) (
     name: "PyUnicode_DecodeUTF8",
     legacyName: "PyString_FromStringAndSize")
 
-var _Py_ZeroStruct: PyObjectPointer =
+let _Py_ZeroStruct: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "_Py_ZeroStruct")
 
-var _Py_TrueStruct: PyObjectPointer =
+let _Py_TrueStruct: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "_Py_TrueStruct")
 
-var _Py_TrueStructb: PyBinaryOperation =
+let _Py_TrueStructb: PyBinaryOperation =
   PythonLibrary.loadSymbol(name: "_Py_TrueStructb")
 
-var PyBool_Type: PyObjectPointer =
+let PyBool_Type: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "PyBool_Type")
 
-var PySlice_Type: PyObjectPointer =
+let PySlice_Type: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "PySlice_Type")
 
 let PyNumber_Add: PyBinaryOperation =
