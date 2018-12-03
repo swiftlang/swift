@@ -511,3 +511,20 @@ extension LetThereBeCrash {
   init() { x = 1 }
   // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
+
+protocol SomeProtocol {
+	associatedtype SomeType
+	func someFunction()
+	func anotherFunction()
+}
+
+extension SomeProtocol {
+	
+	func someFunction() {
+		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector due to associatedtype requirement on 'SomeProtocol'}}
+	}
+	
+	func anotherFunction() { 
+		print("Hello world!")
+	}
+}
