@@ -173,9 +173,6 @@ let _Py_ZeroStruct: PyObjectPointer =
 let _Py_TrueStruct: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "_Py_TrueStruct")
 
-let _Py_TrueStructb: PyBinaryOperation =
-  PythonLibrary.loadSymbol(name: "_Py_TrueStructb")
-
 let PyBool_Type: PyObjectPointer =
   PythonLibrary.loadSymbol(name: "PyBool_Type")
 
