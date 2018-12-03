@@ -101,7 +101,10 @@ endif()
 # consecutive execution, which makes local builds fail faster.
 set(SWIFT_TEST_EXTRA_ARGS "--incremental")
 
-if(NOT SWIFT_INCLUDE_TOOLS)
+# TODO(compnerd) unconditionalise the options.  We can always build and not
+# install the tools.  Instead, we should check if we want to use an external set
+# of tools via the SWIFT_NATIVE_SWIFT_TOOLS_PATH variable.
+if(NOT SWIFT_BUILD_TOOLS)
   list(APPEND SWIFT_TEST_EXTRA_ARGS
        "--path=${SWIFT_NATIVE_LLVM_TOOLS_PATH}"
        "--path=${SWIFT_NATIVE_CLANG_TOOLS_PATH}"
