@@ -1361,6 +1361,104 @@
         },
         {
           "kind": "Conformance",
+          "name": "SIMDScalar",
+          "printedName": "SIMDScalar",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "SIMDMaskScalar",
+              "printedName": "SIMDMaskScalar",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD2Storage",
+              "printedName": "SIMD2Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD2Storage",
+                  "printedName": "Int.SIMD2Storage",
+                  "usr": "s:Si12SIMD2StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD4Storage",
+              "printedName": "SIMD4Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD4Storage",
+                  "printedName": "Int.SIMD4Storage",
+                  "usr": "s:Si12SIMD4StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD8Storage",
+              "printedName": "SIMD8Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD8Storage",
+                  "printedName": "Int.SIMD8Storage",
+                  "usr": "s:Si12SIMD8StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD16Storage",
+              "printedName": "SIMD16Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD16Storage",
+                  "printedName": "Int.SIMD16Storage",
+                  "usr": "s:Si13SIMD16StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD32Storage",
+              "printedName": "SIMD32Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD32Storage",
+                  "printedName": "Int.SIMD32Storage",
+                  "usr": "s:Si13SIMD32StorageV"
+                }
+              ]
+            },
+            {
+              "kind": "TypeWitness",
+              "name": "SIMD64Storage",
+              "printedName": "SIMD64Storage",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "SIMD64Storage",
+                  "printedName": "Int.SIMD64Storage",
+                  "usr": "s:Si13SIMD64StorageV"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
           "name": "CVarArg",
           "printedName": "CVarArg"
         }

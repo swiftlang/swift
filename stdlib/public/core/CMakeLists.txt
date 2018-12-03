@@ -206,6 +206,8 @@ set(SWIFTLIB_SOURCES
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
+  SIMDVector.swift
+  SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift
