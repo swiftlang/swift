@@ -972,9 +972,9 @@ public:
   /// \brief Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
-  bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
-                             SourceLoc &LAngleLoc,
-                             SourceLoc &RAngleLoc);
+  ParserStatus parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
+                                     SourceLoc &LAngleLoc,
+                                     SourceLoc &RAngleLoc);
 
   ParserResult<TypeRepr> parseTypeIdentifier();
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();

@@ -1207,9 +1207,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (canParseAsGenericArgumentList()) {
         SmallVector<TypeRepr *, 8> args;
         SourceLoc LAngleLoc, RAngleLoc;
-        if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
+        auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+        if (argStat.isError())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-        }
 
         SmallVector<TypeLoc, 8> locArgs;
         for (auto ty : args)
@@ -2259,9 +2259,9 @@ Expr *Parser::parseExprIdentifier() {
   if (canParseAsGenericArgumentList()) {
     SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
     SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
+    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    if (argStat.isError())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-    }
     
     // The result can be empty in error cases.
     hasGenericArgumentList = !args.empty();
