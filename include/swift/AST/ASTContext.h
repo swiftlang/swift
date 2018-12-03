@@ -52,6 +52,7 @@ namespace swift {
   enum class Associativity : unsigned char;
   class BoundGenericType;
   class ClangNode;
+  class ConstructorDecl;
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
@@ -512,6 +513,9 @@ public:
   /// If this is true, the method getAllocateUninitializedArray
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics(LazyResolver *resolver) const;
+
+  /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
+  ConstructorDecl *getBoolBuiltinInitDecl() const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;

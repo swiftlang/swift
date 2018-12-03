@@ -1866,17 +1866,7 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
 
   // Call the Bool(_builtinBooleanLiteral:) initializer
   ASTContext &ctx = SGF.getASTContext();
-  DeclName name(ctx, DeclBaseName::createConstructor(),
-                { ctx.Id_builtinBooleanLiteral });
-  auto members = ctx.getBoolDecl()->lookupDirect(name);
-  
-  // Ensure we just have one initializer
-  assert(members.size() == 1);
-
-  // Ensure it is actually an initializer
-  assert(::isa<ConstructorDecl>(members[0]));
-
-  auto init = cast<ConstructorDecl>(members[0]);
+  auto init = ctx.getBoolBuiltinInitDecl();
   Type builtinArgType = BuiltinIntegerType::get(1, ctx);
   RValue builtinArg(SGF, ManagedValue::forUnmanaged(isa),
                     builtinArgType->getCanonicalType());
@@ -1884,7 +1874,6 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
     SGF.emitApplyAllocatingInitializer(E, ConcreteDeclRef(init),
                                        std::move(builtinArg), Type(),
                                        C);
-
   return result;
 }
 
@@ -1909,17 +1898,7 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
   }
   
   // Call the Bool(_builtinBooleanLiteral:) initializer
-  DeclName name(ctx, DeclBaseName::createConstructor(),
-                { ctx.Id_builtinBooleanLiteral });
-  auto members = ctx.getBoolDecl()->lookupDirect(name);
-  
-  // Ensure we just have one initializer
-  assert(members.size() == 1);
-  
-  // Ensure it is actually an initializer
-  assert(::isa<ConstructorDecl>(members[0]));
-
-  auto init = cast<ConstructorDecl>(members[0]);
+  auto init = ctx.getBoolBuiltinInitDecl();
   Type builtinArgType = BuiltinIntegerType::get(1, ctx);
   RValue builtinArg(SGF, ManagedValue::forUnmanaged(selected),
                     builtinArgType->getCanonicalType());

@@ -194,6 +194,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
+  /// Swift.Bool.init(_builtinBooleanLiteral:)
+  ConstructorDecl *BoolBuiltinInitDecl = nullptr;
+  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -988,6 +991,29 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
 
     if (pred(funcTy))
       return fnDecl;
+  }
+
+  return nullptr;
+}
+
+ConstructorDecl *ASTContext::getBoolBuiltinInitDecl() const {
+  if (getImpl().BoolBuiltinInitDecl)
+    return getImpl().BoolBuiltinInitDecl;
+
+  if (!getBoolDecl())
+    return nullptr;
+
+  DeclName initName(*const_cast<ASTContext *>(this),
+                    DeclBaseName::createConstructor(),
+                    { Id_builtinBooleanLiteral });
+  auto members = getBoolDecl()->lookupDirect(initName);
+
+  if (members.size() != 1)
+    return nullptr;
+
+  if (auto init = dyn_cast<ConstructorDecl>(members[0])) {
+    getImpl().BoolBuiltinInitDecl = init;
+    return init;
   }
 
   return nullptr;
