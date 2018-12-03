@@ -4200,14 +4200,17 @@ namespace {
          // a default implementation of the method through a protocol extension
          // then insert the fix-it on protocol, rather than on the method in the
          // protocol declaration (not allowed).
+         
+         // Show a custom diagnostic 
          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
+         bool containsAssociatedTypes = protocolDecl->getAssociatedTypeMembers().empty();
           
          tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
             .highlight(subExpr->getSourceRange());
          tc.diagnose(foundDecl, diag::make_decl_objc,
                      foundDecl->getDescriptiveKind())
-            .fixItInsert(protocolDecl ?
+            .fixItInsert(protocolDecl && !containsAssociatedTypes ?
                          protocolDecl->getAttributeInsertionLoc(false) :
                          foundDecl->getAttributeInsertionLoc(false),
                          "@objc ");
