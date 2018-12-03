@@ -19,15 +19,15 @@ public let ArrayAppend = [
   BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: t, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: t, legacyFactor: 11),
-  BenchmarkInfo(name: "ArrayAppendAsciiSubstring", runFunction: run_ArrayAppendAsciiSubstring, tags: t, legacyFactor: 11),
+  BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendAsciiSubstring", runFunction: run_ArrayAppendAsciiSubstring, tags: t, legacyFactor: 36),
   BenchmarkInfo(name: "ArrayAppendFromGeneric", runFunction: run_ArrayAppendFromGeneric, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: t,
     setUpFunction: { otherStructs = Array(repeating: S(x: 3, y: 4.2), count: 10_000) },
     tearDownFunction: {  otherStructs = nil }, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: t, legacyFactor: 11),
-  BenchmarkInfo(name: "ArrayAppendLatin1Substring", runFunction: run_ArrayAppendLatin1Substring, tags: t, legacyFactor: 11),
+  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendLatin1Substring", runFunction: run_ArrayAppendLatin1Substring, tags: t, legacyFactor: 36),
   BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: t,
     setUpFunction: { blackHole(array) }, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: t,
@@ -43,12 +43,12 @@ public let ArrayAppend = [
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
   BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: t, legacyFactor: 11),
-  BenchmarkInfo(name: "ArrayAppendUTF16Substring", runFunction: run_ArrayAppendUTF16Substring, tags: t, legacyFactor: 11),
+  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendUTF16Substring", runFunction: run_ArrayAppendUTF16Substring, tags: t, legacyFactor: 36),
   BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: t,
     setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
-  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: t, legacyFactor: 49),
-  BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: t, legacyFactor: 40),
+  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: t, legacyFactor: 37),
+  BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: t, legacyFactor: 47),
   BenchmarkInfo(name: "ArrayPlusEqualThreeElements", runFunction: run_ArrayPlusEqualThreeElements, tags: t, legacyFactor: 10),
 ]
 
@@ -308,7 +308,7 @@ public func run_ArrayAppendAscii(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog!"
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getString(s).utf8
     }
   }
@@ -320,7 +320,7 @@ public func run_ArrayAppendLatin1(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog\u{00A1}"
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getString(s).utf8
     }
   }
@@ -332,7 +332,7 @@ public func run_ArrayAppendUTF16(_ N: Int) {
   let s = "the quick brown 🦊 jumps over the lazy dog"
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getString(s).utf8
     }
   }
@@ -344,7 +344,7 @@ public func run_ArrayAppendAsciiSubstring(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog!"[...]
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getSubstring(s).utf8
     }
   }
@@ -356,7 +356,7 @@ public func run_ArrayAppendLatin1Substring(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog\u{00A1}"[...]
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getSubstring(s).utf8
     }
   }
@@ -368,7 +368,7 @@ public func run_ArrayAppendUTF16Substring(_ N: Int) {
   let s = "the quick brown 🦊 jumps over the lazy dog"[...]
   for _ in 0..<N {
     var nums = [UInt8]()
-    for _ in 0..<10_000 {
+    for _ in 0..<3_000 {
       nums += getSubstring(s).utf8
     }
   }
