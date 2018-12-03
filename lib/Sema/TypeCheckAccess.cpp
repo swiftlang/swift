@@ -566,6 +566,12 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
   }
+                               
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    // The constraint class/protocols on the opaque interface, as well as
+    // the naming decl for the opaque type, need to be accessible.
+#warning "todo"
+  }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     // This must stay in sync with diag::associated_type_access.
@@ -1144,6 +1150,12 @@ public:
       auto diag = TC.diagnose(TAD, diagID);
       highlightOffendingType(TC, diag, complainRepr);
     });
+  }
+
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    // The constraint class/protocols on the opaque interface, as well as
+    // the naming decl for the opaque type, need to be accessible.
+#warning "todo"
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {

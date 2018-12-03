@@ -464,6 +464,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
     return true;
+  case DeclKind::OpaqueType:
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
