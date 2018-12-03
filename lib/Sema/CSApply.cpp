@@ -3250,18 +3250,9 @@ namespace {
       }
 
       // SIL-generation magically turns this into a Bool; make sure it can.
-      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
-                        { tc.Context.Id_builtinBooleanLiteral });
-      auto members = tc.Context.getBoolDecl()->lookupDirect(initName);
-      
-      if (members.size() != 1) {
+      if (!tc.Context.getBoolBuiltinInitDecl()) {
         tc.diagnose(expr->getLoc(), diag::broken_bool);
         // Continue anyway.
-      } else {
-        if (!isa<ConstructorDecl>(members[0])) {
-          tc.diagnose(expr->getLoc(), diag::broken_bool);
-          // Continue anyway.
-        }
       }
 
       // Dig through the optionals in the from/to types.
