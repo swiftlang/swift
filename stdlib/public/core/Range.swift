@@ -410,7 +410,13 @@ extension Range: Decodable where Bound: Decodable {
     var container = try decoder.unkeyedContainer()
     let lowerBound = try container.decode(Bound.self)
     let upperBound = try container.decode(Bound.self)
-    self = lowerBound..<upperBound
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(Range.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
@@ -467,7 +473,7 @@ extension PartialRangeUpTo: RangeExpression {
 extension PartialRangeUpTo: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
-    self = try (..<container.decode(Bound.self))
+    try self.init(container.decode(Bound.self))
   }
 }
 
@@ -522,7 +528,7 @@ extension PartialRangeThrough: RangeExpression {
 extension PartialRangeThrough: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
-    self = try (...container.decode(Bound.self))
+    try self.init(container.decode(Bound.self))
   }
 }
 
@@ -672,7 +678,7 @@ extension PartialRangeFrom: Sequence
 extension PartialRangeFrom: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
-    self = try container.decode(Bound.self)...
+    try self.init(container.decode(Bound.self))
   }
 }
 

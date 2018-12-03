@@ -494,7 +494,13 @@ extension ClosedRange: Decodable where Bound: Decodable {
     var container = try decoder.unkeyedContainer()
     let lowerBound = try container.decode(Bound.self)
     let upperBound = try container.decode(Bound.self)
-    self = lowerBound...upperBound
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
