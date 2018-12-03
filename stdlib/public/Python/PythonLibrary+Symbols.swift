@@ -34,13 +34,13 @@ let Py_GE: Int32 = 5
 // Python library symbols lazily loaded at runtime.
 //===----------------------------------------------------------------------===//
 
-let Py_Initialize: @convention(c) () -> () =
+let Py_Initialize: @convention(c) () -> Void =
   PythonLibrary.loadSymbol(name: "Py_Initialize")
 
-let Py_IncRef: @convention(c) (PyObjectPointer?) -> () =
+let Py_IncRef: @convention(c) (PyObjectPointer?) -> Void =
   PythonLibrary.loadSymbol(name: "Py_IncRef")
 
-let Py_DecRef: @convention(c) (PyObjectPointer?) -> () =
+let Py_DecRef: @convention(c) (PyObjectPointer?) -> Void =
   PythonLibrary.loadSymbol(name: "Py_DecRef")
 
 let PyImport_ImportModule: @convention(c) (
@@ -53,20 +53,20 @@ let PyEval_GetBuiltins: @convention(c) () -> PyObjectPointer =
 let PyErr_Occurred: @convention(c) () -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyErr_Occurred")
 
-let PyErr_Clear: @convention(c) () -> () =
+let PyErr_Clear: @convention(c) () -> Void =
   PythonLibrary.loadSymbol(name: "PyErr_Clear")
 
 let PyErr_Fetch: @convention(c) (
   UnsafeMutablePointer<PyObjectPointer?>,
   UnsafeMutablePointer<PyObjectPointer?>,
-  UnsafeMutablePointer<PyObjectPointer?>) -> () =
+  UnsafeMutablePointer<PyObjectPointer?>) -> Void =
   PythonLibrary.loadSymbol(name: "PyErr_Fetch")
 
 let PyDict_New: @convention(c) () -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyDict_New")
 
 let PyDict_SetItem: @convention(c) (
-  PyObjectPointer?, PyObjectPointer, PyObjectPointer) -> () =
+  PyObjectPointer?, PyObjectPointer, PyObjectPointer) -> Void =
   PythonLibrary.loadSymbol(name: "PyDict_SetItem")
 
 let PyObject_GetItem: @convention(c) (
@@ -74,89 +74,89 @@ let PyObject_GetItem: @convention(c) (
   PythonLibrary.loadSymbol(name: "PyObject_GetItem")
 
 let PyObject_SetItem: @convention(c) (
-  PyObjectPointer, PyObjectPointer, PyObjectPointer) -> () =
+  PyObjectPointer, PyObjectPointer, PyObjectPointer) -> Void =
   PythonLibrary.loadSymbol(name: "PyObject_SetItem")
 
 let PyObject_DelItem: @convention(c) (
-  PyObjectPointer, PyObjectPointer) -> () =
+  PyObjectPointer, PyObjectPointer) -> Void =
   PythonLibrary.loadSymbol(name: "PyObject_DelItem")
 
 let PyObject_Call: @convention(c) (
   PyObjectPointer, PyObjectPointer,
-  PyObjectPointer?) -> (PyObjectPointer?) =
+  PyObjectPointer?) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyObject_Call")
 
 let PyObject_CallObject: @convention(c) (
-  PyObjectPointer, PyObjectPointer) -> (PyObjectPointer?) =
+  PyObjectPointer, PyObjectPointer) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyObject_CallObject")
 
 let PyObject_GetAttrString: @convention(c) (
-  PyObjectPointer, PyCCharPointer) -> (PyObjectPointer?) =
+  PyObjectPointer, PyCCharPointer) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyObject_GetAttrString")
 
 let PyObject_SetAttrString: @convention(c) (
-  PyObjectPointer, PyCCharPointer, PyObjectPointer) -> (Int) =
+  PyObjectPointer, PyCCharPointer, PyObjectPointer) -> Int =
   PythonLibrary.loadSymbol(name: "PyObject_SetAttrString")
 
 let PySlice_New: @convention(c) (
   PyObjectPointer?, PyObjectPointer?,
-  PyObjectPointer?) -> (PyObjectPointer?) =
+  PyObjectPointer?) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PySlice_New")
 
-let PyTuple_New: @convention(c) (Int) -> (PyObjectPointer?) =
+let PyTuple_New: @convention(c) (Int) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyTuple_New")
 
 let PyTuple_SetItem: @convention(c) (
-  PyObjectPointer, Int, PyObjectPointer) -> () =
+  PyObjectPointer, Int, PyObjectPointer) -> Void =
   PythonLibrary.loadSymbol(name: "PyTuple_SetItem")
 
 let PyObject_RichCompareBool: @convention(c) (
-  PyObjectPointer, PyObjectPointer, Int32) -> (Int32) =
+  PyObjectPointer, PyObjectPointer, Int32) -> Int32 =
   PythonLibrary.loadSymbol(name: "PyObject_RichCompareBool")
 
 let PyDict_Next: @convention(c) (
   PyObjectPointer, UnsafeMutablePointer<Int>,
   UnsafeMutablePointer<PyObjectPointer?>,
-  UnsafeMutablePointer<PyObjectPointer?>) -> (Int32) =
+  UnsafeMutablePointer<PyObjectPointer?>) -> Int32 =
   PythonLibrary.loadSymbol(name: "PyDict_Next")
 
-let PyList_New: @convention(c) (Int) -> (PyObjectPointer?) =
+let PyList_New: @convention(c) (Int) -> PyObjectPointer? =
   PythonLibrary.loadSymbol(name: "PyList_New")
 
 let PyList_SetItem: @convention(c) (
-  PyObjectPointer, Int, PyObjectPointer) -> (Int32) =
+  PyObjectPointer, Int, PyObjectPointer) -> Int32 =
   PythonLibrary.loadSymbol(name: "PyList_SetItem")
 
-let PyBool_FromLong: @convention(c) (Int) -> (PyObjectPointer) =
+let PyBool_FromLong: @convention(c) (Int) -> PyObjectPointer =
   PythonLibrary.loadSymbol(name: "PyBool_FromLong")
 
-let PyFloat_AsDouble: @convention(c) (PyObjectPointer) -> (Double) =
+let PyFloat_AsDouble: @convention(c) (PyObjectPointer) -> Double =
   PythonLibrary.loadSymbol(name: "PyFloat_AsDouble")
 
-let PyFloat_FromDouble: @convention(c) (Double) -> (PyObjectPointer) =
+let PyFloat_FromDouble: @convention(c) (Double) -> PyObjectPointer =
   PythonLibrary.loadSymbol(name: "PyFloat_FromDouble")
 
-let PyInt_AsLong: @convention(c) (PyObjectPointer) -> (Int) =
+let PyInt_AsLong: @convention(c) (PyObjectPointer) -> Int =
   PythonLibrary.loadSymbol(
     name: "PyLong_AsLong",
     legacyName: "PyInt_AsLong")
 
-let PyInt_FromLong: @convention(c) (Int) -> (PyObjectPointer) =
+let PyInt_FromLong: @convention(c) (Int) -> PyObjectPointer =
   PythonLibrary.loadSymbol(
     name: "PyLong_FromLong",
     legacyName: "PyInt_FromLong")
 
-let PyInt_AsUnsignedLongMask: @convention(c) (PyObjectPointer) -> (UInt) =
+let PyInt_AsUnsignedLongMask: @convention(c) (PyObjectPointer) -> UInt =
   PythonLibrary.loadSymbol(
     name: "PyLong_AsUnsignedLongMask",
     legacyName: "PyInt_AsUnsignedLongMask")
 
-let PyInt_FromSize_t: @convention(c) (Int) -> (PyObjectPointer) =
+let PyInt_FromSize_t: @convention(c) (Int) -> PyObjectPointer =
   PythonLibrary.loadSymbol(
     name: "PyInt_FromLong",
     legacyName: "PyInt_FromSize_t")
 
-let PyString_AsString: @convention(c) (PyObjectPointer) -> (PyCCharPointer?) =
+let PyString_AsString: @convention(c) (PyObjectPointer) -> PyCCharPointer? =
   PythonLibrary.loadSymbol(
     name: "PyUnicode_AsUTF8",
     legacyName: "PyString_AsString")

@@ -745,7 +745,7 @@ private func isType(_ object: PythonObject,
   defer { Py_DecRef(pyObject) }
 
   // Anything not equal to `Py_ZeroStruct` is truthy.
-  return !(pyObject == _Py_ZeroStruct)
+  return pyObject != _Py_ZeroStruct
 }
 
 extension Bool : PythonConvertible {
