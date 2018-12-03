@@ -200,7 +200,9 @@ extension Substring: StringProtocol {
   }
 
   public subscript(i: Index) -> Character {
-    return _slice[i]
+    _read {
+      yield _slice[i]
+    }
   }
 
   public mutating func replaceSubrange<C>(
@@ -360,7 +362,11 @@ extension Substring.UTF8View : BidirectionalCollection {
   public var endIndex: Index { return _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element {
+    _read {
+      yield _slice[index]
+    }
+  }
 
   @inlinable
   public var indices: Indices { return _slice.indices }
@@ -486,7 +492,11 @@ extension Substring.UTF16View : BidirectionalCollection {
   public var endIndex: Index { return _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element {
+    _read {
+      yield _slice[index]
+    }
+  }
 
   @inlinable
   public var indices: Indices { return _slice.indices }
@@ -612,7 +622,11 @@ extension Substring.UnicodeScalarView : BidirectionalCollection {
   public var endIndex: Index { return _slice.endIndex }
 
   @inlinable
-  public subscript(index: Index) -> Element { return _slice[index] }
+  public subscript(index: Index) -> Element {
+    _read {
+      yield _slice[index]
+    }
+  }
 
   @inlinable
   public var indices: Indices { return _slice.indices }
@@ -801,7 +815,9 @@ extension Substring {
   @inlinable
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
-    return Substring(_slice[r])
+    _read {
+      yield Substring(_slice[r])
+    }
   }
 }
 
