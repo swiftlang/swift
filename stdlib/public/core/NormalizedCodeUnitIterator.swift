@@ -141,34 +141,6 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
 
     return utf8Buffer[bufferIndex]
   }
-
-  internal mutating func compare(
-    with other: _NormalizedUTF8CodeUnitIterator
-  ) -> _StringComparisonResult {
-    var mutableOther = other
-
-    for cu in self {
-      if let otherCU = mutableOther.next() {
-        let result = _lexicographicalCompare(cu, otherCU)
-        if result == .equal {
-          continue
-        } else {
-          return result
-        }
-      } else {
-        //other returned nil, we are greater
-        return .greater
-      }
-    }
-
-    //we ran out of code units, either we are equal, or only we ran out and
-    //other is greater
-    if let _ = mutableOther.next() {
-      return .less
-    } else {
-      return .equal
-    }
-  }
 }
 
 extension _NormalizedUTF8CodeUnitIterator: Sequence { }
@@ -463,16 +435,6 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
   @inline(__always)
   @_effects(releasenone)
   private mutating func fastPathFill() -> (numRead: Int, numWritten: Int) {
-    // Quick check if a scalar is NFC and a segment starter
-    @inline(__always) func isNFCStarter(_ scalar: Unicode.Scalar) -> Bool {
-      // Fast-path: All scalars up through U+02FF are NFC and have boundaries
-      // before them
-      if scalar.value < 0x300 { return true }
-
-      // Otherwise, consult the properties
-      return scalar._hasNormalizationBoundaryBefore && scalar._isNFCQCYes
-    }
-
     // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
     // TODO: Just freakin do normalization and don't bother with ICU
     var outputCount = 0
@@ -490,7 +452,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
           if _slowPath(
                !utf8.hasNormalizationBoundary(before: inputCount &+ len)
-            || !isNFCStarter(scalar)
+            || !scalar._isNFCStarter
           ) {
             break 
           }
@@ -516,7 +478,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
         if _slowPath(
              !gutsSlice.foreignHasNormalizationBoundary(
                before: startIdx.encoded(offsetBy: len))
-          || !isNFCStarter(scalar)
+          || !scalar._isNFCStarter
         ) {
           break 
         }
@@ -577,29 +539,22 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
   @_effects(readonly)
   internal mutating func compare(
-    with other: _NormalizedUTF8CodeUnitIterator_2
-  ) -> _StringComparisonResult {
-    var iter = self
+    with other: _NormalizedUTF8CodeUnitIterator_2,
+    expecting: _StringComparisonResult
+  ) -> Bool {
     var mutableOther = other
 
-    while let cu = iter.next() {
-      if let otherCU = mutableOther.next() {
-        let result = _lexicographicalCompare(cu, otherCU)
-        if result == .equal {
-          continue
-        }
-        return result
+    for cu in self {
+      guard let otherCU = mutableOther.next() else {
+        // We have more code units, therefore we are greater
+        return false
       }
-      //other returned nil, we are greater
-      return .greater
+      if cu == otherCU { continue }
+      return expecting == .less ? cu < otherCU : false
     }
 
-    //we ran out of code units, either we are equal, or only we ran out and
-    //other is greater
-    if let _ = mutableOther.next() {
-      return .less
-    }
-    return .equal
+    // We have exhausted our code units. We are less if there's more remaining
+    return mutableOther.next() == nil ? expecting == .equal : expecting == .less
   }
 }
 
