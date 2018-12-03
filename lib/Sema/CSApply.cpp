@@ -4200,15 +4200,22 @@ namespace {
          // a default implementation of the method through a protocol extension
          // then insert the fix-it on protocol, rather than on the method in the
          // protocol declaration (not allowed).
-         auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
-         bool containsAssociatedTypes = protocolDecl ? protocolDecl->getAssociatedTypeMembers().empty() : false;
+         auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext());
+         bool containsAssociatedTypes = protocolDecl ? !protocolDecl->getAssociatedTypeMembers().empty() : false;
+          
+         // If the protocol contains any associated types, bail out.
+         if (containsAssociatedTypes) {
+             tc.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
+                         foundDecl->getFullName(), protocolDecl->getFullName());
+             return E;
+         }
           
          tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
             .highlight(subExpr->getSourceRange());
          tc.diagnose(foundDecl, diag::make_decl_objc,
                      foundDecl->getDescriptiveKind())
-            .fixItInsert(protocolDecl && !containsAssociatedTypes ?
+            .fixItInsert(protocolDecl ?
                          protocolDecl->getAttributeInsertionLoc(false) :
                          foundDecl->getAttributeInsertionLoc(false),
                          "@objc ");
