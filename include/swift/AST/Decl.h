@@ -5631,10 +5631,6 @@ public:
     return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
 
-  TypeLoc getReturnTypeLoc() const {
-    return FnRetType;
-  }
-  
   SelfAccessKind getSelfAccessKind() const {
     return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
   }
