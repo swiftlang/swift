@@ -758,22 +758,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(OverflowFlag);
   }
 
-  if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
-      Builtin.ID == BuiltinValueKind::USCheckedConversion) {
-    auto Ty =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
-
-    // Report a sign error if the input parameter is a negative number, when
-    // interpreted as signed.
-    llvm::Value *Arg = args.claimNext();
-    llvm::Value *Zero = llvm::ConstantInt::get(Ty, 0);
-    llvm::Value *OverflowFlag = IGF.Builder.CreateICmpSLT(Arg, Zero);
-
-    // Return the tuple: (the result (same as input), the overflow flag).
-    out.add(Arg);
-    return out.add(OverflowFlag);
-  }
-
   // We are currently emitting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
