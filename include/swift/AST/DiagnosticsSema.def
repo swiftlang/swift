@@ -550,6 +550,9 @@ ERROR(expr_selector_property_not_settable,none,
       (DescriptiveDeclKind, DeclName))
 ERROR(expr_selector_property_setter_inaccessible,none,
       "setter of %0 %1 is inaccessible", (DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_cannot_be_used,none,
+     "cannot use %0 as a selector due to associatedtype requirement on %1",
+     (DeclName, DeclName))
 ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %0 %1 that is not exposed to "
       "Objective-C",
