@@ -1318,7 +1318,7 @@ bool SingleExitLoopTransformer::transform() {
   if (loop->getExitBlock() && loop->getExitingBlock() &&
       loop->getExitingBlock() == loop->getHeader())  {
     bool hasEffectfulOps = false;
-    for (SILInstruction &inst : *loop->getHeader()) {
+    for (const SILInstruction &inst : *loop->getHeader()) {
       if (auto graphOp = dyn_cast<GraphOperationInst>(&inst)) {
         if (isStatefulOp(graphOp)) {
           hasEffectfulOps = true;

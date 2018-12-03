@@ -123,7 +123,7 @@ SILLocation getUserSourceLocation(const SILInstruction *inst);
 //===--------------------------------------------------------------------===//
 
 /// Returns true if `inst` represents a stateful graph op.
-bool isStatefulOp(GraphOperationInst* inst);
+bool isStatefulOp(const GraphOperationInst* inst);
 
 /// Create a "Const" tensor operation containing the specified scalars, with
 /// the specified shape and elementType (setting dtype).  The resultType is

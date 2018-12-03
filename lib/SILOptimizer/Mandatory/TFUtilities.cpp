@@ -259,7 +259,7 @@ SILLocation tf::getUserSourceLocation(const SILInstruction *inst) {
   return getUserSourceLocation(inst->getDebugLocation());
 }
 
-bool tf::isStatefulOp(GraphOperationInst *graphOp) {
+bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
   GraphOperationInfo decoder(graphOp);
   StringRef tensorOpName = decoder.getOperationName();
   // Is this a known stateful op used in partitioning?
