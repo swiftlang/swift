@@ -1777,6 +1777,11 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Module:
     return;
+      
+  case DeclKind::OpaqueType:
+    // TODO: Eventually we'll need to emit descriptors to access the opaque
+    // type's metadata.
+    return;
   }
 
   llvm_unreachable("bad decl kind!");
@@ -3683,6 +3688,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::TypeAlias:
+    case DeclKind::OpaqueType:
       // Do nothing.
       continue;
 
