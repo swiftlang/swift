@@ -722,6 +722,13 @@ static bool canReplaceCopiedArg(FullApplySite Apply,
   SILValue existentialAddr =
       cast<InitExistentialAddrInst>(InitExistential)->getOperand();
 
+  // If we peeked through an InitEnumDataAddr or some such, then don't assume we
+  // can reuse the copied value. It's likely destroyed by
+  // UncheckedTakeEnumDataInst before the copy.
+  auto *ASI = dyn_cast<AllocStackInst>(existentialAddr);
+  if (!ASI)
+    return false;
+
   // Return true only if the given value is guaranteed to be initialized across
   // the given call site.
   //

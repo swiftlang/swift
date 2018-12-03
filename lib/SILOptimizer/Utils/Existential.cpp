@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -122,11 +123,14 @@ SILValue swift::findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
 /// alloc_stack user \p ASIUser.
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
-SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
+///
+/// allocStackAddr may either itself be an AllocStackInst or an
+/// InitEnumDataAddrInst that projects the value of an AllocStackInst.
+SILValue swift::getAddressOfStackInit(SILValue allocStackAddr,
                                       SILInstruction *ASIUser, bool &isCopied) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
-  for (auto Use : ASI->getUses()) {
+  for (auto Use : allocStackAddr->getUses()) {
     auto *User = Use->getUser();
 
     // Ignore instructions which don't write to the stack location.
@@ -138,7 +142,7 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == ASI) {
+      if (CAI->getDest() == allocStackAddr) {
         if (SingleWrite)
           return SILValue();
         SingleWrite = CAI;
@@ -168,8 +172,13 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
 
   // A very simple dominance check. As ASI is an operand of ASIUser,
   // SingleWrite dominates ASIUser if it is in the same block as ASI or ASIUser.
+  //
+  // If allocStack holds an Optional, then ASI is an InitEnumDataAddrInst
+  // projection and not strictly an operand of ASIUser. We rely on the guarantee
+  // that this InitEnumDataAddrInst must occur before the InjectEnumAddrInst
+  // that was the source of the existential address.
   SILBasicBlock *BB = SingleWrite->getParent();
-  if (BB != ASI->getParent() && BB != ASIUser->getParent())
+  if (BB != allocStackAddr->getParentBlock() && BB != ASIUser->getParent())
     return SILValue();
 
   if (auto *CAI = dyn_cast<CopyAddrInst>(SingleWrite)) {
@@ -179,6 +188,21 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
       return getAddressOfStackInit(ASI, CAI, isCopied);
+
+    // Recognize a stack location holding an Optional.
+    //   %stack_adr = alloc_stack
+    //   %data_adr  = init_enum_data_addr %stk_adr
+    //   %enum_adr  = inject_enum_addr %stack_adr
+    //   %copy_src  = unchecked_take_enum_data_addr %enum_adr
+    // Replace %copy_src with %data_adr and recurse.
+    //
+    // TODO: a general Optional elimination sil-combine could
+    // supersede this check.
+    if (auto *UTEDAI = dyn_cast<UncheckedTakeEnumDataAddrInst>(CAISrc)) {
+      if (InitEnumDataAddrInst *IEDAI = findInitAddressForTrivialEnum(UTEDAI))
+        return getAddressOfStackInit(IEDAI, CAI, isCopied);
+    }
+
     // Check if the CAISrc is a global_addr.
     if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
       return findInitExistentialFromGlobalAddrAndCopyAddr(GAI, CAI);
