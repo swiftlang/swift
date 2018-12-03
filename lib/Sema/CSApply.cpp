@@ -4211,7 +4211,7 @@ namespace {
                        protocolDecl->getAttributeInsertionLoc(false) :
                        foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
-         return E;
+        return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
         // If this attribute was inferred based on deprecated Swift 3 rules,
         // complain.
