@@ -196,6 +196,26 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release"
             }
+        },
+        "swift-5.0-branch-11-16-2018" : {
+            "aliases": ["swift-5.0-branch-11-16-2018"],
+            "repos": {
+                "llvm": "swift-5.0-branch",
+                "clang": "swift-5.0-branch",
+                "compiler-rt": "swift-5.0-branch",
+                "swift": "swift-5.0-branch-11-16-2018",
+                "lldb": "swift-5.0-branch",
+                "cmark": "swift-5.0-branch",
+                "llbuild": "swift-5.0-branch",
+                "swiftpm": "swift-5.0-branch",
+                "swift-syntax": "swift-5.0-branch",
+                "swift-corelibs-xctest": "swift-5.0-branch",
+                "swift-corelibs-foundation": "swift-5.0-branch",
+                "swift-corelibs-libdispatch": "swift-5.0-branch",
+                "swift-integration-tests": "swift-5.0-branch",
+                "swift-xcode-playground-support": "swift-5.0-branch",
+                "ninja": "release"
+            }
         }
     }
 }
