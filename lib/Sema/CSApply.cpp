@@ -4198,16 +4198,16 @@ namespace {
       if (!method->isObjC()) {
           // If the method declaration lies in a protocol and we're providing
           // a default implementation of the method through a protocol extension
-          // then insert the fixit on protocol, rather than on the method in the
+          // then insert the fix-it on protocol, rather than on the method in the
           // protocol declaration (not allowed).
-          auto protocolDecl = foundDecl->getDeclContext()->getSelfProtocolDecl();
+          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
           
           tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                       foundDecl->getDescriptiveKind(), foundDecl->getFullName())
-          .highlight(subExpr->getSourceRange());
+            .highlight(subExpr->getSourceRange());
           tc.diagnose(foundDecl, diag::make_decl_objc,
                       foundDecl->getDescriptiveKind())
-          .fixItInsert(protocolDecl ?
+            .fixItInsert(protocolDecl ?
                        protocolDecl->getAttributeInsertionLoc(false) :
                        foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
