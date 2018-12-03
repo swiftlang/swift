@@ -35,7 +35,7 @@ SILValue findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
 /// alloc_stack user \p ASIUser.
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
-SILValue getAddressOfStackInit(AllocStackInst *ASI, SILInstruction *ASIUser,
+SILValue getAddressOfStackInit(SILValue allocStackAddr, SILInstruction *ASIUser,
                                bool &isCopied);
 
 /// Find the init_existential, which could be used to determine a concrete

@@ -437,3 +437,65 @@ bb0:
   %v = tuple ()
   return %v : $()
 }
+
+// <rdar://problem/46322928> Failure to devirtualize a protocol method
+// applied to an opened existential blocks implemention of
+// DataProtocol.
+public protocol ContiguousBytes {
+  func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+}
+
+extension Array : ContiguousBytes {
+}
+
+// specialized thunk for @callee_guaranteed (@unowned UnsafeRawBufferPointer) -> (@error @owned Error)
+sil [transparent] [reabstraction_thunk] @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
+
+// Test that the witness method's opened archetype is replaced by a
+// concrete conformance.
+//
+// Note that the enum is destroyed by unchecked_take_enum_data_addr
+// before the apply (and the extracted data is destroy by the copy
+// itself), so SILCombine cannot replace the call's self
+// argument. Instead, we expect a later devirtualizer pass to just
+// insert a cast of the opened existential.
+//
+// CHECK-LABEL: sil shared [noinline] @testDevirtExistentialEnum : $@convention(thin) (@guaranteed Array<Int>) -> () {
+// CHECK: [[ALLOC_EXISTENTIAL:%.*]] = alloc_stack $ContiguousBytes
+// CHECK: [[ALLOC_ENUM:%.*]] = alloc_stack $Optional<ContiguousBytes>
+// CHECK: [[ENUM:%.*]] = init_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+// CHECK: [[INIT_DATA:%.*]] = init_existential_addr [[ENUM]] : $*ContiguousBytes, $Array<Int>
+// CHECK: store %0 to [[INIT_DATA]] : $*Array<Int>
+// CHECK: inject_enum_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+// CHECK: [[TAKE_DATA:%.*]] = unchecked_take_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+// CHECK: copy_addr [take] [[TAKE_DATA]] to [initialization] [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes
+// CHECK: [[OPENED:%.*]] = open_existential_addr immutable_access [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes to $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes
+// CHECK: [[THUNK:%.*]] = function_ref @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
+// CHECK: [[TTF:%.*]] = thin_to_thick_function [[THUNK:%.*]] : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error) to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out (), @error Error)
+// CHECK: [[WM:%.*]] = witness_method $Array<Int>, #ContiguousBytes.withUnsafeBytes!1 : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+// CHECK: apply [nothrow] [[WM]]<@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, ()>(%{{.*}}, [[TTF]], [[OPENED]]) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+// CHECK: destroy_addr [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes
+// CHECK-LABEL: } // end sil function 'testDevirtExistentialEnum'
+sil shared [noinline] @testDevirtExistentialEnum : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  %3 = alloc_stack $ContiguousBytes
+  %4 = alloc_stack $Optional<ContiguousBytes>
+  %5 = init_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+  %6 = init_existential_addr %5 : $*ContiguousBytes, $Array<Int>
+  store %0 to %6 : $*Array<Int>
+  inject_enum_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+  %9 = unchecked_take_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+  copy_addr [take] %9 to [initialization] %3 : $*ContiguousBytes
+  dealloc_stack %4 : $*Optional<ContiguousBytes>
+  %12 = open_existential_addr immutable_access %3 : $*ContiguousBytes to $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes
+  %13 = alloc_stack $()
+  %14 = function_ref @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
+  %15 = thin_to_thick_function %14 : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error) to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out (), @error Error)
+  %16 = witness_method $@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, #ContiguousBytes.withUnsafeBytes!1 : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R, %12 : $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+  %21 = apply [nothrow] %16<@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, ()>(%13, %15, %12) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+  dealloc_stack %13 : $*()
+  destroy_addr %3 : $*ContiguousBytes
+  dealloc_stack %3 : $*ContiguousBytes
+  %25 = tuple ()
+  return %25 : $()
+}
