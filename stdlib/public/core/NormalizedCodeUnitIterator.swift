@@ -16,58 +16,6 @@ extension _Normalization {
   internal typealias _SegmentOutputBuffer = _FixedArray16<UInt16>
 }
 
-extension Unicode.Scalar {
-  // Normalization boundary - a place in a string where everything left of the
-  // boundary can be normalized independently from everything right of the
-  // boundary. The concatenation of each result is the same as if the entire
-  // string had been normalized as a whole.
-  //
-  // Normalization segment - a sequence of code units between two normalization
-  // boundaries (without any boundaries in the middle). Note that normalization
-  // segments can, as a process of normalization, expand, contract, and even
-  // produce new sub-segments.
-
-  // Whether this scalar value always has a normalization boundary before it.
-  internal var _hasNormalizationBoundaryBefore: Bool {
-    _internalInvariant(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
-    let value = Int32(bitPattern: self.value)
-    return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
-      _Normalization._nfcNormalizer, value)
-  }
-  internal var _isNFCQCYes: Bool {
-    return __swift_stdlib_u_getIntPropertyValue(
-      Builtin.reinterpretCast(value), __swift_stdlib_UCHAR_NFC_QUICK_CHECK
-    ) == 1
-  }
-}
-
-internal func _tryNormalize(
-  _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer:
-    UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
-) -> Int? {
-  return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
-}
-internal func _tryNormalize(
-  _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> Int? {
-  var err = __swift_stdlib_U_ZERO_ERROR
-  let count = __swift_stdlib_unorm2_normalize(
-    _Normalization._nfcNormalizer,
-    input.baseAddress._unsafelyUnwrappedUnchecked,
-    numericCast(input.count),
-    outputBuffer.baseAddress._unsafelyUnwrappedUnchecked,
-    numericCast(outputBuffer.count),
-    &err
-  )
-  guard err.isSuccess else {
-    // The output buffer needs to grow
-    return nil
-  }
-  return numericCast(count)
-}
-
 //
 // Pointer casting helpers
 //
