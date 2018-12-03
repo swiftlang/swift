@@ -95,9 +95,12 @@ public func model() {
   //                                    output_shapes: [nil as TensorShape?])
 }
 
+#if !CUDA
 DatasetTests.testAllBackends("Basic") {
+  // OneShotIterator is not supported on GPU.
   model()
 }
+#endif
 
 DatasetTests.testAllBackends("MultiValue") {
   enableCPU()

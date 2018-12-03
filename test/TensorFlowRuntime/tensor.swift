@@ -554,4 +554,10 @@ TensorTests.testAllBackends("ShapeGetter4", testShapeGetter4)
 
 // For now it is sufficient to run remote tests with test cases in this file
 // only. When creating new test files, consider simply calling runAllTests().
+#if CUDA
+// RemoteSession does not work for GPU because partitioning logic gets confused
+// with multiple devices.
+runAllTests()
+#else
 runAllTestsWithRemoteSession()
+#endif  // CUDA

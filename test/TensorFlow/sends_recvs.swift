@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %filecheck-tensorflow-extra-options %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates %swift-tensorflow-extra-options -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %filecheck-tensorflow-extra-options %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
