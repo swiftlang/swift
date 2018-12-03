@@ -736,7 +736,7 @@ public extension PythonObject {
 private func isType(_ object: PythonObject,
                     type: UnsafeMutableRawPointer) -> Bool {
   let typePyRef = PythonObject(borrowing: type)
-  
+
   let result = Python.isinstance(object, typePyRef)
 
   // We cannot use the normal failable Bool initializer from `PythonObject`
@@ -750,7 +750,7 @@ private func isType(_ object: PythonObject,
 
 extension Bool : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PyBool_Type) else { return nil }
+    guard isType(pythonObject, type: PyBool_Type) else { return nil }
 
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
@@ -1043,7 +1043,7 @@ extension Dictionary : PythonConvertible
 
 extension Range : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start),
           let upperBound = Bound(pythonObject.stop) else {
        return nil
@@ -1060,7 +1060,7 @@ extension Range : PythonConvertible where Bound : PythonConvertible {
 
 extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start) else { return nil }
     guard pythonObject.stop == Python.None,
           pythonObject.step == Python.None else {
@@ -1077,7 +1077,7 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
 
 extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let upperBound = Bound(pythonObject.stop) else { return nil }
     guard pythonObject.start == Python.None,
           pythonObject.step == Python.None else {
