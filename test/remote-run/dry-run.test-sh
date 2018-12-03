@@ -1,3 +1,5 @@
+REQUIRES: shell
+
 RUN: %empty-directory(%t)
 RUN: %debug-remote-run -n --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
 RUN: test -z "`ls %t`"

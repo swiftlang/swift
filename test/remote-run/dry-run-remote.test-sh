@@ -1,4 +1,4 @@
-RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE --input-prefix %S/Inputs/ some_user@some_host ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
+RUN: %remote-run -n --remote-dir /xyz-REMOTE --input-prefix %S/Inputs/ some_user@some_host ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
 
 CHECK-INPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/input/upload'
 CHECK-INPUT-NEXT: /usr/bin/sftp
@@ -10,7 +10,7 @@ CHECK-INPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' 'ls'
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t/nested)
 RUN: touch %t/nested/input %t/nested/BAD
-RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE --output-prefix %t some_user@some_host cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-OUTPUT %s
+RUN: %remote-run -n --remote-dir /xyz-REMOTE --output-prefix %/t some_user@some_host cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 CHECK-OUTPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
 CHECK-OUTPUT-NEXT: /usr/bin/sftp
