@@ -4940,7 +4940,7 @@ diagnoseMissingAppendInterpolationMethod(TypeChecker &tc,
         break;
         
       case InvalidMethod::Reason::ReturnType:
-        tc.diagnose(invalidMethod.method->getReturnTypeLoc().getLoc(),
+        tc.diagnose(invalidMethod.method->getBodyResultTypeLoc().getLoc(),
                     diag::append_interpolation_void_or_discardable)
             .fixItInsert(invalidMethod.method->getStartLoc(),
                          "@discardableResult ");
