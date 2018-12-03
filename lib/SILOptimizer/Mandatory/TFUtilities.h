@@ -91,7 +91,7 @@ SubstitutionMap getSingleSubstitutionMapForElementType(Type ty,
                                                        ASTContext &ctx);
 
 /// `inst` must have a single result, and return that result value.
-static inline SILValue getSingleValueResult(GraphOperationInst *inst) {
+static inline SILValue getSingleValueResult(const GraphOperationInst *inst) {
   assert(inst->getNumResults() == 1);
   return inst->getResults()[0];
 }
@@ -116,7 +116,7 @@ inline SILLocation getUserSourceLocation(SILDebugLocation loc) {
 /// instruction, we can apply various heuristics to improve the precision of
 /// the returned location information.
 SILLocation getUserSourceLocation(SILValue value);
-SILLocation getUserSourceLocation(SILInstruction *inst);
+SILLocation getUserSourceLocation(const SILInstruction *inst);
 
 //===--------------------------------------------------------------------===//
 // Other stuff

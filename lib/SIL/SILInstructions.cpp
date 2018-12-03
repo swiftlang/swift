@@ -2577,7 +2577,7 @@ GraphOperationAttribute GraphOperationInst::getAttribute(unsigned i) const {
 }
 
 
-Optional<SymbolicValue> GraphOperationInst::getAttributeNamed(StringRef name) {
+Optional<SymbolicValue> GraphOperationInst::getAttributeNamed(StringRef name) const {
   for (auto attr : getAttributes())
     if (attr.name.is(name))
       return attr.value;
