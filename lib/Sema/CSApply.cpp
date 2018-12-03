@@ -4206,7 +4206,7 @@ namespace {
          // If the protocol contains any associated types, bail out.
          if (containsAssociatedTypes) {
              tc.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
-                         foundDecl->getFullName(), protocolDecl->getFullName());
+                         foundDecl->getBaseName(), protocolDecl->getFullName());
              return E;
          }
           
