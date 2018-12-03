@@ -1821,8 +1821,10 @@ extension FloatingPoint {
   ///
   /// - Returns: The square root of the value.
   @_transparent
-  /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
+  // SWIFT_ENABLE_TENSORFLOW
+  // FIXME: This causes AD to register a differentiation task for this function
+  // twice.
+  // @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )

@@ -985,9 +985,9 @@ public:
     assert(!lookUpDifferentiableAttr(original, indices));
     auto *attr =
         SILDifferentiableAttr::create(getModule(), indices,
-                                             /*primalName*/ StringRef(),
-                                             /*adjointName*/ StringRef(),
-                                             /*primitive*/ false);
+                                      /*primalName*/ StringRef(),
+                                      /*adjointName*/ StringRef(),
+                                      /*primitive*/ false);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -1022,6 +1022,8 @@ public:
                                    const SILAutoDiffIndices &indices) {
     auto supersetParamIndices = llvm::SmallBitVector();
     const auto &indexSet = indices.parameters;
+    if (auto *existingTask = lookUpDifferentiationTask(original, indices))
+      return existingTask;
     for (auto *rda : original->getDifferentiableAttrs()) {
       const auto &rdaIndexSet = rda->getIndices().parameters;
       // If all indices in indexSet are in rdaIndexSet, and it has fewer
