@@ -41,11 +41,11 @@ final class PyReference {
 
   init(owning pointer: OwnedPyObjectPointer) {
     self.pointer = pointer
+    Py_IncRef(pointer)
   }
 
   init(borrowing pointer: PyObjectPointer) {
     self.pointer = pointer
-    Py_IncRef(pointer)
   }
 
   deinit {
