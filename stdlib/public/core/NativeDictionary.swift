@@ -387,6 +387,44 @@ extension _NativeDictionary: _DictionaryBuffer {
   }
 }
 
+extension _NativeDictionary {
+  @inlinable
+  subscript(key: Key, isUnique isUnique: Bool) -> Value? {
+    @inline(__always)
+    get {
+      // Dummy definition; don't use.
+      return lookup(key)
+    }
+    @inline(__always)
+    _modify {
+      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
+      if found {
+        // Move the old value out of storage, wrapping it into an optional
+        // before yielding it.
+        var value: Value? = (_values + bucket.offset).move()
+        yield &value
+        if let value = value {
+          // **Mutation.** Initialize storage to new value.
+          (_values + bucket.offset).initialize(to: value)
+        } else {
+          // **Removal.** We've already deinitialized the value; deinitialize
+          // the key too and register the removal.
+          (_keys + bucket.offset).deinitialize(count: 1)
+          _delete(at: bucket)
+        }
+      } else {
+        var value: Value? = nil
+        yield &value
+        if let value = value {
+          // **Insertion.** Insert the new entry at the correct place.  Note
+          // that `mutatingFind` already ensured that we have enough capacity.
+          _insert(at: bucket, key: key, value: value)
+        }
+      }
+    }
+  }
+}
+
 // This function has a highly visible name to make it stand out in stack traces.
 @usableFromInline
 @inline(never)
