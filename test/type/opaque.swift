@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -verify -enable-opaque-result-types %s
 
-// TODO: The syntax is only parsed currently, no type checking is implemented
-// yet.
+// TODO: The syntax is only parsed, and opaque decls are synthesized for 
+// function decls, but the opaque types are not themselves formed, resolved,
+// or checked yet.
 
 protocol P {}
 protocol Q {}
@@ -13,20 +14,30 @@ class D: C, P, Q {}
 // TODO: Should be valid
 
 let foo: __opaque P = 1 // FIXME expected-error{{'opaque' types are only implemented}}
-func bar() -> __opaque P { // FIXME expected-error{{'opaque' types are only implemented}}
+var computedFoo: __opaque P {  // FIXME expected-error{{'opaque' types are only implemented}}
+  get { return 1 }
+  set { _ = newValue + 1 }
+}
+func bar() -> __opaque P {
   return 1
 }
-func bas() -> __opaque P & Q { // FIXME expected-error{{'opaque' types are only implemented}}
+func bas() -> __opaque P & Q {
   return 1
 }
-func zim() -> __opaque C { // FIXME expected-error{{'opaque' types are only implemented}}
+func zim() -> __opaque C {
   return D()
 }
-func zang() -> __opaque C & P & Q { // FIXME expected-error{{'opaque' types are only implemented}}
+func zang() -> __opaque C & P & Q {
+  return D()
+}
+func zung() -> __opaque AnyObject {
+  return D()
+}
+func zoop() -> __opaque Any {
   return D()
 }
 
-//let zung = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
+//let zingle = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
 
 // Invalid positions
 
@@ -36,7 +47,7 @@ func blibble(blobble: __opaque P) {} // expected-error{{'opaque' types are only 
 
 let blubble: () -> __opaque P = { 1 } // expected-error{{'opaque' types are only implemented}}
 
-func blib() -> P & __opaque Q { return 1 } // FIXME expected-error{{'opaque' types are only implemented}} expected-error{{'opaque' should appear at the beginning}}
+func blib() -> P & __opaque Q { return 1 } // FIXME expected-error{{'opaque' should appear at the beginning}}
 func blab() -> (P, __opaque Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
 func blob() -> (__opaque P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
 

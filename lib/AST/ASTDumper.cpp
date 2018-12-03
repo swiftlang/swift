@@ -639,6 +639,17 @@ namespace {
       printInherited(TAD->getInherited());
       OS << "')";
     }
+    
+    void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+      printCommon(OTD, "opaque_type");
+      OS << " naming_decl=";
+      printDeclName(OTD->getNamingDecl());
+      PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
+        << Type(OTD->getUnderlyingInterfaceType()).getString();
+      OS << " in "
+         << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
                                       const char *name) {
@@ -1034,6 +1045,14 @@ namespace {
           OS << "result\n";
           printRec(FD->getBodyResultTypeLoc().getTypeRepr());
           PrintWithColorRAII(OS, ParenthesisColor) << ')';
+          if (auto opaque = FD->getOpaqueResultTypeDecl()) {
+            OS << '\n';
+            OS.indent(Indent);
+            PrintWithColorRAII(OS, ParenthesisColor) << '(';
+            OS << "opaque_result_decl\n";
+            printRec(opaque);
+            PrintWithColorRAII(OS, ParenthesisColor) << ')';
+          }
           Indent -= 2;
         }
       }
