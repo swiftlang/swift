@@ -259,18 +259,18 @@ SILLocation tf::getUserSourceLocation(const SILInstruction *inst) {
   return getUserSourceLocation(inst->getDebugLocation());
 }
 
-bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
-  StringRef mangledName = graphOp->getName().str();
+bool tf::isStatefulOp(GraphOperationInst *graphOp) {
+  GraphOperationInfo decoder(graphOp);
+  StringRef tensorOpName = decoder.getOperationName();
   // Is this a known stateful op used in partitioning?
-  if (mangledName.startswith("tfc.SendToHost") ||
-      mangledName.startswith("tfc.RecvFromHost")) {
+  if (tensorOpName.startswith("tfc.SendToHost") ||
+      tensorOpName.startswith("tfc.RecvFromHost")) {
     return true;
   }
   // Is this a stateful TensorFlow op?
   std::unique_ptr<TF_Status, decltype(&TF_DeleteStatus)> status(
-    TF_NewStatus(), TF_DeleteStatus);
-  std::string opName = mangledName.substr(0, mangledName.find(','));
-  int isStateful = TF_OpIsStateful(opName.c_str(), status.get());
+      TF_NewStatus(), TF_DeleteStatus);
+  int isStateful = TF_OpIsStateful(tensorOpName.str().c_str(), status.get());
   TF_Code statusCode = TF_GetCode(status.get());
   // FIXME(SR-9388): we should actually fail if statusCode != TF_OK. However,
   // the current tests use arbitrary strings in graph_op. Therefore, we will
