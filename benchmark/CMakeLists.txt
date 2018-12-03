@@ -56,6 +56,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Codable
     single-source/Combos
     single-source/CountAlgo
     single-source/DataBenchmarks
@@ -94,7 +95,6 @@ set(SWIFT_BENCH_MODULES
     single-source/InsertCharacter  
     single-source/Integrate
     single-source/IterateData
-    single-source/JSON
     single-source/Join
     single-source/LazyFilter
     single-source/LinkedList
