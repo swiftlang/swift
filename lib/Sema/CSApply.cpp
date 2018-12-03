@@ -4203,14 +4203,14 @@ namespace {
          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
           
          tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
             .highlight(subExpr->getSourceRange());
          tc.diagnose(foundDecl, diag::make_decl_objc,
-                      foundDecl->getDescriptiveKind())
+                     foundDecl->getDescriptiveKind())
             .fixItInsert(protocolDecl ?
-                       protocolDecl->getAttributeInsertionLoc(false) :
-                       foundDecl->getAttributeInsertionLoc(false),
-                       "@objc ");
+                         protocolDecl->getAttributeInsertionLoc(false) :
+                         foundDecl->getAttributeInsertionLoc(false),
+                         "@objc ");
         return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
         // If this attribute was inferred based on deprecated Swift 3 rules,
