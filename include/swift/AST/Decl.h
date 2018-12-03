@@ -157,6 +157,7 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
+  OpaqueType,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -2294,6 +2295,8 @@ public:
     return D->getKind() == DeclKind::PoundDiagnostic;
   }
 };
+  
+class OpaqueTypeDecl;
 
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
@@ -2650,6 +2653,15 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
+  
+  /// Get the decl for this value's opaque result type, if it has one.
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
+  
+  /// Set the opaque return type decl for this decl.
+  ///
+  /// `this` must be of a decl type that supports opaque return types, and
+  /// must not have previously had an opaque result type set.
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2700,7 +2712,7 @@ public:
   }
 };
 
-/// A type declaration that can have generic parameters attached to it.  Because
+/// A type declaration that can have generic parameters attached to it. Because
 /// it has these generic parameters, it is always a DeclContext.
 class GenericTypeDecl : public GenericContext, public TypeDecl {
 public:
@@ -2725,7 +2737,60 @@ public:
   }
 };
 
-
+/// OpaqueTypeDecl - This is a declaration of an opaque type. The opaque type
+/// is formally equivalent to its underlying type, but abstracts it away from
+/// clients of the opaque type, only exposing the type as something conforming
+/// to a given set of constraints.
+///
+/// Currently, opaque types do not normally have an explicit spelling in source
+/// code. One is formed implicitly when a declaration is written with an opaque
+/// result type, as in:
+///
+/// func foo() -> opaque SignedInteger { return 1 }
+///
+/// The declared type is a special kind of ArchetypeType representing the
+/// abstracted underlying type.
+class OpaqueTypeDecl : public GenericTypeDecl {
+  /// The original declaration that "names" the opaque type. Although a specific
+  /// opaque type cannot be explicitly named, oapque types can propagate
+  /// arbitrarily through expressions, so we need to know *which* opaque type is
+  /// propagated.
+  ValueDecl *NamingDecl;
+  
+  /// The generic signature of the opaque interface to the type. This is the
+  /// outer generic signature with an added generic parameter representing the
+  /// underlying type.
+  GenericSignature *OpaqueInterfaceGenericSignature;
+  
+  /// The generic parameter that represents the underlying type.
+  GenericTypeParamType *UnderlyingInterfaceType;
+  
+  /// If known, the underlying type and conformances of the opaque type,
+  /// expressed as a SubstitutionMap for the opaque interface generic signature.
+  /// This maps types in the interface generic signature to the outer generic
+  /// signature of the original declaration.
+  Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
+  
+public:
+  OpaqueTypeDecl(ValueDecl *NamingDecl,
+                 GenericParamList *GenericParams,
+                 DeclContext *DC,
+                 GenericSignature *OpaqueInterfaceGenericSignature,
+                 GenericTypeParamType *UnderlyingInterfaceType);
+  
+  ValueDecl *getNamingDecl() const { return NamingDecl; }
+  
+  GenericSignature *getOpaqueInterfaceGenericSignature() const {
+    return OpaqueInterfaceGenericSignature;
+  }
+  
+  GenericTypeParamType *getUnderlyingInterfaceType() const {
+    return UnderlyingInterfaceType;
+  }
+  
+  // Opaque type decls are currently always implicit
+  SourceRange getSourceRange() const { return SourceRange(); }
+};
 
 /// TypeAliasDecl - This is a declaration of a typealias, for example:
 ///
@@ -5499,6 +5564,7 @@ class FuncDecl : public AbstractFunctionDecl {
   TypeLoc FnRetType;
 
   OperatorDecl *Operator = nullptr;
+  OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
   FuncDecl(DeclKind Kind,
@@ -5650,6 +5716,14 @@ public:
   void setOperatorDecl(OperatorDecl *o) {
     assert(isOperator() && "can't set an OperatorDecl for a non-operator");
     Operator = o;
+  }
+  
+  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
+    return OpaqueReturn;
+  }
+  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    assert(!OpaqueReturn && "already has opaque type decl");
+    OpaqueReturn = decl;
   }
   
   /// Returns true if the function is forced to be statically dispatched.

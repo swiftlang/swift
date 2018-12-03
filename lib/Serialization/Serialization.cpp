@@ -1740,6 +1740,10 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::EnumCase:
     return false;
 
+  case DeclKind::OpaqueType:
+    // TODO: Will eventually need to serialize.
+    return false;
+      
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
   case DeclKind::Constructor:
@@ -2720,6 +2724,8 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   switch (D->getKind()) {
+  case DeclKind::OpaqueType:
+    llvm_unreachable("serialization not implemented yet");
   case DeclKind::Import:
     llvm_unreachable("import decls should not be serialized");
 

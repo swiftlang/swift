@@ -4996,7 +4996,6 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
-
 /// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///

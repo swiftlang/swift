@@ -158,9 +158,15 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
                    SymbolLanguage::Swift, SymbolPropertySet() };
   switch (D->getKind()) {
-    case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
-    case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
-    case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
+    case DeclKind::Enum:
+      info.Kind = SymbolKind::Enum;
+      break;
+    case DeclKind::Struct:
+      info.Kind = SymbolKind::Struct;
+      break;
+    case DeclKind::Protocol:
+      info.Kind = SymbolKind::Protocol;
+      break;
     case DeclKind::Class:
       info.Kind = SymbolKind::Class;
       if (isUnitTestCase(cast<ClassDecl>(D)))
@@ -233,6 +239,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PoundDiagnostic:
     case DeclKind::MissingMember:
     case DeclKind::Module:
+    case DeclKind::OpaqueType:
       break;
   }
 

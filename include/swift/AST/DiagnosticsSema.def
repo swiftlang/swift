@@ -1503,6 +1503,11 @@ ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
 
+// Opaque return types
+ERROR(opaque_type_invalid_constraint,none,
+      "an 'opaque' type must specify only 'Any', protocols, and/or a "
+      "base class", ())
+
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
