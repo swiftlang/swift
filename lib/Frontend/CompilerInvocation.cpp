@@ -655,6 +655,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
 
+  // If we're only emitting a module, stop optimizations once we've serialized
+  // the SIL for the module.
+  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
+    Opts.StopOptimizationAfterSerialization = true;
+
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
