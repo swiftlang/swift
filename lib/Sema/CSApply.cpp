@@ -4200,16 +4200,15 @@ namespace {
           // a default implementation of the method through a protocol extension
           // then insert the fixit on protocol, rather than on the method in the
           // protocol declaration (not allowed).
-          auto foundDeclContextAsDecl = foundDecl->getDeclContext()->getExtendedProtocolDecl();
-          bool isProtocolDecl = foundDeclContextAsDecl->getKind() == DeclKind::Protocol;
+          auto protocolDecl = foundDecl->getDeclContext()->getSelfProtocolDecl();
           
           tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                       foundDecl->getDescriptiveKind(), foundDecl->getFullName())
           .highlight(subExpr->getSourceRange());
           tc.diagnose(foundDecl, diag::make_decl_objc,
                       foundDecl->getDescriptiveKind())
-          .fixItInsert(isProtocolDecl ?
-                       foundDeclContextAsDecl->getStartLoc() :
+          .fixItInsert(protocolDecl ?
+                       protocolDecl->getAttributeInsertionLoc(false) :
                        foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
           return E;
