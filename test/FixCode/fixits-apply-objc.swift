@@ -22,16 +22,16 @@ func foo2(_ messageData: Any?) -> AnyObject? {
 }
 
 protocol SomeProtocol {
-	func foo()
-	func baz()
+ func foo()
+ func baz()
 }
 
 extension SomeProtocol {
-	func foo() {
-		let _ = #selector(baz)
-	}
-	
-	func baz() { 
-		print("Hello world!")
-	}
+ func foo() {
+  let _ = #selector(baz)
+ }
+ 
+ func baz() { 
+  print("Hello world!")
+ }
 }
