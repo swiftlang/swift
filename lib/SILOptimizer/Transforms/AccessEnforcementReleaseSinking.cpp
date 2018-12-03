@@ -122,6 +122,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::SToUCheckedTrunc:
     case BuiltinValueKind::SToSCheckedTrunc:
     case BuiltinValueKind::UToUCheckedTrunc:
+    case BuiltinValueKind::SUCheckedConversion:
+    case BuiltinValueKind::USCheckedConversion:
     case BuiltinValueKind::IntToFPWithOverflow:
     case BuiltinValueKind::ZeroInitializer:
     case BuiltinValueKind::Once:

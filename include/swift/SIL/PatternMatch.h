@@ -715,6 +715,13 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 // if any of the sub-matchers succeed.
 //
 
+/// Matcher for any of the builtin checked conversions.
+template <typename T0>
+inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
+m_CheckedConversion(const T0 &Op0) {
+  return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
+}
+
 /// Matcher for any of the builtin ExtOrBitCast instructions.
 template <typename T0>
 inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
