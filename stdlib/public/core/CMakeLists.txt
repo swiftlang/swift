@@ -116,6 +116,7 @@ set(SWIFTLIB_ESSENTIAL
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
+  Result.swift
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift

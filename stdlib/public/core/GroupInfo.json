@@ -220,5 +220,8 @@
     "Comparable.swift",
     "Codable.swift",
     "MigrationSupport.swift"
+  ],
+  "Result": [
+    "Result.swift"
   ]
 }
