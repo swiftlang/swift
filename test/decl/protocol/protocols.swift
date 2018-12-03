@@ -513,18 +513,18 @@ extension LetThereBeCrash {
 }
 
 protocol SomeProtocol {
-	associatedtype SomeType
-	func someFunction()
-	func anotherFunction()
+ associatedtype SomeType
+ func someFunction()
+ func anotherFunction()
 }
 
 extension SomeProtocol {
 	
-	func someFunction() {
-		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector due to associatedtype requirement on 'SomeProtocol'}}
-	}
+ func someFunction() {
+  let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector due to associatedtype requirement on 'SomeProtocol'}}
+ }
 	
-	func anotherFunction() { 
-		print("Hello world!")
-	}
+ func anotherFunction() { 
+  print("Hello world!")
+ }
 }
