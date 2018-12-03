@@ -479,8 +479,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, UToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, SToSCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, SToUCheckedTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, UToUCheckedTrunc)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, SUCheckedConversion)
-CONSTANT_OWNERSHIP_BUILTIN(Trivial, USCheckedConversion)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToFPWithOverflow)
 
 // This is surprising, Builtin.unreachable returns a "Never" value which is
