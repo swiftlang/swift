@@ -4200,7 +4200,7 @@ namespace {
           // a default implementation of the method through a protocol extension
           // then insert the fixit on protocol, rather than on the method in the
           // protocol declaration (not allowed).
-          auto foundDeclContextAsDecl = foundDecl->getDeclContext()->getAsDecl();
+          auto foundDeclContextAsDecl = foundDecl->getDeclContext()->getExtendedProtocolDecl();
           bool isProtocolDecl = foundDeclContextAsDecl->getKind() == DeclKind::Protocol;
           
           tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
