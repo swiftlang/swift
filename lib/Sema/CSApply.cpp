@@ -4200,8 +4200,6 @@ namespace {
          // a default implementation of the method through a protocol extension
          // then insert the fix-it on protocol, rather than on the method in the
          // protocol declaration (not allowed).
-         
-         // Show a custom diagnostic 
          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
          bool containsAssociatedTypes = protocolDecl->getAssociatedTypeMembers().empty();
           
