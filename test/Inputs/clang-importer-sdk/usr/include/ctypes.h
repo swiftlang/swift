@@ -277,6 +277,11 @@ void staticBoundsArray(const char x[static 4]);
 void useBigArray(char max_size[4096], char max_size_plus_one[4097]);
 void useBigArray2d(char max_size[][4096], char max_size_plus_one[][4097]);
 
+struct StructWithBigArray {
+  char max_size[4096];
+  char max_size_plus_one[4097];
+};
+
 typedef const int FourConstInts[4];
 void nonnullArrayParameters(const char x[_Nonnull], void * const _Nullable y[_Nonnull], _Nonnull FourConstInts z);
 void nullableArrayParameters(const char x[_Nullable], void * const _Nullable y[_Nullable], _Nullable FourConstInts z);
