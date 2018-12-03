@@ -4201,7 +4201,7 @@ namespace {
          // then insert the fix-it on protocol, rather than on the method in the
          // protocol declaration (not allowed).
          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
-         bool containsAssociatedTypes = protocolDecl->getAssociatedTypeMembers().empty();
+         bool containsAssociatedTypes = protocolDecl ? protocolDecl->getAssociatedTypeMembers().empty() : false;
           
          tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                      foundDecl->getDescriptiveKind(), foundDecl->getFullName())
