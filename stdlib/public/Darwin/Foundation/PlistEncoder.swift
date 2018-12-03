@@ -283,7 +283,7 @@ fileprivate struct _PlistKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCo
         let containerKey = key.stringValue
         let existingContainer = self.container[containerKey]
         precondition(existingContainer is NSMutableArray?,
-	                 "Attempt to request for unkeyed container with the key that previously keyed container already requested.")
+                     "Attempt to request for unkeyed container with the key that previously keyed container already requested.")
         let array = existingContainer as? NSMutableArray ?? NSMutableArray()
         self.container[containerKey] = array
 
