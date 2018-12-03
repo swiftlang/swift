@@ -481,6 +481,16 @@ Protocol _NSEnumerator has been removed
 Protocol _NSFastEnumeration has been removed
 Protocol _ShadowProtocol has been removed
 
+EnumElement _StringComparisonResult.equal in a non-resilient type changes position from 1 to 0
+EnumElement _StringComparisonResult.greater has been removed
+EnumElement _StringComparisonResult.less in a non-resilient type changes position from 0 to 1
+Func _StringGuts.withFastUTF8(range:_:) has parameter 0 type change from Optional<Range<Int>> to Range<Int>
+Func _binaryCompare(_:_:) has been removed
+Func _stringCompare(_:_:expecting:) has been renamed to Func _stringCompareInternal(_:_:expecting:)
+Func _stringCompare(_:_:expecting:) has parameter 0 type change from UnsafeBufferPointer<UInt8> to _StringGuts
+Func _stringCompare(_:_:expecting:) has parameter 1 type change from UnsafeBufferPointer<UInt8> to _StringGuts
+Func _stringCompareSlow(_:_:_:_:expecting:) has been removed
+
 Constructor _StringGutsSlice.init(_:) has been removed
 Constructor _StringGutsSlice.init(_:_:) has been removed
 Func _StringGutsSlice._normalizedHash(into:) has been removed

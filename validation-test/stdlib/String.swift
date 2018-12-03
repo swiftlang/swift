@@ -2043,10 +2043,24 @@ struct ComparisonTestCase {
       switch comparison {
       case .less:
         expectLT(pair.0, pair.1)
+        if !pair.0.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0.dropLast() < pair.1)
+        }
       case .greater:
         expectGT(pair.0, pair.1)
+        if !pair.1.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0 > pair.1.dropLast())
+        }
       case .equal:
         expectEqual(pair.0, pair.1)
+        if !pair.0.isEmpty {
+          // Test mixed String/Substring
+          expectTrue(pair.0.dropLast() == pair.1.dropLast())
+          expectFalse(pair.0.dropFirst() == pair.1)
+          expectFalse(pair.0 == pair.1.dropFirst())
+        }
       }
     }
   }
@@ -2077,11 +2091,10 @@ struct ComparisonTestCase {
       
       guard string1.count > 0 else { return }
       
-      let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
-      let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
-      
       expectEqual(string1, opaqueString)
-      expectEqual(opaqueResult, expectedResult)
+      expectEqual(string1 < string2, opaqueString < string2)
+      expectEqual(string1 > string2, opaqueString > string2)
+      expectEqual(string1 == string2, opaqueString == string2)
     }
 #endif
   }
@@ -2156,10 +2169,14 @@ let comparisonTestCases = [
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
     "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}\u{302}",
     "ae\u{302}",
     "ae\u{302}{303}",
     "ae\u{302}🧀",
     "ae\u{303}",
+    "x\u{0939}x",
+    "x\u{0939}\u{093a}x",
+    "x\u{0939}\u{093a}\u{093b}x",
     "\u{f90b}\u{f90c}\u{f90d}", // Normalizes to BMP scalars
     "\u{FFEE}", // half width CJK dot
     "🧀", // D83E DDC0 -- aka a really big scalar
