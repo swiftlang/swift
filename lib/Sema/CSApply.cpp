@@ -4196,22 +4196,22 @@ namespace {
       // The declaration we found must be exposed to Objective-C.
       tc.validateDecl(method);
       if (!method->isObjC()) {
-          // If the method declaration lies in a protocol and we're providing
-          // a default implementation of the method through a protocol extension
-          // then insert the fix-it on protocol, rather than on the method in the
-          // protocol declaration (not allowed).
-          auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
+         // If the method declaration lies in a protocol and we're providing
+         // a default implementation of the method through a protocol extension
+         // then insert the fix-it on protocol, rather than on the method in the
+         // protocol declaration (not allowed).
+         auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext()->getAsDecl());
           
-          tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
+         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
                       foundDecl->getDescriptiveKind(), foundDecl->getFullName())
             .highlight(subExpr->getSourceRange());
-          tc.diagnose(foundDecl, diag::make_decl_objc,
+         tc.diagnose(foundDecl, diag::make_decl_objc,
                       foundDecl->getDescriptiveKind())
             .fixItInsert(protocolDecl ?
                        protocolDecl->getAttributeInsertionLoc(false) :
                        foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
-          return E;
+         return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
         // If this attribute was inferred based on deprecated Swift 3 rules,
         // complain.
