@@ -213,6 +213,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     return doIt(TAD->getUnderlyingTypeLoc());
   }
+  
+  bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    if (OTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      if (visitGenericParamList(OTD->getGenericParams()))
+        return true;
+    }
+    return false;
+  }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
     for (auto Inherit: TPD->getInherited()) {

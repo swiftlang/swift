@@ -1515,6 +1515,11 @@ WARNING(function_type_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (unsigned, bool))
 
+// Opaque return types
+ERROR(opaque_type_invalid_constraint,none,
+      "an 'opaque' type must specify only 'Any', protocols, and/or a "
+      "base class", ())
+
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))

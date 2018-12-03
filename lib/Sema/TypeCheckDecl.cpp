@@ -2436,6 +2436,15 @@ public:
     checkAccessControl(TC, TAD);
   }
   
+  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    TC.checkDeclAttributesEarly(OTD);
+    
+    TC.validateDecl(OTD);
+    TC.checkDeclAttributes(OTD);
+    
+    checkAccessControl(TC, OTD);
+  }
+  
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
     TC.checkDeclAttributesEarly(AT);
 
@@ -3609,6 +3618,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateGenericTypeSignature(typeAlias);
     validateTypealiasType(*this, typeAlias);
+    break;
+  }
+      
+  case DeclKind::OpaqueType: {
+    auto opaque = cast<OpaqueTypeDecl>(D);
+    DeclValidationRAII IBV(opaque);
+    validateGenericTypeSignature(opaque);
     break;
   }
 
