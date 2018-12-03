@@ -2064,6 +2064,7 @@ struct ComparisonTestCase {
         expectEqual(pair.0, pair.1)
       }
     }
+    expectEqualSequence(strings, opaqueStrings)
 #endif
   }
   
@@ -2079,6 +2080,7 @@ struct ComparisonTestCase {
       let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
       let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
       
+      expectEqual(string1, opaqueString)
       expectEqual(opaqueResult, expectedResult)
     }
 #endif
@@ -2133,6 +2135,9 @@ let comparisonTestCases = [
   ComparisonTestCase(["\u{f90b}", "\u{5587}"], .equal),
   
   ComparisonTestCase(["a\u{1D160}a", "a\u{1D158}\u{1D1C7}"], .less),
+
+  ComparisonTestCase(["a\u{305}\u{315}", "a\u{315}\u{305}"], .equal),
+  ComparisonTestCase(["a\u{315}bz", "a\u{315}\u{305}az"], .greater),
   
   ComparisonTestCase(["\u{212b}", "\u{00c5}"], .equal),
   ComparisonTestCase([
