@@ -513,7 +513,6 @@ extension LetThereBeCrash {
 }
 
 protocol SomeProtocol {
-	associatedtype SomeType
 	func someFunction()
 	func anotherFunction()
 }
@@ -521,7 +520,7 @@ protocol SomeProtocol {
 extension SomeProtocol {
 	
 	func someFunction() {
-		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector due to associatedtype requirement on 'SomeProtocol'}}
+		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective C}}
 	}
 	
 	func anotherFunction() { 
