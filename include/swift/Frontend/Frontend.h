@@ -574,6 +574,13 @@ public:
   /// parse-only invocation, module imports will be processed.
   void performParseAndResolveImportsOnly();
 
+  /// Performs mandatory, diagnostic, and optimization passes over the SIL.
+  /// \param silModule The SIL module that was generated during SILGen.
+  /// \param stats A stats reporter that will report optimization statistics.
+  /// \returns true if any errors occurred.
+  bool performSILProcessing(SILModule *silModule,
+                            UnifiedStatsReporter *stats = nullptr);
+
 private:
   SourceFile *
   createSourceFileForMainModule(SourceFileKind FileKind,

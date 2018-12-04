@@ -1,0 +1,54 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name SerializedSIL -enable-resilience
+
+// RUN: %empty-directory(%t)
+// RUN: echo 'import SerializedSIL' | %target-swift-frontend -typecheck -enable-parseable-module-interface -module-cache-path %t -I %S -
+// RUN: %target-sil-opt -disable-sil-linking %t/SerializedSIL-*.swiftmodule -module-name SerializedSIL > %t/SerializedSIL.sil
+// RUN: %FileCheck %s < %t/SerializedSIL.sil
+// RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SerializedSIL.sil
+
+public class TestClass {
+    public init()
+    public func method()
+    public subscript(_: Int) -> Void { get set }
+    public var prop: Int { get set }
+    public var storedProp: Int
+    public static var staticProp: Int
+    deinit
+}
+
+public class TestEmptyClass {
+}
+
+public struct TestEmptyStruct {
+}
+
+public enum TestEnum {
+    case a
+    public init()
+    public func method()
+    public subscript(_: Int) -> Void { get set }
+    public var prop: Int { get set }
+    public static var staticProp: Int
+}
+
+public struct TestStruct {
+    public init()
+    public func method()
+    public subscript(_: Int) -> Void { get set }
+    public var prop: Int { get set }
+    public var storedProp: Int
+    public static var staticProp: Int
+}
+
+public let globalWithNoAccessors: Int
+public var readOnlyVar: Int { get }
+public var readWriteVar: Int { get set }
+public func verySimpleFunction()
+
+// CHECK: sil [serialized] [canonical] @$s13SerializedSIL9TestClassCACycfC : $@convention(method) (@thick TestClass.Type) -> @owned TestClass {
+
+// NEGATIVE-NOT: {{sil .*@.+storedProp}}
+
+// NEGATIVE-NOT: sil_vtable
+// NEGATIVE-NOT: sil_witness_table
