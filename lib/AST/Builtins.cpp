@@ -1225,10 +1225,7 @@ static const char *const IntrinsicNameTable[] = {
 #include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
-/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
-/// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
-/// or 0 if the intrinsic name doesn't match anything.
-unsigned swift::getLLVMIntrinsicID(StringRef InName) {
+llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
   // Swift intrinsic names start with int_.
@@ -1321,12 +1318,11 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
 
 /// \returns true on success, false on failure.
 static bool
-getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
+getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
+                                 ArrayRef<Type> TypeArgs,
                                  ASTContext &Context,
                                  SmallVectorImpl<Type> &ArgElts,
                                  Type &ResultTy, FunctionType::ExtInfo &Info) {
-  llvm::Intrinsic::ID ID = (llvm::Intrinsic::ID)iid;
-  
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   SmallVector<IITDescriptor, 8> Table;
   getIntrinsicInfoTableEntries(ID, Table);
@@ -1439,7 +1435,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   // If this is the name of an LLVM intrinsic, cons up a swift function with a
   // type that matches the IR types.
-  if (unsigned ID = getLLVMIntrinsicID(OperationName)) {
+  if (llvm::Intrinsic::ID ID = getLLVMIntrinsicID(OperationName)) {
     SmallVector<Type, 8> ArgElts;
     Type ResultTy;
     FunctionType::ExtInfo Info;
