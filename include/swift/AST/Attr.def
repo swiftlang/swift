@@ -362,7 +362,7 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
   NotSerialized, 74)
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
-  OnSubscript | OnConstructor | OnEnumElement | UserInaccessible,
+  OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(_frozen, Frozen,
   OnEnum |
