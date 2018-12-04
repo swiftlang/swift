@@ -1349,6 +1349,8 @@ ERROR(attr_availability_unavailable_deprecated,none,
       "'%0' attribute cannot be both unconditionally 'unavailable' and "
       "'deprecated'", (StringRef))
 
+WARNING(attr_availability_invalid_duplicate,none,
+        "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 ERROR(attr_availability_invalid_renamed,none,
