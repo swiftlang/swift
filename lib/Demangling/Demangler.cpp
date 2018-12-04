@@ -1875,6 +1875,20 @@ NodePointer Demangler::popAssocTypePath() {
   return AssocTypePath;
 }
 
+NodePointer Demangler::popSelfOrAssocTypePath() {
+  if (auto Type = popNode(Node::Kind::Type)) {
+    if (Type->getChild(0) &&
+        Type->getChild(0)->getKind() ==
+        Node::Kind::DependentGenericParamType) {
+      return Type;
+    }
+
+    pushNode(Type);
+  }
+
+  return popAssocTypePath();
+}
+
 NodePointer Demangler::getDependentGenericParamType(int depth, int index) {
   if (depth < 0 || index < 0)
     return nullptr;
@@ -2041,15 +2055,15 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'n': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popAssocTypePath();
+      NodePointer conformingType = popSelfOrAssocTypePath();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
-                                protoTy, assocTypePath, requirementTy);
+                                protoTy, conformingType, requirementTy);
     }
 
     case 'N': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popAssocTypePath();
+      auto assocTypePath = popSelfOrAssocTypePath();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(
                             Node::Kind::DefaultAssociatedConformanceAccessor,
@@ -2423,19 +2437,7 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      NodePointer ConformingType = nullptr;
-      if (auto Type = popNode(Node::Kind::Type)) {
-        if (Type->getChild(0) &&
-            Type->getChild(0)->getKind() ==
-            Node::Kind::DependentGenericParamType) {
-          ConformingType = Type;
-        } else {
-          pushNode(Type);
-        }
-      }
-
-      if (!ConformingType)
-        ConformingType = popAssocTypePath();
+      NodePointer ConformingType = popSelfOrAssocTypePath();
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, ConformingType, ProtoTy);

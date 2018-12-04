@@ -334,4 +334,4 @@ $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocT
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
-
+$s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn --> associated conformance descriptor for resilient_protocol.ResilientDerivedProtocol.A: resilient_protocol.ResilientBaseProtocol

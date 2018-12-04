@@ -29,6 +29,9 @@
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$s18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$s18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)
 
+// Associated conformance descriptor for inherited protocol
+// CHECK-DEFINITION-LABEL: s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn" = alias 
+
 // Associated type and conformance
 
 // CHECK-DEFINITION: @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
