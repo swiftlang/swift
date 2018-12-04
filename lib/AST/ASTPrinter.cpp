@@ -4135,11 +4135,15 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
 
 void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
   StreamPrinter Printer(OS);
-  PrintAST(Printer, Opts)
-      .printGenericSignature(this,
-                             PrintAST::PrintParams |
-                             PrintAST::PrintRequirements);
+  print(Printer, Opts);
 }
+
+void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
+  PrintAST(Printer, Opts).printGenericSignature(this,
+                                                PrintAST::PrintParams |
+                                                PrintAST::PrintRequirements);
+}
+
 void GenericSignature::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';

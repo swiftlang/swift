@@ -41,6 +41,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class GenericSignature;
   enum class AccessorKind;
 
 namespace syntax {
@@ -377,6 +378,9 @@ public:
                                             swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
+  static void
+  printFullyAnnotatedGenericReq(const swift::GenericSignature *Sig,
+                                llvm::raw_ostream &OS);
   /// Tries to resolve the path to the real file-system path. If it fails it
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);

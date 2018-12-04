@@ -5276,6 +5276,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>SetAlgebra</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>SetAlgebra</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
     key.offset: 1445,
     key.length: 683,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:s10SetAlgebraP4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s10SetAlgebraP4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:s10SetAlgebraP\">SetAlgebra</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "FooRuncingOptions",
@@ -5464,6 +5465,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
     key.offset: 2130,
     key.length: 280,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:s9OptionSetP4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s9OptionSetP4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:s9OptionSetP\">OptionSet</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "FooRuncingOptions",
@@ -5539,6 +5541,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where Self == Self.Element</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>Element == Self</codeVoice>, which is the default.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note></Discussion></CommentParts></Other>",
     key.offset: 2412,
     key.length: 407,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:s9OptionSetPs7ElementQzRszrlE4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s9OptionSetPs7ElementQzRszrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:s9OptionSetP\">OptionSet</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s9OptionSetPs7ElementQzRszrlE4Selfxmfp\">Self</ref.generic_type_param> == <ref.generic_type_param usr=\"s:s9OptionSetPs7ElementQzRszrlE4Selfxmfp\">Self</ref.generic_type_param>.Element</decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "FooRuncingOptions",
@@ -5633,6 +5636,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Other><Name></Name><Declaration>extension FooRuncingOptions where Self.RawValue : FixedWidthInteger</Declaration><CommentParts><Abstract><Para><codeVoice>OptionSet</codeVoice> requirements for which default implementations are supplied when <codeVoice>RawValue</codeVoice> conforms to <codeVoice>FixedWidthInteger</codeVoice>, which is the usual case.  Each distinct bit of an option set’s <codeVoice>.rawValue</codeVoice> corresponds to a disjoint value of the <codeVoice>OptionSet</codeVoice>.</Para></Abstract><Discussion><Note><Para>A type conforming to <codeVoice>OptionSet</codeVoice> can implement any of these initializers or methods, and those implementations will be used in lieu of these defaults.</Para></Note><List-Bullet><Item><Para><codeVoice>union</codeVoice> is implemented as a bitwise “or” (<codeVoice>|</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>intersection</codeVoice> is implemented as a bitwise “and” (<codeVoice>&amp;</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item><Item><Para><codeVoice>symmetricDifference</codeVoice> is implemented as a bitwise “exclusive or” (<codeVoice>^</codeVoice>) of <codeVoice>rawValue</codeVoice>s</Para></Item></List-Bullet></Discussion></CommentParts></Other>",
     key.offset: 2821,
     key.length: 279,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:s9OptionSetP\">OptionSet</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:s9OptionSetPss17FixedWidthInteger8RawValueRpzrlE4Selfxmfp\">Self</ref.generic_type_param>.RawValue : <ref.protocol usr=\"s:s17FixedWidthIntegerP\">FixedWidthInteger</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "FooRuncingOptions",
