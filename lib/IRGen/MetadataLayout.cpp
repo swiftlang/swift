@@ -169,10 +169,8 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
 
   auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
-  auto *loadInst = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
-  IGF.setInvariantLoad(loadInst);
-
-  llvm::Value *offsetVal = loadInst;
+  // FIXME: Should this be an invariant load?
+  llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
 
   auto relativeOffset = offset.getRelativeOffset().getValue();
   if (relativeOffset != 0) {
