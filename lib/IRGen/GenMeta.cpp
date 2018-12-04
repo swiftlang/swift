@@ -729,6 +729,20 @@ namespace {
               B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
+        if (entry.isBase()) {
+          // Define the associated conformance descriptor to point to the
+          // current position in the protocol descriptor, which is an
+          // out-of-line base protocol.
+          AssociatedConformance conformance(
+                                  Proto,
+                                  Proto->getProtocolSelfType()
+                                    ->getCanonicalType(),
+                                  entry.getBase());
+          IGM.defineAssociatedConformanceDescriptor(
+              conformance,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
+        }
+
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);

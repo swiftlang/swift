@@ -880,8 +880,10 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     // their declaration, but are weak linked if the associated
     // type stored in extra storage area is weak linked.
     auto assocConformance = getAssociatedConformance();
-    auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
-    return depMemTy->getAssocType()->isWeakImported(module);
+    if (auto *depMemTy = assocConformance.first->getAs<DependentMemberType>())
+      return depMemTy->getAssocType()->isWeakImported(module);
+
+    return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
   }
 
   case Kind::TypeMetadata:
