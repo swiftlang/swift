@@ -210,8 +210,6 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     if (!operand.isConstant())
       return operand;
 
-    // TODO: SUCheckedConversion/USCheckedConversion
-
     // Implement support for s_to_s_checked_trunc_Int2048_Int64 and other
     // checking integer truncates.  These produce a tuple of the result value
     // and an overflow bit.
