@@ -44,6 +44,6 @@ sil_default_witness_table hidden DerivedFromSimpleAssoc {
   no_default
 }
 
-// CHECK: define internal swiftcc i8** @"$s4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAxAA03HasfG0PWT"
+// CHECK: define internal void @"$s4test15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"
 
 

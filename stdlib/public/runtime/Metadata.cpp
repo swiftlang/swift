@@ -3952,6 +3952,7 @@ static bool doesNotRequireInstantiation(
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(
                               const ProtocolConformanceDescriptor *conformance,
+                              const Metadata *conformingType,
                               const GenericWitnessTable *genericTable,
                               void **table) {
   auto protocol = conformance->getProtocol();
@@ -3965,7 +3966,7 @@ static void initializeResilientWitnessTable(
     auto reqDescriptor = witness.Requirement.get();
 
     // The requirement descriptor may be NULL, in which case this is a
-    // requirement introduced in a later version of the protocol./
+    // requirement introduced in a later version of the protocol.
     if (!reqDescriptor) continue;
 
     // If the requirement descriptor doesn't land within the bounds of the
@@ -3988,35 +3989,24 @@ static void initializeResilientWitnessTable(
   for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
     unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
 
+    // If we don't have a witness, fill in the default implementation.
     // If we already have a witness, there's nothing to do.
-    if (table[witnessIndex])
-      continue;
-
-    // Otherwise, fill in a default implementation.
     auto &reqt = requirements[i];
-    void *impl = reqt.DefaultImplementation.get();
-    table[witnessIndex] = impl;
-  }
-}
+    if (!table[witnessIndex]) {
+      void *impl = reqt.DefaultImplementation.get();
+      table[witnessIndex] = impl;
+    }
 
-/// Realize witness tables for base protocols.
-static void realizeBaseProtocolWitnessTables(const ProtocolDescriptor *protocol,
-                                             const Metadata *conformingType,
-                                             WitnessTable *witnessTable) {
-  // Loop over the requirements, realizing witness tables for base class
-  // conformances.
-  auto requirements = protocol->getRequirements();
-  auto baseReq = protocol->getRequirementBaseDescriptor();
-  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
-    // Once we hit a non-base protocol requirement, we're done.
-    auto &reqt = requirements[i];
-    if (reqt.Flags.getKind() != ProtocolRequirementFlags::Kind::BaseProtocol)
-      break;
-
-    // Realize the base protocol witness table.
-    (void)swift_getAssociatedConformanceWitness(witnessTable,
-                                                conformingType, conformingType,
-                                                baseReq, &reqt);
+    // Realize base protocol witnesses.
+    if (reqt.Flags.getKind() == ProtocolRequirementFlags::Kind::BaseProtocol &&
+        table[witnessIndex]) {
+      // Realize the base protocol witness table.
+      auto baseReq = protocol->getRequirementBaseDescriptor();
+      (void)swift_getAssociatedConformanceWitness((WitnessTable *)table,
+                                                  conformingType,
+                                                  conformingType,
+                                                  baseReq, &reqt);
+    }
   }
 }
 
@@ -4079,9 +4069,8 @@ WitnessTableCacheEntry::allocate(
   }
 
   // Fill in any default requirements.
-  initializeResilientWitnessTable(conformance, genericTable, table);
+  initializeResilientWitnessTable(conformance, Type, genericTable, table);
   auto castTable = reinterpret_cast<WitnessTable*>(table);
-  realizeBaseProtocolWitnessTables(protocol, Type, castTable);
 
   // Call the instantiation function if present.
   if (!genericTable->Instantiator.isNull()) {
@@ -4114,10 +4103,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
-    auto pattern = conformance->getWitnessTablePattern();
-    realizeBaseProtocolWitnessTables(conformance->getProtocol(), type,
-                                     const_cast<WitnessTable *>(pattern));
-    return uniqueForeignWitnessTableRef(pattern);
+    return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
 
   auto &cache = getCache(genericTable);

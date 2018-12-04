@@ -79,6 +79,12 @@ where Element: ProtocolWithRequirements, Element.T == Y {
   public func second() { }
 }
 
+// CHECK-USAGE: @"$s31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAAMc" =
+// CHECK-SAME: @"associated conformance 31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAaD0h4BaseI0"
+public struct ConformsToDerived : ResilientDerivedProtocol {
+  public func requirement() -> Int { return 0 }
+}
+
 // ----------------------------------------------------------------------------
 // Resilient protocol usage
 // ----------------------------------------------------------------------------
