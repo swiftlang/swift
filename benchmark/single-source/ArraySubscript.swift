@@ -29,20 +29,18 @@ public func run_ArraySubscript(_ N: Int) {
   func bound(_ x: Int) -> Int { return min(x, numArrayElements-1) }
 
   for _ in 1...N {
-
-  var arrays = [[Int]](repeating: [], count: numArrays)
-  for i in 0..<numArrays {
-    for _ in 0..<numArrayElements {
-      arrays[i].append(Int(truncatingIfNeeded: Random()))
+    var arrays = [[Int]](repeating: [], count: numArrays)
+    for i in 0..<numArrays {
+      for _ in 0..<numArrayElements {
+        arrays[i].append(Int(truncatingIfNeeded: Random()))
+      }
     }
-  }
 
-  // Do a max up the diagonal.
-  for i in 1..<numArrays {
-    arrays[i][bound(i)] =
-      max(arrays[i-1][bound(i-1)], arrays[i][bound(i)])
-  }
-  CheckResults(arrays[0][0] <= arrays[numArrays-1][bound(numArrays-1)])
-
+    // Do a max up the diagonal.
+    for i in 1..<numArrays {
+      arrays[i][bound(i)] =
+        max(arrays[i-1][bound(i-1)], arrays[i][bound(i)])
+    }
+    CheckResults(arrays[0][0] <= arrays[numArrays-1][bound(numArrays-1)])
   }
 }
