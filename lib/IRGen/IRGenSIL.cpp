@@ -1990,7 +1990,13 @@ void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
 
 void IRGenSILFunction::
 visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  auto *fnVal = getLoweredSingletonExplosion(i->getFunctionOperand());
+  auto assocFnOffset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  auto structFieldOffset = assocFnOffset + 1;
+  Explosion e;
+  e.add(Builder.CreateExtractValue(fnVal, {structFieldOffset}));
+  setLoweredExplosion(i, e);
 }
 
 // The code structure resembles

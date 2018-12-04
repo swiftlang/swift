@@ -12,11 +12,11 @@ import Builtin
 // parameter.
 sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
 bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float):
-  return %2 : $Float
+  return %0 : $Float
 }
 
 // The original function with an attribute that specifies the compiler-emitted pullback.
-sil hidden [reverse_differentiable source 0 wrt 0 primal @foo adjoint @foo_adj primitive] @foo : $@convention(thin) (Float) -> Float {
+sil hidden [differentiable source 0 wrt 0 primal @foo adjoint @foo_adj primitive] @foo : $@convention(thin) (Float) -> Float {
 bb0(%0 : @trivial $Float):
   return %0 : $Float
 }
