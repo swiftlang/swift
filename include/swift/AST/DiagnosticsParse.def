@@ -1365,15 +1365,15 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-WARNING(attr_availability_swift_expected_option,none,
+WARNING(attr_availability_platform_agnostic_expected_option,none,
       "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-      "for platform 'swift'", (StringRef))
-WARNING(attr_availability_swift_expected_deprecated_version,none,
+      "for platform '%1'", (StringRef, StringRef))
+WARNING(attr_availability_platform_agnostic_expected_deprecated_version,none,
       "expected version number with 'deprecated' in '%0' attribute for "
-      "platform 'swift'", (StringRef))
-WARNING(attr_availability_swift_infeasible_option,none,
-      "'%0' cannot be used in '%1' attribute for platform 'swift'",
-      (StringRef, StringRef))
+      "platform '%1'", (StringRef, StringRef))
+WARNING(attr_availability_platform_agnostic_infeasible_option,none,
+      "'%0' cannot be used in '%1' attribute for platform '%2'",
+      (StringRef, StringRef, StringRef))
 
 WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
@@ -1608,11 +1608,14 @@ ERROR(avail_query_version_comparison_not_needed,
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())
 
-ERROR(availability_swift_must_occur_alone, none,
-      "'swift' version-availability must be specified alone", ())
+ERROR(availability_must_occur_alone, none,
+      "'%0' version-availability must be specified alone", (StringRef))
 
 ERROR(pound_available_swift_not_allowed, none,
       "Swift language version checks not allowed in #available(...)", ())
+
+ERROR(pound_available_package_description_not_allowed, none,
+      "PackageDescription version checks not allowed in #available(...)", ())
 
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))

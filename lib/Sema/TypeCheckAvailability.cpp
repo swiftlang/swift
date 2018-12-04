@@ -2177,6 +2177,7 @@ bool swift::diagnoseExplicitUnavailability(
   case PlatformAgnosticAvailabilityKind::None:
   case PlatformAgnosticAvailabilityKind::Unavailable:
   case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
   case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
     bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
                     PlatformAgnosticAvailabilityKind::UnavailableInSwift);
@@ -2235,10 +2236,14 @@ bool swift::diagnoseExplicitUnavailability(
     llvm_unreachable("These aren't considered unavailable");
 
   case AvailableVersionComparison::Unavailable:
-    if (Attr->isLanguageVersionSpecific()
+    if ((Attr->isLanguageVersionSpecific() ||
+         Attr->isPackageDescriptionVersionSpecific())
         && Attr->Introduced.hasValue())
-      diags.diagnose(D, diag::availability_introduced_in_swift,
-                     RawAccessorKind, Name, *Attr->Introduced)
+      diags.diagnose(D, diag::availability_introduced_in_version,
+                     RawAccessorKind, Name,
+                     (Attr->isLanguageVersionSpecific() ? 
+                      "Swift" : "PackageDescription"),
+                     *Attr->Introduced)
         .highlight(Attr->getRange());
     else
       diags.diagnose(D, diag::availability_marked_unavailable, RawAccessorKind,
@@ -2249,10 +2254,19 @@ bool swift::diagnoseExplicitUnavailability(
   case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
+
+    StringRef platformDisplayString;
+    if (Attr->isLanguageVersionSpecific()) {
+      platformDisplayString = "Swift";
+    } else if (Attr->isPackageDescriptionVersionSpecific()) {
+      platformDisplayString = "PackageDescription";
+    } else {
+      platformDisplayString = Attr->prettyPlatformString();
+    }
+
     diags.diagnose(D, diag::availability_obsoleted,
                    RawAccessorKind, Name,
-                   (Attr->isLanguageVersionSpecific() ?
-                    "Swift" : Attr->prettyPlatformString()),
+                   platformDisplayString,
                    *Attr->Obsoleted)
       .highlight(Attr->getRange());
     break;
