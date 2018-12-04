@@ -1414,8 +1414,8 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>
   parsePlatformVersionConstraintSpec();
-  ParserResult<LanguageVersionConstraintAvailabilitySpec>
-  parseLanguageVersionConstraintSpec();
+  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+  parsePlatformAgnosticVersionConstraintSpec();
 
   bool canDelayMemberDeclParsing();
 };

@@ -3981,9 +3981,9 @@ NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
      "unavailable here", (unsigned, DeclName))
 
-NOTE(availability_introduced_in_swift, none,
-     "%select{getter for |setter for |}0%1 was introduced in Swift %2",
-     (unsigned, DeclName, llvm::VersionTuple))
+NOTE(availability_introduced_in_version, none,
+     "%select{getter for |setter for |}0%1 was introduced in %2 %3",
+     (unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_obsoleted, none,
      "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",

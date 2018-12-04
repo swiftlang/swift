@@ -2452,6 +2452,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         bool isImplicit;
         bool isUnavailable;
         bool isDeprecated;
+        bool isPackageDescriptionVersionSpecific;
         DEF_VER_TUPLE_PIECES(Introduced);
         DEF_VER_TUPLE_PIECES(Deprecated);
         DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -2459,6 +2460,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         // Decode the record, pulling the version tuple information.
         serialization::decls_block::AvailableDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable, isDeprecated,
+            isPackageDescriptionVersionSpecific,
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
             LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -2481,7 +2483,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                  (!Introduced.empty() ||
                   !Deprecated.empty() ||
                   !Obsoleted.empty()))
-          platformAgnostic =
+          platformAgnostic = isPackageDescriptionVersionSpecific ?
+            PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
             PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
         else
           platformAgnostic = PlatformAgnosticAvailabilityKind::None;

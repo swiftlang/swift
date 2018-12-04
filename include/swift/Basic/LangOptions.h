@@ -82,6 +82,9 @@ namespace swift {
     /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
+    /// PackageDescription version to compile for.
+    version::Version PackageDescriptionVersion;
+
     /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 

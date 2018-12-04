@@ -535,28 +535,32 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.hasValue() && Platform == "swift") {
+  if (!PlatformKind.hasValue() &&
+      (Platform == "swift" || Platform == "_PackageDescription")) {
+
     if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
       diagnose(AttrLoc,
-               diag::attr_availability_swift_expected_deprecated_version,
-               AttrName);
+               diag::attr_availability_platform_agnostic_expected_deprecated_version,
+               AttrName, Platform);
       return nullptr;
     }
     if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
-      diagnose(AttrLoc, diag::attr_availability_swift_infeasible_option,
-               "unavailable", AttrName);
+      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_infeasible_option,
+               "unavailable", AttrName, Platform);
       return nullptr;
     }
     assert(PlatformAgnostic == PlatformAgnosticAvailabilityKind::None);
 
     if (!SomeVersion) {
-      diagnose(AttrLoc, diag::attr_availability_swift_expected_option,
-               AttrName);
+      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_expected_option,
+               AttrName, Platform);
       return nullptr;
     }
 
     PlatformKind = PlatformKind::none;
-    PlatformAgnostic = PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+    PlatformAgnostic = (Platform == "swift") ?
+                         PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
+                         PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
   }
 
 
@@ -1335,12 +1339,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       //  @available(iOS, introduced: 8.0)
       //  @available(OSX, introduced: 10.10)
       //
-      // Similarly if we have a language version spec in the spec
-      // list, create an implicit AvailableAttr with the specified
-      // version as the introduced argument. For example, if we have
+      // Similarly if we have a language version spec or PackageDescription
+      // version in the spec list, create an implicit AvailableAttr
+      // with the specified version as the introduced argument. 
+      // For example, if we have
       //   @available(swift 3.1)
       // we will synthesize
       //   @available(swift, introduced: 3.1)
+      // or, if we have
+      //   @available(_PackageDescription 4.2)
+      // we will synthesize
+      //   @available(_PackageDescription, introduced: 4.2)
 
       for (auto *Spec : Specs) {
         PlatformKind Platform;
@@ -1355,13 +1364,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
           VersionRange = PlatformVersionSpec->getVersionSrcRange();
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
-        } else if (auto *LanguageVersionSpec =
-                   dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+        } else if (auto *PlatformAgnosticVersionSpec =
+                   dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
           Platform = PlatformKind::none;
-          Version = LanguageVersionSpec->getVersion();
-          VersionRange = LanguageVersionSpec->getVersionSrcRange();
-          PlatformAgnostic =
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+          Version = PlatformAgnosticVersionSpec->getVersion();
+          VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
+          PlatformAgnostic = PlatformAgnosticVersionSpec->isLanguageVersionSpecific() ?
+                               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
+                               PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
 
         } else {
           continue;

@@ -3548,6 +3548,7 @@ void Parser::addParametersToScope(ParameterList *PL) {
 ///  availability-spec:
 ///     '*'
 ///     language-version-constraint-spec
+///     package-description-constraint-spec
 ///     platform-version-constraint-spec
 ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
   if (Tok.isBinaryOperator() && Tok.getText() == "*") {
@@ -3556,36 +3557,47 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 
     return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
   }
-  if (Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift") {
-    return parseLanguageVersionConstraintSpec();
-  }
+  if (Tok.isIdentifierOrUnderscore() &&
+       (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
+      return parsePlatformAgnosticVersionConstraintSpec();
 
   return parsePlatformVersionConstraintSpec();
 }
 
-/// Parse language-version constraint specification.
+/// Parse platform-agnostic version constraint specification.
 ///
 ///  language-version-constraint-spec:
 ///     "swift" version-tuple
-ParserResult<LanguageVersionConstraintAvailabilitySpec>
-Parser::parseLanguageVersionConstraintSpec() {
+///  package-description-version-constraint-spec:
+///     "_PackageDescription" version-tuple
+ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SyntaxParsingContext VersionRestrictionContext(
       SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
-  SourceLoc SwiftLoc;
+  SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
+  Optional<AvailabilitySpecKind> Kind;
   SourceRange VersionRange;
-  if (!(Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift"))
+
+  if (Tok.isIdentifierOrUnderscore()) {
+    if (Tok.getText() == "swift")
+      Kind = AvailabilitySpecKind::LanguageVersionConstraint;
+    else if (Tok.getText() == "_PackageDescription")
+      Kind = AvailabilitySpecKind::PackageDescriptionVersionConstraint;
+  }
+
+  if (!Kind.hasValue())
     return nullptr;
 
-  SwiftLoc = Tok.getLoc();
+  PlatformAgnosticNameLoc = Tok.getLoc();
   consumeToken();
   if (parseVersionTuple(Version, VersionRange,
                         diag::avail_query_expected_version_number)) {
     return nullptr;
   }
   return makeParserResult(new (Context)
-                          LanguageVersionConstraintAvailabilitySpec(
-                            SwiftLoc, Version, VersionRange));
+                          PlatformAgnosticVersionConstraintAvailabilitySpec(
+                            Kind.getValue(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.

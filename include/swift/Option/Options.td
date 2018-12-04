@@ -172,6 +172,11 @@ def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, Par
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
+def package_description_version: Separate<["-"], "package-description-version">,
+  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
+  HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
+  MetaVarName<"<vers>">;
+
 def tools_directory : Separate<["-"], "tools-directory">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,

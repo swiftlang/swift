@@ -1188,9 +1188,10 @@ static void validateAvailabilitySpecList(Parser &P,
   bool HasOtherPlatformSpec = false;
 
   if (Specs.size() == 1 &&
-      isa<LanguageVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @available(swift N) is allowed only in isolation; it cannot
-    // be combined with other availability specs in a single list.
+      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
+    // @available(swift N) and @available(_PackageDescription N) are allowed 
+    // only in isolation; they cannot be combined with other availability specs
+    // in a single list.
     return;
   }
 
@@ -1200,10 +1201,11 @@ static void validateAvailabilitySpecList(Parser &P,
       continue;
     }
 
-    if (auto *LangSpec =
-        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
-      P.diagnose(LangSpec->getSwiftLoc(),
-                 diag::availability_swift_must_occur_alone);
+    if (auto *PlatformAgnosticSpec =
+        dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+      P.diagnose(PlatformAgnosticSpec->getPlatformAgnosticNameLoc(),
+                 diag::availability_must_occur_alone,
+                 PlatformAgnosticSpec->isLanguageVersionSpecific() ? "swift" : "_PackageDescription");
       continue;
     }
 
@@ -1250,10 +1252,12 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   ParserStatus Status = parseAvailabilitySpecList(Specs);
 
   for (auto *Spec : Specs) {
-    if (auto *Lang =
-        dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
-      diagnose(Lang->getSwiftLoc(),
-               diag::pound_available_swift_not_allowed);
+    if (auto *PlatformAgnostic =
+        dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
+        diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
+                 PlatformAgnostic->isLanguageVersionSpecific() ?
+                   diag::pound_available_swift_not_allowed :
+                   diag::pound_available_package_description_not_allowed);
       Status.setIsParseError();
     }
   }
