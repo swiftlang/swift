@@ -307,6 +307,10 @@ static bool buildSwiftModuleFromSwiftInterface(
       return;
     }
 
+    // Optimize emitted modules. This has to happen after we parse arguments,
+    // because parseSILOpts would override the current optimization mode.
+    SubInvocation.getSILOptions().OptMode = OptimizationMode::ForSpeed;
+
     // Build the .swiftmodule; this is a _very_ abridged version of the logic in
     // performCompile in libFrontendTool, specialized, to just the one
     // module-serialization task we're trying to do here.
@@ -334,17 +338,14 @@ static bool buildSwiftModuleFromSwiftInterface(
     SILOptions &SILOpts = SubInvocation.getSILOptions();
     auto Mod = SubInstance.getMainModule();
     auto SILMod = performSILGeneration(Mod, SILOpts);
-    if (SILMod) {
-      LLVM_DEBUG(llvm::dbgs() << "Running SIL diagnostic passes\n");
-      if (runSILDiagnosticPasses(*SILMod)) {
-        LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
-        SubError = true;
-        return;
-      }
-      SILMod->verify();
+    if (!SILMod) {
+      LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
+      SubError = true;
+      return;
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Serializing " << OutPath << "\n");
+    // Setup the callbacks for serialization, which can occur during the
+    // optimization pipeline.
     FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
@@ -358,9 +359,16 @@ static bool buildSwiftModuleFromSwiftInterface(
     }
     SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
-        serialize(Mod, SerializationOpts, SILMod.get());
-      });
-    SILMod->serialize();
+      serialize(Mod, SerializationOpts, SILMod.get());
+    });
+
+    LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");
+    if (SubInstance.performSILProcessing(SILMod.get())) {
+      LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
+      SubError = true;
+      return;
+    }
+
     SubError = Diags.hadAnyError();
   });
   return !RunSuccess || SubError;
