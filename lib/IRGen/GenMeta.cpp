@@ -1675,7 +1675,10 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
 void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   eraseExistingTypeContextDescriptor(IGM, type);
 
-  if (auto sd = dyn_cast<StructDecl>(type)) {
+  if (requiresForeignTypeMetadata(type)) {
+    (void)IGM.getAddrOfForeignTypeMetadataCandidate(
+        type->getDeclaredInterfaceType()->getCanonicalType());
+  } else if (auto sd = dyn_cast<StructDecl>(type)) {
     return emitStructMetadata(IGM, sd);
   } else if (auto ed = dyn_cast<EnumDecl>(type)) {
     emitEnumMetadata(IGM, ed);
@@ -3878,7 +3881,8 @@ bool irgen::requiresForeignTypeMetadata(NominalTypeDecl *decl) {
     llvm_unreachable("bad foreign class kind");
   }
 
-  return isa<ClangModuleUnit>(decl->getModuleScopeContext());
+  return isa<ClangModuleUnit>(decl->getModuleScopeContext()) &&
+    !isa<ProtocolDecl>(decl);
 }
 
 llvm::Constant *

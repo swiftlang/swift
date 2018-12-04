@@ -1184,7 +1184,12 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
   // Try to create a new record of the fact that we used this type.
   auto insertResult = LazyTypeGlobals.try_emplace(type);
   auto &entry = insertResult.first->second;
-  
+
+  // Imported structs and enums types are known to be lazy.
+  if (insertResult.second) {
+    entry.IsLazy = requiresForeignTypeMetadata(type);
+  }
+
   bool metadataWasUsed = entry.IsMetadataUsed;
   bool descriptorWasUsed = entry.IsDescriptorUsed;
 
