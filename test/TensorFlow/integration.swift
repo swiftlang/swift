@@ -160,7 +160,7 @@ public func test_bool_param(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
 // CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.Int1>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Float>):
 // CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
-// CHECK: cond_br %3, bb1, bb2
+// CHECK: cond_br %3, bb2, bb1
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
@@ -227,11 +227,11 @@ public func test_multiple_ifs(status: Bool) {
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
 // CHECK-NEXT: [sequence
 // CHECK-NEXT:   {condition Header: bb0
-// CHECK-NEXT:     block bb1
-// CHECK-NEXT:     block bb2}
+// CHECK-NEXT:     block bb2
+// CHECK-NEXT:     block bb1}
 // CHECK-NEXT:   {condition Header: bb3
-// CHECK-NEXT:     block bb4
-// CHECK-NEXT:     block bb5}
+// CHECK-NEXT:     block bb5
+// CHECK-NEXT:     block bb4}
 // CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>) {
@@ -257,7 +257,7 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // CHECK-NEXT: graph_op "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
 
-// CHECK: bb3([[A:%.*]] : @trivial $TensorHandle<Float>, [[COUNT:%.*]] : @trivial $TensorHandle<Builtin.Int64>):
+// CHECK: bb3([[COUNT:%.*]] : @trivial $TensorHandle<Builtin.Int64>, [[A:%.*]] : @trivial $TensorHandle<Float>):
 // CHECK:       [[NEXTA:%.*]] = graph_op "Sub"([[A]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:       [[NEXTCOUNT:%.*]] = graph_op "Add"([[COUNT]] : $TensorHandle<Builtin.Int64>
 // CHECK:       [[CONDT:%.*]] = graph_op "Less"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>
@@ -265,7 +265,7 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // CHECK-NEXT:   cond_br [[COND]], bb5, bb4
 
 // CHECK: bb5:
-// CHECK-NEXT: br bb3([[NEXTA]] : $TensorHandle<Float>, [[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>)
+// CHECK-NEXT: br bb3([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>, [[NEXTA]] : $TensorHandle<Float>)
 
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_while1{{.*}}
