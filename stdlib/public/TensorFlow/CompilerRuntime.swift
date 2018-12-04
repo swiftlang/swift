@@ -305,6 +305,17 @@ public final class _ExecutionContext {
     TFE_DeleteContextOptions(opts)
     checkOk(status)
 
+    if case .remote(let grpcAddress) = _RuntimeConfig.session {
+      debugLog("Setting up the server def to \(grpcAddress)...")
+      let serverDef: UnsafeMutablePointer! =
+        TFE_GetServerDef(grpcAddress, status)
+      checkOk(status)
+      TFE_ContextSetServerDef(eagerContext, /*keep_alive_secs*/0,
+        serverDef.pointee.data, serverDef.pointee.length, status)
+      checkOk(status)
+      TF_DeleteBuffer(serverDef)
+    }
+
     // Initialize GPU device.
     // While the code here is only needed when _RuntimeConfig.executionMode is
     // set to .gpu, running it in all code paths helps keep things simple
@@ -316,6 +327,11 @@ public final class _ExecutionContext {
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
     var deviceNames: [String : String] = [:]
+    // TODO: When we use remote session, we need to set cpu device to a local
+    // device.  There is no C API yet to find the local device. So, we are
+    // hard-coding the value for now.
+    let localCPUDeviceName = "/job:localhost/replica:0/task:0/device:CPU:0"
+    var foundCPU = false
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -326,12 +342,15 @@ public final class _ExecutionContext {
       debugLog(
         "Device \(deviceId) has type \(deviceType) and name \(deviceName)."
       )
+      if deviceType == "CPU", deviceName == localCPUDeviceName {
+        foundCPU = true
+      }
       deviceNames[deviceType] = deviceName
     }
-    guard let cpuDeviceName = deviceNames["CPU"] else {
+    guard foundCPU else {
       fatalError("CPU should always be an available device.")
     }
-    self.cpuDeviceName = cpuDeviceName
+    self.cpuDeviceName = localCPUDeviceName
     // This can be nil when no GPU is available.
     self.gpuDeviceName = deviceNames["GPU"]
 

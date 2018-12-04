@@ -15,19 +15,18 @@ extension String.UTF16View.Index {
   @available(swift, deprecated: 3.2)
   @available(swift, obsoleted: 4.0)
   public init(_ offset: Int) {
-    assert(offset >= 0, "Negative UTF16 index offset not allowed")
-    self.init(encodedOffset: offset)
+    fatalError()
   }
 
   @available(swift, deprecated: 3.2)
   @available(swift, obsoleted: 4.0)
   public func distance(to other: String.UTF16View.Index?) -> Int {
-    return _offset.distance(to: other!._offset)
+    fatalError()
   }
 
   @available(swift, deprecated: 3.2)
   @available(swift, obsoleted: 4.0)
   public func advanced(by n: Int) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset.advanced(by: n))
+    fatalError()
   }
 }

@@ -281,14 +281,29 @@ namespace {
 
     bool parseVerbatim(StringRef identifier);
 
-    template <typename T> bool parseInteger(T &Result, const Diagnostic &D) {
+    template <typename T>
+    bool parseInteger(T &Result, const Diagnostic &D) {
       if (!P.Tok.is(tok::integer_literal)) {
         P.diagnose(P.Tok, D);
         return true;
       }
-      P.Tok.getText().getAsInteger(0, Result);
+      bool error = parseIntegerLiteral(P.Tok.getText(), 0, Result);
       P.consumeToken(tok::integer_literal);
-      return false;
+      return error;
+    }
+
+    template <typename T>
+    bool parseIntegerLiteral(StringRef text, unsigned radix, T &result) {
+      text = prepareIntegerLiteralForParsing(text);
+      return text.getAsInteger(radix, result);
+    }
+
+    StringRef prepareIntegerLiteralForParsing(StringRef text) {
+      // tok::integer_literal can contain characters that the library
+      // parsing routines don't expect.
+      if (text.contains('_'))
+        text = P.copyAndStripUnderscores(text);
+      return text;
     }
 
     /// @}
@@ -1109,11 +1124,11 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Parse a `reverse_differentiable` attribute, e.g.
-/// `[reverse_differentiable wrt 0, 1 adjoint @other]`.
+/// Parse a `differentiable` attribute, e.g.
+/// `[differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
-static bool parseReverseDifferentiableAttr(
-  SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
+static bool parseDifferentiableAttr(
+  SmallVectorImpl<SILDifferentiableAttr *> &DAs, SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
   // Parse 'source'.
@@ -1171,14 +1186,26 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     adjointIsPrimitive = true;
   }
+  // Parse optional 'jvp'.
+  Identifier JVPName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
+    P.consumeToken();
+    if (parseFnName(JVPName)) return true;
+  }
+  // Parse optional 'vjp'.
+  Identifier VJPName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
+    P.consumeToken();
+    if (parseFnName(VJPName)) return true;
+  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
-  // Create an AdjointAttr and we are done.
-  auto *Attr = SILReverseDifferentiableAttr::create(
+  // Create a SILDifferentiableAttr and we are done.
+  auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsPrimitive);
+      adjointIsPrimitive, JVPName.str(), VJPName.str());
   DAs.push_back(Attr);
   return false;
 }
@@ -1194,7 +1221,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  // SWIFT_ENABLE_TENSORFLOW
-                    SmallVectorImpl<SILReverseDifferentiableAttr *> *RDiffAttrs,
+                          SmallVectorImpl<SILDifferentiableAttr *> *DiffAttrs,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -1289,9 +1316,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       continue;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    else if (RDiffAttrs && SP.P.Tok.getText() == "reverse_differentiable") {
+    else if (DiffAttrs && SP.P.Tok.getText() == "differentiable") {
       SP.P.consumeToken(tok::identifier);
-      if (parseReverseDifferentiableAttr(*RDiffAttrs, SP))
+      if (parseDifferentiableAttr(*DiffAttrs, SP))
         return true;
       continue;
     }
@@ -1661,7 +1688,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else
         break;
     } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      P.Tok.getText().getAsInteger(0, uncurryLevel);
+      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
       P.consumeToken(tok::integer_literal);
       ParseState = 2;
     } else
@@ -1784,7 +1811,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
         return true;
       }
       uint16_t ArgNo;
-      if (P.Tok.getText().getAsInteger(0, ArgNo))
+      if (parseIntegerLiteral(P.Tok.getText(), 0, ArgNo))
         return true;
       Var.ArgNo = ArgNo;
     } else if (Key == "let") {
@@ -2225,7 +2252,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            return true;
          
          if (!P.Tok.is(tok::integer_literal)
-             || P.Tok.getText().getAsInteger(0, index))
+             || parseIntegerLiteral(P.Tok.getText(), 0, index))
            return true;
          
          P.consumeToken(tok::integer_literal);
@@ -2651,21 +2678,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     
-    auto intTy = Ty.getAs<BuiltinIntegerType>();
+    auto intTy = Ty.getAs<AnyBuiltinIntegerType>();
     if (!intTy) {
       P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
       return true;
     }
-    
-    APInt value(intTy->getGreatestWidth(), 0);
-    bool error = P.Tok.getText().getAsInteger(0, value);
-    assert(!error && "integer_literal token did not parse as APInt?!");
-    (void)error;
-    
-    if (Negative)
-      value = -value; 
-    if (value.getBitWidth() != intTy->getGreatestWidth())
-      value = value.zextOrTrunc(intTy->getGreatestWidth());
+
+    StringRef text = prepareIntegerLiteralForParsing(P.Tok.getText());
+
+    bool error;
+    APInt value = intTy->getWidth().parse(text, 0, Negative, &error);
+    if (error) {
+      P.diagnose(P.Tok, diag::sil_integer_literal_not_well_formed, intTy);
+      return true;
+    }
 
     P.consumeToken(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
@@ -2690,9 +2716,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_float_literal_not_float_type);
       return true;
     }
+
+    StringRef text = prepareIntegerLiteralForParsing(P.Tok.getText());
     
     APInt bits(floatTy->getBitWidth(), 0);
-    bool error = P.Tok.getText().getAsInteger(0, bits);
+    bool error = text.getAsInteger(0, bits);
     assert(!error && "float_literal token did not parse as APInt?!");
     (void)error;
     
@@ -2817,7 +2845,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     unsigned Index;
-    bool error = P.Tok.getText().getAsInteger(0, Index);
+    bool error = parseIntegerLiteral(P.Tok.getText(), 0, Index);
     assert(!error && "project_box index did not parse as integer?!");
     (void)error;
 
@@ -4560,7 +4588,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     unsigned Field = 0;
     TupleType *TT = Val->getType().getAs<TupleType>();
     if (P.Tok.isNot(tok::integer_literal) ||
-        P.Tok.getText().getAsInteger(10, Field) ||
+        parseIntegerLiteral(P.Tok.getText(), 10, Field) ||
         Field >= TT->getNumElements()) {
       P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
       return true;
@@ -5849,7 +5877,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   // SWIFT_ENABLE_TENSORFLOW
-  SmallVector<SILReverseDifferentiableAttr *, 4> RDiffAttrs;
+  SmallVector<SILDifferentiableAttr *, 4> DiffAttrs;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5858,7 +5886,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &isWithoutActuallyEscapingThunk,
                            // SWIFT_ENABLE_TENSORFLOW
-                           &Semantics, &SpecAttrs, &RDiffAttrs,
+                           &Semantics, &SpecAttrs, &DiffAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5891,8 +5919,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto &Attr : RDiffAttrs)
-      FunctionState.F->addReverseDifferentiableAttr(Attr);
+    for (auto &Attr : DiffAttrs)
+      FunctionState.F->addDifferentiableAttr(Attr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
@@ -6653,33 +6681,102 @@ static bool parseSILVTableEntry(
     return false;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Parses "#declref : @function" and puts the results into the passed-in
+  // references.
+  auto parseSILDeclRefAndFunc = [&](SILDeclRef &Ref, SILFunction *&Func)
+      -> bool {
+    Identifier FuncName;
+    SourceLoc FuncLoc;
+
+    if (witnessState.parseSILDeclRef(Ref, true) ||
+        P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+      return true;
+
+    if (P.Tok.is(tok::kw_nil)) {
+      P.consumeToken();
+    } else {
+      if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          witnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                          diag::expected_sil_value_name))
+        return true;
+
+      Func = M.lookUpFunction(FuncName.str());
+      if (!Func) {
+        P.diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (EntryKeyword.str() == "autodiff_associated_function") {
+    AutoDiffAssociatedFunctionKind AssocFuncKind;
+    Identifier AssocFuncKindId;
+    SourceLoc AssocFuncKindLoc;
+    if (witnessState.parseSILIdentifier(AssocFuncKindId, AssocFuncKindLoc,
+                                        diag::expected_sil_constant))
+      return true;
+    if (AssocFuncKindId.str() == "jvp")
+      AssocFuncKind = AutoDiffAssociatedFunctionKind::JVP;
+    else if (AssocFuncKindId.str() == "vjp")
+      AssocFuncKind = AutoDiffAssociatedFunctionKind::VJP;
+    else {
+      P.diagnose(AssocFuncKindLoc,
+                 diag::malformed_autodiff_associated_function_kind);
+      return true;
+    }
+
+    unsigned differentiationOrder;
+    if (!P.Tok.is(tok::integer_literal)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+      return true;
+    }
+    bool error = P.Tok.getText().getAsInteger(10, differentiationOrder);
+    assert(!error && "differentiationOrder did not parse as integer?!");
+    (void)error;
+    P.consumeToken(tok::integer_literal);
+
+    Identifier IndicesId;
+    SourceLoc IndicesLoc;
+    if (witnessState.parseSILIdentifier(IndicesId, IndicesLoc,
+                                        diag::expected_sil_constant))
+      return true;
+    AutoDiffParameterIndices *Indices = AutoDiffParameterIndices::create(
+        M.getASTContext(), IndicesId.str());
+    if (!Indices) {
+      P.diagnose(IndicesLoc,
+                 diag::malformed_autodiff_associated_function_indices);
+      return true;
+    }
+
+    AutoDiffAssociatedFunctionIdentifier *AssocFuncId =
+        AutoDiffAssociatedFunctionIdentifier::get(AssocFuncKind,
+                                                  differentiationOrder, Indices,
+                                                  M.getASTContext());
+
+    SILDeclRef Ref;
+    SILFunction *Func = nullptr;
+    if (parseSILDeclRefAndFunc(Ref, Func))
+      return true;
+
+    witnessEntries.push_back(SILWitnessTable::AutoDiffAssociatedFunctionWitness{
+      Ref, AssocFuncId, Func
+    });
+    return false;
+  }
+
   if (EntryKeyword.str() != "method") {
     P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
     return true;
   }
 
   SILDeclRef Ref;
-  Identifier FuncName;
-  SourceLoc FuncLoc;
-  if (witnessState.parseSILDeclRef(Ref, true) ||
-      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+  SILFunction *Func = nullptr;
+  if (parseSILDeclRefAndFunc(Ref, Func))
     return true;
 
-  SILFunction *Func = nullptr;
-  if (P.Tok.is(tok::kw_nil)) {
-    P.consumeToken();
-  } else {
-    if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-        witnessState.parseSILIdentifier(FuncName, FuncLoc,
-                                        diag::expected_sil_value_name))
-      return true;
-
-    Func = M.lookUpFunction(FuncName.str());
-    if (!Func) {
-      P.diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
-      return true;
-    }
-  }
   witnessEntries.push_back(SILWitnessTable::MethodWitness{
     Ref, Func
   });

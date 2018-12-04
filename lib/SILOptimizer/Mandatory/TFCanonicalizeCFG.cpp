@@ -385,53 +385,18 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
 namespace {
 
 class BasicBlockCloner : public SILClonerWithScopes<BasicBlockCloner> {
-private:
-  /// The flag to track if  this cloner was used to clone any blocks.
-  bool cloned;
-
 public:
-  BasicBlockCloner(SILFunction &F)
-      : SILClonerWithScopes(F), cloned(false) {}
+  BasicBlockCloner(SILFunction &F) : SILClonerWithScopes(F) {}
 
-  bool hasCloned() const { return cloned; }
+  bool hasCloned() const { return !BBMap.empty(); }
 
-  /// Create a block and clone the arguments alone.
-  SILBasicBlock *initBlock(SILBasicBlock *bb) {
-    auto bbIt = BBMap.find(bb);
-    if (bbIt != BBMap.end())
-      return bbIt->second;
-
-    cloned = true;
-
-    SILFunction &F = getBuilder().getFunction();
-    SILBasicBlock *newBB = F.createBasicBlock();
-    getBuilder().setInsertionPoint(newBB);
-    BBMap[bb] = newBB;
-    // If the basic block has arguments, clone them as well.
-    for (auto *arg : bb->getArguments()) {
-      // Create a new argument and copy it into the ValueMap so future
-      // references use it.
-      ValueMap[arg] = newBB->createPhiArgument(
-          arg->getType(), arg->getOwnershipKind(), arg->getDecl());
-    }
-    return newBB;
-  }
-
-  // Clone all the instructions and return the cloned block.
   SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
     auto bbIt = BBMap.find(bb);
-    assert (bbIt != BBMap.end() && "Block is not initialied before cloning.");
-    SILBasicBlock *newBB = bbIt->second;
-    getBuilder().setInsertionPoint(newBB);
-    for (auto &inst : *bb) {
-      visit(&inst);
+    if (bbIt != BBMap.end()) {
+      return bbIt->second;
     }
-    return newBB;
-  }
-
-  SILBasicBlock *initAndCloneBlock(SILBasicBlock *bb) {
     initBlock(bb);
-    return cloneBlock(bb);
+    return cloneInstructions(bb);
   }
 
   /// Handle references to basic blocks when cloning.
@@ -444,7 +409,7 @@ public:
     return bb;
   }
 
-  SILValue remapValue(SILValue Value) {
+  SILValue getMappedValue(SILValue Value) {
     auto VI = ValueMap.find(Value);
     if (VI != ValueMap.end())
       return VI->second;
@@ -539,7 +504,7 @@ public:
       }
     }
     for (SILBasicBlock *bb : initializedBlocks) {
-      SILBasicBlock *clonedBlock = cloneBlock(bb);
+      SILBasicBlock *clonedBlock = cloneInstructions(bb);
       if (SILLoop *loopClone = loopClones[LI->getLoopFor(bb)]) {
         loopClone->addBasicBlockToLoop(clonedBlock, LI->getBase());
         if (LI->getLoopFor(bb)->getHeader() == bb) {
@@ -549,6 +514,40 @@ public:
     }
     return loopClones[loop];
   }
+
+private:
+  /// Create a block and clone the arguments alone.
+  SILBasicBlock *initBlock(SILBasicBlock *bb) {
+    auto bbIt = BBMap.find(bb);
+    if (bbIt != BBMap.end())
+      return bbIt->second;
+
+    SILFunction &F = getBuilder().getFunction();
+    SILBasicBlock *newBB = F.createBasicBlock();
+    getBuilder().setInsertionPoint(newBB);
+    BBMap[bb] = newBB;
+    // If the basic block has arguments, clone them as well.
+    for (auto *arg : bb->getArguments()) {
+      // Create a new argument and copy it into the ValueMap so future
+      // references use it.
+      ValueMap[arg] = newBB->createPhiArgument(
+          arg->getType(), arg->getOwnershipKind(), arg->getDecl());
+    }
+    return newBB;
+  }
+
+  // Clone all the instructions and return the cloned block.
+  SILBasicBlock *cloneInstructions(SILBasicBlock *bb) {
+    auto bbIt = BBMap.find(bb);
+    assert (bbIt != BBMap.end() && "Block is not initialied before cloning.");
+    SILBasicBlock *newBB = bbIt->second;
+    getBuilder().setInsertionPoint(newBB);
+    for (auto &inst : *bb) {
+      visit(&inst);
+    }
+    return newBB;
+  }
+
 };
 
 }  // namespace
@@ -843,7 +842,7 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
         if (DI->properlyDominates(succ, header)) continue;
 
         // Clone the block and rewire the edge.
-        SILBasicBlock *clonedSucc = cloner.initAndCloneBlock(succ);
+        SILBasicBlock *clonedSucc = cloner.cloneBlock(succ);
         // If `succ` is a preheader of an unrelated loop, we will have to clone
         // the entire loop now so that we can also incrementally update LoopInfo.
         if (succBlockLoop) {
@@ -1229,6 +1228,11 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
                                            /*bitwidth*/ 1, stayInLoop));
     appendArguments(src->getTerminator(), newTgt, newArgs);
   }
+  // Split any critical edges that were introduced when patching edges.
+  for (const auto &edge : edgesToFix) {
+    SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
+    splitIfCriticalEdge(src, latchBlock, /*DI*/ nullptr, LI);
+  }
   return exitIndices;
 }
 
@@ -1547,13 +1551,13 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //      cloned predecessor whenever needed.
   for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
     auto predTermInst = dyn_cast<BranchInst>(pred->getTerminator());
-    assert(predTermInst && "Preheader of a loop has a non-branch terminator");
+    assert(predTermInst && "Found a critical edge to the latch block.");
     for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
       // Check if the argument of *cloned* predecessor needs patching.
       SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
       auto clonedPredTermInst = dyn_cast<BranchInst>(clonedPred->getTerminator());
       assert(clonedPredTermInst &&
-             "Preheader of a loop has a non-branch terminator");
+             "Found a critical edge to the latch block.");
       auto arg = clonedPredTermInst->getArg(argIndex);
       // Skip if this is not an argument of the `newHeader`.
       if (!isa<SILArgument>(arg) ||
@@ -1571,7 +1575,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
           // A suitable value is found. Update the edge value in the unrolled
           // loop with the corresponding cloned value.
           changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
-                          cloner.remapValue(value));
+                          cloner.getMappedValue(value));
           patched = true;
           break;
         }

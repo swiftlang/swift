@@ -6,11 +6,11 @@ let x: Float = 1
 @differentiable(reverse, adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
 protocol P {}
 
-func dfoo(_ x: Float, primal: Float, seed: Float) -> Float {
+func dfoo(_ seed: Float, _ primal: Float, _ x: Float) -> Float {
   return 2 * x
 }
 
-@differentiable(reverse, adjoint: dfoo(_:primal:seed:)) // ok!
+@differentiable(reverse, adjoint: dfoo) // ok!
 func foo(_ x: Float) -> Float {
   return x * x
 }
@@ -28,40 +28,40 @@ func prim_but_no_adj(_ x: Float) -> Float {
 // Original function must return non-Void type.
 @differentiable(reverse, adjoint: dvoid) // expected-error {{cannot differentiate void function 'void'}}
 func void(_ a: Float) {}
-func dvoid(_ a: Float, _ x: (), _ y: ()) -> Float { return 1 }
+func dvoid(_ x: (), _ y: (), _ a: Float) -> Float { return 1 }
 
 // Primal returns custom checkpoints type.
 struct CheckpointsFoo {}
 func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) {
   return (CheckpointsFoo(), x * x)
 }
-func dfoo_checkpointed(_ x: Float, checkpoints: CheckpointsFoo, originalValue: Float, seed: Float) -> Float {
+func dfoo_checkpointed(_ seed: Float, _ checkpoints: CheckpointsFoo, _ originalValue: Float, _ x: Float) -> Float {
   return 2 * x
 }
-@differentiable(reverse, primal: pfoo(_:), adjoint: dfoo_checkpointed(_:checkpoints:originalValue:seed:)) // ok!
+@differentiable(reverse, primal: pfoo, adjoint: dfoo_checkpointed) // ok!
 func foo_checkpointed(_ x: Float) -> Float {
   return x * x
 }
 
-func dbar(_ x: Float, _ y: Float, primal: Float, seed: Float) -> (Float, Float) {
+func dbar(_ seed: Float, primal: Float, _ x: Float, _ y: Float) -> (Float, Float) {
   return (1, 1)
 }
 
-@differentiable(reverse, adjoint: dbar(_:_:primal:seed:)) // ok!
+@differentiable(reverse, adjoint: dbar) // ok!
 func bar(_ x: Float, _ y: Float) -> Float {
   return x + y
 }
 
-@differentiable(forward, adjoint: dbar(_:_:primal:seed:)) // expected-error {{forward-mode automatic differentiation is not supported yet}}
+@differentiable(forward, adjoint: dbar) // expected-error {{forward-mode automatic differentiation is not supported yet}}
 func bar_fwd(_ x: Float, _ y: Float) -> Float {
   return x + y
 }
 
-func dfoo2_wrong_type(_ x: Float, primal: Float, seed: Double) -> Float {
+func dfoo2_wrong_type(_ seed: Double, _ primal: Float, _ x: Float) -> Float {
   return 2 * x
 }
 
-@differentiable(reverse, adjoint: dfoo2_wrong_type(_:primal:seed:)) // expected-error {{'dfoo2_wrong_type(_:primal:seed:)' does not have expected type '(Float, Float, Float) -> Float'}}
+@differentiable(reverse, adjoint: dfoo2_wrong_type) // expected-error {{'dfoo2_wrong_type' does not have expected type '(Float, Float, Float) -> Float'}}
 func foo2(_ x: Float) -> Float {
   return x * x
 }
@@ -86,11 +86,11 @@ func meow1(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-func dmeow1_out_of_S(_ s: S, _ x: Float, _ primal: Float, _ seed: Float) -> (S, Float) {
+func dmeow1_out_of_S(_ seed: Float, _ primal: Float, _ s: S, _ x: Float) -> (S, Float) {
   return (s, x)
 }
 
-func dPlus(_ x: S, _ y: S, _ primal: S, _ seed: S) -> (S, S) {
+func dPlus(_ seed: S, _ primal: S, _ x: S, _ y: S) -> (S, S) {
   return (x, y)
 }
 
@@ -98,7 +98,7 @@ func dPlus_curried(_ x: S.Type) -> (S, S, S, S) -> (S, S) {
   fatalError("never run")
 }
 
-func dPlus(_ x: Int, _ y: S, _ primal: S, _ seed: S) -> (Int, S) {
+func dPlus(_ seed: S, _ primal: S, _ x: Int, _ y: S) -> (Int, S) {
   return (x, y)
 }
 
@@ -144,7 +144,7 @@ struct S {
     return lhs
   }
 
-  static func dMul(_ lhs: Int, _ rhs: S, _: S, _: S) -> (Int, S) {
+  static func dMul(_: S, _: S, _ lhs: Int, _ rhs: S) -> (Int, S) {
     return (lhs, rhs)
   }
 
@@ -153,7 +153,7 @@ struct S {
     return rhs
   }
 
-  @differentiable(reverse, wrt: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (Int, S, S, S) -> (Int, S)'}}
+  @differentiable(reverse, wrt: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (S, S, Int, S) -> (Int, S)'}}
   func instance_mul(lhs: Int, rhs: S) -> S {
     return rhs
   }
@@ -163,7 +163,7 @@ struct S {
     return self
   }
 
-  func dIdentity_wrt_self(_: S, seed: S) -> S {
+  func dIdentity_wrt_self(seed: S, _: S) -> S {
     return seed
   }
 
@@ -172,7 +172,7 @@ struct S {
     return s
   }
 
-  static func dStaticIdentity_wrt_0(_: S, _: S, seed: S) -> S {
+  static func dStaticIdentity_wrt_0(_ seed: S, _: S, _: S) -> S {
     return seed
   }
 }
@@ -188,15 +188,15 @@ func meow3(_ x: Float, _: Float, _: Float) -> Float {
 }
 
 @differentiable(reverse, wrt: (.2, self, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
-func meow4(_ x: Float, _: Float, _: Float) -> Float {
+func meow4(_ : Float, _: Float, _ x: Float) -> Float {
   return 1 + x
 }
 
-func dmeow1(_ x: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
+func dmeow1(_ : Float, _: Float, _: Float, _ x: Float) -> (Float, Float) {
   return (x, x)
 }
 
-func dmeow2(_ x: Float, _: Float, _: Float, _: Float, _: Float) -> (Float, Float) {
+func dmeow2(_ : Float, _: Float, _: Float, _: Float, _ x: Float) -> (Float, Float) {
   return (x, x)
 }
 
@@ -214,7 +214,7 @@ struct E1 {
   }
 }
 extension E1 {
-  func adjoint(x: Float, _: Float, _: Float) -> Float {
+  func adjoint(_: Float, _: Float, _ x: Float) -> Float {
     return x
   }
 }
@@ -228,7 +228,7 @@ extension E2 {
   }
 }
 extension E2 {
-  func adjoint(x: Float, _: Float, _: Float) -> Float {
+  func adjoint(_: Float, _: Float, _ x: Float) -> Float {
     return x
   }
 }
@@ -256,7 +256,7 @@ extension E4 {
   }
 }
 extension E4 {
-  func adjoint_no_constraint(x: Float, _: Float, _: Float) -> Float {
+  func adjoint_no_constraint(_: Float, _: Float, _ x: Float) -> Float {
     return x
   }
 }
@@ -272,7 +272,7 @@ extension E5 {
   }
 }
 extension E5 where T == Float {
-  func adjoint_diff_constraint(x: Float, _: Float, _: Float) -> Float {
+  func adjoint_diff_constraint(_: Float, _: Float, _ x: Float) -> Float {
     return x
   }
 }
@@ -306,25 +306,25 @@ extension E6 {
     return (Checkpoints(e6: self), x)
   }
 
-  func adjoint_checkpointed(x: Float, _: Checkpoints, _: Float, _: Float) -> E6 {
+  func adjoint_checkpointed(_: Float, _: Checkpoints, _: Float, _ x: Float) -> E6 {
     return self
   }
 
-  func adjoint_checkpointed_mismatch(x: Float, _: Float, _: Float) -> E6 {
+  func adjoint_checkpointed_mismatch(_: Float, _: Float, _ x: Float) -> E6 {
     return self
   }
 }
 extension E6 {
-  func adjoint_wrt_self(x: Float, _: Float, _: Float) -> E6 {
+  func adjoint_wrt_self(_: Float, _: Float, _ x: Float) -> E6 {
     return self
   }
 }
 
 // Generic functions with no constraints.
-func dbaz1<T>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+func dbaz1<T>(_ seed: T, primal: T, _ x: T, _ y: T) -> (T, T) {
   return (y, x)
 }
-@differentiable(reverse, adjoint: dbaz1(_:_:primal:seed:)) // ok!
+@differentiable(reverse, adjoint: dbaz1) // ok!
 func baz1<T>(_ x: T, _ y: T) -> T {
   return x
 }
@@ -332,19 +332,19 @@ func baz1<T>(_ x: T, _ y: T) -> T {
 func pbaz1<T>(_ x: T, _ y: T) -> ((T, T), T) {
   return ((y, y), x)
 }
-func dbaz1_checkpointed<T>(_ x: T, _ y: T, primal: (T, T), originalValue: T, seed: T) -> (T, T) {
+func dbaz1_checkpointed<T>(_ seed: T, _ primal: (T, T), originalValue: T, _ x: T, _ y: T) -> (T, T) {
   return (y, x)
 }
-@differentiable(reverse, primal: pbaz1(_:_:), adjoint: dbaz1_checkpointed(_:_:primal:originalValue:seed:)) // ok!
+@differentiable(reverse, primal: pbaz1, adjoint: dbaz1_checkpointed) // ok!
 func baz1_checkpointed<T>(_ x: T, _ y: T) -> T {
   return x
 }
 
 // Generic functions with matching constraints.
-func dbaz2<T : FloatingPoint>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+func dbaz2<T : FloatingPoint>(_ seed: T, _ primal: T, _ x: T, _ y: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, adjoint: dbaz2(_:_:primal:seed:)) // ok!
+@differentiable(reverse, adjoint: dbaz2) // ok!
 func baz2<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
 }
@@ -355,20 +355,20 @@ struct CheckpointsFP<T : FloatingPoint> {
 func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
   return (CheckpointsFP(meow: 1), x + y)
 }
-func dbaz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T, primal: CheckpointsFP<T>, originalValue: T, seed: T) -> (T, T) {
+func dbaz2_checkpointed<T : FloatingPoint>(_ seed: T, _ primal: CheckpointsFP<T>, _ originalValue: T, _ x: T, _ y: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, primal: pbaz2(_:_:), adjoint: dbaz2_checkpointed(_:_:primal:originalValue:seed:)) // ok!
+@differentiable(reverse, primal: pbaz2, adjoint: dbaz2_checkpointed) // ok!
 func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
 }
 
 // Generic functions with different constraints.
-func dbaz3<T : Numeric>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
+func dbaz3<T : Numeric>(_ seed: T, _ primal: T, _ x: T, _ y: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, adjoint: dbaz3(_:_:primal:seed:))
-// expected-error @-1 {{'dbaz3(_:_:primal:seed:)' does not have expected type '<T where T : FloatingPoint> (T, T, T, T) -> (T, T)'}}
+@differentiable(reverse, adjoint: dbaz3)
+// expected-error @-1 {{'dbaz3' does not have expected type '<T where T : FloatingPoint> (T, T, T, T) -> (T, T)'}}
 func baz3<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
 }
@@ -379,10 +379,10 @@ struct CheckpointsNumeric<T : Numeric> {
 func pbaz3<T : Numeric>(_ x: T, _ y: T) -> (CheckpointsNumeric<T>, T) {
   return (CheckpointsNumeric(meow: 1), x + y)
 }
-func dbaz3_checkpointed<T : Numeric>(_ x: T, _ y: T, primal: CheckpointsNumeric<T>, originalValue: T, seed: T) -> (T, T) {
+func dbaz3_checkpointed<T : Numeric>(_ seed: T, _ primal: CheckpointsNumeric<T>, _ originalValue: T, _ x: T, _ y: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, primal: pbaz3(_:_:), adjoint: dbaz3_checkpointed(_:_:primal:originalValue:seed:))
+@differentiable(reverse, primal: pbaz3(_:_:), adjoint: dbaz3_checkpointed)
 // expected-error @-1 {{'pbaz3' does not have expected parameters' type '(T, T)'}}
 func baz3_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
@@ -422,7 +422,7 @@ func protocolParameter2(_: ParamProtocol) -> Float {
   return 1
 }
 
-func dProtocolParameter(_: ParamProtocol, _: Float, seed: Float) -> ParamProtocol {
+func dProtocolParameter(_ seed: Float, _: Float, _: ParamProtocol) -> ParamProtocol {
   return ParamProtocolStruct()
 }
 
@@ -464,11 +464,205 @@ protocol ProtoWithDiffReqs {
   @differentiable(reverse, wrt: (.1))
   func req5(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify primal on protocol requirement}}
+  // expected-error @+1 {{cannot specify associated differentiation function on protocol requirement}}
   @differentiable(reverse, primal: dummyPrimal)
   func req6(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify adjoint on protocol requirement}}
+  // expected-error @+1 {{cannot specify associated differentiation function on protocol requirement}}
   @differentiable(reverse, adjoint: dummyAdjoint)
   func req7(x: Float) -> Float
+}
+
+// JVP and VJP typechecking
+// These tests are not as exhaustive as the primal and adjoint tests above,
+// because JVP and VJP are still under development. When we delete primal and
+// adjoint, we will replace the primal and adjoint tests with corresponding JVP
+// and VJP tests.
+
+// JVP
+
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpSimple(x: Float) -> Float {
+  return x
+}
+
+func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
+  return (x, { v in v })
+}
+
+@differentiable(reverse, wrt: (.1), jvp: jvpWrtSubsetJVP)
+func jvpWrtSubset(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func jvpWrtSubsetJVP(x: Float, y: Float) -> (Float, (Float) -> Float) {
+  return (x + y, { v in v })
+}
+
+@differentiable(reverse, jvp: jvp2ParamsJVP)
+func jvp2Params(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func jvp2ParamsJVP(x: Float, y: Float) -> (Float, (Float, Float) -> Float) {
+  return (x + y, { (a, b) in a + b })
+}
+
+// expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+@differentiable(reverse, jvp: jvpWrongTypeJVP)
+func jvpWrongType(x: Float) -> Float {
+  return x
+}
+
+func jvpWrongTypeJVP(x: Float) -> (Float, (Float) -> Int) {
+  return (x, { v in Int(v) })
+}
+
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffParam(x: Int) -> Float {
+  return Float(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffResult(x: Float) -> Int {
+  return Int(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffResult2(x: Float) -> (Float, Int) {
+  return (x, Int(x))
+}
+
+struct JVPStruct {
+  let p: Float
+}
+
+extension JVPStruct : Differentiable {
+  typealias TangentVector = JVPStruct
+  typealias CotangentVector = JVPStruct
+  func moved(toward direction: JVPStruct) -> JVPStruct {
+    return JVPStruct(p: p + direction.p)
+  }
+  func tangentVector(from cotangent: JVPStruct) -> JVPStruct {
+    return cotangent
+  }
+}
+
+extension JVPStruct {
+  @differentiable(reverse, jvp: wrtAllNonSelfJVP)
+  func wrtAllNonSelf(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllNonSelfJVP(x: Float) -> (Float, (Float) -> Float) {
+    return (x + p, { v in v })
+  }
+}
+
+extension JVPStruct {
+  @differentiable(reverse, wrt: (self, .0), jvp: wrtAllJVP)
+  func wrtAll(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllJVP(x: Float) -> (Float, (JVPStruct, Float) -> Float) {
+    return (x + p, { (a, b) in a.p + b })
+  }
+}
+
+// VJP
+
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpSimple(x: Float) -> Float {
+  return x
+}
+
+func vjpSimpleVJP(x: Float) -> (Float, ((Float) -> Float)) {
+  return (x, { v in v })
+}
+
+@differentiable(reverse, wrt: (.1), vjp: vjpWrtSubsetVJP)
+func vjpWrtSubset(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func vjpWrtSubsetVJP(x: Float, y: Float) -> (Float, (Float) -> Float) {
+  return (x + y, { v in v })
+}
+
+@differentiable(reverse, vjp: vjp2ParamsVJP)
+func vjp2Params(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func vjp2ParamsVJP(x: Float, y: Float) -> (Float, (Float) -> (Float, Float)) {
+  return (x + y, { v in (v, v) })
+}
+
+// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+@differentiable(reverse, vjp: vjpWrongTypeVJP)
+func vjpWrongType(x: Float) -> Float {
+  return x
+}
+
+func vjpWrongTypeVJP(x: Float) -> (Float, (Float) -> Int) {
+  return (x, { v in Int(v) })
+}
+
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffParam(x: Int) -> Float {
+  return Float(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffResult(x: Float) -> Int {
+  return Int(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffResult2(x: Float) -> (Float, Int) {
+  return (x, Int(x))
+}
+
+struct VJPStruct {
+  let p: Float
+}
+
+extension VJPStruct : Differentiable {
+  typealias TangentVector = VJPStruct
+  typealias CotangentVector = VJPStruct
+  func moved(toward direction: VJPStruct) -> VJPStruct {
+    return VJPStruct(p: p + direction.p)
+  }
+  func tangentVector(from cotangent: VJPStruct) -> VJPStruct {
+    return cotangent
+  }
+}
+
+extension VJPStruct {
+  @differentiable(reverse, vjp: wrtAllNonSelfVJP)
+  func wrtAllNonSelf(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllNonSelfVJP(x: Float) -> (Float, (Float) -> Float) {
+    return (x + p, { v in v })
+  }
+}
+
+extension VJPStruct {
+  @differentiable(reverse, wrt: (self, .0), vjp: wrtAllVJP)
+  func wrtAll(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllVJP(x: Float) -> (Float, (Float) -> (VJPStruct, Float)) {
+    return (x + p, { v in (VJPStruct(p: v), v) })
+  }
 }

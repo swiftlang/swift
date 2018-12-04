@@ -52,6 +52,20 @@ public:
     /// This can be null in case dead function elimination has removed the method.
     SILFunction *Witness;
   };
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// A witness table entry describing the witness for an autodiff associated
+  /// function for a method.
+  struct AutoDiffAssociatedFunctionWitness {
+    /// The original method required.
+    SILDeclRef RequirementOriginalMethod;
+    /// The AutoDiffAssociatedFunctionIdentifier identifying the associated
+    /// function.
+    AutoDiffAssociatedFunctionIdentifier *RequirementIdentifier;
+    /// The witness for the autodiff associated function.
+    /// This can be null in case dead function elimination has removed the method.
+    SILFunction *Witness;
+  };
   
   /// A witness table entry describing the witness for an associated type.
   struct AssociatedTypeWitness {
@@ -89,7 +103,9 @@ public:
     Method,
     AssociatedType,
     AssociatedTypeProtocol,
-    BaseProtocol
+    BaseProtocol,
+    // SWIFT_ENABLE_TENSORFLOW
+    AutoDiffAssociatedFunction
   };
   
   /// A witness table entry.
@@ -100,6 +116,8 @@ public:
       AssociatedTypeWitness AssociatedType;
       AssociatedTypeProtocolWitness AssociatedTypeProtocol;
       BaseProtocolWitness BaseProtocol;
+      // SWIFT_ENABLE_TENSORFLOW
+      AutoDiffAssociatedFunctionWitness AutoDiffAssociatedFunction;
     };
     
   public:
@@ -122,6 +140,12 @@ public:
       : Kind(WitnessKind::BaseProtocol),
         BaseProtocol(BaseProtocol)
     {}
+
+    // SWIFT_ENABLE_TENSORFLOW
+    Entry(const AutoDiffAssociatedFunctionWitness &AutoDiffAssociatedFunction)
+      : Kind(WitnessKind::AutoDiffAssociatedFunction),
+        AutoDiffAssociatedFunction(AutoDiffAssociatedFunction)
+    {}
     
     WitnessKind getKind() const { return Kind; }
 
@@ -143,6 +167,11 @@ public:
     const BaseProtocolWitness &getBaseProtocolWitness() const {
       assert(Kind == WitnessKind::BaseProtocol);
       return BaseProtocol;
+    }
+    const AutoDiffAssociatedFunctionWitness
+    &getAutoDiffAssociatedFunctionWitness() const {
+      assert(Kind == WitnessKind::AutoDiffAssociatedFunction);
+      return AutoDiffAssociatedFunction;
     }
     
     void removeWitnessMethod() {

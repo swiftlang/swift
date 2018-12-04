@@ -55,6 +55,8 @@ enum class WellKnownFunction {
   AssertionFailure,
   // Array._allocateUninitializedArray
   AllocateUninitializedArray,
+  // Array.init()
+  ArrayInitEmpty,
 };
 
 static WellKnownFunction classifyFunction(SILFunction *fn) {
@@ -64,6 +66,8 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
   StringRef mangledName = fn->getName();
   if (mangledName == "$sS2SycfC")
     return WellKnownFunction::StringInitEmpty;
+  if (mangledName == "$sS2ayxGycfC")
+    return WellKnownFunction::ArrayInitEmpty;
 
   if (mangledName.contains("_assertionFailure"))
     return WellKnownFunction::AssertionFailure;
@@ -457,17 +461,38 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       auto dstBitWidth =
           builtin.Types[1]->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
-      APInt result = operandVal.trunc(dstBitWidth);
+      // Get source type and bit width.
+      auto SrcTy = builtin.Types[0]->castTo<AnyBuiltinIntegerType>();
+      assert((srcSigned || !isa<BuiltinIntegerLiteralType>(SrcTy)) &&
+             "only the signed intrinsics can be used with integer literals");
 
-      // Compute the overflow by re-extending the value back to its source and
-      // checking for loss of value.
-      APInt reextended =
+      assert((dstBitWidth < srcBitWidth || !SrcTy->getWidth().isFixedWidth()) &&
+             "preconditions on builtin trunc operations should prevent"
+             "fixed-width truncations that actually extend");
+      APInt result;
+      bool overflowed;
+      if (dstBitWidth > srcBitWidth) {
+        // The only way a true extension can overflow is if the value is
+        // negative and the result is unsigned.
+        overflowed = (srcSigned && !dstSigned && operandVal.isNegative());
+        result =
+            srcSigned ? operandVal.sext(dstBitWidth) : operandVal.zext(dstBitWidth);
+      } else if (dstBitWidth == srcBitWidth) {
+        // A same-width change can overflow if the top bit disagrees.
+        overflowed = (srcSigned != dstSigned && operandVal.isNegative());
+      } else {
+        // Truncate the result and check for overflow.
+        result = operandVal.trunc(dstBitWidth);
+
+        // Compute the overflow by re-extending the value back to its source and
+        // checking for loss of value.
+        APInt reextended =
           dstSigned ? result.sext(srcBitWidth) : result.zext(srcBitWidth);
-      bool overflowed = (operandVal != reextended);
+        overflowed = (operandVal != reextended);
 
-      if (builtin.ID == BuiltinValueKind::UToSCheckedTrunc)
-        overflowed |= result.isSignBitSet();
-
+        if (builtin.ID == BuiltinValueKind::UToSCheckedTrunc)
+          overflowed |= result.isSignBitSet();
+      }
       if (overflowed)
         return evaluator.getUnknown(SILValue(inst), UnknownReason::Overflow);
 
@@ -827,6 +852,23 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
         byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
       break;
     setValue(apply, literal);
+    return None;
+  }
+  case WellKnownFunction::ArrayInitEmpty: { // Array.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array.init() signature");
+
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::Metatype)
+      break;
+
+    auto literalType = literal.getMetatypeValue();
+
+    auto arrayVal = SymbolicValue::getArray(
+        {}, getArrayElementType(literalType)->getCanonicalType(),
+        evaluator.getAllocator());
+    setValue(apply, arrayVal);
     return None;
   }
   case WellKnownFunction::AllocateUninitializedArray: {

@@ -852,6 +852,8 @@ public:
       SmallVectorImpl<AutoDiffParameter> &params,
       Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
       Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
+      Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
+      Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a specific attribute.
@@ -1243,6 +1245,8 @@ public:
   /// SWIFT_ENABLE_TENSORFLOW
   ParserResult<Expr> parseExprGradientBody(ExprKind kind);
   ParserResult<Expr> parseExprAdjoint();
+
+  StringRef copyAndStripUnderscores(StringRef text);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    SmallVectorImpl<Expr*> &Exprs,

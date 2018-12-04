@@ -1077,9 +1077,9 @@ namespace {
       auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
       auto intType = getDiscriminatorType();
 
-      APInt intValue = IntegerLiteralExpr::getValue(intExpr->getDigitsText(),
-                                                    intType->getBitWidth(),
-                                                    intExpr->isNegative());
+      APInt intValue =
+        BuiltinIntegerWidth::fixed(intType->getBitWidth())
+          .parse(intExpr->getDigitsText(), /*radix*/ 0, intExpr->isNegative());
 
       return intValue.getZExtValue();
     }

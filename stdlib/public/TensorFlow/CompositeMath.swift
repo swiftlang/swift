@@ -26,7 +26,7 @@ public func sigmoid<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 /// Computes `relu` of the specified tensor element-wise.
 /// Specifically, computes `max(0, x)`.
 @inlinable @inline(__always)
-@differentiable(reverse, adjoint: _adjointRelu(_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointRelu(_:_:_:))
 public func relu<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return max(0, x)
 }

@@ -7945,7 +7945,7 @@ public:
     return Attributes;
   }
 
-  Optional<SymbolicValue> getAttributeNamed(StringRef name);
+  Optional<SymbolicValue> getAttributeNamed(StringRef name) const;
 
   void setNoClustering(bool noClustering) { NoClustering = noClustering; }
   bool getNoClustering() const { return NoClustering; }

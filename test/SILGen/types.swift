@@ -85,8 +85,8 @@ func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
 }
 
 // CHECK-LABEL: sil hidden @$s5types32referencedFromFunctionEnumFieldsyyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
-// CHECK:       bb{{[0-9]+}}([[F:%.*]] : @owned $@callee_guaranteed (@guaranteed ReferencedFromFunctionEnum) -> ()):
-// CHECK:       bb{{[0-9]+}}([[G:%.*]] : @owned $@callee_guaranteed (@guaranteed ReferencedFromFunctionStruct) -> ()):
+// CHECK:       bb{{[0-9]+}}([[F:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed ReferencedFromFunctionEnum) -> ()):
+// CHECK:       bb{{[0-9]+}}([[G:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
       ((ReferencedFromFunctionEnum) -> ())?,

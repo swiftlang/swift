@@ -1270,7 +1270,8 @@ public:
                 "The JVP function must not be @autodiff");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::JVP, F.getModule());
+            AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedJVPType == jvpType, "Unexpected JVP function type");
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
         require(vjpType, "The VJP function must have a function type");
@@ -1278,7 +1279,8 @@ public:
                 "The VJP function must not be @autodiff");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), order,
-            AutoDiffAssociatedFunctionKind::VJP, F.getModule());
+            AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
+            LookUpConformanceInModule(F.getModule().getSwiftModule()));
         require(expectedVJPType == vjpType, "Unexpected VJP function type");
       }
     }
@@ -1619,7 +1621,7 @@ public:
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    require(ILI->getType().is<BuiltinIntegerType>(),
+    require(ILI->getType().is<AnyBuiltinIntegerType>(),
             "invalid integer literal type");
   }
 
@@ -4577,9 +4579,9 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Verify the [reverse_differentiable] attribute.
-  void verifyReverseDifferentiableAttr(SILFunction *F,
-                                       SILReverseDifferentiableAttr &Attr) {
+  /// Verify the [differentiable] attribute.
+  void verifyDifferentiableAttr(SILFunction *F,
+                                       SILDifferentiableAttr &Attr) {
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
@@ -4600,12 +4602,7 @@ public:
     // level, after everything is parsed?
   }
 
-  /// Verify the various control-flow-sensitive rules of SIL:
-  ///
-  /// - stack allocations and deallocations must obey a stack discipline
-  /// - accesses must be uniquely ended
-  /// - flow-sensitive states must be equivalent on all paths into a block
-  void verifyFlowSensitiveRules(SILFunction *F) {
+  struct VerifyFlowSensitiveRulesDetails {
     enum CFGState {
       /// No special rules are in play.
       Normal,
@@ -4614,6 +4611,7 @@ public:
       /// We've followed the unwind edge of a yield.
       YieldUnwind
     };
+
     struct BBState {
       std::vector<SingleValueInstruction*> Stack;
 
@@ -4622,17 +4620,24 @@ public:
 
       CFGState CFG = Normal;
     };
+  };
 
+  /// Verify the various control-flow-sensitive rules of SIL:
+  ///
+  /// - stack allocations and deallocations must obey a stack discipline
+  /// - accesses must be uniquely ended
+  /// - flow-sensitive states must be equivalent on all paths into a block
+  void verifyFlowSensitiveRules(SILFunction *F) {
     // Do a breath-first search through the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
-    llvm::DenseMap<SILBasicBlock*, BBState> visitedBBs;
+    llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
     visitedBBs.try_emplace(&*F->begin());
     Worklist.push_back(&*F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      BBState state = visitedBBs[BB];
+      VerifyFlowSensitiveRulesDetails::BBState state = visitedBBs[BB];
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
@@ -4667,16 +4672,16 @@ public:
                     "return with operations still active");
 
             if (isa<UnwindInst>(term)) {
-              require(state.CFG == YieldUnwind,
+              require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldUnwind,
                       "encountered 'unwind' when not on unwind path");
             } else {
-              require(state.CFG != YieldUnwind,
+              require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldUnwind,
                       "encountered 'return' or 'throw' when on unwind path");
               if (isa<ReturnInst>(term) &&
                   F->getLoweredFunctionType()->getCoroutineKind() ==
                     SILCoroutineKind::YieldOnce &&
                   F->getModule().getStage() != SILStage::Raw) {
-                require(state.CFG == YieldOnceResume,
+                require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldOnceResume,
                         "encountered 'return' before yielding a value in "
                         "yield_once coroutine");
               }
@@ -4684,9 +4689,9 @@ public:
           }
 
           if (isa<YieldInst>(term)) {
-            require(state.CFG != YieldOnceResume,
+            require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldOnceResume,
                     "encountered multiple 'yield's along single path");
-            require(state.CFG == Normal,
+            require(state.CFG == VerifyFlowSensitiveRulesDetails::Normal,
                     "encountered 'yield' on abnormal CFG path");
           }
 
@@ -4713,14 +4718,14 @@ public:
               if (isa<YieldInst>(term)) {
                 // Enforce that the unwind logic is segregated in all stages.
                 if (i == 1) {
-                  insertResult.first->second.CFG = YieldUnwind;
+                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
 
                 // We check the yield_once rule in the mandatory analyses,
                 // so we can't assert it yet in the raw stage.
                 } else if (F->getLoweredFunctionType()->getCoroutineKind()
                              == SILCoroutineKind::YieldOnce && 
                            F->getModule().getStage() != SILStage::Raw) {
-                  insertResult.first->second.CFG = YieldOnceResume;
+                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
                 }
               }
 
@@ -4957,8 +4962,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *RDiffAttr : F->getReverseDifferentiableAttrs())
-      verifyReverseDifferentiableAttr(F, *RDiffAttr);
+    for (auto *RDiffAttr : F->getDifferentiableAttrs())
+      verifyDifferentiableAttr(F, *RDiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

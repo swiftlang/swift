@@ -156,10 +156,11 @@ namespace {
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
-    void evaluateAttributesAndDoPacking(
-        GraphOperationInfo &opInfo,
-        DenseMap<SILValue, SymbolicValue> &constants,
-        GraphFunctionDeviceInfo &deviceInfo);
+    void
+    evaluateAttributesAndDoPacking(GraphOperationInst *origInst,
+                                   GraphOperationInfo &opInfo,
+                                   DenseMap<SILValue, SymbolicValue> &constants,
+                                   GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
@@ -1394,7 +1395,12 @@ static SILValue explodeSILStructArgument(SILPhiArgument *arg) {
 
   // Ok, now that we've exploded the BB argument itself, we need to explode the
   // values passed in the predecessor blocks.
-  for (auto pi : argBB->getPredecessorBlocks()) {
+  //
+  // Collect all predecessor blocks before processing because we invalidate the
+  // iterator when we replace the branch at the end of the loop.
+  SmallPtrSet<SILBasicBlock *, 8> predBlocks(argBB->pred_begin(),
+                                             argBB->pred_end());
+  for (auto pi : predBlocks) {
     auto *br = cast<BranchInst>(pi->getTerminator());
     SmallVector<SILValue, 8> operands;
     for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
@@ -2007,7 +2013,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
           opInfo.getOperationName() == "tfc.configureGPU" ||
           opInfo.getOperationName() == "tfc.configureCPU")
         continue;
-      evaluateAttributesAndDoPacking(opInfo, constants, deviceInfo);
+      evaluateAttributesAndDoPacking(graphOpInst, opInfo, constants,
+                                     deviceInfo);
       // evaluateAttributesAndDoPacking deletes inst. So, continue as the rest
       // of the loop is irrelevant. (This also avoid memory errors.)
       continue;
@@ -2259,9 +2266,11 @@ static bool collectInnermostTensorFlowDTypes(
 /// This deletes the underlying inst in `opInfo` when a GraphOperation is
 /// created successfully.
 void TFDeabstraction::evaluateAttributesAndDoPacking(
-    GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
+    GraphOperationInst *origInst, GraphOperationInfo &opInfo,
+    DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
-  auto *origInst = opInfo.getInst();
+  assert(opInfo.getInst() == origInst &&
+         "Instruction and GraphOperationInfo don't match.");
   auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(origInst);

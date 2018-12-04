@@ -1079,10 +1079,6 @@ ProtocolConformance::getRootNormalConformance() const {
   return cast<NormalProtocolConformance>(C);
 }
 
-bool ProtocolConformance::witnessTableAccessorRequiresArguments() const {
-  return getRootNormalConformance()->getDeclContext()->isGenericContext();
-}
-
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   // FIXME: Implement me!
   return true;

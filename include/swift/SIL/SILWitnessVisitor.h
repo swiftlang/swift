@@ -42,6 +42,8 @@ namespace swift {
 /// - addMethod()
 /// - addConstructor()
 /// - addAssociatedType()
+/// SWIFT_ENABLE_TENSORFLOW
+/// - addAutoDiffAssociatedFunction()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
@@ -138,8 +140,29 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func))
-      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!SILDeclRef::requiresNewWitnessTableEntry(func))
+      return;
+
+    auto funcDeclRef = SILDeclRef(func, SILDeclRef::Kind::Func);
+    asDerived().addMethod(funcDeclRef);
+
+    if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
+      asDerived().addAutoDiffAssociatedFunction(
+          funcDeclRef,
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP,
+              /*differentiationOrder*/ 1,
+              DA->getCheckedParameterIndices(),
+              func->getASTContext()));
+      asDerived().addAutoDiffAssociatedFunction(
+          funcDeclRef,
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP,
+              /*differentiationOrder*/ 1,
+              DA->getCheckedParameterIndices(),
+              func->getASTContext()));
+    }
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {

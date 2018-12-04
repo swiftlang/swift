@@ -6,10 +6,10 @@
 // Top-level function
 //===----------------------------------------------------------------------===//
 
-@differentiable(reverse, adjoint: dSquare(_:primal:seed:))
+@differentiable(reverse, adjoint: dSquare)
 func square<T : FloatingPoint>(_ x: T) -> T { return x * x }
-// expected-note @+1 {{in call to function 'dSquare(_:primal:seed:)'}}
-private func dSquare<T : FloatingPoint>(_ x: T, primal: T, seed: T) -> T {
+// expected-note @+1 {{in call to function 'dSquare'}}
+private func dSquare<T : FloatingPoint>(_ seed: T, _ primal: T, _ x: T) -> T {
   return 2 * x
 }
 // Overload `square` with non-differentiable cases.
@@ -26,10 +26,10 @@ func testTopLevelGeneric<T : FloatingPoint>(_ x: T) -> T {
   return adjointSquare(x, x, x)
 }
 func testTopLevel2() -> Float {
-  return #adjoint(square)(1, primal: 2, seed: 3)
+  return #adjoint(square)(1, 2, 3)
 }
 func testTopLevelGeneric2<T : FloatingPoint>(_ x: T) -> T {
-  return #adjoint(square)(x, primal: x, seed: x)
+  return #adjoint(square)(x, x, x)
 }
 
 //===----------------------------------------------------------------------===//
@@ -39,27 +39,27 @@ func testTopLevelGeneric2<T : FloatingPoint>(_ x: T) -> T {
 struct A {
   struct B {
     struct C {
-      @differentiable(reverse, adjoint: dAdd(a:b:primal:seed:))
+      @differentiable(reverse, adjoint: dAdd(seed:primal:a:b:))
       public static func add(a: C, b: C) -> C {
         return a
       }
 
       @usableFromInline internal static func dAdd(
-        a: C, b: C, primal: C, seed: C
+        seed: C, primal: C, a: C, b: C
       ) -> (C, C) {
         return (seed, seed)
       }
 
       @differentiable(
         reverse, wrt: (self, .0),
-        adjoint: dSubtract(a:primal:seed:)
+        adjoint: dSubtract(seed:primal:a:)
       )
       func subtract(a: C) -> C {
         return a
       }
 
       private func dSubtract(
-        a: C, primal: C, seed: C
+        seed: C, primal: C, a: C
       ) -> (C, C) {
         return (seed, seed)
       }
@@ -95,24 +95,24 @@ struct Pair {
   let y: Float
 }
 extension Pair {
-  @differentiable(reverse, adjoint: dAdd(_:_:primal:seed:))
+  @differentiable(reverse, adjoint: dAdd)
   static func + (_ a: Pair, _ b: Pair) -> Pair {
     return Pair(x: a.x+b.x, y: a.y+b.y)
   }
 
   private static func dAdd(
-    _ a: Pair, _ b: Pair, primal: Pair, seed: Pair
+    _ seed: Pair, _ primal: Pair, _ a: Pair, _ b: Pair
   ) -> (Pair, Pair) {
     return (seed, seed)
   }
 
-  @differentiable(reverse, wrt: (self, .0), adjoint: dSubtract(_:primal:seed:))
+  @differentiable(reverse, wrt: (self, .0), adjoint: dSubtract)
   func subtract(_ a: Pair) -> Pair {
     return Pair(x: x-a.x, y: y-a.y)
   }
 
   private func dSubtract(
-    _ a: Pair, primal: Pair, seed: Pair
+    _ seed: Pair, _ primal: Pair, _ a: Pair
   ) -> (Pair, Pair) {
     return (seed, Pair(x: -seed.x, y: -seed.y))
   }
@@ -137,26 +137,26 @@ func testPair() {
 //===----------------------------------------------------------------------===//
 
 struct Vector<T> {
-  @differentiable(reverse, adjoint: dMultiply(_:_:primal:seed:))
+  @differentiable(reverse, adjoint: dMultiply)
   static func * <A : FloatingPoint>(
     _ a: Vector<A>, _ b: Vector<A>
   ) -> Vector<A> {
     return a
   }
 
-  @differentiable(reverse, wrt: (self, .0), adjoint: dDivide(_:primal:seed:))
+  @differentiable(reverse, wrt: (self, .0), adjoint: dDivide)
   func divide<A : FloatingPoint>(_ a: Vector<A>) -> Vector<A> {
     return a
   }
 
   static func dMultiply<A : FloatingPoint>(
-    _ a: Vector<A>, _ b: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>, _ b: Vector<A>
   ) -> (Vector<A>, Vector<A>) {
     return (seed, seed)
   }
 
   func dDivide<A : FloatingPoint>(
-    _ a: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>
   ) -> (Vector, Vector<A>) {
     return (self, seed)
   }
@@ -164,7 +164,7 @@ struct Vector<T> {
 
 extension Vector {
   static func dMultiply2<A : FloatingPoint>(
-    _ a: Vector<A>, _ b: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>, _ b: Vector<A>
   ) -> (Vector<A>, Vector<A>) {
     let adjoint: (Vector<A>, Vector<A>, Vector<A>, Vector<A>) -> (Vector<A>, Vector<A>)
       = #adjoint(*)
@@ -172,7 +172,7 @@ extension Vector {
   }
 
   func dDivide2<A : FloatingPoint>(
-    _ a: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>
   ) -> (Vector, Vector<A>) {
     let adjoint: (Vector) -> (Vector<A>, Vector<A>, Vector<A>) -> (Vector, Vector<A>) =
       #adjoint(divide)
@@ -180,15 +180,15 @@ extension Vector {
   }
 
   static func dMultiply3<A : FloatingPoint>(
-    _ a: Vector<A>, _ b: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>, _ b: Vector<A>
   ) -> (Vector<A>, Vector<A>) {
-    return #adjoint(*(_:_:))(a, b, primal: primal, seed: seed)
+    return #adjoint(*(_:_:))(a, b, primal, seed)
   }
 
   func dDivide3<A : FloatingPoint>(
-    _ a: Vector<A>, primal: Vector<A>, seed: Vector<A>
+    _ seed: Vector<A>, _ primal: Vector<A>, _ a: Vector<A>
   ) -> (Vector, Vector<A>) {
-    return #adjoint(divide(_:))(self)(a, primal: primal, seed: seed)
+    return #adjoint(divide(_:))(self)(a, primal, seed)
   }
 }
 

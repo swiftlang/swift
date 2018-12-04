@@ -218,39 +218,11 @@ inline unsigned TypeLayout::getNumExtraInhabitants() const {
 
 // Standard value-witness tables.
 
-// The "Int" tables are used for arbitrary POD data with the matching
-// size/alignment characteristics.
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi8_);   // Builtin.Int8
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi16_);  // Builtin.Int16
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi32_);  // Builtin.Int32
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi64_);  // Builtin.Int64
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi128_); // Builtin.Int128
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi256_); // Builtin.Int256
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
-
-// The object-pointer table can be used for arbitrary Swift refcounted
-// pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bb); // Builtin.BridgeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPointer
-
-#if SWIFT_OBJC_INTEROP
-// The ObjC-pointer table can be used for arbitrary ObjC pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
-#endif
+#define BUILTIN_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#define BUILTIN_POINTER_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#include "swift/Runtime/BuiltinTypes.def"
 
 // The () -> () table can be used for arbitrary function types.
 SWIFT_RUNTIME_EXPORT
@@ -385,18 +357,13 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_checkMetadataState(MetadataRequest request,
                                           const Metadata *type);
 
-/// Instantiate a resilient or generic protocol witness table.
+/// Retrieve a witness table based on a given conformance.
 ///
-/// \param genericTable - The witness table template for the
-///   conformance. It may either have fields that require runtime
-///   initialization, or be missing requirements at the end for
-///   which default witnesses are available.
+/// \param conformance - The protocol conformance descriptor, which
+///   contains any information required to form the witness table.
 ///
 /// \param type - The conforming type, used to form a uniquing key
-///   for the conformance. If the witness table is not dependent on
-///   the substituted type of the conformance, this can be set to
-///   nullptr, in which case there will only be one instantiated
-///   witness table per witness table template.
+///   for the conformance.
 ///
 /// \param instantiationArgs - An opaque pointer that's forwarded to
 ///   the instantiation function, used for conditional conformances.
@@ -406,9 +373,9 @@ MetadataResponse swift_checkMetadataState(MetadataRequest request,
 ///   conformances.
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *
-swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
-                             const Metadata *type,
-                             void **const *instantiationArgs);
+swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
 
 /// Retrieve an associated type witness from the given witness table.
 ///
@@ -489,13 +456,6 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getForeignTypeMetadata(MetadataRequest request,
                              ForeignTypeMetadata *nonUnique);
-
-/// \brief Fetch a unique witness table for a foreign witness table.
-SWIFT_RUNTIME_EXPORT
-const WitnessTable *
-swift_getForeignWitnessTable(const WitnessTable *nonUniqueWitnessCandidate,
-                             const TypeContextDescriptor *forForeignType,
-                             const ProtocolDescriptor *forProtocol);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///

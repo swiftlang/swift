@@ -288,6 +288,10 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
+    /// Scaffolding to permit experimentation with finer-grained dependencies
+    /// and faster rebuilds.
+    bool EnableExperimentalDependencies = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -352,11 +356,6 @@ namespace swift {
 
     ArrayRef<std::string> getCustomConditionalCompilationFlags() const {
       return CustomConditionalCompilationFlags;
-    }
-
-    /// Whether our effective Swift version is in the Swift 3 family
-    bool isSwiftVersion3() const {
-      return EffectiveLanguageVersion.isVersion3();
     }
 
     /// Whether our effective Swift version is at least 'major'.

@@ -337,7 +337,7 @@ extension LazySequenceProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this sequence.
   ///
-  /// Use this method to receive a sequence of nonoptional values when your
+  /// Use this method to receive a sequence of non-optional values when your
   /// transformation produces an optional value.
   ///
   /// - Parameter transform: A closure that accepts an element of this sequence
@@ -413,7 +413,7 @@ extension LazyCollectionProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this collection.
   ///
-  /// Use this method to receive a collection of nonoptional values when your
+  /// Use this method to receive a collection of non-optional values when your
   /// transformation produces an optional value.
   ///
   /// - Parameter transform: A closure that accepts an element of this

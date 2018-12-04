@@ -1821,8 +1821,10 @@ extension FloatingPoint {
   ///
   /// - Returns: The square root of the value.
   @_transparent
-  /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
+  // SWIFT_ENABLE_TENSORFLOW
+  // FIXME: This causes AD to register a differentiation task for this function
+  // twice.
+  // @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
@@ -1833,7 +1835,7 @@ extension FloatingPoint {
   /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
   /// respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
-  func _adjointSquareRoot(originalValue: Self, adjoint: Self) -> Self {
+  func _adjointSquareRoot(_ adjoint: Self, _ originalValue: Self) -> Self {
     return 2 * self * adjoint
   }
 
@@ -1864,8 +1866,9 @@ extension FloatingPoint {
   /// with respect to `self`, `lhs` and `rhs`.
   @inlinable
   func _adjointAddingProduct(
-    _ lhs: Self, _ rhs: Self,
-    originalValue: Self, adjoint: Self
+    _ adjoint: Self,
+    _ originalValue: Self,
+    _ lhs: Self, _ rhs: Self
   ) -> (Self, Self, Self) {
     return (1, rhs, lhs)
   }

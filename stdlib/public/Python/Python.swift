@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,15 +19,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CPython
-
 //===----------------------------------------------------------------------===//
 // `PyReference` definition
 //===----------------------------------------------------------------------===//
 
 /// Typealias used when passing or returning a `PyObject` pointer with
 /// implied ownership.
-public typealias OwnedPyObjectPointer = UnsafeMutablePointer<PyObject>
+typealias OwnedPyObjectPointer = PyObjectPointer
 
 /// A primitive reference to a Python C API `PyObject`.
 ///
@@ -43,18 +41,18 @@ final class PyReference {
 
   init(owning pointer: OwnedPyObjectPointer) {
     self.pointer = pointer
+    Py_IncRef(pointer)
   }
 
-  init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+  init(borrowing pointer: PyObjectPointer) {
     self.pointer = pointer
-    Py_IncRef(pointer)
   }
 
   deinit {
     Py_DecRef(pointer)
   }
 
-  var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  var borrowedPyObject: PyObjectPointer {
     return pointer
   }
 
@@ -95,16 +93,16 @@ public struct PythonObject {
 
   /// Creates a new instance, taking ownership of the specified `PyObject`
   /// pointer.
-  public init(owning pointer: OwnedPyObjectPointer) {
+  init(owning pointer: OwnedPyObjectPointer) {
     reference = PyReference(owning: pointer)
   }
 
   /// Creates a new instance from the specified `PyObject` pointer.
-  public init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+  init(borrowing pointer: PyObjectPointer) {
     reference = PyReference(borrowing: pointer)
   }
 
-  fileprivate var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  fileprivate var borrowedPyObject: PyObjectPointer {
     return reference.borrowedPyObject
   }
 
@@ -113,7 +111,7 @@ public struct PythonObject {
   }
 }
 
-/// Make `print(python)` print a pretty form of the `PythonObject`.
+// Make `print(python)` print a pretty form of the `PythonObject`.
 extension PythonObject : CustomStringConvertible {
   /// A textual description of this `PythonObject`, produced by `Python.str`.
   public var description: String {
@@ -165,7 +163,7 @@ public extension PythonObject {
 /// Internal helpers to convert `PythonConvertible` values to owned and borrowed
 /// `PyObject` instances. These should not be made public.
 fileprivate extension PythonConvertible {
-  var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  var borrowedPyObject: PyObjectPointer {
     return pythonObject.borrowedPyObject
   }
 
@@ -174,7 +172,7 @@ fileprivate extension PythonConvertible {
   }
 }
 
-/// `PythonObject` is trivially `PythonConvertible`.
+// `PythonObject` is trivially `PythonConvertible`.
 extension PythonObject : PythonConvertible {
   public init(_ object: PythonObject) {
     self.init(owning: object.ownedPyObject)
@@ -229,9 +227,9 @@ extension PythonError : CustomStringConvertible {
 private func throwPythonErrorIfPresent() throws {
   if PyErr_Occurred() == nil { return }
 
-  var type: UnsafeMutablePointer<PyObject>?
-  var value: UnsafeMutablePointer<PyObject>?
-  var traceback: UnsafeMutablePointer<PyObject>?
+  var type: PyObjectPointer?
+  var value: PyObjectPointer?
+  var traceback: PyObjectPointer?
 
   // Fetch the exception and clear the exception state.
   PyErr_Fetch(&type, &value, &traceback)
@@ -550,7 +548,7 @@ public extension PythonObject {
       guard let item = checking[key] else {
         fatalError("""
           Could not access PythonObject element corresponding to the specified \
-          key values
+          key values: \(key)
           """)
       }
       return item
@@ -657,13 +655,6 @@ public struct PythonInterface {
     return try! attemptImport(name)
   }
 
-  public func updatePath(to path: String) {
-    var cStr = path.utf8CString
-    cStr.withUnsafeMutableBufferPointer { buffPtr in
-      PySys_SetPath(buffPtr.baseAddress)
-    }
-  }
-
   public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
   }
@@ -744,9 +735,8 @@ public extension PythonObject {
 /// type descriptor passed in as 'type'.
 private func isType(_ object: PythonObject,
                     type: UnsafeMutableRawPointer) -> Bool {
-  let typePyRef = PythonObject(
-    borrowing: type.assumingMemoryBound(to: PyObject.self)
-  )
+  let typePyRef = PythonObject(borrowing: type)
+
   let result = Python.isinstance(object, typePyRef)
 
   // We cannot use the normal failable Bool initializer from `PythonObject`
@@ -755,22 +745,17 @@ private func isType(_ object: PythonObject,
   defer { Py_DecRef(pyObject) }
 
   // Anything not equal to `Py_ZeroStruct` is truthy.
-  return !(pyObject == &_Py_ZeroStruct)
-}
-
-private func == (_ x: UnsafeMutablePointer<PyObject>,
-                 _ y: UnsafeMutableRawPointer) -> Bool {
-  return x == y.assumingMemoryBound(to: PyObject.self)
+  return pyObject != _Py_ZeroStruct
 }
 
 extension Bool : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PyBool_Type) else { return nil }
+    guard isType(pythonObject, type: PyBool_Type) else { return nil }
 
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
-    self = pyObject == &_Py_TrueStruct
+    self = pyObject == _Py_TrueStruct
   }
 
   public var pythonObject: PythonObject {
@@ -880,8 +865,8 @@ extension Double : PythonConvertible {
 // `PythonConvertible` conformances for `FixedWidthInteger` and `Float`
 //===----------------------------------------------------------------------===//
 
-/// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
-/// implementation.
+// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
+// implementation.
 
 extension Int8 : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
@@ -971,7 +956,7 @@ extension UInt64 : PythonConvertible {
   }
 }
 
-/// `Float` is `PythonConvertible` via the `Double` implementation.
+// `Float` is `PythonConvertible` via the `Double` implementation.
 
 extension Float : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
@@ -1004,7 +989,7 @@ extension Array : PythonConvertible where Element : PythonConvertible {
     let list = PyList_New(count)!
     for (index, element) in enumerated() {
       // `PyList_SetItem` steals the reference of the object stored.
-      PyList_SetItem(list, index, element.ownedPyObject)
+      _ = PyList_SetItem(list, index, element.ownedPyObject)
     }
     return PythonObject(owning: list)
   }
@@ -1019,8 +1004,8 @@ extension Dictionary : PythonConvertible
 
     // Iterate over the Python dictionary, converting its keys and values to
     // Swift `Key` and `Value` pairs.
-    var key, value: UnsafeMutablePointer<PyObject>?
-    var position: Py_ssize_t = 0
+    var key, value: PyObjectPointer?
+    var position: Int = 0
 
     while PyDict_Next(pythonDict.borrowedPyObject,
                       &position, &key, &value) != 0 {
@@ -1058,7 +1043,7 @@ extension Dictionary : PythonConvertible
 
 extension Range : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start),
           let upperBound = Bound(pythonObject.stop) else {
        return nil
@@ -1075,7 +1060,7 @@ extension Range : PythonConvertible where Bound : PythonConvertible {
 
 extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let lowerBound = Bound(pythonObject.start) else { return nil }
     guard pythonObject.stop == Python.None,
           pythonObject.step == Python.None else {
@@ -1092,7 +1077,7 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
 
 extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard isType(pythonObject, type: PySlice_Type) else { return nil }
     guard let upperBound = Bound(pythonObject.stop) else { return nil }
     guard pythonObject.start == Python.None,
           pythonObject.step == Python.None else {

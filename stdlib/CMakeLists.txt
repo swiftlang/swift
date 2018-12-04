@@ -1,5 +1,9 @@
 # Create convenience targets for the Swift standard library.
 
+# NOTE(compnerd) save the original compiler for the host swiftReflection that
+# we build
+set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+set(HOST_CMAKE_C_COMPILER_INITIAL ${CMAKE_C_COMPILER})
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
   if((NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang") AND
@@ -18,7 +22,7 @@ else()
     set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
     set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
   endif()
-  
+
   set(CMAKE_CXX_COMPILER_ARG1 "")
   set(CMAKE_C_COMPILER_ARG1 "")
   # The sanitizers require using the same version of the compiler for

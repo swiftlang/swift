@@ -34,9 +34,9 @@ func assignment(_ x: Int, y: Int) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}assignment
-// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: integer_literal $Builtin.IntLiteral, 42
 // CHECK: assign
-// CHECK: integer_literal $Builtin.Int2048, 57
+// CHECK: integer_literal $Builtin.IntLiteral, 57
 // CHECK: assign
 
 func if_test(_ x: Int, y: Bool) {
@@ -356,7 +356,7 @@ func test_if_break(_ a : Bool) {
 
 // CHECK-LABEL: sil hidden @$s10statements7test_doyyF
 func test_do() {
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
@@ -367,7 +367,7 @@ func test_do() {
     let obj = MyClass()
     _ = obj
     
-    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: integer_literal $Builtin.IntLiteral, 1
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
@@ -377,7 +377,7 @@ func test_do() {
     // CHECK-NOT: br bb
   }
 
-  // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: integer_literal $Builtin.IntLiteral, 2
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(2)
@@ -385,7 +385,7 @@ func test_do() {
 
 // CHECK-LABEL: sil hidden @$s10statements15test_do_labeledyyF
 func test_do_labeled() {
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(0)
@@ -397,7 +397,7 @@ func test_do_labeled() {
     let obj = MyClass()
     _ = obj
 
-    // CHECK: integer_literal $Builtin.Int2048, 1
+    // CHECK: integer_literal $Builtin.IntLiteral, 1
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(1)
@@ -412,7 +412,7 @@ func test_do_labeled() {
     }
 
     // CHECK: bb3:
-    // CHECK: integer_literal $Builtin.Int2048, 2
+    // CHECK: integer_literal $Builtin.IntLiteral, 2
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(2)
@@ -427,7 +427,7 @@ func test_do_labeled() {
     }
 
     // CHECK: bb5:
-    // CHECK: integer_literal $Builtin.Int2048, 3
+    // CHECK: integer_literal $Builtin.IntLiteral, 3
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
     bar(3)
@@ -436,7 +436,7 @@ func test_do_labeled() {
     // CHECK: br bb6
   }
 
-  // CHECK: integer_literal $Builtin.Int2048, 4
+  // CHECK: integer_literal $Builtin.IntLiteral, 4
   // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
   // CHECK: apply [[BAR]](
   bar(4)

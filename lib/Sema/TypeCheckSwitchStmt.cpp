@@ -18,8 +18,9 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/STLExtras.h"
 
-#include <llvm/ADT/APInt.h>
+#include "swift/Basic/APIntMap.h"
 #include <llvm/ADT/APFloat.h>
 
 #include <numeric>
@@ -30,22 +31,6 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckSwitchStmt"
 
 namespace {
-  struct DenseMapAPIntKeyInfo {
-    static inline APInt getEmptyKey() { return APInt(); }
-
-    static inline APInt getTombstoneKey() {
-      return APInt::getAllOnesValue(/*bitwidth*/1);
-    }
-
-    static unsigned getHashValue(const APInt &Key) {
-      return static_cast<unsigned>(hash_value(Key));
-    }
-
-    static bool isEqual(const APInt &LHS, const APInt &RHS) {
-      return LHS.getBitWidth() == RHS.getBitWidth() && LHS == RHS;
-    }
-  };
-
   struct DenseMapAPFloatKeyInfo {
     static inline APFloat getEmptyKey() { return APFloat(APFloat::Bogus(), 1); }
     static inline APFloat getTombstoneKey() { return APFloat(APFloat::Bogus(), 2); }
@@ -684,11 +669,9 @@ namespace {
             llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
-            for (auto &sp : Spaces) {
-              buffer << "\n";
+            interleave(Spaces, [&](const Space &sp) {
               sp.show(buffer, forDisplay);
-              buffer << " |";
-            }
+            }, [&buffer]() { buffer << " |\n"; });
             buffer << ")";
           }
         }
@@ -707,16 +690,9 @@ namespace {
           }
 
           buffer << "(";
-          bool first = true;
-          for (auto &param : Spaces) {
-            if (!first) {
-              buffer << ", ";
-            }
+          interleave(Spaces, [&](const Space &param) {
             param.show(buffer, forDisplay);
-            if (first) {
-              first = false;
-            }
-          }
+          }, [&buffer]() { buffer << ", "; });
           buffer << ")";
         }
           break;
@@ -866,7 +842,7 @@ namespace {
     TypeChecker &TC;
     const SwitchStmt *Switch;
     const DeclContext *DC;
-    llvm::DenseMap<APInt, Expr *, ::DenseMapAPIntKeyInfo> IntLiteralCache;
+    APIntMap<Expr *> IntLiteralCache;
     llvm::DenseMap<APFloat, Expr *, ::DenseMapAPFloatKeyInfo> FloatLiteralCache;
     llvm::DenseMap<StringRef, Expr *> StringLiteralCache;
     
@@ -894,12 +870,8 @@ namespace {
         return !cacheVal.second;
       }
       case ExprKind::IntegerLiteral: {
-        // FIXME: The magic number 128 is bad and we should actually figure out
-        // the bitwidth.  But it's too early in Sema to get it.
         auto *ILE = cast<IntegerLiteralExpr>(EL);
-        auto cacheVal =
-            IntLiteralCache.insert(
-                {ILE->getValue(ILE->getDigitsText(), 128, ILE->isNegative()), ILE});
+        auto cacheVal = IntLiteralCache.insert({ILE->getRawValue(), ILE});
         PrevPattern = (cacheVal.first != IntLiteralCache.end())
                     ? cacheVal.first->getSecond()
                     : nullptr;

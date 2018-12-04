@@ -77,9 +77,6 @@ public class SequenceLog {
   // Sequence
   public static var makeIterator = TypeIndexed(0)
   public static var underestimatedCount = TypeIndexed(0)
-  public static var map = TypeIndexed(0)
-  public static var filter = TypeIndexed(0)
-  public static var forEach = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
   public static var dropWhile = TypeIndexed(0)
@@ -101,20 +98,15 @@ public class SequenceLog {
   public static var successor = TypeIndexed(0)
   public static var formSuccessor = TypeIndexed(0)
   public static var indices = TypeIndexed(0)
-  public static var prefixUpTo = TypeIndexed(0)
-  public static var prefixThrough = TypeIndexed(0)
-  public static var suffixFrom = TypeIndexed(0)
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
-  public static var first = TypeIndexed(0)
   public static var advance = TypeIndexed(0)
   public static var advanceLimit = TypeIndexed(0)
   public static var distance = TypeIndexed(0)
   // BidirectionalCollection
   public static var predecessor = TypeIndexed(0)
   public static var formPredecessor = TypeIndexed(0)
-  public static var last = TypeIndexed(0)
   // MutableCollection
   public static var subscriptIndexSet = TypeIndexed(0)
   public static var subscriptRangeSet = TypeIndexed(0)
@@ -222,25 +214,6 @@ extension LoggingSequence: Sequence {
     return base.underestimatedCount
   }
 
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    SequenceLog.map[selfType] += 1
-    return try base.map(transform)
-  }
-
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    SequenceLog.filter[selfType] += 1
-    return try base.filter(isIncluded)
-  }
-
-  public func forEach(_ body: (Element) throws -> Void) rethrows {
-    SequenceLog.forEach[selfType] += 1
-    try base.forEach(body)
-  }
-
   public func dropFirst(_ n: Int) -> SubSequence {
     SequenceLog.dropFirst[selfType] += 1
     return base.dropFirst(n)
@@ -336,17 +309,13 @@ extension LoggingCollection: Collection {
   }
 
   public subscript(position: Index) -> Element {
-    get {
-      CollectionLog.subscriptIndex[selfType] += 1
-      return base[position]
-    }
+    CollectionLog.subscriptIndex[selfType] += 1
+    return base[position]
   }
 
   public subscript(bounds: Range<Index>) -> SubSequence {
-    get {
-      CollectionLog.subscriptRange[selfType] += 1
-      return base[bounds]
-    }
+    CollectionLog.subscriptRange[selfType] += 1
+    return base[bounds]
   }
 
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
@@ -374,21 +343,6 @@ extension LoggingCollection: Collection {
     return base.indices
   }
 
-  public func prefix(upTo end: Index) -> SubSequence {
-    CollectionLog.prefixUpTo[selfType] += 1
-    return base.prefix(upTo: end)
-  }
-
-  public func prefix(through position: Index) -> SubSequence {
-    CollectionLog.prefixThrough[selfType] += 1
-    return base.prefix(through: position)
-  }
-
-  public func suffix(from start: Index) -> SubSequence {
-    CollectionLog.suffixFrom[selfType] += 1
-    return base.suffix(from: start)
-  }
-
   public var isEmpty: Bool {
     CollectionLog.isEmpty[selfType] += 1
     return base.isEmpty
@@ -404,11 +358,6 @@ extension LoggingCollection: Collection {
   ) -> Index?? {
     CollectionLog._customIndexOfEquatableElement[selfType] += 1
     return base._customIndexOfEquatableElement(element)
-  }
-
-  public var first: Element? {
-    CollectionLog.first[selfType] += 1
-    return base.first
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -442,11 +391,6 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
   public func formIndex(before i: inout Index) {
     BidirectionalCollectionLog.formPredecessor[selfType] += 1
     base.formIndex(before: &i)
-  }
-
-  public var last: Element? {
-    BidirectionalCollectionLog.last[selfType] += 1
-    return base.last
   }
 }
 

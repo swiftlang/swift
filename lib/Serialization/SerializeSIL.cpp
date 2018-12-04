@@ -394,7 +394,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       // SWIFT_ENABLE_TENSORFLOW
       (unsigned)numSpecAttrs,
-      (unsigned)F.getReverseDifferentiableAttrs().size(),
+      (unsigned)F.getDifferentiableAttrs().size(),
       (unsigned)F.hasQualifiedOwnership(),
       F.isWeakLinked(), FnID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
@@ -411,18 +411,28 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // SWIFT_ENABLE_TENSORFLOW
   auto &Ctx = F.getASTContext();
-  for (auto *DA : F.getReverseDifferentiableAttrs()) {
+  for (auto *DA : F.getDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
-        SILAbbrCodes[SILReverseDifferentiableAttrLayout::Code];
+        SILAbbrCodes[SILDifferentiableAttrLayout::Code];
     auto &indices = DA->getIndices();
     SmallVector<bool, 4> parameters;
     for (unsigned i = 0; i < indices.parameters.size(); i++)
       parameters.push_back(indices.parameters[i]);
-    SILReverseDifferentiableAttrLayout::emitRecord(
+    SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
         S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName())),
         S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName())),
-        DA->isAdjointPrimitive(), indices.source, parameters);
+        DA->isAdjointPrimitive(),
+        // TODO: Once we add synthesis for JVP and VJP, serialized
+        // [differentiable] attrs should always have JVP and VJP, so we should
+        // be able to eliminate these checks.
+        DA->hasJVP()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
+            : IdentifierID(),
+        DA->hasVJP()
+            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
+            : IdentifierID(),
+        indices.source, parameters);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -2448,7 +2458,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
-  registerSILAbbr<SILReverseDifferentiableAttrLayout>();
+  registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstGraphOperationLayout>();
   registerSILAbbr<SILInstGradientLayout>();
 

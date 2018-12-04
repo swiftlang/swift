@@ -2062,6 +2062,21 @@ for host in "${ALL_HOSTS[@]}"; do
         -DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER:BOOL=$(true_false "${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
     )
 
+    if [[ "${TEST_PATHS}" ]]; then
+        build_dir=$(build_directory ${host} "swift")
+
+        test_paths=()
+        for path in ${TEST_PATHS}; do
+            test_paths+=(
+                "${build_dir}/$(echo ${path} | sed -E "s/^(validation-test|test)/\1-${host}/")"
+            )
+        done
+
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_LIT_TEST_PATHS="${test_paths}")
+    fi
+
     if [[ "${SKIP_TEST_SOURCEKIT}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
@@ -3187,7 +3202,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${LLDB_DOTEST_CC_OPTS} \
                         ${LLDB_FORMATTER_OPTS} \
                         --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        -E "${DOTEST_EXTRA}"
+                        -t -E "${DOTEST_EXTRA}"
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                         echo "Running LLDB swift compatibility tests against" \
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
@@ -3203,7 +3218,7 @@ for host in "${ALL_HOSTS[@]}"; do
                              --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
                              -G swift-history \
                              --swift-compiler "${LLDB_TEST_SWIFT_COMPATIBILITY}" \
-                             -E "${DOTEST_EXTRA}"
+                             -t -E "${DOTEST_EXTRA}"
                     fi
                 fi
 
@@ -3276,7 +3291,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 # If libdispatch is being built, TestFoundation will need access to it
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch)/src/.libs"
+                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch):$(build_directory ${host} libdispatch)/src"
                 else
                     LIBDISPATCH_LIB_DIR=""
                 fi
@@ -3381,43 +3396,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 trap "tests_busted ${product} '(${target})'" ERR
 
                 test_target="$target"
-                test_paths=()
-
-                if [[ ${test_target} == check-swift* ]]; then
-                    if [[ "${TEST_PATHS}" ]]; then
-                        test_target="${test_target}-custom"
-                        for path in ${TEST_PATHS}; do
-                            test_paths+=(
-                                "${build_dir}/$(echo ${path} | sed -E "s/^(validation-test|test)/\1-${host}/")"
-                            )
-                        done
-                    fi
+                if [[ ${test_target} == check-swift* ]] && [[ "${TEST_PATHS}" ]]; then
+                    test_target="${test_target}-custom"
                 fi
 
-                # NOTE: In dry-run mode, build_dir might not exist yet. In that
-                #       case, -n query will fail. So, in dry-run mode,
-                #       we don't expand test script.
-                if [[ ! "${DRY_RUN}" && "${CMAKE_GENERATOR}" == Ninja ]] && !( "${build_cmd[@]}" --version 2>&1 | grep -i -q llbuild ) && [[ -z "${DISTCC_PUMP}" ]]; then
-                    # Ninja buffers command output to avoid scrambling the output
-                    # of parallel jobs, which is awesome... except that it
-                    # interferes with the progress meter when testing.  Instead of
-                    # executing ninja directly, have it dump the commands it would
-                    # run, strip Ninja's progress prefix with sed, and tell the
-                    # shell to execute that.
-                    # However, if we do this in a subshell in the ``sh -e -x -c`` line,
-                    # errors in the command will not stop the script as they should.
-                    echo "Generating dry run test command from: ${build_cmd[@]} -n -v ${test_target}"
-                    dry_run_command_output="$(${build_cmd[@]} -n -v ${test_target} | sed -e 's/[^]]*] //')"
-                    echo "Test command: ${dry_run_command_output}"
+                call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
 
-                    if [[ ! "${test_paths}" ]]; then
-                        env bash -ex <(echo -e "${dry_run_command_output}")
-                    else
-                        env bash -ex <(echo -e "${dry_run_command_output}" "${test_paths[@]}")
-                    fi
-                else
-                    call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
-                fi
                 echo "-- ${target} finished --"
             fi
         done

@@ -42,6 +42,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, Decl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
+  SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform);
   SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
@@ -105,8 +106,13 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  ConformingProtocols(Info.ConformingProtocols),
   EnumRawTypeName(Info.EnumRawTypeName) {}
+
+SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
+  SDKNode(Info, SDKNodeKind::Conformance) {}
+
+SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
+  SDKNode(Info, SDKNodeKind::TypeWitness) {}
 
 SDKNodeDeclOperator::SDKNodeDeclOperator(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclOperator) {}
@@ -217,10 +223,6 @@ void SDKNode::addChild(SDKNode *Child) {
   }
 }
 
-ArrayRef<SDKNode*> SDKNode::getChildren() const {
-  return llvm::makeArrayRef(Children);
-}
-
 NodePtr SDKNode::childAt(unsigned I) const {
   assert(I < getChildrenCount());
   return getChildren()[I];
@@ -324,7 +326,7 @@ StringRef SDKNodeType::getParamValueOwnership() const {
 
 StringRef SDKNodeType::getTypeRoleDescription() const {
   assert(isTopLevelType());
-  auto P = cast<SDKNodeDecl>(getParent());
+  auto P = getParent();
   switch(P->getKind()) {
   case SDKNodeKind::Root:
   case SDKNodeKind::TypeNominal:
@@ -332,6 +334,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::TypeAlias:
   case SDKNodeKind::DeclType:
   case SDKNodeKind::DeclOperator:
+  case SDKNodeKind::Conformance:
     llvm_unreachable("Type Parent is wrong");
   case SDKNodeKind::DeclFunction:
   case SDKNodeKind::DeclConstructor:
@@ -346,6 +349,8 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
     return "underlying";
   case SDKNodeKind::DeclAssociatedType:
     return "default";
+  case SDKNodeKind::TypeWitness:
+    return "type witness type";
   }
 }
 
@@ -370,14 +375,6 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << ": ";
   OS << getDeclKind() << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
-}
-
-bool SDKNodeDecl::isSDKPrivate() const {
-  if (getName().startswith("__"))
-    return true;
-  if (auto *PD = dyn_cast<SDKNodeDecl>(getParent()))
-    return PD->isSDKPrivate();
-  return false;
 }
 
 void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
@@ -427,6 +424,20 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
   return Result->getAs<SDKNodeDecl>();
 }
 
+void SDKNodeDeclType::addConformance(SDKNode *Conf) {
+  cast<SDKNodeConformance>(Conf)->TypeDecl = this;
+  Conformances.push_back(Conf);
+}
+
+SDKNodeType *SDKNodeTypeWitness::getUnderlyingType() const {
+  return getOnlyChild()->getAs<SDKNodeType>();
+}
+
+StringRef SDKNodeTypeWitness::getWitnessedTypeName() const {
+  return Ctx.buffer((llvm::Twine(getParent()->getAs<SDKNodeConformance>()->
+    getName()) + "." + getName()).str());
+}
+
 Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
   if (SuperclassUsr.empty())
     return None;
@@ -465,9 +476,9 @@ bool SDKNodeDeclType::isConformingTo(KnownProtocolKind Kind) const {
   switch (Kind) {
 #define KNOWN_PROTOCOL(NAME)                                                \
     case KnownProtocolKind::NAME:                                           \
-      return std::find(ConformingProtocols.begin(),                         \
-                       ConformingProtocols.end(),                           \
-                       #NAME) != ConformingProtocols.end();
+      return std::find_if(Conformances.begin(), Conformances.end(),         \
+        [](SDKNode *Conf) { return Conf->getName() == #NAME; }) !=          \
+          Conformances.end();
 #include "swift/IDE/DigesterEnums.def"
   }
 }
@@ -524,6 +535,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
+  NodeVector Conformances;
 
   for (auto &Pair : *Node) {
     auto keyString = GetScalarString(Pair.getKey()); 
@@ -549,6 +561,12 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
           Children.push_back(constructSDKNode(Ctx,
                                         cast<llvm::yaml::MappingNode>(&Mapping)));
+        }
+        break;
+      case KeyKind::KK_conformances:
+        for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Conformances.push_back(constructSDKNode(Ctx,
+                                    cast<llvm::yaml::MappingNode>(&Mapping)));
         }
         break;
 #define KEY_STRING_ARR(X, Y)                                                  \
@@ -622,6 +640,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   for (auto C : Children) {
     Result->addChild(C);
   }
+  for (auto *Conf: Conformances) {
+    cast<SDKNodeDeclType>(Result)->addConformance(Conf);
+  }
   return Result;
 }
 
@@ -635,22 +656,36 @@ bool SDKNode::hasSameChildren(const SDKNode &Other) const {
   return true;
 }
 
-void swift::ide::api::stringSetDifference(ArrayRef<StringRef> Left,
-                                          ArrayRef<StringRef> Right,
-                                          std::vector<StringRef> &LeftMinusRight,
-                                          std::vector<StringRef> &RightMinusLeft) {
-  std::set<StringRef> LS(Left.begin(), Left.end());
-  std::set<StringRef> RS(Right.begin(), Right.end());
-  std::set_difference(LS.begin(), LS.end(), RS.begin(), RS.end(),
-                      std::back_inserter(LeftMinusRight));
-  std::set_difference(RS.begin(), RS.end(), LS.begin(), LS.end(),
-                      std::back_inserter(RightMinusLeft));
+void swift::ide::api::nodeSetDifference(ArrayRef<SDKNode*> Left,
+                                        ArrayRef<SDKNode*> Right,
+                                        NodeVector &LeftMinusRight,
+                                        NodeVector &RightMinusLeft) {
+  llvm::SmallPtrSet<NodePtr, 16> LeftToRemove;
+  llvm::SmallPtrSet<NodePtr, 16> RightToRemove;
+  for (auto LC: Left) {
+    for (auto RC: Right) {
+      if (!RightToRemove.count(RC) && *LC == *RC) {
+        LeftToRemove.insert(LC);
+        RightToRemove.insert(RC);
+        break;
+      }
+    }
+  }
+  std::for_each(Left.begin(), Left.end(), [&] (SDKNode *N) {
+    if (!LeftToRemove.count(N))
+      LeftMinusRight.push_back(N);
+  });
+  std::for_each(Right.begin(), Right.end(), [&] (SDKNode *N) {
+    if (!RightToRemove.count(N))
+      RightMinusLeft.push_back(N);
+  });
 }
 
-static bool hasSameContents(ArrayRef<StringRef> Left,
-                            ArrayRef<StringRef> Right) {
-  std::vector<StringRef> LeftMinusRight, RightMinusLeft;
-  stringSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
+
+static bool hasSameContents(ArrayRef<SDKNode*> Left,
+                            ArrayRef<SDKNode*> Right) {
+  NodeVector LeftMinusRight, RightMinusLeft;
+  nodeSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
   return LeftMinusRight.empty() && RightMinusLeft.empty();
 }
 
@@ -736,7 +771,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
       auto *Left = dyn_cast<SDKNodeDeclType>(&L);
       auto *Right = dyn_cast<SDKNodeDeclType>(&R);
       if (Left && Right) {
-        if (!hasSameContents(Left->getAllProtocols(), Right->getAllProtocols())) {
+        if (!hasSameContents(Left->getConformances(), Right->getConformances())) {
           return false;
         }
         if (Left->getSuperClassName() != Right->getSuperClassName()) {
@@ -782,6 +817,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
       }
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::Conformance:
+    case SDKNodeKind::TypeWitness:
     case SDKNodeKind::Root: {
       return L.getPrintedName() == R.getPrintedName() &&
         L.hasSameChildren(R);
@@ -1128,15 +1165,6 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   }
 #undef CASE
 
-  // Get all protocol names this type decl conforms to.
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (auto *P: NTD->getAllProtocols()) {
-      if (!Ctx.shouldIgnore(P)) {
-        ConformingProtocols.push_back(P->getName().str());
-      }
-    }
-  }
-
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
     if (auto RT = ED->getRawType()) {
@@ -1294,8 +1322,6 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (AvailableAttr::isUnavailable(D))
       return true;
   }
-  if (isa<ConstructorDecl>(D))
-    return false;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
@@ -1331,6 +1357,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeDeclNode(NominalTypeDecl *NTD) {
   auto TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
+  addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
   addMembersToRoot(TypeNode, NTD);
   for (auto Ext : NTD->getExtensions()) {
     HandledExtensions.insert(Ext);
@@ -1348,7 +1375,7 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
                                             ArrayRef<ExtensionDecl*> AllExts) {
   auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
-
+  addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
   // The members of the extensions are the only members of this synthesized type.
   for (auto *Ext: AllExts) {
     HandledExtensions.insert(Ext);
@@ -1429,6 +1456,37 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
     } else {
       llvm_unreachable("unhandled member decl kind.");
     }
+  }
+}
+
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructTypeWitnessNode(AssociatedTypeDecl *Assoc,
+                                             Type Ty) {
+  auto *Witness = SDKNodeInitInfo(Ctx, Assoc).createSDKNode(SDKNodeKind::TypeWitness);
+  Witness->addChild(constructTypeNode(Ty));
+  return Witness;
+}
+
+SDKNode *swift::ide::api::
+SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
+  if (Ctx.checkingABI())
+    Conform = Conform->getCanonicalConformance();
+  auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
+    Conform->getProtocol()).createSDKNode(SDKNodeKind::Conformance));
+  Conform->forEachTypeWitness(nullptr,
+    [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
+      ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
+      return false;
+    });
+  return ConfNode;
+}
+
+void swift::ide::api::
+SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
+                                              NominalTypeDecl *NTD) {
+  for (auto &Conf: NTD->getAllConformances()) {
+    if (!Ctx.shouldIgnore(Conf->getProtocol()))
+      Root->addConformance(constructConformanceNode(Conf));
   }
 }
 
@@ -1574,7 +1632,7 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
-  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformingProtocols).data(), ConformingProtocols);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }
 
 void SDKNodeType::jsonize(json::Output &out) {

@@ -196,21 +196,7 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
     let status = TF_NewStatus()
-    // If the `CTensorHandle` is on the accelerator, it needs to be copied to
-    // host.
-    // NOTE: This will not perform a copy if the handle is already on the host.
-    let context = _ExecutionContext.global
-    debugLog("Calling TFE_TensorHandleCopyToDevice().")
-    let hostHandle: CTensorHandle! = TFE_TensorHandleCopyToDevice(
-      cTensorHandle, context.eagerContext, context.cpuDeviceName, status)
-    checkOk(status)
-    internalConsistencyCheck(hostHandle != nil,
-                             "TFE_TensorHandleCopyToDevice() returned nil.")
-    defer { TFE_DeleteTensorHandle(hostHandle) }
-    // Materialize the tensor on the host.
-    debugLog("Resolving tensor.")
-    let cTensor = TFE_TensorHandleResolve(hostHandle, status)
-    checkOk(status)
+    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
     TF_DeleteStatus(status)
     debugLog("# of dims is \(TF_NumDims(cTensor!))")
     debugLog("Returning a shaped array.")

@@ -22,6 +22,7 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DeclContext.h"
@@ -307,10 +308,10 @@ public:
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
 
-    // Invoker by a `[reverse_differentiable]` attribute in SIL **without**
-    // being lined to a Swift AST attribute. This case has an associated
-    // `[reverse_differentiable]` attribute.
-    SILReverseDifferentiableAttribute
+    // Invoker by a `[differentiable]` attribute in SIL **without** being lined
+    // to a Swift AST attribute. This case has an associated `[differentiable]`
+    // attribute.
+    SILDifferentiableAttribute
   };
 
 private:
@@ -337,12 +338,12 @@ private:
     Value(DifferentiableAttr *attr, FuncDecl *fd)
         : differentiableAttribute({attr, fd}) {}
 
-    /// The `[reverse_differentiable]` attribute associated with the
-    /// `SILReverseDifferentiableAttribute` case.
-    std::pair<SILReverseDifferentiableAttr *, SILFunction *>
-        silReverseDifferentiableAttribute;
-    Value(SILReverseDifferentiableAttr *attr, SILFunction *f)
-        : silReverseDifferentiableAttribute({attr, f}) {}
+    /// The `[differentiable]` attribute associated with the
+    /// `SILDifferentiableAttribute` case.
+    std::pair<SILDifferentiableAttr *, SILFunction *>
+        silDifferentiableAttribute;
+    Value(SILDifferentiableAttr *attr, SILFunction *f)
+        : silDifferentiableAttribute({attr, f}) {}
   } value;
 
   /*implicit*/
@@ -357,8 +358,8 @@ public:
       : kind(Kind::DifferentialOperator), value(expr) {}
   DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
       : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
-  DifferentiationInvoker(SILReverseDifferentiableAttr *attr, SILFunction *f)
-      : kind(Kind::SILReverseDifferentiableAttribute), value(attr, f) {}
+  DifferentiationInvoker(SILDifferentiableAttr *attr, SILFunction *f)
+      : kind(Kind::SILDifferentiableAttribute), value(attr, f) {}
 
   Kind getKind() const { return kind; }
 
@@ -384,10 +385,10 @@ public:
     return value.differentiableAttribute;
   }
 
-  std::pair<SILReverseDifferentiableAttr *, SILFunction *>
-  getSILReverseDifferentiableAttribute() const {
-    assert(kind == Kind::SILReverseDifferentiableAttribute);
-    return value.silReverseDifferentiableAttribute;
+  std::pair<SILDifferentiableAttr *, SILFunction *>
+  getSILDifferentiableAttribute() const {
+    assert(kind == Kind::SILDifferentiableAttribute);
+    return value.silDifferentiableAttribute;
   }
 
   bool isAnyDifferentialOperator() const {
@@ -643,12 +644,12 @@ public:
 };
 
 /// A differentiation task, specifying the original function and the
-/// `[reverse_differentiable]` attribute on the function. PrimalGen and
-/// AdjointGen will synthesize the primal and the adjoint for this task, filling
-/// the primal and adjoint fields in the attribute.
+/// `[differentiable]` attribute on the function. PrimalGen and AdjointGen
+/// will synthesize the primal and the adjoint for this task, filling the primal
+/// and adjoint fields in the attribute.
 ///
-/// NOTE: A task instance manages a `[reverse_differentiable]` SIL attribute and
-/// shall be the only one that modifies this attribute.
+/// NOTE: A task instance manages a `[differentiable]` SIL attribute and shall
+/// be the only one that modifies this attribute.
 class DifferentiationTask {
   friend llvm::DenseMapInfo<DifferentiationTask>;
   friend class ADContext;
@@ -657,12 +658,12 @@ private:
   /// The original function to be differentiated.
   SILFunction *original;
 
-  /// The `[reverse_differentiable]` attribute on the original function. Since
-  /// attribute synthesis is part of differentiation, a
-  /// `[reverse_differentiable]` attribute must be available when a
-  /// `DifferentiationTask` is created. The AD configuration resides within the
-  /// attribute. This is guaranteed to be non-null.
-  SILReverseDifferentiableAttr *attr;
+  /// The `[differentiable]` attribute on the original function. Since
+  /// attribute synthesis is part of differentiation, a `[differentiable]`
+  /// attribute must be available when a `DifferentiationTask` is created. The
+  /// AD configuration resides within the attribute. This is guaranteed to be
+  /// non-null.
+  SILDifferentiableAttr *attr;
 
   /// The invoker of this differentiation task.
   DifferentiationInvoker invoker;
@@ -685,11 +686,11 @@ protected:
   /// Create a differentiation task.
   ///
   /// @param original The original function to be differentiated.
-  /// @param attr The [reverse_differentiable] attribute to take control of.
+  /// @param attr The [differentiable] attribute to take control of.
   /// @param invoker The invoker of this differentiation task.
   /// @param module The module where differentiation happens.
   explicit DifferentiationTask(SILFunction *original,
-                               SILReverseDifferentiableAttr *&&attr,
+                               SILDifferentiableAttr *&&attr,
                                SILModule &module,
                                DifferentiationInvoker invoker)
       : original(original), attr(attr), invoker(invoker) {
@@ -704,7 +705,7 @@ public:
   DifferentiationTask &operator=(const DifferentiationTask &) = delete;
 
   SILFunction *getOriginal() const { return original; }
-  SILReverseDifferentiableAttr *getAttribute() const { return attr; }
+  SILDifferentiableAttr *getAttribute() const { return attr; }
   DifferentiationInvoker getInvoker() const { return invoker; }
 
   PrimalInfo *getPrimalInfo() const { return primalInfo.get(); }
@@ -767,11 +768,14 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
        << ") task=" << indDiff.second << ')';
     break;
   }
-  case Kind::DifferentialOperator:
+  case Kind::DifferentialOperator: {
+    StreamPrinter printer(os);
+    PrintOptions options;
     os << "differential_operator=(";
-    getDifferentialOperator()->print(os);
+    getDifferentialOperator()->print(printer, options);
     os << ')';
     break;
+  }
   case Kind::DifferentiableAttribute: {
     auto diffAttr = getDifferentiableAttribute();
     os << "differentiable_attribute=(attr=(";
@@ -779,9 +783,9 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     os << ") func_decl=" << diffAttr.second->getFullName();
     break;
   }
-  case Kind::SILReverseDifferentiableAttribute: {
-    auto diffAttr = getSILReverseDifferentiableAttribute();
-    os << "sil_reverse_differentiable_attribute=(attr=(";
+  case Kind::SILDifferentiableAttribute: {
+    auto diffAttr = getSILDifferentiableAttribute();
+    os << "sil_differentiable_attribute=(attr=(";
     diffAttr.first->print(os);
     os << ") function=" << diffAttr.second->getName();
     break;
@@ -851,7 +855,7 @@ private:
   /// A mapping from functions and AD configurations to gradient functions.
   ///
   /// NOTE: The parameter index array is hashed by reference, which is expected
-  /// to point to [reverse_differentiable wrt ...]'s trailing index storage.
+  /// to point to [differentiable wrt ...]'s trailing index storage.
   DenseMap<GradientLookUpKey, SILFunction *> gradientMap;
   /// Canonical gradients to be filled.
   SmallVector<std::pair<GradientLookUpKey, SILFunction *>, 32>
@@ -961,40 +965,40 @@ public:
     return lookUpGradient({task->original, task->getMasterConfig()});
   }
 
-  /// Finds the `[reverse_differentiable]` attribute on the specified original
-  /// function corresponding to the specified parameter indices. Returns nullptr
-  /// if it does not exist.
+  /// Finds the `[differentiable]` attribute on the specified original function
+  /// corresponding to the specified parameter indices. Returns nullptr if it
+  /// does not exist.
   ///
   /// TODO: Currently we are doing a O(n) lookup. This could be improved by
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
-  SILReverseDifferentiableAttr *lookUpReverseDifferentiableAttr(
+  SILDifferentiableAttr *lookUpDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    for (auto *attr : original->getReverseDifferentiableAttrs())
+    for (auto *attr : original->getDifferentiableAttrs())
       if (attr->getIndices() == indices)
         return attr;
     return nullptr;
   }
 
-  SILReverseDifferentiableAttr *createReverseDifferentiableAttr(
+  SILDifferentiableAttr *createDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    assert(!lookUpReverseDifferentiableAttr(original, indices));
+    assert(!lookUpDifferentiableAttr(original, indices));
     auto *attr =
-        SILReverseDifferentiableAttr::create(getModule(), indices,
-                                             /*primalName*/ StringRef(),
-                                             /*adjointName*/ StringRef(),
-                                             /*primitive*/ false);
-    original->addReverseDifferentiableAttr(attr);
+        SILDifferentiableAttr::create(getModule(), indices,
+                                      /*primalName*/ StringRef(),
+                                      /*adjointName*/ StringRef(),
+                                      /*primitive*/ false);
+    original->addDifferentiableAttr(attr);
     return attr;
   }
 
-  /// Finds or creates a `[reverse_differentiable]` attribute on the specified
+  /// Finds or creates a `[differentiable]` attribute on the specified
   /// original function corresponding to the specified parameter indices.
-  SILReverseDifferentiableAttr *getOrCreateReverseDifferentiableAttr(
+  SILDifferentiableAttr *getOrCreateDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) {
-    if (auto *attr = lookUpReverseDifferentiableAttr(original, indices))
+    if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
-    return createReverseDifferentiableAttr(original, indices);
+    return createDifferentiableAttr(original, indices);
   }
 
   /// Finds a differentiation task on a function such that the task produces
@@ -1018,7 +1022,9 @@ public:
                                    const SILAutoDiffIndices &indices) {
     auto supersetParamIndices = llvm::SmallBitVector();
     const auto &indexSet = indices.parameters;
-    for (auto *rda : original->getReverseDifferentiableAttrs()) {
+    if (auto *existingTask = lookUpDifferentiationTask(original, indices))
+      return existingTask;
+    for (auto *rda : original->getDifferentiableAttrs()) {
       const auto &rdaIndexSet = rda->getIndices().parameters;
       // If all indices in indexSet are in rdaIndexSet, and it has fewer
       // indices than our current candidate and a primitive adjoint, rda is our
@@ -1037,8 +1043,8 @@ public:
   }
 
   /// Register a differentiation task in the global worklist. This will ensure
-  /// that a `[reverse_differentiable]` attribute will be generated for the
-  /// specified indices, and that primal/adjoint synthesis will be run in the
+  /// that a `[differentiable]` attribute will be generated for the specified
+  /// indices, and that primal/adjoint synthesis will be run in the
   /// Differentiation pass.
   ///
   /// The function must either be a definition or be serialized.
@@ -1049,7 +1055,7 @@ public:
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
     // Make sure this function either has a body or has a
-    // `[reverse_differentiable]` attribute that is a superset of all the
+    // `[differentiable]` attribute that is a superset of all the
     if (original->isExternalDeclaration()) {
       // If it's serialized, deserialize it.
       assert(original->isSerialized() &&
@@ -1058,7 +1064,7 @@ public:
       assert(deserializedFn && "Cannot deserialize original function");
       (void)deserializedFn;
     }
-    auto *attr = getOrCreateReverseDifferentiableAttr(original, indices);
+    auto *attr = getOrCreateDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
     differentiationTasks.push_back(std::move(task));
@@ -1117,11 +1123,11 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              << "\n"
              << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
-  // For a gradient instruction or a `[reverse_differentiable]` attribute that
-  // is not associated with any source location, we emit a diagnostic at the
+  // For a gradient instruction or a `[differentiable]` attribute that is not
+  // associated with any source location, we emit a diagnostic at the
   // instruction source location.
   case DifferentiationInvoker::Kind::GradientInst:
-  case DifferentiationInvoker::Kind::SILReverseDifferentiableAttribute:
+  case DifferentiationInvoker::Kind::SILDifferentiableAttribute:
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
@@ -1616,9 +1622,9 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
   auto *intLitTypeDecl = intLitTy->getAnyNominal();
   assert(intLitTypeDecl);
   // %1 = float_literal $Builtin.FPIEEE80, <value>
-  auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
-  auto builtinInteger = builder.createIntegerLiteral(
-      loc, builtinIntegerTy, APInt(2048, scalar));
+  auto builtinIntegerLiteralTy = SILType::getBuiltinIntegerLiteralType(astCtx);
+  auto builtinInteger =
+      builder.createIntegerLiteral(loc, builtinIntegerLiteralTy, scalar);
   // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
@@ -2182,7 +2188,6 @@ protected:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleExtractInst:
     case SILInstructionKind::TupleElementAddrInst:
-    case SILInstructionKind::ApplyInst:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::StructElementAddrInst:
     case SILInstructionKind::EnumInst:
@@ -2248,6 +2253,10 @@ public:
       // FIXME: Get or create typed tape, and emit push-to-tape builtin.
       llvm_unreachable("Unhandled tape checkpoint");
     case PrimalValueKind::StaticCheckpoint:
+      // Checkpointing active function applications is handled within
+      // `PrimalGenCloner::visitApplyInst`.
+      if (isa<ApplyInst>(orig))
+        break;
       for (auto resultPair :
            llvm::zip(orig->getResults(), cloned->getResults())) {
         LLVM_DEBUG(getADDebugStream()
@@ -2350,6 +2359,14 @@ public:
   void visitReturnInst(ReturnInst *ri) {
     // The original return is not to be cloned.
     return;
+  }
+  
+  void visitReleaseValueInst(ReleaseValueInst *rvi) {
+    // Checkpoints are not to be released.
+    if (auto *inst = rvi->getOperand()->getDefiningInstruction())
+      if (classifyPrimalValue(inst) == PrimalValueKind::StaticCheckpoint)
+        return;
+    SILClonerWithScopes::visitReleaseValueInst(rvi);
   }
 
   /// Handle the primal transformation of an `apply` instruction. We do not
@@ -2481,11 +2498,13 @@ public:
     // or address operations to perform checkpointing.
 
     // Checkpoint nested primal values as a tuple.
-    auto nestedPrimValDeclTy =
-        joinElementTypesFromValues(primVals, getASTContext());
-    getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
-    auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
-    staticPrimalValues.push_back(primValAggr);
+    if (!primVals.empty()) {
+      auto nestedPrimValDeclTy =
+          joinElementTypesFromValues(primVals, getASTContext());
+      getPrimalInfo().addNestedStaticPrimalValueDecl(ai, nestedPrimValDeclTy);
+      auto primValAggr = joinElements(primVals, builder, primalCall->getLoc());
+      staticPrimalValues.push_back(primValAggr);
+    }
 
     // Checkpoint original results as a tuple.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
@@ -2688,24 +2707,20 @@ private:
 SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   auto &module = context.getModule();
   auto *original = task->getOriginal();
-  // Parameters of the adjoint include the original parameters, a primal value
-  // struct, original results, and a seed.
+  // Parameters of the adjoint are:
+  // - a seed,
+  // - a primal value struct,
+  // - original results, and
+  // - the original parameters.
   // Results of the adjoint have the same type as the original parameters.
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
   auto origParams = origTy->getParameters();
-  assert((!origTy->hasSelfParam() ||
-          origParams.back() == origTy->getSelfParameter()) &&
-         "self argument should be the last one");
-  auto origParamsWithoutSelf = origTy->hasSelfParam() ?
-      origParams.slice(0, origParams.size() - 1) : origParams;
 
-  // Add adjoint parameters for the original non-self parameters. If there is a
-  // self parameter, we'll push it later as the last adjoint parameter, because
-  // Swift's method convention always has self last.
-  for (auto &param : origParamsWithoutSelf)
-    adjParams.push_back(param);
+  // Add adjoint parameter for the seed.
+  adjParams.push_back(getFormalParameterInfo(
+      origTy->getResults()[task->getIndices().source].getType(), module));
 
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
@@ -2720,13 +2735,9 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   for (auto &origRes : origTy->getResults())
     adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
 
-  // Add adjoint parameter for the seed.
-  adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[task->getIndices().source].getType(), module));
-
-  // Add adjoint parameter for the original self parameter, if applicable.
-  if (origTy->hasSelfParam())
-    adjParams.push_back(origTy->getSelfParameter());
+  // Add adjoint parameters for the original parameters.
+  for (auto &param : origParams)
+    adjParams.push_back(param);
 
   // Add adjoint result for the wrt self parameter, if it was requested.
   auto selfParamIndex = origParams.size() - 1;
@@ -3037,11 +3048,8 @@ private:
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
   /// Original parameters passed to the adjoint function, in the same order as
-  /// they appear in the adjoint function. Note that these parameters are not
-  /// necessarily contiguous in the adjoint function signature because the
-  /// non-self original parameters are at the beginning and the self parameter
-  /// (if any) is at the end.
-  SmallVector<SILArgument *, 8> originalParametersInAdj;
+  /// they appear in the adjoint function.
+  ArrayRef<SILArgument *> originalParametersInAdj;
 
   /// The primal value aggregate passed to the adjoint function.
   SILArgument *primalValueAggregateInAdj = nullptr;
@@ -3166,11 +3174,9 @@ public:
     // `originalResults` and `seed`.
     auto adjParamArgs = getAdjoint().getArgumentsWithoutIndirectResults();
     auto origNumParams = origConv.getNumParameters();
-    auto origNumParamsWithoutSelf = origTy->hasSelfParam() ? origNumParams - 1
-                                                           : origNumParams;
     auto origNumResults = origTy->getNumResults();
     // The adjoint function has type
-    //   (arg0, ..., argn, pv0, ..., pvn, origres, seed, [self])
+    //   (seed, pv0, ..., pvn, origres, arg0, ..., argn, [self])
     //       -> ([self], [arg0], ..., [argn]).
     // Square brackets denote [] elements that are not always in the signature:
     //   * "self" is present in the argument list when it's present in the
@@ -3180,17 +3186,12 @@ public:
     //
     // We get each range of arguments by shifting the `paramArgsData` pointer.
     auto *paramArgsData = adjParamArgs.data();
-    originalParametersInAdj.reserve(origNumParams);
-    for (auto i : range(origNumParamsWithoutSelf)) {
-      (void)i;
-      originalParametersInAdj.push_back(*paramArgsData++);
-    }
+    seed = *paramArgsData++;
     primalValueAggregateInAdj = *paramArgsData++;
     originalResultsInAdj = {paramArgsData, origNumResults};
     paramArgsData += origNumResults;
-    seed = *paramArgsData++;
-    if (origTy->hasSelfParam())
-      originalParametersInAdj.push_back(*paramArgsData++);
+    originalParametersInAdj = {paramArgsData, origNumParams};
+    paramArgsData += origNumParams;
     assert(paramArgsData == adjParamArgs.data() + adjParamArgs.size());
 
     // Map the original's parameters to the adjoint's corresponding "original
@@ -3381,7 +3382,7 @@ public:
   }
 
   /// Remap a value in the original function.
-  SILValue remapValue(SILValue value) {
+  SILValue getMappedValue(SILValue value) {
     // If `value` is a checkpointed primal value, extract it from the primal
     // value aggregate.
     if (auto extractedPV = extractPrimalValueIfAny(value))
@@ -3390,7 +3391,7 @@ public:
     // rematerialize it in the adjoint function.
     if (auto *inst = value->getDefiningInstruction())
       rematerializeOriginalInstruction(inst);
-    return rematCloner.remapValue(value);
+    return rematCloner.getMappedValue(value);
   }
 
   /// Handle `apply` instruction. If it's active (on the differentiation path),
@@ -3413,7 +3414,7 @@ public:
     auto *adjoint = otherTask->getAdjoint();
     auto loc = remapLocation(ai->getLoc());
     // Prepare arguments for calling the corresponding adjoint.
-    // Parameters: (orig_args..., prim_val_struct?, orig_res..., seed...)
+    // Parameters: (seed..., prim_val_struct?, orig_res..., orig_args...)
     // Results: (derivatives...)
     SmallVector<SILValue, 8> args;
     // For each indirect result, allocate a local buffer and add it to the
@@ -3425,30 +3426,6 @@ public:
       args.push_back(buf);
       allocsToCleanUp.push_back(buf);
     }
-
-    // For each non-self original parameter, push the mapped parameter. If
-    // there is a self parameter, we'll push it later as the last argument,
-    // because Swift's method convention always has self last.
-    auto originalParams = ai->getArgumentsWithoutIndirectResults();
-    assert((!ai->hasSelfArgument() ||
-           originalParams.back() == ai->getSelfArgument()) &&
-           "self argument should be the last one");
-    auto originalParamsWithoutSelf = ai->hasSelfArgument() ?
-        originalParams.slice(0, originalParams.size() - 1) : originalParams;
-    for (auto param : originalParamsWithoutSelf)
-      args.push_back(remapValue(param));
-
-    // Add nested primal values.
-    if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
-      SmallVector<SILValue, 8> nestedPrimVals;
-      extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
-      args.append(nestedPrimVals.begin(), nestedPrimVals.end());
-    }
-    // Add original results.
-    auto origResultAggr = remapValue(ai);
-    SmallVector<SILValue, 8> origResults;
-    extractAllElements(origResultAggr, builder, origResults);
-    args.append(origResults.begin(), origResults.end());
 
     // Add seed.
     auto seed = getAdjointValue(ai);
@@ -3466,9 +3443,22 @@ public:
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
 
-    // Push the mapped self parameter, if any.
-    if (ai->hasSelfArgument())
-      args.push_back(remapValue(ai->getSelfArgument()));
+    // Add nested primal values.
+    if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
+      SmallVector<SILValue, 8> nestedPrimVals;
+      extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
+      args.append(nestedPrimVals.begin(), nestedPrimVals.end());
+    }
+    // Add original results.
+    auto origResultAggr = getMappedValue(ai);
+    SmallVector<SILValue, 8> origResults;
+    extractAllElements(origResultAggr, builder, origResults);
+    args.append(origResults.begin(), origResults.end());
+
+    // Add the original parameters.
+    auto originalParams = ai->getArgumentsWithoutIndirectResults();
+    for (auto param : originalParams)
+      args.push_back(getMappedValue(param));
 
     // Call the adjoint function.
     auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
@@ -3679,18 +3669,18 @@ public:
       auto adjVal = materializeAdjointDirect(adj, opLoc);
       auto *adjLHS = builder.createBuiltinBinaryFunction(
           opLoc, "fmul", opType, opType,
-          {adjVal, remapValue(bi->getOperand(1))});
+          {adjVal, getMappedValue(bi->getOperand(1))});
       addAdjointValue(bi->getOperand(0), adjLHS);
       auto *adjRHS = builder.createBuiltinBinaryFunction(
           opLoc, "fmul", opType, opType,
-          {adjVal, remapValue(bi->getOperand(0))});
+          {adjVal, getMappedValue(bi->getOperand(0))});
       addAdjointValue(bi->getOperand(1), adjRHS);
       break;
     }
     case BuiltinValueKind::FDiv: {
       auto adjVal = materializeAdjointDirect(adj, opLoc);
-      auto lhs = remapValue(bi->getOperand(0));
-      auto rhs = remapValue(bi->getOperand(1));
+      auto lhs = getMappedValue(bi->getOperand(0));
+      auto rhs = getMappedValue(bi->getOperand(1));
       // x' = seed / y
       auto adjLHS = builder.createBuiltinBinaryFunction(opLoc, "fdiv", opType,
                                                         opType, {adjVal, rhs});
@@ -3733,7 +3723,7 @@ void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
                          });
   // Ensure that all operands have a corresponding value in the adjoint.
   for (auto &op : inst->getAllOperands())
-    remapValue(op.get());
+    getMappedValue(op.get());
   rematCloner.setInsertionPointBeforeAnyTerminator(ncd);
   rematCloner.visit(inst);
 }
@@ -4328,23 +4318,31 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   }
   // Call adjoint with original arguments, the checkpoints value and the seed.
   SmallVector<SILValue, 8> adjointArgs;
-  // Add indirect results and original parameters. These are the canonical
-  // gradient's arguments except the seed, which is the last argument.
-  for (auto arg : canGrad.getArguments().drop_back())
-    adjointArgs.push_back(arg);
+  // Add indirect results.
+  for (auto indRes : canGrad.getIndirectResults())
+    adjointArgs.push_back(indRes);
+  // Add seed.
+  adjointArgs.push_back(canGrad.getArguments().back());
   // Add primal values and the original result (all returned by primal).
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : primalConv.getResults())
     adjointArgs.push_back(resInfo.isFormalDirect() ? primalResults[dirResIdx++]
                                                    : primalArgs[indResIdx++]);
-  // Add seed.
-  adjointArgs.push_back(canGrad.getArguments().back());
+  // Add original parameters. These are the canonical gradient's parameters
+  // except the seed, which is the last.
+  for (auto arg : canGrad.getArgumentsWithoutIndirectResults().drop_back())
+    adjointArgs.push_back(arg);
   // %2 = function_ref @adjoint
   auto *adjRef = builder.createFunctionRef(loc, adjoint);
   // %3 = apply %2(...)
   auto *adjApply =
       builder.createApply(loc, adjRef, canGrad.getForwardingSubstitutionMap(),
                           adjointArgs, /*isNonThrowing*/ false);
+  // Release primal results. This includes primal values and original results.
+  for (unsigned i : indices(primalResults))
+    if (primalTy->getResults()[i].getConvention() == ResultConvention::Owned)
+      builder.createReleaseValue(loc, primalResults[i],
+                                 builder.getDefaultAtomicity());
   // Clean up stack allocations.
   for (auto val : reversed(stackAllocsToCleanUp))
     builder.createDeallocStack(loc, val);
@@ -4444,17 +4442,16 @@ void Differentiation::run() {
   auto &astCtx = module.getASTContext();
   debugDump(module);
 
-  // Collect [reverse_differentiable] attributes and gradient instructions to
-  // process.
+  // Collect [differentiable] attributes and gradient instructions to process.
   SmallVector<std::pair<SILFunction *,
-                        SILReverseDifferentiableAttr *>, 8> diffAttrs;
+                        SILDifferentiableAttr *>, 8> diffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
-  // Handle each `gradient` instruction and each `reverse_differentiable`
+  // Handle each `gradient` instruction and each `differentiable`
   // attribute in the module.
   for (SILFunction &f : module) {
-    // If `f` has a `[reverse_differentiable]` attribute, it should become a
+    // If `f` has a `[differentiable]` attribute, it should become a
     // differentiation task.
-    for (auto *diffAttr : f.getReverseDifferentiableAttrs()) {
+    for (auto *diffAttr : f.getDifferentiableAttrs()) {
       if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()) {
         diffAttrs.push_back({&f, diffAttr});
         continue;
@@ -4477,8 +4474,8 @@ void Differentiation::run() {
     }
   }
 
-  // If there's no `gradient` instruction or no `[reverse_differentiable]`
-  // attributes, there's no AD to do.
+  // If there's no `gradient` instruction or no `[differentiable]` attributes,
+  // there's no AD to do.
   if (gradInsts.empty() && diffAttrs.empty())
     return;
 
@@ -4493,9 +4490,9 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
-  // For every `[reverse_differentiable]` attribute, create a differentiation
-  // task. If the attribute has a primal and adjoint, this task will not
-  // synthesize anything, but it's still needed as a lookup target.
+  // For every `[differentiable]` attribute, create a differentiation task. If
+  // the attribute has a primal and adjoint, this task will not synthesize
+  // anything, but it's still needed as a lookup target.
   for (auto &fnAndAttr : diffAttrs) {
     context.registerDifferentiationTask(
         fnAndAttr.first, fnAndAttr.second->getIndices(),

@@ -79,16 +79,11 @@ public struct ${Self} {
 
 extension ${Self} : CustomStringConvertible {
   /// A textual representation of the value.
-  @inlinable
   public var description: String {
-    if isFinite {
-      return _float${bits}ToString(self, debug: false)
-    } else if isNaN {
+    if isNaN {
       return "nan"
-    } else if sign == .minus {
-      return "-inf"
     } else {
-      return "inf"
+      return _float${bits}ToString(self, debug: false)
     }
   }
 }
@@ -96,13 +91,7 @@ extension ${Self} : CustomStringConvertible {
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
-    if isFinite || isNaN {
-      return _float${bits}ToString(self, debug: true)
-    } else if sign == .minus {
-      return "-inf"
-    } else {
-      return "inf"
-    }
+    return _float${bits}ToString(self, debug: true)
   }
 }
 
@@ -1449,8 +1438,8 @@ extension ${Self}: BinaryFloatingPoint {
 extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   @_transparent
   public
-  init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
-    self = ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
+  init(_builtinIntegerLiteral value: Builtin.IntLiteral){
+    self = ${Self}(Builtin.itofp_with_overflow_IntLiteral_FPIEEE${bits}(value))
   }
 
   /// Creates a new value from the given integer literal.
@@ -1757,7 +1746,8 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointAdd(
-    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
+    _ adjoint: ${Self}, _ originalValue: ${Self},
+    _ lhs: ${Self}, _ rhs: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint, adjoint)
   }
@@ -1765,7 +1755,8 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointSubtract(
-    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
+    _ adjoint: ${Self}, _ originalValue: ${Self},
+    _ lhs: ${Self}, _ rhs: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint, -adjoint)
   }
@@ -1773,7 +1764,8 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointMultiply(
-    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
+    _ adjoint: ${Self}, _ originalValue: ${Self},
+    _ lhs: ${Self}, _ rhs: ${Self}
   ) -> (${Self}, ${Self}) {
     return (rhs * adjoint, lhs * adjoint)
   }
@@ -1781,7 +1773,8 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointDivide(
-    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
+    _ adjoint: ${Self}, _ originalValue: ${Self},
+    _ lhs: ${Self}, _ rhs: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint / rhs, -lhs / (rhs * rhs) * adjoint)
   }

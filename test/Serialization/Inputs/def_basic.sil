@@ -885,22 +885,22 @@ bb0:
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [transparent] [serialized] [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0
-  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   return %3 : $Int
 }
 // CHECK-LABEL: [always_inline] @always_inline_callee
 sil [transparent] [serialized] [always_inline] @always_inline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0
-  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [transparent] [serialized] [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] [serialized] [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 // CHECK-LABEL: [_semantics "foo"] @test_semantics : $@convention(thin) () -> ()
 sil [transparent] [serialized] [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {

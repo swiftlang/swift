@@ -526,6 +526,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                                BuiltinUnsafeValueBufferType(*this)),
     TheSILTokenType(new (*this, AllocationArena::Permanent)
                       SILTokenType(*this)),
+    TheIntegerLiteralType(new (*this, AllocationArena::Permanent)
+                               BuiltinIntegerLiteralType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)
@@ -3129,6 +3131,7 @@ Type ErrorType::get(Type originalType) {
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
+  assert(!BitWidth.isArbitraryWidth());
   BuiltinIntegerType *&Result = C.getImpl().IntegerTypes[BitWidth];
   if (Result == nullptr)
     Result = new (C, AllocationArena::Permanent) BuiltinIntegerType(BitWidth,C);

@@ -8,7 +8,7 @@ if(SWIFT_ENABLE_TENSORFLOW)
   include_directories(BEFORE "${TF_INCLUDE_DIR}")
 endif()
 
-add_swift_library(swiftAST STATIC
+add_swift_host_library(swiftAST STATIC
   AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp

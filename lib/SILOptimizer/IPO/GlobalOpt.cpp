@@ -175,8 +175,8 @@ public:
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
-  SILValue remapValue(SILValue Value) {
-    return SILCloner<InstructionsCloner>::remapValue(Value);
+  SILValue getMappedValue(SILValue Value) {
+    return SILCloner<InstructionsCloner>::getMappedValue(Value);
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -292,13 +292,10 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   auto V = Store->getSrc();
 
   SmallVector<SILInstruction *, 8> Insts;
-  Insts.push_back(Store);
-  Insts.push_back(cast<SingleValueInstruction>(Store->getDest()));
   if (!analyzeStaticInitializer(V, Insts))
     return nullptr;
-
-  // Produce a correct order of instructions.
-  std::reverse(Insts.begin(), Insts.end());
+  Insts.push_back(cast<SingleValueInstruction>(Store->getDest()));
+  Insts.push_back(Store);
 
   auto *GetterF = getGlobalGetterFunction(FunctionBuilder,
                                           Store->getModule(),
@@ -551,14 +548,13 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   if (!InitF->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 
-  auto *EntryBB = GetterF->createBasicBlock();
-  // Copy InitF into GetterF
-  BasicBlockCloner Cloner(&*InitF->begin(), EntryBB, /*WithinFunction=*/false);
-  Cloner.clone();
+  // Copy InitF into GetterF, including the entry arguments.
+  SILFunctionCloner Cloner(GetterF);
+  Cloner.cloneFunction(InitF);
   GetterF->setInlined();
 
   // Find the store instruction
-  auto BB = EntryBB;
+  auto *BB = GetterF->getEntryBlock();
   SILValue Val;
   SILInstruction *Store;
   for (auto II = BB->begin(), E = BB->end(); II != E;) {

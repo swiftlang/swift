@@ -162,24 +162,24 @@ internal struct _HasherTailBuffer {
 // FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
 // rdar://problem/38549901
 @usableFromInline @_fixed_layout
-internal struct _BufferingHasher<RawCore: _HasherCore> {
+internal struct _BufferingHasher<Core: _HasherCore> {
   private var _buffer: _HasherTailBuffer
-  private var _core: RawCore
+  private var _core: Core
 
   @inline(__always)
-  internal init(core: RawCore) {
+  internal init(core: Core) {
     self._buffer = _HasherTailBuffer()
     self._core = core
   }
 
   @inline(__always)
   internal init() {
-    self.init(core: RawCore())
+    self.init(core: Core())
   }
 
   @inline(__always)
   internal init(seed: Int) {
-    self.init(core: RawCore(seed: seed))
+    self.init(core: Core(seed: seed))
   }
 
   @inline(__always)
@@ -300,13 +300,9 @@ public struct Hasher {
   // FIXME: Remove @usableFromInline once Hasher is resilient.
   // rdar://problem/38549901
   @usableFromInline
-  internal typealias RawCore = _SipHash13Core
-  // FIXME: Remove @usableFromInline once Hasher is resilient.
-  // rdar://problem/38549901
-  @usableFromInline
-  internal typealias Core = _BufferingHasher<RawCore>
+  internal typealias _BufferingCore = _BufferingHasher<_Core>
 
-  internal var _core: Core
+  internal var _core: _BufferingCore
 
   /// Creates a new hasher.
   ///
@@ -314,7 +310,7 @@ public struct Hasher {
   /// startup, usually from a high-quality random source.
   @_effects(releasenone)
   public init() {
-    self._core = Core()
+    self._core = _BufferingCore()
   }
 
   /// Initialize a new hasher using the specified seed value.
@@ -322,14 +318,14 @@ public struct Hasher {
   @usableFromInline
   @_effects(releasenone)
   internal init(_seed: Int) {
-    self._core = Core(seed: _seed)
+    self._core = _BufferingCore(seed: _seed)
   }
 
   /// Initialize a new hasher using the specified seed value.
   @usableFromInline // @testable
   @_effects(releasenone)
   internal init(_rawSeed: (UInt64, UInt64)) {
-    self._core = Core(core: RawCore(rawSeed: _rawSeed))
+    self._core = _BufferingCore(core: _Core(rawSeed: _rawSeed))
   }
 
   /// Indicates whether we're running in an environment where hashing needs to
@@ -445,7 +441,7 @@ public struct Hasher {
   @_effects(readnone)
   @usableFromInline
   internal static func _hash(seed: Int, _ value: UInt64) -> Int {
-    var core = RawCore(seed: seed)
+    var core = _Core(seed: seed)
     core.compress(value)
     let tbc = _HasherTailBuffer(tail: 0, byteCount: 8)
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
@@ -454,7 +450,7 @@ public struct Hasher {
   @_effects(readnone)
   @usableFromInline
   internal static func _hash(seed: Int, _ value: UInt) -> Int {
-    var core = RawCore(seed: seed)
+    var core = _Core(seed: seed)
 #if arch(i386) || arch(arm)
     _sanityCheck(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _HasherTailBuffer(
@@ -475,7 +471,7 @@ public struct Hasher {
     bytes value: UInt64,
     count: Int) -> Int {
     _sanityCheck(count >= 0 && count < 8)
-    var core = RawCore(seed: seed)
+    var core = _Core(seed: seed)
     let tbc = _HasherTailBuffer(tail: value, byteCount: count)
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
   }
@@ -485,7 +481,7 @@ public struct Hasher {
   internal static func _hash(
     seed: Int,
     bytes: UnsafeRawBufferPointer) -> Int {
-    var core = Core(seed: seed)
+    var core = _BufferingCore(seed: seed)
     core.combine(bytes: bytes)
     return Int(truncatingIfNeeded: core.finalize())
   }

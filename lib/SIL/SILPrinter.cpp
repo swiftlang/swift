@@ -2502,8 +2502,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  for (auto *Attr : getReverseDifferentiableAttrs()) {
-    OS << "[reverse_differentiable "; Attr->print(OS); OS << "] ";
+  for (auto *Attr : getDifferentiableAttrs()) {
+    OS << "[differentiable "; Attr->print(OS); OS << "] ";
   }
 
   // TODO: Handle clang node owners which don't have a name.
@@ -2995,6 +2995,40 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     }
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  case WitnessKind::AutoDiffAssociatedFunction: {
+    // autodiff_associated_function (jvp|vjp) <order> <indices> #declref : @function
+    auto &witness = getAutoDiffAssociatedFunctionWitness();
+    out << "autodiff_associated_function ";
+    switch (witness.RequirementIdentifier->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      out << "jvp ";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      out << "vjp ";
+      break;
+    }
+    out << witness.RequirementIdentifier->getDifferentiationOrder() << " "
+        << witness.RequirementIdentifier->getParameterIndices()->getString()
+        << " ";
+    witness.RequirementOriginalMethod.print(out);
+    out << ": ";
+    QualifiedSILTypeOptions.CurrentModule =
+        witness.RequirementOriginalMethod.getDecl()
+            ->getDeclContext()
+            ->getParentModule();
+    witness.RequirementOriginalMethod.getDecl()->getInterfaceType().print(
+        out, QualifiedSILTypeOptions);
+    out << " : ";
+    if (witness.Witness) {
+      witness.Witness->printName(out);
+      out << "\t// "
+         << demangleSymbol(witness.Witness->getName());
+    } else {
+      out << "nil";
+    }
+    break;
+  }
   case WitnessKind::AssociatedType: {
     // associated_type AssociatedTypeName: ConformingType
     auto &assocWitness = getAssociatedTypeWitness();
@@ -3187,7 +3221,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
+void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   auto &indices = getIndices();
   OS << "source " << indices.source << " wrt ";
   interleave(indices.parameters.set_bits(),
@@ -3200,6 +3234,12 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
     OS << " adjoint @" << AdjointName;
   }
   if (AdjointIsPrimitive) OS << " primitive";
+  if (!JVPName.empty()) {
+    OS << " jvp @" << JVPName;
+  }
+  if (!VJPName.empty()) {
+    OS << " vjp @" << VJPName;
+  }
 }
 
 //===----------------------------------------------------------------------===//

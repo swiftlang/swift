@@ -5,7 +5,7 @@ func id(_ x: Float) -> Float {
   return x
 }
 
-func adjointId(_ x: Float, originalValue: Float, seed: Float) -> Float {
+func adjointId(_ seed: Float, _ originalValue: Float, _ x: Float) -> Float {
   return seed
 }
 
@@ -33,7 +33,7 @@ func primalSigmoid(_ x: Double) -> (checkpoints: (Double, Double, Double), resul
   return (checkpoints: (minusX, expon, plus), result: div)
 }
 
-func adjointSigmoid(_ x: Double, checkpoints: (Double, Double, Double), result: Double, seed: Double) -> Double {
+func adjointSigmoid(_ seed: Double, _ checkpoints: (Double, Double, Double), _ result: Double, _ x: Double) -> Double {
   return result * (1 - result)
 }
 

@@ -29,7 +29,6 @@ SubstringTests.test("Equality") {
   expectEqual("fg" as String, s.suffix(2))
   
 #if _runtime(_ObjC)
-  let emoji: String = s + "😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈" + "😡🇧🇪🇨🇦🇮🇳"
   expectTrue(s == s[...])
   expectTrue(s[...] == s)
   expectTrue(s.dropFirst(2) != s)
@@ -43,6 +42,20 @@ SubstringTests.test("Equality") {
   expectNotEqual(s.dropLast(2), s.dropLast(1))
   expectEqual(s.dropFirst(1), s.dropFirst(1))
   expectTrue(s != s[...].dropFirst(1))
+#endif
+
+	// equatable conformance
+	expectTrue("one,two,three".split(separator: ",").contains("two"))
+	expectTrue("one,two,three".split(separator: ",") == ["one","two","three"])
+}
+
+#if _runtime(_ObjC)
+SubstringTests.test("Equality/Emoji")
+    .xfail(.osxMinor(10, 9, reason: "Mac OS X 10.9 has an old ICU"))
+    .xfail(.iOSMajor(7, reason: "iOS 7 has an old ICU"))
+    .code {
+  let s = "abcdefg"
+  let emoji: String = s + "😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈" + "😡🇧🇪🇨🇦🇮🇳"
   let i = emoji.firstIndex(of: "😄")!
   expectEqual("😄👍🏽" as String, emoji[i...].prefix(2))
   expectTrue("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String == emoji[i...].dropLast(2))
@@ -50,11 +63,8 @@ SubstringTests.test("Equality") {
   expectTrue(s as String != emoji[i...].dropLast(2).dropFirst(2))
   expectEqualSequence("😄👍🏽🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2))
   expectEqualSequence("🇫🇷👩‍👩‍👧‍👦🙈😡🇧🇪" as String, emoji[i...].dropLast(2).dropFirst(2))
-#endif
-	// equatable conformance
-	expectTrue("one,two,three".split(separator: ",").contains("two"))
-	expectTrue("one,two,three".split(separator: ",") == ["one","two","three"])
 }
+#endif
 
 SubstringTests.test("Comparison") {
   var s = "abc"

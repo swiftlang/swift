@@ -34,6 +34,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -261,22 +262,40 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       // Emit the preceding literal chunk.
       auto literalChunk = StringRef(mangling.String.data() + pos,
                                     symbolic.second - pos);
-      assert(literalChunk.back() == '\1' && "should be prefixed with \\1");
       auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
                                                         literalChunk,
                                                         /*null*/ false);
       S.add(literal);
     }
     
-    // The symbolic reference is to the type context descriptor of the
-    // referenced type.
-    // We currently only allow symbolic references to nominal type contexts.
-    auto nominal = cast<NominalTypeDecl>(symbolic.first);
-    S.addRelativeAddress(
-         getAddrOfTypeContextDescriptor(const_cast<NominalTypeDecl*>(nominal),
-                                        DontRequireMetadata));
+    ConstantReference ref;
+    unsigned char baseKind;
+    if (auto ctype = symbolic.first.dyn_cast<const NominalTypeDecl*>()) {
+      auto type = const_cast<NominalTypeDecl*>(ctype);
+      if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+        // The symbolic reference is to the protocol descriptor of the
+        // referenced protocol.
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forProtocolDescriptor(proto));
+      } else {
+        // The symbolic reference is to the type context descriptor of the
+        // referenced type.
+        IRGen.noteUseOfTypeContextDescriptor(type, DontRequireMetadata);
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forNominalTypeDescriptor(type));
+      }
+      // \1 - direct reference, \2 - indirect reference
+      baseKind = 1;
+    } else {
+      llvm_unreachable("unhandled symbolic referent");
+    }
     
-    pos = symbolic.second + 4;
+    // add kind byte. indirect kinds are the direct kind + 1
+    unsigned char kind = ref.isIndirect() ? baseKind + 1 : baseKind;
+    S.add(llvm::ConstantInt::get(Int8Ty, kind));
+    // add relative reference
+    S.addRelativeAddress(ref.getValue());
+    pos = symbolic.second + 5;
   }
   
   // Add the last literal bit, if any.
@@ -824,31 +843,31 @@ namespace {
   public:
     EmitTypeMetadataRef(IRGenFunction &IGF) : IGF(IGF) {}
 
-#define TREAT_AS_OPAQUE(KIND)                                             \
-    MetadataResponse visit##KIND##Type(Can##KIND##Type type,              \
-                                       DynamicMetadataRequest request) {  \
-      return visitOpaqueType(type);                                       \
-    }
-    TREAT_AS_OPAQUE(BuiltinInteger)
-    TREAT_AS_OPAQUE(BuiltinFloat)
-    TREAT_AS_OPAQUE(BuiltinVector)
-    TREAT_AS_OPAQUE(BuiltinRawPointer)
-#undef TREAT_AS_OPAQUE
-
     MetadataResponse emitDirectMetadataRef(CanType type) {
       return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
     }
 
     /// The given type should use opaque type info.  We assume that
-    /// the runtime always provides an entry for such a type;  right
-    /// now, that mapping is as one of the power-of-two integer types.
-    MetadataResponse visitOpaqueType(CanType type) {
+    /// the runtime always provides an entry for such a type.
+    MetadataResponse visitBuiltinIntegerType(CanBuiltinIntegerType type,
+                                             DynamicMetadataRequest request) {
+      // If the size isn't a power up two, round up to the next power of two
+      // and use the corresponding integer type.
       auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
       unsigned numBits = opaqueTI.getFixedSize().getValueInBits();
-      if (!llvm::isPowerOf2_32(numBits))
+      if (!llvm::isPowerOf2_32(numBits)) {
         numBits = llvm::NextPowerOf2(numBits);
-      auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
-      return emitDirectMetadataRef(CanType(intTy));
+        type = CanBuiltinIntegerType(
+                 BuiltinIntegerType::get(numBits, IGF.IGM.Context));
+      }
+
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinIntegerLiteralType(CanBuiltinIntegerLiteralType type,
+                                   DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
     }
 
     MetadataResponse
@@ -872,6 +891,24 @@ namespace {
     MetadataResponse
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type,
                                       DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinFloatType(CanBuiltinFloatType type,
+                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinVectorType(CanBuiltinVectorType type,
+                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -928,8 +965,9 @@ namespace {
       // flags.
       auto getABIParameterFlags = [](ParameterTypeFlags flags) {
         return ParameterFlags()
-                 .withValueOwnership(flags.getValueOwnership())
-                 .withVariadic(flags.isVariadic());
+            .withValueOwnership(flags.getValueOwnership())
+            .withVariadic(flags.isVariadic())
+            .withAutoClosure(flags.isAutoClosure());
       };
 
       bool hasFlags = false;

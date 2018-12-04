@@ -99,19 +99,31 @@ private:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Reverse-mode differentiable attribute - @differentiable attribute lowered to
-/// SIL. This attribute is used by the automatic differentiation pass to find
-/// the defined adjoint of a function.
+/// Differentiable attribute - @differentiable attribute lowered to SIL. This
+/// attribute is used by the automatic differentiation pass to find the autodiff
+/// functions associated with a function: 'primal', 'adjoint', 'jvp', and 'vjp'.
 ///
-/// The attribute can be specified to one of the following levels, and the rest
-/// will be synthesized by the compiler.
-/// - Just adjoint
-/// - Primal and adjoint
+/// For 'primal' and 'adjoint', the attribute may specify:
+/// - neither,
+/// - just 'adjoint', or
+/// - both 'primal' and 'adjoint'.
+/// The core AD pass synthesizes the missing ones.
+///
+/// Note: 'primal' and 'adjoint' are legacy functions that we will keep around
+/// until we have fully switched to 'jvp' and 'vjp'.
+///
+/// 'jvp' and 'vjp' are optional. We intend for the core AD pass to synthesize
+/// the missing ones.
+///
+/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
+/// AD pass does not use or synthesize them.
 ///
 /// Example:
-///   sil [reverse_differentiable primal @foo_primal adjoint @foo_adjoint] @foo
+///   sil [differentiable primal @foo_primal adjoint @foo_adjoint] @foo
 ///     : $(Float) -> Float { ... }
-class SILReverseDifferentiableAttr final {
+///   sil [differentiable jvp @foo_jvp vjp @foo_vjp] @foo
+///     : $(Float) -> Float { ... }
+class SILDifferentiableAttr final {
   friend SILFunction;
 
 private:
@@ -121,17 +133,22 @@ private:
   StringRef PrimalName, AdjointName;
   /// Whether the adjoint is primitive.
   bool AdjointIsPrimitive;
+  /// The JVP and VJP function names.
+  StringRef JVPName, VJPName;
 
-  SILReverseDifferentiableAttr(const SILAutoDiffIndices &indices,
-                               StringRef primalName,
-                               StringRef adjointName,
-                               bool adjointIsPrimitive);
+  SILDifferentiableAttr(const SILAutoDiffIndices &indices,
+                        StringRef primalName,
+                        StringRef adjointName,
+                        bool adjointIsPrimitive,
+                        StringRef jvpName,
+                        StringRef vjpName);
 
 public:
-  static SILReverseDifferentiableAttr *create(
+  static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
       StringRef primalName = StringRef(), StringRef adjointName = StringRef(),
-      bool adjointIsPrimitive = false);
+      bool adjointIsPrimitive = false, StringRef jvpName = StringRef(),
+      StringRef vjpName = StringRef());
 
   bool hasPrimal() const { return !PrimalName.empty(); }
   StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
@@ -144,6 +161,14 @@ public:
     AdjointName = name;
     AdjointIsPrimitive = primitive;
   }
+
+  bool hasJVP() const { return !JVPName.empty(); }
+  StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
+  void setJVPName(StringRef name) { JVPName = name; }
+
+  bool hasVJP() const { return !VJPName.empty(); }
+  StringRef getVJPName() const { assert(hasVJP()); return VJPName; }
+  void setVJPName(StringRef name) { VJPName = name; }
 
   const SILAutoDiffIndices &getIndices() const { return indices; }
 
@@ -252,9 +277,9 @@ private:
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// The function's `[reverse_differentiable]` attributes.
-  llvm::SmallVector<SILReverseDifferentiableAttr *, 4>
-    ReverseDifferentiableAttrs;
+  /// The function's `[differentiable]` attributes.
+  llvm::SmallVector<SILDifferentiableAttr *, 4>
+    DifferentiableAttrs;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -628,13 +653,13 @@ public:
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  ArrayRef<SILReverseDifferentiableAttr *>
-  getReverseDifferentiableAttrs() const {
-    return ReverseDifferentiableAttrs;
+  ArrayRef<SILDifferentiableAttr *>
+  getDifferentiableAttrs() const {
+    return DifferentiableAttrs;
   }
 
-  void addReverseDifferentiableAttr(SILReverseDifferentiableAttr *attr) {
-    ReverseDifferentiableAttrs.push_back(attr);
+  void addDifferentiableAttr(SILDifferentiableAttr *attr) {
+    DifferentiableAttrs.push_back(attr);
   }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is

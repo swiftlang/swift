@@ -1425,14 +1425,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, but
-      // we aren't compiling in Swift 3 compatibility mode, emit a call to
-      // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
-      // the uses of such entrypoints.
-      if (attr->isSwift3Inferred() &&
-          !decl->isDynamic() &&
-          !getASTContext().LangOpts.isSwiftVersion3()) {
-        
+      // If @objc was inferred based on the Swift 3 @objc inference rules, emit
+      // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
+      // logging of the uses of such entrypoints.
+      if (attr->isSwift3Inferred() && !decl->isDynamic()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =

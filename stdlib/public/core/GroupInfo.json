@@ -68,7 +68,7 @@
     "Range.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
-    "HeapBuffer.swift",
+    "BridgingBuffer.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",

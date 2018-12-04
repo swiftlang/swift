@@ -35,7 +35,7 @@ public func * <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
 
-public func fakeAdj<T>(lhs: Vector<T>, rhs: Vector<T>, y: Vector<T>, seed: Vector<T>) -> (Vector<T>, Vector<T>) {
+public func fakeAdj<T>(seed: Vector<T>, y: Vector<T>, lhs: Vector<T>, rhs: Vector<T>) -> (Vector<T>, Vector<T>) {
   abort()
 }
 

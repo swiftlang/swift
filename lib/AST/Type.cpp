@@ -201,6 +201,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -4020,6 +4021,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -4087,21 +4089,21 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Makes a function with the same generic signature and extinfo as `copy`, but
+// with `params` parameters and `retTy` return type.
+static AnyFunctionType *
+makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
+                 Type retTy) {
+  if (auto *genFunctionType = copy->getAs<GenericFunctionType>()) {
+    return GenericFunctionType::get(genFunctionType->getGenericSignature(),
+                                    params, retTy, copy->getExtInfo());
+  }
+  return FunctionType::get(params, retTy, copy->getExtInfo());
+}
+
 AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     const AutoDiffParameterIndices &indices, const TupleType *primalResultTy) {
   assert(!indices.isEmpty() && "there must be at least one wrt index");
-
-  // Makes a function with the same generic signature as `copy`, but with
-  // `params` parameters and `retTy` return type.
-  auto makeFunctionType = [&](AnyFunctionType *copy,
-                              ArrayRef<AnyFunctionType::Param> params,
-                              Type retTy) -> AnyFunctionType * {
-    if (auto *genFunctionType = copy->getAs<GenericFunctionType>()) {
-      return GenericFunctionType::get(genFunctionType->getGenericSignature(),
-                                      params, retTy);
-    }
-    return FunctionType::get(params, retTy);
-  };
 
   // Compute the return type of the adjoint.
   SmallVector<TupleTypeElt, 8> retElts;
@@ -4125,9 +4127,9 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   // Compute the adjoint parameters.
   SmallVector<AnyFunctionType::Param, 8> adjointParams;
 
-  // The first parameters are the same as those of the original function.
-  for (auto &param : unwrapped->getParams())
-    adjointParams.push_back(param);
+  // The first parameter is the seed, which has the same type as the original
+  // return type.
+  adjointParams.push_back(AnyFunctionType::Param(unwrapped->getResult()));
 
   // If the primal exists, the checkpoints type is the primal result type.
   if (primalResultTy) {
@@ -4135,9 +4137,12 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     adjointParams.push_back(AnyFunctionType::Param(checkpointsTy));
   }
 
-  // The original result and the seed have the same type as the original
-  // return type.
-  adjointParams.append(2, AnyFunctionType::Param(unwrapped->getResult()));
+  // The original result has the same type as the original return type.
+  adjointParams.push_back(AnyFunctionType::Param(unwrapped->getResult()));
+
+  // The last parameters are the parameters of the original function.
+  for (auto &param : unwrapped->getParams())
+    adjointParams.push_back(param);
 
   // Build the adjoint type.
   AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams, retTy);
@@ -4148,4 +4153,126 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     adjoint = makeFunctionType(this, getParams(), adjoint);
 
   return adjoint;
+}
+
+AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
+    const AutoDiffParameterIndices &indices, unsigned differentiationOrder,
+    AutoDiffAssociatedFunctionKind kind, LookupConformanceFn lookupConformance,
+    bool selfUncurried) {
+  // JVP: (T...) -> ((R...),
+  //                 (T.TangentVector...) -> (R.TangentVector...))
+  // VJP: (T...) -> ((R...),
+  //                 (R.CotangentVector...) -> (T.CotangentVector...))
+  //
+  // Note that both can be written as "(T...) -> ((R...), Closure)", so we build
+  // "Closure" and then use common code to wrap "Closure" in the outer function
+  // type.
+
+  assert(differentiationOrder == 1 && "only order 1 currently supported");
+  assert(!indices.isEmpty() && "there must be at least one wrt index");
+
+  auto &ctx = getASTContext();
+
+  auto *differentiableProtocol =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "could not find differentiable protocol");
+  auto tangentLookup = differentiableProtocol->lookupDirect(
+      ctx.getIdentifier("TangentVector"));
+  assert(tangentLookup.size() == 1);
+  auto *tangentDependentType = DependentMemberType::get(
+      differentiableProtocol->getDeclaredInterfaceType(),
+      cast<AssociatedTypeDecl>(tangentLookup[0]));
+  auto cotangentLookup = differentiableProtocol->lookupDirect(
+      ctx.getIdentifier("CotangentVector"));
+  assert(cotangentLookup.size() == 1);
+  auto *cotangentDependentType = DependentMemberType::get(
+      differentiableProtocol->getDeclaredInterfaceType(),
+      cast<AssociatedTypeDecl>(cotangentLookup[0]));
+  auto getAssociatedType = [&](Type type,
+                               DependentMemberType *dependentType) -> CanType {
+    // Builtins are their own Tangent/Cotangent.
+    if (type->is<BuiltinType>()) return type->getCanonicalType();
+    return dependentType->substBaseType(type, lookupConformance)
+        ->getCanonicalType();
+  };
+
+  SmallVector<Type, 8> wrtParamTypes;
+  indices.getSubsetParameterTypes(this, wrtParamTypes, selfUncurried);
+
+  // If this is a method, unwrap the function type so that we can see the
+  // non-self parameters and the final result.
+  AnyFunctionType *unwrapped = this;
+  if (indices.isMethod() && !selfUncurried)
+    unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
+  Type originalResult = unwrapped->getResult();
+
+  // Build the closure type, which is different depending on whether this is a
+  // JVP or VJP.
+  Type closure;
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP: {
+    // closure is the JVP "differential":
+    //   (T.TangentVector...) -> (R.TangentVector...)
+    SmallVector<AnyFunctionType::Param, 8> differentialParams;
+    for (auto wrtParamType : wrtParamTypes)
+      differentialParams.push_back(AnyFunctionType::Param(getAssociatedType(
+          wrtParamType, tangentDependentType)));
+
+    SmallVector<TupleTypeElt, 8> differentialResults;
+    if (auto *resultTuple = originalResult->getAs<TupleType>())
+      for (auto &resultTupleElt : resultTuple->getElements())
+        differentialResults.push_back(getAssociatedType(
+            resultTupleElt.getType(), tangentDependentType));
+    else
+      differentialResults.push_back(getAssociatedType(
+          originalResult, tangentDependentType));
+    Type differentialResult =
+        differentialResults.size() > 1
+            ? TupleType::get(differentialResults, ctx)
+            : differentialResults[0].getType();
+
+    closure = FunctionType::get(differentialParams, differentialResult);
+    break;
+  }
+  case AutoDiffAssociatedFunctionKind::VJP: {
+    // closure is the VJP "pullback":
+    //   (R.CotangentVector...) -> (T.CotangentVector...)
+    SmallVector<AnyFunctionType::Param, 8> pullbackParams;
+    if (auto *resultTuple = originalResult->getAs<TupleType>())
+      for (auto &resultTupleElt : resultTuple->getElements())
+        pullbackParams.push_back(AnyFunctionType::Param(getAssociatedType(
+            resultTupleElt.getType(), cotangentDependentType)));
+    else
+      pullbackParams.push_back(AnyFunctionType::Param(getAssociatedType(
+          originalResult, cotangentDependentType)));
+
+    SmallVector<TupleTypeElt, 8> pullbackResults;
+    for (auto wrtParamType : wrtParamTypes)
+      pullbackResults.push_back(getAssociatedType(
+          wrtParamType, cotangentDependentType));
+    Type pullbackResult = pullbackResults.size() > 1
+                              ? TupleType::get(pullbackResults, ctx)
+                              : pullbackResults[0].getType();
+
+    closure = FunctionType::get(pullbackParams, pullbackResult);
+    break;
+  }
+  }
+  assert(closure && "should have built a closure");
+
+  // Build "(T...) -> ((R...), Closure)".
+  SmallVector<TupleTypeElt, 2> retElts;
+  retElts.push_back(originalResult);
+  retElts.push_back(closure);
+  auto retTy = TupleType::get(retElts, ctx);
+  auto *associatedFunction =
+      makeFunctionType(unwrapped, unwrapped->getParams(), retTy);
+
+  // If this is a method, wrap the associated function type in an additional
+  // "(Self) ->" curry level.
+  if (indices.isMethod() && !selfUncurried)
+    associatedFunction =
+        makeFunctionType(this, getParams(), associatedFunction);
+
+  return associatedFunction;
 }

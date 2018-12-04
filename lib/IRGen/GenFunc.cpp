@@ -105,8 +105,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IndirectTypeInfo.h"
-#include "NativeConventionSchema.h"
-#include "ScalarTypeInfo.h"
+#include "ScalarPairTypeInfo.h"
 #include "Signature.h"
 #include "IRGenMangler.h"
 
@@ -178,12 +177,13 @@ namespace {
   };
 
   /// The @thick function type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
-                       public FuncSignatureInfo {
+  class FuncTypeInfo :
+      public ScalarPairTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
+      public FuncSignatureInfo {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits,
                  IsPOD_t pod)
-      : ScalarTypeInfo(storageType, size, std::move(spareBits), align, pod),
+      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align, pod),
         FuncSignatureInfo(formalType)
     {
     }
@@ -207,33 +207,60 @@ namespace {
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    static Size getFirstElementSize(IRGenModule &IGM) {
+      return IGM.getPointerSize();
+    }
+    static StringRef getFirstElementLabel() {
+      return ".fn";
+    }
+    static bool isFirstElementTrivial() {
+      return true;
+    }
+    void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                Optional<Atomicity> atomicity = None) const {}
+    void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                 Optional<Atomicity> atomicity = None) const {}
+    void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                Address fnAddr) const {
+      IGF.Builder.CreateStore(fn, fnAddr);
     }
 
-    unsigned getExplosionSize() const override {
-      return 2;
+    static Size getSecondElementOffset(IRGenModule &IGM) {
+      return IGM.getPointerSize();
     }
-
-    void getSchema(ExplosionSchema &schema) const override {
-      llvm::StructType *structTy = getStorageType();
-      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
-      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
+    static Size getSecondElementSize(IRGenModule &IGM) {
+      return IGM.getPointerSize();
     }
-
-    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
-                          Size offset) const override {
-      auto ptrSize = IGM.getPointerSize();
-      llvm::StructType *structTy = getStorageType();
-      addScalarToAggLowering(IGM, lowering, structTy->getElementType(0),
-                             offset, ptrSize);
-      addScalarToAggLowering(IGM, lowering, structTy->getElementType(1),
-                             offset + ptrSize, ptrSize);
+    static StringRef getSecondElementLabel() {
+      return ".data";
+    }
+    bool isSecondElementTrivial() const {
+      return isPOD(ResilienceExpansion::Maximal);
+    }
+    void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
+                                 Optional<Atomicity> atomicity = None) const {
+      if (!isPOD(ResilienceExpansion::Maximal)) {
+        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
+        IGF.emitNativeStrongRetain(data, *atomicity);
+      }
+    }
+    void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
+                                  Optional<Atomicity> atomicity = None) const {
+      if (!isPOD(ResilienceExpansion::Maximal)) {
+        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
+        IGF.emitNativeStrongRelease(data, *atomicity);
+      }
+    }
+    void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
+                                 Address dataAddr) const {
+      if (isPOD(ResilienceExpansion::Maximal))
+        IGF.Builder.CreateStore(context, dataAddr);
+      else
+        IGF.emitNativeStrongAssign(context, dataAddr);
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
-      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
-                                         address->getName() + ".fn");
+      return projectFirstElement(IGF, address);
     }
 
     Address projectData(IRGenFunction &IGF, Address address) const {
@@ -241,94 +268,16 @@ namespace {
                                          address->getName() + ".data");
     }
 
-    void loadAsCopy(IRGenFunction &IGF, Address address,
-                    Explosion &e) const override {
-      // Load the function.
-      Address fnAddr = projectFunction(IGF, address);
-      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
-
-      Address dataAddr = projectData(IGF, address);
-      auto data = IGF.Builder.CreateLoad(dataAddr);
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data, IGF.getDefaultAtomicity());
-      e.add(data);
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr,
-                    Explosion &e) const override {
-      // Load the function.
-      Address fnAddr = projectFunction(IGF, addr);
-      e.add(IGF.Builder.CreateLoad(fnAddr));
-
-      Address dataAddr = projectData(IGF, addr);
-      e.add(IGF.Builder.CreateLoad(dataAddr));
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address address,
-                bool isOutlined) const override {
-      // Store the function pointer.
-      Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
-
-      Address dataAddr = projectData(IGF, address);
-      auto context = e.claimNext();
-      if (isPOD(ResilienceExpansion::Maximal))
-        IGF.Builder.CreateStore(context, dataAddr);
-      else
-        IGF.emitNativeStrongAssign(context, dataAddr);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address address,
-                    bool isOutlined) const override {
-      // Store the function pointer.
-      Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
-
-      // Store the data pointer, if any, transferring the +1.
-      Address dataAddr = projectData(IGF, address);
-      auto context = e.claimNext();
-      if (isPOD(ResilienceExpansion::Maximal))
-        IGF.Builder.CreateStore(context, dataAddr);
-      else
-        IGF.emitNativeStrongInit(context, dataAddr);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest, Atomicity atomicity) const override {
-      src.transferInto(dest, 1);
-      auto data = src.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data, atomicity);
-      dest.add(data);
-    }
-
-    void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
-      src.claimNext();
-      auto context = src.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(context, atomicity);
-    }
-
-    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
-      src.claimNext();      
-      IGF.emitFixLifetime(src.claimNext());
-    }
-
     void strongRetain(IRGenFunction &IGF, Explosion &e,
                       Atomicity atomicity) const override {
       e.claimNext();
-      auto context = e.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(context, atomicity);
+      emitRetainSecondElement(IGF, e.claimNext(), atomicity);
     }
 
     void strongRelease(IRGenFunction &IGF, Explosion &e,
                        Atomicity atomicity) const override {
       e.claimNext();
-      auto context = e.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(context, atomicity);
+      emitReleaseSecondElement(IGF, e.claimNext(), atomicity);
     }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -370,32 +319,6 @@ namespace {
     NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
     ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
 #include "swift/AST/ReferenceStorage.def"
-
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
-    }
-
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &src,
-                             unsigned offset) const override {
-      payload.insertValue(IGF, src.claimNext(), offset);
-      payload.insertValue(IGF, src.claimNext(),
-                          offset + IGF.IGM.getPointerSize().getValueInBits());
-    }
-    
-    void unpackFromEnumPayload(IRGenFunction &IGF,
-                               const EnumPayload &payload,
-                               Explosion &dest,
-                               unsigned offset) const override {
-      auto storageTy = getStorageType();
-      dest.add(payload.extractValue(IGF, storageTy->getElementType(0), offset));
-      dest.add(payload.extractValue(IGF, storageTy->getElementType(1),
-                          offset + IGF.IGM.getPointerSize().getValueInBits()));
-    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -561,19 +484,16 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
         SmallBitVector(T->getNumParameters(), true),
         /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-        IGM.getSILModule());
+        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
         SmallBitVector(T->getNumParameters(), true),
         /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-        IGM.getSILModule());
+        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return convertTupleType(TupleType::get({origTy, jvpTy, vjpTy}, IGM.Context)
                                 ->castTo<TupleType>());
   }
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:
-    // SWIFT_ENABLE_TENSORFLOW
-    assert(T->isDifferentiable() &&
-           "Block functions cannot be @autodiff yet");
     return new BlockTypeInfo(CanSILFunctionType(T),
                              IGM.ObjCBlockPtrTy,
                              IGM.getPointerSize(),

@@ -611,18 +611,18 @@ private: // Helpers for lowering.
   GLStatus visitGraphOpD2DTensorSendInst(GraphOperationInfo &graphOpInfo);
 
   // Helper functions to add different flavors of send/recv TF ops.
-  GLStatus addTFRecvOp(SILInstruction *inst, int transferId,
+  GLStatus addTFRecvOp(const SILInstruction *inst, int transferId,
                        StringRef srcDevice);
-  GLStatus addTFSendOp(SILInstruction *inst, int transferId,
+  GLStatus addTFSendOp(const SILInstruction *inst, int transferId,
                        StringRef destDevice);
   // For the TPU infeed/outfeed related ops, the shape array of the tensor being
   // transferred is given by `dims`, `numDims` and `dimPtrs`.
-  GLStatus addTPUDequeueOp(SILInstruction *inst, bool isInfeed, int transferId,
-                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
-                           ArrayRef<int64_t *> dimPtrs);
-  GLStatus addTPUEnqueueOp(SILInstruction *inst, bool isInfeed, int transferId,
-                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
-                           ArrayRef<int64_t *> dimPtrs);
+  GLStatus addTPUDequeueOp(const SILInstruction *inst, bool isInfeed,
+                           int transferId, ArrayRef<int64_t> dims,
+                           ArrayRef<int> numDims, ArrayRef<int64_t *> dimPtrs);
+  GLStatus addTPUEnqueueOp(const SILInstruction *inst, bool isInfeed,
+                           int transferId, ArrayRef<int64_t> dims,
+                           ArrayRef<int> numDims, ArrayRef<int64_t *> dimPtrs);
 
   // For `op` with `opName` under construction, set a function-typed attribute
   // with a graph function name derived from `silFuncName` under the following
@@ -1169,7 +1169,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   return GLStatus::Success;
 }
 
-GLStatus TFGraphFunctionLowering::addTFRecvOp(SILInstruction *inst,
+GLStatus TFGraphFunctionLowering::addTFRecvOp(const SILInstruction *inst,
                                               int transferId,
                                               StringRef srcDevice) {
   auto opName = "tf_recv_" + llvm::itostr(transferId);
@@ -1197,7 +1197,7 @@ GLStatus TFGraphFunctionLowering::addTFRecvOp(SILInstruction *inst,
   return GLStatus::Success;
 }
 
-GLStatus TFGraphFunctionLowering::addTPUDequeueOp(SILInstruction *inst,
+GLStatus TFGraphFunctionLowering::addTPUDequeueOp(const SILInstruction *inst,
                                                   bool isInfeed, int transferId,
                                                   ArrayRef<int64_t> dims,
                                                   ArrayRef<int> numDims,
@@ -1298,7 +1298,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   }
 }
 
-GLStatus TFGraphFunctionLowering::addTFSendOp(SILInstruction *inst,
+GLStatus TFGraphFunctionLowering::addTFSendOp(const SILInstruction *inst,
                                               int transferId,
                                               StringRef destDevice) {
   auto opName = "tf_send_" + llvm::itostr(transferId);
@@ -1328,7 +1328,7 @@ GLStatus TFGraphFunctionLowering::addTFSendOp(SILInstruction *inst,
   return GLStatus::Success;
 }
 
-GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(SILInstruction *inst,
+GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(const SILInstruction *inst,
                                                   bool isInfeed, int transferId,
                                                   ArrayRef<int64_t> dims,
                                                   ArrayRef<int> numDims,

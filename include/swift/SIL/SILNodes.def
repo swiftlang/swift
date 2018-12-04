@@ -75,7 +75,7 @@
 #define NODE(ID, PARENT)
 #endif
 
-/// SINGLE_VALUE_INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+/// SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
 ///   A concrete subclass of SingleValueInstruction, which inherits from
 ///   both ValueBase and SILInstruction.  ID is a member of both ValueKind
@@ -90,6 +90,11 @@
 #endif
 #endif
 
+/// APPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                             MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a partial or full apply site. ID is a member
+///   of ApplySiteKind.
 #ifndef APPLYSITE_SINGLE_VALUE_INST
 #ifdef APPLYSITE_INST
 #define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -100,6 +105,11 @@
 #endif
 #endif
 
+/// FULLAPPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                 MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a full apply site. ID is a member of
+///   FullApplySiteKind and ApplySiteKind.
 #ifndef FULLAPPLYSITE_SINGLE_VALUE_INST
 #ifdef FULLAPPLYSITE_INST
 #define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -120,6 +130,11 @@
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 
+/// APPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                               MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally either a partial or full apply
+///   site. ID is a member of ApplySiteKind.
 #ifndef APPLYSITE_MULTIPLE_VALUE_INST
 #ifdef APPLYSITE_INST
 #define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -130,6 +145,11 @@
 #endif
 #endif
 
+/// FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                   MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally a full apply site. ID is a
+///   member of FullApplySiteKind and ApplySiteKind.
 #ifndef FULLAPPLYSITE_MULTIPLE_VALUE_INST
 #ifdef FULLAPPLYSITE_INST
 #define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \

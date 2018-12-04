@@ -391,8 +391,9 @@ public:
       auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
                                 .withValueOwnership(ownership)
-                                // SWIFT_ENABLE_TENSORFLOW
                                 .withVariadic(flags.isVariadic())
+                                // SWIFT_ENABLE_TENSORFLOW
+                                .withAutoClosure(flags.isAutoClosure())
                                 .withNonDifferentiable(flags.isNonDifferentiable());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));

@@ -15,7 +15,7 @@
 //  distinguish these cases efficiently.
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -29,18 +29,17 @@ protocol BridgeStorage {
   associatedtype Native : AnyObject
   associatedtype ObjC : AnyObject
 
-  init(native: Native, bits: Int)
+  init(native: Native, isFlagged: Bool)
   init(native: Native)
   init(objC: ObjC)
 
   mutating func isUniquelyReferencedNative() -> Bool
-  mutating func isUniquelyReferenced_native_noSpareBits() -> Bool
+  mutating func isUniquelyReferencedUnflaggedNative() -> Bool
   var isNative: Bool {get}
   var isObjC: Bool {get}
   var nativeInstance: Native {get}
-  var nativeInstance_noSpareBits: Native {get}
+  var unflaggedNativeInstance: Native {get}
   var objCInstance: ObjC {get}
-  var spareBits: Int {get}
 }
 
 extension _BridgeStorage : BridgeStorage {}
@@ -116,42 +115,41 @@ var unTaggedNSString : NSString {
   return expectTagged("fûtbōl" as NSString, false)
 }
 
-% for Self in ['_BridgeStorage']:
-allTests.test("${Self}") {
-  typealias B = ${Self}<C, NSString>
+allTests.test("_BridgeStorage") {
+  typealias B = _BridgeStorage<C, NSString>
 
   let oy: NSString = "oy"
   expectTrue(B(objC: oy).objCInstance == oy)
 
-  for i in 0..<2 {
+  for flag in [false, true] {
     do {
-      var b = B(native: C(), bits: i)
+      var b = B(native: C(), isFlagged: flag)
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
+      expectEqual(!flag, b.isUnflaggedNative)
       expectTrue(b.isUniquelyReferencedNative())
-      if i == 0 {
-        expectTrue(b.isUniquelyReferenced_native_noSpareBits())
+      if !flag {
+        expectTrue(b.isUniquelyReferencedUnflaggedNative())
       }
-      expectEqual(i, b.spareBits)
     }
 
     do {
       let c = C()
-      var b = B(native: c, bits: i)
+      var b = B(native: c, isFlagged: flag)
       expectFalse(b.isObjC)
       expectTrue(b.isNative)
       expectFalse(b.isUniquelyReferencedNative())
-      expectEqual(i, b.spareBits)
+      expectEqual(!flag, b.isUnflaggedNative)
       expectTrue(b.nativeInstance === c)
-      if i == 0 {
-        expectTrue(b.nativeInstance_noSpareBits === c)
-        expectFalse(b.isUniquelyReferenced_native_noSpareBits())
+      if !flag {
+        expectTrue(b.unflaggedNativeInstance === c)
+        expectFalse(b.isUniquelyReferencedUnflaggedNative())
       }
     }
 
   }
 
-  var b = B(native: C(), bits: 0)
+  var b = B(native: C(), isFlagged: false)
   expectTrue(b.isUniquelyReferencedNative())
 
   // Add a reference and verify that it's still native but no longer unique
@@ -161,23 +159,24 @@ allTests.test("${Self}") {
 
   let n = C()
   var bb = B(native: n)
-  expectEqual(0, bb.spareBits)
   expectTrue(bb.nativeInstance === n)
   expectTrue(bb.isNative)
+  expectTrue(bb.isUnflaggedNative)
   expectFalse(bb.isObjC)
 
   var d = B(objC: taggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectFalse(d.isNative)
+  expectFalse(d.isUnflaggedNative)
   expectTrue(d.isObjC)
 
   d = B(objC: unTaggedNSString)
   expectFalse(d.isUniquelyReferencedNative())
   expectFalse(d.isNative)
+  expectFalse(d.isUnflaggedNative)
   expectTrue(d.isObjC)
 
 }
-% end
 
 runAllTests()
 

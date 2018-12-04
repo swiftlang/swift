@@ -5287,7 +5287,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return result;
   }
 
-  case FixKind::SkipSameTypeRequirement: {
+  case FixKind::SkipSameTypeRequirement:
+  case FixKind::SkipSuperclassRequirement: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

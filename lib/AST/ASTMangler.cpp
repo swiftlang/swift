@@ -216,6 +216,44 @@ std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
 std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
+
+  // Concrete witness thunks get a special mangling.
+  if (Conformance)
+    appendProtocolConformance(Conformance);
+
+  if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
+    appendConstructorEntity(ctor, /*isAllocating=*/true);
+  } else {
+    assert(isa<FuncDecl>(Requirement) && "expected function");
+    appendEntity(cast<FuncDecl>(Requirement));
+  }
+
+  if (Conformance)
+    appendOperator("TW");
+  return finalize();
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+std::string ASTMangler::mangleAutoDiffAssociatedFunctionWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement,
+    const AutoDiffAssociatedFunctionIdentifier *id) {
+  assert(id);
+
+  beginMangling();
+
+  // TODO: Proper mangling for autodiff associated function witness thunks.
+  switch (id->getKind()) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    appendIdentifier("jvp");
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    appendIdentifier("vjp");
+    break;
+  }
+  appendIdentifier(id->getParameterIndices()->getString() + " ");
+
+  // The rest of this function is copy-pasted from `mangleWitnessThunk`.
+
   // Concrete witness thunks get a special mangling.
   if (Conformance)
     appendProtocolConformance(Conformance);
@@ -462,7 +500,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   assert(Root->getKind() == Node::Kind::Global);
   Node *NomTy = Root->getFirstChild();
   if (NomTy->getKind() == Node::Kind::Protocol) {
-    // Protocols are actually mangled as protocol lists.
+    // Protocol types are mangled as protocol lists.
     Node *PTy = Dem.createNode(Node::Kind::Type);
     PTy->addChild(NomTy, Dem);
     Node *TList = Dem.createNode(Node::Kind::TypeList);
@@ -717,6 +755,8 @@ void ASTMangler::appendType(Type type) {
         llvm_unreachable("impossible width value");
       return;
     }
+    case TypeKind::BuiltinIntegerLiteral:
+      return appendOperator("BI");
     case TypeKind::BuiltinRawPointer:
       return appendOperator("Bp");
     case TypeKind::BuiltinNativeObject:
@@ -1501,6 +1541,19 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
   if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
     return;
 
+  // We can use a symbolic reference if they're allowed in this context.
+  if (AllowSymbolicReferences
+      && (!CanSymbolicReference || CanSymbolicReference(protocol))) {
+    // Try to use a symbolic reference substitution.
+    if (tryMangleSubstitution(protocol))
+      return;
+  
+    appendSymbolicReference(protocol);
+    // Substitutions can refer back to the symbolic reference.
+    addSubstitution(protocol);
+    return;
+  }
+
   appendContextOf(protocol);
   auto *clangDecl = protocol->getClangDecl();
   if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))
@@ -1527,13 +1580,12 @@ const clang::NamedDecl *ASTMangler::getClangDeclForMangling(const ValueDecl *vd)
   return namedDecl;
 }
 
-void ASTMangler::appendSymbolicReference(const DeclContext *context) {
+void ASTMangler::appendSymbolicReference(SymbolicReferent referent) {
   // Drop in a placeholder. The real reference value has to be filled in during
   // lowering to IR.
-  Buffer << '\1';
   auto offset = Buffer.str().size();
-  Buffer << StringRef("\0\0\0\0", 4);
-  SymbolicReferences.emplace_back(context, offset);
+  Buffer << StringRef("\0\0\0\0\0", 5);
+  SymbolicReferences.emplace_back(referent, offset);
 }
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
@@ -1556,13 +1608,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   if (tryMangleSubstitution(key.getPointer()))
     return;
   
-  // Try to mangle a symbolic reference.
-  if (CanSymbolicReference
-      && CanSymbolicReference(key->getAnyNominal())) {
-    appendSymbolicReference(key->getAnyNominal());
-    // Substitutions can refer back to the symbolic reference.
-    addSubstitution(key.getPointer());
-    return;
+  // Try to mangle a symbolic reference for a nominal type.
+  if (AllowSymbolicReferences) {
+    auto nominal = key->getAnyNominal();
+    if (nominal && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
+      appendSymbolicReference(nominal);
+      // Substitutions can refer back to the symbolic reference.
+      addSubstitution(key.getPointer());
+      return;
+    }
   }
 
   appendContextOf(decl);
@@ -2188,7 +2242,8 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
     appendOperator("Z");
 }
 
-void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance){
+void
+ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   GenericSignature *contextSig = nullptr;
   auto topLevelContext =
       conformance->getDeclContext()->getModuleScopeContext();
@@ -2204,6 +2259,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
   } else {
     auto conformingType = conformance->getType();
     appendType(conformingType->getCanonicalType());
+    
     appendProtocolName(conformance->getProtocol());
 
     bool needsModule = true;

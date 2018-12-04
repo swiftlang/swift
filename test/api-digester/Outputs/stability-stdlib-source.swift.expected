@@ -4,59 +4,34 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Func Collection.prefix(through:) has been removed
+Func Collection.prefix(upTo:) has been removed
+Func Collection.suffix(from:) has been removed
+Func Sequence.filter(_:) has been removed
+Func Sequence.forEach(_:) has been removed
+Func Sequence.map(_:) has been removed
+Func _SequenceWrapper.filter(_:) has been removed
+Func _SequenceWrapper.forEach(_:) has been removed
+Func _SequenceWrapper.map(_:) has been removed
+Var AnyBidirectionalCollection.first has been removed
+Var AnyBidirectionalCollection.last has been removed
+Var AnyCollection.first has been removed
+Var AnyRandomAccessCollection.first has been removed
+Var AnyRandomAccessCollection.last has been removed
+Var BidirectionalCollection.last has been removed
+Var Collection.first has been removed
+Var Dictionary.first has been removed
+Var LazyCollection.first has been removed
+Var LazyCollection.last has been removed
+Var LazyMapCollection.first has been removed
+Var LazyMapCollection.last has been removed
+Var Set.first has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
 
 /* Type Changes */
-Func AnyBidirectionalCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
-Func AnyBidirectionalCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
-Func AnyBidirectionalCollection.formIndex(after:) has parameter 0 changing from Default to InOut
-Func AnyBidirectionalCollection.formIndex(before:) has parameter 0 changing from Default to InOut
-Func AnyCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
-Func AnyCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
-Func AnyCollection.formIndex(after:) has parameter 0 changing from Default to InOut
-Func AnyRandomAccessCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
-Func AnyRandomAccessCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
-Func AnyRandomAccessCollection.formIndex(after:) has parameter 0 changing from Default to InOut
-Func AnyRandomAccessCollection.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Array.append(_:) has parameter 0 changing from Default to Owned
-Func Array.append(_:) has parameter 0 type change from Array<Element>.Element to Element
-Func Array.insert(_:at:) has parameter 0 changing from Default to Owned
-Func Array.insert(_:at:) has parameter 0 type change from Array<Element>.Element to Element
-Func ArraySlice.append(_:) has parameter 0 changing from Default to Owned
-Func ArraySlice.append(_:) has parameter 0 type change from ArraySlice<Element>.Element to Element
-Func ArraySlice.insert(_:at:) has parameter 0 changing from Default to Owned
-Func ArraySlice.insert(_:at:) has parameter 0 type change from ArraySlice<Element>.Element to Element
-Func ContiguousArray.append(_:) has parameter 0 changing from Default to Owned
-Func ContiguousArray.append(_:) has parameter 0 type change from ContiguousArray<Element>.Element to Element
-Func ContiguousArray.insert(_:at:) has parameter 0 changing from Default to Owned
-Func ContiguousArray.insert(_:at:) has parameter 0 type change from ContiguousArray<Element>.Element to Element
-Func DefaultIndices.formIndex(after:) has parameter 0 changing from Default to InOut
-Func DefaultIndices.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Dictionary.updateValue(_:forKey:) has parameter 0 changing from Default to Owned
-Func Dictionary.updateValue(_:forKey:) has parameter 0 type change from Dictionary<Key, Value>.Value to Value
-Func LazyFilterCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
-Func LazyFilterCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
-Func LazyFilterCollection.formIndex(after:) has parameter 0 changing from Default to InOut
-Func LazyFilterCollection.formIndex(before:) has parameter 0 changing from Default to InOut
-Func LazyMapCollection.formIndex(after:) has parameter 0 changing from Default to InOut
-Func LazyMapCollection.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Set.insert(_:) has parameter 0 changing from Default to Owned
-Func Set.insert(_:) has parameter 0 type change from Set<Element>.Element to Element
-Func Set.update(with:) has parameter 0 changing from Default to Owned
-Func Set.update(with:) has parameter 0 type change from Set<Element>.Element to Element
-Func Slice.formIndex(after:) has parameter 0 changing from Default to InOut
-Func Slice.formIndex(before:) has parameter 0 changing from Default to InOut
-Func String.UTF16View.Indices.formIndex(after:) has parameter 0 changing from Default to InOut
-Func String.UTF16View.Indices.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Substring.UTF16View.formIndex(after:) has parameter 0 changing from Default to InOut
-Func Substring.UTF16View.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Substring.UTF8View.formIndex(after:) has parameter 0 changing from Default to InOut
-Func Substring.UTF8View.formIndex(before:) has parameter 0 changing from Default to InOut
-Func Substring.UnicodeScalarView.formIndex(after:) has parameter 0 changing from Default to InOut
-Func Substring.UnicodeScalarView.formIndex(before:) has parameter 0 changing from Default to InOut
 
 /* Decl Attribute changes */
 

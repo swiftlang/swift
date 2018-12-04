@@ -51,7 +51,7 @@ class B : A {}
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1BCMa"
 //   Superclass type.
-// CHECK-SAME: @"symbolic \01____ 14class_metadata1AC"
+// CHECK-SAME: @"symbolic _____ 14class_metadata1AC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -89,7 +89,7 @@ class C<T> : B {}
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1CCMa"
 //   Superclass type.
-// CHECK-SAME: @"symbolic \01____ 14class_metadata1BC"
+// CHECK-SAME: @"symbolic _____ 14class_metadata1BC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -150,7 +150,7 @@ class D : E {}
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1DCMa"
 //   Superclass type.
-// CHECK-SAME: @"symbolic \01____ 14class_metadata1EC"
+// CHECK-SAME: @"symbolic _____ 14class_metadata1EC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -167,14 +167,14 @@ class D : E {}
 // CHECK-SAME: i32 1,
 // CHECK-SAME: %swift.method_override_descriptor {
 //   Override table entry #1: base class.
-// CHECK-SAME: @"got.$s14class_metadata1ECMn.1"
+// CHECK-SAME: @"$s14class_metadata1ECMn"
 //   Override table entry #1: base method.
-// CHECK-SAME: @"got.$s14class_metadata1ECACycfCTq"
+// CHECK-SAME: @"$s14class_metadata1ECMn"
 //   Override table entry #1: invocation function.
 // CHECK-SAME: @"$s14class_metadata1DCACycfC"
 // CHECK-SAME: }>, section
 class E {}
 
 // CHECK-LABEL: @"$s14class_metadata1FCMn" =
-// CHECK-SAME: @"symbolic \01____yq_G 14class_metadata1CC"
+// CHECK-SAME: @"symbolic _____yq_G 14class_metadata1CC"
 class F<T, U> : C<U> { }

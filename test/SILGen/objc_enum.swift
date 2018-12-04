@@ -36,8 +36,8 @@ protocol Bub {}
 
 extension NSRuncingOptions: Bub {}
 
-// CHECK-32-DAG: integer_literal $Builtin.Int2048, -2147483648
-// CHECK-64-DAG: integer_literal $Builtin.Int2048, 2147483648
+// CHECK-32-DAG: integer_literal $Builtin.IntLiteral, -2147483648
+// CHECK-64-DAG: integer_literal $Builtin.IntLiteral, 2147483648
 _ = NSFungingMask.toTheMax
 
 // CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: RawRepresentable module gizmo

@@ -2638,6 +2638,10 @@ public:
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
+        if (IsUnresolvedMember &&
+            cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
+          continue;
+        }
         addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
                            /*IsOnType=*/true, name);
       }
@@ -3786,6 +3790,9 @@ public:
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind reason) {
+      if (VD->isOperator())
+        return false;
+
       if (!VD->hasInterfaceType()) {
         TypeResolver->resolveDeclSignature(VD);
         if (!VD->hasInterfaceType())
@@ -3819,6 +3826,11 @@ public:
       // convertible to the contextual type.
       if (auto CD = dyn_cast<TypeDecl>(VD)) {
         declTy = declTy->getMetatypeInstanceType();
+
+        // Emit construction for the same type via typealias doesn't make sense
+        // because we are emitting all `.init()`s.
+        if (declTy->isEqual(T))
+          return false;
         return swift::isConvertibleTo(declTy, T, *DC);
       }
 
@@ -3836,7 +3848,7 @@ public:
         // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
         declTy = FT->getResult();
       }
-      return swift::isConvertibleTo(declTy, T, *DC);
+      return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
     });
 
     auto baseType = MetatypeType::get(T);
@@ -3875,9 +3887,57 @@ public:
 
   using FunctionParams = ArrayRef<AnyFunctionType::Param>;
 
+  static void collectPossibleParamListByQualifiedLookup(
+      DeclContext &DC, Type baseTy, DeclBaseName name,
+      SmallVectorImpl<FunctionParams> &candidates) {
+
+    SmallVector<ValueDecl *, 2> decls;
+    auto resolver = DC.getASTContext().getLazyResolver();
+    if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
+      return;
+
+    for (auto *VD : decls) {
+      if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
+          shouldHideDeclFromCompletionResults(VD))
+        continue;
+      resolver->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        continue;
+      Type declaredMemberType = VD->getInterfaceType();
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+        if (AFD->getDeclContext()->isTypeContext())
+          declaredMemberType = AFD->getMethodInterfaceType();
+
+      auto fnType =
+          baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
+
+      if (!fnType || fnType->hasError())
+        continue;
+      if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
+        candidates.push_back(AFT->getParams());
+      }
+    }
+  }
+
+  static void collectPossibleParamListByQualifiedLookup(
+      DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+      SmallVectorImpl<FunctionParams> &candidates) {
+    ConcreteDeclRef ref = nullptr;
+    auto baseTyOpt = getTypeOfCompletionContextExpr(
+        DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr,
+        ref);
+    if (!baseTyOpt)
+      return;
+    auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
+    if (!baseTy->mayHaveMembers())
+      return;
+
+    collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
+  }
+
   static bool
-  collectPossibleParamLists(DeclContext &DC, ApplyExpr *callExpr,
-                            SmallVectorImpl<FunctionParams> &candidates) {
+  collectPossibleParamListsApply(DeclContext &DC, ApplyExpr *callExpr,
+                                 SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
     if (auto type = fnExpr->getType()) {
@@ -3895,19 +3955,47 @@ public:
         if (auto *funcType = declType->getAs<AnyFunctionType>())
           candidates.push_back(funcType->getParams());
       }
-    } else {
-      ConcreteDeclRef ref = nullptr;
-      auto fnType = getTypeOfCompletionContextExpr(DC.getASTContext(),
-                                                   &DC, CompletionTypeCheckKind::Normal,
-                                                   fnExpr, ref);
+    } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+      collectPossibleParamListByQualifiedLookup(
+          DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+    }
 
+    if (candidates.empty()) {
+      ConcreteDeclRef ref = nullptr;
+      auto fnType = getTypeOfCompletionContextExpr(
+          DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, fnExpr,
+          ref);
       if (!fnType)
         return false;
 
-      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>())
+      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
         candidates.push_back(AFT->getParams());
+      } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
+        auto baseTy = AMT->getInstanceType();
+        if (baseTy->mayHaveMembers())
+          collectPossibleParamListByQualifiedLookup(
+              DC, baseTy, DeclBaseName::createConstructor(), candidates);
+      }
     }
 
+    return !candidates.empty();
+  }
+
+  static bool collectPossibleParamListsSubscript(
+      DeclContext &DC, SubscriptExpr *subscriptExpr,
+      SmallVectorImpl<FunctionParams> &candidates) {
+    if (subscriptExpr->hasDecl()) {
+      if (auto SD =
+              dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
+        auto declType = SD->getInterfaceType();
+        if (auto *funcType = declType->getAs<AnyFunctionType>())
+          candidates.push_back(funcType->getParams());
+      }
+    } else {
+      collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
+                                                DeclBaseName::createSubscript(),
+                                                candidates);
+    }
     return !candidates.empty();
   }
 
@@ -3971,26 +4059,34 @@ public:
   }
 
   static bool
-  collectArgumentExpectation(DeclContext &DC, ApplyExpr *CallE, Expr *CCExpr,
+  collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
                              std::vector<StringRef> &ExpectedNames) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionParams, 4> Candidates;
-    if (!collectPossibleParamLists(DC, CallE, Candidates))
-      return false;
+    Expr *Arg = nullptr;
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
+      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
+        return false;
+      Arg = applyExpr->getArg();
+    } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
+      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
+        return false;
+      Arg = subscriptExpr->getIndex();
+    }
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
     bool HasName;
-    if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
+    if (!getPositionInArgs(DC, Arg, CCExpr, Position, HasName))
       return false;
-    if (!translateArgIndexToParamIndex(CallE->getArg(), Position, HasName))
+    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
       return false;
 
     // Collect possible types (or labels) at the position.
     {
-      bool MayNeedName =
-          !HasName && isa<CallExpr>(CallE) && !CallE->isImplicit();
+      bool MayNeedName = !HasName && !E->isImplicit() &&
+                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto Params : Candidates) {
@@ -5153,24 +5249,18 @@ namespace  {
 
   public:
     llvm::SmallVector<ParentTy, 5> Ancestors;
-    ParentTy ParentClosest;
-    ParentTy ParentFarthest;
     ExprParentFinder(Expr* ChildExpr,
                      llvm::function_ref<bool(ParentTy, ParentTy)> Predicate) :
                      ChildExpr(ChildExpr), Predicate(Predicate) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (E != ChildExpr && Predicate(E, Parent)) {
+      // Finish if we found the target. 'ChildExpr' might have been replaced
+      // with typechecked expression. In that case, match the position.
+      if (E == ChildExpr || arePositionsSame(E, ChildExpr))
+        return { false, nullptr };
+
+      if (Predicate(E, Parent))
         Ancestors.push_back(E);
-        return { true, E };
-      }
-      if (E == ChildExpr || arePositionsSame(E, ChildExpr)) {
-        if (!Ancestors.empty()) {
-          ParentClosest = Ancestors.back();
-          ParentFarthest = Ancestors.front();
-        }
-        return {false, nullptr};
-      }
       return { true, E };
     }
 
@@ -5238,11 +5328,13 @@ public:
         case ExprKind::Binary:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
+        case ExprKind::Subscript:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE || (!isa<CallExpr>(ParentE) &&
-                              !isa<BinaryExpr>(ParentE)&&
+                              !isa<SubscriptExpr>(ParentE) &&
+                              !isa<BinaryExpr>(ParentE) &&
                               !isa<TupleShuffleExpr>(ParentE));
         }
         default:
@@ -5282,13 +5374,13 @@ public:
                    SmallVectorImpl<StringRef> &PossibleNames) {
     switch (Parent->getKind()) {
       case ExprKind::Call:
+      case ExprKind::Subscript:
       case ExprKind::Binary:
       case ExprKind::PrefixUnary: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
         CompletionLookup::collectArgumentExpectation(
-            *DC, cast<ApplyExpr>(Parent), ParsedExpr, PotentialTypes,
-            ExpectedNames);
+            *DC, Parent, ParsedExpr, PotentialTypes, ExpectedNames);
         for (Type Ty : PotentialTypes)
           Callback(Ty);
         for (auto name : ExpectedNames)

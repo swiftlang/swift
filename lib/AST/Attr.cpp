@@ -583,6 +583,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // Print adjoint function name.
     if (auto adjoint = attr->getAdjoint())
       Printer << ", adjoint: " << adjoint->Name;
+    // Print jvp function name.
+    if (auto jvp = attr->getJVP())
+      Printer << ", jvp: " << jvp->Name;
+    // Print vjp function name.
+    if (auto vjp = attr->getVJP())
+      Printer << ", vjp: " << vjp->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
@@ -998,11 +1004,13 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<DeclNameWithLoc> primal,
                                        Optional<DeclNameWithLoc> adjoint,
+                                       Optional<DeclNameWithLoc> jvp,
+                                       Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     Mode(mode), ModeLoc(modeLoc), NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    WhereClause(clause) {
+    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
@@ -1013,6 +1021,8 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            ArrayRef<AutoDiffParameter> parameters,
                            Optional<DeclNameWithLoc> primal,
                            Optional<DeclNameWithLoc> adjoint,
+                           Optional<DeclNameWithLoc> jvp,
+                           Optional<DeclNameWithLoc> vjp,
                            TrailingWhereClause *clause) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(DifferentiableAttr) +
@@ -1020,7 +1030,8 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, mode, modeLoc,
                                       parameters, std::move(primal),
-                                      std::move(adjoint), clause);
+                                      std::move(adjoint), std::move(jvp),
+                                      std::move(vjp), clause);
 }
 
 ArrayRef<AutoDiffParameter>

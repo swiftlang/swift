@@ -63,9 +63,18 @@ def main():
     argparser.add_argument(
         'newbuilddir', nargs=1, type=str,
         help='new benchmark build directory')
+    argparser.add_argument(
+        '-check-added', action='store_const',
+        help="Run BenchmarkDoctor's check on newly added benchmarks",
+        const=lambda args: check_added(args), dest='func')
+    argparser.set_defaults(func=test_opt_levels)
     args = argparser.parse_args()
     VERBOSE = args.verbose
 
+    return args.func(args)
+
+
+def test_opt_levels(args):
     for opt_level in args.opt_levels or ['O', 'Osize', 'Onone']:
         log('Testing optimization level -' + opt_level)
         test_opt_level(opt_level, args.oldbuilddir[0], args.newbuilddir[0],
@@ -178,7 +187,33 @@ def get_results(bench_dir, opt_level, num_samples, to_test):
         sys.stderr.flush()
         return sys.exit(e.returncode)
     else:
-        return output 
+        return output
+
+
+class DriverArgs(object):
+    def __init__(self, tests):
+        self.benchmarks = None
+        self.filters = None
+        self.tests = os.path.join(tests, 'bin')
+        self.optimization = 'O'
+
+
+def check_added(args):
+    from imp import load_source
+    # import Benchmark_Driver  # doesn't work because it misses '.py' extension
+    Benchmark_Driver = load_source(
+        'Benchmark_Driver', os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), 'Benchmark_Driver'))
+    # from Benchmark_Driver import BenchmarkDriver, BenchmarkDoctor
+    BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
+    BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
+
+    old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0]))
+    new = BenchmarkDriver(DriverArgs(args.newbuilddir[0]))
+    added = set(new.tests).difference(set(old.tests))
+    new.tests = list(added)
+    doctor = BenchmarkDoctor(args, driver=new)
+    doctor.check()
 
 
 if __name__ == '__main__':

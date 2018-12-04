@@ -103,6 +103,25 @@ sil_global @static_array_with_empty_element : $TestArrayStorage = {
 }
 // CHECK: @static_array_with_empty_element = {{( dllexport)?}}{{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems3c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems3 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [1 x i8] undef, [1 x i8] undef }> }, align 8
 
+struct MyString {
+  var buffer: Builtin.BridgeObject
+}
+
+sil_global [let] @string_with_offset : $MyString = {
+  %0 = integer_literal $Builtin.Int64, -9223372036854775808
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = integer_literal $Builtin.Int64, 32
+  %3 = string_literal utf8 "abc123asd3sdj3basfasdf"
+  %4 = builtin "ptrtoint_Word"(%3 : $Builtin.RawPointer) : $Builtin.Word
+  %5 = builtin "zextOrBitCast_Word_Int64"(%4 : $Builtin.Word) : $Builtin.Int64
+  %6 = builtin "usub_with_overflow_Int64"(%5 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
+  %8 = builtin "stringObjectOr_Int64"(%7 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
+  %9 = value_to_bridge_object %8 : $Builtin.Int64
+  %initval = struct $MyString (%9 : $Builtin.BridgeObject)
+}
+// CHECK: @string_with_offset = {{.*global .*}} <{ %swift.bridge* inttoptr (i64 add (i64 ptrtoint ([23 x i8]* @0 to i64), i64 9223372036854775776) to %swift.bridge*) }>, align 8
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @_TF2cha1xSi() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret i8* bitcast (%Ts5Int32V* @"$s2ch1xSiv" to i8*)

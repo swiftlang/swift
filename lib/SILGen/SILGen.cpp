@@ -657,10 +657,12 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
              F->getLoweredType().print(llvm::dbgs());
              llvm::dbgs() << '\n';
              if (astNode) {
-               if (auto *decl = astNode.dyn_cast<ValueDecl *>())
+               if (auto *decl = astNode.dyn_cast<ValueDecl *>()) {
                  decl->dump(llvm::dbgs());
-               else
+               } else {
                  astNode.get<Expr *>()->dump(llvm::dbgs());
+                 llvm::dbgs() << "\n";
+               }
                llvm::dbgs() << '\n';
              });
 }
@@ -717,15 +719,15 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // [reverse_differentiable] attributes only make sense on functions with
-  // bodies, because [reverse_differentiable] attributes declare actual primals
+  // [differentiable] attributes only make sense on functions with
+  // bodies, because [differentiable] attributes declare actual primals
   // and adjoints corresponding to the function body.
   if (!AFD->hasBody())
     return;
 
   // If the declaration has a @differentiable(reverse) attribute, turn it into a
-  // SIL [reverse_differentiable] attribute with lowered primal and adjoint
-  // function names and lowered differentiation parameter indices.
+  // SIL [differentiable] attribute with lowered associated function names and
+  // lowered differentiation parameter indices.
   //
   // FIXME: Handle multiple @differentiable attributes.
   if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
@@ -739,7 +741,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
       // Either only adjoint is specified, or both primal and adjoint are
       // spcified.
-      StringRef primName, adjName;
+      StringRef primName, adjName, jvpName, vjpName;
       bool hasPrimitiveAdjoint = false;
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
@@ -755,14 +757,18 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         assert(primName.empty() &&
                "Primal cannot be present if adjoint is not");
       }
+      if (auto *jvpFn = diffAttr->getJVPFunction())
+        jvpName = getFunction(SILDeclRef(jvpFn), ForDefinition)->getName();
+      if (auto *vjpFn = diffAttr->getVJPFunction())
+        vjpName = getFunction(SILDeclRef(vjpFn), ForDefinition)->getName();
       // Get lowered argument indices.
       auto paramIndices = diffAttr->getCheckedParameterIndices()->getLowered(
           AFD->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
-      silOriginalFn->addReverseDifferentiableAttr(
-          SILReverseDifferentiableAttr::create(
+      silOriginalFn->addDifferentiableAttr(
+          SILDifferentiableAttr::create(
             M, indices, primName, adjName,
-            /*primitive*/ hasPrimitiveAdjoint));
+            /*primitive*/ hasPrimitiveAdjoint, jvpName, vjpName));
       break;
     }
     }
@@ -1584,6 +1590,14 @@ public:
         SGF.B.createBuiltin(moduleLoc,
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});
+
+        // Then end the lifetime of the error.
+        //
+        // We do this to appease the ownership verifier. We do not care about
+        // actually destroying the value since we are going to immediately exit,
+        // so this saves us a slight bit of code-size since end_lifetime is
+        // stripped out after ownership is removed.
+        SGF.B.createEndLifetime(moduleLoc, error);
 
         // Signal an abnormal exit by returning 1.
         SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc),

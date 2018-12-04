@@ -725,12 +725,6 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
 // filter()
 //===----------------------------------------------------------------------===//
 
-SequenceTypeTests.test("filter/Sequence/Dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.filter { _ in false }
-  expectCustomizable(tester, tester.log.filter)
-}
-
 SequenceTypeTests.test("filter/Sequence/Semantics") {
   for test in filterTests {
     for underestimatedCountBehavior in [
@@ -838,9 +832,7 @@ func callGenericSequenceMap<S : Sequence, T>(
   return result
 }
 
-% for Implementation in ['Default', 'Custom']:
-
-%   for dispatch in ['Static', 'Generic']:
+% for dispatch in ['Static', 'Generic']:
 
 SequenceTypeTests.test(
   "map/Sequence/${Implementation}Implementation/${dispatch}"
@@ -857,9 +849,6 @@ SequenceTypeTests.test(
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled = 0
-%     end
       var result = call${dispatch}SequenceMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
@@ -868,20 +857,13 @@ SequenceTypeTests.test(
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(
-        1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
-%     end
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(
-        test.sequence.count, timesClosureWasCalled,
+      expectEqual(        test.sequence.count, timesClosureWasCalled,
         "map() should be eager and should only call its predicate"
         + "once per element")
     }
   }
 }
-
-%   end
 
 % end
 
@@ -959,16 +941,6 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
         "flatMap() should not reserve capacity")
     }
   }
-}
-
-//===----------------------------------------------------------------------===//
-// forEach()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("forEach/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.forEach { print($0) }
-  expectCustomizable(tester, tester.log.forEach)
 }
 
 //===----------------------------------------------------------------------===//

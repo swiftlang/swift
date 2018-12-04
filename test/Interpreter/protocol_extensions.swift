@@ -65,7 +65,7 @@ extension Sequence {
 
 extension Sequence {
   public func myZip<S : Sequence>(_ s: S) -> Zip2Sequence<Self, S> {
-    return Zip2Sequence(_sequence1: self, _sequence2: s)
+    return zip(self, s)
   }
 }
 

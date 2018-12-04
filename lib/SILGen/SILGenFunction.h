@@ -295,7 +295,9 @@ public:
   bool NeedsReturn = false;
 
   /// \brief Is emission currently within a formal modification?
-  bool InFormalEvaluationScope = false;
+  bool isInFormalEvaluationScope() const {
+    return FormalEvalContext.isInFormalEvaluationScope();
+  }
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
@@ -636,13 +638,20 @@ public:
   ///
   /// This is used for both concrete witness thunks and default witness
   /// thunks.
+  ///
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// If 'autoDiffFuncId' is 'nullptr', generates the protocol witness entry
+  /// point for 'witness'. Otherwise, generates the protocol witness entry point
+  /// for the coressponding autodiff associated function.
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
-                           IsFreeFunctionWitness_t isFree);
+                           // SWIFT_ENABLE_TENSORFLOW
+                           IsFreeFunctionWitness_t isFree,
+                           AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId);
   
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,

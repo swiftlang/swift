@@ -13,7 +13,7 @@ class SomeDerivedClass : Parent {
   override init() {
     y = 42
 // CHECK-LABEL: sil hidden @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
-// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: integer_literal $Builtin.IntLiteral, 42
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
 // CHECK-NEXT: // function_ref

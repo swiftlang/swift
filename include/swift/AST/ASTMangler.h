@@ -46,12 +46,22 @@ protected:
   /// If disabled, it is an error to try to mangle such an entity.
   bool AllowNamelessEntities = false;
 
-  /// If nonnull, provides a callback to encode symbolic references to
-  /// type contexts.
-  std::function<bool (const DeclContext *Context)>
-    CanSymbolicReference;
-  
-  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+  /// If enabled, some entities will be emitted as symbolic reference
+  /// placeholders. The offsets of these references will be stored in the
+  /// `SymbolicReferences` vector, and it is up to the consumer of the mangling
+  /// to fill these in.
+  bool AllowSymbolicReferences = false;
+
+public:
+  using SymbolicReferent = llvm::PointerUnion<const NominalTypeDecl *,
+                                              const ProtocolConformance *>;
+protected:
+
+  /// If set, the mangler calls this function to determine whether to symbolic
+  /// reference a given entity. Defaults to always returning true.
+  std::function<bool (SymbolicReferent)> CanSymbolicReference;
+
+  std::vector<std::pair<SymbolicReferent, unsigned>> SymbolicReferences;
   
 public:
   enum class SymbolKind {
@@ -109,6 +119,11 @@ public:
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  std::string mangleAutoDiffAssociatedFunctionWitnessThunk(
+      const ProtocolConformance *Conformance, const ValueDecl *Requirement,
+      const AutoDiffAssociatedFunctionIdentifier *AutoDiffFuncId);
 
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);
@@ -292,7 +307,7 @@ protected:
 
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
-  void appendSymbolicReference(const DeclContext *context);
+  void appendSymbolicReference(SymbolicReferent referent);
   
   std::string mangleTypeWithoutPrefix(Type type) {
     appendType(type);
