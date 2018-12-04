@@ -3250,8 +3250,8 @@ namespace {
       }
 
       // SIL-generation magically turns this into a Bool; make sure it can.
-      if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
-        tc.diagnose(expr->getLoc(), diag::bool_intrinsics_not_found);
+      if (!tc.Context.getBoolBuiltinInitDecl()) {
+        tc.diagnose(expr->getLoc(), diag::broken_bool);
         // Continue anyway.
       }
 
