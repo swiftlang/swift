@@ -1990,12 +1990,19 @@ void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
 
 void IRGenSILFunction::
 visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
-  auto *fnVal = getLoweredSingletonExplosion(i->getFunctionOperand());
-  auto assocFnOffset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+  unsigned assocFnOffset = autodiff::getOffsetForAutoDiffAssociatedFunction(
       i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
-  auto structFieldOffset = assocFnOffset + 1;
+  unsigned structFieldOffset = assocFnOffset + 1;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto adFnExp = getLoweredExplosion(i->getFunctionOperand());
   Explosion e;
-  e.add(Builder.CreateExtractValue(fnVal, {structFieldOffset}));
+  e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)adFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
 

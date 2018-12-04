@@ -32,15 +32,33 @@ bb0(%0 : @trivial $Float):
   return %5 : $(Float, @callee_guaranteed (Float) -> Float)
 }
 
-sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Float) -> Float {
+sil @make_diff_func : $@convention(thin) () -> (@autodiff @convention(thin) (Float) -> Float, @convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)) {
 bb0:
   %orig = function_ref @foo : $@convention(thin) (Float) -> Float
   %vjp = function_ref @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   %diffFunc = autodiff_function [wrt 0] [order 1] %orig : $@convention(thin) (Float) -> Float with {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
-  // %extractedVJP = autodiff_function_extract [vjp] [order 1] %diffFunc : $@autodiff @convention(thin) (Float) -> Float
-  return %diffFunc : $@autodiff @convention(thin) (Float) -> Float
+  %extractedVJP = autodiff_function_extract [vjp] [order 1] %diffFunc : $@autodiff @convention(thin) (Float) -> Float
+  %tuple = tuple (%diffFunc : $@autodiff @convention(thin) (Float) -> Float, %extractedVJP : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float))
+  return %tuple : $(@autodiff @convention(thin) (Float) -> Float, @convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float))
 }
 
-// CHECK-LABEL: define swiftcc { i8*, i8*, i8* } @make_diff_func() #0 {
+sil @caller : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @make_diff_func : $@convention(thin) () -> (@autodiff @convention(thin) (Float) -> Float, @convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float))
+  %tuple = apply %f() : $@convention(thin) () -> (@autodiff @convention(thin) (Float) -> Float, @convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float))
+  %vjp = tuple_extract %tuple : $(@autodiff @convention(thin) (Float) -> Float, @convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)), 1
+  %res = apply %vjp(undef) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define swiftcc { i8*, i8*, i8*, i8* } @make_diff_func()
 // CHECK-NEXT: entry:
-// CHECK-NEXT: ret { i8*, i8*, i8* } { i8* bitcast (float (float)* @foo to i8*), i8* undef, i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @foo_vjp to i8*) }
+// CHECK-NEXT:   ret { i8*, i8*, i8*, i8* } { i8* bitcast (float (float)* @foo to i8*), i8* undef, i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @foo_vjp to i8*), i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @foo_vjp to i8*) }
+
+// CHECK-LABEL: define swiftcc void @caller()
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   [[RESULT_TUPLE:%.*]] = call swiftcc { i8*, i8*, i8*, i8* } @make_diff_func()
+// CHECK:   [[VJP:%.*]] = extractvalue { i8*, i8*, i8*, i8* } [[RESULT_TUPLE]], 3
+// CHECK:   [[VJP_TYPED:%.*]] = bitcast i8* [[VJP]] to { float, i8*, %swift.refcounted* } (float)*
+// CHECK:   call swiftcc { float, i8*, %swift.refcounted* } [[VJP_TYPED]](float undef)
