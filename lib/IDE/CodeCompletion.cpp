@@ -4993,12 +4993,13 @@ void collectPossibleCalleesByQualifiedLookup(
     Type declaredMemberType = VD->getInterfaceType();
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
       if (AFD->getDeclContext()->isTypeContext())
-        declaredMemberType = AFD->getMethodInterfaceType();
+        declaredMemberType =
+            declaredMemberType->castTo<AnyFunctionType>()->getResult();
 
     auto fnType =
         baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
 
-    if (!fnType || fnType->hasError())
+    if (!fnType)
       continue;
     if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
       candidates.emplace_back(AFT, VD);
