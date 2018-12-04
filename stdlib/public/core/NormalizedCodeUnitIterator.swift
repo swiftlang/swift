@@ -16,58 +16,6 @@ extension _Normalization {
   internal typealias _SegmentOutputBuffer = _FixedArray16<UInt16>
 }
 
-extension Unicode.Scalar {
-  // Normalization boundary - a place in a string where everything left of the
-  // boundary can be normalized independently from everything right of the
-  // boundary. The concatenation of each result is the same as if the entire
-  // string had been normalized as a whole.
-  //
-  // Normalization segment - a sequence of code units between two normalization
-  // boundaries (without any boundaries in the middle). Note that normalization
-  // segments can, as a process of normalization, expand, contract, and even
-  // produce new sub-segments.
-
-  // Whether this scalar value always has a normalization boundary before it.
-  internal var _hasNormalizationBoundaryBefore: Bool {
-    _internalInvariant(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
-    let value = Int32(bitPattern: self.value)
-    return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
-      _Normalization._nfcNormalizer, value)
-  }
-  internal var _isNFCQCYes: Bool {
-    return __swift_stdlib_u_getIntPropertyValue(
-      Builtin.reinterpretCast(value), __swift_stdlib_UCHAR_NFC_QUICK_CHECK
-    ) == 1
-  }
-}
-
-internal func _tryNormalize(
-  _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer:
-    UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>
-) -> Int? {
-  return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
-}
-internal func _tryNormalize(
-  _ input: UnsafeBufferPointer<UInt16>,
-  into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> Int? {
-  var err = __swift_stdlib_U_ZERO_ERROR
-  let count = __swift_stdlib_unorm2_normalize(
-    _Normalization._nfcNormalizer,
-    input.baseAddress._unsafelyUnwrappedUnchecked,
-    numericCast(input.count),
-    outputBuffer.baseAddress._unsafelyUnwrappedUnchecked,
-    numericCast(outputBuffer.count),
-    &err
-  )
-  guard err.isSuccess else {
-    // The output buffer needs to grow
-    return nil
-  }
-  return numericCast(count)
-}
-
 //
 // Pointer casting helpers
 //
@@ -131,8 +79,10 @@ extension UnsafeBufferPointer where Element == UInt8 {
     if index == 0 || index == count {
       return true
     }
-
     assert(!_isContinuation(self[_unchecked: index]))
+
+    // Sub-300 latiny fast-path
+    if self[_unchecked: index] < 0xCC { return true }
 
     let cu = _decodeScalar(self, startingAt: index).0
     return cu._hasNormalizationBoundaryBefore
@@ -190,34 +140,6 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
     defer { bufferIndex += 1 }
 
     return utf8Buffer[bufferIndex]
-  }
-
-  internal mutating func compare(
-    with other: _NormalizedUTF8CodeUnitIterator
-  ) -> _StringComparisonResult {
-    var mutableOther = other
-
-    for cu in self {
-      if let otherCU = mutableOther.next() {
-        let result = _lexicographicalCompare(cu, otherCU)
-        if result == .equal {
-          continue
-        } else {
-          return result
-        }
-      } else {
-        //other returned nil, we are greater
-        return .greater
-      }
-    }
-
-    //we ran out of code units, either we are equal, or only we ran out and
-    //other is greater
-    if let _ = mutableOther.next() {
-      return .less
-    } else {
-      return .equal
-    }
   }
 }
 
@@ -513,16 +435,6 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
   @inline(__always)
   @_effects(releasenone)
   private mutating func fastPathFill() -> (numRead: Int, numWritten: Int) {
-    // Quick check if a scalar is NFC and a segment starter
-    @inline(__always) func isNFCStarter(_ scalar: Unicode.Scalar) -> Bool {
-      // Fast-path: All scalars up through U+02FF are NFC and have boundaries
-      // before them
-      if scalar.value < 0x300 { return true }
-
-      // Otherwise, consult the properties
-      return scalar._hasNormalizationBoundaryBefore && scalar._isNFCQCYes
-    }
-
     // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
     // TODO: Just freakin do normalization and don't bother with ICU
     var outputCount = 0
@@ -540,7 +452,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
           if _slowPath(
                !utf8.hasNormalizationBoundary(before: inputCount &+ len)
-            || !isNFCStarter(scalar)
+            || !scalar._isNFCStarter
           ) {
             break 
           }
@@ -566,7 +478,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
         if _slowPath(
              !gutsSlice.foreignHasNormalizationBoundary(
                before: startIdx.encoded(offsetBy: len))
-          || !isNFCStarter(scalar)
+          || !scalar._isNFCStarter
         ) {
           break 
         }
@@ -627,29 +539,22 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
   @_effects(readonly)
   internal mutating func compare(
-    with other: _NormalizedUTF8CodeUnitIterator_2
-  ) -> _StringComparisonResult {
-    var iter = self
+    with other: _NormalizedUTF8CodeUnitIterator_2,
+    expecting: _StringComparisonResult
+  ) -> Bool {
     var mutableOther = other
 
-    while let cu = iter.next() {
-      if let otherCU = mutableOther.next() {
-        let result = _lexicographicalCompare(cu, otherCU)
-        if result == .equal {
-          continue
-        }
-        return result
+    for cu in self {
+      guard let otherCU = mutableOther.next() else {
+        // We have more code units, therefore we are greater
+        return false
       }
-      //other returned nil, we are greater
-      return .greater
+      if cu == otherCU { continue }
+      return expecting == .less ? cu < otherCU : false
     }
 
-    //we ran out of code units, either we are equal, or only we ran out and
-    //other is greater
-    if let _ = mutableOther.next() {
-      return .less
-    }
-    return .equal
+    // We have exhausted our code units. We are less if there's more remaining
+    return mutableOther.next() == nil ? expecting == .equal : expecting == .less
   }
 }
 
