@@ -275,8 +275,8 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
-    option('--no-legacy-impl', store_false('legacy_impl'),
-           help='avoid legacy implementation')
+    option('--legacy-impl', store_true('legacy_impl'),
+           help='use legacy implementation')
 
     option('--build-runtime-with-host-compiler', toggle_true,
            help='Use the host compiler, not the self-built one to compile the '
