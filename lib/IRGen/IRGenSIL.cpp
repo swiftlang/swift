@@ -3727,8 +3727,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
       emitShadowCopyIfNeeded(Addr, i->getDebugScope(), Name, VarInfo->ArgNo,
                              IsAnonymous),
       DbgTy, SILType(), i->getDebugScope(), Decl, Name, VarInfo->ArgNo,
-      (IsLoadablyByAddress || DbgTy.isImplicitlyIndirect()) ? DirectValue
-                                                            : IndirectValue);
+      (IsLoadablyByAddress) ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
@@ -3995,10 +3994,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
       RealType, type);
-
-  // FIXME: This is working around the inverse special case in LLDB.
-  if (DbgTy.isImplicitlyIndirect())
-    Indirection = DirectValue;
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
