@@ -45,10 +45,12 @@ bool BuiltinInfo::isReadNone() const {
 }
 
 bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
-  // FIXME: We should not be relying on the global LLVM context.
-  llvm::AttributeList attrs =
-      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  return (attrs.hasAttribute(llvm::AttributeList::FunctionIndex, Kind));
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
+  if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
+    // FIXME: We should not be relying on the global LLVM context.
+    Attrs = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+  }
+  return Attrs.hasFnAttribute(Kind);
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {

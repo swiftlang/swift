@@ -107,7 +107,10 @@ public:
 };
 
 /// \brief The information identifying the llvm intrinsic - its id and types.
-struct IntrinsicInfo {
+class IntrinsicInfo {
+  mutable llvm::AttributeList Attrs =
+      llvm::DenseMapInfo<llvm::AttributeList>::getEmptyKey();
+public:
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
   bool hasAttribute(llvm::Attribute::AttrKind Kind) const;
