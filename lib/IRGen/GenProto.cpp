@@ -1918,9 +1918,7 @@ namespace {
       Flags = Flags.withNumConditionalRequirements(numConditional);
 
       // Relative reference to the witness table.
-      auto witnessTableRef =
-        ConstantReference(Description.pattern, ConstantReference::Direct);
-      B.addRelativeAddress(witnessTableRef);
+      B.addRelativeAddressOrNull(Description.pattern);
     }
 
     void addFlags() {
@@ -2244,19 +2242,27 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
-  bool isDependent = isDependentConformance(conf, /*considerResilience=*/true);
-  auto global = cast<llvm::GlobalVariable>(
-    isDependent
-      ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
-                                     initializer)
-      : getAddrOfWitnessTable(conf, initializer));
-  global->setConstant(isConstantWitnessTable(wt));
-  global->setAlignment(getWitnessTableAlignment().getValue());
+  llvm::GlobalVariable *global = nullptr;
+  unsigned tableSize;
+  if (!isResilientConformance(conf)) {
+    bool isDependent =
+      isDependentConformance(conf, /*considerResilience=*/false);
+    global = cast<llvm::GlobalVariable>(
+      isDependent
+        ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
+                                       initializer)
+        : getAddrOfWitnessTable(conf, initializer));
+    global->setConstant(isConstantWitnessTable(wt));
+    global->setAlignment(getWitnessTableAlignment().getValue());
+    tableSize = wtableBuilder.getTableSize();
+  } else {
+    initializer.abandon();
+    tableSize = 0;
+  }
 
   // Collect the information that will go into the protocol conformance
   // descriptor.
-  ConformanceDescription description(conf, wt, global,
-                                     wtableBuilder.getTableSize(),
+  ConformanceDescription description(conf, wt, global, tableSize,
                                      wtableBuilder.getTablePrivateSize(),
                                      wtableBuilder.requiresSpecialization(),
                                      isDependentConformance(
