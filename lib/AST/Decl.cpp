@@ -557,6 +557,12 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (auto *dtor = dyn_cast<DestructorDecl>(this))
     return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
 
+  auto *dc = getDeclContext();
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    return ext->isWeakImported(fromModule);
+  if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
+    return ntd->isWeakImported(fromModule);
+
   // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
