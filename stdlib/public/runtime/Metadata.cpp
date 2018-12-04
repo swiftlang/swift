@@ -310,12 +310,39 @@ namespace {
   };
 } // end anonymous namespace
 
-using GenericMetadataCache = MetadataCache<GenericCacheEntry, false>;
-using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
+namespace {
+  class GenericMetadataCache : public MetadataCache<GenericCacheEntry, false> {
+  public:
+    uint16_t NumKeyParameters;
+    uint16_t NumWitnessTables;
+
+    GenericMetadataCache(const TargetGenericContext<InProcess> &genericContext)
+        : NumKeyParameters(0), NumWitnessTables(0) {
+      // Count up the # of key parameters and # of witness tables.
+
+      // Find key generic parameters.
+      for (const auto &gp : genericContext.getGenericParams()) {
+        if (gp.hasKeyArgument())
+          ++NumKeyParameters;
+      }
+
+      // Find witness tables.
+      for (const auto &req : genericContext.getGenericRequirements()) {
+        if (req.Flags.hasKeyArgument() &&
+            req.getKind() == GenericRequirementKind::Protocol)
+          ++NumWitnessTables;
+      }
+    }
+  };
+
+  using LazyGenericMetadataCache = Lazy<GenericMetadataCache>;
+}
 
 /// Fetch the metadata cache for a generic metadata structure.
 static GenericMetadataCache &getCache(
-    const TypeGenericContextDescriptorHeader &generics) {
+                               const TypeContextDescriptor &description) {
+  auto &generics = description.getFullGenericContextHeader();
+
   // Keep this assert even if you change the representation above.
   static_assert(sizeof(LazyGenericMetadataCache) <=
                 sizeof(GenericMetadataInstantiationCache::PrivateData),
@@ -324,7 +351,7 @@ static GenericMetadataCache &getCache(
   auto lazyCache =
     reinterpret_cast<LazyGenericMetadataCache*>(
       generics.getInstantiationCache()->PrivateData);
-  return lazyCache->get();
+  return lazyCache->getWithInit(*description.getGenericContext());
 }
 
 /// Fetch the metadata cache for a generic metadata structure,
@@ -569,9 +596,11 @@ swift::swift_getGenericMetadata(MetadataRequest request,
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto key = MetadataCacheKey(arguments, numGenericArgs);
-  auto result =
-    getCache(generics).getOrInsert(key, request, description, arguments);
+  auto &cache = getCache(*description);
+  assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
+  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                              arguments);
+  auto result = cache.getOrInsert(key, request, description, arguments);
 
   return result.second;
 }
@@ -4379,11 +4408,15 @@ static Result performOnMetadataCache(const Metadata *metadata,
   auto genericArgs =
     reinterpret_cast<const void * const *>(
                                     description->getGenericArguments(metadata));
+  auto &cache = getCache(*description);
   size_t numGenericArgs = generics.Base.NumKeyArguments;
-  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  assert(numGenericArgs == cache.NumKeyParameters + cache.NumWitnessTables);
+  (void)numGenericArgs;
+  auto key = MetadataCacheKey(cache.NumKeyParameters, cache.NumWitnessTables,
+                              genericArgs);
 
   return std::move(callbacks).forGenericMetadata(metadata, description,
-                                                 getCache(generics), key);
+                                                 cache, key);
 }
 
 bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
