@@ -513,17 +513,16 @@ extension LetThereBeCrash {
 }
 
 protocol SomeProtocol {
-	func someFunction()
-	func anotherFunction()
+  func someFunction()
+  func anotherFunction()
 }
 
 extension SomeProtocol {
-	
-	func someFunction() {
-		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective C}}
-	}
-	
- func anotherFunction() { 
-  print("Hello world!")
+  func someFunction() {
+    let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective C}}
+  }
+
+  func anotherFunction() { 
+    print("Hello world!")
  }
 }
