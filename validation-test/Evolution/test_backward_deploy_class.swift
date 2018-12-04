@@ -70,12 +70,12 @@ BackwardDeployClassTest.test("OpenClass") {
 }
 
 BackwardDeployClassTest.test("InsertSuperclass") {
-  class DerivedClass : Top {
+  class DerivedClass : Bottom {
     var count: Int = 0
 
-    override func bottomMethod() {
+    override func topMethod() {
       count += 1
-      super.bottomMethod()
+      super.topMethod()
     }
 
     override func middleMethod() {
@@ -86,7 +86,7 @@ BackwardDeployClassTest.test("InsertSuperclass") {
 
   let d = DerivedClass()
 
-  d.bottomMethod()
+  d.topMethod()
   if getVersion() == 1 {
     d.middleMethod()
     expectEqual(d.count, 11)

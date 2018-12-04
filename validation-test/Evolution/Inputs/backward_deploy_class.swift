@@ -64,22 +64,22 @@ open class OpenClass {
 }
 
 // Inserting a superclass
-open class Bottom {
+open class Top {
   public init() {}
 
-  open func bottomMethod() {}
+  open func topMethod() {}
 }
 
 #if BEFORE
 
-open class Top : Bottom {}
+open class Bottom : Top {}
 
 #else
 
-@_weakLinked open class Middle : Bottom {
+@_weakLinked open class Middle : Top {
   open func middleMethod() {}
 }
 
-open class Top : Middle {}
+open class Bottom : Middle {}
 
 #endif
