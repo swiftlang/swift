@@ -1322,7 +1322,7 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
                                  ArrayRef<Type> TypeArgs,
                                  ASTContext &Context,
                                  SmallVectorImpl<Type> &ArgElts,
-                                 Type &ResultTy, FunctionType::ExtInfo &Info) {
+                                 Type &ResultTy) {
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   SmallVector<IITDescriptor, 8> Table;
   getIntrinsicInfoTableEntries(ID, Table);
@@ -1344,7 +1344,6 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
   // Translate LLVM function attributes to Swift function attributes.
   llvm::AttributeList attrs =
       llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
@@ -1438,10 +1437,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (llvm::Intrinsic::ID ID = getLLVMIntrinsicID(OperationName)) {
     SmallVector<Type, 8> ArgElts;
     Type ResultTy;
-    FunctionType::ExtInfo Info;
-    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,
-                                         Info))
-      return getBuiltinFunction(Id, ArgElts, ResultTy, Info);
+    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
+      return getBuiltinFunction(Id, ArgElts, ResultTy);
   }
   
   // If this starts with fence, we have special suffixes to handle.
