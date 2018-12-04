@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -128,15 +128,4 @@ extension Result where Error == Swift.Error {
 
 extension Result : Equatable where Value : Equatable, Error : Equatable { }
 
-extension Result : Hashable where Value : Hashable, Error : Hashable {
-  public func hash(into hasher: inout Hasher) {
-    switch self {
-    case let .value(value):
-      hasher.combine(value)
-      hasher.combine(Optional<Error>.none)
-    case let .error(error):
-      hasher.combine(Optional<Value>.none)
-      hasher.combine(error)
-    }
-  }
-}
+extension Result : Hashable where Value : Hashable, Error : Hashable { }

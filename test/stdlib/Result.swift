@@ -21,14 +21,14 @@ fileprivate extension Result {
     case .error:
       return nil
     }
-    
-    var error: Error? {
-      switch self {
-      case .value:
-        return nil
-      case let .error(error):
-        return error
-      }
+  }
+  
+  var error: Error? {
+    switch self {
+    case .value:
+      return nil
+    case let .error(error):
+      return error
     }
   }
 }
@@ -71,14 +71,7 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   let result1 = Result { try throwing() }
   let result2 = Result { try notThrowing() }
   
-  // Kept getting enum case 'error' cannot be used as an instance member, so get value manually.
-  switch result1 {
-  case let .error(error):
-    expectEqual(error as? Err, Err.err)
-  case .value:
-    expectUnreachable() 
-  }
-  
+  expectEqual(result1.error as? Err, Err.err)
   expectEqual(result2.value, string)
     
   do {
