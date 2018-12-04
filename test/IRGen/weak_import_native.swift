@@ -170,3 +170,8 @@ class WeakGenericSub: GenericC<Int> {
     // CHECK-DAG: declare extern_weak swiftcc {{.+}} @"$s25weak_import_native_helper8GenericCCfd"
   }
 }
+
+protocol RefinesP : BaseP {}
+
+// CHECK-DAG: @"$s25weak_import_native_helper1SVAA5BasePAAWP" = extern_weak global i8*
+extension S : RefinesP {}

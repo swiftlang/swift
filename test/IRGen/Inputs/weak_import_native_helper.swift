@@ -118,3 +118,6 @@ public protocol ProtocolWithWeakMembers {
 extension ProtocolWithWeakMembers {
   @_weakLinked public func f() {}
 }
+
+public protocol BaseP {}
+@_weakLinked extension S : BaseP {}
