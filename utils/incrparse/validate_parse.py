@@ -4,11 +4,9 @@ from __future__ import print_function
 
 import argparse
 import os
-import subprocess
 import sys
 
-from test_util import TestFailedError, run_command, \
-    serializeIncrParseMarkupFile
+from test_util import TestFailedError, serializeIncrParseMarkupFile
 
 
 def main():
@@ -102,19 +100,18 @@ def main():
         sys.exit(1)
 
     # Check if the two syntax trees are the same
-    try:
-        run_command(
-            [
-                'diff', '-u',
-                incremental_serialized_file,
-                post_edit_serialized_file
-            ])
-    except subprocess.CalledProcessError as e:
+    import difflib
+    lines = difflib.unified_diff(open(incremental_serialized_file).readlines(),
+                                 open(post_edit_serialized_file).readlines(),
+                                 fromfile=incremental_serialized_file,
+                                 tofile=incremental_serialized_file)
+    diff = '\n'.join(line for line in lines)
+    if diff:
         print('Test case "%s" of %s FAILed' % (test_case, test_file),
               file=sys.stderr)
         print('Syntax tree of incremental parsing does not match '
               'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
-        print(e.output, file=sys.stderr)
+        print(diff, file=sys.stderr)
         sys.exit(1)
 
 
