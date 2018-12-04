@@ -26,6 +26,11 @@ module visualc [system] {
     export *
   }
 
+  module setjmp {
+    header "setjmp.h"
+    export *
+  }
+
   module stdint {
     header "stdint.h"
     export *

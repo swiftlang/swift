@@ -105,6 +105,12 @@ void TBDGenVisitor::addAssociatedConformanceDescriptor(
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addBaseConformanceDescriptor(
+                                           BaseConformance conformance) {
+  auto entity = LinkEntity::forBaseConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -431,15 +437,18 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
 
-      // Skip inherited requirements.
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType()))
-        continue;
-
-      AssociatedConformance conformance(
-        PD,
-        req.getFirstType()->getCanonicalType(),
-        req.getSecondType()->castTo<ProtocolType>()->getDecl());
-      addAssociatedConformanceDescriptor(conformance);
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
+        BaseConformance conformance(
+          PD,
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addBaseConformanceDescriptor(conformance);
+      } else {
+        AssociatedConformance conformance(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addAssociatedConformanceDescriptor(conformance);
+      }
     }
 
     for (auto *member : PD->getMembers()) {
