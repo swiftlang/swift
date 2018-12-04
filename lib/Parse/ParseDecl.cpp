@@ -396,14 +396,11 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
     consumeToken();
 
-    auto diagnoseIfDuplicate = [&](StringRef Value) -> bool {
-      if (!Value.empty()) {
-        AnyArgumentInvalid = true;
+    auto diagnoseDuplicate = [&](bool WasEmpty) {
+      if (!WasEmpty) {
         diagnose(ArgumentLoc, diag::attr_availability_invalid_duplicate,
                  ArgumentKindStr);
-        return true;
       }
-      return false;
     };
 
     switch (ArgumentKind) {
@@ -438,9 +435,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       }
 
       if (ArgumentKind == IsMessage) {
-        if (diagnoseIfDuplicate(Message)) {
-          break;
-        }
+        diagnoseDuplicate(Message.empty());
         Message = Value.getValue();
       } else {
         ParsedDeclName parsedName = parseDeclName(Value.getValue());
@@ -449,9 +444,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
           AnyArgumentInvalid = true;
           break;
         }
-        if (diagnoseIfDuplicate(Renamed)) {
-          break;
-        }
+        diagnoseDuplicate(Renamed.empty());
         Renamed = Value.getValue();
       }
 
@@ -493,6 +486,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
               ? Introduced
               : (ArgumentKind == IsDeprecated) ? Deprecated : Obsoleted;
 
+      bool VerArgWasEmpty = VerArg.empty();
       if (parseVersionTuple(
               VerArg.Version, VerArg.Range,
               Diagnostic(diag::attr_availability_expected_version, AttrName))) {
@@ -501,6 +495,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
           consumeToken();
       }
       VerArg.DelimiterLoc = DelimiterLoc;
+      diagnoseDuplicate(VerArgWasEmpty);
 
       SyntaxContext->createNodeInPlace(SyntaxKind::AvailabilityLabeledArgument);
 

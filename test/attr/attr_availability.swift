@@ -1057,3 +1057,15 @@ func rdar46348825_message() {}
 @available(*, deprecated, renamed: "rdar46348825_message", renamed: "unavailable_func_with_message")
 // expected-warning@-1 {{'renamed' argument has already been specified}}
 func rdar46348825_renamed() {}
+
+@available(swift, introduced: 4.0, introduced: 4.0)
+// expected-warning@-1 {{'introduced' argument has already been specified}}
+func rdar46348825_introduced() {}
+
+@available(swift, deprecated: 4.0, deprecated: 4.0)
+// expected-warning@-1 {{'deprecated' argument has already been specified}}
+func rdar46348825_deprecated() {}
+
+@available(swift, obsoleted: 4.0, obsoleted: 4.0)
+// expected-warning@-1 {{'obsoleted' argument has already been specified}}
+func rdar46348825_obsoleted() {}
