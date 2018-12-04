@@ -3634,19 +3634,63 @@ getWitnessFunctionType(SILGenModule &SGM,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// When 'autoDiffFuncId', gets a function ref to 'witness'. Otherwise, gets a
+/// function ref to the autodiff associated function corresponding to 'witness'
+/// and 'autoDiffFuncId'.
 static SILValue
 getWitnessFunctionRef(SILGenFunction &SGF,
                       SILDeclRef witness,
                       CanSILFunctionType witnessFTy,
                       WitnessDispatchKind witnessKind,
                       SmallVectorImpl<ManagedValue> &witnessParams,
-                      SILLocation loc) {
+                      SILLocation loc,
+                      // SWIFT_ENABLE_TENSORFLOW
+                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) {
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
+    // SWIFT_ENABLE_TENSORFLOW
+    if (autoDiffFuncId) {
+      // Look up the associated autodiff function and emit a ref to that.
+      // TODO: We should replace this with `autodiff_function_extract`, like:
+      //   %adfunc = autodiff_function %orig
+      //   %assocfunc = autodiff_function_extract [...] %adfunc
+      // This is not yet possible because `autodiff_function_extract` does not
+      // calculate the right type.
+
+      auto *diffAttr =
+          witness.getDecl()->getAttrs().getAttribute<DifferentiableAttr>();
+      assert(diffAttr && autoDiffFuncId->getDifferentiationOrder() == 1
+             && *diffAttr->getCheckedParameterIndices() ==
+                *autoDiffFuncId->getParameterIndices()
+             && "TODO: use `autodiff_function_extract` so that we support "
+                "non-manually-specified associated functions");
+
+      FuncDecl *associatedFuncDecl = nullptr;
+      switch (autoDiffFuncId->getKind()) {
+      case AutoDiffAssociatedFunctionKind::JVP:
+        associatedFuncDecl = diffAttr->getJVPFunction();
+        break;
+      case AutoDiffAssociatedFunctionKind::VJP:
+        associatedFuncDecl = diffAttr->getVJPFunction();
+        break;
+      }
+
+      assert(associatedFuncDecl
+             && "TODO: use `autodiff_function_extract` so that we support "
+                "non-manually-specified associated functions");
+
+      return SGF.emitGlobalFunctionRef(loc, SILDeclRef(associatedFuncDecl));
+    }
+
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(!autoDiffFuncId);
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Class: {
+    // SWIFT_ENABLE_TENSORFLOW
+    assert(!autoDiffFuncId);
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
   }
@@ -3680,7 +3724,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          SubstitutionMap reqtSubs,
                                          SILDeclRef witness,
                                          SubstitutionMap witnessSubs,
-                                         IsFreeFunctionWitness_t isFree) {
+                                         // SWIFT_ENABLE_TENSORFLOW
+                                         IsFreeFunctionWitness_t isFree,
+                                         AutoDiffAssociatedFunctionIdentifier
+                                             *autoDiffFuncId) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -3701,8 +3748,18 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   collectThunkParams(loc, origParams);
 
   // Get the type of the witness.
-  auto witnessInfo = getConstantInfo(witness);
-  CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
+  // SWIFT_ENABLE_TENSORFLOW
+  CanAnyFunctionType witnessOrigTy = getConstantInfo(witness).LoweredType;
+  if (autoDiffFuncId) {
+    auto associated = witnessOrigTy->getAutoDiffAssociatedFunctionType(
+        *autoDiffFuncId->getParameterIndices(),
+        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
+        LookUpConformanceInModule(SGM.M.getSwiftModule()),
+        /*selfUncurried*/ true);
+    witnessOrigTy = cast<AnyFunctionType>(associated->getCanonicalType());
+  }
+
+  CanAnyFunctionType witnessSubstTy = witnessOrigTy;
   if (auto genericFnType = dyn_cast<GenericFunctionType>(witnessSubstTy)) {
     witnessSubstTy = cast<FunctionType>(genericFnType
                                           ->substGenericArgs(witnessSubs)
@@ -3732,24 +3789,37 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
   auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffFuncId) {
+    auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+        witnessSubstTy, /*selfUncurried*/ true);
+    origWitnessFTy = origWitnessFTy->getAutoDiffAssociatedFunctionType(
+        loweredIndices, autoDiffFuncId->getDifferentiationOrder(),
+        autoDiffFuncId->getKind(), SGM.M,
+        LookUpConformanceInModule(SGM.M.getSwiftModule()));
+  }
   auto witnessFTy = origWitnessFTy;
   if (!witnessSubs.empty())
     witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
 
   SmallVector<ManagedValue, 8> witnessParams;
-  AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
+  // SWIFT_ENABLE_TENSORFLOW
+  AbstractionPattern witnessOrigTyPattern(witnessOrigTy);
   TranslateArguments(*this, loc,
                      origParams, witnessParams,
                      witnessFTy->getParameters())
     .translate(reqtOrigTy,
                reqtSubstParams,
-               witnessOrigTy,
+               // SWIFT_ENABLE_TENSORFLOW
+               witnessOrigTyPattern,
                witnessSubstParams);
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
                                                 origWitnessFTy,
                                                 witnessKind,
-                                                witnessParams, loc);
+                                                // SWIFT_ENABLE_TENSORFLOW
+                                                witnessParams, loc,
+                                                autoDiffFuncId);
 
   auto coroutineKind =
     witnessFnRef->getType().castTo<SILFunctionType>()->getCoroutineKind();
@@ -3763,7 +3833,8 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   if (coroutineKind == SILCoroutineKind::None) {
     //   - indirect results
     resultPlanner.emplace(*this, loc);
-    resultPlanner->plan(witnessOrigTy.getFunctionResultType(),
+    // SWIFT_ENABLE_TENSORFLOW
+    resultPlanner->plan(witnessOrigTyPattern.getFunctionResultType(),
                         witnessSubstTy.getResult(),
                         reqtOrigTy.getFunctionResultType(),
                         reqtSubstTy.getResult(),

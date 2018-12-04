@@ -1,0 +1,131 @@
+// SWIFT_ENABLE_TENSORFLOW
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-sil %s -emit-ir | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol DifferentiableReq {
+  @differentiable(reverse)
+  func f(_ x: Float) -> Float
+}
+
+struct DifferentiableConf : DifferentiableReq {
+  @differentiable(reverse, jvp: df, vjp: pf)
+  func f(_ x: Float) -> Float
+  func df(_ x: Float) -> (Float, (Float) -> Float)
+  func pf(_ x: Float) -> (Float, (Float) -> Float)
+  init()
+}
+
+// DifferentiableConf.f(_:)
+sil hidden [differentiable source 0 wrt 0 primal @AD__$s22autodiff_witness_table18DifferentiableConfV1fyS2fF__primal_src_0_wrt_0 adjoint @AD__$s22autodiff_witness_table18DifferentiableConfV1fyS2fF__adjoint_src_0_wrt_0 jvp @$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfF vjp @$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfF] @$s22autodiff_witness_table18DifferentiableConfV1fyS2fF : $@convention(method) (Float, DifferentiableConf) -> Float {
+// %0                                             // users: %4, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConf):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConf, let, name "self", argno 2 // id: %3
+  return %0 : $Float                              // id: %4
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfV1fyS2fF'
+
+// DifferentiableConf.df(_:)
+sil hidden @$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // users: %6, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConf):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConf, let, name "self", argno 2 // id: %3
+  // function_ref closure #1 in DifferentiableConf.df(_:)
+  %4 = function_ref @$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float // user: %5
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float // user: %6
+  %6 = tuple (%0 : $Float, %5 : $@callee_guaranteed (Float) -> Float) // user: %7
+  return %6 : $(Float, @callee_guaranteed (Float) -> Float) // id: %7
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfF'
+
+// DifferentiableConf.pf(_:)
+sil hidden @$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // users: %6, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConf):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConf, let, name "self", argno 2 // id: %3
+  // function_ref closure #1 in DifferentiableConf.pf(_:)
+  %4 = function_ref @$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float // user: %5
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float // user: %6
+  %6 = tuple (%0 : $Float, %5 : $@callee_guaranteed (Float) -> Float) // user: %7
+  return %6 : $(Float, @callee_guaranteed (Float) -> Float) // id: %7
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfF'
+
+// closure #1 in DifferentiableConf.df(_:)
+sil private @$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float {
+// %0                                             // users: %2, %1
+bb0(%0 : $Float):
+  debug_value %0 : $Float, let, name "v", argno 1 // id: %1
+  return %0 : $Float                              // id: %2
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfFS2fcfU_'
+
+// closure #1 in DifferentiableConf.pf(_:)
+sil private @$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float {
+// %0                                             // users: %2, %1
+bb0(%0 : $Float):
+  debug_value %0 : $Float, let, name "v", argno 1 // id: %1
+  return %0 : $Float                              // id: %2
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfFS2fcfU_'
+
+// protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+sil private [transparent] [thunk] @$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqA2aDP1fyS2fFTW : $@convention(witness_method: DifferentiableReq) (Float, @in_guaranteed DifferentiableConf) -> Float {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConf):
+  %2 = load %1 : $*DifferentiableConf             // user: %4
+  // function_ref DifferentiableConf.f(_:)
+  %3 = function_ref @$s22autodiff_witness_table18DifferentiableConfV1fyS2fF : $@convention(method) (Float, DifferentiableConf) -> Float // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConf) -> Float // user: %5
+  return %4 : $Float                              // id: %5
+} // end sil function '$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqA2aDP1fyS2fFTW'
+
+// jvpMSU protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+sil private [transparent] [thunk] @$s3jvp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableReq) (Float, @in_guaranteed DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConf):
+  %2 = load %1 : $*DifferentiableConf             // user: %4
+  // function_ref DifferentiableConf.df(_:)
+  %3 = function_ref @$s22autodiff_witness_table18DifferentiableConfV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) // users: %6, %5
+  %5 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 0 // user: %7
+  %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
+  %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
+  return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
+} // end sil function '$s3jvp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW'
+
+// vjpMSU protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+sil private [transparent] [thunk] @$s3vjp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableReq) (Float, @in_guaranteed DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConf):
+  %2 = load %1 : $*DifferentiableConf             // user: %4
+  // function_ref DifferentiableConf.pf(_:)
+  %3 = function_ref @$s22autodiff_witness_table18DifferentiableConfV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConf) -> (Float, @owned @callee_guaranteed (Float) -> Float) // users: %6, %5
+  %5 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 0 // user: %7
+  %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
+  %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
+  return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
+} // end sil function '$s3vjp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW'
+
+sil_witness_table hidden DifferentiableConf: DifferentiableReq module autodiff_witness_table {
+  method #DifferentiableReq.f!1: <Self where Self : DifferentiableReq> (Self) -> (Float) -> Float : @$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqA2aDP1fyS2fFTW	// protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+  autodiff_associated_function jvp 1 MSU #DifferentiableReq.f!1: <Self where Self : DifferentiableReq> (Self) -> (Float) -> Float : @$s3jvp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW	// jvpMSU protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+  autodiff_associated_function vjp 1 MSU #DifferentiableReq.f!1: <Self where Self : DifferentiableReq> (Self) -> (Float) -> Float : @$s3vjp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW	// vjpMSU protocol witness for DifferentiableReq.f(_:) in conformance DifferentiableConf
+}
+
+// CHECK: @"$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqAAWP" = hidden constant [4 x i8*] [
+// CHECK: i8* bitcast (%swift.protocol_conformance_descriptor* @"$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqAAMc" to i8*),
+// CHECK: i8* bitcast (float (float, %T22autodiff_witness_table18DifferentiableConfV*, %swift.type*, i8**)* @"$s22autodiff_witness_table18DifferentiableConfVAA0D3ReqA2aDP1fyS2fFTW" to i8*),
+// CHECK: i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T22autodiff_witness_table18DifferentiableConfV*, %swift.type*, i8**)* @"$s3jvp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW" to i8*),
+// CHECK: i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T22autodiff_witness_table18DifferentiableConfV*, %swift.type*, i8**)* @"$s3vjp008MSU_xiEp22autodiff_witness_table18DifferentiableConfVAC0E3ReqA2cFP1fyS2fFTW" to i8*)
+// CHECK: ]
+

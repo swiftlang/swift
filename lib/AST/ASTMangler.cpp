@@ -216,6 +216,44 @@ std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
 std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
+
+  // Concrete witness thunks get a special mangling.
+  if (Conformance)
+    appendProtocolConformance(Conformance);
+
+  if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
+    appendConstructorEntity(ctor, /*isAllocating=*/true);
+  } else {
+    assert(isa<FuncDecl>(Requirement) && "expected function");
+    appendEntity(cast<FuncDecl>(Requirement));
+  }
+
+  if (Conformance)
+    appendOperator("TW");
+  return finalize();
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+std::string ASTMangler::mangleAutoDiffAssociatedFunctionWitnessThunk(
+    const ProtocolConformance *Conformance, const ValueDecl *Requirement,
+    const AutoDiffAssociatedFunctionIdentifier *id) {
+  assert(id);
+
+  beginMangling();
+
+  // TODO: Proper mangling for autodiff associated function witness thunks.
+  switch (id->getKind()) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    appendIdentifier("jvp");
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    appendIdentifier("vjp");
+    break;
+  }
+  appendIdentifier(id->getParameterIndices()->getString() + " ");
+
+  // The rest of this function is copy-pasted from `mangleWitnessThunk`.
+
   // Concrete witness thunks get a special mangling.
   if (Conformance)
     appendProtocolConformance(Conformance);

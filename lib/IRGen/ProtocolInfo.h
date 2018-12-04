@@ -42,10 +42,17 @@ class WitnessTableEntry {
 public:
   llvm::PointerUnion<Decl *, TypeBase *> MemberOrAssociatedType;
   ProtocolDecl *Protocol;
+  // SWIFT_ENABLE_TENSORFLOW
+  /// When this is an entry for an autodiff associated funciton, this stores the
+  /// function's identifier.
+  AutoDiffAssociatedFunctionIdentifier *AutoDiffFuncId;
 
-  WitnessTableEntry(llvm::PointerUnion<Decl *, TypeBase *> member,
-                    ProtocolDecl *protocol)
-    : MemberOrAssociatedType(member), Protocol(protocol) {}
+  // SWIFT_ENABLE_TENSORFLOW
+  WitnessTableEntry(
+      llvm::PointerUnion<Decl *, TypeBase *> member, ProtocolDecl *protocol,
+      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId = nullptr)
+    : MemberOrAssociatedType(member), Protocol(protocol),
+      AutoDiffFuncId(autoDiffFuncId) {}
 
 public:
   WitnessTableEntry() = default;
@@ -75,25 +82,59 @@ public:
     return Protocol;
   }
 
-  static WitnessTableEntry forFunction(AbstractFunctionDecl *func) {
-    assert(func != nullptr);
+  static WitnessTableEntry forFunction(Decl *func) {
     return WitnessTableEntry(func, nullptr);
   }
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  static WitnessTableEntry forAutoDiffAssociatedFunction(
+      Decl *func, AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) {
+    return WitnessTableEntry(func, nullptr, autoDiffFuncId);
+  }
+
   bool isFunction() const {
     auto decl = MemberOrAssociatedType.dyn_cast<Decl*>();
-    return Protocol == nullptr && decl && isa<AbstractFunctionDecl>(decl);
+    // SWIFT_ENABLE_TENSORFLOW
+    return Protocol == nullptr && AutoDiffFuncId == nullptr && decl &&
+           isa<AbstractFunctionDecl>(decl);
   }
 
   bool matchesFunction(AbstractFunctionDecl *func) const {
     assert(func != nullptr);
     if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      return decl == func && Protocol == nullptr;
+      // SWIFT_ENABLE_TENSORFLOW
+      return decl == func && Protocol == nullptr && AutoDiffFuncId == nullptr;
+    return false;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isAutoDiffAssociatedFunction() const {
+    auto decl = MemberOrAssociatedType.dyn_cast<Decl*>();
+    return Protocol == nullptr && AutoDiffFuncId != nullptr && decl &&
+           isa<AbstractFunctionDecl>(decl);
+  }
+
+  bool matchesAutoDiffAssociatedFunction(
+      Decl *func,
+      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) const {
+    assert(func != nullptr);
+    assert(autoDiffFuncId != nullptr);
+    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
+      return decl == func && Protocol == nullptr &&
+             AutoDiffFuncId != nullptr &&
+             *AutoDiffFuncId == *autoDiffFuncId;
     return false;
   }
 
   AbstractFunctionDecl *getFunction() const {
     assert(isFunction());
+    auto decl = MemberOrAssociatedType.get<Decl*>();
+    return static_cast<AbstractFunctionDecl*>(decl);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  AbstractFunctionDecl *getAutoDiffAssociatedFunctionOriginal() const {
+    assert(isAutoDiffAssociatedFunction());
     auto decl = MemberOrAssociatedType.get<Decl*>();
     return static_cast<AbstractFunctionDecl*>(decl);
   }
@@ -104,13 +145,17 @@ public:
   
   bool isAssociatedType() const {
     if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      return Protocol == nullptr && isa<AssociatedTypeDecl>(decl);
+      // SWIFT_ENABLE_TENSORFLOW
+      return Protocol == nullptr && AutoDiffFuncId == nullptr &&
+             isa<AssociatedTypeDecl>(decl);
     return false;
   }
 
   bool matchesAssociatedType(AssociatedType assocType) const {
     if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      return decl == assocType.getAssociation() && Protocol == nullptr;
+      // SWIFT_ENABLE_TENSORFLOW
+      return decl == assocType.getAssociation() && Protocol == nullptr &&
+             AutoDiffFuncId == nullptr;
     return false;
   }
 
@@ -126,13 +171,17 @@ public:
   }
 
   bool isAssociatedConformance() const {
-    return Protocol != nullptr && !MemberOrAssociatedType.isNull();
+    // SWIFT_ENABLE_TENSORFLOW
+    return Protocol != nullptr && AutoDiffFuncId == nullptr &&
+        !MemberOrAssociatedType.isNull();
   }
 
   bool matchesAssociatedConformance(const AssociatedConformance &conf) const {
     if (auto type = MemberOrAssociatedType.dyn_cast<TypeBase*>())
       return type == conf.getAssociation().getPointer() &&
-             Protocol == conf.getAssociatedRequirement();
+             // SWIFT_ENABLE_TENSORFLOW
+             Protocol == conf.getAssociatedRequirement() &&
+             AutoDiffFuncId == nullptr;
     return false;
   }
 
@@ -149,7 +198,9 @@ public:
 
   friend bool operator==(WitnessTableEntry left, WitnessTableEntry right) {
     return left.MemberOrAssociatedType == right.MemberOrAssociatedType &&
-           left.Protocol == right.Protocol;
+           // SWIFT_ENABLE_TENSORFLOW
+           left.Protocol == right.Protocol &&
+           left.AutoDiffFuncId == right.AutoDiffFuncId;
   }
 };
 
@@ -240,6 +291,20 @@ public:
     assert(getKind() >= ProtocolInfoKind::Full);
     for (auto &witness : getWitnessEntries()) {
       if (witness.matchesFunction(function))
+        return getNonBaseWitnessIndex(&witness);
+    }
+    llvm_unreachable("didn't find entry for function");
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Return the witness index for the witness function for the given
+  /// autodiff associated function requirement.
+  WitnessIndex getAutoDiffAssociatedFunctionIndex(
+      AbstractFunctionDecl *original,
+      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) const {
+    assert(getKind() >= ProtocolInfoKind::Full);
+    for (auto &witness : getWitnessEntries()) {
+      if (witness.matchesAutoDiffAssociatedFunction(original, autoDiffFuncId))
         return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for function");

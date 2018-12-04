@@ -6681,33 +6681,102 @@ static bool parseSILVTableEntry(
     return false;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Parses "#declref : @function" and puts the results into the passed-in
+  // references.
+  auto parseSILDeclRefAndFunc = [&](SILDeclRef &Ref, SILFunction *&Func)
+      -> bool {
+    Identifier FuncName;
+    SourceLoc FuncLoc;
+
+    if (witnessState.parseSILDeclRef(Ref, true) ||
+        P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+      return true;
+
+    if (P.Tok.is(tok::kw_nil)) {
+      P.consumeToken();
+    } else {
+      if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          witnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                          diag::expected_sil_value_name))
+        return true;
+
+      Func = M.lookUpFunction(FuncName.str());
+      if (!Func) {
+        P.diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (EntryKeyword.str() == "autodiff_associated_function") {
+    AutoDiffAssociatedFunctionKind AssocFuncKind;
+    Identifier AssocFuncKindId;
+    SourceLoc AssocFuncKindLoc;
+    if (witnessState.parseSILIdentifier(AssocFuncKindId, AssocFuncKindLoc,
+                                        diag::expected_sil_constant))
+      return true;
+    if (AssocFuncKindId.str() == "jvp")
+      AssocFuncKind = AutoDiffAssociatedFunctionKind::JVP;
+    else if (AssocFuncKindId.str() == "vjp")
+      AssocFuncKind = AutoDiffAssociatedFunctionKind::VJP;
+    else {
+      P.diagnose(AssocFuncKindLoc,
+                 diag::malformed_autodiff_associated_function_kind);
+      return true;
+    }
+
+    unsigned differentiationOrder;
+    if (!P.Tok.is(tok::integer_literal)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+      return true;
+    }
+    bool error = P.Tok.getText().getAsInteger(10, differentiationOrder);
+    assert(!error && "differentiationOrder did not parse as integer?!");
+    (void)error;
+    P.consumeToken(tok::integer_literal);
+
+    Identifier IndicesId;
+    SourceLoc IndicesLoc;
+    if (witnessState.parseSILIdentifier(IndicesId, IndicesLoc,
+                                        diag::expected_sil_constant))
+      return true;
+    AutoDiffParameterIndices *Indices = AutoDiffParameterIndices::create(
+        M.getASTContext(), IndicesId.str());
+    if (!Indices) {
+      P.diagnose(IndicesLoc,
+                 diag::malformed_autodiff_associated_function_indices);
+      return true;
+    }
+
+    AutoDiffAssociatedFunctionIdentifier *AssocFuncId =
+        AutoDiffAssociatedFunctionIdentifier::get(AssocFuncKind,
+                                                  differentiationOrder, Indices,
+                                                  M.getASTContext());
+
+    SILDeclRef Ref;
+    SILFunction *Func = nullptr;
+    if (parseSILDeclRefAndFunc(Ref, Func))
+      return true;
+
+    witnessEntries.push_back(SILWitnessTable::AutoDiffAssociatedFunctionWitness{
+      Ref, AssocFuncId, Func
+    });
+    return false;
+  }
+
   if (EntryKeyword.str() != "method") {
     P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
     return true;
   }
 
   SILDeclRef Ref;
-  Identifier FuncName;
-  SourceLoc FuncLoc;
-  if (witnessState.parseSILDeclRef(Ref, true) ||
-      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+  SILFunction *Func = nullptr;
+  if (parseSILDeclRefAndFunc(Ref, Func))
     return true;
 
-  SILFunction *Func = nullptr;
-  if (P.Tok.is(tok::kw_nil)) {
-    P.consumeToken();
-  } else {
-    if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-        witnessState.parseSILIdentifier(FuncName, FuncLoc,
-                                        diag::expected_sil_value_name))
-      return true;
-
-    Func = M.lookUpFunction(FuncName.str());
-    if (!Func) {
-      P.diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
-      return true;
-    }
-  }
   witnessEntries.push_back(SILWitnessTable::MethodWitness{
     Ref, Func
   });

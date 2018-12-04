@@ -2995,6 +2995,40 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
     }
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  case WitnessKind::AutoDiffAssociatedFunction: {
+    // autodiff_associated_function (jvp|vjp) <order> <indices> #declref : @function
+    auto &witness = getAutoDiffAssociatedFunctionWitness();
+    out << "autodiff_associated_function ";
+    switch (witness.RequirementIdentifier->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      out << "jvp ";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      out << "vjp ";
+      break;
+    }
+    out << witness.RequirementIdentifier->getDifferentiationOrder() << " "
+        << witness.RequirementIdentifier->getParameterIndices()->getString()
+        << " ";
+    witness.RequirementOriginalMethod.print(out);
+    out << ": ";
+    QualifiedSILTypeOptions.CurrentModule =
+        witness.RequirementOriginalMethod.getDecl()
+            ->getDeclContext()
+            ->getParentModule();
+    witness.RequirementOriginalMethod.getDecl()->getInterfaceType().print(
+        out, QualifiedSILTypeOptions);
+    out << " : ";
+    if (witness.Witness) {
+      witness.Witness->printName(out);
+      out << "\t// "
+         << demangleSymbol(witness.Witness->getName());
+    } else {
+      out << "nil";
+    }
+    break;
+  }
   case WitnessKind::AssociatedType: {
     // associated_type AssociatedTypeName: ConformingType
     auto &assocWitness = getAssociatedTypeWitness();
