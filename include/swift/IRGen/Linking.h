@@ -230,6 +230,13 @@ class LinkEntity {
     /// is stored in the data.
     DefaultAssociatedConformanceAccessor,
 
+    /// An descriptor for an base conformance within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular base conformance.
+    /// The pointer is a ProtocolDecl*; the index of the base conformance
+    /// is stored in the data.
+    BaseConformanceDescriptor,
+
     /// A global function pointer for dynamically replaceable functions.
     /// The pointer is a AbstractStorageDecl*.
     DynamicallyReplaceableFunctionVariableAST,
@@ -811,6 +818,18 @@ public:
   }
 
   static LinkEntity
+  forBaseConformanceDescriptor(BaseConformance conformance) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::BaseConformanceDescriptor,
+        conformance.getSourceProtocol(),
+        conformance.getSourceProtocol()->getSelfInterfaceType()
+          ->getCanonicalType(),
+        conformance.getBaseRequirement());
+    return entity;
+  }
+
+  static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
                                      const AssociatedConformance &association) {
     LinkEntity entity;
@@ -963,7 +982,8 @@ public:
     }
 
     assert(getKind() == Kind::AssociatedConformanceDescriptor ||
-           getKind() == Kind::DefaultAssociatedConformanceAccessor);
+           getKind() == Kind::DefaultAssociatedConformanceAccessor ||
+           getKind() == Kind::BaseConformanceDescriptor);
     return getAssociatedConformanceByIndex(
              cast<ProtocolDecl>(getDecl()),
              LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));

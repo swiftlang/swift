@@ -730,15 +730,10 @@ namespace {
         }
 
         if (entry.isBase()) {
-          // Define the associated conformance descriptor to point to the
-          // current position in the protocol descriptor, which is an
-          // out-of-line base protocol.
-          AssociatedConformance conformance(
-                                  Proto,
-                                  Proto->getProtocolSelfType()
-                                    ->getCanonicalType(),
-                                  entry.getBase());
-          IGM.defineAssociatedConformanceDescriptor(
+          // Define a base conformance descriptor, which is just an associated
+          // conformance descriptor for a base protocol.
+          BaseConformance conformance(Proto, entry.getBase());
+          IGM.defineBaseConformanceDescriptor(
               conformance,
               B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }

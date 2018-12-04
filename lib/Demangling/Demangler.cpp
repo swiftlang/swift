@@ -2055,7 +2055,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'n': {
       NodePointer requirementTy = popProtocol();
-      NodePointer conformingType = popSelfOrAssocTypePath();
+      NodePointer conformingType = popAssocTypePath();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
                                 protoTy, conformingType, requirementTy);
@@ -2063,11 +2063,18 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'N': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popSelfOrAssocTypePath();
+      auto assocTypePath = popAssocTypePath();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(
                             Node::Kind::DefaultAssociatedConformanceAccessor,
                             protoTy, assocTypePath, requirementTy);
+    }
+
+    case 'b': {
+      NodePointer requirementTy = popProtocol();
+      NodePointer protoTy = popNode(Node::Kind::Type);
+      return createWithChildren(Node::Kind::BaseConformanceDescriptor,
+                                protoTy, requirementTy);
     }
 
     case 'H':
