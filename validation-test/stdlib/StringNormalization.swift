@@ -444,7 +444,12 @@ let codeUnitNormalizationTests: [([UInt8], String)] = [
 ]
 
 for (i, test) in codeUnitNormalizationTests.enumerated() {
-  tests.test("CodeUnitNormalizationTest#\(i)") {
+  tests.test("CodeUnitNormalizationTest#\(i)")
+.skip(.custom({
+      if #available(macOS 10.14, iOS 12, watchOS 5, tvOS 12, *) { return false }
+      return true
+    }, reason: "NormalizationTest.txt requires Unicode 11"))
+.code {
     let codeUnits = test.1._nfcCodeUnits
     expectEqual(test.0, codeUnits)
   }
