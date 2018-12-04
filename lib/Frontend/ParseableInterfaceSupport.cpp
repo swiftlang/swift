@@ -349,7 +349,6 @@ static bool buildSwiftModuleFromSwiftInterface(
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
     SerializationOpts.OutputPath = OutPathStr.c_str();
-    SerializationOpts.SerializeAllSIL = true;
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SmallVector<FileDependency, 16> Deps;
     if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
