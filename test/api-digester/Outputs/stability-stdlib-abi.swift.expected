@@ -358,8 +358,6 @@ Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0
 Struct _DropWhileSequence has removed conformance to IteratorProtocol
 Struct _DropWhileSequence has type witness type for Sequence.Iterator changing from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
 Var Collection.lazy has been removed
-Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_0> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_0>
-Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_1> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_1>
 Var LazySequence._base has removed its setter
 Var _DropWhileSequence._iterator has declared type change from τ_0_0 to τ_0_0.Iterator
 Func Collection._preprocessingPass(_:) has been removed
@@ -534,3 +532,61 @@ Func _AbstractStringStorage.copy(with:) has been removed
 Func _AbstractStringStorage.getOrComputeBreadcrumbs() has been removed
 
 Func Sequence.reduce(into:_:) has parameter 0 changing from Default to Owned
+
+Constructor String.Index.init(_codeUnitOffset:) has been removed (deprecated)
+Constructor String.Index.init(_position:) has been removed (deprecated)
+Constructor String.init(_:) has been removed (deprecated)
+Constructor String.init(_:obsoletedInSwift4:) has been removed
+Constructor _ExpressibleByColorLiteral.init(colorLiteralRed:green:blue:alpha:) has been removed (deprecated)
+Func BinaryInteger.toIntMax() has been removed
+Func Dictionary.filter(_:obsoletedInSwift4:) has been removed
+Func FixedWidthInteger.unsafeAdding(_:) has been removed
+Func FixedWidthInteger.unsafeDivided(by:) has been removed
+Func FixedWidthInteger.unsafeMultiplied(by:) has been removed
+Func FixedWidthInteger.unsafeSubtracting(_:) has been removed
+Func FloatingPoint._fromBitPattern(_:) has been removed
+Func FloatingPoint._toBitPattern() has been removed
+Func FloatingPoint.abs(_:) has been removed (deprecated)
+Func FloatingPoint.add(_:) has been removed
+Func FloatingPoint.adding(_:) has been removed
+Func FloatingPoint.divide(by:) has been removed
+Func FloatingPoint.divided(by:) has been removed
+Func FloatingPoint.multiplied(by:) has been removed
+Func FloatingPoint.multiply(by:) has been removed
+Func FloatingPoint.negated() has been removed
+Func FloatingPoint.subtract(_:) has been removed
+Func FloatingPoint.subtracting(_:) has been removed
+Func Optional....(_:_:) has been removed
+Func Optional...<(_:_:) has been removed
+Func Set.filter(_:obsoletedInSwift4:) has been removed
+Func SignedNumeric.abs(_:) has been removed
+Func Strideable.+(_:_:) has been removed (deprecated)
+Func Strideable.+=(_:_:) has been removed (deprecated)
+Func Strideable.-(_:_:) has been removed (deprecated)
+Func Strideable.-=(_:_:) has been removed (deprecated)
+Func String.UTF16View.distance(from:to:) has been removed
+Func String.UTF16View.index(_:offsetBy:) has been removed
+Func String.UTF16View.index(after:) has been removed
+Func String.UTF8View.distance(from:to:) has been removed
+Func String.UTF8View.index(_:offsetBy:) has been removed
+Func String.UTF8View.index(after:) has been removed
+Func String.UnicodeScalarView.distance(from:to:) has been removed
+Func String.UnicodeScalarView.index(_:offsetBy:) has been removed
+Func String.UnicodeScalarView.index(after:) has been removed
+Func String.UnicodeScalarView.popFirst() has been removed (deprecated)
+Func String.popFirst() has been removed (deprecated)
+Func TextOutputStreamable.writeTo(_:) has been removed
+Func UnsignedInteger.toUIntMax() has been removed
+Protocol _BitwiseOperations has been removed
+Subscript String.UTF16View.subscript(_:) has been removed
+Subscript String.UTF8View.subscript(_:) has been removed
+Subscript String.UnicodeScalarView.subscript(_:) has been removed
+Subscript String.subscript(_:) has been removed
+Var BinaryFloatingPoint.NaN has been removed
+Var BinaryFloatingPoint.isSignaling has been removed
+Var BinaryFloatingPoint.quietNaN has been removed
+Var Dictionary.keys has been removed
+Var Dictionary.values has been removed
+Var FixedWidthInteger.allZeros has been removed (deprecated)
+Var String.Index._offset has been removed (deprecated)
+Var String.Index._utf16Index has been removed (deprecated)
