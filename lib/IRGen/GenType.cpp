@@ -2077,12 +2077,16 @@ IRGenModule::getAutoDiffFunctionStorageType(
   assert(differentiationOrder > 0 && "Differentiation order must be positive");
   assert(originalRep != SILFunctionTypeRepresentation::Block &&
          "Block functions cannot be @autodiff");
-  SmallVector<llvm::Type *, 4> eltTypes {Int8PtrTy};
-  if (originalRep == SILFunctionTypeRepresentation::Thick)
-    eltTypes.push_back(RefCountedPtrTy);
-  auto numAssocFns =
+  SmallVector<llvm::Type *, 4> eltTypes;
+  auto numFns = 1 +
       autodiff::getNumAutoDiffAssociatedFunctions(differentiationOrder);
-  eltTypes.append(differentiationOrder * numAssocFns, Int8PtrTy);
+  if (originalRep == SILFunctionTypeRepresentation::Thick) {
+    for (unsigned i = 0; i < numFns; ++i)
+      eltTypes.append(FunctionPairTy->element_begin(),
+                      FunctionPairTy->element_end());
+  } else {
+    eltTypes.append(numFns, Int8PtrTy);
+  }
   return llvm::StructType::get(getLLVMContext(), eltTypes);
 }
 
