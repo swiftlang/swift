@@ -1320,17 +1320,23 @@ public:
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
+#endif
+      SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
+
+#ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
       auto piIndex = PI.getBaseIndex(baseProto);
       assert((size_t)piIndex.getValue() ==
-              Table.size() - WitnessTableFirstRequirementOffset &&
+             Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
-      
-      SILEntries = SILEntries.slice(1);
 
       // TODO: Use the witness entry instead of falling through here.
 
@@ -1346,18 +1352,10 @@ public:
         return;
       }
 
-      // Emit a mangled name.
-      if (isDependentConformance(astConf->getRootConformance(),
-                                 /*considerResilience=*/false))
-        RequiresSpecialization = true;
-
-      auto proto = Conformance.getProtocol();
-      CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
-      AssociatedConformance requirement(proto, selfType, baseProto);
-      llvm::Constant *witnessEntry =
-        getAssociatedConformanceWitness(requirement, ConcreteType,
-                                        ProtocolConformanceRef(astConf));
-      Table.addBitCast(witnessEntry, IGM.Int8PtrTy);
+      // Otherwise, we'll need to derive it at instantiation time.
+      RequiresSpecialization = true;
+      SpecializedBaseConformances.push_back({Table.size(), &conf});
+      Table.addNullPointer(IGM.Int8PtrTy);
     }
 
     void addMethod(SILDeclRef requirement) {
@@ -1761,6 +1759,22 @@ void WitnessTableBuilder::collectResilientWitnesses(
       continue;
     }
 
+    // Inherited conformance witnesses.
+    if (entry.getKind() == SILWitnessTable::BaseProtocol) {
+      const auto &witness = entry.getBaseProtocolWitness();
+      auto baseProto = witness.Requirement;
+      auto proto = SILWT->getProtocol();
+      CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
+      AssociatedConformance requirement(proto, selfType, baseProto);
+      ProtocolConformanceRef inheritedConformance =
+        ConformanceInContext.getAssociatedConformance(selfType, baseProto);
+      llvm::Constant *witnessEntry =
+        getAssociatedConformanceWitness(requirement, ConcreteType,
+                                        inheritedConformance);
+      resilientWitnesses.push_back(witnessEntry);
+      continue;
+    }
+
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
 
@@ -1978,6 +1992,18 @@ namespace {
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedConformanceDescriptor(requirement));
           B.addRelativeAddress(assocConformanceDescriptor);
+        } else if (entry.getKind() == SILWitnessTable::BaseProtocol) {
+          // Associated conformance descriptor for a base protocol.
+          const auto &witness = entry.getBaseProtocolWitness();
+          auto proto = SILWT->getProtocol();
+          AssociatedConformance requirement(proto,
+                                            proto->getSelfInterfaceType()
+                                              ->getCanonicalType(),
+                                            witness.Requirement);
+          auto baseConformanceDescriptor =
+            IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+              LinkEntity::forAssociatedConformanceDescriptor(requirement));
+          B.addRelativeAddress(baseConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;

@@ -97,6 +97,15 @@ struct Computed<T, U> : Assocked {
   typealias Assoc = Pair<T, U>
 }
 
+//   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
+// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8**, %swift.type* %"GenericComputed<T>", i8**)
+// CHECK:         [[T0:%.*]] = call i8** @swift_getWitnessTable({{.*}}@"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAMc"
+// CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
+// CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 1
+// CHECK-NEXT:    store i8* [[T1]], i8** [[T2]], align 8
+// CHECK-NEXT:    ret void
+
+
 struct PBox<T: P> {}
 protocol HasSimpleAssoc {
   associatedtype Assoc
@@ -106,7 +115,7 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 //   Generic witness table pattern for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" = internal constant [2 x i8*]
 // GLOBAL-SAME: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc"
-// GLOBAL-SAME: @"associated conformance 23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A03HashI0"
+// GLOBAL-SAME: i8* null
 
 //   Relative reference to private data
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
@@ -139,5 +148,5 @@ struct UsesVoid : HasSimpleAssoc {
 // GLOBAL-SAME:    i16 2,
 // GLOBAL-SAME:    i16 1,
 
-//   No instantiator function needed
-// GLOBAL-SAME:    i32 0
+//   Relative reference to instantiator function
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),
