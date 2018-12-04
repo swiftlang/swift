@@ -2364,6 +2364,11 @@ static void initClassVTable(ClassMetadata *self) {
       auto *baseClass = descriptor.Class.get();
       auto *baseMethod = descriptor.Method.get();
 
+      // If the base method is null, it's an unavailable weak-linked
+      // symbol.
+      if (baseClass == nullptr || baseMethod == nullptr)
+        continue;
+
       // Calculate the base method's vtable offset from the
       // base method descriptor. The offset will be relative
       // to the base class's vtable start offset.
