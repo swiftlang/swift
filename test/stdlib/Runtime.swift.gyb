@@ -721,9 +721,10 @@ var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   func isAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
-    return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
-                                               minor._builtinWordValue,
-                                               patch._builtinWordValue))
+    return Bool(_builtinBooleanLiteral: _stdlib_isOSVersionAtLeast(
+                                          major._builtinWordValue,
+                                          minor._builtinWordValue,
+                                          patch._builtinWordValue))
   }
 
 // _stdlib_isOSVersionAtLeast is broken for

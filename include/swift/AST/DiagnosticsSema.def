@@ -3458,8 +3458,6 @@ ERROR(pointer_argument_intrinsics_not_found,none,
 ERROR(array_literal_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Array<T>", ())
-ERROR(bool_intrinsics_not_found,none,
-      "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
