@@ -20,7 +20,7 @@ using llvm::StringRef;
 using namespace swift;
 using namespace tf;
 
-GraphOperationInfo::GraphOperationInfo(GraphOperationInst *inst) : inst(inst) {
+GraphOperationInfo::GraphOperationInfo(const GraphOperationInst *inst) : inst(inst) {
   PrettyStackTraceSILNode X("decoding graph_op name", inst);
 
   ArrayRef<Operand> remainingOperands = inst->getAllOperands();

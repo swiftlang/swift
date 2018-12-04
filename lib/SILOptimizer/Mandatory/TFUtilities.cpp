@@ -240,7 +240,7 @@ SILLocation tf::getUserSourceLocation(SILValue value) {
 /// Get the user's source location for the specified instruction.  Because it
 /// is an instruction, we can apply various heuristics to improve the
 /// precision of the returned location information.
-SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
+SILLocation tf::getUserSourceLocation(const SILInstruction *inst) {
   // If we have a struct extract from a type like Int, Float, or Tensor of an
   // internal type like Builtin.i64 or TensorHandle, look through it to the
   // higher level type, which will have better source location information.
