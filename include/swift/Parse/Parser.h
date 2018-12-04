@@ -1365,13 +1365,9 @@ public:
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
-  ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
-
-  // SWIFT_ENABLE_TENSORFLOW
-  ParserResult<Expr> parseExprPoundAssert();
 
   UnresolvedDeclRefExpr *parseExprOperator();
 

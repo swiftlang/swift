@@ -7629,7 +7629,7 @@ class TryApplyInst final
 /// GradientInst - Represents the gradient of another SIL function.
 class GradientInst final
   : public InstructionBase<SILInstructionKind::GradientInst,
-                           SingleValueInstruction> {
+                           OwnershipForwardingSingleValueInst> {
 private:
   friend SILBuilder;
   /// The AD configuration.
@@ -7690,7 +7690,7 @@ public:
 class AutoDiffFunctionInst final :
     public InstructionBaseWithTrailingOperands<
                SILInstructionKind::AutoDiffFunctionInst,
-               AutoDiffFunctionInst, SingleValueInstruction> {
+               AutoDiffFunctionInst, OwnershipForwardingSingleValueInst> {
 private:
   friend SILBuilder;
   /// Differentiation parameter indices.
@@ -7761,7 +7761,7 @@ public:
 /// specified function.
 class AutoDiffFunctionExtractInst :
     public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
-                           SingleValueInstruction> {
+                           OwnershipForwardingSingleValueInst> {
 private:
   /// The kind of the associated function to extract.
   AutoDiffAssociatedFunctionKind associatedFunctionKind;

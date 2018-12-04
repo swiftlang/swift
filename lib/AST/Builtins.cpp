@@ -1958,8 +1958,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffPopFromTape(Context, Id);
   case BuiltinValueKind::AutoDiffDestroyTape:
     return getAutoDiffDestroyTape(Context, Id);
-  case BuiltinValueKind::PoundAssert:
-    return getPoundAssert(Context, Id);
 
   case BuiltinValueKind::OnFastPath:
     return getOnFastPath(Context, Id);

@@ -868,10 +868,6 @@ public:
   
   void visitCDeclAttr(CDeclAttr *attr);
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
   void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
@@ -966,46 +962,26 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns true if a method is an valid implementation of a @dynamicCallable
-/// attribute requirement. The method is given to be defined as one of the
-/// following: `dynamicallyCall(withArguments:)` or
-/// `dynamicallyCall(withKeywordArguments:)`.
-bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
-=======
 /// Returns true if the given method is an valid implementation of a
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
                                          TypeChecker &TC,
                                          bool hasKeywordArguments) {
   // There are two cases to check.
   // 1. `dynamicallyCall(withArguments:)`.
-<<<<<<< HEAD
-  //    In this case, the method is valid if the argument has type `C` where
-  //    `C` conforms to `ExpressibleByArrayLiteral`.
-  //    `C.ArrayLiteralElement` and the return type can be arbitrary.
-=======
   //    In this case, the method is valid if the argument has type `A` where
   //    `A` conforms to `ExpressibleByArrayLiteral`.
   //    `A.ArrayLiteralElement` and the return type can be arbitrary.
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   // 2. `dynamicallyCall(withKeywordArguments:)`
   //    In this case, the method is valid if the argument has type `D` where
   //    `D` conforms to `ExpressibleByDictionaryLiteral` and `D.Key` conforms to
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-<<<<<<< HEAD
-  TC.validateDeclForNameLookup(funcDecl);
-  auto paramList = funcDecl->getParameters();
-=======
   TC.validateDeclForNameLookup(decl);
   auto paramList = decl->getParameters();
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
 
@@ -1033,25 +1009,6 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
   return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
                                ConformanceCheckOptions()).hasValue();
-<<<<<<< HEAD
-
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns true if a declaration has a valid implementation of a
-/// @dynamicCallable attribute requirement.
-static bool hasValidDynamicCallableMethod(TypeChecker &TC,
-                                          NominalTypeDecl *decl,
-                                          StringRef methodName,
-                                          StringRef argumentName,
-                                          bool hasKeywordArgs,
-                                          bool &error) {
-  auto declType = decl->getDeclaredType();
-  auto option = DeclName(TC.Context,
-                         DeclBaseName(TC.Context.getIdentifier(methodName)),
-                         { TC.Context.getIdentifier(argumentName) });
-  auto candidates = TC.lookupMember(decl, declType, option);
-=======
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1065,7 +1022,6 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
                              DeclBaseName(TC.Context.Id_dynamicallyCall),
                              { argumentName });
   auto candidates = TC.lookupMember(decl, declType, methodName);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   if (candidates.empty()) return false;
 
   // Filter valid candidates.
@@ -1076,27 +1032,9 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
 
   // If there are no valid candidates, return false.
   if (candidates.size() == 0) return false;
-<<<<<<< HEAD
-
-  auto candidate = cast<FuncDecl>(candidates.front().getValueDecl());
-  // If there are multiple valid candidates, emit overload error.
-  if (candidates.size() > 1) {
-    TC.diagnose(candidate->getLoc(),
-                diag::ambiguous_dynamic_callable_method,
-                candidate->getFullName());
-    error = true;
-    return false;
-  }
-  // Otherwise, there is a single valid method.
   return true;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-=======
-  return true;
-}
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
 void AttributeChecker::
 visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   // This attribute is only allowed on nominal types.
@@ -1104,17 +1042,6 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   auto type = decl->getDeclaredType();
 
   bool hasValidMethod = false;
-<<<<<<< HEAD
-  bool error = false;
-  hasValidMethod |=
-    hasValidDynamicCallableMethod(TC, decl, "dynamicallyCall", "withArguments",
-                                  /*hasKeywordArgs*/ false, error);
-  hasValidMethod |=
-    hasValidDynamicCallableMethod(TC, decl, "dynamicallyCall",
-                                  "withKeywordArguments",
-                                  /*hasKeywordArgs*/ true, error);
-  if (!hasValidMethod || error) {
-=======
   hasValidMethod |=
     hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withArguments,
                                   /*hasKeywordArgs*/ false);
@@ -1122,22 +1049,11 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
     hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withKeywordArguments,
                                   /*hasKeywordArgs*/ true);
   if (!hasValidMethod) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
     TC.diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
     attr->setInvalid();
   }
 }
 
-<<<<<<< HEAD
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                     DeclContext *DC,
-                                                     TypeChecker &TC) {
-  // The only thing that we care about is that the index list has exactly one
-  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
-=======
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
@@ -1147,7 +1063,6 @@ bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   auto indices = decl->getIndices();
 
   auto stringLitProto =

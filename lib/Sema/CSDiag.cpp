@@ -170,16 +170,6 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
-      if (auto *poundAssertExpr = dyn_cast<PoundAssertExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
-
-        anchor = poundAssertExpr->getCondition();
-        path = path.slice(1);
-        continue;
-      }
-
       if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
         // The target anchor is the method being called,
         // no additional information could be retrieved
@@ -598,7 +588,6 @@ private:
   bool visitKeyPathExpr(KeyPathExpr *KPE);
   // SWIFT_ENABLE_TENSORFLOW
   bool visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE);
-  bool visitPoundAssertExpr(PoundAssertExpr *PAE);
 };
 } // end anonymous namespace
 
@@ -6961,12 +6950,6 @@ diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
 
 bool FailureDiagnosis::visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
   return diagnoseReverseAutoDiffExpr(RADE);
-}
-
-bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
-  auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
-  return !typeCheckChildIndependently(PAE->getCondition(), boolType,
-                                      CTP_CallArgument);
 }
 
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {

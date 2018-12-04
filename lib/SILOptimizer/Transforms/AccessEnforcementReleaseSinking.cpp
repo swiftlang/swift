@@ -156,6 +156,13 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignTakeArray:
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
+    // SWIFT_ENABLE_TENSORFLOW
+    case BuiltinValueKind::TensorFlowSend:
+    case BuiltinValueKind::TensorFlowReceive:
+    case BuiltinValueKind::AutoDiffCreateTape:
+    case BuiltinValueKind::AutoDiffPushToTape:
+    case BuiltinValueKind::AutoDiffPopFromTape:
+    case BuiltinValueKind::AutoDiffDestroyTape:
       return true;
 
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)

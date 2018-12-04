@@ -1888,7 +1888,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // Injects printf + abort function calls to abort with an error message.
 static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
@@ -3115,10 +3114,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   }
 }
 
-void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
-=======
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2018-11-26-a
   auto fn = i->getReferencedFunction();
 
   llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(

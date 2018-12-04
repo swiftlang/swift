@@ -379,9 +379,8 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
 
   auto setterDecl = AccessorDecl::create(C,
     /*FuncLoc*/ SourceLoc(), /*AccessorKeywordLoc*/ SourceLoc(),
-    AccessorKind::Set, AddressorKind::NotAddressor, property,
-    /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-    /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
+    AccessorKind::Set, property, /*StaticLoc*/ SourceLoc(),
+    StaticSpellingKind::None, /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
     /*GenericParams*/ nullptr, params, TypeLoc(), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);

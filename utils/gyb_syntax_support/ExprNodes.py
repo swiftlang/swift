@@ -647,20 +647,4 @@ EXPR_NODES = [
                    '''),
              Child('RightParen', kind='RightParenToken'),
 	     ]),
-
-    # SWIFT_ENABLE_TENSORFLOW
-    # e.g. #assert(1 == 2, "Error message")
-    Node('PoundAssertExpr', kind='Expr',
-         traits=['Parenthesized'],
-         children=[
-             Child('PoundAssert', kind='PoundAssertToken'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('Condition', kind='Expr',
-                   description='The assertion condition.'),
-             Child('Comma', kind='CommaToken', is_optional=True,
-                   description='The command after the assertion condition.'),
-             Child('Message', kind='StringLiteralExpr', is_optional=True,
-                   description='The assertion message.'),
-             Child('RightParen', kind='RightParenToken'),
-         ]),
 ]

@@ -441,7 +441,9 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto extInfo =
     SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
                              /*pseudogeneric*/false,
-                             /*non-escaping*/false);
+                             // SWIFT_ENABLE_TENSORFLOW
+                             /*non-escaping*/false,
+                             FunctionTypeDifferentiability());
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,

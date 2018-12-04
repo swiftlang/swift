@@ -2402,6 +2402,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     // TODO: Serialize trailing where clause.
     // Type-checking where clause should be done first (mimicking the
     // @_specialize attribute).
+    break;
+  }
 
   case DAK_DynamicReplacement: {
     auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];

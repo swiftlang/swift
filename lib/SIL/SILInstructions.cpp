@@ -584,7 +584,8 @@ GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
                            SILValue original,
                            const SILAutoDiffConfig &config)
   : InstructionBase(debugLoc,
-                    getGradientSILType(module, original, config)),
+                    getGradientSILType(module, original, config),
+                    ValueOwnershipKind::Any),
     Config(config), Operands(this, original) {}
 
 SILType GradientInst::getGradientSILType(
@@ -625,7 +626,7 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
           debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
-                                    parameterIndices)),
+                                    parameterIndices), ValueOwnershipKind::Any),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
       numOperands(1 + associatedFunctions.size()) {
@@ -685,7 +686,8 @@ AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
     AutoDiffAssociatedFunctionKind associatedFunctionKind,
     unsigned differentiationOrder, SILValue theFunction)
     : InstructionBase(debugLoc, getAssociatedFunctionType(
-          theFunction, associatedFunctionKind, differentiationOrder, module)),
+          theFunction, associatedFunctionKind, differentiationOrder, module),
+                      ValueOwnershipKind::Any),
       associatedFunctionKind(associatedFunctionKind),
       differentiationOrder(differentiationOrder),
       operands(this, theFunction) {

@@ -677,8 +677,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
-  // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::PoundAssert:
     return false;
 
   case ExprKind::Tap:

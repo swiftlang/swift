@@ -2621,7 +2621,8 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
     linkage = SILLinkage::PublicNonABI;
   auto *primal = fb.getOrCreateFunction(
       original->getLocation(), primalName, linkage, primalTy,
-      original->isBare(), original->isTransparent(), original->isSerialized());
+      original->isBare(), original->isTransparent(), original->isSerialized(),
+      original->isDynamicallyReplaceable());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
@@ -2768,7 +2769,8 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
     linkage = SILLinkage::PublicNonABI;
   auto *adjoint = fb.createFunction(linkage, adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
-      original->isBare(), original->isTransparent(), original->isSerialized());
+      original->isBare(), original->isTransparent(), original->isSerialized(),
+      original->isDynamicallyReplaceable());
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
@@ -4155,7 +4157,8 @@ static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
         fb.createFunction(linkage, gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
-                          original->isTransparent(), original->isSerialized());
+                          original->isTransparent(), original->isSerialized(),
+                          original->isDynamicallyReplaceable());
     gradFn->setUnqualifiedOwnership();
     gradFn->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), gradFn));

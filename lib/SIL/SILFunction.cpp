@@ -552,6 +552,14 @@ bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+unsigned SILFunction::codeSize() const {
+  unsigned size = 0;
+  for (auto &BB : *this)
+    size += BB.codeSize();
+  return size;
+}
+
 static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {
   SmallVector<char, 64> buffer;
   auto str = selector.getString(buffer);

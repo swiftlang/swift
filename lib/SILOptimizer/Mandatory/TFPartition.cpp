@@ -4295,7 +4295,7 @@ bool TFFunctionPartition::partition(bool isTest) {
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
       /* Function is SIL-only (no-debug): */ IsBare, IsNotTransparent,
-      IsNotSerialized);
+      IsNotSerialized, IsNotDynamic);
   SWIFT_DEFER {
     // If we error out before assigning `resultFn` to the member field
     // `acceleratorFn`, we should make sure this synthensized function is

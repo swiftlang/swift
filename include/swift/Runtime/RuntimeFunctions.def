@@ -1527,7 +1527,7 @@ FUNCTION(TFC_OpSetAttrOptionalTensorShapeArray,
 // IRGen passes those two values in place of the Swift String.
 FUNCTION(TFC_OpSetAttrString, _swift_tfc_OpSetAttrString, C_CC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, Int8PtrTy, BridgeObjectPtrTy, Int64Ty),
+         ARGS(Int8PtrTy, Int8PtrTy, Int64Ty, BridgeObjectPtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrStringArray, _swift_tfc_OpSetAttrStringArray,
