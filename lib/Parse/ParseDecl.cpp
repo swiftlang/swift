@@ -358,6 +358,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   while (HasUpcomingEntry) {
     SyntaxParsingContext EntryContext(SyntaxContext,
                                       SyntaxKind::AvailabilityArgument);
+    auto ArgumentLoc = Tok.getLoc();
     AnyAnnotations = true;
     StringRef ArgumentKindStr = Tok.getText();
     ParamIndex++;
@@ -382,8 +383,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     }
 
     if (ArgumentKind == IsInvalid) {
-      diagnose(Tok.getLoc(), diag::attr_availability_expected_option, AttrName)
-          .highlight(SourceRange(Tok.getLoc()));
+      diagnose(ArgumentLoc, diag::attr_availability_expected_option, AttrName)
+          .highlight(SourceRange(ArgumentLoc));
       if (Tok.is(tok::code_complete) && CodeCompletion) {
         CodeCompletion->completeDeclAttrParam(DAK_Available, ParamIndex);
         consumeToken(tok::code_complete);
@@ -394,6 +395,16 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     }
 
     consumeToken();
+
+    auto diagnoseIfDuplicate = [&](StringRef Value) -> bool {
+      if (!Value.empty()) {
+        AnyArgumentInvalid = true;
+        diagnose(ArgumentLoc, diag::attr_availability_invalid_duplicate,
+                 ArgumentKindStr);
+        return true;
+      }
+      return false;
+    };
 
     switch (ArgumentKind) {
     case IsMessage:
@@ -427,12 +438,18 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       }
 
       if (ArgumentKind == IsMessage) {
+        if (diagnoseIfDuplicate(Message)) {
+          break;
+        }
         Message = Value.getValue();
       } else {
         ParsedDeclName parsedName = parseDeclName(Value.getValue());
         if (!parsedName) {
           diagnose(AttrLoc, diag::attr_availability_invalid_renamed, AttrName);
           AnyArgumentInvalid = true;
+          break;
+        }
+        if (diagnoseIfDuplicate(Renamed)) {
           break;
         }
         Renamed = Value.getValue();

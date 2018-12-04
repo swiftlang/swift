@@ -1049,3 +1049,11 @@ struct SR8634_Struct: Equatable {
   @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
   let a: Int
 }
+
+@available(*, deprecated, message: "This is a message", message: "This is another message")
+// expected-warning@-1 {{'message' argument has already been specified}}
+func rdar46348825_message() {}
+
+@available(*, deprecated, renamed: "rdar46348825_message", renamed: "unavailable_func_with_message")
+// expected-warning@-1 {{'renamed' argument has already been specified}}
+func rdar46348825_renamed() {}
