@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify -Xllvm -debug -Xllvm -debug-only -Xllvm ConstExpr
 
+// REQUIRES: asserts
+
 //===----------------------------------------------------------------------===//
 // Basic function calls and control flow
 //===----------------------------------------------------------------------===//
