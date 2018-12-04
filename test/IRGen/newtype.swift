@@ -8,8 +8,8 @@ import Newtype
 
 // REQUIRES: objc_interop
 
-// Witness table for synthesized ClosedEnums : _ObjectiveCBridgeable.
-// CHECK: @"$sSo13SNTClosedEnumas21_ObjectiveCBridgeableSCWp" = linkonce_odr
+// Conformance descriptor for synthesized ClosedEnums : _ObjectiveCBridgeable.
+// CHECK: @"$sSo13SNTClosedEnumas21_ObjectiveCBridgeableSCMc" =
 
 // CHECK-LABEL: define swiftcc %TSo8NSStringC* @"$s7newtype14getErrorDomainSo08SNTErrorD0ayF"()
 public func getErrorDomain() -> ErrorDomain {
