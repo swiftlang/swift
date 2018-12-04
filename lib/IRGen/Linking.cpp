@@ -917,6 +917,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DynamicallyReplaceableFunctionImpl:
     return getDecl()->isWeakImported(module);
 
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+    return getProtocolConformance()->getRootConformance()
+                                   ->isWeakImported(module);
+
   // TODO: Revisit some of the below, for weak conformances.
   case Kind::TypeMetadataPattern:
   case Kind::TypeMetadataInstantiationCache:
@@ -925,12 +930,10 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::TypeMetadataCompletionFunction:
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
-  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::ReflectionAssociatedTypeDescriptor:
-  case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ValueWitness:
