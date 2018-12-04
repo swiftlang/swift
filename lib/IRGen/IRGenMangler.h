@@ -197,10 +197,24 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("Tn");
+    return finalize();
+  }
+
+  std::string mangleBaseConformanceDescriptor(
+      const ProtocolDecl *proto,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    appendProtocolName(requirement);
+    appendOperator("Tb");
     return finalize();
   }
 
@@ -270,6 +284,16 @@ public:
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
     appendOperator("WT");
+    return finalize();
+  }
+
+  std::string mangleBaseWitnessTableAccessFunction(
+                                      const ProtocolConformance *Conformance,
+                                      const ProtocolDecl *BaseProto) {
+    beginMangling();
+    appendProtocolConformance(Conformance);
+    appendAnyGenericType(BaseProto);
+    appendOperator("Wb");
     return finalize();
   }
 

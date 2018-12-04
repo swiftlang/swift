@@ -146,7 +146,7 @@ struct UsesVoid : HasSimpleAssoc {
 //   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
 // GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 0,
+// GLOBAL-SAME:    i16 1,
 
 //   Relative reference to instantiator function
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),

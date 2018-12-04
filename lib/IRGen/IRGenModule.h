@@ -82,6 +82,7 @@ namespace swift {
   class AssociatedConformance;
   class AssociatedType;
   class ASTContext;
+  class BaseConformance;
   class BraceStmt;
   class CanType;
   class LinkLibrary;
@@ -1291,6 +1292,11 @@ public:
                                             AssociatedConformance conformance);
   llvm::GlobalValue *defineAssociatedConformanceDescriptor(
                                               AssociatedConformance conformance,
+                                              llvm::Constant *definition);
+  llvm::Constant *getAddrOfBaseConformanceDescriptor(
+                                                 BaseConformance conformance);
+  llvm::GlobalValue *defineBaseConformanceDescriptor(
+                                              BaseConformance conformance,
                                               llvm::Constant *definition);
 
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,

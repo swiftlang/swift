@@ -202,6 +202,13 @@ std::string LinkEntity::mangleAsString() const {
              assocConformance.second);
   }
 
+  case Kind::BaseConformanceDescriptor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleBaseConformanceDescriptor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.second);
+  }
+
   case Kind::DefaultAssociatedConformanceAccessor: {
     auto assocConformance = getAssociatedConformance();
     return mangler.mangleDefaultAssociatedConformanceAccessor(
@@ -240,6 +247,11 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::AssociatedTypeWitnessTableAccessFunction: {
     auto assocConf = getAssociatedConformance();
+    if (isa<GenericTypeParamType>(assocConf.first)) {
+      return mangler.mangleBaseWitnessTableAccessFunction(
+                  getProtocolConformance(), assocConf.second);
+    }
+    
     return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
                 getProtocolConformance(), assocConf.first, assocConf.second);
   }
@@ -505,6 +517,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   }
 
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -656,6 +669,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return true;
 
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
@@ -737,6 +751,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.ProtocolDescriptorStructTy;
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
     return IGM.ProtocolRequirementStructTy;
   case Kind::ProtocolConformanceDescriptor:
@@ -818,6 +833,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ProtocolDescriptor:
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::ReflectionBuiltinDescriptor:
@@ -883,6 +899,9 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
   }
+
+  case Kind::BaseConformanceDescriptor:
+    return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
@@ -990,6 +1009,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::AssociatedTypeDescriptor:
   case Kind::AssociatedConformanceDescriptor:
   case Kind::DefaultAssociatedConformanceAccessor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionImpl:

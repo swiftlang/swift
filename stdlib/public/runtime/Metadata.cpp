@@ -4002,6 +4002,7 @@ static bool doesNotRequireInstantiation(
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(
                               const ProtocolConformanceDescriptor *conformance,
+                              const Metadata *conformingType,
                               const GenericWitnessTable *genericTable,
                               void **table) {
   auto protocol = conformance->getProtocol();
@@ -4015,7 +4016,7 @@ static void initializeResilientWitnessTable(
     auto reqDescriptor = witness.Requirement.get();
 
     // The requirement descriptor may be NULL, in which case this is a
-    // requirement introduced in a later version of the protocol./
+    // requirement introduced in a later version of the protocol.
     if (!reqDescriptor) continue;
 
     // If the requirement descriptor doesn't land within the bounds of the
@@ -4038,14 +4039,24 @@ static void initializeResilientWitnessTable(
   for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
     unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
 
+    // If we don't have a witness, fill in the default implementation.
     // If we already have a witness, there's nothing to do.
-    if (table[witnessIndex])
-      continue;
-
-    // Otherwise, fill in a default implementation.
     auto &reqt = requirements[i];
-    void *impl = reqt.DefaultImplementation.get();
-    table[witnessIndex] = impl;
+    if (!table[witnessIndex]) {
+      void *impl = reqt.DefaultImplementation.get();
+      table[witnessIndex] = impl;
+    }
+
+    // Realize base protocol witnesses.
+    if (reqt.Flags.getKind() == ProtocolRequirementFlags::Kind::BaseProtocol &&
+        table[witnessIndex]) {
+      // Realize the base protocol witness table.
+      auto baseReq = protocol->getRequirementBaseDescriptor();
+      (void)swift_getAssociatedConformanceWitness((WitnessTable *)table,
+                                                  conformingType,
+                                                  conformingType,
+                                                  baseReq, &reqt);
+    }
   }
 }
 
@@ -4079,17 +4090,42 @@ WitnessTableCacheEntry::allocate(
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
-  auto pattern = reinterpret_cast<void * const *>(
-                   &*conformance->getWitnessTablePattern());
+  if (auto pattern =
+          reinterpret_cast<void * const *>(
+            &*conformance->getWitnessTablePattern())) {
+    // Fill in the provided part of the requirements from the pattern.
+    for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
+      table[i] = pattern[i];
+    }
+  } else {
+    // Put the conformance descriptor in place. Instantiation will fill in the
+    // rest.
+    assert(numPatternWitnesses == 0);
+    table[0] = (void *)conformance;
+  }
 
-  // Fill in the provided part of the requirements from the pattern.
-  for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
-    table[i] = pattern[i];
+  // Copy any instantiation arguments that correspond to conditional
+  // requirements into the private area.
+  {
+    unsigned currentInstantiationArg = 0;
+    auto copyNextInstantiationArg = [&] {
+      assert(currentInstantiationArg < privateSizeInWords);
+      table[-1 - (int)currentInstantiationArg] =
+        const_cast<void *>(instantiationArgs[currentInstantiationArg]);
+      ++currentInstantiationArg;
+    };
+
+    for (const auto &conditionalRequirement
+          : conformance->getConditionalRequirements()) {
+      if (conditionalRequirement.Flags.hasKeyArgument())
+        copyNextInstantiationArg();
+      if (conditionalRequirement.Flags.hasExtraArgument())
+        copyNextInstantiationArg();
+    }
   }
 
   // Fill in any default requirements.
-  initializeResilientWitnessTable(conformance, genericTable, table);
-
+  initializeResilientWitnessTable(conformance, Type, genericTable, table);
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
   // Call the instantiation function if present.
