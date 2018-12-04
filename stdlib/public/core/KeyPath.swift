@@ -2099,7 +2099,7 @@ internal func _appendingKeyPaths<
         rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
         leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
-        appendedKVCLength = rootKVCLength + 1 + leafKVCLength
+        appendedKVCLength = rootKVCLength + 1 + leafKVCLength + 1
       } else {
         rootKVCLength = 0
         leafKVCLength = 0
