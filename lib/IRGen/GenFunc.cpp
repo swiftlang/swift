@@ -669,7 +669,7 @@ namespace {
       auto storageTy = getStorageType();
       dest.add(payload.extractValue(IGF, storageTy->getElementType(0), offset));
       dest.add(payload.extractValue(IGF, storageTy->getElementType(1),
-                                    offset + IGF.IGM.getPointerSize().getValueInBits()));
+                           offset + IGF.IGM.getPointerSize().getValueInBits()));
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
