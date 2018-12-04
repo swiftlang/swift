@@ -283,6 +283,10 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     }));
   }
 
+  // [do not merge] Evaluate the hot/cold splitting pass
+  if (Opts.shouldOptimize() && !Opts.DisableLLVMOptzns)
+    ModulePasses.add(createHotColdSplittingPass());
+
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
 
