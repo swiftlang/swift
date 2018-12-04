@@ -184,11 +184,13 @@ private func _stringCompareSlow(
 private func _findDiffIdx(
   _ left: UnsafeBufferPointer<UInt8>, _ right: UnsafeBufferPointer<UInt8>
 ) -> Int? {
-  var count = Swift.min(left.count, right.count)
-  for idx in 0..<count {
+  let count = Swift.min(left.count, right.count)
+  var idx = 0
+  while idx < count {
     guard left[_unchecked: idx] == right[_unchecked: idx] else {
       return idx
     }
+    idx &+= 1
   }
   return nil
 }
