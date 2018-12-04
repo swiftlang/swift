@@ -523,7 +523,7 @@ extension SomeProtocol {
 		let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective C}}
 	}
 	
-	func anotherFunction() { 
-		print("Hello world!")
-	}
+ func anotherFunction() { 
+  print("Hello world!")
+ }
 }
