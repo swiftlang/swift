@@ -2823,7 +2823,7 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 /*** Metatypes *************************************************************/
 /***************************************************************************/
 
-/// \brief Find the appropriate value witness table for the given type.
+/// Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
 getMetatypeValueWitnesses(const Metadata *instanceType) {
   // When metatypes are accessed opaquely, they always have a "thick"
@@ -2862,7 +2862,7 @@ namespace {
 /// The uniquing structure for metatype type metadata.
 static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
 
-/// \brief Fetch a uniqued metadata for a metatype type.
+/// Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
 const MetatypeMetadata *
 swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
@@ -2986,7 +2986,7 @@ ExistentialMetatypeValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   assert(getNumWitnessTables() == numWitnessTables);
 }
 
-/// \brief Fetch a uniqued metadata for a metatype type.
+/// Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
 const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
@@ -3493,7 +3493,7 @@ swift::_getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol) {
                                           &protocolRef);
 }
 
-/// \brief Fetch a uniqued metadata for an existential type. The array
+/// Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
 swift::swift_getExistentialTypeMetadata(
@@ -3564,7 +3564,7 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   }
 }
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with no
 /// witness tables.
 OpaqueValue *swift::swift_assignExistentialWithCopy0(OpaqueValue *dest,
@@ -3574,7 +3574,7 @@ OpaqueValue *swift::swift_assignExistentialWithCopy0(OpaqueValue *dest,
   return Witnesses::assignWithCopy(dest, const_cast<OpaqueValue*>(src), type);
 }
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with one
 /// witness table.
 OpaqueValue *swift::swift_assignExistentialWithCopy1(OpaqueValue *dest,
@@ -3584,7 +3584,7 @@ OpaqueValue *swift::swift_assignExistentialWithCopy1(OpaqueValue *dest,
   return Witnesses::assignWithCopy(dest, const_cast<OpaqueValue*>(src), type);
 }
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
 /// same number of witness tables.
 OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,

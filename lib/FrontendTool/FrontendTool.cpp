@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This is the entry point to the swift -frontend functionality, which
+/// This is the entry point to the swift -frontend functionality, which
 /// implements the core compiler functionality along with a number of additional
 /// tools for demonstration and testing purposes.
 ///

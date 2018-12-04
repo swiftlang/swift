@@ -102,7 +102,7 @@ HeapObject *swift::_swift_reallocObject(HeapObject *obj, size_t size) {
 
 #if SWIFT_OBJC_INTEROP
 
-/// \brief Replacement for ObjC object_isClass(), which is unavailable on
+/// Replacement for ObjC object_isClass(), which is unavailable on
 /// deployment targets macOS 10.9 and iOS 7.
 static bool objcObjectIsClass(id object) {
   // same as object_isClass(object)
@@ -114,7 +114,7 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
   return class_const_cast(_swift_getClassOfAllocated(object));
 }
 
-/// \brief Fetch the ObjC class object associated with the formal dynamic
+/// Fetch the ObjC class object associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
 /// by KVO.
@@ -144,7 +144,7 @@ const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
 }
 #endif
 
-/// \brief Fetch the type metadata associated with the formal dynamic
+/// Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
 /// by KVO.

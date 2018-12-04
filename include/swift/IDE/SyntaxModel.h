@@ -169,21 +169,21 @@ class SyntaxModelWalker {
 public:
   virtual ~SyntaxModelWalker() {}
 
-  /// \brief Called when first visiting a syntax node, before walking into its
+  /// Called when first visiting a syntax node, before walking into its
   /// children.  If it returns false, the subtree is skipped.
   ///
   virtual bool walkToNodePre(SyntaxNode Node) { return true; }
 
-  /// \brief Called after visiting the children of a syntax node. If it returns
+  /// Called after visiting the children of a syntax node. If it returns
   /// false, the remaining traversal is terminated and returns failure.
   virtual bool walkToNodePost(SyntaxNode Node) { return true; }
 
-  /// \brief Called when first visiting a sub-structure node, before walking
+  /// Called when first visiting a sub-structure node, before walking
   /// into its children. If it returns false, the subtree is skipped.
   ///
   virtual bool walkToSubStructurePre(SyntaxStructureNode Node) { return true; }
 
-  /// \brief Called after visiting the children of a sub-structure node. If it
+  /// Called after visiting the children of a sub-structure node. If it
   /// returns false, the remaining traversal is terminated and returns failure.
   ///
   virtual bool walkToSubStructurePost(SyntaxStructureNode Node) { return true; }

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This is the YAML to binary converter for API notes.
+/// This is the YAML to binary converter for API notes.
 ///
 //===----------------------------------------------------------------------===//
 #include "clang/APINotes/APINotesYAMLCompiler.h"

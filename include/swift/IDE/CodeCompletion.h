@@ -37,7 +37,7 @@ class CodeCompletionContext;
 class CodeCompletionResultBuilder;
 struct RequestedCachedModule;
 
-/// \brief A routine to remove code completion tokens from code completion
+/// A routine to remove code completion tokens from code completion
 /// tests.
 ///
 /// \code
@@ -211,7 +211,7 @@ private:
   unsigned Kind : 8;
   unsigned NestingLevel : 8;
 
-  /// \brief If true, then this chunk is an annotation that is included only
+  /// If true, then this chunk is an annotation that is included only
   /// for exposition and may not be inserted in the editor buffer.
   unsigned IsAnnotation : 1;
 
@@ -278,7 +278,7 @@ public:
 
 } // end namespace detail
 
-/// \brief A structured representation of a code completion string.
+/// A structured representation of a code completion string.
 class alignas(detail::CodeCompletionStringChunk) CodeCompletionString final :
     private llvm::TrailingObjects<CodeCompletionString,
                                   detail::CodeCompletionStringChunk> {
@@ -317,7 +317,7 @@ public:
   void dump() const;
 };
 
-/// \brief Describes the origin of the code completion result.
+/// Describes the origin of the code completion result.
 ///
 /// This enum is ordered from the contexts that are "nearest" to the code
 /// completion point to "outside" contexts.
@@ -325,7 +325,7 @@ enum class SemanticContextKind {
   /// Used in cases when the concept of semantic context is not applicable.
   None,
 
-  /// \brief This is a highly-likely expression-context-specific completion
+  /// This is a highly-likely expression-context-specific completion
   /// result.  This description is intentionally vague: this is a catch-all
   /// category for all heuristics for highly-likely results.
   ///
@@ -512,7 +512,7 @@ enum class CompletionKind {
   PrecedenceGroup,
 };
 
-/// \brief A single code completion result.
+/// A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
 
@@ -797,7 +797,7 @@ struct CodeCompletionResultSink {
 class CodeCompletionContext {
   friend class CodeCompletionResultBuilder;
 
-  /// \brief A set of current completion results, not yet delivered to the
+  /// A set of current completion results, not yet delivered to the
   /// consumer.
   CodeCompletionResultSink CurrentResults;
 
@@ -813,13 +813,13 @@ public:
   CodeCompletionContext(CodeCompletionCache &Cache)
       : Cache(Cache) {}
 
-  /// \brief Allocate a string owned by the code completion context.
+  /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
 
-  /// \brief Return current code completion results.
+  /// Return current code completion results.
   MutableArrayRef<CodeCompletionResult *> takeResults();
 
-  /// \brief Sort code completion results in an implementation-defined order
+  /// Sort code completion results in an implementation-defined order
   /// in place.
   static void sortCompletionResults(
       MutableArrayRef<CodeCompletionResult *> Results);
@@ -829,7 +829,7 @@ public:
   }
 };
 
-/// \brief An abstract base class for consumers of code completion results.
+/// An abstract base class for consumers of code completion results.
 /// \see \c SimpleCachingCodeCompletionConsumer.
 class CodeCompletionConsumer {
 public:
@@ -855,7 +855,7 @@ struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
       MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };
 
-/// \brief A code completion result consumer that prints the results to a
+/// A code completion result consumer that prints the results to a
 /// \c raw_ostream.
 class PrintingCodeCompletionConsumer
     : public SimpleCachingCodeCompletionConsumer {
@@ -874,7 +874,7 @@ public:
  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override;
 };
 
-/// \brief Create a factory for code completion callbacks.
+/// Create a factory for code completion callbacks.
 CodeCompletionCallbacksFactory *
 makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
                                    CodeCompletionConsumer &Consumer);

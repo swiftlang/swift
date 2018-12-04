@@ -198,7 +198,7 @@ protected:
 
   void bindGenericParameters(CanGenericSignature sig);
 
-  /// \brief Mangles a sugared type iff we are mangling for the debugger.
+  /// Mangles a sugared type iff we are mangling for the debugger.
   template <class T> void appendSugaredType(Type type) {
     assert(DWARFMangling &&
            "sugared types are only legal when mangling for the debugger");

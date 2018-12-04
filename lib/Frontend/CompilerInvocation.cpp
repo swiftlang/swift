@@ -114,7 +114,7 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
   }
 }
 
-/// \brief Create a new Regex instance out of the string value in \p RpassArg.
+/// Create a new Regex instance out of the string value in \p RpassArg.
 /// It returns a pointer to the newly generated Regex instance.
 static std::shared_ptr<llvm::Regex>
 generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,

@@ -59,7 +59,7 @@ public:
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
-  /// \brief A list of arguments to forward to LLVM's option processing; this
+  /// A list of arguments to forward to LLVM's option processing; this
   /// should only be used for debugging and experimental features.
   std::vector<std::string> LLVMArgs;
 

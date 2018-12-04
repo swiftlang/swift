@@ -129,13 +129,13 @@ class CharSourceRange {
   unsigned ByteLength;
 
 public:
-  /// \brief Constructs an invalid range.
+  /// Constructs an invalid range.
   CharSourceRange() = default;
 
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
     : Start(Start), ByteLength(ByteLength) {}
 
-  /// \brief Constructs a character range which starts and ends at the
+  /// Constructs a character range which starts and ends at the
   /// specified character locations.
   CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
@@ -169,7 +169,7 @@ public:
      less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
   }
 
-  /// \brief expands *this to cover Other
+  /// expands *this to cover Other
   void widen(CharSourceRange Other) {
     auto Diff = Other.getEnd().Value.getPointer() - getEnd().Value.getPointer();
     if (Diff > 0) {
@@ -192,7 +192,7 @@ public:
     return StringRef(Start.Value.getPointer(), ByteLength);
   }
 
-  /// \brief Return the length of this valid range in bytes.  Can be zero.
+  /// Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
     assert(isValid() && "length does not make sense for an invalid range");
     return ByteLength;

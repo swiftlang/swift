@@ -365,7 +365,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   return PotentialBinding{type, kind, constraint->getKind()};
 }
 
-/// \brief Retrieve the set of potential type bindings for the given
+/// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
 ConstraintSystem::PotentialBindings
@@ -777,7 +777,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   return result;
 }
 
-/// \brief Check whether the given type can be used as a binding for the given
+/// Check whether the given type can be used as a binding for the given
 /// type variable.
 ///
 /// \returns the type to bind to, if the binding is okay.
@@ -840,7 +840,7 @@ static Type getOptionalSuperclass(Type type) {
   return superclass;
 }
 
-/// \brief Enumerates all of the 'direct' supertypes of the given type.
+/// Enumerates all of the 'direct' supertypes of the given type.
 ///
 /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
 /// such that there is no type U where T < U and U < S.

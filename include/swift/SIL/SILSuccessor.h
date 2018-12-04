@@ -23,7 +23,7 @@ namespace swift {
 class SILBasicBlock;
 class TermInst;
 
-/// \brief An edge in the control flow graph.
+/// An edge in the control flow graph.
 ///
 /// A SILSuccessor is stored in the terminator instruction of the tail block of
 /// the CFG edge. Internally it has a back reference to the terminator that

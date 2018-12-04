@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-/// \brief Demangle Swift function names.
+/// Demangle Swift function names.
 ///
 /// \returns the length of the demangled function name (even if greater than the
 /// size of the output buffer) or 0 if the input is not a Swift-mangled function
@@ -46,7 +46,7 @@ SWIFT_DEMANGLE_LINKAGE
 size_t swift_demangle_getDemangledName(const char *MangledName,
                                        char *OutputBuffer, size_t Length);
 
-/// \brief Demangle Swift function names with module names and implicit self
+/// Demangle Swift function names with module names and implicit self
 /// and metatype type names in function signatures stripped.
 ///
 /// \returns the length of the demangled function name (even if greater than the
@@ -57,7 +57,7 @@ size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  char *OutputBuffer,
                                                  size_t Length);
 
-/// \brief Demangles a Swift function name and returns true if the function
+/// Demangles a Swift function name and returns true if the function
 /// conforms to the Swift calling convention.
 ///
 /// \returns true if the function conforms to the Swift calling convention.
@@ -88,7 +88,7 @@ int swift_demangle_hasSwiftCallingConvention(const char *MangledName);
 extern "C" {
 #endif
 
-/// \brief Demangle Swift function names.
+/// Demangle Swift function names.
 ///
 /// Note that this function has a generic name because it is called from
 /// contexts where it is not appropriate to use code names.

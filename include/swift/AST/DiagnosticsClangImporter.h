@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for the Clang importer.
+/// This file defines diagnostics for the Clang importer.
 //
 //===----------------------------------------------------------------------===//
 

@@ -398,7 +398,7 @@ private:
   void doFixUp(SILFunction *F);
 };
 
-/// \brief A SILBuilder that automatically invokes postprocess on each
+/// A SILBuilder that automatically invokes postprocess on each
 /// inserted instruction.
 template<class SomeSILCloner, unsigned N = 4>
 class SILBuilderWithPostProcess : public SILBuilder {
@@ -711,7 +711,7 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   }
 }
 
-/// \brief Clean-up after cloning.
+/// Clean-up after cloning.
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::doFixUp(SILFunction *F) {

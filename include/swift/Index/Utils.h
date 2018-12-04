@@ -20,7 +20,7 @@
 namespace swift {
 class ValueDecl;
 
-/// \brief Collect all the protocol requirements that a given declaration can
+/// Collect all the protocol requirements that a given declaration can
 ///   provide default implementations for. VD is a declaration in extension
 ///   declaration. Scratch is the buffer to collect those protocol
 ///   requirements.
@@ -30,7 +30,7 @@ ArrayRef<ValueDecl*>
 canDeclProvideDefaultImplementationFor(ValueDecl* VD,
                                        llvm::SmallVectorImpl<ValueDecl*> &Scratch);
 
-/// \brief Get decls that the given decl overrides, protocol requirements that
+/// Get decls that the given decl overrides, protocol requirements that
 ///   it serves as a default implementation of, and optionally protocol
 ///   requirements it satisfies in a conforming class
 std::vector<ValueDecl*>

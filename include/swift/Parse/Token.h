@@ -36,10 +36,10 @@ class Token {
   ///
   tok Kind;
 
-  /// \brief Whether this token is the first token on the line.
+  /// Whether this token is the first token on the line.
   unsigned AtStartOfLine : 1;
 
-  /// \brief Whether this token is an escaped `identifier` token.
+  /// Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
   /// Modifiers for string literals
@@ -50,7 +50,7 @@ class Token {
 
   // Padding bits == 32 - 11;
 
-  /// \brief The length of the comment that precedes the token.
+  /// The length of the comment that precedes the token.
   unsigned CommentLength;
 
   /// Text - The actual string covered by the token in the source buffer.
@@ -114,15 +114,15 @@ public:
     return !isEllipsis();
   }
 
-  /// \brief Determine whether this token occurred at the start of a line.
+  /// Determine whether this token occurred at the start of a line.
   bool isAtStartOfLine() const { return AtStartOfLine; }
 
-  /// \brief Set whether this token occurred at the start of a line.
+  /// Set whether this token occurred at the start of a line.
   void setAtStartOfLine(bool value) { AtStartOfLine = value; }
   
-  /// \brief True if this token is an escaped identifier token.
+  /// True if this token is an escaped identifier token.
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
-  /// \brief Set whether this token is an escaped identifier token.
+  /// Set whether this token is an escaped identifier token.
   void setEscapedIdentifier(bool value) {
     assert((!value || Kind == tok::identifier) &&
            "only identifiers can be escaped identifiers");
@@ -221,15 +221,15 @@ public:
     }
   }
 
-  /// \brief True if the string literal token is multiline.
+  /// True if the string literal token is multiline.
   bool isMultilineString() const {
     return MultilineString;
   }
-  /// \brief Count of extending escaping '#'.
+  /// Count of extending escaping '#'.
   unsigned getCustomDelimiterLen() const {
     return CustomDelimiterLen;
   }
-  /// \brief Set characteristics of string literal token.
+  /// Set characteristics of string literal token.
   void setStringLiteral(bool IsMultilineString, unsigned CustomDelimiterLen) {
     assert(Kind == tok::string_literal);
     this->MultilineString = IsMultilineString;
@@ -282,7 +282,7 @@ public:
 
   void setText(StringRef T) { Text = T; }
 
-  /// \brief Set the token to the specified kind and source range.
+  /// Set the token to the specified kind and source range.
   void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;
     Text = T;

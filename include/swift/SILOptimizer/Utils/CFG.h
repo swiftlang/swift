@@ -22,7 +22,7 @@ class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
 
-/// \brief Adds a new argument to an edge between a branch and a destination
+/// Adds a new argument to an edge between a branch and a destination
 /// block.
 ///
 /// \param Branch The terminator to add the argument to.
@@ -33,7 +33,7 @@ class SILLoopInfo;
 TermInst *addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
                                   SILValue Val);
 
-/// \brief Changes the edge value between a branch and destination basic block
+/// Changes the edge value between a branch and destination basic block
 /// at the specified index. Changes all edges from \p Branch to \p Dest to carry
 /// the value.
 ///
@@ -45,7 +45,7 @@ TermInst *addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
 TermInst *changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest, size_t Idx,
                           SILValue Val);
 
-/// \brief Replace a branch target.
+/// Replace a branch target.
 ///
 /// \param T The terminating instruction to modify.
 /// \param OldDest The successor block that will be replaced.
@@ -54,10 +54,10 @@ TermInst *changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest, size_t Idx,
 void replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
                          SILBasicBlock *NewDest, bool PreserveArgs);
 
-/// \brief Check if the edge from the terminator is critical.
+/// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *T, unsigned EdgeIdx);
 
-/// \brief Splits the edge from terminator if it is critical.
+/// Splits the edge from terminator if it is critical.
 ///
 /// Updates dominance information and loop information if not null.
 /// Returns the newly created basic block on success or nullptr otherwise (if
@@ -80,13 +80,13 @@ SILBasicBlock *splitIfCriticalEdge(SILBasicBlock *From, SILBasicBlock *To,
 bool splitCriticalEdgesFrom(SILBasicBlock *fromBB, DominanceInfo *DT = nullptr,
                             SILLoopInfo *LI = nullptr);
 
-/// \brief Splits the edges between two basic blocks.
+/// Splits the edges between two basic blocks.
 ///
 /// Updates dominance information and loop information if not null.
 void splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
                       DominanceInfo *DT = nullptr, SILLoopInfo *LI = nullptr);
 
-/// \brief Rotate a loop's header as long as it is exiting and not equal to the
+/// Rotate a loop's header as long as it is exiting and not equal to the
 /// passed basic block.
 /// If \p RotateSingleBlockLoops is true a single basic block loop will be
 /// rotated once. ShouldVerify specifies whether to perform verification after
@@ -96,22 +96,22 @@ bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
                 bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
                 bool ShouldVerify);
 
-/// \brief Splits the basic block before the instruction with an unconditional
+/// Splits the basic block before the instruction with an unconditional
 /// branch and updates the dominator tree and loop info.
 SILBasicBlock *splitBasicBlockAndBranch(SILBuilder &B,
                                         SILInstruction *SplitBeforeInst,
                                         DominanceInfo *DT, SILLoopInfo *LI);
 
-/// \brief Return true if the function has a critical edge, false otherwise.
+/// Return true if the function has a critical edge, false otherwise.
 bool hasCriticalEdges(SILFunction &F, bool OnlyNonCondBr);
 
-/// \brief Split all critical edges in the given function, updating the
+/// Split all critical edges in the given function, updating the
 /// dominator tree and loop information if they are provided.
 ///
 /// FIXME: This should never be called! Fix passes that create critical edges.
 bool splitAllCriticalEdges(SILFunction &F, DominanceInfo *DT, SILLoopInfo *LI);
 
-/// \brief Split all cond_br critical edges with non-trivial arguments in the
+/// Split all cond_br critical edges with non-trivial arguments in the
 /// function updating the dominator tree and loop information (if they are not
 /// set to null).
 ///
@@ -121,7 +121,7 @@ bool splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
                                                    DominanceInfo *DT,
                                                    SILLoopInfo *LI);
 
-/// \brief Merge a basic block ending in a branch with its successor
+/// Merge a basic block ending in a branch with its successor
 /// if possible. If dominance information or loop info is non null update it.
 /// Return true if block was merged.
 bool mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
@@ -167,7 +167,7 @@ void completeJointPostDominanceSet(
     ArrayRef<SILBasicBlock *> UserBlocks, ArrayRef<SILBasicBlock *> DefBlocks,
     llvm::SmallVectorImpl<SILBasicBlock *> &Completion);
 
-/// \brief Remove all unreachable blocks in a function.
+/// Remove all unreachable blocks in a function.
 bool removeUnreachableBlocks(SILFunction &Fn);
 
 } // end namespace swift

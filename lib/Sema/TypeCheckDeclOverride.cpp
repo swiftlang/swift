@@ -1318,7 +1318,7 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   return OverrideRequiresKeyword::Always;
 }
 
-/// \brief Returns true if the availability of the overriding declaration
+/// Returns true if the availability of the overriding declaration
 /// makes it a safe override, given the availability of the base declaration.
 static bool isAvailabilitySafeForOverride(ValueDecl *override,
                                           ValueDecl *base) {

@@ -34,7 +34,7 @@ template <typename Runtime> struct TargetEnumMetadata;
 using EnumMetadata = TargetEnumMetadata<InProcess>;
 struct TypeLayout;
 
-/// \brief Initialize the type metadata for a single-case enum type.
+/// Initialize the type metadata for a single-case enum type.
 ///
 /// \param enumType - pointer to the instantiated but uninitialized metadata
 ///                   for the enum.
@@ -45,7 +45,7 @@ void swift_initEnumMetadataSingleCase(EnumMetadata *enumType,
                                       EnumLayoutFlags flags,
                                       const TypeLayout *payload);
 
-/// \brief Initialize the type metadata for a single-payload enum type.
+/// Initialize the type metadata for a single-payload enum type.
 ///
 /// \param enumType - pointer to the instantiated but uninitialized metadata
 ///                   for the enum.
@@ -58,7 +58,7 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          const TypeLayout *payload,
                                          unsigned emptyCases);
 
-/// \brief Faster variant of the above which avoids digging into the enum type
+/// Faster variant of the above which avoids digging into the enum type
 /// metadata when the caller already has the payload information handy.
 ///
 /// \param value - pointer to the enum value.
@@ -73,7 +73,7 @@ unsigned swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                         const Metadata *payload,
                                         unsigned emptyCases);
 
-/// \brief Store the tag value for the given case into a single-payload enum,
+/// Store the tag value for the given case into a single-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 ///
 /// \param value - pointer to the enum value. If the case being initialized is
@@ -90,7 +90,7 @@ void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                      unsigned whichCase,
                                      unsigned emptyCases);
 
-/// \brief Initialize the type metadata for a generic, multi-payload
+/// Initialize the type metadata for a generic, multi-payload
 ///        enum instance.
 SWIFT_RUNTIME_EXPORT
 void swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
@@ -98,7 +98,7 @@ void swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                         unsigned numPayloads,
                                         const TypeLayout * const *payloadTypes);
 
-/// \brief Return an integer value representing which case of a multi-payload
+/// Return an integer value representing which case of a multi-payload
 ///        enum is inhabited.
 ///
 /// \param value - pointer to the enum value.
@@ -109,7 +109,7 @@ SWIFT_RUNTIME_EXPORT
 unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                        const EnumMetadata *enumType);
   
-/// \brief Store the tag value for the given case into a multi-payload enum,
+/// Store the tag value for the given case into a multi-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 SWIFT_RUNTIME_EXPORT
 void swift_storeEnumTagMultiPayload(OpaqueValue *value,

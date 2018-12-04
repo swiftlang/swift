@@ -153,7 +153,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
                       "Fatal error: Weak reference to stack object\n");
 }
 
-/// \brief Allocate a reference-counted object on the heap that
+/// Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI

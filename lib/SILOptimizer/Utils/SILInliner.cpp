@@ -313,7 +313,7 @@ class SILInlineCloner
 
   SILInliner::DeletionFuncTy DeletionCallback;
 
-  /// \brief The location representing the inlined instructions.
+  /// The location representing the inlined instructions.
   ///
   /// This location wraps the call site AST node that is being inlined.
   /// Alternatively, it can be the SIL file location of the call site (in case

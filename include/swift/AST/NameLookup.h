@@ -83,7 +83,7 @@ public:
   ValueDecl *getBaseDecl() const;
 };
 
-/// \brief This class implements and represents the result of performing
+/// This class implements and represents the result of performing
 /// unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
 public:
@@ -103,7 +103,7 @@ public:
   };
   using Options = OptionSet<Flags>;
 
-  /// \brief Lookup an unqualified identifier \p Name in the context.
+  /// Lookup an unqualified identifier \p Name in the context.
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
@@ -111,7 +111,7 @@ public:
                     SourceLoc Loc = SourceLoc(), Options options = Options());
 
   SmallVector<LookupResultEntry, 4> Results;
-  /// \brief The index of the first result that isn't from the innermost scope
+  /// The index of the first result that isn't from the innermost scope
   /// with results.
   ///
   /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
@@ -119,10 +119,10 @@ public:
   /// remaining elements of Results will be from parent scopes of this one.
   size_t IndexOfFirstOuterResult;
 
-  /// \brief Return true if anything was found by the name lookup.
+  /// Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
 
-  /// \brief Get the result as a single type, or a null type if that fails.
+  /// Get the result as a single type, or a null type if that fails.
   TypeDecl *getSingleTypeResult();
 };
 
@@ -277,13 +277,13 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
 };
 
-/// \brief Remove any declarations in the given set that were overridden by
+/// Remove any declarations in the given set that were overridden by
 /// other declarations in that set.
 ///
 /// \returns true if any declarations were removed, false otherwise.
 bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 
-/// \brief Remove any declarations in the given set that are shadowed by
+/// Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.

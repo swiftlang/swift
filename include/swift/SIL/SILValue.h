@@ -247,7 +247,7 @@ public:
   /// results. To replace just one result use SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
 
-  /// \brief Replace all uses of this instruction with an undef value of the
+  /// Replace all uses of this instruction with an undef value of the
   /// same type as the result of this instruction.
   void replaceAllUsesWithUndef();
 
@@ -580,7 +580,7 @@ public:
     set(OtherV);
   }
 
-  /// \brief Remove this use of the operand.
+  /// Remove this use of the operand.
   void drop() {
     removeFromCurrent();
     TheValue = SILValue();

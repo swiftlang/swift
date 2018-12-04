@@ -324,7 +324,7 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
-    /// \brief The unique number assigned to this type variable.
+    /// The unique number assigned to this type variable.
     ID : 32 - NumTypeBaseBits,
 
     /// Type variable options.
@@ -522,21 +522,21 @@ public:
   /// ownership attributes?
   bool allowsOwnership();  
 
-  /// \brief Determine whether this type involves a type variable.
+  /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
     return getRecursiveProperties().hasTypeVariable();
   }
 
-  /// \brief Determine where this type is a type variable or a dependent
+  /// Determine where this type is a type variable or a dependent
   /// member root in a type variable.
   bool isTypeVariableOrMember();
 
-  /// \brief Determine whether this type involves a UnresolvedType.
+  /// Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
   }
   
-  /// \brief Determine whether the type involves an archetype.
+  /// Determine whether the type involves an archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
@@ -579,7 +579,7 @@ public:
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext();
 
-  /// \brief Compute and return the set of type variables that occur within this
+  /// Compute and return the set of type variables that occur within this
   /// type.
   ///
   /// \param typeVariables This vector is populated with the set of
@@ -595,7 +595,7 @@ public:
   /// whether a type parameter exists at any position.
   bool isTypeParameter();
 
-  /// \brief Determine whether this type can dynamically be an optional type.
+  /// Determine whether this type can dynamically be an optional type.
   ///
   /// \param includeExistential Whether an existential type should be considered
   /// such a type.
@@ -646,7 +646,7 @@ public:
     return getRecursiveProperties().hasDependentMember();
   }
 
-  /// \brief Check if this type is a valid type for the LHS of an assignment.
+  /// Check if this type is a valid type for the LHS of an assignment.
   /// This mainly means hasLValueType(), but empty tuples and tuples of empty
   /// tuples also qualify.
   bool isAssignableType();
@@ -686,13 +686,13 @@ public:
     return getAnyPointerElementType(Ignore);
   }
   
-  /// \brief Determine whether the given type is "specialized", meaning that
+  /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
-  /// \brief Determine whether this type is a legal, lowered SIL type.
+  /// Determine whether this type is a legal, lowered SIL type.
   ///
   /// A type is SIL-illegal if it is:
   ///   - an l-value type,
@@ -702,7 +702,7 @@ public:
   ///   - a tuple type with a SIL-illegal element type.
   bool isLegalSILType();
 
-  /// \brief Determine whether this type is a legal formal type.
+  /// Determine whether this type is a legal formal type.
   ///
   /// A type is illegal as a formal type if it is:
   ///   - an l-value type,
@@ -715,28 +715,28 @@ public:
   /// These are the types of the Swift type system.
   bool isLegalFormalType();
 
-  /// \brief Check if this type is equal to the empty tuple type.
+  /// Check if this type is equal to the empty tuple type.
   bool isVoid();
 
-  /// \brief Check if this type is equal to Swift.Bool.
+  /// Check if this type is equal to Swift.Bool.
   bool isBool();
 
-  /// \brief Check if this type is equal to Builtin.IntN.
+  /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
 
-  /// \brief If this is a class type or a bound generic class type, returns the
+  /// If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
   
-  /// \brief If this is a struct type or a bound generic struct type, returns
+  /// If this is a struct type or a bound generic struct type, returns
   /// the (possibly generic) class.
   StructDecl *getStructOrBoundGenericStruct();
   
-  /// \brief If this is an enum or a bound generic enum type, returns the
+  /// If this is an enum or a bound generic enum type, returns the
   /// (possibly generic) enum.
   EnumDecl *getEnumOrBoundGenericEnum();
   
-  /// \brief Determine whether this type may have a superclass, which holds for
+  /// Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
   bool mayHaveSuperclass();
@@ -751,7 +751,7 @@ public:
   /// - classes
   bool satisfiesClassConstraint();
 
-  /// \brief Determine whether this type can be used as a base type for AST
+  /// Determine whether this type can be used as a base type for AST
   /// name lookup, which is the case for nominal types, protocol compositions
   /// and archetypes.
   ///
@@ -768,7 +768,7 @@ public:
             getAnyNominal());
   }
 
-  /// \brief Retrieve the superclass of this type.
+  /// Retrieve the superclass of this type.
   ///
   /// \param useArchetypes Whether to use context archetypes for outer generic
   /// parameters if the class is nested inside a generic function.
@@ -777,7 +777,7 @@ public:
   ///          superclass.
   Type getSuperclass(bool useArchetypes = true);
   
-  /// \brief True if this type is the exact superclass of another type.
+  /// True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.
   ///
@@ -792,7 +792,7 @@ public:
   /// a type's subclass.
   bool isExactSuperclassOf(Type ty);
 
-  /// \brief Get the substituted base class type, starting from a base class
+  /// Get the substituted base class type, starting from a base class
   /// declaration and a substituted derived class type.
   ///
   /// For example, given the following declarations:
@@ -809,7 +809,7 @@ public:
   Type getSuperclassForDecl(const ClassDecl *classDecl,
                             bool useArchetypes = true);
 
-  /// \brief True if this type is the superclass of another type, or a generic
+  /// True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///
   /// \param ty       The potential subclass.
@@ -823,20 +823,20 @@ public:
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty);
 
-  /// \brief Determines whether this type is similar to \p other as defined by
+  /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);
 
   bool matchesParameter(Type other, TypeMatchOptions matchMode);
 
-  /// \brief Determines whether this function type is similar to \p
+  /// Determines whether this function type is similar to \p
   /// other as defined by \p matchOptions and the callback \p
   /// paramsAndResultMatch which determines in a client-specific way
   /// whether the parameters and result of the types match.
   bool matchesFunctionType(Type other, TypeMatchOptions matchOptions,
                            llvm::function_ref<bool()> paramsAndResultMatch);
 
-  /// \brief Determines whether this type has a retainable pointer
+  /// Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
   /// possibly nil pointer that can be unknown-retained and
   /// unknown-released.
@@ -864,11 +864,11 @@ public:
   /// conceivably be bridged to an Objective-C class type.
   bool isPotentiallyBridgedValueType();
 
-  /// \brief If this is a nominal type or a bound generic nominal type,
+  /// If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();
 
-  /// \brief If this is a nominal type, bound generic nominal type, or
+  /// If this is a nominal type, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   NominalTypeDecl *getAnyNominal();
@@ -893,12 +893,12 @@ public:
   bool isTriviallyRepresentableIn(ForeignLanguage language,
                                   const DeclContext *dc);
 
-  /// \brief Given that this is a nominal type or bound generic nominal
+  /// Given that this is a nominal type or bound generic nominal
   /// type, return its parent type; this will be a null type if the type
   /// is not a nested type.
   Type getNominalParent();
 
-  /// \brief If this is a GenericType, bound generic nominal type, or
+  /// If this is a GenericType, bound generic nominal type, or
   /// unbound generic nominal type, return the (possibly generic) nominal type
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
@@ -1098,7 +1098,7 @@ class AnyGenericType : public TypeBase {
     NominalTypeDecl *NomDecl;
   };
 
-  /// \brief The type of the parent, in which this type is nested.
+  /// The type of the parent, in which this type is nested.
   Type Parent;
 
   template <typename... Args>
@@ -1112,10 +1112,10 @@ protected:
 
 public:
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   GenericTypeDecl *getDecl() const { return GenDecl; }
 
-  /// \brief Returns the type of the parent of this type. This will
+  /// Returns the type of the parent of this type. This will
   /// be null for top-level types or local types, and for non-generic types
   /// will simply be the same as the declared type of the declaration context
   /// of TheDecl. For types nested within generic types, however, this will
@@ -1144,7 +1144,7 @@ public:
   NominalOrBoundGenericNominalType(Args &&...args)
     : AnyGenericType(std::forward<Args>(args)...) {}
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return NomDecl; }
 
   // Implement isa/cast/dyncast/etc.
@@ -1302,7 +1302,7 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
 
-/// \brief A builtin vector type.
+/// A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
   Type elementType;
   unsigned numElements;
@@ -1318,10 +1318,10 @@ public:
   static BuiltinVectorType *get(const ASTContext &context, Type elementType,
                                 unsigned numElements);
 
-  /// \brief Retrieve the type of this vector's elements.
+  /// Retrieve the type of this vector's elements.
   Type getElementType() const { return elementType; }
 
-  /// \brief Retrieve the number of elements in this vector.
+  /// Retrieve the number of elements in this vector.
   unsigned getNumElements() const { return numElements; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -1663,7 +1663,7 @@ public:
   static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
                             SubstitutionMap substitutions, Type underlying);
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
     // Avoid requiring the definition of TypeAliasDecl.
     return typealias;
@@ -1904,7 +1904,7 @@ class TupleTypeElt {
   /// An optional name for the field.
   Identifier Name;
 
-  /// \brief This is the type of the field.
+  /// This is the type of the field.
   Type ElementType;
 
   /// Flags that are specific to and relevant for parameter types
@@ -2138,7 +2138,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   ClassDecl *getDecl() const {
     return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
   }
@@ -2172,7 +2172,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   EnumDecl *getDecl() const {
     return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
   }
@@ -2206,7 +2206,7 @@ public:
                                    parent, genericArgs));
   }
 
-  /// \brief Returns the declaration that declares this type.
+  /// Returns the declaration that declares this type.
   StructDecl *getDecl() const {
     return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());
   }
@@ -2247,7 +2247,7 @@ public:
     return reinterpret_cast<EnumDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given enum
+  /// Retrieve the type when we're referencing the given enum
   /// declaration in the parent type \c Parent.
   static EnumType *get(EnumDecl *D, Type Parent, const ASTContext &C);
 
@@ -2275,7 +2275,7 @@ public:
     return reinterpret_cast<StructDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given struct
+  /// Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
   static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
 
@@ -2303,7 +2303,7 @@ public:
     return reinterpret_cast<ClassDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given class
+  /// Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
   static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
 
@@ -2407,7 +2407,7 @@ class MetatypeType : public AnyMetatypeType {
                            const ASTContext &C);
 
 public:
-  /// \brief Return the MetatypeType for the specified type declaration.
+  /// Return the MetatypeType for the specified type declaration.
   ///
   /// This leaves the 'representation' property unavailable.
   static MetatypeType *get(Type T, const ASTContext &C) {
@@ -2534,7 +2534,7 @@ class DynamicSelfType : public TypeBase {
   Type SelfType;
 
 public:
-  /// \brief Return the DynamicSelf for the specified self type.
+  /// Return the DynamicSelf for the specified self type.
   static DynamicSelfType *get(Type selfType, const ASTContext &ctx);
 
   /// Retrieve the (static) self type for this dynamic self type.
@@ -2830,7 +2830,7 @@ public:
     }
   };
 
-  /// \brief A class which abstracts out some details necessary for
+  /// A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
@@ -2979,11 +2979,11 @@ protected:
   }
 
 public:
-  /// \brief Break an input type into an array of \c AnyFunctionType::Params.
+  /// Break an input type into an array of \c AnyFunctionType::Params.
   static void decomposeInput(Type type,
                              SmallVectorImpl<Param> &result);
 
-  /// \brief Take an array of parameters and turn it into an input type.
+  /// Take an array of parameters and turn it into an input type.
   ///
   /// The result type is only there as a way to extract the ASTContext when
   /// needed.
@@ -2994,13 +2994,13 @@ public:
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
-  /// \brief Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal.
   static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
-  /// \brief Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
-  /// \brief Given an array of parameters and an array of labels of the
+  /// Given an array of parameters and an array of labels of the
   /// same length, update each parameter to have the corresponding label.
   static void relabelParams(MutableArrayRef<Param> params,
                             ArrayRef<Identifier> labels);
@@ -3015,12 +3015,12 @@ public:
     return ExtInfo(Bits.AnyFunctionType.ExtInfo);
   }
 
-  /// \brief Get the representation of the function type.
+  /// Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
 
-  /// \brief True if the parameter declaration it is attached to is guaranteed
+  /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
     return getExtInfo().isNoEscape();
@@ -3622,7 +3622,7 @@ public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
 
-  /// \brief A class which abstracts out some details necessary for
+  /// A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
@@ -4030,7 +4030,7 @@ public:
 
   ExtInfo getExtInfo() const { return ExtInfo(Bits.SILFunctionType.ExtInfo); }
 
-  /// \brief Returns the language-level calling convention of the function.
+  /// Returns the language-level calling convention of the function.
   Language getLanguage() const {
     return getExtInfo().getLanguage();
   }
@@ -4039,7 +4039,7 @@ public:
     return getExtInfo().hasSelfParam();
   }
 
-  /// \brief Get the representation of the function type.
+  /// Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
@@ -4175,7 +4175,7 @@ public:
                       SILLayout *Layout,
                       SubstitutionMap Args);
   
-  /// \brief Produce a profile of this box, for use in a folding set.
+  /// Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getLayout(), getSubstitutions());
   }
@@ -4345,7 +4345,7 @@ public:
 /// by another type.
 class ProtocolType : public NominalType, public llvm::FoldingSetNode {
 public:
-  /// \brief Retrieve the type when we're referencing the given protocol.
+  /// Retrieve the type when we're referencing the given protocol.
   /// declaration.
   static ProtocolType *get(ProtocolDecl *D, Type Parent, const ASTContext &C);
 
@@ -4411,12 +4411,12 @@ class ProtocolCompositionType final : public TypeBase,
   friend TrailingObjects;
   
 public:
-  /// \brief Retrieve an instance of a protocol composition type with the
+  /// Retrieve an instance of a protocol composition type with the
   /// given set of members.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
   
-  /// \brief Retrieve the set of members composed to create this type.
+  /// Retrieve the set of members composed to create this type.
   ///
   /// For non-canonical types, this can contain classes, protocols and
   /// protocol compositions in any order. There can be at most one unique
@@ -4639,14 +4639,14 @@ public:
   /// \param existential The existential type or existential metatype to open.
   static CanType getAnyOpened(Type existential);
 
-  /// \brief Retrieve the name of this archetype.
+  /// Retrieve the name of this archetype.
   Identifier getName() const;
 
-  /// \brief Retrieve the fully-dotted name that should be used to display this
+  /// Retrieve the fully-dotted name that should be used to display this
   /// archetype.
   std::string getFullName() const;
 
-  /// \brief Retrieve the parent of this archetype, or null if this is a
+  /// Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const { 
     return ParentOrOpenedOrEnvironment.dyn_cast<ArchetypeType *>();
@@ -4686,38 +4686,38 @@ public:
   /// a superclass constraint.
   bool requiresClass() const;
 
-  /// \brief Retrieve the superclass of this type, if such a requirement exists.
+  /// Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const {
     if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
     return *getTrailingObjects<Type>();
   }
 
-  /// \brief Retrieve the layout constraint of this type, if such a requirement exists.
+  /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
     if (!Bits.ArchetypeType.HasLayoutConstraint) return LayoutConstraint();
 
     return *getTrailingObjects<LayoutConstraint>();
   }
 
-  /// \brief Return true if the archetype has any requirements at all.
+  /// Return true if the archetype has any requirements at all.
   bool hasRequirements() const {
     return !getConformsTo().empty() || getSuperclass();
   }
 
-  /// \brief Retrieve the nested type with the given name.
+  /// Retrieve the nested type with the given name.
   Type getNestedType(Identifier Name) const;
 
-  /// \brief Retrieve the nested type with the given name, if it's already
+  /// Retrieve the nested type with the given name, if it's already
   /// known.
   ///
   /// This is an implementation detail used by the generic signature builder.
   Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
-  /// \brief Check if the archetype contains a nested type with the given name.
+  /// Check if the archetype contains a nested type with the given name.
   bool hasNestedType(Identifier Name) const;
 
-  /// \brief Retrieve the known nested types of this archetype.
+  /// Retrieve the known nested types of this archetype.
   ///
   /// Useful only for debugging dumps; all other queries should attempt to
   /// find a particular nested type by name, directly, or look at the
@@ -4727,7 +4727,7 @@ public:
     return getAllNestedTypes(/*resolveTypes=*/false);
   }
 
-  /// \brief Retrieve the nested types of this archetype.
+  /// Retrieve the nested types of this archetype.
   ///
   /// \param resolveTypes Whether to eagerly resolve the nested types
   /// (defaults to \c true). Otherwise, the nested types might be
@@ -4738,7 +4738,7 @@ public:
   ArrayRef<std::pair<Identifier, Type>>
   getAllNestedTypes(bool resolveTypes = true) const;
 
-  /// \brief Set the nested types to a copy of the given array of
+  /// Set the nested types to a copy of the given array of
   /// archetypes.
   void setNestedTypes(ASTContext &Ctx,
                       ArrayRef<std::pair<Identifier, Type>> Nested);
@@ -4929,7 +4929,7 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
 
-/// \brief The storage type of a variable with non-strong reference
+/// The storage type of a variable with non-strong reference
 /// ownership semantics.
 ///
 /// The referent type always satisfies allowsOwnership().
@@ -5010,7 +5010,7 @@ END_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType)
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
 
-/// \brief A type variable used during type checking.
+/// A type variable used during type checking.
 class TypeVariableType : public TypeBase {
   // Note: We can't use llvm::TrailingObjects here because the trailing object
   // type is opaque.
@@ -5025,13 +5025,13 @@ class TypeVariableType : public TypeBase {
   
 public:
  
-  /// \brief Create a new type variable whose implementation is constructed
+  /// Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
   
-  /// \brief Retrieve the implementation data corresponding to this type
+  /// Retrieve the implementation data corresponding to this type
   /// variable.
   ///
   /// The contents of the implementation data for this type are hidden in the
@@ -5040,7 +5040,7 @@ public:
     return *reinterpret_cast<Implementation *>(this + 1);
   }
 
-  /// \brief Retrieve the implementation data corresponding to this type
+  /// Retrieve the implementation data corresponding to this type
   /// variable.
   ///
   /// The contents of the implementation data for this type are hidden in the
@@ -5049,7 +5049,7 @@ public:
     return *reinterpret_cast<const Implementation *>(this + 1);
   }
 
-  /// \brief Access the implementation object for this type variable.
+  /// Access the implementation object for this type variable.
   Implementation *operator->() {
     return reinterpret_cast<Implementation *>(this + 1);
   }
@@ -5347,7 +5347,7 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
   }
 }
   
-/// \brief If this is a method in a type or extension thereof, compute
+/// If this is a method in a type or extension thereof, compute
 /// and return a parameter to be used for the 'self' argument.  The type of
 /// the parameter is the empty Type() if no 'self' argument should exist. This
 /// can only be used after name binding has resolved types.

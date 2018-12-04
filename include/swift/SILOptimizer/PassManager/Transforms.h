@@ -81,7 +81,7 @@ namespace swift {
     llvm::StringRef getID() { return PassKindID(getPassKind()); }
 
   protected:
-    /// \brief Searches for an analysis of type T in the list of registered
+    /// Searches for an analysis of type T in the list of registered
     /// analysis. If the analysis is not found, the program terminates.
     template<typename T>
     T* getAnalysis() { return PM->getAnalysis<T>(); }
@@ -107,7 +107,7 @@ namespace swift {
 
     void injectFunction(SILFunction *Func) { F = Func; }
 
-    /// \brief Notify the pass manager of a function \p F that needs to be
+    /// Notify the pass manager of a function \p F that needs to be
     /// processed by the function passes and the analyses.
     ///
     /// If not null, the function \p DerivedFrom is the function from which \p F
@@ -120,7 +120,7 @@ namespace swift {
       PM->addFunctionToWorklist(F, DerivedFrom);
     }
 
-    /// \brief Reoptimize the current function by restarting the pass
+    /// Reoptimize the current function by restarting the pass
     /// pipeline on it.
     void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
 

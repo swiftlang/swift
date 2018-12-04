@@ -23,7 +23,7 @@ class LoopRegionFunctionInfo;
 class AliasAnalysis;
 class RCIdentityFunctionInfo;
 
-/// \brief Per-Region state.
+/// Per-Region state.
 class ARCRegionState {
 public:
   // TODO: These are relatively expensive, find something else to use here.

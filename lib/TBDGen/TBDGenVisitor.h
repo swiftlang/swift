@@ -86,7 +86,7 @@ public:
       addSymbol("main");
   }
 
-  /// \brief Adds the global symbols associated with the first file.
+  /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);

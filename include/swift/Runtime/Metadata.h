@@ -332,14 +332,14 @@ ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
-/// \brief Fetch a uniqued metadata object for a nominal type which requires
+/// Fetch a uniqued metadata object for a nominal type which requires
 /// singleton metadata initialization.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getSingletonMetadata(MetadataRequest request,
                            const TypeContextDescriptor *description);
 
-/// \brief Fetch a uniqued metadata object for a generic nominal type.
+/// Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getGenericMetadata(MetadataRequest request,
@@ -383,7 +383,7 @@ swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const GenericValueMetadataPattern *pattern,
                                    size_t extraDataSize);
 
-/// \brief Check that the given metadata has the right state.
+/// Check that the given metadata has the right state.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_checkMetadataState(MetadataRequest request,
                                           const Metadata *type);
@@ -442,7 +442,7 @@ const WitnessTable *swift_getAssociatedConformanceWitness(
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
-/// \brief Fetch a uniqued metadata for a function type.
+/// Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
@@ -485,12 +485,12 @@ SWIFT_RUNTIME_EXPORT
 Class
 swift_getInitializedObjCClass(Class c);
 
-/// \brief Fetch a uniqued type metadata for an ObjC class.
+/// Fetch a uniqued type metadata for an ObjC class.
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_getObjCClassMetadata(const ClassMetadata *theClass);
 
-/// \brief Get the ObjC class object from class type metadata.
+/// Get the ObjC class object from class type metadata.
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
@@ -505,13 +505,13 @@ const ClassMetadata *
 swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
-/// \brief Fetch a unique type metadata object for a foreign type.
+/// Fetch a unique type metadata object for a foreign type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getForeignTypeMetadata(MetadataRequest request,
                              ForeignTypeMetadata *nonUnique);
 
-/// \brief Fetch a uniqued metadata for a tuple type.
+/// Fetch a uniqued metadata for a tuple type.
 ///
 /// The labels argument is null if and only if there are no element
 /// labels in the tuple.  Otherwise, it is a null-terminated
@@ -676,17 +676,17 @@ swift_lookUpClassMethod(const ClassMetadata *metadata,
                         const MethodDescriptor *method,
                         const ClassDescriptor *description);
 
-/// \brief Fetch a uniqued metadata for a metatype type.
+/// Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
 const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
 
-/// \brief Fetch a uniqued metadata for an existential metatype type.
+/// Fetch a uniqued metadata for an existential metatype type.
 SWIFT_RUNTIME_EXPORT
 const ExistentialMetatypeMetadata *
 swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
-/// \brief Fetch a uniqued metadata for an existential type. The array
+/// Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 SWIFT_RUNTIME_EXPORT
 const ExistentialTypeMetadata *
@@ -695,7 +695,7 @@ swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
                                  size_t numProtocols,
                                  const ProtocolDescriptorRef *protocols);
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with the
 /// same number of witness tables.
 SWIFT_RUNTIME_EXPORT
@@ -703,14 +703,14 @@ OpaqueValue *swift_assignExistentialWithCopy(OpaqueValue *dest,
                                              const OpaqueValue *src,
                                              const Metadata *type);
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with no
 /// witness tables.
 OpaqueValue *swift_assignExistentialWithCopy0(OpaqueValue *dest,
                                               const OpaqueValue *src,
                                               const Metadata *type);
 
-/// \brief Perform a copy-assignment from one existential container to another.
+/// Perform a copy-assignment from one existential container to another.
 /// Both containers must be of the same existential type representable with one
 /// witness table.
 OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,

@@ -824,7 +824,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   return None;
 }
 
-/// \brief Return the type of an expression parsed during code completion, or
+/// Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
 Optional<Type> swift::getTypeOfCompletionContextExpr(
                         ASTContext &Ctx,
@@ -840,7 +840,7 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                                           referencedDecl);
 }
 
-/// \brief Return the type of operator function for specified LHS, or a null
+/// Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
 FunctionType *
 swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,

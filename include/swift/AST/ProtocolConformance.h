@@ -41,7 +41,7 @@ class ModuleDecl;
 class SubstitutableType;
 enum class AllocationArena;
 
-/// \brief Type substitution mapping from substitutable types to their
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -82,7 +82,7 @@ enum class ProtocolConformanceState {
   Checking,
 };
 
-/// \brief Describes how a particular type conforms to a given protocol,
+/// Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
 ///
@@ -92,7 +92,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
-  /// \brief The type that conforms to the protocol, in the context of the
+  /// The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
 
@@ -418,7 +418,7 @@ public:
 class NormalProtocolConformance : public RootProtocolConformance,
                                   public llvm::FoldingSetNode
 {
-  /// \brief The protocol being conformed to and its current state.
+  /// The protocol being conformed to and its current state.
   llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
     ProtocolAndState;
 
@@ -434,7 +434,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// Also stores the "invalid" bit.
   llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
 
-  /// \brief The reason that this conformance exists.
+  /// The reason that this conformance exists.
   ///
   /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
   /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
@@ -448,7 +448,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
       SourceKindAndImplyingConformance = {nullptr,
                                           ConformanceEntryKind::Explicit};
 
-  /// \brief The mapping of individual requirements in the protocol over to
+  /// The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
 

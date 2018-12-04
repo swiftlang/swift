@@ -151,53 +151,53 @@ struct InferredTypeWitnessesSolution {
 
 class RequirementEnvironment;
 
-/// \brief The result of matching a particular declaration to a given
+/// The result of matching a particular declaration to a given
 /// requirement.
 enum class MatchKind : uint8_t {
-  /// \brief The witness matched the requirement exactly.
+  /// The witness matched the requirement exactly.
   ExactMatch,
 
-  /// \brief There is a difference in optionality.
+  /// There is a difference in optionality.
   OptionalityConflict,
 
-  /// \brief The witness matched the requirement with some renaming.
+  /// The witness matched the requirement with some renaming.
   RenamedMatch,
 
-  /// \brief The witness is invalid or has an invalid type.
+  /// The witness is invalid or has an invalid type.
   WitnessInvalid,
 
-  /// \brief The kind of the witness and requirement differ, e.g., one
+  /// The kind of the witness and requirement differ, e.g., one
   /// is a function and the other is a variable.
   KindConflict,
 
-  /// \brief The types conflict.
+  /// The types conflict.
   TypeConflict,
 
-  /// \brief The witness would match if an additional requirement were met.
+  /// The witness would match if an additional requirement were met.
   MissingRequirement,
 
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
 
-  /// \brief The witness did not match due to static/non-static differences.
+  /// The witness did not match due to static/non-static differences.
   StaticNonStaticConflict,
 
-  /// \brief The witness is not settable, but the requirement is.
+  /// The witness is not settable, but the requirement is.
   SettableConflict,
 
-  /// \brief The witness did not match due to prefix/non-prefix differences.
+  /// The witness did not match due to prefix/non-prefix differences.
   PrefixNonPrefixConflict,
 
-  /// \brief The witness did not match due to postfix/non-postfix differences.
+  /// The witness did not match due to postfix/non-postfix differences.
   PostfixNonPostfixConflict,
 
-  /// \brief The witness did not match because of mutating conflicts.
+  /// The witness did not match because of mutating conflicts.
   MutatingConflict,
 
-  /// \brief The witness did not match because of nonmutating conflicts.
+  /// The witness did not match because of nonmutating conflicts.
   NonMutatingConflict,
 
-  /// \brief The witness did not match because of __consuming conflicts.
+  /// The witness did not match because of __consuming conflicts.
   ConsumingConflict,
 
   /// The witness is not rethrows, but the requirement is.
@@ -342,7 +342,7 @@ public:
   SourceLoc getOptionalityLoc(TypeRepr *tyR) const;
 };
 
-/// \brief Describes a match between a requirement and a witness.
+/// Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Optional<RequirementEnvironment> env = None)
@@ -374,19 +374,19 @@ struct RequirementMatch {
            "Should have witness type and requirement");
   }
 
-  /// \brief The witness that matches the (implied) requirement.
+  /// The witness that matches the (implied) requirement.
   ValueDecl *Witness;
 
-  /// \brief The kind of match.
+  /// The kind of match.
   MatchKind Kind;
 
-  /// \brief The type of the witness when it is referenced.
+  /// The type of the witness when it is referenced.
   Type WitnessType;
 
-  /// \brief Requirement not met.
+  /// Requirement not met.
   Optional<Requirement> MissingRequirement;
 
-  /// \brief The requirement environment to use for the witness thunk.
+  /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
 
   /// The set of optional adjustments performed on the witness.
@@ -396,7 +396,7 @@ struct RequirementMatch {
   /// environment.
   SubstitutionMap WitnessSubstitutions;
 
-  /// \brief Determine whether this match is viable.
+  /// Determine whether this match is viable.
   bool isViable() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
@@ -424,7 +424,7 @@ struct RequirementMatch {
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
 
-  /// \brief Determine whether this requirement match has a witness type.
+  /// Determine whether this requirement match has a witness type.
   bool hasWitnessType() const {
     switch(Kind) {
     case MatchKind::ExactMatch:
@@ -452,7 +452,7 @@ struct RequirementMatch {
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
 
-  /// \brief Determine whether this requirement match has a requirement.
+  /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
 
   swift::Witness getWitness(ASTContext &ctx) const;
@@ -889,7 +889,7 @@ public:
                                                  AssociatedTypeDecl *assocType);
 };
 
-/// \brief Match the given witness to the given requirement.
+/// Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
 RequirementMatch matchWitness(

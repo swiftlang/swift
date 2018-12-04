@@ -67,7 +67,7 @@ namespace {
   }
 }
 
-/// \brief Describes the suitability of the chosen witness for
+/// Describes the suitability of the chosen witness for
 /// the requirement.
 struct swift::RequirementCheck {
   CheckKind Kind;
@@ -972,7 +972,7 @@ witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
   return false;
 }
 
-/// \brief Determine whether one requirement match is better than the other.
+/// Determine whether one requirement match is better than the other.
 static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
                           ValueDecl *requirement,
                           const RequirementMatch &match1,
@@ -1623,7 +1623,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
       .fixItInsert(loc, differentFixit);
 }
 
-/// \brief Determine whether the type \c T conforms to the protocol \c Proto,
+/// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
@@ -1849,7 +1849,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   return conformance;
 }
 
-/// \brief Add the next associated type deduction to the string representation
+/// Add the next associated type deduction to the string representation
 /// of the deductions, used in diagnostics.
 static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
                                         AssociatedTypeDecl *assocType,
@@ -1928,7 +1928,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
                     SubstFlags::UseErrorType);
 }
 
-/// \brief Retrieve the kind of requirement described by the given declaration,
+/// Retrieve the kind of requirement described by the given declaration,
 /// for use in some diagnostics.
 static diag::RequirementKind getRequirementKind(ValueDecl *VD) {
   if (isa<ConstructorDecl>(VD))
@@ -2074,7 +2074,7 @@ static void addOptionalityFixIts(
 
 }
 
-/// \brief Diagnose a requirement match, describing what went wrong (or not).
+/// Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
               ValueDecl *req, const RequirementMatch &match) {

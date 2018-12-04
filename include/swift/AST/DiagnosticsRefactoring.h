@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for refactoring.
+/// This file defines diagnostics for refactoring.
 //
 //===----------------------------------------------------------------------===//
 

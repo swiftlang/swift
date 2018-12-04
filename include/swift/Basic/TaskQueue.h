@@ -35,7 +35,7 @@ class Task; // forward declared to allow for platform-specific implementations
 
 using ProcessId = llvm::sys::procid_t;
 
-/// \brief Indicates how a TaskQueue should respond to the task finished event.
+/// Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
   /// Indicates that execution should continue.
   ContinueExecution,
@@ -100,7 +100,7 @@ public:
   virtual void provideMapping(json::Output &out);
 };
 
-/// \brief A class encapsulating the execution of multiple tasks in parallel.
+/// A class encapsulating the execution of multiple tasks in parallel.
 class TaskQueue {
   /// Tasks which have not begun execution.
   std::queue<std::unique_ptr<Task>> QueuedTasks;
@@ -112,7 +112,7 @@ class TaskQueue {
   UnifiedStatsReporter *Stats;
 
 public:
-  /// \brief Create a new TaskQueue instance.
+  /// Create a new TaskQueue instance.
   ///
   /// \param NumberOfParallelTasks indicates the number of tasks which should
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
@@ -126,13 +126,13 @@ public:
   // std::function (<rdar://problem/15665132>).
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdocumentation"
-  /// \brief A callback which will be executed when each task begins execution
+  /// A callback which will be executed when each task begins execution
   ///
   /// \param Pid the ProcessId of the task which just began execution.
   /// \param Context the context which was passed when the task was added
   using TaskBeganCallback = std::function<void(ProcessId Pid, void *Context)>;
 
-  /// \brief A callback which will be executed after each task finishes
+  /// A callback which will be executed after each task finishes
   /// execution.
   ///
   /// \param Pid the ProcessId of the task which finished execution.
@@ -152,7 +152,7 @@ public:
       ProcessId Pid, int ReturnCode, StringRef Output, StringRef Errors,
       TaskProcessInformation ProcInfo, void *Context)>;
 
-  /// \brief A callback which will be executed if a task exited abnormally due
+  /// A callback which will be executed if a task exited abnormally due
   /// to a signal.
   ///
   /// \param Pid the ProcessId of the task which exited abnormally.
@@ -177,7 +177,7 @@ public:
       void *Context, Optional<int> Signal, TaskProcessInformation ProcInfo)>;
 #pragma clang diagnostic pop
 
-  /// \brief Indicates whether TaskQueue supports buffering output on the
+  /// Indicates whether TaskQueue supports buffering output on the
   /// current system.
   ///
   /// \note If this returns false, the TaskFinishedCallback passed
@@ -185,7 +185,7 @@ public:
   /// if the task actually generated output.
   static bool supportsBufferingOutput();
 
-  /// \brief Indicates whether TaskQueue supports parallel execution on the
+  /// Indicates whether TaskQueue supports parallel execution on the
   /// current system.
   static bool supportsParallelExecution();
 
@@ -193,7 +193,7 @@ public:
   /// parallel
   unsigned getNumberOfParallelTasks() const;
 
-  /// \brief Adds a task to the TaskQueue.
+  /// Adds a task to the TaskQueue.
   ///
   /// \param ExecPath the path to the executable which the task should execute
   /// \param Args the arguments which should be passed to the task
@@ -205,7 +205,7 @@ public:
                        ArrayRef<const char *> Env = llvm::None,
                        void *Context = nullptr, bool SeparateErrors = false);
 
-  /// \brief Synchronously executes the tasks in the TaskQueue.
+  /// Synchronously executes the tasks in the TaskQueue.
   ///
   /// \param Began a callback which will be called when a task begins
   /// \param Finished a callback which will be called when a task finishes
@@ -225,7 +225,7 @@ public:
   }
 };
 
-/// \brief A class which simulates execution of tasks with behavior similar to
+/// A class which simulates execution of tasks with behavior similar to
 /// TaskQueue.
 class DummyTaskQueue : public TaskQueue {
   class DummyTask {
@@ -246,7 +246,7 @@ class DummyTaskQueue : public TaskQueue {
   std::queue<std::unique_ptr<DummyTask>> QueuedTasks;
 
 public:
-  /// \brief Create a new DummyTaskQueue instance.
+  /// Create a new DummyTaskQueue instance.
   DummyTaskQueue(unsigned NumberOfParallelTasks = 0);
   virtual ~DummyTaskQueue();
 

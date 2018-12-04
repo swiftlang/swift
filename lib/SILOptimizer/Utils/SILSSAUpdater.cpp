@@ -390,7 +390,7 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlockInternal(SILBasicBlock *BB){
   return Impl.GetValue(BB);
 }
 
-/// \brief Construct a use wrapper. For branches we store information so that we
+/// Construct a use wrapper. For branches we store information so that we
 /// can reconstruct the use after the branch has been modified.
 ///
 /// When a branch is modified existing pointers to the operand

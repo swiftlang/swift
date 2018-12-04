@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief The TAPI registry keeps track of the supported file formats.
+/// The TAPI registry keeps track of the supported file formats.
 ///
 //===----------------------------------------------------------------------===//
 

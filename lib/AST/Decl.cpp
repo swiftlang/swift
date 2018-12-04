@@ -4567,7 +4567,7 @@ void VarDecl::markInvalid() {
   setInterfaceType(ErrorType::get(Ctx));
 }
 
-/// \brief Returns whether the var is settable in the specified context: this
+/// Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
@@ -4898,7 +4898,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
 }
 
 
-/// \brief Retrieve the type of 'self' for the given context.
+/// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
@@ -4912,7 +4912,7 @@ Type DeclContext::getSelfTypeInContext() const {
   return getDeclaredTypeInContext();
 }
 
-/// \brief Retrieve the interface type of 'self' for the given context.
+/// Retrieve the interface type of 'self' for the given context.
 Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 

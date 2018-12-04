@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Access the TAPI API version information and feature availability.
+/// Access the TAPI API version information and feature availability.
 /// \since 1.0
 ///
 //===----------------------------------------------------------------------===//
@@ -31,13 +31,13 @@
 namespace tapi {
 
 ///
-/// \brief Defines a list of TAPI library features.
+/// Defines a list of TAPI library features.
 /// \since 1.0
 ///
 enum class Feature : unsigned {};
 
 ///
-/// \brief Access to API version, feature and ABI related information about the
+/// Access to API version, feature and ABI related information about the
 ///        TAPI dynamic library.
 /// \since 1.0
 ///
@@ -49,28 +49,28 @@ public:
   ///
 
   ///
-  /// \brief Get the major API version number.
+  /// Get the major API version number.
   /// \return The major API version number as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getMajor() noexcept;
 
   ///
-  /// \brief Get the minor API version number.
+  /// Get the minor API version number.
   /// \return The minor API version number as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getMinor() noexcept;
 
   ///
-  /// \brief Get the patch API version number.
+  /// Get the patch API version number.
   /// \return The patch API version as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getPatch() noexcept;
 
   ///
-  /// \brief Check if the current API version is at least the specified API
+  /// Check if the current API version is at least the specified API
   ///        version or greater.
   /// \param[in] major The major API version number to compare against.
   /// \param[in] minor The minor API version number to compare against.
@@ -92,7 +92,7 @@ public:
   ///
 
   ///
-  /// \brief Check if the library supports a particular #Feature.
+  /// Check if the library supports a particular #Feature.
   /// \param[in] feature The #Feature to be queried for.
   /// \return True if \a feature is supported.
   /// \since 1.0
@@ -109,7 +109,7 @@ public:
   ///
 
   ///
-  /// \brief Check if the library supports the specified ABI version.
+  /// Check if the library supports the specified ABI version.
   /// \param[in] abiVersion The ABI version to query for.
   /// \return True if the library supports the ABI version \a abiVersion.
   /// \since 1.0

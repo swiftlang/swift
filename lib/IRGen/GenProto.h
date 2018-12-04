@@ -157,7 +157,7 @@ namespace irgen {
                                 CanSILFunctionType &SubstFnType,
                                 Explosion &nativeParam, unsigned paramIndex);
 
-  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  /// Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol
   /// descriptor symbol.

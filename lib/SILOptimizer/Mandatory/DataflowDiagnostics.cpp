@@ -95,7 +95,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
   }
 }
 
-/// \brief Issue diagnostics whenever we see Builtin.static_report(1, ...).
+/// Issue diagnostics whenever we see Builtin.static_report(1, ...).
 static void diagnoseStaticReports(const SILInstruction *I,
                                   SILModule &M) {
 
@@ -116,7 +116,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
-/// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
+/// Emit a diagnostic for `poundAssert` builtins whose condition is
 /// false or whose condition cannot be evaluated.
 static void diagnosePoundAssert(const SILInstruction *I,
                                 SILModule &M,

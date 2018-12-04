@@ -1029,7 +1029,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   return createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
 }
 
-/// \brief Check that all users of the apply are retain/release ignoring one
+/// Check that all users of the apply are retain/release ignoring one
 /// user.
 static bool
 hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
@@ -1049,7 +1049,7 @@ hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
   return true;
 };
 
-/// \brief We only know how to simulate reference call effects for unary
+/// We only know how to simulate reference call effects for unary
 /// function calls that take their argument @owned or @guaranteed and return an
 /// @owned value.
 static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
@@ -1077,7 +1077,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
          ParamConv == ParameterConvention::Direct_Guaranteed;
 }
 
-/// \brief Add reference counting operations equal to the effect of the call.
+/// Add reference counting operations equal to the effect of the call.
 static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
   SILFunction *F = FRI->getReferencedFunction();

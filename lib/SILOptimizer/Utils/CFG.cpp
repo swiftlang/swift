@@ -21,7 +21,7 @@
 
 using namespace swift;
 
-/// \brief Adds a new argument to an edge between a branch and a destination
+/// Adds a new argument to an edge between a branch and a destination
 /// block.
 ///
 /// \param Branch The terminator to add the argument to.
@@ -77,7 +77,7 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
   return NewBr;
 }
 
-/// \brief Changes the edge value between a branch and destination basic block
+/// Changes the edge value between a branch and destination basic block
 /// at the specified index. Changes all edges from \p Branch to \p Dest to carry
 /// the value.
 ///
@@ -187,7 +187,7 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
     return DefaultBB;
 }
 
-/// \brief Replace a branch target.
+/// Replace a branch target.
 ///
 /// \param T The terminating instruction to modify.
 /// \param OldDest The successor block that will be replaced.
@@ -332,7 +332,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   llvm_unreachable("Not yet implemented!");
 }
 
-/// \brief Check if the edge from the terminator is critical.
+/// Check if the edge from the terminator is critical.
 bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
