@@ -52,11 +52,11 @@ bb0:
   return %ret : $()
 }
 
-// CHECK-LABEL: define swiftcc { i8*, i8*, i8*, i8* } @make_diff_func()
+// CHECK-LABEL: swiftcc { i8*, i8*, i8*, i8* } @make_diff_func()
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret { i8*, i8*, i8*, i8* } { i8* bitcast (float (float)* @foo to i8*), i8* undef, i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @foo_vjp to i8*), i8* bitcast ({ float, i8*, %swift.refcounted* } (float)* @foo_vjp to i8*) }
 
-// CHECK-LABEL: define swiftcc void @caller()
+// CHECK-LABEL: swiftcc void @caller()
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   [[RESULT_TUPLE:%.*]] = call swiftcc { i8*, i8*, i8*, i8* } @make_diff_func()
 // CHECK:   [[VJP:%.*]] = extractvalue { i8*, i8*, i8*, i8* } [[RESULT_TUPLE]], 3
