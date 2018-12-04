@@ -2913,9 +2913,6 @@ public:
 ///   func getNext() -> Element?
 /// }
 /// \endcode
-///
-/// Every protocol has an implicitly-created associated type 'Self' that
-/// describes a type that conforms to the protocol.
 class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The location of the initial keyword.
   SourceLoc KeywordLoc;
@@ -3875,6 +3872,14 @@ private:
 ///   protocol Drawable {
 ///     func draw()
 ///   }
+///
+/// Every protocol has an implicitly-created 'Self' generic parameter that
+/// stands for a type that conforms to the protocol. For example,
+///
+///   protocol Cloneable {
+///     func clone() -> Self
+///   }
+///
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
