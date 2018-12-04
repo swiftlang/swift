@@ -455,7 +455,6 @@ protected:
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();
-  NodePointer popSelfOrAssocTypePath();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();

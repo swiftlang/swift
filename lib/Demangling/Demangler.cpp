@@ -1875,20 +1875,6 @@ NodePointer Demangler::popAssocTypePath() {
   return AssocTypePath;
 }
 
-NodePointer Demangler::popSelfOrAssocTypePath() {
-  if (auto Type = popNode(Node::Kind::Type)) {
-    if (Type->getChild(0) &&
-        Type->getChild(0)->getKind() ==
-        Node::Kind::DependentGenericParamType) {
-      return Type;
-    }
-
-    pushNode(Type);
-  }
-
-  return popAssocTypePath();
-}
-
 NodePointer Demangler::getDependentGenericParamType(int depth, int index) {
   if (depth < 0 || index < 0)
     return nullptr;
@@ -2458,10 +2444,16 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      NodePointer ConformingType = popSelfOrAssocTypePath();
+      NodePointer ConformingType = popAssocTypePath();
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
                                 Conf, ConformingType, ProtoTy);
+    }
+    case 'b': {
+      NodePointer ProtoTy = popNode(Node::Kind::Type);
+      NodePointer Conf = popProtocolConformance();
+      return createWithChildren(Node::Kind::BaseWitnessTableAccessor,
+                                Conf, ProtoTy);
     }
     case 'O': {
       switch (nextChar()) {

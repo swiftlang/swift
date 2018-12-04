@@ -963,6 +963,10 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[2]); // type
 }
 
+void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
+  Out << "<base-witness-table-accessor>";
+}
+
 void Remangler::mangleReabstractionThunkHelper(Node *node) {
   Out << "TR";
   if (node->getNumChildren() == 3) Out << 'G';

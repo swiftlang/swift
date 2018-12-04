@@ -607,6 +607,11 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   Buffer << "WT";
 }
 
+void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
+  mangleChildNodes(node); // protocol conformance, protocol
+  Buffer << "Wb";
+}
+
 void Remangler::mangleAutoClosureType(Node *node) {
   mangleChildNodesReversed(node); // argument tuple, result type
   Buffer << "XK";
