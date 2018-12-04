@@ -1994,13 +1994,10 @@ namespace {
           // Associated conformance descriptor for a base protocol.
           const auto &witness = entry.getBaseProtocolWitness();
           auto proto = SILWT->getProtocol();
-          AssociatedConformance requirement(proto,
-                                            proto->getSelfInterfaceType()
-                                              ->getCanonicalType(),
-                                            witness.Requirement);
+          BaseConformance requirement(proto, witness.Requirement);
           auto baseConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forAssociatedConformanceDescriptor(requirement));
+              LinkEntity::forBaseConformanceDescriptor(requirement));
           B.addRelativeAddress(baseConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
           // Method descriptor.

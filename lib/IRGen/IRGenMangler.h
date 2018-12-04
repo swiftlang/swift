@@ -208,6 +208,16 @@ public:
     return finalize();
   }
 
+  std::string mangleBaseConformanceDescriptor(
+      const ProtocolDecl *proto,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    appendProtocolName(requirement);
+    appendOperator("Tb");
+    return finalize();
+  }
+
   std::string mangleDefaultAssociatedConformanceAccessor(
       const ProtocolDecl *proto,
       CanType subject,
