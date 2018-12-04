@@ -147,7 +147,7 @@ Globals
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
   global ::= protocol-conformance assoc-type-list protocol 'WT' // associated type witness table accessor
-  global ::= protocol-conformance type protocol 'WT' // inherited protocol witness table accessor
+  global ::= protocol-conformance protocol 'Wb' // base protocol witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table

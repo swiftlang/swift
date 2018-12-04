@@ -280,14 +280,20 @@ public:
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
-    if (isa<GenericTypeParamType>(AssociatedType)) {
-      appendType(AssociatedType);
-    } else {
-      bool isFirstAssociatedTypeIdentifier = true;
-      appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
-    }
+    bool isFirstAssociatedTypeIdentifier = true;
+    appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
     appendOperator("WT");
+    return finalize();
+  }
+
+  std::string mangleBaseWitnessTableAccessFunction(
+                                      const ProtocolConformance *Conformance,
+                                      const ProtocolDecl *BaseProto) {
+    beginMangling();
+    appendProtocolConformance(Conformance);
+    appendAnyGenericType(BaseProto);
+    appendOperator("Wb");
     return finalize();
   }
 
