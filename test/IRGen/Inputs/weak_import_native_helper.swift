@@ -83,7 +83,10 @@ public protocol P {
 }
 
 @_weakLinked
-public struct WeakS {}
+public struct WeakS {
+  public init() {}
+  public func weakMember() {}
+}
 
 @_weakLinked
 public enum WeakE {}

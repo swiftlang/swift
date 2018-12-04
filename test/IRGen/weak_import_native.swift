@@ -55,6 +55,10 @@ func testStruct() {
   let z = s[0]
   s[0] = z
   s[0] += 1
+
+  // CHECK-DAG: declare extern_weak {{.+}} @"$s25weak_import_native_helper5WeakSV0A6MemberyyF"
+  let w = WeakS()
+  w.weakMember()
 }
 
 func testEnum() {
