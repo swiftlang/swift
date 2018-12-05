@@ -15,7 +15,7 @@ func testInferredElementResult() -> TensorHandle<Int32> {
 
 class ClassTest {
   var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
-  let b = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
+  let b = Tensor<Float>(zeros: [1, 2]) 
 
   var c : Tensor<Float> { return w } // expected-warning {{properties in classes always cause a copy to the accelerator}}
 
@@ -49,7 +49,8 @@ public func testDevice() {
 // should be a single copy-to-host compiler warning.
 public func SR8412_CopyToHost() {
   for _ in 0...10 {
-    let x = Tensor(1)  // expected-warning {{value implicitly copied to the host}}
+		// This gets moved outside the loop by the compiler optimizations. So, no warnings. 
+    let x = Tensor(1)  
     _hostOp(x)
   }
 }
