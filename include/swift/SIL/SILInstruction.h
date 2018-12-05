@@ -7646,28 +7646,48 @@ public:
 class AutoDiffFunctionExtractInst :
     public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
                            SingleValueInstruction> {
+public:
+  struct Extractee {
+    enum innerty : uint8_t {
+      Original = 0,
+      JVP = 1,
+      VJP = 2
+    } rawValue;
+    Extractee() = default;
+    Extractee(innerty rawValue) : rawValue(rawValue) {}
+    explicit Extractee(StringRef name);
+    operator innerty() const { return rawValue; }
+  };
+
 private:
-  /// The kind of the associated function to extract.
-  AutoDiffAssociatedFunctionKind associatedFunctionKind;
-  /// The differentiation order.
+  /// The extractee.
+  Extractee extractee;
+  /// The differentiation order. A zero value is only legal when the extractee
+  /// is the original function, and it is a private representation only.
   unsigned differentiationOrder;
   /// The list containing the `@autodiff` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getAssociatedFunctionType(SILValue function,
-                            AutoDiffAssociatedFunctionKind kind,
-                            unsigned differentiationOrder,
-                            SILModule &module);
+  getExtracteeType(SILValue function, Extractee extractee,
+                   unsigned differentiationOrder, SILModule &module);
 
 public:
   explicit AutoDiffFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc,
-      AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
       unsigned differentiationOrder, SILValue theFunction);
 
+  Extractee getExtractee() const {
+    return extractee;
+  }
+
   AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
-    return associatedFunctionKind;
+    assert(extractee != Extractee::Original);
+    switch (extractee) {
+    case Extractee::JVP: return AutoDiffAssociatedFunctionKind::JVP;
+    case Extractee::VJP: return AutoDiffAssociatedFunctionKind::VJP;
+    case Extractee::Original: llvm_unreachable("Cannot be Original");
+    }
   }
 
   SILValue getFunctionOperand() const {
@@ -7690,6 +7710,8 @@ public:
     return N->getKind() == SILNodeKind::AutoDiffFunctionExtractInst;
   }
 };
+
+typedef AutoDiffFunctionExtractInst::Extractee AutoDiffFunctionExtractee;
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of

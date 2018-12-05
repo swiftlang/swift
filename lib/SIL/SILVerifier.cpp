@@ -1254,7 +1254,8 @@ public:
   }
 
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // FIXME(rxwei): Complete verification.
+    require(adfi->getDifferentiationOrder() > 0,
+            "The differentiation order must be non-zero");
     auto origTy =
         adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
@@ -1287,7 +1288,14 @@ public:
   }
   
   void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
-    // FIXME(rxwei): Complete verification.
+    if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original)
+      require(adfei->getDifferentiationOrder() == 0,
+              "Differentiation order should not have been set when the original"
+              " function is being extracted");
+    else
+      require(adfei->getDifferentiationOrder() > 0,
+              "Extraction of associated functions requires a differentiation "
+              "order");
     auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
