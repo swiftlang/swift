@@ -552,45 +552,59 @@ public extension Tensor {
 
 // Export Glibc/Darwin math functions. We should not require users to import
 // Foundation/Darwin/Glibc in order to use scalar math functions.
+//
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_exported import func Darwin.C.sin
-@_exported import func Darwin.C.cos
-@_exported import func Darwin.C.tan
-@_exported import func Darwin.C.sinf
-@_exported import func Darwin.C.cosf
-@_exported import func Darwin.C.tanf
-@_exported import func Darwin.C.sinh
-@_exported import func Darwin.C.cosh
-@_exported import func Darwin.C.tanh
-@_exported import func Darwin.C.sinhf
-@_exported import func Darwin.C.coshf
-@_exported import func Darwin.C.tanhf
-@_exported import func Darwin.C.log
-@_exported import func Darwin.C.logf
-@_exported import func Darwin.C.exp
-@_exported import func Darwin.C.expf
-@_exported import func Darwin.C.pow
-@_exported import func Darwin.C.powf
+@_exported import Darwin.C
 #else
-@_exported import func Glibc.sin
-@_exported import func Glibc.cos
-@_exported import func Glibc.tan
-@_exported import func Glibc.sinf
-@_exported import func Glibc.cosf
-@_exported import func Glibc.tanf
-@_exported import func Glibc.sinh
-@_exported import func Glibc.cosh
-@_exported import func Glibc.tanh
-@_exported import func Glibc.sinhf
-@_exported import func Glibc.coshf
-@_exported import func Glibc.tanhf
-@_exported import func Glibc.log
-@_exported import func Glibc.logf
-@_exported import func Glibc.exp
-@_exported import func Glibc.expf
-@_exported import func Glibc.pow
-@_exported import func Glibc.powf
+@_exported import Glibc
 #endif
+//
+// FIXME(rxwei): Scoped imports are not yet supported in parseable module
+// interfaces, so `@_exported import` won't work. When that becomes supported,
+// switch to `@_exported import` by removing `import Darwin.C/Glibc` above and
+// uncommenting the following lines. In the meantime, consider using indirect
+// wrappers for each function so that random libc symbols won't be leaked to
+// users' code completion.
+//
+// #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+// @_exported import func Darwin.C.sin
+// @_exported import func Darwin.C.cos
+// @_exported import func Darwin.C.tan
+// @_exported import func Darwin.C.sinf
+// @_exported import func Darwin.C.cosf
+// @_exported import func Darwin.C.tanf
+// @_exported import func Darwin.C.sinh
+// @_exported import func Darwin.C.cosh
+// @_exported import func Darwin.C.tanh
+// @_exported import func Darwin.C.sinhf
+// @_exported import func Darwin.C.coshf
+// @_exported import func Darwin.C.tanhf
+// @_exported import func Darwin.C.log
+// @_exported import func Darwin.C.logf
+// @_exported import func Darwin.C.exp
+// @_exported import func Darwin.C.expf
+// @_exported import func Darwin.C.pow
+// @_exported import func Darwin.C.powf
+// #else
+// @_exported import func Glibc.sin
+// @_exported import func Glibc.cos
+// @_exported import func Glibc.tan
+// @_exported import func Glibc.sinf
+// @_exported import func Glibc.cosf
+// @_exported import func Glibc.tanf
+// @_exported import func Glibc.sinh
+// @_exported import func Glibc.cosh
+// @_exported import func Glibc.tanh
+// @_exported import func Glibc.sinhf
+// @_exported import func Glibc.coshf
+// @_exported import func Glibc.tanhf
+// @_exported import func Glibc.log
+// @_exported import func Glibc.logf
+// @_exported import func Glibc.exp
+// @_exported import func Glibc.expf
+// @_exported import func Glibc.pow
+// @_exported import func Glibc.powf
+// #endif
 
 public extension Tensor where Scalar : SignedNumeric {
   /// Computes the negation of the specified tensor element-wise.
