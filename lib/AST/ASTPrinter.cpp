@@ -1406,13 +1406,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
         }
       } else {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        if (second) {
-          Requirement substReq(req.getKind(), first, second);
-          printRequirement(substReq);
-        } else {
-          Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
-          printRequirement(substReq);
-        }
+
+        // We don't substitute type for the printed requirement so that the
+        // printed requirement agrees with separately reported generic parameters.
+        printRequirement(req);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
     }

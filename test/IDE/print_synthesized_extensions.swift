@@ -237,21 +237,21 @@ extension S13 : P5 {
   public func foo1() {}
 }
 
-// CHECK1: <synthesized>extension <ref:Struct>S1</ref> where T : <ref:Protocol>P2</ref> {
+// CHECK1: <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>Self</ref>.P2T1 : <ref:Protocol>P2</ref> {
 // CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: T</decl>)</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:Struct>S2</ref></decl>)</loc></decl>
 // CHECK1-NEXT: }</synthesized>
 
-// CHECK2:  <synthesized>extension <ref:Struct>S1</ref> where T : <ref:Protocol>P3</ref> {
+// CHECK2:  <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>Self</ref>.T1 : <ref:Protocol>P3</ref>  {
 // CHECK2-NEXT:     <decl:Func>public func <loc>p3Func(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK2-NEXT: }</synthesized>
 
-// CHECK3:  <synthesized>extension <ref:Struct>S1</ref> where T == <ref:Struct>Int</ref> {
+// CHECK3:  <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>Self</ref>.T1 == <ref:Struct>Int</ref>  {
 // CHECK3-NEXT:     <decl:Func>public func <loc>p1IntFunc(<decl:Param>i: <ref:Struct>Int</ref></decl>)</loc> -> <ref:Struct>Int</ref></decl>
 // CHECK3-NEXT: }</synthesized>
 
-// CHECK4:  <synthesized>extension <ref:Struct>S1</ref> where T == <ref:Struct>S9</ref><<ref:Struct>Int</ref>> {
+// CHECK4:  <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>Self</ref>.T1 == <ref:Struct>S9</ref><<ref:Struct>Int</ref>> {
 // CHECK4-NEXT:     <decl:Func>public func <loc>S9IntFunc()</loc></decl>
 // CHECK4-NEXT: }</synthesized>
 
