@@ -376,7 +376,7 @@ endfunction()
 function(_add_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
+  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -387,6 +387,7 @@ function(_add_variant_link_flags)
   precondition(LFLAGS_ARCH MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
+  set(link_libraries ${${LFLAGS_LINK_LIBRARIES_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
 
   _add_variant_c_compile_link_flags(
@@ -403,9 +404,9 @@ function(_add_variant_link_flags)
     RESULT_VAR_NAME result)
 
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
-    list(APPEND result "-lpthread" "-latomic" "-ldl")
+    list(APPEND link_libraries "pthread" "atomic" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
-    list(APPEND result "-lpthread")
+    list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -423,9 +424,10 @@ function(_add_variant_link_flags)
     list(APPEND library_search_directories
          ${CMAKE_BINARY_DIR}/winsdk_lib_${LFLAGS_ARCH}_symlinks)
   elseif("${LFLAGS_SDK}" STREQUAL "HAIKU")
-    list(APPEND result "-lbsd" "-latomic" "-Wl,-Bsymbolic")
+    list(APPEND link_libraries "bsd" "atomic")
+    list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result "-ldl" "-llog" "-latomic" "-licudataswift" "-licui18nswift" "-licuucswift")
+    list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
     if("${LFLAGS_ARCH}" MATCHES armv7)
       list(APPEND result "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
@@ -435,7 +437,7 @@ function(_add_variant_link_flags)
     endif()
     swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
-      list(APPEND library_search_directories ${path}) 
+      list(APPEND library_search_directories ${path})
     endforeach()
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
@@ -475,6 +477,7 @@ function(_add_variant_link_flags)
   endif()
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
+  set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
   set("${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}" "${library_search_directories}" PARENT_SCOPE)
 endfunction()
 
@@ -1207,6 +1210,7 @@ function(_add_swift_library_single target name)
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME link_flags
+    LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
       )
 
@@ -1251,6 +1255,7 @@ function(_add_swift_library_single target name)
       COMPILE_FLAGS " ${c_compile_flags}")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
+  set_property(TARGET "${target}" APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
   swift_target_link_search_directories("${target}" "${library_search_directories}")
 
   # Adjust the linked libraries for windows targets.  On Windows, the link is
@@ -2119,6 +2124,7 @@ function(_add_swift_executable_single name)
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags
+    LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
 
   if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
@@ -2176,6 +2182,7 @@ function(_add_swift_executable_single name)
   swift_target_link_search_directories("${name}" "${library_search_directories}")
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
+  set_property(TARGET ${name} APPEND PROPERTY LINK_LIBRARIES ${link_libraries})
   if (SWIFT_PARALLEL_LINK_JOBS)
     set_property(TARGET ${name} PROPERTY JOB_POOL_LINK swift_link_job_pool)
   endif()
