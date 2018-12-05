@@ -1,6 +1,7 @@
 /// bad ==> main | bad --> other
 
-// RUN: rm -rf %t && cp -r %S/Inputs/fail-simple/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/fail-simple/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies-bad.py -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./bad.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
