@@ -37,7 +37,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 // CHECK-NEXT: load
 // CHECK:  return
 sil @self_init_assert_instruction : $@convention(thin) (Int, @thin MyStruct.Type) -> MyStruct {
-  bb0(%0 : @trivial $Int, %1 : @trivial $@thin MyStruct.Type):
+  bb0(%0 : $Int, %1 : $@thin MyStruct.Type):
   %2 = alloc_stack $MyStruct, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct
 
@@ -54,7 +54,7 @@ sil @selfinit_delegate : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStr
 // <rdar://problem/18089574> Protocol member in struct + delegating init miscompilation
 // CHECK-LABEL: @self_init_copyaddr
 sil @self_init_copyaddr : $@convention(thin) (@thin MyStruct2.Type) -> @out MyStruct2 {
-bb0(%0 : @trivial $*MyStruct2, %1 : @trivial $@thin MyStruct2.Type):
+bb0(%0 : $*MyStruct2, %1 : $@thin MyStruct2.Type):
   // CHECK: [[SELF:%[0-9]+]] = alloc_stack $MyStruct2
   %2 = alloc_stack $MyStruct2, var, name "sf"
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct2
@@ -85,7 +85,7 @@ sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 
 // CHECK-LABEL: sil hidden @test_conditional_destroy_delegating_init
 sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyStruct3
 

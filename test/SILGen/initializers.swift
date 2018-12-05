@@ -359,7 +359,7 @@ class FailableBaseClass {
   }
 
   // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC19failAfterDelegationACSgyt_tcfC
-  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
+  // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -378,7 +378,7 @@ class FailableBaseClass {
   // Optional to optional
   //
   // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC20failDuringDelegationACSgyt_tcfC
-  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
+  // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -411,7 +411,7 @@ class FailableBaseClass {
   // IUO to optional
   //
   // CHECK-LABEL: sil hidden @$s21failable_initializers17FailableBaseClassC21failDuringDelegation2ACSgyt_tcfC
-  // CHECK: bb0([[SELF_META:%.*]] : @trivial $@thick FailableBaseClass.Type):
+  // CHECK: bb0([[SELF_META:%.*]] : $@thick FailableBaseClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var FailableBaseClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -751,7 +751,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK:   try_apply [[UNWRAP_FN2]]({{%.*}}) : $@convention(thin) (Int) -> (Int, @error Error), normal [[UNWRAP_NORMAL_BB2:bb[0-9]+]], error [[UNWRAP_ERROR_BB2:bb[0-9]+]]
   //
   // Then since this example has a
-  // CHECK: [[UNWRAP_NORMAL_BB2]]([[INT:%.*]] : @trivial $Int):
+  // CHECK: [[UNWRAP_NORMAL_BB2]]([[INT:%.*]] : $Int):
   // CHECK:   [[INIT_FN2:%.*]] = function_ref @$s21failable_initializers14ThrowBaseClassC6noFailACSi_tcfc : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF_CAST:%.*]] = apply [[INIT_FN2]]([[INT]], [[SELF_CAST]]) : $@convention(method) (Int, @owned ThrowBaseClass) -> @owned ThrowBaseClass
   // CHECK:   [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF_CAST]] : $ThrowBaseClass to $ThrowDerivedClass
@@ -868,7 +868,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   }
 
   // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC39chainingFailDuringDelegationArgEmission0fghI4CallACSi_SitKcfC
-  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
+  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -902,7 +902,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   }
 
   // CHECK-LABEL: sil hidden @$s21failable_initializers17ThrowDerivedClassC32chainingFailDuringDelegationCall0fg5AfterI0ACSi_SitKcfC
-  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : @trivial $@thick ThrowDerivedClass.Type):
+  // CHECK: bb0({{.*}}, [[SELF_META:%.*]] : $@thick ThrowDerivedClass.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var ThrowDerivedClass }, let, name "self"
   // CHECK:   [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -1111,7 +1111,7 @@ struct DynamicTypeStruct {
 
 class InOutInitializer {
 // CHECK-LABEL: sil hidden @$s21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
-// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@thick InOutInitializer.Type):
+// CHECK: bb0(%0 : $*Int, %1 : $@thick InOutInitializer.Type):
   init(x: inout Int) {}
 }
 

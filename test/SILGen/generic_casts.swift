@@ -12,7 +12,7 @@ struct Unloadable : NotClassBound { var x : NotClassBound }
 func opaque_archetype_to_opaque_archetype
 <T:NotClassBound, U>(_ t:T) -> U {
   return t as! U
-  // CHECK: bb0([[RET:%.*]] : @trivial $*U, {{%.*}}: @trivial $*T):
+  // CHECK: bb0([[RET:%.*]] : $*U, {{%.*}}: $*T):
   // CHECK:   unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[RET]] : $*U
 }
 
@@ -28,7 +28,7 @@ func opaque_archetype_is_opaque_archetype
   // CHECK: [[NO]]:
   // CHECK:   [[N:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK:   br [[CONT]]([[N]] : $Builtin.Int1)
-  // CHECK: [[CONT]]([[I1:%.*]] : @trivial $Builtin.Int1):
+  // CHECK: [[CONT]]([[I1:%.*]] : $Builtin.Int1):
   // CHECK-NEXT:  [[META:%.*]] = metatype $@thin Bool.Type
   // CHECK-NEXT:  function_ref Swift.Bool.init(_builtinBooleanLiteral: Builtin.Int1)
   // CHECK-NEXT:  [[BOOL:%.*]] = function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC :
@@ -76,7 +76,7 @@ func class_archetype_is_class_archetype
 func opaque_archetype_to_addr_only_concrete
 <T:NotClassBound> (_ t:T) -> Unloadable {
   return t as! Unloadable
-  // CHECK: bb0([[RET:%.*]] : @trivial $*Unloadable, {{%.*}}: @trivial $*T):
+  // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*T):
   // CHECK:   unconditional_checked_cast_addr T in {{%.*}} : $*T to Unloadable in [[RET]] : $*Unloadable
 }
 
@@ -122,7 +122,7 @@ func class_archetype_is_class
 func opaque_existential_to_opaque_archetype
 <T:NotClassBound>(_ p:NotClassBound) -> T {
   return p as! T
-  // CHECK: bb0([[RET:%.*]] : @trivial $*T, [[ARG:%.*]] : @trivial $*NotClassBound):
+  // CHECK: bb0([[RET:%.*]] : $*T, [[ARG:%.*]] : $*NotClassBound):
   // CHECK:      [[TEMP:%.*]] = alloc_stack $NotClassBound
   // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[TEMP]]
   // CHECK-NEXT: unconditional_checked_cast_addr NotClassBound in [[TEMP]] : $*NotClassBound to T in [[RET]] : $*T
@@ -173,7 +173,7 @@ func class_existential_is_class_archetype
 // CHECK-LABEL: sil hidden @$s13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_to_addr_only_concrete(_ p: NotClassBound) -> Unloadable {
   return p as! Unloadable
-  // CHECK: bb0([[RET:%.*]] : @trivial $*Unloadable, {{%.*}}: @trivial $*NotClassBound):
+  // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*NotClassBound):
   // CHECK:   unconditional_checked_cast_addr NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in [[RET]] : $*Unloadable
 }
 
@@ -222,7 +222,7 @@ func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
 // CHECK-LABEL: sil hidden @$s13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_opaque_archetype<T>(_ x: Any?) -> T {
   return x as! T
-  // CHECK: bb0([[RET:%.*]] : @trivial $*T, {{%.*}} : @trivial $*Optional<Any>):
+  // CHECK: bb0([[RET:%.*]] : $*T, {{%.*}} : $*Optional<Any>):
   // CHECK: unconditional_checked_cast_addr Optional<Any> in {{%.*}} : $*Optional<Any> to T in [[RET]] : $*T
 }
 

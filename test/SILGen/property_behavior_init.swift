@@ -25,7 +25,7 @@ struct Foo {
   // var xx: (Int, Int) __behavior diBehavior
 
   // CHECK-LABEL: sil hidden @$s22property_behavior_init3FooV{{[_0-9a-zA-Z]*}}fC
-  // CHECK:       bb0([[X:%.*]] : @trivial $Int,
+  // CHECK:       bb0([[X:%.*]] : $Int,
   init(x: Int) {
     // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [rootself]
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]

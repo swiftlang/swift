@@ -4,12 +4,12 @@ sil_stage raw
 import Builtin
 
 // CHECK-LABEL: sil @foo : $@convention(thin) <T> (@in T) -> @out T {
-// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T):
+// CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK:   return undef : $()
 // CHECK: }
 sil @foo : $@convention(thin) <T> (@in T) -> @out T {
-entry(%o : @trivial $*T, %i : @trivial $*T):
+entry(%o : $*T, %i : $*T):
   copy_addr [take] %i to [initialization] %o : $*T
   return undef : $()
 }
@@ -97,7 +97,7 @@ protocol FooProto {
 
 // These generic parameters used to crash the compiler.
 sil @protocol_extension_with_constrained_associated_type : $@convention(method) <Self where Self : FooProto, Self.Assoc : FooProtoHelper><I where I : FooProto, I.Assoc == Self.Assoc> (@in I, @in_guaranteed Self) -> () {
-bb0(%0 : @trivial $*I, %1 : @trivial $*Self):
+bb0(%0 : $*I, %1 : $*Self):
   %2 = alloc_stack $I                             // users: %3, %6, %7, %9
   copy_addr %0 to [initialization] %2 : $*I     // id: %3
   %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method: FooProto) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@in_guaranteed τ_0_0) -> @out τ_0_0.Assoc // user: %6

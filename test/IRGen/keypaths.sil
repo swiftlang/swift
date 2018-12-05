@@ -241,27 +241,27 @@ entry:
 
 sil @k_id : $@convention(thin) () -> ()
 sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*S):
+bb0(%0 : $*Int, %1 : $*S):
   unreachable
 }
 
 sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> () {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
 sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
@@ -363,7 +363,7 @@ sil @r_get : $@convention(thin) (@in_guaranteed C, UnsafeRawPointer) -> @out S
 sil @r_set : $@convention(thin) (@in_guaranteed S, @in_guaranteed C, UnsafeRawPointer) -> ()
 
 sil @generic_computed_property_indices : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
+entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
   %s = keypath $WritableKeyPath<A, B>, <X: Hashable, Y: Hashable> (
     root $X;
     settable_property $Y,

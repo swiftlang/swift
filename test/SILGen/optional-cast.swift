@@ -155,7 +155,7 @@ func baz(_ y : AnyObject?) {
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
 // CHECK-LABEL: sil hidden @$s4main07opt_to_B8_trivialySiSgACF
-// CHECK:       bb0(%0 : @trivial $Optional<Int>):
+// CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
 // CHECK-NEXT:  return %0 : $Optional<Int>
 // CHECK-NEXT:}
@@ -173,7 +173,7 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @$s4main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
-// CHECK:       bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*Optional<T>):
+// CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
 // CHECK-NEXT:  copy_addr %1 to [initialization] %0
 // CHECK-NOT:  destroy_addr %1
@@ -185,7 +185,7 @@ public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
   
   // CHECK-LABEL: sil hidden @$s4main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
-  // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $TestAddressOnlyStruct<T>):
+  // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: apply {{.*}}<T>(%0, %1)
   func testCall(_ a : T!) {
     f(a)
@@ -193,7 +193,7 @@ public struct TestAddressOnlyStruct<T> {
 }
 
 // CHECK-LABEL: sil hidden @$s4main35testContextualInitOfNonAddrOnlyTypeyySiSgF
-// CHECK: bb0(%0 : @trivial $Optional<Int>):
+// CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]

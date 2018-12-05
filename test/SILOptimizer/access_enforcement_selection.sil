@@ -7,7 +7,7 @@ sil_stage raw
 
 // Test undef begin_access operands.
 // CHECK-LABEL: sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
-// CHECK: bb0(%0 : @trivial $Builtin.Int64):
+// CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: bb1:
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] undef : $*Builtin.Int64
 // CHECK: store %{{.*}} to [trivial] [[WRITE]] : $*Builtin.Int64
@@ -19,7 +19,7 @@ sil_stage raw
 // CHECK: end_access [[READ]] : $*Builtin.Int64
 // CHECK-LABEL: } // end sil function 'undefStack'
 sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : @trivial $Builtin.Int64):
+bb0(%0 : $Builtin.Int64):
   br bb1
 
 bb1:
@@ -190,7 +190,7 @@ bb0:
 // CHECK: begin_access [read] [static]
 // CHECK-LABEL: } // end sil function 'borrowedClosure'
 sil @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
-bb0(%0 : @trivial $*Builtin.Int64):
+bb0(%0 : $*Builtin.Int64):
   %access = begin_access [read] [unknown] %0 : $*Builtin.Int64
   %val = load [trivial] %access : $*Builtin.Int64
   end_access %access : $*Builtin.Int64
@@ -222,7 +222,7 @@ sil @borrowClosure : $@convention(thin) () -> () {
 }
 
 sil @dontAssert : $@convention(thin) (Builtin.Int64) -> (@out Builtin.Int64) {
-bb0(%0 : @trivial $*Builtin.Int64, %1 : @trivial $Builtin.Int64):
+bb0(%0 : $*Builtin.Int64, %1 : $Builtin.Int64):
   store %1 to [trivial] %0 : $*Builtin.Int64
   %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
   %closure = partial_apply %f(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
@@ -230,7 +230,7 @@ bb0(%0 : @trivial $*Builtin.Int64, %1 : @trivial $Builtin.Int64):
 }
 
 sil [canonical] @serializedClosureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
-bb0(%0 : @trivial $*Builtin.Int64):
+bb0(%0 : $*Builtin.Int64):
   %2 = begin_access [read] [unknown] %0 : $*Builtin.Int64
   %3 = load [trivial] %2 : $*Builtin.Int64
   end_access %2 : $*Builtin.Int64
@@ -279,7 +279,7 @@ sil [noinline] @takeInoutAndPerform : $@convention(thin) (@inout Builtin.Int64, 
 // CHECK-LABEL: sil @testDirectApplyNoescapeDynamic : $@convention(thin) (Builtin.Int64) -> () {
 // CHECK-LABEL:  // end sil function 'testDirectApplyNoescapeDynamic'
 sil @testDirectApplyNoescapeDynamic : $@convention(thin) (Builtin.Int64) -> () {
-bb0(%0 : @trivial $Builtin.Int64):
+bb0(%0 : $Builtin.Int64):
   %box = alloc_box ${ var Builtin.Int64 }, var, name "localVal"
   %boxproj = project_box %box : ${ var Builtin.Int64 }, 0
 
@@ -317,7 +317,7 @@ bb0(%0 : @guaranteed ${ var Builtin.Int64 }):
 // CHECK: begin_access [modify] [dynamic] %1 : $*Builtin.Int64
 // CHECK-LABEL: end sil function 'directApplyNoescapeDynamicAppliedClosure'
 sil private @directApplyNoescapeDynamicAppliedClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @inout_aliasable Builtin.Int64) -> () {
-bb0(%0 : @guaranteed $@callee_guaranteed () -> (), %1 : @trivial $*Builtin.Int64):
+bb0(%0 : @guaranteed $@callee_guaranteed () -> (), %1 : $*Builtin.Int64):
   %4 = begin_access [modify] [unknown] %1 : $*Builtin.Int64
 
   %5 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @guaranteed @callee_guaranteed () -> ()) -> ()

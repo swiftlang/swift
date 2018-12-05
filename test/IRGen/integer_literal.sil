@@ -87,7 +87,7 @@ entry:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @trunc_s16
 sil @trunc_s16 : $(Builtin.IntLiteral) -> (Builtin.Int16, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[OVERFLOW:%.*]] = icmp ugt i32 [[WIDTH]], 16
   // CHECK-NEXT:    br i1 [[OVERFLOW]], label %[[INVALID:[a-z.]+]], label %[[VALID:[a-z.]+]]
@@ -107,7 +107,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i1 } @trunc_s32
 sil @trunc_s32 : $(Builtin.IntLiteral) -> (Builtin.Int32, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[OVERFLOW:%.*]] = icmp ugt i32 [[WIDTH]], 32
   // CHECK-NEXT:    br i1 [[OVERFLOW]], label %[[INVALID:[a-z.]+]], label %[[VALID:[a-z.]+]]
@@ -126,7 +126,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @trunc_s48
 sil @trunc_s48 : $(Builtin.IntLiteral) -> (Builtin.Int48, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[OVERFLOW:%.*]] = icmp ugt i32 [[WIDTH]], 48
   // CHECK-NEXT:    br i1 [[OVERFLOW]], label %[[INVALID:[a-z.]+]], label %[[VALID:[a-z.]+]]
@@ -157,7 +157,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i1 } @trunc_s64
 sil @trunc_s64 : $(Builtin.IntLiteral) -> (Builtin.Int64, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[OVERFLOW:%.*]] = icmp ugt i32 [[WIDTH]], 64
   // CHECK-NEXT:    br i1 [[OVERFLOW]], label %[[INVALID:[a-z.]+]], label %[[VALID:[a-z.]+]]
@@ -194,7 +194,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @trunc_u16
 sil @trunc_u16 : $(Builtin.IntLiteral) -> (Builtin.Int16, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[NEGATIVE:%.*]] = trunc i32 %1 to i1
   // CHECK-NEXT:    [[LARGE:%.*]] = icmp ugt i32 [[WIDTH]], 17
@@ -216,7 +216,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i1 } @trunc_u32
 sil @trunc_u32 : $(Builtin.IntLiteral) -> (Builtin.Int32, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[NEGATIVE:%.*]] = trunc i32 %1 to i1
   // CHECK-NEXT:    [[LARGE:%.*]] = icmp ugt i32 [[WIDTH]], 33
@@ -237,7 +237,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @trunc_u48
 sil @trunc_u48 : $(Builtin.IntLiteral) -> (Builtin.Int48, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[NEGATIVE:%.*]] = trunc i32 %1 to i1
   // CHECK-NEXT:    [[LARGE:%.*]] = icmp ugt i32 [[WIDTH]], 49
@@ -270,7 +270,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i1 } @trunc_u64
 sil @trunc_u64 : $(Builtin.IntLiteral) -> (Builtin.Int64, Builtin.Int1) {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:         [[WIDTH:%.*]] = lshr i32 %1, 8
   // CHECK-NEXT:    [[NEGATIVE:%.*]] = trunc i32 %1 to i1
   // CHECK-NEXT:    [[LARGE:%.*]] = icmp ugt i32 [[WIDTH]], 65
@@ -309,7 +309,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc half @sitofp16
 sil @sitofp16 : $(Builtin.IntLiteral) -> Builtin.FPIEEE16 {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:      [[T0:%.*]] = call swiftcc float @swift_intToFloat32(i32* %0, i32 %1)
   // CHECK-NEXT: [[T1:%.*]] = fptrunc float [[T0]] to half
   // CHECK-NEXT: ret half [[T1]]
@@ -319,7 +319,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc float @sitofp32
 sil @sitofp32 : $(Builtin.IntLiteral) -> Builtin.FPIEEE32 {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:      [[T0:%.*]] = call swiftcc float @swift_intToFloat32(i32* %0, i32 %1)
   // CHECK-NEXT: ret float [[T0]]
   %result = builtin "itofp_with_overflow_IntLiteral_FPIEEE32"(%0 : $Builtin.IntLiteral) : $Builtin.FPIEEE32
@@ -328,7 +328,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc double @sitofp64
 sil @sitofp64 : $(Builtin.IntLiteral) -> Builtin.FPIEEE64 {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:      [[T0:%.*]] = call swiftcc double @swift_intToFloat64(i32* %0, i32 %1)
   // CHECK-NEXT: ret double [[T0]]
   %result = builtin "itofp_with_overflow_IntLiteral_FPIEEE64"(%0 : $Builtin.IntLiteral) : $Builtin.FPIEEE64
@@ -337,7 +337,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc x86_fp80 @sitofp80
 sil @sitofp80 : $(Builtin.IntLiteral) -> Builtin.FPIEEE80 {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:      [[T0:%.*]] = call swiftcc double @swift_intToFloat64(i32* %0, i32 %1)
   // CHECK-NEXT: [[T1:%.*]] = fpext double [[T0]] to x86_fp80
   // CHECK-NEXT: ret x86_fp80 [[T1]]
@@ -347,7 +347,7 @@ entry(%0 : @trivial $Builtin.IntLiteral):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc fp128 @sitofp128
 sil @sitofp128 : $(Builtin.IntLiteral) -> Builtin.FPIEEE128 {
-entry(%0 : @trivial $Builtin.IntLiteral):
+entry(%0 : $Builtin.IntLiteral):
   // CHECK:      [[T0:%.*]] = call swiftcc double @swift_intToFloat64(i32* %0, i32 %1)
   // CHECK-NEXT: [[T1:%.*]] = fpext double [[T0]] to fp128
   // CHECK-NEXT: ret fp128 [[T1]]

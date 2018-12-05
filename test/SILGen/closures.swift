@@ -29,7 +29,7 @@ func return_local_generic_function_with_captures<A, R>(_ a: A) -> (A) -> R {
 // CHECK-LABEL: sil hidden @$s8closures17read_only_captureyS2iF : $@convention(thin) (Int) -> Int {
 func read_only_capture(_ x: Int) -> Int {
   var x = x
-  // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // SEMANTIC ARC TODO: This is incorrect. We need to do the project_box on the copy.
   // CHECK:   [[PROJECT:%.*]] = project_box [[XBOX]]
@@ -63,7 +63,7 @@ func read_only_capture(_ x: Int) -> Int {
 // CHECK-LABEL: sil hidden @$s8closures16write_to_captureyS2iF : $@convention(thin) (Int) -> Int {
 func write_to_capture(_ x: Int) -> Int {
   var x = x
-  // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
   // CHECK:   store [[X]] to [trivial] [[XBOX_PB]]
@@ -121,7 +121,7 @@ func multiple_closure_refs(_ x: Int) -> (() -> Int, () -> Int) {
 
 // CHECK-LABEL: sil hidden @$s8closures18capture_local_funcySiycycSiF : $@convention(thin) (Int) -> @owned @callee_guaranteed () -> @owned @callee_guaranteed () -> Int {
 func capture_local_func(_ x: Int) -> () -> () -> Int {
-  // CHECK: bb0([[ARG:%.*]] : @trivial $Int):
+  // CHECK: bb0([[ARG:%.*]] : $Int):
   var x = x
   // CHECK:   [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[XBOX_PB:%.*]] = project_box [[XBOX]]
@@ -159,7 +159,7 @@ func capture_local_func(_ x: Int) -> () -> () -> Int {
 // CHECK-LABEL: sil hidden @$s8closures22anon_read_only_capture{{[_0-9a-zA-Z]*}}F
 func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
-  // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
@@ -173,7 +173,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil private @[[CLOSURE_NAME]]
-// CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[ACCESS]]
 // CHECK: return [[X]]
@@ -181,7 +181,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 // CHECK-LABEL: sil hidden @$s8closures21small_closure_capture{{[_0-9a-zA-Z]*}}F
 func small_closure_capture(_ x: Int) -> Int {
   var x = x
-  // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[XBOX]]
 
@@ -195,7 +195,7 @@ func small_closure_capture(_ x: Int) -> Int {
   // CHECK: return [[RET]]
 }
 // CHECK: sil private @[[CLOSURE_NAME]]
-// CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $*Int):
+// CHECK: bb0([[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[XADDR]] : $*Int
 // CHECK: [[X:%[0-9]+]] = load [trivial] [[ACCESS]]
 // CHECK: return [[X]]
@@ -216,7 +216,7 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
 // CHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
-// CHECK: bb0([[DOLLAR0:%[0-9]+]] : @trivial $Int, [[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
 // CHECK: [[INTTYPE:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK: [[XACCESS:%[0-9]+]] = begin_access [read] [unknown] [[XADDR]] : $*Int
@@ -234,13 +234,13 @@ func small_closure_no_capture() -> (_ y: Int) -> Int {
   return { $0 }
 }
 // CHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int) -> Int
-// CHECK: bb0([[YARG:%[0-9]+]] : @trivial $Int):
+// CHECK: bb0([[YARG:%[0-9]+]] : $Int):
 
 // CHECK-LABEL: sil hidden @$s8closures17uncaptured_locals{{[_0-9a-zA-Z]*}}F :
 func uncaptured_locals(_ x: Int) -> (Int, Int) {
   var x = x
   // -- locals without captures are stack-allocated
-  // CHECK: bb0([[XARG:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
   // CHECK:   [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PB:%.*]] = project_box [[XADDR]]
   // CHECK:   store [[XARG]] to [trivial] [[PB]]
@@ -417,13 +417,13 @@ struct StructWithMutatingMethod {
 // Check that the address of self is passed in, but not the refcount pointer.
 
 // CHECK-LABEL: sil hidden @$s8closures24StructWithMutatingMethodV08mutatingE0{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*StructWithMutatingMethod):
+// CHECK: bb0(%0 : $*StructWithMutatingMethod):
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @$s8closures24StructWithMutatingMethodV08mutatingE0{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
 // CHECK: partial_apply [callee_guaranteed] [[CLOSURE]](%0) : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int
 
 // Check that the closure body only takes the pointer.
 // CHECK-LABEL: sil private @$s8closures24StructWithMutatingMethodV08mutatingE0{{.*}} : $@convention(thin) (@inout_aliasable StructWithMutatingMethod) -> Int {
-// CHECK:       bb0(%0 : @trivial $*StructWithMutatingMethod):
+// CHECK:       bb0(%0 : $*StructWithMutatingMethod):
 
 class SuperBase {
   func boom() {}

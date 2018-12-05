@@ -280,7 +280,7 @@ entry(%c : @unowned $RootGeneric<F>):
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Y_OFFSET]]
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
 sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (RootGeneric<F>) -> @out F {
-entry(%z : @trivial $*F, %c : @unowned $RootGeneric<F>):
+entry(%z : $*F, %c : @unowned $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
   %t = tuple ()
@@ -291,7 +291,7 @@ entry(%z : @trivial $*F, %c : @unowned $RootGeneric<F>):
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %1, i32 0, i32 3
 // CHECK:   bitcast %TSi* [[Y_ADDR]] to i8*
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
-entry(%z : @trivial $*Int, %c : @unowned $RootGeneric<Int>):
+entry(%z : $*Int, %c : @unowned $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*Int
   %t = tuple ()

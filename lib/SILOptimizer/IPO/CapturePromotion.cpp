@@ -483,7 +483,7 @@ ClosureCloner::populateCloned() {
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
     if (Cloned->hasQualifiedOwnership() &&
-        MappedValue.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+        MappedValue.getOwnershipKind() != ValueOwnershipKind::Any) {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
       MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
     }
@@ -575,7 +575,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // If ownership is enabled, then we must emit a begin_borrow for any
       // non-trivial value.
       if (F.hasQualifiedOwnership() &&
-          Value.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+          Value.getOwnershipKind() != ValueOwnershipKind::Any) {
         auto *BBI = cast<BeginBorrowInst>(Value);
         Value = BBI->getOperand();
         B.createEndBorrow(Inst->getLoc(), BBI, Value);
@@ -641,7 +641,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // the loads get mapped to uses of the new object type argument.
     //
     // We assume that the value is already guaranteed.
-    assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
+    assert(Val.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed) &&
            "Expected argument value to be guaranteed");
     recordFoldedValue(LI, Val);
     return;
@@ -683,7 +683,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
     // struct_extract of the new passed in value. The value should be borrowed
     // already, so we can just extract the value.
     assert(!getBuilder().getFunction().hasQualifiedOwnership() ||
-           Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
+           Val.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed));
     Val = getBuilder().emitStructExtract(LI->getLoc(), Val, SEAI->getField(),
                                          LI->getType());
 

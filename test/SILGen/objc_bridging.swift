@@ -144,7 +144,7 @@ func setZim(_ f: Foo, b: Bool) {
   f.setZim(b)
 }
 // CHECK-ios-i386-LABEL: sil hidden @$s13objc_bridging6setZim{{.*}}F
-// CHECK-ios-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-ios-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
@@ -153,7 +153,7 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-ios-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @$s13objc_bridging6setZim{{.*}}F
-// CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
@@ -162,21 +162,21 @@ func setZim(_ f: Foo, b: Bool) {
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @$s13objc_bridging6setZim{{.*}}F
-// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK-ios-x86_64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-ios-x86_64:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-ios-x86_64-NOT:   destroy_value [[ARG0]]
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @$s13objc_bridging6setZim{{.*}}F
-// CHECK-arm64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-arm64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK-arm64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-arm64-NOT:   destroy_value [[ARG0]]
 // CHECK-arm64: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @$s13objc_bridging6setZim{{.*}}F
-// CHECK-watchos-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-watchos-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK-watchos-i386:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
 // CHECK-watchos-i386:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-watchos-i386-NOT:   destroy_value [[ARG0]]
@@ -198,7 +198,7 @@ func setZang(_ f: Foo, _ b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @$s13objc_bridging7setZangyySo3FooC_SbtF
-// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : $Bool):
 // CHECK:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZang!1.foreign
 // CHECK:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-NOT:   destroy_value [[ARG0]]
@@ -567,7 +567,7 @@ func getFridge(_ home: APPHouse) -> Refrigerator {
 }
 
 // CHECK-LABEL: sil hidden @$s13objc_bridging16updateFridgeTemp{{.*}}F
-// CHECK: bb0([[HOME:%[0-9]+]] : @guaranteed $APPHouse, [[DELTA:%[0-9]+]] : @trivial $Double):
+// CHECK: bb0([[HOME:%[0-9]+]] : @guaranteed $APPHouse, [[DELTA:%[0-9]+]] : $Double):
 func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // Temporary fridge
   // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
@@ -614,7 +614,7 @@ func defineNonStandardBlock(x: Any) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sypypIegnr_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
-// CHECK: bb0(%0 : @trivial $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, %1 : @unowned $AnyObject):
+// CHECK: bb0(%0 : $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
 // CHECK:   [[ARG:%.*]] = alloc_stack $Any

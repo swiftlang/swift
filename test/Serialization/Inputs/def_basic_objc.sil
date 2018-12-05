@@ -9,7 +9,7 @@ class SomeClass : SomeProtocol { }
 
 // CHECK-LABEL: @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
 sil [transparent] [serialized] @objc_classes : $@convention(thin) (@thick NSObject.Type) -> () {
-bb0(%0 : @trivial $@thick NSObject.Type):
+bb0(%0 : $@thick NSObject.Type):
   %1 = thick_to_objc_metatype %0 : $@thick NSObject.Type to $@objc_metatype NSObject.Type
   // CHECK: %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
   %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
@@ -35,7 +35,7 @@ protocol SomeClassProtocol : class {}
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
 // CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
 sil [transparent] [serialized] @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
-entry(%a : @trivial $@objc_metatype SomeClass.Type, %b : @trivial $@objc_metatype SomeClassProtocol.Type):
+entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
   %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
   %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
   %z = tuple (%x : $AnyObject, %y : $AnyObject)

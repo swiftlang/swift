@@ -15,7 +15,7 @@ func test3() -> NSObject {
   // CHECK-LABEL: sil shared [serializable] @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
-  // CHECK: bb0([[GIZMO_META:%[0-9]+]] : @trivial $@thick Gizmo.Type):
+  // CHECK: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
   // CHECK-NEXT: [[GIZMO_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[GIZMO_META]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = alloc_ref_dynamic [objc] [[GIZMO_META_OBJC]] : $@objc_metatype Gizmo.Type, $Gizmo
   // CHECK-NEXT: // function_ref
@@ -132,12 +132,12 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype AnyObject.Type):
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype AnyObject.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt.1, [[THICK]]
-  // CHECK:   bb{{.*}}(%{{.*}} : @trivial $Optional<@thick AnyObject.Type>):
+  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick AnyObject.Type>):
   // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
-  // CHECK:   bb{{.*}}([[RES:%.*]] : @trivial $@thick AnyObject.Type):
+  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick AnyObject.Type):
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
   return g.classProp
@@ -153,12 +153,12 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype NSAnsing.Type):
+  // CHECK: [[SOME_BB]]([[OBJC:%.*]] : $@objc_metatype NSAnsing.Type):
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick NSAnsing.Type>, #Optional.some!enumelt.1, [[THICK]]
-  // CHECK:   bb{{.*}}(%{{.*}} : @trivial $Optional<@thick NSAnsing.Type>):
+  // CHECK:   bb{{.*}}(%{{.*}} : $Optional<@thick NSAnsing.Type>):
   // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
-  // CHECK:   bb{{.*}}([[RES:%.*]] : @trivial $@thick NSAnsing.Type):
+  // CHECK:   bb{{.*}}([[RES:%.*]] : $@thick NSAnsing.Type):
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
   // CHECK-NOT:      destroy_value [[G]] : $Gizmo

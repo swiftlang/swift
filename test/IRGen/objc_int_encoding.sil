@@ -20,7 +20,7 @@ class Foo: NSObject {
 }
 
 sil hidden @$s17objc_int_encoding3FooC3foo1xSuSi_tFTo : $@convention(objc_method) (Int, @guaranteed Foo) -> UInt {
-entry(%0 : @trivial $Int, %1 : @owned $Foo):
+entry(%0 : $Int, %1 : @owned $Foo):
   unreachable
 }
 sil @$s17objc_int_encoding3FooCACycfcTo : $@convention(objc_method) (@owned Foo) -> @owned Foo {

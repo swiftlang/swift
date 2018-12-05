@@ -199,7 +199,7 @@ func foo() {}
 // <rdar://problem/13549626>
 // CHECK-LABEL: sil hidden @$s10statements14return_from_if{{[_0-9a-zA-Z]*}}F
 func return_from_if(_ a: Bool) -> Int {
-  // CHECK: bb0(%0 : @trivial $Bool):
+  // CHECK: bb0(%0 : $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
   if a {
     // CHECK: [[THEN]]:
@@ -211,7 +211,7 @@ func return_from_if(_ a: Bool) -> Int {
     return 0
   }
   // CHECK-NOT: function_ref @foo
-  // CHECK: [[EPILOG]]([[RET:%.*]] : @trivial $Int):
+  // CHECK: [[EPILOG]]([[RET:%.*]] : $Int):
   // CHECK:   return [[RET]]
   foo()  // expected-warning {{will never be executed}}
 }
@@ -578,12 +578,12 @@ func testRequireExprPattern(_ a : Int) {
 
 
 // CHECK-LABEL: sil hidden @$s10statements20testRequireOptional1yS2iSgF
-// CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Int>):
+// CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<Int>, let, name "a"
 // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 func testRequireOptional1(_ a : Int?) -> Int {
 
-  // CHECK: [[SOME]]([[PAYLOAD:%.*]] : @trivial $Int):
+  // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
   // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
   // CHECK-NEXT:   return [[PAYLOAD]] : $Int
   guard let t = a else { abort() }
@@ -660,7 +660,7 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 // CHECK-LABEL: sil hidden @$s10statements22let_else_tuple_bindingyS2i_SitSgF
 func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
-  // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<(Int, Int)>):
+  // CHECK: bb0([[ARG:%.*]] : $Optional<(Int, Int)>):
   // CHECK-NEXT:   debug_value [[ARG]] : $Optional<(Int, Int)>, let, name "a"
   // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -668,7 +668,7 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   _ = y
   return x
 
-  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : @trivial $(Int, Int)):
+  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
   // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
   // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
   // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
