@@ -8,7 +8,8 @@ a --> b         File 'b' privately depends on file 'a' (normal dependencies casc
 
 Because of the way the tests are set up, the dependency information is put into the .swift files; any such test needs to start by "building" everything to copy that information into .swiftdeps files. To avoid timestamp issues, most of these tests start with:
 
-    // RUN: rm -rf %t && cp -r %S/Inputs/<TEST_GRAPH>/ %t
+    // RUN: %empty-directory(%t)
+    // RUN: cp -r %S/Inputs/<TEST_GRAPH>/* %t
     // RUN: touch -t 201401240005 %t/*
 
 
@@ -21,6 +22,7 @@ In order to correctly run these tests, the "before" information is put into .swi
 
 Most of these tests start with:
 
-    // RUN: rm -rf %t && cp -r %S/Inputs/<TEST_GRAPH>/ %t
+    // RUN: %empty-directory(%t)
+    // RUN: cp -r %S/Inputs/<TEST_GRAPH>/* %t
     // RUN: touch -t 201401240005 %t/*.swift
     // RUN: touch -t 201401240006 %t/*.o
