@@ -3000,6 +3000,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                        diag::sil_inst_autodiff_attr_expected_rsquare,
                        "differentiation order"))
         return true;
+      if (order == 0) {
+        P.diagnose(lastLoc, diag::sil_inst_autodiff_expected_nonzero_order);
+        return true;
+      }
     }
     // Parse the original function value.
     SILValue original;
@@ -3044,31 +3048,38 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
     // Parse the rest of the instruction: an associated function kind, a
     // function operand, an order operand and a debug location.
-    AutoDiffAssociatedFunctionKind assocFnKind;
-    StringRef assocFnKindNames[2] = {"jvp", "vjp"};
-    unsigned order = 1;
+    AutoDiffFunctionExtractInst::Extractee extractee;
+    StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
+    unsigned order = 0;
     SILValue functionOperand;
     SourceLoc lastLoc;
     if (P.parseToken(tok::l_square,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
-        parseSILIdentifierSwitch(assocFnKind, assocFnKindNames,
+        parseSILIdentifierSwitch(extractee, extracteeNames,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "associated function kind") ||
-        P.parseToken(tok::l_square,
-                     diag::sil_inst_autodiff_expected_order) ||
-        P.parseSpecificIdentifier("order",
-                                  diag::sil_inst_autodiff_expected_order) ||
-        P.parseUnsignedInteger(order, lastLoc,
-                               diag::sil_inst_autodiff_expected_order) ||
-        P.parseToken(tok::r_square,
-                     diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "differentiation order") ||
-        parseTypedValueRef(functionOperand, B) ||
+                     "associated function kind"))
+      return true;
+    if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "order") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      if (P.parseUnsignedInteger(order, lastLoc,
+                                 diag::sil_inst_autodiff_expected_order) ||
+          P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "differentiation order"))
+        return true;
+      if (order == 0) {
+        P.diagnose(lastLoc, diag::sil_inst_autodiff_expected_nonzero_order);
+        return true;
+      }
+    }
+    if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, assocFnKind, order,
+    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, extractee, order,
                                                 functionOperand);
     break;
   }

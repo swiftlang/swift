@@ -941,7 +941,7 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
   recordClonedInstruction(Inst,
       getBuilder().createAutoDiffFunctionExtract(
           getOpLocation(Inst->getLoc()),
-          Inst->getAssociatedFunctionKind(),
+          Inst->getExtractee(),
           Inst->getDifferentiationOrder(),
           getOpValue(Inst->getFunctionOperand())));
 }

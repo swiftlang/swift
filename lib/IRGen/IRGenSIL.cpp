@@ -1990,9 +1990,10 @@ void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
 
 void IRGenSILFunction::
 visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
-  unsigned assocFnOffset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+  unsigned structFieldOffset = 0;
+  if (i->getExtractee() != AutoDiffFunctionExtractee::Original)
+    structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
       i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
-  unsigned structFieldOffset = assocFnOffset + 1;
   unsigned fieldSize = 1;
   auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
   if (fnRepr == SILFunctionTypeRepresentation::Thick) {

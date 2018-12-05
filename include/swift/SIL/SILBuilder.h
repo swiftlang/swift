@@ -519,11 +519,11 @@ public:
   }
   
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
-      SILLocation loc, AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILLocation loc, AutoDiffFunctionExtractInst::Extractee extractee,
       unsigned differentiationOrder, SILValue theFunction) {
     return insert(new (getModule()) AutoDiffFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc), associatedFunctionKind,
-        differentiationOrder, theFunction));
+        getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
+        theFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

@@ -1512,6 +1512,8 @@ ERROR(sil_inst_autodiff_attr_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to complete the %0", (StringRef))
 ERROR(sil_inst_autodiff_expected_order,PointsToFirstBadToken,
       "expected an unsigned integer indicating the differentiation order", ())
+ERROR(sil_inst_autodiff_expected_nonzero_order,PointsToFirstBadToken,
+      "expected a non-zero differentiation order", ())
 ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
       "expected '{' to start an associated function list", ())
 ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
