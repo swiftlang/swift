@@ -128,7 +128,7 @@ struct ArgumentDescriptor {
     if (IsEntirelyDead)
       return None;
     if (SubTy.isTrivial(Arg->getModule()))
-      return Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial);
+      return Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
     if (OwnedToGuaranteed)
       return Optional<ValueOwnershipKind>(ValueOwnershipKind::Guaranteed);
     return Arg->getOwnershipKind();

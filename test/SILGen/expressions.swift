@@ -205,7 +205,7 @@ struct Generic<T> {
 
 // CHECK-LABEL: sil hidden @$s11expressions18generic_member_ref{{[_0-9a-zA-Z]*}}F
 func generic_member_ref<T>(_ x: Generic<T>) -> Int {
-  // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $*Generic<T>):
+  // CHECK: bb0([[XADDR:%[0-9]+]] : $*Generic<T>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
   // CHECK: load [trivial] [[MEMBER_ADDR]]
@@ -214,7 +214,7 @@ func generic_member_ref<T>(_ x: Generic<T>) -> Int {
 // CHECK-LABEL: sil hidden @$s11expressions24bound_generic_member_ref{{[_0-9a-zA-Z]*}}F
 func bound_generic_member_ref(_ x: Generic<UnicodeScalar>) -> Int {
   var x = x
-  // CHECK: bb0([[XADDR:%[0-9]+]] : @trivial $Generic<Unicode.Scalar>):
+  // CHECK: bb0([[XADDR:%[0-9]+]] : $Generic<Unicode.Scalar>):
   return x.mono_member
   // CHECK: [[MEMBER_ADDR:%[0-9]+]] = struct_element_addr {{.*}}, #Generic.mono_member
   // CHECK: load [trivial] [[MEMBER_ADDR]]
@@ -463,9 +463,9 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBZ]]
   // CHECK:   [[ZVAL:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK:   br [[CONT_B:bb[0-9]+]]([[ZVAL]] : $Int)
-  // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : @trivial $Int):
+  // CHECK: [[CONT_B]]([[B_RES:%[0-9]+]] : $Int):
   // CHECK:   br [[CONT_A:bb[0-9]+]]([[B_RES]] : $Int)
-  // CHECK: [[CONT_A]]([[A_RES:%[0-9]+]] : @trivial $Int):
+  // CHECK: [[CONT_A]]([[A_RES:%[0-9]+]] : $Int):
   // CHECK:   return [[A_RES]]
 }
 
@@ -544,7 +544,7 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
   return type(of: a!)
 }
 // CHECK-LABEL: dontLoadIgnoredLValueForceUnwrap
-// CHECK: bb0(%0 : @trivial $*Optional<NonTrivialStruct>):
+// CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
@@ -560,7 +560,7 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
   return type(of: a!!)
 }
 // CHECK-LABEL: dontLoadIgnoredLValueDoubleForceUnwrap
-// CHECK: bb0(%0 : @trivial $*Optional<Optional<NonTrivialStruct>>):
+// CHECK: bb0(%0 : $*Optional<Optional<NonTrivialStruct>>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
@@ -581,7 +581,7 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
   return type(of: a.x!)
 }
 // CHECK-LABEL: loadIgnoredLValueForceUnwrap
-// CHECK: bb0(%0 : @trivial $*NonTrivialStruct):
+// CHECK: bb0(%0 : $*NonTrivialStruct):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[READ]]
@@ -602,7 +602,7 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
   return type(of: a!.x!)
 }
 // CHECK-LABEL: loadIgnoredLValueThroughForceUnwrap
-// CHECK: bb0(%0 : @trivial $*Optional<NonTrivialStruct>):
+// CHECK: bb0(%0 : $*Optional<NonTrivialStruct>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
@@ -628,7 +628,7 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
   return type(of: s[keyPath: kp])
 }
 // CHECK-LABEL: evaluateIgnoredKeyPathExpr
-// CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
+// CHECK: bb0(%0 : $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: debug_value %1
 // CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
@@ -654,10 +654,10 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
 // CHECK-LABEL: sil hidden @$s11expressions21implodeRecursiveTupleyySi_Sit_SitSgF
-// CHECK: bb0(%0 : @trivial $Optional<((Int, Int), Int)>):
+// CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
 
-  // CHECK: bb2([[WHOLE:%.*]] : @trivial $((Int, Int), Int)):
+  // CHECK: bb2([[WHOLE:%.*]] : $((Int, Int), Int)):
   // CHECK-NEXT: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[WHOLE]]
   // CHECK-NEXT: ([[X0:%[0-9]+]], [[X1:%[0-9]+]]) = destructure_tuple [[X]]
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)

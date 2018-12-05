@@ -182,7 +182,7 @@ bb0(%0 : @owned $C):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialMetatypeDowncast(%swift.type*, %swift.type*, i8**)
 sil @checkExistentialMetatypeDowncast : $@convention(thin) (@owned @thick C.Type, @owned @thick (C & P).Type) -> () {
-bb0(%0 : @trivial $@thick C.Type, %1 : @trivial $@thick (C & P).Type):
+bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
 // CHECK-NEXT:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1DCMa"([[INT]] 0)
@@ -203,7 +203,7 @@ bb0(%0 : @trivial $@thick C.Type, %1 : @trivial $@thick (C & P).Type):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkExistentialSameClassMetatypeDowncast(%swift.type*)
 sil @checkExistentialSameClassMetatypeDowncast : $@convention(thin) (@owned @thick C.Type) -> () {
-bb0(%0 : @trivial $@thick C.Type):
+bb0(%0 : $@thick C.Type):
 
 // CHECK:       [[METATYPE:%.*]] = bitcast %swift.type* %0 to i8*
 // CHECK-NEXT:  [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[METATYPE]], %swift.type* %0, {{.*}} @"$s21subclass_existentials1PMp"

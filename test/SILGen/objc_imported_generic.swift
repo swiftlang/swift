@@ -26,11 +26,11 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 }
 
 // CHECK-LABEL: sil @$s21objc_imported_generic0C24MethodOnAnyObjectChained1o1byXlSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : $Bool):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '$s21objc_imported_generic0C24MethodOnAnyObjectChained1o1byXlSgyXl_SbtF'
 
 public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
@@ -42,7 +42,7 @@ public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
 // CHCEK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.subscript!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
+// CHECK:   bb1({{%.*}} : $@convention(objc_method) (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
 // CHECK: } // end sil function '$s21objc_imported_generic0C20SubscriptOnAnyObject1o1byXlSgyXl_SbtF'
 
 public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
@@ -50,11 +50,11 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 }
 
 // CHECK-LABEL: sil @$s21objc_imported_generic0C19PropertyOnAnyObject1o1byXlSgSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : $Bool):
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '$s21objc_imported_generic0C19PropertyOnAnyObject1o1byXlSgSgyXl_SbtF'
 
 public protocol ThingHolder {

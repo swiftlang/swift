@@ -33,7 +33,7 @@ sil_stage canonical
 import Builtin
 
 sil @testTBI : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : @trivial $Builtin.Int64):
+bb0(%0 : $Builtin.Int64):
   %1 = integer_literal $Builtin.Int64, 0x00FFFFFFFFFFFFFF
   %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
   %3 = builtin "inttoptr_Int64"(%2 : $Builtin.Int64) : $Builtin.RawPointer

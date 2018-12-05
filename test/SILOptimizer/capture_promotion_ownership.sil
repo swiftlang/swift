@@ -165,7 +165,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil private @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
-// CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : @trivial $Int):
+// CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : $Int):
 // CHECK:   [[ARG0:%.*]] = begin_borrow [[ORIGINAL_ARG0]]
 // CHECK:   [[ARG1:%.*]] = begin_borrow [[ORIGINAL_ARG1]]
 // CHECK:   [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
@@ -268,7 +268,7 @@ sil @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 // CHECK-LABEL: sil @captureWithinGeneric
 sil @captureWithinGeneric : $@convention(thin) <T> (@inout Int, @inout Int) -> () {
 // CHECK: bb0
-bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
+bb0(%0 : $*Int, %1 : $*Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   copy_addr %0 to [initialization] %2a : $*Int
@@ -310,7 +310,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0
 sil [transparent] [serialized] @$ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
 
 sil private @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
-bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+bb0(%0: $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %17 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <Int>, 0

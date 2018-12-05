@@ -66,7 +66,7 @@ import Foundation
   }
 
   // CHECK-LABEL: sil hidden [thunk] @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}FTo
-  // CHECK:       bb0([[F:%.*]] : @trivial $@convention(c) @noescape (Int) -> Int, [[X:%.*]] : @trivial $Int, [[SELF:%.*]] : @unowned $Foo):
+  // CHECK:       bb0([[F:%.*]] : $@convention(c) @noescape (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : @unowned $Foo):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC16cFunctionPointer{{[_0-9a-zA-Z]*}}F
@@ -96,7 +96,7 @@ import Foundation
   // CHECK-LABEL: sil hidden @$s20objc_blocks_bridging3FooC19optCFunctionPointer{{[_0-9a-zA-Z]*}}F
   // CHECK:         switch_enum %0
   //
-  // CHECK: bb1([[FP_BUF:%.*]] : @trivial $@convention(c) (NSString) -> @autoreleased NSString):
+  // CHECK: bb1([[FP_BUF:%.*]] : $@convention(c) (NSString) -> @autoreleased NSString):
   @objc dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
     return fp?(x)
   }

@@ -2130,8 +2130,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   ValueOwnershipKind Kind = SILValue(Inst).getOwnershipKind();
   if (getOpValue(Inst->getOperand()).getOwnershipKind() ==
-      ValueOwnershipKind::Trivial) {
-    Kind = ValueOwnershipKind::Trivial;
+      ValueOwnershipKind::Any) {
+    Kind = ValueOwnershipKind::Any;
   }
   recordClonedInstruction(Inst, getBuilder().createUncheckedOwnershipConversion(
                                     getOpLocation(Inst->getLoc()),

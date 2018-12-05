@@ -11,7 +11,7 @@ protocol P {
 }
 
 sil hidden @caller : $@convention(thin) (@in P) -> () {
-bb0(%0 : @trivial $*P):
+bb0(%0 : $*P):
   %2 = open_existential_addr immutable_access %0 : $*P to $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P
   %3 = witness_method $@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P, #P.f7!1, %2 : $*@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
   %4 = apply %3<@opened("214EF566-CD33-11E6-A1F0-34363BD08DA0") P>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_owned () -> @out τ_0_0
@@ -30,7 +30,7 @@ bb0(%0 : @trivial $*P):
 }
 
 sil hidden [transparent] @callee : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> @out P {
-bb0(%0 : @trivial $*P, %1 : @owned $@callee_owned () -> @out τ_0_0):
+bb0(%0 : $*P, %1 : @owned $@callee_owned () -> @out τ_0_0):
   %2 = alloc_stack $τ_0_0
   %3 = apply %1(%2) : $@callee_owned () -> @out τ_0_0
   %4 = init_existential_addr %0 : $*P, $τ_0_0

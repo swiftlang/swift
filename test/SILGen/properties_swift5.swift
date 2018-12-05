@@ -15,7 +15,7 @@ struct DidSetWillSetTests: ForceAccessors {
   var a: Int {
     // CHECK-LABEL: sil private @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
-      // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
 
       a = zero  // reassign, but don't infinite loop, as accessing on 'self'.
 

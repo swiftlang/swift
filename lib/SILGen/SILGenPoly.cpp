@@ -1423,7 +1423,7 @@ namespace {
         case ParameterConvention::Direct_Owned:
         case ParameterConvention::Indirect_In:
           if (!input.hasCleanup() &&
-              input.getOwnershipKind() != ValueOwnershipKind::Trivial)
+              input.getOwnershipKind() != ValueOwnershipKind::Any)
             input = input.copyUnmanaged(SGF, Loc);
           break;
 
@@ -1640,8 +1640,8 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
-    if (value.getOwnershipKind() == ValueOwnershipKind::Trivial)
-      return ManagedValue::forTrivialObjectRValue(value);
+    if (value.getOwnershipKind() == ValueOwnershipKind::Any)
+      return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed:
     return ManagedValue::forBorrowedAddressRValue(value);
@@ -2630,8 +2630,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
       Scope S(SGF.Cleanups, CleanupLocation::get(Loc));
 
       // First create an rvalue cleanup for our direct result.
-      assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
-             innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
+      assert(innerResult.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
       executeInnerTuple(innerResult, innerDirectResults);
       // Then allow the cleanups to be emitted in the proper reverse order.
     }

@@ -6,7 +6,7 @@ struct X { }
 struct S {
   // CHECK-LABEL: sil hidden @$s19init_ref_delegation1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S.Type) -> S {
   init() {
-    // CHECK: bb0([[SELF_META:%[0-9]+]] : @trivial $@thin S.Type):
+    // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S }
     // CHECK-NEXT:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -33,7 +33,7 @@ enum E {
 
   // CHECK-LABEL: sil hidden @$s19init_ref_delegation1EO{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin E.Type) -> E
   init() {
-    // CHECK: bb0([[E_META:%[0-9]+]] : @trivial $@thin E.Type):
+    // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
     // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box ${ var E }
     // CHECK:   [[MARKED_E_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[E_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_E_BOX]]
@@ -57,7 +57,7 @@ enum E {
 struct S2 {
   // CHECK-LABEL: sil hidden @$s19init_ref_delegation2S2V{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S2.Type) -> S2
   init() {
-    // CHECK: bb0([[S2_META:%[0-9]+]] : @trivial $@thin S2.Type):
+    // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -87,7 +87,7 @@ class C1 {
 
  // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C1C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[SELF_META:%[0-9]+]] : @trivial $@thick C1.Type):
+    // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C1.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C1 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -109,7 +109,7 @@ class C1 {
 
   // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $X, [[SELF_META:%[0-9]+]] : @trivial $@thick C2.Type):
+    // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
     // CHECK:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK:   [[PB_SELF:%.*]] = project_box [[MARKED_SELF_BOX]]

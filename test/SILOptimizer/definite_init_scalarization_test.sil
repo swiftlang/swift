@@ -24,7 +24,7 @@ struct ObjectValue {
 }
 
 // CHECK-LABEL: sil @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-// CHECK: bb0([[ARG0:%.*]] : @trivial $TripleInt, [[ARG1:%.*]] : @trivial $TripleInt, [[ARG2:%.*]] : @trivial $TripleInt):
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
 // CHECK:   [[ELT0:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
@@ -41,7 +41,7 @@ struct ObjectValue {
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function 'test_store_trivial'
 sil @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-bb0(%0 : @trivial $TripleInt, %1 : @trivial $TripleInt, %1a : @trivial $TripleInt):
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))
@@ -84,7 +84,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 }
 
 // CHECK-LABEL: sil @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-// CHECK: bb0([[ARG0:%.*]] : @trivial $TripleInt, [[ARG1:%.*]] : @trivial $TripleInt, [[ARG2:%.*]] : @trivial $TripleInt):
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
 // CHECK:   [[ELT0:%.*]] = tuple_element_addr [[PB_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
@@ -101,7 +101,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function 'test_assign_trivial'
 sil @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-bb0(%0 : @trivial $TripleInt, %1 : @trivial $TripleInt, %1a : @trivial $TripleInt):
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))
@@ -114,7 +114,7 @@ bb0(%0 : @trivial $TripleInt, %1 : @trivial $TripleInt, %1a : @trivial $TripleIn
 }
 
 // CHECK-LABEL: sil @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-// CHECK: bb0([[ARG0:%.*]] : @trivial $TripleInt, [[ARG1:%.*]] : @trivial $TripleInt, [[ARG2:%.*]] : @trivial $TripleInt):
+// CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
 // CHECK:   [[PROJ_BOX_0:%.*]] = tuple_element_addr [[PROJ_BOX]] : $*(TripleInt, (TripleInt, TripleInt)), 0
@@ -137,7 +137,7 @@ bb0(%0 : @trivial $TripleInt, %1 : @trivial $TripleInt, %1a : @trivial $TripleIn
 // CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
 // CHECK: } // end sil function 'test_assign_trivial_2'
 sil @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
-bb0(%0 : @trivial $TripleInt, %1 : @trivial $TripleInt, %1a : @trivial $TripleInt):
+bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
   %4 = mark_uninitialized [var] %3 : $*(TripleInt, (TripleInt, TripleInt))

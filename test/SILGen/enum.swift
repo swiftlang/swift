@@ -115,7 +115,7 @@ func AddressOnly_cases(_ s: S) {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil shared [transparent] @$ss11AddressOnlyO4mereyABs1P_pcABmF : $@convention
-// CHECK: bb0([[ARG0:%.*]] : @trivial $*AddressOnly, [[ARG1:%.*]] : @trivial $*P, [[ARG2:%.*]] : @trivial $@thin AddressOnly.Type):
+// CHECK: bb0([[ARG0:%.*]] : $*AddressOnly, [[ARG1:%.*]] : $*P, [[ARG2:%.*]] : $@thin AddressOnly.Type):
 // CHECK:        [[RET_DATA:%.*]] = init_enum_data_addr [[ARG0]] : $*AddressOnly, #AddressOnly.mere!enumelt.1
 // CHECK-NEXT:   copy_addr [take] [[ARG1]] to [initialization] [[RET_DATA]] : $*P
 // CHECK-NEXT:   inject_enum_addr [[ARG0]] : $*AddressOnly, #AddressOnly.mere!enumelt.1
@@ -189,7 +189,7 @@ enum Foo { case A(P, String) }
 
 // Foo.A(_:)
 // CHECK-LABEL: sil shared [transparent] @$ss3FooO1AyABs1P_p_SStcABmF
-// CHECK: bb0([[ARG0:%.*]] : @trivial $*Foo, [[ARG1:%.*]] : @trivial $*P, [[ARG2:%.*]] : @owned $String, [[ARG3:%.*]] : @trivial $@thin Foo.Type):
+// CHECK: bb0([[ARG0:%.*]] : $*Foo, [[ARG1:%.*]] : $*P, [[ARG2:%.*]] : @owned $String, [[ARG3:%.*]] : $@thin Foo.Type):
 // CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr [[ARG0]] : $*Foo, #Foo.A!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
