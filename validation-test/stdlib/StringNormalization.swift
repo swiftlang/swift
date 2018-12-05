@@ -9,15 +9,27 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %empty-directory(%t)
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out; \
+// REQUIRES: objc_interop
+// RUN: else \
+// RUN:   %target-build-swift %s -o %t/a.out; \
+// RUN: fi
+
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
 
 import Swift
 import StdlibUnittest
 import StdlibUnicodeUnittest
+
+#if _runtime(_ObjC)
+import NSSlowString
+#endif
 
 private func expectEqualIterators(
   label: String,
@@ -453,6 +465,18 @@ for (i, test) in codeUnitNormalizationTests.enumerated() {
     let codeUnits = test.1._nfcCodeUnits
     expectEqual(test.0, codeUnits)
   }
+#if _runtime(_ObjC)
+  tests.test("CodeUnitNormalizationTest#\(i)/Opaque")
+.skip(.custom({
+      if #available(macOS 10.14, iOS 12, watchOS 5, tvOS 12, *) { return false }
+      return true
+    }, reason: "NormalizationTest.txt requires Unicode 11"))
+.code {
+    let opaqueString = NSSlowString(string: test.1) as String
+    let codeUnits = opaqueString._nfcCodeUnits
+    expectEqual(test.0, codeUnits)
+  }
+#endif
 }
 
 runAllTests()
