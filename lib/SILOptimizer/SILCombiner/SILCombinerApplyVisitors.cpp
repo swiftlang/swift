@@ -623,6 +623,12 @@ void SILCombiner::replaceWitnessMethodInst(
 SILInstruction *
 SILCombiner::propagateSoleConformingType(FullApplySite Apply,
                                          WitnessMethodInst *WMI) {
+  // Disable this optimization for now since it causes miscompiles.
+  //
+  // rdar://46409354
+#if 1
+  return nullptr;
+#else
   // If WMI has concrete conformance, it can be optimized.
   if (WMI->getConformance().isConcrete())
     return nullptr;
@@ -700,6 +706,7 @@ SILCombiner::propagateSoleConformingType(FullApplySite Apply,
   /// Create the new apply instruction using the concrete type.
   auto *NewAI = createApplyWithConcreteType(Apply, CEIs, BuilderCtx);
   return NewAI;
+#endif
 }
 
 /// Given an Apply and an argument value produced by InitExistentialAddrInst,
