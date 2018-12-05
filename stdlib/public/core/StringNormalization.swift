@@ -32,6 +32,7 @@ internal enum _Normalization {
   // musical notes). This expansion is capped by the maximum expansion factor of
   // the normal form. For NFC, that is 3x.
   internal static let _maxNFCExpansionFactor = 3
+  internal static let _maxUTF16toUTF8ExpansionFactor = 3
 }
 
 extension Unicode.Scalar {
@@ -117,9 +118,10 @@ internal enum NormalizationResult {
   }
   
   static func bufferTooSmall(count: Int) -> NormalizationResult {
-    let outputBufferSize = count * 9
+    let outputBufferSize = 
+      count * _Normalization._maxNFCExpansionFactor * _Normalization._maxUTF16toUTF8ExpansionFactor
     let icuInputBufferSize = count
-    let icuOutputBufferSize = count * 3
+    let icuOutputBufferSize = count * _Normalization._maxNFCExpansionFactor
     let resizeRequest = BufferResizeRequest(
       outputBufferSize: outputBufferSize, 
       icuInputBufferSize: icuInputBufferSize,
