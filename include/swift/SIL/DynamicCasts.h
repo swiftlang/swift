@@ -19,6 +19,7 @@
 #define SWIFT_SIL_DYNAMICCASTS_H
 
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SILValue.h"
 
 namespace swift {
 

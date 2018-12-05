@@ -392,6 +392,12 @@ public:
   Optional<ProtocolConformanceRef>
   lookupExistentialConformance(Type type, ProtocolDecl *protocol);
 
+  /// Expose TypeChecker functionality for querying protocol conformance.
+  /// Returns a valid ProtocolConformanceRef only if all conformance
+  /// requirements are succesfully resolved.
+  Optional<ProtocolConformanceRef>
+  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
+
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///
