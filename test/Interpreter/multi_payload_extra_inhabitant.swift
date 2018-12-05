@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend SpareBitExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend SpareBitSingleExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant2 -Xfrontend -verify-type-layout -Xfrontend TwoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend ThreeTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend NoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsNever -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsZeroBytes -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsOneByte -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsTwoBytes -O -o %t/a.out %s
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend SpareBitExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend SpareBitSingleExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant2 -Xfrontend -verify-type-layout -Xfrontend TwoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend ThreeTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend NoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsNever -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsZeroBytes -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsOneByte -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsTwoBytes -Xfrontend -verify-type-layout -Xfrontend MoreSpareBitsThanTagsExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend OptOptMoreSpareBitsThanTagsExtraInhabitants -O -o %t/a.out %s
 // RUN: %target-run %t/a.out 2>&1
 
 // Type layout verifier is only compiled into the runtime in asserts builds.
@@ -48,6 +48,21 @@ enum ThreeTagExtraInhabitants {
   case a(Builtin.Int32)
   case b(Builtin.Int32)
   case c(Builtin.Int32)
+}
+
+enum MoreSpareBitsThanTagsExtraInhabitants {
+  case a(Builtin.Int29)
+  case b(Builtin.Int29)
+  case c(Builtin.Int29)
+  case d(Builtin.Int29)
+}
+typealias OptOptMoreSpareBitsThanTagsExtraInhabitants =
+  Optional<Optional<MoreSpareBitsThanTagsExtraInhabitants>>
+
+enum MoreSpareBitsThanTagsExtraInhabitants2 {
+  case a(Builtin.Int29)
+  case b(Builtin.Int29)
+  case c(Builtin.Int29)
 }
 
 enum NoTagExtraInhabitants {
@@ -200,5 +215,38 @@ tests.test("types that have at least two extra inhabitants") {
   expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsZeroBytes.self, nil: nil, someNil: .some(nil))
   expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsOneByte.self, nil: nil, someNil: .some(nil))
   expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsTwoBytes.self, nil: nil, someNil: .some(nil))
+}
+tests.test("types with more spare bits than used by tags") {
+  expectHasAtLeastTwoExtraInhabitants(MoreSpareBitsThanTagsExtraInhabitants.self,
+                                      nil: nil, someNil: .some(nil))
+
+  for x in [MoreSpareBitsThanTagsExtraInhabitants.a(Builtin.zeroInitializer()),
+            MoreSpareBitsThanTagsExtraInhabitants.b(Builtin.zeroInitializer()),
+            MoreSpareBitsThanTagsExtraInhabitants.c(Builtin.zeroInitializer()),
+            MoreSpareBitsThanTagsExtraInhabitants.d(Builtin.zeroInitializer())]{
+    let opt = Optional(x)
+    expectNotNil(opt)
+    let opt2 = Optional(opt)
+    expectNotNil(opt2)
+    let opt3 = Optional(opt2)
+    expectNotNil(opt3)
+    let opt4 = Optional(opt3)
+    expectNotNil(opt4)
+  }
+
+  for x in [MoreSpareBitsThanTagsExtraInhabitants.a(Builtin.zeroInitializer()),
+            MoreSpareBitsThanTagsExtraInhabitants.b(Builtin.zeroInitializer()),
+            MoreSpareBitsThanTagsExtraInhabitants.c(Builtin.zeroInitializer())]{
+    let opt = Optional(x)
+    expectNotNil(opt)
+    let opt2 = Optional(opt)
+    expectNotNil(opt2)
+    let opt3 = Optional(opt2)
+    expectNotNil(opt3)
+    let opt4 = Optional(opt3)
+    expectNotNil(opt4)
+    let opt5 = Optional(opt4)
+    expectNotNil(opt5)
+  }
 }
 runAllTests()
