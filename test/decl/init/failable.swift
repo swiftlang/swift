@@ -60,7 +60,7 @@ class Sub : Super {
   }
 
   convenience init(forceNonfail: Int) {
-    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type '()'}} {{37-38=}}
+    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type 'Sub'}} {{37-38=}}
   }
 
   init(nonfail2: Int) { // okay, traps on nil

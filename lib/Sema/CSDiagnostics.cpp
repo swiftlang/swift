@@ -1226,3 +1226,17 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
       .fixItInsertAfter(argExpr->getEndLoc(), "()");
   return true;
 }
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
+  return true;
+}

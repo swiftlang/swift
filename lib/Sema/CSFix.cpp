@@ -215,7 +215,9 @@ AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
 }
 
 bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
+                                          getLocator());
+  return failure.diagnose(asNote);
 }
 
 RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
