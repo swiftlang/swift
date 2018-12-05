@@ -128,7 +128,6 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), in: .xml)
   }
 
-  // MARK: - Multiple Nested Keys with the same top-level key Encoding Tests
   func testEncodingMultipleNestedContainersWithTheSameTopLevelKey() {
     struct Model : Codable, Equatable {
       let first: String
@@ -180,20 +179,9 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
     _testRoundTrip(of: model, in: .xml, expectedPlist: expectedXML)
   }
   
-  func testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey() {
-    struct Model : Codable, Equatable {
+  func testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey() {
+    struct Model : Encodable, Equatable {
       let first: String
-      let second: String
-      
-      init(from coder: Decoder) throws {
-        let container = try coder.container(keyedBy: TopLevelCodingKeys.self)
-        
-        let firstNestedContainer = try container.nestedContainer(keyedBy: FirstNestedCodingKeys.self, forKey: .top)
-        self.first = try firstNestedContainer.decode(String.self, forKey: .first)
-        
-        let secondNestedContainer = try container.nestedContainer(keyedBy: SecondNestedCodingKeys.self, forKey: .top)
-        self.second = try secondNestedContainer.decode(String.self, forKey: .second)
-      }
       
       func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: TopLevelCodingKeys.self)
@@ -201,18 +189,17 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
         var firstNestedContainer = container.nestedContainer(keyedBy: FirstNestedCodingKeys.self, forKey: .top)
         try firstNestedContainer.encode(self.first, forKey: .first)
         
+        // The following line would fail as it attempts to re-encode into already encoded container is invalid. This will always fail
         var secondNestedContainer = container.nestedUnkeyedContainer(forKey: .top)
-        try secondNestedContainer.encode(self.second)
+        try secondNestedContainer.encode("second")
       }
       
-      init(first: String, second: String) {
+      init(first: String) {
         self.first = first
-        self.second = second
       }
       
       static var testValue: Model {
-        return Model(first: "Johnny Appleseed",
-                     second: "appleseed@apple.com")
+        return Model(first: "Johnny Appleseed")
       }
       enum TopLevelCodingKeys : String, CodingKey {
         case top
@@ -221,14 +208,11 @@ class TestPropertyListEncoder : TestPropertyListEncoderSuper {
       enum FirstNestedCodingKeys : String, CodingKey {
         case first
       }
-      enum SecondNestedCodingKeys : String, CodingKey {
-        case second
-      }
     }
     
     let model = Model.testValue
-    let expectedXML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>top</key>\n\t<dict>\n\t\t<key>first</key>\n\t\t<string>Johnny Appleseed</string>\n\t\t<key>second</key>\n\t\t<string>appleseed@apple.com</string>\n\t</dict>\n</dict>\n</plist>\n".data(using: .utf8)!
-    _testRoundTrip(of: model, in: .xml, expectedPlist: expectedXML)
+    // This following test would fail as it attempts to re-encode into already encoded container is invalid. This will always fail
+    _testEncodeFailure(of: model, in: .xml)
   }
   
   // MARK: - Encoder Features
@@ -890,10 +874,10 @@ PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPr
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
 PropertyListEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") { TestPropertyListEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey() }
-PropertyListEncoderTests.test("testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey")
+PropertyListEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey")
   .xfail(.always("Attempt to re-encode into already encoded container is invalid. This will always fail"))
   .code {
-    TestPropertyListEncoder().testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey()
+    TestPropertyListEncoder().testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey()
 }
 PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
 PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }

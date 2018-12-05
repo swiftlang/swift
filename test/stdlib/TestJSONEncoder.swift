@@ -103,7 +103,6 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTrip(of: TopLevelWrapper(EnhancedBool.fileNotFound), expectedJSON: "{\"value\":null}".data(using: .utf8)!)
   }
   
-  // MARK: - Multiple Nested Keys with the same top-level key Encoding Tests
   func testEncodingMultipleNestedContainersWithTheSameTopLevelKey() {
     struct Model : Codable, Equatable {
       let first: String
@@ -160,59 +159,44 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     }
   }
   
-  func testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey() {
-    struct Model : Codable, Equatable {
+  func testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey() {
+    struct Model : Encodable, Equatable {
       let first: String
-      let second: String
-      
-      init(from coder: Decoder) throws {
-        let container = try coder.container(keyedBy: TopLevelCodingKeys.self)
-        
-        let firstNestedContainer = try container.nestedContainer(keyedBy: FirstNestedCodingKeys.self, forKey: .top)
-        self.first = try firstNestedContainer.decode(String.self, forKey: .first)
-        
-        let secondNestedContainer = try container.nestedContainer(keyedBy: SecondNestedCodingKeys.self, forKey: .top)
-        self.second = try secondNestedContainer.decode(String.self, forKey: .second)
-      }
-      
+
       func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: TopLevelCodingKeys.self)
         
         var firstNestedContainer = container.nestedContainer(keyedBy: FirstNestedCodingKeys.self, forKey: .top)
         try firstNestedContainer.encode(self.first, forKey: .first)
         
+        // The following line would fail as it attempts to re-encode into already encoded container is invalid. This will always fail
         var secondNestedContainer = container.nestedUnkeyedContainer(forKey: .top)
-        try secondNestedContainer.encode(self.second)
+        try secondNestedContainer.encode("second")
       }
       
-      init(first: String, second: String) {
+      init(first: String) {
         self.first = first
-        self.second = second
       }
       
       static var testValue: Model {
-        return Model(first: "Johnny Appleseed",
-                     second: "appleseed@apple.com")
+        return Model(first: "Johnny Appleseed")
       }
       
       enum TopLevelCodingKeys : String, CodingKey {
         case top
       }
-      
       enum FirstNestedCodingKeys : String, CodingKey {
         case first
-      }
-      enum SecondNestedCodingKeys : String, CodingKey {
-        case second
       }
     }
     
     let model = Model.testValue
+    // This following test would fail as it attempts to re-encode into already encoded container is invalid. This will always fail
     if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
       let expectedJSON = "{\"top\":{\"first\":\"Johnny Appleseed\",\"second\":\"appleseed@apple.com\"}}".data(using: .utf8)!
-      _testRoundTrip(of: model, expectedJSON: expectedJSON, outputFormatting: [.sortedKeys])
+      _testEncodeFailure(of: model)
     } else {
-      _testRoundTrip(of: model)
+      _testEncodeFailure(of: model)
     }
   }
   
@@ -1729,10 +1713,10 @@ JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncode
 JSONEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestJSONEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 JSONEncoderTests.test("testEncodingTopLevelNullableType") { TestJSONEncoder().testEncodingTopLevelNullableType() }
 JSONEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") { TestJSONEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey() }
-JSONEncoderTests.test("testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey")
+JSONEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey")
   .xfail(.always("Attempt to re-encode into already encoded container is invalid. This will always fail"))
   .code {
-    TestJSONEncoder().testEncodingConfilictedTypeNestedContainersWithTheSameTopLevelKey()
+    TestJSONEncoder().testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey()
 }
 JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
 JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrinted") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrinted() }
