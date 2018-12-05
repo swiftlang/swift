@@ -264,20 +264,25 @@ bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
   StringRef tensorOpName = decoder.getOperationName();
   // Is this a known stateful op used in partitioning?
   if (tensorOpName.startswith("tfc.SendToHost") ||
-      tensorOpName.startswith("tfc.RecvFromHost")) {
+      tensorOpName.startswith("tfc.RecvFromHost") ||
+      tensorOpName.startswith("tfc.D2DTensorRecv") ||
+      tensorOpName.startswith("tfc.D2DTensorSend") ||
+      tensorOpName.startswith("tfc.TensorTransfer")) {
     return true;
+  }
+  // Other ops only known to Swift for TensorFlow.
+  if (tensorOpName.startswith("tf_tensor_to_i1") ||
+      tensorOpName.startswith("tfc.")) {
+    return false;
   }
   // Is this a stateful TensorFlow op?
   std::unique_ptr<TF_Status, decltype(&TF_DeleteStatus)> status(
       TF_NewStatus(), TF_DeleteStatus);
   int isStateful = TF_OpIsStateful(tensorOpName.str().c_str(), status.get());
   TF_Code statusCode = TF_GetCode(status.get());
-  // FIXME(SR-9388): we should actually fail if statusCode != TF_OK. However,
-  // the current tests use arbitrary strings in graph_op. Therefore, we will
-  // just allow TF_NOT_FOUND for now to avoid changing too many tests.
-  assert((statusCode == TF_OK || statusCode == TF_NOT_FOUND) &&
+  assert(statusCode == TF_OK &&
          "Error checking if a TensorFlow op is stateful.");
-  return (statusCode == TF_OK && isStateful);
+  return isStateful;
 }
 
 /// Create a "Const" tensor operation containing the specified scalars, with
