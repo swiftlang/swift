@@ -201,7 +201,7 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   TheParser.parseDeclListDelayed(IDC);
 }
 
-/// \brief Main entrypoint for the parser.
+/// Main entrypoint for the parser.
 ///
 /// \verbatim
 ///   top-level:
@@ -2275,7 +2275,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
   }
 }
 
-/// \brief This is the internal implementation of \c parseTypeAttributeList,
+/// This is the internal implementation of \c parseTypeAttributeList,
 /// which we expect to be inlined to handle the common case of an absent
 /// attribute list.
 ///
@@ -2335,7 +2335,7 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
           Tok2.isContextualKeyword("infix"));
 }
 
-/// \brief Diagnose issues with fixity attributes, if any.
+/// Diagnose issues with fixity attributes, if any.
 static void diagnoseOperatorFixityAttributes(Parser &P,
                                              DeclAttributes &Attrs,
                                              const Decl *D) {
@@ -2618,7 +2618,7 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
     consumeToken();
 }
 
-/// \brief Parse a single syntactic declaration and return a list of decl
+/// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
 ///
@@ -3054,7 +3054,7 @@ void Parser::parseDeclDelayed() {
   });
 }
 
-/// \brief Parse an 'import' declaration, doing no token skipping on error.
+/// Parse an 'import' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-import:
@@ -3161,7 +3161,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   return DCC.fixupParserResult(ID);
 }
 
-/// \brief Parse an inheritance clause.
+/// Parse an inheritance clause.
 ///
 /// \verbatim
 ///   inheritance:
@@ -3421,7 +3421,7 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   return Result;
 }
 
-/// \brief Parse the members in a struct/class/enum/protocol/extension.
+/// Parse the members in a struct/class/enum/protocol/extension.
 ///
 /// \verbatim
 ///    decl* '}'
@@ -3484,7 +3484,7 @@ bool Parser::canDelayMemberDeclParsing() {
   return !BackTrack.willBacktrack();
 }
 
-/// \brief Parse an 'extension' declaration.
+/// Parse an 'extension' declaration.
 ///
 /// \verbatim
 ///   extension:
@@ -3804,7 +3804,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
   return makeParserSuccess();
 }
 
-/// \brief Parse a typealias decl.
+/// Parse a typealias decl.
 ///
 /// \verbatim
 ///   decl-typealias:
@@ -3916,7 +3916,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(Status, TAD);
 }
 
-/// \brief Parse an associatedtype decl.
+/// Parse an associatedtype decl.
 ///
 /// \verbatim
 ///   decl-associatedtype:
@@ -4578,7 +4578,7 @@ static void fillInAccessorTypeErrors(Parser &P,
 #include "swift/AST/AccessorKinds.def"
 }
 
-/// \brief Parse the brace-enclosed getter and setter for a variable.
+/// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                            SourceLoc StaticLoc, SourceLoc VarLoc,
@@ -5039,7 +5039,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
 }
 
 
-/// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
+/// Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ParserResult<PatternBindingDecl>
 Parser::parseDeclVar(ParseDeclOptions Flags,
                      DeclAttributes &Attributes,
@@ -5423,7 +5423,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   }
 }
 
-/// \brief Parse a 'func' declaration, returning null on error.  The caller
+/// Parse a 'func' declaration, returning null on error.  The caller
 /// handles this case and does recovery as appropriate.
 ///
 /// \verbatim
@@ -5681,7 +5681,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   return false;
 }
 
-/// \brief Parse a 'enum' declaration, returning true (and doing no token
+/// Parse a 'enum' declaration, returning true (and doing no token
 /// skipping) on error.
 ///
 /// \verbatim
@@ -5780,7 +5780,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
-/// \brief Parse a 'case' of an enum.
+/// Parse a 'case' of an enum.
 ///
 /// \verbatim
 ///   enum-case:
@@ -5962,7 +5962,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
   return makeParserResult(Status, TheCase);
 }
 
-/// \brief Parse a 'struct' declaration, returning true (and doing no token
+/// Parse a 'struct' declaration, returning true (and doing no token
 /// skipping) on error.
 ///
 /// \verbatim
@@ -6065,7 +6065,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, SD);
 }
 
-/// \brief Parse a 'class' declaration, doing no token skipping on error.
+/// Parse a 'class' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-class:
@@ -6194,7 +6194,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, CD);
 }
 
-/// \brief Parse a 'protocol' declaration, doing no token skipping on error.
+/// Parse a 'protocol' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-protocol:
@@ -6300,7 +6300,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(Status, Proto);
 }
 
-/// \brief Parse a 'subscript' declaration.
+/// Parse a 'subscript' declaration.
 ///
 /// \verbatim
 ///   decl-subscript:

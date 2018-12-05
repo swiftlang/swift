@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines version macros and version-related utility functions
+/// Defines version macros and version-related utility functions
 /// for Swift.
 ///
 //===----------------------------------------------------------------------===//

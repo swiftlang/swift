@@ -20,7 +20,7 @@ namespace swift {
 class ASTContext;
 class ModuleDecl;
   
-/// \brief Imports serialized Swift modules into an ASTContext.
+/// Imports serialized Swift modules into an ASTContext.
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
@@ -48,14 +48,14 @@ public:
   SourceLoader &operator=(const SourceLoader &) = delete;
   SourceLoader &operator=(SourceLoader &&) = delete;
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
   virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// \param importLoc The location of the 'import' keyword.
   ///
@@ -68,7 +68,7 @@ public:
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
-  /// \brief Load extensions to the given nominal type.
+  /// Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
   ///

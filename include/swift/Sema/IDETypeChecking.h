@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides extra type-checking entry points for use during code
+/// Provides extra type-checking entry points for use during code
 /// completion, which happens *without* type-checking an entire file at once.
 //
 //===----------------------------------------------------------------------===//
@@ -36,10 +36,10 @@ namespace swift {
   class ValueDecl;
   class DeclName;
 
-  /// \brief Typecheck a declaration parsed during code completion.
+  /// Typecheck a declaration parsed during code completion.
   void typeCheckCompletionDecl(Decl *D);
 
-  /// \brief Check if T1 is convertible to T2.
+  /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
@@ -74,7 +74,7 @@ namespace swift {
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
-  /// \brief Given a type and an extension to the original type decl of that type,
+  /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
   /// \returns True on applied, false on not applied.
@@ -89,7 +89,7 @@ namespace swift {
     KeyPath,
   };
 
-  /// \brief Return the type of an expression parsed during code completion, or
+  /// Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
@@ -116,7 +116,7 @@ namespace swift {
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
 
-  /// \brief Typecheck top-level code parsed during code completion.
+  /// Typecheck top-level code parsed during code completion.
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);

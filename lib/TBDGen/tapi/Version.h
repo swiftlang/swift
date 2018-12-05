@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Access the TAPI version information.
+/// Access the TAPI version information.
 /// \since 1.0
 ///
 //===----------------------------------------------------------------------===//
@@ -32,7 +32,7 @@
 namespace tapi {
 
 ///
-/// \brief Access to version related information about the TAPI dynamic library.
+/// Access to version related information about the TAPI dynamic library.
 /// \since 1.0
 ///
 class TAPI_PUBLIC Version {
@@ -43,42 +43,42 @@ public:
   ///
 
   ///
-  /// \brief Get the major version number.
+  /// Get the major version number.
   /// \return The major version number as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getMajor() noexcept;
 
   ///
-  /// \brief Get the minor version number.
+  /// Get the minor version number.
   /// \return The minor version number as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getMinor() noexcept;
 
   ///
-  /// \brief Get the patch version number.
+  /// Get the patch version number.
   /// \return The patch version as unsigned integer.
   /// \since 1.0
   ///
   static unsigned getPatch() noexcept;
 
   ///
-  /// \brief Get the library version as string.
+  /// Get the library version as string.
   /// \return A string with the version number.
   /// \since 1.0
   ///
   static std::string getAsString() noexcept;
 
   ///
-  /// \brief Get the full library name and version as string.
+  /// Get the full library name and version as string.
   /// \return A string with the program name and version number.
   /// \since 1.0
   ///
   static std::string getFullVersionAsString() noexcept;
 
   ///
-  /// \brief Check if the current version is at least the specified version or
+  /// Check if the current version is at least the specified version or
   ///        greater.
   /// \param[in] major The major version number to compare against.
   /// \param[in] minor The minor version number to compare against.

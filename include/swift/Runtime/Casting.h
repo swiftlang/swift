@@ -21,7 +21,7 @@
 
 namespace swift {
 
-/// \brief Perform a checked dynamic cast of a value to a target type.
+/// Perform a checked dynamic cast of a value to a target type.
 ///
 /// \param dest A buffer into which to write the destination value.
 /// In all cases, this will be left uninitialized if the cast fails.
@@ -44,7 +44,7 @@ swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *targetType,
                   DynamicCastFlags flags);
 
-/// \brief Checked dynamic cast to a Swift class type.
+/// Checked dynamic cast to a Swift class type.
 ///
 /// \param object The object to cast.
 /// \param targetType The type to which we are casting, which is known to be
@@ -55,7 +55,7 @@ SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
 
-/// \brief Unconditional, checked dynamic cast to a Swift class type.
+/// Unconditional, checked dynamic cast to a Swift class type.
 ///
 /// Aborts if the object isn't of the target type.
 ///
@@ -70,7 +70,7 @@ swift_dynamicCastClassUnconditional(const void *object,
                                     const ClassMetadata *targetType);
 
 #if SWIFT_OBJC_INTEROP
-/// \brief Checked Objective-C-style dynamic cast to a class type.
+/// Checked Objective-C-style dynamic cast to a class type.
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
@@ -81,7 +81,7 @@ SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
 
-/// \brief Checked dynamic cast to a foreign class type.
+/// Checked dynamic cast to a foreign class type.
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
@@ -93,7 +93,7 @@ const void *
 swift_dynamicCastForeignClass(const void *object,
                               const ForeignClassMetadata *targetType);
 
-/// \brief Unconditional, checked, Objective-C-style dynamic cast to a class
+/// Unconditional, checked, Objective-C-style dynamic cast to a class
 /// type.
 ///
 /// Aborts if the object isn't of the target type.
@@ -110,7 +110,7 @@ const void *
 swift_dynamicCastObjCClassUnconditional(const void *object,
                                         const ClassMetadata *targetType);
 
-/// \brief Unconditional, checked dynamic cast to a foreign class type.
+/// Unconditional, checked dynamic cast to a foreign class type.
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
@@ -124,7 +124,7 @@ swift_dynamicCastForeignClassUnconditional(
   const ForeignClassMetadata *targetType);
 #endif
 
-/// \brief Checked dynamic cast of a class instance pointer to the given type.
+/// Checked dynamic cast of a class instance pointer to the given type.
 ///
 /// \param object The class instance to cast.
 ///
@@ -136,7 +136,7 @@ SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastUnknownClass(const void *object, const Metadata *targetType);
 
-/// \brief Unconditional checked dynamic cast of a class instance pointer to
+/// Unconditional checked dynamic cast of a class instance pointer to
 /// the given type.
 ///
 /// Aborts if the object isn't of the target type.
@@ -181,7 +181,7 @@ swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
   const ClassMetadata *targetType);
 
-/// \brief Return the dynamic type of an opaque value.
+/// Return the dynamic type of an opaque value.
 ///
 /// \param value An opaque value.
 /// \param self  The static type metadata for the opaque value and the result
@@ -201,7 +201,7 @@ const Metadata *
 swift_getDynamicType(OpaqueValue *value, const Metadata *self,
                      bool existentialMetatype);
 
-/// \brief Fetch the type metadata associated with the formal dynamic
+/// Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
 /// by KVO.
@@ -210,7 +210,7 @@ swift_getDynamicType(OpaqueValue *value, const Metadata *self,
 SWIFT_RUNTIME_EXPORT
 const Metadata *swift_getObjectType(HeapObject *object);
 
-/// \brief Check whether a type conforms to a given native Swift protocol,
+/// Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
 ///
 /// If so, returns a pointer to the witness table for its conformance.

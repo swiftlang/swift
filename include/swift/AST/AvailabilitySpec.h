@@ -58,7 +58,7 @@ public:
   void operator delete(void *Data) throw() = delete;
 };
 
-/// \brief An availability specification that guards execution based on the
+/// An availability specification that guards execution based on the
 /// run-time platform and version, e.g., OS X >= 10.10.
 class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
   PlatformKind Platform;
@@ -100,7 +100,7 @@ public:
   }
 };
 
-/// \brief An availability specification that guards execution based on the
+/// An availability specification that guards execution based on the
 /// compile-time language version, e.g., swift >= 3.0.1.
 class LanguageVersionConstraintAvailabilitySpec : public AvailabilitySpec {
   SourceLoc SwiftLoc;

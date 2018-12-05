@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines a symbol.
+/// Defines a symbol.
 /// \since 1.0
 ///
 //===----------------------------------------------------------------------===//
@@ -27,23 +27,23 @@
 TAPI_NAMESPACE_V1_BEGIN
 
 ///
-/// \brief Symbol flags.
+/// Symbol flags.
 /// \since 1.0
 ///
 enum class SymbolFlags : unsigned {
-  /// \brief No flags
+  /// No flags
   /// \since 1.0
   None = 0,
 
-  /// \brief Thread-local value symbol
+  /// Thread-local value symbol
   /// \since 1.0
   ThreadLocalValue = 1U << 0,
 
-  /// \brief Weak defined symbol
+  /// Weak defined symbol
   /// \since 1.0
   WeakDefined = 1U << 1,
 
-  /// \brief Weak referenced symbol
+  /// Weak referenced symbol
   /// \since 1.0
   WeakReferenced = 1U << 2,
 };
@@ -55,7 +55,7 @@ inline SymbolFlags operator&(const SymbolFlags &lhs,
 }
 
 ///
-/// \brief Provides query methods for symbols.
+/// Provides query methods for symbols.
 /// \since 1.0
 ///
 class TAPI_PUBLIC Symbol {
@@ -65,21 +65,21 @@ public:
       : _name(std::forward<Tp>(name)), _flags(flags) {}
 
   ///
-  /// \brief Get the symbol name as string.
+  /// Get the symbol name as string.
   /// \return A string with the symbol name.
   /// \since 1.0
   ///
   inline const std::string &getName() const noexcept { return _name; }
 
   ///
-  /// \brief Obtain the symbol flags.
+  /// Obtain the symbol flags.
   /// \return Returns the symbol flags.
   /// \since 1.0
   ///
   inline SymbolFlags getFlags() const noexcept { return _flags; }
 
   ///
-  /// \brief Query if the symbol is thread-local.
+  /// Query if the symbol is thread-local.
   /// \return True if the symbol is a thread-local value, false otherwise.
   /// \since 1.0
   ///
@@ -89,7 +89,7 @@ public:
   }
 
   ///
-  /// \brief Query if the symbol is weak defined.
+  /// Query if the symbol is weak defined.
   /// \return True if the symbol is weak defined, false otherwise.
   /// \since 1.0
   ///
@@ -98,7 +98,7 @@ public:
   }
 
   ///
-  /// \brief Query if the symbol is weak referenced.
+  /// Query if the symbol is weak referenced.
   /// \return True if the symbol is weak referenced, false otherwise.
   /// \since 1.0
   ///

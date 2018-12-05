@@ -25,7 +25,7 @@ namespace ide {
 struct CodeCompletionCacheImpl;
 class OnDiskCodeCompletionCache;
 
-/// \brief In-memory per-module code completion result cache.
+/// In-memory per-module code completion result cache.
 ///
 /// These results persist between multiple code completion requests and can be
 /// used with different ASTContexts.
@@ -34,7 +34,7 @@ class CodeCompletionCache {
   OnDiskCodeCompletionCache *nextCache;
 
 public:
-  /// \brief Cache key.
+  /// Cache key.
   struct Key {
     std::string ModuleFilename;
     std::string ModuleName;
@@ -72,7 +72,7 @@ private:
   void setImpl(const Key &K, ValueRefCntPtr V, bool setChain);
 };
 
-/// \brief On-disk per-module code completion result cache.
+/// On-disk per-module code completion result cache.
 ///
 /// These results persist between multiple code completion requests and can be
 /// used with different ASTContexts.

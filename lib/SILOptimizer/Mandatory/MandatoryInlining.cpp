@@ -42,7 +42,7 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-/// \brief Fixup reference counts after inlining a function call (which is a
+/// Fixup reference counts after inlining a function call (which is a
 /// no-op unless the function is a thick function). Note that this function
 /// makes assumptions about the release/retain convention of thick function
 /// applications: namely, that an apply of a thick function consumes the callee
@@ -133,7 +133,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
   return CalleeValue;
 }
 
-/// \brief Removes instructions that create the callee value if they are no
+/// Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void cleanupCalleeValue(SILValue CalleeValue) {
   // Handle the case where the callee of the apply is a load instruction. If we
@@ -282,7 +282,7 @@ static void collectPartiallyAppliedArguments(
   }
 }
 
-/// \brief Returns the callee SILFunction called at a call site, in the case
+/// Returns the callee SILFunction called at a call site, in the case
 /// that the call is transparent (as in, both that the call is marked
 /// with the transparent flag and that callee function is actually transparently
 /// determinable from the SIL) or nullptr otherwise. This assumes that the SIL
@@ -481,7 +481,7 @@ static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
   return newApplyAI;
 }
 
-/// \brief Inlines all mandatory inlined functions into the body of a function,
+/// Inlines all mandatory inlined functions into the body of a function,
 /// first recursively inlining all mandatory apply instructions in those
 /// functions into their bodies if necessary.
 ///

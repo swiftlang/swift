@@ -2189,7 +2189,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   return diagnosed;
 }
 
-/// \brief Determine the number of distinct overload choices in the
+/// Determine the number of distinct overload choices in the
 /// provided set.
 static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   llvm::SmallPtrSet<void *, 4> uniqueChoices;
@@ -2201,7 +2201,7 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   return result;
 }
 
-/// \brief Determine the name of the overload in a set of overload choices.
+/// Determine the name of the overload in a set of overload choices.
 static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   DeclName name;
   for (auto choice : choices) {

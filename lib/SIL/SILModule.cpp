@@ -478,7 +478,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
   return SILLoader.get();
 }
 
-/// \brief Given a conformance \p C and a protocol requirement \p Requirement,
+/// Given a conformance \p C and a protocol requirement \p Requirement,
 /// search the witness table for the conformance and return the witness thunk
 /// for the requirement.
 std::pair<SILFunction *, SILWitnessTable *>
@@ -513,7 +513,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   return std::make_pair(nullptr, nullptr);
 }
 
-/// \brief Given a protocol \p Protocol and a requirement \p Requirement,
+/// Given a protocol \p Protocol and a requirement \p Requirement,
 /// search the protocol's default witness table and return the default
 /// witness thunk for the requirement.
 std::pair<SILFunction *, SILDefaultWitnessTable *>

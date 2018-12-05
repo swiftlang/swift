@@ -78,7 +78,7 @@ public:
 
 Lazy<CtorTesterSet> ConstructedTesters;
 
-/// \brief A test class that tries to check that construction and destruction
+/// A test class that tries to check that construction and destruction
 /// occur correctly.
 class CtorTester {
   friend class CtorTesterSet;

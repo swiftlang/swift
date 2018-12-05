@@ -64,7 +64,7 @@ typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
 STATISTIC(NumCapturesPromoted, "Number of captures promoted");
 
 namespace {
-/// \brief Transient reference to a block set within ReachabilityInfo.
+/// Transient reference to a block set within ReachabilityInfo.
 ///
 /// This is a bitset that conveniently flattens into a matrix allowing bit-wise
 /// operations without masking.
@@ -78,7 +78,7 @@ public:
     return (NumBlocks + BITWORD_SIZE - 1) / BITWORD_SIZE;
   }
 
-  /// \brief Transient reference to a reaching block matrix.
+  /// Transient reference to a reaching block matrix.
   struct ReachingBlockMatrix {
     uint64_t *Bits;
     unsigned NumBitWords; // Words per row.
@@ -168,7 +168,7 @@ public:
   }
 };
 
-/// \brief Store the reachability matrix: ToBlock -> FromBlocks.
+/// Store the reachability matrix: ToBlock -> FromBlocks.
 class ReachabilityInfo {
   SILFunction *F;
   llvm::DenseMap<SILBasicBlock*, unsigned> BlockMap;
@@ -190,7 +190,7 @@ private:
 
 
 namespace {
-/// \brief A SILCloner subclass which clones a closure function while converting
+/// A SILCloner subclass which clones a closure function while converting
 /// one or more captures from 'inout' (by-reference) to by-value.
 class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
 public:
@@ -231,7 +231,7 @@ private:
 };
 } // end anonymous namespace
 
-/// \brief Compute ReachabilityInfo so that it can answer queries about
+/// Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
 /// block in the function.
 ///
@@ -294,7 +294,7 @@ void ReachabilityInfo::compute() {
   ReachingBlockSet::deallocateSet(NewSet);
 }
 
-/// \brief Return true if the To basic block is reachable from the From basic
+/// Return true if the To basic block is reachable from the From basic
 /// block. A block is considered reachable from itself only if its entry can be
 /// recursively reached from its own exit.
 bool
@@ -396,7 +396,7 @@ static std::string getSpecializedName(SILFunction *F,
   return Mangler.mangle();
 }
 
-/// \brief Create the function corresponding to the clone of the original
+/// Create the function corresponding to the clone of the original
 /// closure with the signature modified to reflect promotable captures (which
 /// are given by PromotableIndices, such that each entry in the set is the
 /// index of the box containing the variable in the closure's argument list, and
@@ -446,7 +446,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   return Fn;
 }
 
-/// \brief Populate the body of the cloned closure, modifying instructions as
+/// Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the promoted capture(s)
 void
 ClosureCloner::populateCloned() {
@@ -529,7 +529,7 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILCloner<ClosureCloner>::visitDebugValueAddrInst(Inst);
 }
 
-/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
@@ -555,7 +555,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
 }
 
-/// \brief Handle a destroy_value instruction during cloning of a closure; if
+/// Handle a destroy_value instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a destroy_value of the new object type argument, otherwise it is handled
 /// normally.
@@ -629,7 +629,7 @@ void ClosureCloner::visitEndAccessInst(EndAccessInst *Inst) {
   SILCloner<ClosureCloner>::visitEndAccessInst(Inst);
 }
 
-/// \brief Handle a load_borrow instruction during cloning of a closure.
+/// Handle a load_borrow instruction during cloning of a closure.
 ///
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
@@ -651,7 +651,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
   return;
 }
 
-/// \brief Handle a load instruction during cloning of a closure.
+/// Handle a load instruction during cloning of a closure.
 ///
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
@@ -713,7 +713,7 @@ static bool isNonMutatingLoad(SILInstruction *I) {
   return LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
 }
 
-/// \brief Given a partial_apply instruction and the argument index into its
+/// Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
 /// not to mutate the captured variable.
@@ -941,7 +941,7 @@ struct EscapeMutationScanningState {
 
 } // end anonymous namespace
 
-/// \brief Given a use of an alloc_box instruction, return true if the use
+/// Given a use of an alloc_box instruction, return true if the use
 /// definitely does not allow the box to escape; also, if the use is an
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
@@ -1063,7 +1063,7 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
   return isNonEscapingUse(Op, State);
 }
 
-/// \brief Examine an alloc_box instruction, returning true if at least one
+/// Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
 /// argument list is added to IM.
@@ -1198,7 +1198,7 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }
 
-/// \brief Given a partial_apply instruction and a set of promotable indices,
+/// Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
 /// necessary. Also, if the closure is cloned, the cloned function is added to

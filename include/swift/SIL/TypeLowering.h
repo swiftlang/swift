@@ -218,13 +218,13 @@ public:
 
   virtual ~TypeLowering() {}
 
-  /// \brief Are r-values of this type passed as arguments indirectly by formal
+  /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
   ///
   /// This is independent of whether the SIL argument is address type.
   bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
 
-  /// \brief Are r-values of this type returned indirectly by formal convention?
+  /// Are r-values of this type returned indirectly by formal convention?
   ///
   /// This is independent of whether the SIL result is address type.
   bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
@@ -934,7 +934,7 @@ public:
     NeedsThunk
   };
   
-  /// \brief Test if type1 is ABI compatible with type2, and can be converted
+  /// Test if type1 is ABI compatible with type2, and can be converted
   /// with a trivial bitcast.
   ///
   /// Note that type1 and type2 must be lowered types, and type1 must be a
@@ -946,7 +946,7 @@ public:
   ABIDifference checkForABIDifferences(SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
-  /// \brief Same as above but for SIL function types.
+  /// Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 

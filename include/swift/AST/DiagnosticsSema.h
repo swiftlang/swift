@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for semantic analysis.
+/// This file defines diagnostics for semantic analysis.
 //
 //===----------------------------------------------------------------------===//
 

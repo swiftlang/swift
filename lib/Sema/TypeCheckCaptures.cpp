@@ -80,7 +80,7 @@ public:
     CaptureLoc = getCaptureLoc(AFR);
   }
 
-  /// \brief Check if the type of an expression references any generic
+  /// Check if the type of an expression references any generic
   /// type parameters, or the dynamic Self type.
   ///
   /// Note that we do not need to distinguish inner from outer generic

@@ -856,7 +856,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   }
 }
 
-/// \brief Attempt to inline all calls smaller than our threshold.
+/// Attempt to inline all calls smaller than our threshold.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // Don't optimize functions that are marked with the opt.never attribute.

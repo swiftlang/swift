@@ -2186,7 +2186,7 @@ void TypeChecker::synthesizeFunctionBody(SynthesizedFunction fn) {
   llvm_unreachable("bad synthesized function kind");
 }
 
-/// \brief Create an implicit struct or class constructor.
+/// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
 /// \param ICK The kind of implicit constructor to create.

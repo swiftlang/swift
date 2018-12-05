@@ -3423,7 +3423,7 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionSignature() {
   return Signature(fnType, attrs, SwiftCC);
 }
 
-/// \brief Load a reference to the protocol descriptor for the given protocol.
+/// Load a reference to the protocol descriptor for the given protocol.
 ///
 /// For Swift protocols, this is a constant reference to the protocol descriptor
 /// symbol.

@@ -65,12 +65,12 @@ namespace swift {
     Complete,
   };
 
-  /// \brief A collection of options that affect the language dialect and
+  /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
 
-    /// \brief The target we are building for.
+    /// The target we are building for.
     ///
     /// This represents the minimum deployment target.
     llvm::Triple Target;
@@ -79,13 +79,13 @@ namespace swift {
     /// Language features
     ///
 
-    /// \brief User-overridable language version to compile for.
+    /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
-    /// \brief Disable API availability checking.
+    /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// \brief Maximum number of typo corrections we are allowed to perform.
+    /// Maximum number of typo corrections we are allowed to perform.
     unsigned TypoCorrectionLimit = 10;
     
     /// Should access control be respected?
@@ -104,14 +104,14 @@ namespace swift {
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
-    /// \brief Allow throwing call expressions without annotation with 'try'.
+    /// Allow throwing call expressions without annotation with 'try'.
     bool EnableThrowWithoutTry = false;
 
-    /// \brief Enable features useful for running playgrounds.
+    /// Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
 
-    /// \brief Keep comments during lexing and attach them to declarations.
+    /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 
     /// Whether to include initializers when code-completing a postfix
@@ -148,17 +148,17 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// \brief Whether we are debugging the constraint solver.
+    /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
     /// solver.
     bool DebugConstraintSolver = false;
 
-    /// \brief Specific solution attempt for which the constraint
+    /// Specific solution attempt for which the constraint
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable named lazy member loading.
+    /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
     /// Debug the generic signatures computed by the generic signature builder.
@@ -169,21 +169,21 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// \brief How to diagnose cycles encountered
+    /// How to diagnose cycles encountered
     CycleDiagnosticKind EvaluatorCycleDiagnostics =
         CycleDiagnosticKind::NoDiagnose;
 
-    /// \brief The path to which we should emit GraphViz output for the complete
+    /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
     std::string RequestEvaluatorGraphVizPath;
 
-    /// \brief The upper bound, in bytes, of temporary data that can be
+    /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
-    /// \brief The upper bound to number of sub-expressions unsolved
+    /// The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
@@ -193,27 +193,27 @@ namespace swift {
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
-    /// \brief Enable experimental operator designated types feature.
+    /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
-    /// \brief Enable constraint solver support for experimental
+    /// Enable constraint solver support for experimental
     ///        operator protocol designator feature.
     bool SolverEnableOperatorDesignatedTypes = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
-    /// \brief Perform all dynamic allocations using malloc/free instead of
+    /// Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// \brief Enable experimental #assert feature.
+    /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
-    /// \brief Enable experimental property behavior feature.
+    /// Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
-    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
+    /// Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
 

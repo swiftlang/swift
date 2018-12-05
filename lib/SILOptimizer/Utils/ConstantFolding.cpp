@@ -144,7 +144,7 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-/// \brief Construct (int, overflow) result tuple.
+/// Construct (int, overflow) result tuple.
 static SILValue constructResultWithOverflowTuple(BuiltinInst *BI,
                                                  APInt Res, bool Overflow) {
   // Get the SIL subtypes of the returned tuple type.
@@ -164,7 +164,7 @@ static SILValue constructResultWithOverflowTuple(BuiltinInst *BI,
   return B.createTuple(Loc, FuncResType, Result);
 }
 
-/// \brief Fold arithmetic intrinsics with overflow.
+/// Fold arithmetic intrinsics with overflow.
 static SILValue
 constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
                                bool ReportOverflow,
@@ -566,7 +566,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
 }
 
-/// \brief Fold binary operations.
+/// Fold binary operations.
 ///
 /// The list of operations we constant fold might not be complete. Start with
 /// folding the operations used by the standard library.

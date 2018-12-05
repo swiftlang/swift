@@ -39,7 +39,7 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Retrieve the fixed type for the given type variable.
+/// Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
   assert(knownBinding != typeBindings.end());
@@ -103,7 +103,7 @@ SubstitutionMap Solution::computeSubstitutions(
                               lookupConformanceFn);
 }
 
-/// \brief Find a particular named function witness for a type that conforms to
+/// Find a particular named function witness for a type that conforms to
 /// the given protocol.
 ///
 /// \param tc The type check we're using.
@@ -417,7 +417,7 @@ static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
 
 namespace {
 
-  /// \brief Rewrites an expression by applying the solution of a constraint
+  /// Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
   public:
@@ -438,7 +438,7 @@ namespace {
       cs.getTypeChecker().useBridgedNSErrorConformances(dc, toType);
     }
 
-    /// \brief Coerce the given tuple to another tuple type.
+    /// Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
     ///
@@ -464,7 +464,7 @@ namespace {
                              SmallVectorImpl<unsigned> &variadicArgs,
                              Optional<Pattern*> typeFromPattern = None);
 
-    /// \brief Coerce a subclass, class-constrained archetype, class-constrained
+    /// Coerce a subclass, class-constrained archetype, class-constrained
     /// existential or to a superclass type.
     ///
     /// Also supports metatypes of the above.
@@ -478,7 +478,7 @@ namespace {
     Expr *coerceSuperclass(Expr *expr, Type toType,
                            ConstraintLocatorBuilder locator);
 
-    /// \brief Coerce the given value to existential type.
+    /// Coerce the given value to existential type.
     ///
     /// The following conversions are supported:
     /// - concrete to existential
@@ -495,13 +495,13 @@ namespace {
     Expr *coerceExistential(Expr *expr, Type toType,
                             ConstraintLocatorBuilder locator);
 
-    /// \brief Coerce an expression of (possibly unchecked) optional
+    /// Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
     Expr *coerceOptionalToOptional(Expr *expr, Type toType,
                                    ConstraintLocatorBuilder locator,
                                    Optional<Pattern*> typeFromPattern = None);
 
-    /// \brief Coerce an expression of implicitly unwrapped optional type to its
+    /// Coerce an expression of implicitly unwrapped optional type to its
     /// underlying value type, in the correct way for an implicit
     /// look-through.
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
@@ -525,7 +525,7 @@ namespace {
     bool peepholeCollectionUpcast(Expr *expr, Type toType,  bool bridged,
                                   ConstraintLocatorBuilder locator);
 
-    /// \brief Build a collection upcast expression.
+    /// Build a collection upcast expression.
     ///
     /// \param bridged Whether this is a bridging conversion, meaning that the
     /// element types themselves are bridged (vs. simply coerced).
@@ -551,7 +551,7 @@ namespace {
     }
 
   public:
-    /// \brief Build a reference to the given declaration.
+    /// Build a reference to the given declaration.
     Expr *buildDeclRef(OverloadChoice choice, DeclNameLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator, bool implicit,
                        FunctionRefKind functionRefKind,
@@ -879,7 +879,7 @@ namespace {
       return true;
     }
 
-    /// \brief Build a new member reference with the given base and member.
+    /// Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          OverloadChoice choice, DeclNameLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
@@ -1140,10 +1140,10 @@ namespace {
       return finishApply(apply, openedType, locator);
     }
     
-    /// \brief Describes either a type or the name of a type to be resolved.
+    /// Describes either a type or the name of a type to be resolved.
     using TypeOrName = llvm::PointerUnion<Identifier, Type>;
 
-    /// \brief Convert the given literal expression via a protocol pair.
+    /// Convert the given literal expression via a protocol pair.
     ///
     /// This routine handles the two-step literal conversion process used
     /// by integer, float, character, extended grapheme cluster, and string
@@ -1202,7 +1202,7 @@ namespace {
                          Diag<> brokenProtocolDiag,
                          Diag<> brokenBuiltinProtocolDiag);
 
-    /// \brief Convert the given literal expression via a protocol pair.
+    /// Convert the given literal expression via a protocol pair.
     ///
     /// This routine handles the two-step literal conversion process used
     /// by integer, float, character, extended grapheme cluster, and string
@@ -1248,7 +1248,7 @@ namespace {
                                 Diag<> brokenProtocolDiag,
                                 Diag<> brokenBuiltinProtocolDiag);
 
-    /// \brief Finish a function application by performing the appropriate
+    /// Finish a function application by performing the appropriate
     /// conversions on the function and argument expressions and setting
     /// the resulting type.
     ///
@@ -1264,7 +1264,7 @@ namespace {
                       ConstraintLocatorBuilder locator);
 
   private:
-    /// \brief Simplify the given type by substituting all occurrences of
+    /// Simplify the given type by substituting all occurrences of
     /// type variables for their fixed types.
     Type simplifyType(Type type) {
       return solution.simplifyType(type);
@@ -1273,7 +1273,7 @@ namespace {
   public:
 
 
-    /// \brief Coerce a closure expression with a non-Void return type to a
+    /// Coerce a closure expression with a non-Void return type to a
     /// contextual function type with a Void return type.
     ///
     /// This operation cannot fail.
@@ -1284,7 +1284,7 @@ namespace {
     ///
     ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
 
-    /// \brief Coerce a closure expression with a Never return type to a
+    /// Coerce a closure expression with a Never return type to a
     /// contextual function type with some other return type.
     ///
     /// This operation cannot fail.
@@ -1295,7 +1295,7 @@ namespace {
     ///
     ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
     
-    /// \brief Coerce the given expression to the given type.
+    /// Coerce the given expression to the given type.
     ///
     /// This operation cannot fail.
     ///
@@ -1310,7 +1310,7 @@ namespace {
                        ConstraintLocatorBuilder locator,
                        Optional<Pattern*> typeFromPattern = None);
     
-    /// \brief Coerce the given expression (which is the argument to a call) to
+    /// Coerce the given expression (which is the argument to a call) to
     /// the given parameter type.
     ///
     /// This operation cannot fail.
@@ -1331,7 +1331,7 @@ namespace {
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
 
-    /// \brief Coerce the given object argument (e.g., for the base of a
+    /// Coerce the given object argument (e.g., for the base of a
     /// member expression) to the given type.
     ///
     /// \param expr The expression to coerce.
@@ -1349,7 +1349,7 @@ namespace {
                                      ConstraintLocatorBuilder locator);
 
   private:
-    /// \brief Build a new subscript.
+    /// Build a new subscript.
     ///
     /// \param base The base of the subscript.
     /// \param index The index of the subscript.
@@ -1615,7 +1615,7 @@ namespace {
       return result;
     }
 
-    /// \brief Build a new reference to another constructor.
+    /// Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
                                    ConstructorDecl *ctor, Expr *base,
                                    DeclNameLoc loc,
@@ -1804,7 +1804,7 @@ namespace {
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
-    /// \brief Simplify the expression type and return the expression.
+    /// Simplify the expression type and return the expression.
     ///
     /// This routine is used for 'simple' expressions that only need their
     /// types simplified, with no further computation.
@@ -4871,7 +4871,7 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
   return ConcreteDeclRef();
 }
 
-/// \brief Given a constraint locator, find the declaration reference
+/// Given a constraint locator, find the declaration reference
 /// to the callee, it is a call to a declaration.
 static ConcreteDeclRef
 findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
@@ -7722,12 +7722,12 @@ namespace {
       return result;
     }
 
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
 
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 } // end anonymous namespace
@@ -7778,7 +7778,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
   return diagnosed;
 }
 
-/// \brief Apply a given solution to the expression, producing a fully
+/// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,

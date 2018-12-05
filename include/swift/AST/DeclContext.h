@@ -306,7 +306,7 @@ public:
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
 
-  /// \brief Retrieve the generic parameter 'Self' from a protocol or
+  /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///
   /// Only valid if \c getSelfProtocolDecl().
@@ -336,17 +336,17 @@ public:
   /// - Everything else falls back on getDeclaredInterfaceType().
   Type getSelfInterfaceType() const;
 
-  /// \brief Retrieve the innermost generic parameters of this context or any
+  /// Retrieve the innermost generic parameters of this context or any
   /// of its parents.
   ///
   /// FIXME: Remove this
   GenericParamList *getGenericParamsOfContext() const;
 
-  /// \brief Retrieve the innermost generic signature of this context or any
+  /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;
 
-  /// \brief Retrieve the innermost archetypes of this context or any
+  /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
 

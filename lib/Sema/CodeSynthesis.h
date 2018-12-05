@@ -106,19 +106,19 @@ void maybeAddAccessorsToStorage(TypeChecker &TC, AbstractStorageDecl *storage);
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
 
-/// \brief Describes the kind of implicit constructor that will be
+/// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {
-  /// \brief The default constructor, which default-initializes each
+  /// The default constructor, which default-initializes each
   /// of the instance variables.
   Default,
-  /// \brief The memberwise constructor, which initializes each of
+  /// The memberwise constructor, which initializes each of
   /// the instance variables from a parameter of the same type and
   /// name.
   Memberwise
 };
 
-/// \brief Create an implicit struct or class constructor.
+/// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
 /// \param ICK The kind of implicit constructor to create.

@@ -10,7 +10,7 @@ public struct ObjCBool : CustomStringConvertible {
     self.value = value ? 1 : 0
   }
 
-  /// \brief Allow use in a Boolean context.
+  /// Allow use in a Boolean context.
   public var boolValue: Bool {
     return value != 0
   }

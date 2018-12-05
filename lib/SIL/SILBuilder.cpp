@@ -144,7 +144,7 @@ BranchInst *SILBuilder::createBranch(SILLocation Loc,
   return createBranch(Loc, TargetBlock, ArgsCopy);
 }
 
-/// \brief Branch to the given block if there's an active insertion point,
+/// Branch to the given block if there's an active insertion point,
 /// then move the insertion point to the end of that block.
 void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
   if (!hasValidInsertionPoint()) {

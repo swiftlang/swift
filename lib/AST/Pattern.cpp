@@ -194,7 +194,7 @@ namespace {
 } // end anonymous namespace
 
 
-/// \brief apply the specified function to all variables referenced in this
+/// apply the specified function to all variables referenced in this
 /// pattern.
 void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   switch (getKind()) {
@@ -239,7 +239,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   }
 }
 
-/// \brief apply the specified function to all pattern nodes recursively in
+/// apply the specified function to all pattern nodes recursively in
 /// this pattern.  This is a pre-order traversal.
 void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
   f(this);

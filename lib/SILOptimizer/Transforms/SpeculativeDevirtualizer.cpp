@@ -256,7 +256,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   return VirtAI;
 }
 
-/// \brief Returns true, if a method implementation to be called by the
+/// Returns true, if a method implementation to be called by the
 /// default case handler of a speculative devirtualization is statically
 /// known. This happens if it can be proven that generated
 /// checked_cast_br instructions cover all other possible cases.
@@ -360,7 +360,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   return true;
 }
 
-/// \brief Try to speculate the call target for the call \p AI. This function
+/// Try to speculate the call target for the call \p AI. This function
 /// returns true if a change was made.
 static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
                                  OptRemark::Emitter &ORE) {

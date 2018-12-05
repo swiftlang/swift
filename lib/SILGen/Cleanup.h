@@ -169,7 +169,7 @@ public:
     return stack.findAndAdvance(iter);
   }
 
-  /// \brief Emit a branch to the given jump destination,
+  /// Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
   /// cleanup stack.
   ///

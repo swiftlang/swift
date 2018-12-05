@@ -44,7 +44,7 @@ namespace irgen {
   class TypeConverter;
   using clang::CodeGen::swiftcall::SwiftAggLowering;
 
-/// \brief Emit the dispatch branch(es) for an address-only enum.
+/// Emit the dispatch branch(es) for an address-only enum.
 void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
                                         SILType enumTy,
                                         Address enumAddr,
@@ -52,7 +52,7 @@ void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
                                                            llvm::BasicBlock*>> dests,
                                         llvm::BasicBlock *defaultDest);
 
-/// \brief Injects a case and its associated data, if any, into a loadable enum
+/// Injects a case and its associated data, if any, into a loadable enum
 /// value.
 void emitInjectLoadableEnum(IRGenFunction &IGF,
                              SILType enumTy,
@@ -60,7 +60,7 @@ void emitInjectLoadableEnum(IRGenFunction &IGF,
                              Explosion &data,
                              Explosion &out);
   
-/// \brief Extracts the associated data for an enum case. This is an unchecked
+/// Extracts the associated data for an enum case. This is an unchecked
 /// operation; the input enum value must be of the given case.
 void emitProjectLoadableEnum(IRGenFunction &IGF,
                               SILType enumTy,
@@ -68,14 +68,14 @@ void emitProjectLoadableEnum(IRGenFunction &IGF,
                               EnumElementDecl *theCase,
                               Explosion &out);
 
-/// \brief Projects the address of the associated data for a case inside a
+/// Projects the address of the associated data for a case inside a
 /// enum, to which a new data value can be stored.
 Address emitProjectEnumAddressForStore(IRGenFunction &IGF,
                                         SILType enumTy,
                                         Address enumAddr,
                                         EnumElementDecl *theCase);
 
-/// \brief Projects the address of the associated data for a case inside a
+/// Projects the address of the associated data for a case inside a
 /// enum, clearing any tag bits interleaved into the data area, so that the
 /// value inside can be loaded. Does not check that the enum has a value of the
 /// given case.
@@ -84,7 +84,7 @@ Address emitDestructiveProjectEnumAddressForLoad(IRGenFunction &IGF,
                                                   Address enumAddr,
                                                   EnumElementDecl *theCase);
 
-/// \brief Stores the tag bits for an enum case to the given address, overlaying
+/// Stores the tag bits for an enum case to the given address, overlaying
 /// the data (if any) stored there.
 void emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                 SILType enumTy,
@@ -221,7 +221,7 @@ public:
   /// Emit field names for enum reflection.
   virtual bool isReflectable() const;
 
-  /// \brief Return the bits used for discriminators for payload cases.
+  /// Return the bits used for discriminators for payload cases.
   ///
   /// These bits are populated in increasing value according to the order of
   /// the getElementsWithPayload() array, starting from zero for the first

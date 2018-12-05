@@ -25,7 +25,7 @@
 namespace swift {
 class DiagnosticEngine;
 
-/// \brief Parses a -sanitize= argument's values.
+/// Parses a -sanitize= argument's values.
 ///
 /// \param Diag If non null, the argument is used to diagnose invalid values.
 /// \param sanitizerRuntimeLibExists Function which checks for existence of a
@@ -36,7 +36,7 @@ OptionSet<SanitizerKind> parseSanitizerArgValues(
     const llvm::Triple &Triple, DiagnosticEngine &Diag,
     llvm::function_ref<bool(llvm::StringRef, bool)> sanitizerRuntimeLibExists);
 
-/// \brief Parses a -sanitize-coverage= argument's value.
+/// Parses a -sanitize-coverage= argument's value.
 llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(
         const llvm::opt::Arg *A,
         const llvm::Triple &Triple,

@@ -538,7 +538,7 @@ SILValue InstSimplifier::visitBuiltinInst(BuiltinInst *BI) {
   return simplifyBuiltin(BI);
 }
 
-/// \brief Simplify arithmetic intrinsics with overflow and known identity
+/// Simplify arithmetic intrinsics with overflow and known identity
 /// constants such as 0 and 1.
 /// If this returns a value other than SILValue() then the instruction was
 /// simplified to a value which doesn't overflow.  The overflow case is handled
@@ -653,7 +653,7 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// \brief Try to simplify the specified instruction, performing local
+/// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.

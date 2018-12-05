@@ -2279,7 +2279,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
   return FunctionType::get(argTypes, solution.simplifyType(CS.getType(expr)));
 }
 
-/// \brief Return the type of operator function for specified LHS, or a null
+/// Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
 FunctionType *
 TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,

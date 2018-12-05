@@ -35,7 +35,7 @@ STATISTIC(NumExpand, "Number of instructions expanded");
 //                      Higher Level Operation Expansion
 //===----------------------------------------------------------------------===//
 
-/// \brief Lower copy_addr into loads/stores/retain/release if we have a
+/// Lower copy_addr into loads/stores/retain/release if we have a
 /// non-address only type. We do this here so we can process the resulting
 /// loads/stores.
 ///

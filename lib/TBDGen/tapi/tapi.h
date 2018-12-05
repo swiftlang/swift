@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This is the umbrella header for the TAPI C++ Library Interface.
+/// This is the umbrella header for the TAPI C++ Library Interface.
 /// \since 1.0
 ///
 //===----------------------------------------------------------------------===//

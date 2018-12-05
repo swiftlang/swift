@@ -26,7 +26,7 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Determine whether one type would be a valid substitution for an
+/// Determine whether one type would be a valid substitution for an
 /// archetype.
 ///
 /// \param type The potential type.

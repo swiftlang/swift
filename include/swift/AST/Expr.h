@@ -158,7 +158,7 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
   SWIFT_INLINE_BITFIELD(ParenExpr, IdentityExpr, 1,
-    /// \brief Whether we're wrapping a trailing closure expression.
+    /// Whether we're wrapping a trailing closure expression.
     HasTrailingClosure : 1
   );
 
@@ -391,7 +391,7 @@ public:
   /// Return the kind of this expression.
   ExprKind getKind() const { return ExprKind(Bits.Expr.Kind); }
 
-  /// \brief Retrieve the name of the given expression kind.
+  /// Retrieve the name of the given expression kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
@@ -404,13 +404,13 @@ public:
   /// setType - Sets the type of this expression.
   void setType(Type T);
 
-  /// \brief Return the source range of the expression.
+  /// Return the source range of the expression.
   SourceRange getSourceRange() const;
   
   /// getStartLoc - Return the location of the start of the expression.
   SourceLoc getStartLoc() const;
 
-  /// \brief Retrieve the location of the last token of the expression.
+  /// Retrieve the location of the last token of the expression.
   SourceLoc getEndLoc() const;
   
   /// getLoc - Return the caret location of this expression.
@@ -712,7 +712,7 @@ public:
   }
 };
 
-/// \brief The 'nil' literal.
+/// The 'nil' literal.
 ///
 class NilLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
@@ -730,7 +730,7 @@ public:
   }
 };
 
-/// \brief Abstract base class for numeric literals, potentially with a sign.
+/// Abstract base class for numeric literals, potentially with a sign.
 class NumberLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
@@ -778,7 +778,7 @@ public:
 };
 
   
-/// \brief Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
+/// Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
 ///
 /// After semantic analysis assigns types, this is guaranteed to only have
 /// a BuiltinIntegerType.
@@ -826,7 +826,7 @@ public:
   }
 };
 
-/// \brief A Boolean literal ('true' or 'false')
+/// A Boolean literal ('true' or 'false')
 ///
 class BooleanLiteralExpr : public LiteralExpr {
   SourceLoc Loc;
@@ -923,7 +923,7 @@ public:
   }
 };
 
-/// \brief Runs a series of statements which use or modify \c SubExpr
+/// Runs a series of statements which use or modify \c SubExpr
 /// before it is given to the rest of the expression.
 ///
 /// \c Body should begin with a \c VarDecl; this defines the variable
@@ -944,7 +944,7 @@ public:
   Expr * getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr * se) { SubExpr = se; }
 
-  /// \brief The variable which will be accessed and possibly modified by
+  /// The variable which will be accessed and possibly modified by
   /// the \c Body. This is the first \c ASTNode in the \c Body.
   VarDecl * getVar() const;
 
@@ -983,26 +983,26 @@ public:
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
   }
 
-  /// \brief Retrieve the value of the literalCapacity parameter to the
+  /// Retrieve the value of the literalCapacity parameter to the
   /// initializer.
   unsigned getLiteralCapacity() const {
     return Bits.InterpolatedStringLiteralExpr.LiteralCapacity;
   }
 
-  /// \brief Retrieve the value of the interpolationCount parameter to the
+  /// Retrieve the value of the interpolationCount parameter to the
   /// initializer.
   unsigned getInterpolationCount() const {
     return Bits.InterpolatedStringLiteralExpr.InterpolationCount;
   }
 
-  /// \brief A block containing expressions which call
+  /// A block containing expressions which call
   /// \c StringInterpolationProtocol methods to append segments to the
   /// string interpolation. The first node in \c Body should be an uninitialized
   /// \c VarDecl; the other statements should append to it.
   TapExpr * getAppendingExpr() const { return AppendingExpr; }
   void setAppendingExpr(TapExpr * AE) { AppendingExpr = AE; }
   
-  /// \brief Retrieve the expression that actually evaluates the resulting
+  /// Retrieve the expression that actually evaluates the resulting
   /// string, typically with a series of '+' operations.
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
@@ -1016,7 +1016,7 @@ public:
     return Loc;
   }
 
-  /// \brief Call the \c callback with information about each segment in turn.
+  /// Call the \c callback with information about each segment in turn.
   void forEachSegment(ASTContext &Ctx,
                       llvm::function_ref<void(bool, CallExpr *)> callback);
   
@@ -1226,7 +1226,7 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-  /// \brief The declaration pointer.
+  /// The declaration pointer.
   ConcreteDeclRef D;
   DeclNameLoc Loc;
 
@@ -1986,7 +1986,7 @@ public:
     return RParenLoc;
   }
 
-  /// \brief Whether this expression has a trailing closure as its argument.
+  /// Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return Bits.ParenExpr.HasTrailingClosure; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
@@ -2057,7 +2057,7 @@ public:
 
   SourceRange getSourceRange() const;
 
-  /// \brief Whether this expression has a trailing closure as its argument.
+  /// Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return Bits.TupleExpr.HasTrailingClosure; }
 
   /// Retrieve the elements of this tuple.
@@ -2115,7 +2115,7 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
 
-/// \brief A collection literal expression.
+/// A collection literal expression.
 ///
 /// The subexpression is represented as a TupleExpr or ParenExpr and
 /// passed on to the appropriate semantics-providing conversion
@@ -2201,7 +2201,7 @@ public:
 
 };
  
-/// \brief An array literal expression [a, b, c].
+/// An array literal expression [a, b, c].
 class ArrayExpr final : public CollectionExpr,
     private llvm::TrailingObjects<ArrayExpr, Expr*, SourceLoc> {
   friend TrailingObjects;
@@ -2231,7 +2231,7 @@ public:
   }
 };
 
-/// \brief A dictionary literal expression [a : x, b : y, c : z].
+/// A dictionary literal expression [a : x, b : y, c : z].
 class DictionaryExpr final : public CollectionExpr,
     private llvm::TrailingObjects<DictionaryExpr, Expr*, SourceLoc> {
   friend TrailingObjects;
@@ -2455,7 +2455,7 @@ public:
   }
 };
 
-/// \brief Describes a monadic bind from T? to T.
+/// Describes a monadic bind from T? to T.
 ///
 /// In a ?-chain expression, this is the part that's spelled with a
 /// postfix ?.
@@ -2514,7 +2514,7 @@ public:
   }
 };
 
-/// \brief Describes the outer limits of an operation containing
+/// Describes the outer limits of an operation containing
 /// monadic binds of T? to T.
 ///
 /// In a ?-chain expression, this is implicitly formed at the outer
@@ -2540,7 +2540,7 @@ public:
   }
 };
 
-/// \brief An expression that forces an optional to its underlying value.
+/// An expression that forces an optional to its underlying value.
 ///
 /// \code
 /// func parseInt(s : String) -> Int? { ... }
@@ -2592,7 +2592,7 @@ public:
   }
 };
 
-/// \brief An expression that grants temporary escapability to a nonescaping
+/// An expression that grants temporary escapability to a nonescaping
 /// closure value.
 ///
 /// This expression is formed by the type checker when a call to the
@@ -2664,7 +2664,7 @@ public:
   }
 };
 
-/// \brief An expression that opens up a value of protocol or protocol
+/// An expression that opens up a value of protocol or protocol
 /// composition type and gives a name to its dynamic type.
 ///
 /// This expression is implicitly created by the type checker when
@@ -3213,7 +3213,7 @@ public:
   static ErasureExpr *create(ASTContext &ctx, Expr *subExpr, Type type,
                              ArrayRef<ProtocolConformanceRef> conformances);
 
-  /// \brief Retrieve the mapping specifying how the type of the subexpression
+  /// Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
   /// type involves several different protocols, there will be mappings for each
   /// of those protocols, in the order in which the existential type expands
@@ -3247,7 +3247,7 @@ public:
     : ImplicitConversionExpr(ExprKind::AnyHashableErasure, subExpr, type),
       Conformance(conformance) {}
 
-  /// \brief Retrieve the mapping specifying how the type of the
+  /// Retrieve the mapping specifying how the type of the
   /// subexpression conforms to the Hashable protocol.
   ProtocolConformanceRef getConformance() const {
     return Conformance;
@@ -3270,7 +3270,7 @@ public:
       Conversion(conversion) {
   }
 
-  /// \brief Retrieve the conversion function.
+  /// Retrieve the conversion function.
   ConcreteDeclRef getConversion() const {
     return Conversion;
   }
@@ -3331,7 +3331,7 @@ public:
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *e) { SubExpr = e; }
   
-  /// \brief Retrieve the list of type parameters. These parameters have not yet
+  /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
   ArrayRef<TypeLoc> getUnresolvedParams() const {
     return {getTrailingObjects<TypeLoc>(),
@@ -3354,7 +3354,7 @@ public:
   }
 };
 
-/// \brief Describes an implicit conversion from a subclass to one of its
+/// Describes an implicit conversion from a subclass to one of its
 /// superclasses.
 class DerivedToBaseExpr : public ImplicitConversionExpr {
 public:
@@ -3366,7 +3366,7 @@ public:
   }
 };
 
-/// \brief Describes an implicit conversion from a value of archetype type to
+/// Describes an implicit conversion from a value of archetype type to
 /// its concrete superclass.
 class ArchetypeToSuperExpr : public ImplicitConversionExpr {
 public:
@@ -3469,11 +3469,11 @@ public:
 };
 
 
-/// \brief A base class for closure expressions.
+/// A base class for closure expressions.
 class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
 
-  /// \brief The set of parameters.
+  /// The set of parameters.
   ParameterList *parameterList;
 
 public:
@@ -3488,7 +3488,7 @@ public:
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
-  /// \brief Retrieve the parameters of this closure.
+  /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }
   const ParameterList *getParameters() const { return parameterList; }
   void setParameterList(ParameterList *P);
@@ -3521,13 +3521,13 @@ public:
   }
   enum : unsigned { InvalidDiscriminator = 0xFFFF };
 
-  /// \brief Retrieve the result type of this closure.
+  /// Retrieve the result type of this closure.
   Type getResultType(llvm::function_ref<Type(const Expr *)> getType =
                          [](const Expr *E) -> Type {
     return E->getType();
   }) const;
 
-  /// \brief Return whether this closure is throwing when fully applied.
+  /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
 
   /// Whether this closure consists of a single expression.
@@ -3582,7 +3582,7 @@ public:
   }
 };
 
-/// \brief An explicit unnamed function expression, which can optionally have
+/// An explicit unnamed function expression, which can optionally have
 /// named arguments.
 ///
 /// \code
@@ -3596,17 +3596,17 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
-  /// \brief The location of the '->' denoting an explicit return type,
+  /// The location of the '->' denoting an explicit return type,
   /// if present.
   SourceLoc ArrowLoc;
 
   /// The location of the "in", if present.
   SourceLoc InLoc;
 
-  /// \brief The explicitly-specified result type.
+  /// The explicitly-specified result type.
   TypeLoc ExplicitResultType;
 
-  /// \brief The body of the closure, along with a bit indicating whether it
+  /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
@@ -3634,41 +3634,41 @@ public:
     Body.setInt(isSingleExpression);
   }
 
-  /// \brief Determine whether the parameters of this closure are actually
+  /// Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
   bool hasAnonymousClosureVars() const {
     return Bits.ClosureExpr.HasAnonymousClosureVars;
   }
 
-  /// \brief Set the parameters of this closure along with a flag indicating
+  /// Set the parameters of this closure along with a flag indicating
   /// whether these parameters are actually anonymous closure variables.
   void setHasAnonymousClosureVars() {
     Bits.ClosureExpr.HasAnonymousClosureVars = true;
   }
   
-  /// \brief Determine whether this closure expression has an
+  /// Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
   
-  /// \brief Retrieve the location of the \c '->' for closures with an
+  /// Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
   SourceLoc getArrowLoc() const {
     assert(hasExplicitResultType() && "No arrow location");
     return ArrowLoc;
   }
 
-  /// \brief Retrieve the location of the \c in for a closure that has it.
+  /// Retrieve the location of the \c in for a closure that has it.
   SourceLoc getInLoc() const {
     return InLoc;
   }
   
-  /// \brief Retrieve the location of the 'throws' for a closure that has it.
+  /// Retrieve the location of the 'throws' for a closure that has it.
   SourceLoc getThrowsLoc() const {
     return ThrowsLoc;
   }
 
-  /// \brief Retrieve the explicit result type location information.
+  /// Retrieve the explicit result type location information.
   TypeLoc &getExplicitResultTypeLoc() {
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultType;
@@ -3679,7 +3679,7 @@ public:
     ExplicitResultType = resultType;
   }
 
-  /// \brief Determine whether the closure has a single expression for its
+  /// Determine whether the closure has a single expression for its
   /// body.
   ///
   /// This will be true for closures such as, e.g.,
@@ -3699,20 +3699,20 @@ public:
     return Body.getInt();
   }
 
-  /// \brief Retrieve the body for closure that has a single expression for
+  /// Retrieve the body for closure that has a single expression for
   /// its body.
   ///
   /// Only valid when \c hasSingleExpressionBody() is true.
   Expr *getSingleExpressionBody() const;
 
-  /// \brief Set the body for a closure that has a single expression as its
+  /// Set the body for a closure that has a single expression as its
   /// body.
   ///
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *NewBody);
 
-  /// \brief Is this a completely empty closure?
+  /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
   static bool classof(const Expr *E) {
@@ -3727,7 +3727,7 @@ public:
 };
 
 
-/// \brief This is a closure of the contained subexpression that is formed
+/// This is a closure of the contained subexpression that is formed
 /// when a scalar expression is converted to @autoclosure function type.
 /// For example:
 /// \code
@@ -4208,7 +4208,7 @@ public:
   }
 };
   
-/// \brief Represents an explicit cast, 'a as T' or 'a is T', where "T" is a
+/// Represents an explicit cast, 'a as T' or 'a is T', where "T" is a
 /// type, and "a" is the expression that will be converted to the type.
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
@@ -4268,7 +4268,7 @@ public:
 /// Return a string representation of a CheckedCastKind.
 StringRef getCheckedCastKindName(CheckedCastKind kind);
   
-/// \brief Abstract base class for checked casts 'as' and 'is'. These represent
+/// Abstract base class for checked casts 'as' and 'is'. These represent
 /// casts that can dynamically fail.
 class CheckedCastExpr : public ExplicitCastExpr {
 public:
@@ -4327,7 +4327,7 @@ public:
   }
 };
 
-/// \brief Represents an explicit conditional checked cast, which converts
+/// Represents an explicit conditional checked cast, which converts
 /// from a type to some subtype and produces an Optional value, which will be
 /// .Some(x) if the cast succeeds, or .None if the cast fails.
 /// Spelled 'a as? T' and produces a value of type 'T?'.
@@ -4355,7 +4355,7 @@ public:
   }
 };
 
-/// \brief Represents a runtime type check query, 'a is T', where 'T' is a type
+/// Represents a runtime type check query, 'a is T', where 'T' is a type
 /// and 'a' is a value of some related type. Evaluates to a Bool true if 'a' is
 /// of the type and 'a as T' would succeed, false otherwise.
 ///
@@ -4376,7 +4376,7 @@ public:
   }
 };
 
-/// \brief Represents an explicit coercion from a value to a specific type.
+/// Represents an explicit coercion from a value to a specific type.
 ///
 /// Spelled 'a as T' and produces a value of type 'T'.
 class CoerceExpr : public ExplicitCastExpr {
@@ -4422,7 +4422,7 @@ public:
   }
 };
 
-/// \brief Represents two expressions joined by the arrow operator '->', which
+/// Represents two expressions joined by the arrow operator '->', which
 /// may be preceded by the 'throws' keyword. Currently this only exists to be
 /// transformed into a FunctionTypeRepr by simplifyTypeExpr() in Sema.
 class ArrowExpr : public Expr {
@@ -4463,7 +4463,7 @@ public:
   }
 };
 
-/// \brief Represents the rebinding of 'self' in a constructor that calls out
+/// Represents the rebinding of 'self' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to
 /// 'self', and the expression returns void.
 ///
@@ -4494,7 +4494,7 @@ public:
   }
 };
   
-/// \brief The conditional expression 'x ? y : z'.
+/// The conditional expression 'x ? y : z'.
 class IfExpr : public Expr {
   Expr *CondExpr, *ThenExpr, *ElseExpr;
   SourceLoc QuestionLoc, ColonLoc;
@@ -4614,7 +4614,7 @@ public:
   }
 };
 
-/// \brief A pattern production that has been parsed but hasn't been resolved
+/// A pattern production that has been parsed but hasn't been resolved
 /// into a complete pattern. Name binding converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
 /// position.

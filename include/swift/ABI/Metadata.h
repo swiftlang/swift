@@ -1957,7 +1957,7 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
 };
 using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance witness.
 ///
 /// Resilient conformances must use a pattern where new requirements
@@ -2008,7 +2008,7 @@ struct TargetResilientWitnessTable final
 };
 using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance, which is embedded in the protocol conformance descriptor.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:

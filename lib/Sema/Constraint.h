@@ -45,45 +45,45 @@ namespace constraints {
 class ConstraintLocator;
 class ConstraintSystem;
 
-/// \brief Describes the kind of constraint placed on one or more types.
+/// Describes the kind of constraint placed on one or more types.
 enum class ConstraintKind : char {
-  /// \brief The two types must be bound to the same type. This is the only
+  /// The two types must be bound to the same type. This is the only
   /// truly symmetric constraint.
   Bind,
-  /// \brief The two types must be bound to the same type, dropping
+  /// The two types must be bound to the same type, dropping
   /// lvalueness when comparing a type variable to a type.
   Equal,
-  /// \brief The first type is the type of a function parameter; the second
+  /// The first type is the type of a function parameter; the second
   /// type is the type of a reference to that parameter from within the
   /// function body. Specifically, the left type is an inout type iff the right
   /// type is an lvalue type with the same object type. Otherwise, the two
   /// types must be the same type.
   BindParam,
-  /// \brief Binds the first type to the element type of the second type.
+  /// Binds the first type to the element type of the second type.
   BindToPointerType,
-  /// \brief The first type is a subtype of the second type, i.e., a value
+  /// The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
   /// second type is expected.
   Subtype,
-  /// \brief The first type is convertible to the second type.
+  /// The first type is convertible to the second type.
   Conversion,
-  /// \brief The first type can be bridged to the second type.
+  /// The first type can be bridged to the second type.
   BridgingConversion,
-  /// \brief The first type is the element of an argument tuple that is
+  /// The first type is the element of an argument tuple that is
   /// convertible to the second type (which represents the corresponding
   /// parameter type).
   ArgumentConversion,
-  /// \brief The first type is convertible to the second type, including inout.
+  /// The first type is convertible to the second type, including inout.
   OperatorArgumentConversion,
-  /// \brief The first type must conform to the second type (which is a
+  /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
-  /// \brief The first type describes a literal that conforms to the second
+  /// The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.
   LiteralConformsTo,
   /// A checked cast from the first type to the second.
   CheckedCast,
-  /// \brief The first type can act as the Self type of the second type (which
+  /// The first type can act as the Self type of the second type (which
   /// is a protocol).
   ///
   /// This constraint is slightly looser than a conforms-to constraint, because
@@ -91,78 +91,78 @@ enum class ConstraintKind : char {
   /// existential, even if it doesn't conform to that protocol (e.g., due to
   /// the use of associated types).
   SelfObjectOfProtocol,
-  /// \brief Both types are function types. The first function type's
+  /// Both types are function types. The first function type's
   /// input is the value being passed to the function and its output
   /// is a type variable that describes the output. The second
   /// function type is expected to become a function type. Note, we
   /// do not require the function type attributes to match.
   ApplicableFunction,
-  /// \brief The first type is a function type whose input is the value passed
+  /// The first type is a function type whose input is the value passed
   /// to the function and whose output is a type variable describing the output.
   /// The second type is either a `@dynamicCallable` nominal type or the
   /// function type of a `dynamicallyCall` method defined on a
   /// `@dynamicCallable` nominal type.
   DynamicCallableApplicableFunction,
-  /// \brief The first type is the type of the dynamicType member of the
+  /// The first type is the type of the dynamicType member of the
   /// second type.
   DynamicTypeOf,
-  /// \brief Binds the left-hand type to a particular overload choice.
+  /// Binds the left-hand type to a particular overload choice.
   BindOverload,
-  /// \brief The first type has a member with the given name, and the
+  /// The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
-  /// \brief The first type (which is implicit) has a member with the given
+  /// The first type (which is implicit) has a member with the given
   /// name, and the type of that member, when referenced as a value, is the
   /// second type.
   UnresolvedValueMember,
-  /// \brief The first type can be defaulted to the second (which currently
+  /// The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
   Defaultable,
-  /// \brief A disjunction constraint that specifies that one or more of the
+  /// A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction,
-  /// \brief The first type is an optional type whose object type is the second
+  /// The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
-  /// \brief The first type is the same function type as the second type, but
+  /// The first type is the same function type as the second type, but
   /// made @escaping.
   EscapableFunctionOf,
-  /// \brief The first type is an opened type from the second type (which is
+  /// The first type is an opened type from the second type (which is
   /// an existential).
   OpenedExistentialOf,
-  /// \brief A relation between three types. The first is the key path type,
+  /// A relation between three types. The first is the key path type,
   // the second is the root type, and the third is the projected value type.
   // The second and third types can be lvalues depending on the kind of key
   // path.
   KeyPathApplication,
-  /// \brief A relation between three types. The first is the key path type,
+  /// A relation between three types. The first is the key path type,
   // the second is its root type, and the third is the projected value type.
   // The key path type is chosen based on the selection of overloads for the
   // member references along the path.
   KeyPath,
-  /// \brief The first type is a function type, the second is the function's
+  /// The first type is a function type, the second is the function's
   /// input type.
   FunctionInput,
-  /// \brief The first type is a function type, the second is the function's
+  /// The first type is a function type, the second is the function's
   /// result type.
   FunctionResult,
 };
 
-/// \brief Classification of the different kinds of constraints.
+/// Classification of the different kinds of constraints.
 enum class ConstraintClassification : char {
-  /// \brief A relational constraint, which relates two types.
+  /// A relational constraint, which relates two types.
   Relational,
 
-  /// \brief A member constraint, which names a member of a type and assigns
+  /// A member constraint, which names a member of a type and assigns
   /// it a reference type.
   Member,
 
-  /// \brief A property of a single type, such as whether it is defaultable to
+  /// A property of a single type, such as whether it is defaultable to
   /// a particular type.
   TypeProperty,
 
-  /// \brief A disjunction constraint.
+  /// A disjunction constraint.
   Disjunction
 };
 
@@ -233,12 +233,12 @@ enum RememberChoice_t : bool {
   RememberChoice = true
 };
 
-/// \brief A constraint between two type variables.
+/// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint, TypeVariableType *> {
   friend TrailingObjects;
 
-  /// \brief The kind of constraint.
+  /// The kind of constraint.
   ConstraintKind Kind : 8;
 
   /// The kind of restriction placed on this constraint.
@@ -276,28 +276,28 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   union {
     struct {
-      /// \brief The first type.
+      /// The first type.
       Type First;
 
-      /// \brief The second type.
+      /// The second type.
       Type Second;
 
-      /// \brief The third type, if any.
+      /// The third type, if any.
       Type Third;
     } Types;
 
     struct {
-      /// \brief The type of the base.
+      /// The type of the base.
       Type First;
 
-      /// \brief The type of the member.
+      /// The type of the member.
       Type Second;
 
-      /// \brief If non-null, the name of a member of the first type is that
+      /// If non-null, the name of a member of the first type is that
       /// being related to the second type.
       DeclName Member;
 
-      /// \brief The DC in which the use appears.
+      /// The DC in which the use appears.
       DeclContext *UseDC;
     } Member;
 
@@ -305,22 +305,22 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     ArrayRef<Constraint *> Nested;
 
     struct {
-      /// \brief The first type
+      /// The first type
       Type First;
 
-      /// \brief The overload choice
+      /// The overload choice
       OverloadChoice Choice;
 
-      /// \brief The DC in which the use appears.
+      /// The DC in which the use appears.
       DeclContext *UseDC;
     } Overload;
   };
 
-  /// \brief The locator that describes where in the expression this
+  /// The locator that describes where in the expression this
   /// constraint applies.
   ConstraintLocator *Locator;
 
-  /// \brief Constraints are always allocated within a given constraint
+  /// Constraints are always allocated within a given constraint
   /// system.
   void *operator new(size_t) = delete;
 
@@ -410,7 +410,7 @@ public:
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
 
-  /// \brief Determine the kind of constraint.
+  /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
 
   /// Retrieve the restriction placed on this constraint.
@@ -460,7 +460,7 @@ public:
     return {getTrailingObjects<TypeVariableType*>(), NumTypeVariables};
   }
 
-  /// \brief Determine the classification of this constraint, providing
+  /// Determine the classification of this constraint, providing
   /// a broader categorization than \c getKind().
   ConstraintClassification getClassification() const {
     switch (Kind) {
@@ -504,7 +504,7 @@ public:
     llvm_unreachable("Unhandled ConstraintKind in switch.");
   }
 
-  /// \brief Retrieve the first type in the constraint.
+  /// Retrieve the first type in the constraint.
   Type getFirstType() const {
     switch (getKind()) {
     case ConstraintKind::Disjunction:
@@ -522,7 +522,7 @@ public:
     }
   }
 
-  /// \brief Retrieve the second type in the constraint.
+  /// Retrieve the second type in the constraint.
   Type getSecondType() const {
     switch (getKind()) {
     case ConstraintKind::Disjunction:
@@ -538,7 +538,7 @@ public:
     }
   }
 
-  /// \brief Retrieve the third type in the constraint.
+  /// Retrieve the third type in the constraint.
   Type getThirdType() const {
     switch (getKind()) {
     case ConstraintKind::KeyPath:
@@ -549,17 +549,17 @@ public:
     }
   }
 
-  /// \brief Retrieve the protocol in a conformance constraint.
+  /// Retrieve the protocol in a conformance constraint.
   ProtocolDecl *getProtocol() const;
 
-  /// \brief Retrieve the name of the member for a member constraint.
+  /// Retrieve the name of the member for a member constraint.
   DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::UnresolvedValueMember);
     return Member.Member;
   }
 
-  /// \brief Determine whether this constraint kind has a second type.
+  /// Determine whether this constraint kind has a second type.
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
         || kind == ConstraintKind::UnresolvedValueMember;
@@ -613,7 +613,7 @@ public:
     return Member.UseDC;
   }
 
-  /// \brief Retrieve the locator for this constraint.
+  /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }
 
   /// Clone the given constraint.
