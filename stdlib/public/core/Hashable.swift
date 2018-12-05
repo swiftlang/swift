@@ -106,6 +106,9 @@ public protocol Hashable : Equatable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  ///
+  /// - Important: `hashValue` is deprecated as a Hashable requirement. To
+  ///   conform to `Hashable`, implement the `hash(into:)` requirement instead.
   var hashValue: Int { get }
 
   /// Hashes the essential components of this value by feeding them into the
