@@ -406,7 +406,15 @@ extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
     self.init(rawValue: RawValue(_bridgedNSError.code))
   }
 
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_code)
+  }
+
   public var hashValue: Int { return _code }
+
+  public func _rawHashValue(seed: Int) -> Int {
+    return _code._rawHashValue(seed: seed)
+  }
 }
 
 /// Describes a bridged error that stores the underlying NSError, so
@@ -480,9 +488,17 @@ public extension _BridgedStoredNSError {
 }
 
 /// Implementation of Hashable for all _BridgedStoredNSErrors.
-public extension _BridgedStoredNSError {
-  var hashValue: Int {
-    return _nsError.hashValue
+extension _BridgedStoredNSError {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_nsError)
+  }
+
+  public var hashValue: Int {
+    return _nsError.hash
+  }
+
+  public func _rawHashValue(seed: Int) -> Int {
+    return _nsError._rawHashValue(seed: seed)
   }
 }
 
