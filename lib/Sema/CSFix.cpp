@@ -213,3 +213,12 @@ AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
                                                      ConstraintLocator *locator) {
   return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
 }
+
+bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
+}
