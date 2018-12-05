@@ -104,37 +104,37 @@ public:
   void run();
 
 private:
-  /// \brief Promote AllocStacks into SSA.
+  /// Promote AllocStacks into SSA.
   void promoteAllocationToPhi();
 
-  /// \brief Replace the dummy nodes with new block arguments.
+  /// Replace the dummy nodes with new block arguments.
   void addBlockArguments(BlockSet &PhiBlocks);
 
-  /// \brief Fix all of the branch instructions and the uses to use
+  /// Fix all of the branch instructions and the uses to use
   /// the AllocStack definitions (which include stores and Phis).
   void fixBranchesAndUses(BlockSet &Blocks);
 
-  /// \brief update the branch instructions with the new Phi argument.
+  /// update the branch instructions with the new Phi argument.
   /// The blocks in \p PhiBlocks are blocks that define a value, \p Dest is
   /// the branch destination, and \p Pred is the predecessors who's branch we
   /// modify.
   void fixPhiPredBlock(BlockSet &PhiBlocks, SILBasicBlock *Dest,
                        SILBasicBlock *Pred);
 
-  /// \brief Get the value for this AllocStack variable that is
+  /// Get the value for this AllocStack variable that is
   /// flowing out of StartBB.
   SILValue getLiveOutValue(BlockSet &PhiBlocks, SILBasicBlock *StartBB);
 
-  /// \brief Get the value for this AllocStack variable that is
+  /// Get the value for this AllocStack variable that is
   /// flowing into BB.
   SILValue getLiveInValue(BlockSet &PhiBlocks, SILBasicBlock *BB);
 
-  /// \brief Prune AllocStacks usage in the function. Scan the function
+  /// Prune AllocStacks usage in the function. Scan the function
   /// and remove in-block usage of the AllocStack. Leave only the first
   /// load and the last store.
   void pruneAllocStackUsage();
 
-  /// \brief Promote all of the AllocStacks in a single basic block in one
+  /// Promote all of the AllocStacks in a single basic block in one
   /// linear scan. This function deletes all of the loads and stores except
   /// for the first load and the last store.
   /// \returns the last StoreInst found or zero if none found.
@@ -155,10 +155,10 @@ class MemoryToRegisters {
   /// The builder used to create new instructions during register promotion.
   SILBuilder B;
 
-  /// \brief Check if the AllocStackInst \p ASI is only written into.
+  /// Check if the AllocStackInst \p ASI is only written into.
   bool isWriteOnlyAllocation(AllocStackInst *ASI);
 
-  /// \brief Promote all of the AllocStacks in a single basic block in one
+  /// Promote all of the AllocStacks in a single basic block in one
   /// linear scan. Note: This function deletes all of the users of the
   /// AllocStackInst, including the DeallocStackInst but it does not remove the
   /// AllocStackInst itself!
@@ -174,7 +174,7 @@ public:
   MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt),
                                                             B(Func) {}
 
-  /// \brief Promote memory to registers. Return True on change.
+  /// Promote memory to registers. Return True on change.
   bool run();
 };
 

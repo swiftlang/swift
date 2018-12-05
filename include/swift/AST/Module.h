@@ -514,7 +514,7 @@ public:
   /// Source locations are ignored here.
   static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
 
-  /// \brief Get the path for the file that this module came from, or an empty
+  /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
@@ -923,7 +923,7 @@ private:
   /// We only collect interface hash for primary input files.
   llvm::Optional<llvm::MD5> InterfaceHash;
 
-  /// \brief The ID for the memory buffer containing this file's source.
+  /// The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
@@ -1098,7 +1098,7 @@ public:
 
   void createReferencedNameTracker();
 
-  /// \brief The buffer ID for the file that was imported, or None if there
+  /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
   Optional<unsigned> getBufferID() const {
     if (BufferID == -1)
@@ -1116,7 +1116,7 @@ public:
   void dump() const;
   void dump(raw_ostream &os) const;
 
-  /// \brief Pretty-print the contents of this source file.
+  /// Pretty-print the contents of this source file.
   ///
   /// \param Printer The AST printer used for printing the contents.
   /// \param PO Options controlling the printing process.

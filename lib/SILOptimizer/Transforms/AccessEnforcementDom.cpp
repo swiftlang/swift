@@ -301,12 +301,12 @@ public:
   void perform();
 
 protected:
-  /// \brief Collect a set of instructions that can be dominated
+  /// Collect a set of instructions that can be dominated
   void
   analyzeCurrentLoop(SILLoop *currentLoop,
                      SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec);
 
-  /// \brief Optimize the current loop nest.
+  /// Optimize the current loop nest.
   void optimizeLoop(SILLoop *currnetLoop,
                     SmallVectorImpl<BeginAccessInst *> &dominatableInstrVec);
 };

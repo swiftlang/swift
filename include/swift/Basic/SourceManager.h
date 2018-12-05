@@ -23,7 +23,7 @@
 
 namespace swift {
 
-/// \brief This class manages and owns source buffers.
+/// This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
@@ -150,7 +150,7 @@ public:
   /// in that case.
   StringRef getIdentifierForBuffer(unsigned BufferID) const;
 
-  /// \brief Returns a SourceRange covering the entire specified buffer.
+  /// Returns a SourceRange covering the entire specified buffer.
   ///
   /// Note that the start location might not point at the first token: it
   /// might point at whitespace or a comment.
@@ -165,10 +165,10 @@ public:
     return getRangeForBuffer(BufferID).getStart();
   }
 
-  /// \brief Returns the offset in bytes for the given valid source location.
+  /// Returns the offset in bytes for the given valid source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 
-  /// \brief Returns the distance in bytes between the given valid source
+  /// Returns the distance in bytes between the given valid source
   /// locations.
   unsigned getByteDistance(SourceLoc Start, SourceLoc End) const;
 

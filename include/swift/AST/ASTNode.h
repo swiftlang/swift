@@ -38,16 +38,16 @@ namespace swift {
     
     SourceRange getSourceRange() const;
 
-    /// \brief Return the location of the start of the statement.
+    /// Return the location of the start of the statement.
     SourceLoc getStartLoc() const;
   
-    /// \brief Return the location of the end of the statement.
+    /// Return the location of the end of the statement.
     SourceLoc getEndLoc() const;
 
     void walk(ASTWalker &Walker);
     void walk(ASTWalker &&walker) { walk(walker); }
 
-    /// \brief get the underlying entity as a decl context if it is one,
+    /// get the underlying entity as a decl context if it is one,
     /// otherwise, return nullptr;
     DeclContext *getAsDeclContext() const;
 

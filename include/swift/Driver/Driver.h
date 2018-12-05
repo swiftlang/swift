@@ -55,7 +55,7 @@ namespace driver {
   class JobAction;
   class ToolChain;
 
-/// \brief A class encapsulating information about the outputs the driver
+/// A class encapsulating information about the outputs the driver
 /// is expected to generate.
 class OutputInfo {
 public:

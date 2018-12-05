@@ -1250,10 +1250,10 @@ public:
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
-  /// \brief Add the given member to the lookup table.
+  /// Add the given member to the lookup table.
   void addMember(Decl *members);
 
-  /// \brief Add the given members to the lookup table.
+  /// Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
   /// Iterator into the lookup table.
@@ -1290,7 +1290,7 @@ public:
     dump(llvm::errs());
   }
 
-  // \brief Mark all Decls in this table as not-resident in a table, drop
+  // Mark all Decls in this table as not-resident in a table, drop
   // references to them. Should only be called when this was not fully-populated
   // from an IterableDeclContext.
   void clear() {

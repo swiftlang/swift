@@ -29,7 +29,7 @@ namespace swift {
 class ASTContext;
 class ModuleLoader;
 
-/// \brief Represents a Clang module that has been imported into Swift.
+/// Represents a Clang module that has been imported into Swift.
 class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
@@ -45,7 +45,7 @@ public:
   ClangModuleUnit(ModuleDecl &M, ClangImporter::Implementation &owner,
                   const clang::Module *clangModule);
 
-  /// \brief Retrieve the underlying Clang module.
+  /// Retrieve the underlying Clang module.
   ///
   /// This will be null if the module unit represents the imported headers.
   const clang::Module *getClangModule() const { return clangModule; }

@@ -32,12 +32,12 @@ SourceRange ASTNode::getSourceRange() const {
   llvm_unreachable("unsupported AST node");
 }
 
-/// \brief Return the location of the start of the statement.
+/// Return the location of the start of the statement.
 SourceLoc ASTNode::getStartLoc() const {
   return getSourceRange().Start;
 }
 
-/// \brief Return the location of the end of the statement.
+/// Return the location of the end of the statement.
 SourceLoc ASTNode::getEndLoc() const {
   return getSourceRange().End;
 }

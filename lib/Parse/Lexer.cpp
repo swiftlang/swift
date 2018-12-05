@@ -635,7 +635,7 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
-/// \brief Determines if the given string is a valid operator identifier,
+/// Determines if the given string is a valid operator identifier,
 /// without escaping characters.
 bool Lexer::isOperator(StringRef string) {
   if (string.empty()) return false;

@@ -216,7 +216,7 @@ static void doGlobalExtensionLookup(Type BaseType,
   removeShadowedDecls(FoundDecls, CurrDC->getParentModule());
 }
 
-/// \brief Enumerate immediate members of the type \c LookupType and its
+/// Enumerate immediate members of the type \c LookupType and its
 /// extensions, as seen from the context \c CurrDC.
 ///
 /// Don't do lookup into superclasses or implemented protocols.  Uses
@@ -920,7 +920,7 @@ public:
 };
 } // end anonymous namespace
 
-/// \brief Enumerate all members in \c BaseTy (including members of extensions,
+/// Enumerate all members in \c BaseTy (including members of extensions,
 /// superclasses and implemented protocols), as seen from the context \c CurrDC.
 ///
 /// This operation corresponds to a standard "dot" lookup operation like "a.b"

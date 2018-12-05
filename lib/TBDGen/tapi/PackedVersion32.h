@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines the packed version number.
+/// Defines the packed version number.
 /// \since 1.0
 ///
 //===----------------------------------------------------------------------===//
@@ -27,7 +27,7 @@
 TAPI_NAMESPACE_V1_BEGIN
 
 ///
-/// \brief Packed Version Number Encoding.
+/// Packed Version Number Encoding.
 ///
 /// The Mach-O version numbers are commonly encoded as a 32bit value, where the
 /// upper 16 bit quantity is used for the major version number and the lower two
@@ -41,19 +41,19 @@ private:
 
 public:
   ///
-  /// \brief Default construct a PackedVersion32.
+  /// Default construct a PackedVersion32.
   /// \since 1.0
   ///
   PackedVersion32() = default;
 
   ///
-  /// \brief Construct a PackedVersion32 with a raw value.
+  /// Construct a PackedVersion32 with a raw value.
   /// \since 1.0
   ///
   PackedVersion32(uint32_t rawVersion) : _version(rawVersion) {}
 
   ///
-  /// \brief Construct a PackedVersion32 with the provided major, minor, and
+  /// Construct a PackedVersion32 with the provided major, minor, and
   /// patch version number.
   /// \since 1.0
   ///
@@ -61,21 +61,21 @@ public:
       : _version((major << 16) | ((minor & 0xff) << 8) | (patch & 0xff)) {}
 
   ///
-  /// \brief Get the major version number.
+  /// Get the major version number.
   /// \return The major version number as unsigned integer.
   /// \since 1.0
   ///
   unsigned getMajor() const { return _version >> 16; }
 
   ///
-  /// \brief Get the minor version number.
+  /// Get the minor version number.
   /// \return The minor version number as unsigned integer.
   /// \since 1.0
   ///
   unsigned getMinor() const { return (_version >> 8) & 0xff; }
 
   ///
-  /// \brief Get the patch version number.
+  /// Get the patch version number.
   /// \return The patch version number as unsigned integer.
   /// \since 1.0
   ///

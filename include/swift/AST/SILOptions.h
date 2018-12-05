@@ -132,7 +132,7 @@ public:
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 
-  /// \brief Enable large loadable types IRGen pass.
+  /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
 
   /// The name of the file to which the backend should save YAML optimization

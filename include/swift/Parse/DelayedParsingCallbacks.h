@@ -21,7 +21,7 @@ namespace swift {
   class DeclAttributes;
   class AbstractFunctionDecl;
 
-/// \brief Callbacks for Parser's delayed parsing.
+/// Callbacks for Parser's delayed parsing.
 class DelayedParsingCallbacks {
   virtual void anchor();
 
@@ -44,7 +44,7 @@ class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
   }
 };
 
-/// \brief Implementation of callbacks that guide the parser in delayed
+/// Implementation of callbacks that guide the parser in delayed
 /// parsing for code completion.
 class CodeCompleteDelayedCallbacks : public DelayedParsingCallbacks {
   SourceLoc CodeCompleteLoc;

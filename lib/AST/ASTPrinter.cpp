@@ -418,7 +418,7 @@ static bool willUseTypeReprPrinting(TypeLoc tyLoc,
 }
 
 namespace {
-/// \brief AST pretty-printer.
+/// AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
   ASTPrinter &Printer;
   PrintOptions Options;
@@ -428,7 +428,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   friend DeclVisitor<PrintAST>;
 
-  /// \brief RAII object that increases the indentation level.
+  /// RAII object that increases the indentation level.
   class IndentRAII {
     PrintAST &Self;
     bool DoIndent;
@@ -446,12 +446,12 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   };
 
-  /// \brief Indent the current number of indentation spaces.
+  /// Indent the current number of indentation spaces.
   void indent() {
     Printer.setIndent(IndentLevel);
   }
 
-  /// \brief Record the location of this declaration, which is about to
+  /// Record the location of this declaration, which is about to
   /// be printed, marking the name and signature end locations.
   template<typename FnTy>
   void recordDeclLoc(Decl *decl, const FnTy &NameFn,
@@ -758,7 +758,7 @@ private:
                           ArrayRef<AnyFunctionType::Param> params,
                           bool isAPINameByDefault);
 
-  /// \brief Print the function parameters in curried or selector style,
+  /// Print the function parameters in curried or selector style,
   /// to match the original function declaration.
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 

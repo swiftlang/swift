@@ -2993,7 +2993,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   return SolutionKind::Solved;
 }
 
-/// \brief Attempt to simplify a function input or result constraint.
+/// Attempt to simplify a function input or result constraint.
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyFunctionComponentConstraint(
                                         ConstraintKind kind,

@@ -844,7 +844,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   return resultType;
 }
 
-/// \brief Diagnose a use of an unbound generic type.
+/// Diagnose a use of an unbound generic type.
 static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
   auto unbound = ty->castTo<UnboundGenericType>();
   {
@@ -900,7 +900,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
 }
 
-/// \brief Returns a valid type or ErrorType in case of an error.
+/// Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC,
                             TypeResolution resolution,
@@ -1551,7 +1551,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
   return ty;
 }
 
-/// \brief Returns a valid type or ErrorType in case of an error.
+/// Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(
        TypeResolution resolution,
        IdentTypeRepr *IdType,

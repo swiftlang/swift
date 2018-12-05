@@ -3143,7 +3143,7 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   return closure;
 }
  
-/// \brief Parse an object literal expression.
+/// Parse an object literal expression.
 ///
 /// expr-literal:
 ///   '#' identifier expr-paren
@@ -3184,7 +3184,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                               trailingClosure, /*implicit=*/false));
 }
 
-/// \brief Parse and diagnose unknown pound expression
+/// Parse and diagnose unknown pound expression
 ///
 /// If it look like a legacy (Swift 2) object literal expression, suggest fix-it
 /// to use new object literal syntax.
@@ -3266,7 +3266,7 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   return makeParserError();
 }
 
-/// \brief Handle code completion after pound in expression position.
+/// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
 /// decide the position accepts #available(...) condtion.
@@ -3285,7 +3285,7 @@ Parser::parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind) {
   return makeParserCodeCompletionResult(Expr);
 }
 
-/// \brief Parse an expression call suffix.
+/// Parse an expression call suffix.
 ///
 /// expr-call-suffix:
 ///   expr-paren

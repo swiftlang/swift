@@ -234,7 +234,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 }
 
-/// \brief Restore the type variable bindings to what they were before
+/// Restore the type variable bindings to what they were before
 /// we attempted to solve this constraint system.
 void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
   auto &savedBindings = *getSavedBindings();
@@ -316,7 +316,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
 namespace {
 
-/// \brief Truncate the given small vector to the given new size.
+/// Truncate the given small vector to the given new size.
 template<typename T>
 void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
@@ -485,7 +485,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   cs.failedConstraint = nullptr;
 }
 
-/// \brief Solve the system of constraints.
+/// Solve the system of constraints.
 ///
 /// \param allowFreeTypeVariables How to bind free type variables in
 /// the solution.
@@ -826,7 +826,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     }
 
   private:
-    /// \brief Extract type of the element from given collection type.
+    /// Extract type of the element from given collection type.
     ///
     /// \param collection The type of the collection container.
     ///

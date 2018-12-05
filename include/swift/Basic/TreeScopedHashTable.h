@@ -72,7 +72,7 @@ public:
   }
 };
 
-/// \brief A reference-counted scope that actually owns the data in the
+/// A reference-counted scope that actually owns the data in the
 /// hashtable.
 template <typename K, typename V, typename AllocatorTy = llvm::MallocAllocator>
 class TreeScopedHashTableScopeImpl {
@@ -130,7 +130,7 @@ public:
   ~TreeScopedHashTableScopeImpl();
 };
 
-/// \brief A scope that was detached from the stack to heap.
+/// A scope that was detached from the stack to heap.
 template <typename K, typename V, typename AllocatorTy = llvm::MallocAllocator>
 class TreeScopedHashTableDetachedScope {
   friend class TreeScopedHashTableScope<K, V, AllocatorTy>;
@@ -166,7 +166,7 @@ public:
   }
 };
 
-/// \brief A normal hashtable scope.  Objects of this class should be created only
+/// A normal hashtable scope.  Objects of this class should be created only
 /// on stack.  A normal scope is faster to create than a detached scope because
 /// it does not do heap allocation for the reference counted
 /// \c TreeScopedHashTableScopeImpl.
@@ -213,7 +213,7 @@ public:
       DetachedImpl->release();
   }
 
-  /// \brief Detach this scope to the heap.
+  /// Detach this scope to the heap.
   TreeScopedHashTableDetachedScope<K, V, AllocatorTy> detach() {
     if (DetachedImpl)
       return TreeScopedHashTableDetachedScope<K, V, AllocatorTy>(DetachedImpl);
@@ -266,7 +266,7 @@ public:
   }
 };
 
-/// \brief A scoped hashtable that can have multiple active scopes.
+/// A scoped hashtable that can have multiple active scopes.
 ///
 /// There are two kinds of scopes:
 ///

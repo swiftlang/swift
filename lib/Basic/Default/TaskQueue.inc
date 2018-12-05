@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This file contains a platform-agnostic implementation of TaskQueue
+/// This file contains a platform-agnostic implementation of TaskQueue
 /// using the functions from llvm/Support/Program.h.
 ///
 /// \note The default implementation of TaskQueue does not support parallel

@@ -195,21 +195,21 @@ public:
       (Tok.is(tok::eof) && Tok.getText() != ")");
   }
 
-  /// \brief This is the current token being considered by the parser.
+  /// This is the current token being considered by the parser.
   Token Tok;
 
-  /// \brief leading trivias for \c Tok.
+  /// leading trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia LeadingTrivia;
 
-  /// \brief trailing trivias for \c Tok.
+  /// trailing trivias for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
 
-  /// \brief The receiver to collect all consumed tokens.
+  /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
 
-  /// \brief The location of the previous token.
+  /// The location of the previous token.
   SourceLoc PreviousLoc;
 
   /// Stop parsing immediately.
@@ -443,7 +443,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Utilities
 
-  /// \brief Return the next token that will be installed by \c consumeToken.
+  /// Return the next token that will be installed by \c consumeToken.
   const Token &peekToken();
 
   /// Consume a token that we created on the fly to correct the original token
@@ -473,11 +473,11 @@ public:
     return consumeToken();
   }
 
-  /// \brief Retrieve the location just past the end of the previous
+  /// Retrieve the location just past the end of the previous
   /// source location.
   SourceLoc getEndOfPreviousLoc();
 
-  /// \brief If the current token is the specified kind, consume it and
+  /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K) {
     if (Tok.isNot(K)) return false;
@@ -485,7 +485,7 @@ public:
     return true;
   }
 
-  /// \brief If the current token is the specified kind, consume it and
+  /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K, SourceLoc &consumedLoc) {
     if (Tok.isNot(K)) return false;
@@ -504,13 +504,13 @@ public:
             cast<AccessorDecl>(CurDeclContext)->isCoroutine());
   }
   
-  /// \brief Read tokens until we get to one of the specified tokens, then
+  /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
   void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
-  /// \brief Skip until a token that starts with '>', and consume it if found.
+  /// Skip until a token that starts with '>', and consume it if found.
   /// Applies heuristics that are suitable when trying to find the end of a list
   /// of generic parameters, generic arguments, or list of types in a protocol
   /// composition.
@@ -531,10 +531,10 @@ public:
   /// but not when used as comparison operators.
   void skipSingle();
 
-  /// \brief Skip until the next '#else', '#endif' or until eof.
+  /// Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();
 
-  /// \brief Skip until either finding \c T1 or reaching the end of the line.
+  /// Skip until either finding \c T1 or reaching the end of the line.
   ///
   /// This uses \c skipSingle and so matches parens etc. After calling, one or
   /// more of the following will be true: Tok.is(T1), Tok.isStartOfLine(),
@@ -601,23 +601,23 @@ public:
     return (Tok.isAnyOperator() || Tok.isPunctuation()) &&
            Tok.getText()[0] == symbol;
   }
-  /// \brief Check whether the current token starts with '<'.
+  /// Check whether the current token starts with '<'.
   bool startsWithLess(Token Tok) { return startsWithSymbol(Tok, '<'); }
 
-  /// \brief Check whether the current token starts with '>'.
+  /// Check whether the current token starts with '>'.
   bool startsWithGreater(Token Tok) { return startsWithSymbol(Tok, '>'); }
 
-  /// \brief Consume the starting '<' of the current token, which may either
+  /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
   SourceLoc consumeStartingLess();
 
-  /// \brief Consume the starting '>' of the current token, which may either
+  /// Consume the starting '>' of the current token, which may either
   /// be a complete '>' token or some kind of operator token starting with '>',
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
 
-  /// \brief Consume the starting character of the current token, and split the
+  /// Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
   SourceLoc
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
@@ -625,7 +625,7 @@ public:
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
-  /// \brief Add the given Decl to the current scope.
+  /// Add the given Decl to the current scope.
   void addToScope(ValueDecl *D) {
     getScopeInfo().addToScope(D, *this);
   }
@@ -640,7 +640,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 
-  /// \brief Consume an identifier (but not an operator) if present and return
+  /// Consume an identifier (but not an operator) if present and return
   /// its name in \p Result.  Otherwise, emit an error.
   ///
   /// \returns false on success, true on error.
@@ -671,7 +671,7 @@ public:
     return parseSpecificIdentifier(expected, L, Diagnostic(ID, Args...));
   }
 
-  /// \brief Consume an identifier or operator if present and return its name
+  /// Consume an identifier or operator if present and return its name
   /// in \p Result.  Otherwise, emit an error and return true.
   bool parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
                           const Diagnostic &D);
@@ -689,7 +689,7 @@ public:
     return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...));
   }
 
-  /// \brief The parser expects that \p K is next token in the input.  If so,
+  /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
@@ -706,13 +706,13 @@ public:
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
   
-  /// \brief Parse the specified expected token and return its location
+  /// Parse the specified expected token and return its location
   /// on success.  On failure, emit the specified error diagnostic, and
   /// a note at the specified note location.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  /// \brief Parse a comma separated list of some elements.
+  /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
@@ -969,7 +969,7 @@ public:
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
 
-  /// \brief Parse layout constraint.
+  /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
   ParserStatus parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
@@ -1137,7 +1137,7 @@ public:
   ParserResult<Pattern> parseTypedPattern();
   ParserResult<Pattern> parsePattern();
   
-  /// \brief Parse a tuple pattern element.
+  /// Parse a tuple pattern element.
   ///
   /// \code
   ///   pattern-tuple-element:
@@ -1162,7 +1162,7 @@ public:
                                     VarDecl::Specifier specifier);
   
 
-  /// \brief Determine whether this token can only start a matching pattern
+  /// Determine whether this token can only start a matching pattern
   /// production and not an expression.
   bool isOnlyStartOfMatchingPattern();
 
@@ -1263,7 +1263,7 @@ public:
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
-  /// \brief Parse a closure expression after the opening brace.
+  /// Parse a closure expression after the opening brace.
   ///
   /// \verbatim
   ///   expr-closure:
@@ -1280,7 +1280,7 @@ public:
   /// \endverbatim
   ParserResult<Expr> parseExprClosure();
 
-  /// \brief Parse the closure signature, if present.
+  /// Parse the closure signature, if present.
   ///
   /// \verbatim
   ///   closure-signature:
@@ -1491,7 +1491,7 @@ DeclName parseDeclName(ASTContext &ctx, StringRef name);
 /// Whether a given token can be the start of a decl.
 bool isKeywordPossibleDeclStart(const Token &Tok);
 
-/// \brief Lex and return a vector of `TokenSyntax` tokens, which include
+/// Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
 std::vector<std::pair<RC<syntax::RawSyntax>,
                                  syntax::AbsolutePosition>>

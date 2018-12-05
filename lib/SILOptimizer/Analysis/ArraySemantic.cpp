@@ -30,7 +30,7 @@ getSelfParameterConvention(ApplyInst *SemanticsCall) {
   return FnTy->getSelfParameter().getConvention();
 }
 
-/// \brief Make sure that all parameters are passed with a reference count
+/// Make sure that all parameters are passed with a reference count
 /// neutral parameter convention except for self.
 bool swift::ArraySemanticsCall::isValidSignature() {
   assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
@@ -380,7 +380,7 @@ static ApplyInst *hoistOrCopyCall(ApplyInst *AI, SILInstruction *InsertBefore,
 }
 
 
-/// \brief Hoist or copy the self argument of the semantics call.
+/// Hoist or copy the self argument of the semantics call.
 /// Return the hoisted self argument.
 static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
                                 SILInstruction *InsertBefore,

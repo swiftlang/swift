@@ -80,7 +80,7 @@ class CompilerInvocation {
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
-  /// \brief Code completion offset in bytes from the beginning of the main
+  /// Code completion offset in bytes from the beginning of the main
   /// source file.  Valid only if \c isCodeCompletion() == true.
   unsigned CodeCompletionOffset = ~0U;
 
@@ -512,7 +512,7 @@ public:
     }
   }
 
-  /// \brief Returns true if there was an error during setup.
+  /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
 private:

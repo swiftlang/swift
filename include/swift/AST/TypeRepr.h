@@ -45,7 +45,7 @@ enum class TypeReprKind : uint8_t {
 enum : unsigned { NumTypeReprKindBits =
   countBitsUsed(static_cast<unsigned>(TypeReprKind::Last_TypeRepr)) };
 
-/// \brief Representation of a type as written in source.
+/// Representation of a type as written in source.
 class alignas(8) TypeRepr {
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
@@ -166,7 +166,7 @@ public:
   TypeRepr *clone(const ASTContext &ctx) const;
 };
 
-/// \brief A TypeRepr for a type with a syntax error.  Can be used both as a
+/// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
 /// The client should make sure to emit a diagnostic at the construction time
@@ -193,7 +193,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type with attributes.
+/// A type with attributes.
 /// \code
 ///   @convention(thin) Foo
 /// \endcode
@@ -229,7 +229,7 @@ private:
 
 class ComponentIdentTypeRepr;
 
-/// \brief This is the abstract base class for types with identifier components.
+/// This is the abstract base class for types with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
@@ -308,7 +308,7 @@ protected:
   friend class TypeRepr;
 };
 
-/// \brief A simple identifier type like "Int".
+/// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
   SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
@@ -332,7 +332,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An identifier type with generic arguments.
+/// An identifier type with generic arguments.
 /// \code
 ///   Bar<Gen>
 /// \endcode
@@ -380,7 +380,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type with identifier components.
+/// A type with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
@@ -459,7 +459,7 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
   return ComponentRange(this);
 }
 
-/// \brief A function type.
+/// A function type.
 /// \code
 ///   (Foo) -> Bar
 ///   (Foo, Bar) -> Baz
@@ -515,7 +515,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An array type.
+/// An array type.
 /// \code
 ///   [Foo]
 /// \endcode
@@ -542,7 +542,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A dictionary type.
+/// A dictionary type.
 /// \code
 ///   [K : V]
 /// \endcode
@@ -575,7 +575,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An optional type.
+/// An optional type.
 /// \code
 ///   Foo?
 /// \endcode
@@ -607,7 +607,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An implicitly unwrapped optional type.
+/// An implicitly unwrapped optional type.
 /// \code
 ///   Foo!
 /// \endcode
@@ -636,7 +636,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A parsed element within a tuple type.
+/// A parsed element within a tuple type.
 struct TupleTypeReprElement {
   Identifier Name;
   SourceLoc NameLoc;
@@ -651,7 +651,7 @@ struct TupleTypeReprElement {
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
-/// \brief A tuple type.
+/// A tuple type.
 /// \code
 ///   (Foo, Bar)
 ///   (x: Foo)
@@ -781,7 +781,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A type composite type.
+/// A type composite type.
 /// \code
 ///   Foo & Bar
 /// \endcode
@@ -831,7 +831,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'metatype' type.
+/// A 'metatype' type.
 /// \code
 ///   Foo.Type
 /// \endcode
@@ -860,7 +860,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A 'protocol' type.
+/// A 'protocol' type.
 /// \code
 ///   Foo.Protocol
 /// \endcode
@@ -915,7 +915,7 @@ private:
   friend class TypeRepr;
 };
   
-/// \brief An 'inout' type.
+/// An 'inout' type.
 /// \code
 ///   x : inout Int
 /// \endcode
@@ -930,7 +930,7 @@ public:
   static bool classof(const InOutTypeRepr *T) { return true; }
 };
   
-/// \brief A 'shared' type.
+/// A 'shared' type.
 /// \code
 ///   x : shared Int
 /// \endcode
@@ -945,7 +945,7 @@ public:
   static bool classof(const SharedTypeRepr *T) { return true; }
 };
 
-/// \brief A 'owned' type.
+/// A 'owned' type.
 /// \code
 ///   x : owned Int
 /// \endcode
@@ -960,7 +960,7 @@ public:
   static bool classof(const OwnedTypeRepr *T) { return true; }
 };
 
-/// \brief A TypeRepr for a known, fixed type.
+/// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
 /// where we need to specify some type (usually some built-in type)

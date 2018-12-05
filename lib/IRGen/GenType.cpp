@@ -1562,7 +1562,7 @@ TypeConverter::getOpaqueStorageTypeInfo(Size size, Alignment align) {
   return *type;
 }
 
-/// \brief Convert a primitive builtin type to its LLVM type, size, and
+/// Convert a primitive builtin type to its LLVM type, size, and
 /// alignment.
 static std::tuple<llvm::Type *, Size, Alignment>
 convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {

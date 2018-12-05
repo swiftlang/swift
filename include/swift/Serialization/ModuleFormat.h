@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Contains various constants and helper types to deal with serialized
+/// Contains various constants and helper types to deal with serialized
 /// modules.
 ///
 //===----------------------------------------------------------------------===//

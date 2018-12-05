@@ -55,7 +55,7 @@ fail:
 }
 
 
-/// \brief Demangle a mangled class name into module+class.
+/// Demangle a mangled class name into module+class.
 /// Returns true if the name was successfully decoded.
 /// On success, *outModule and *outClass must be freed with free().
 /// FIXME: this should be replaced by a real demangler

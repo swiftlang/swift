@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides an interface for serializing an object tree to a custom
+/// Provides an interface for serializing an object tree to a custom
 /// binary format called ByteTree.
 ///
 //===----------------------------------------------------------------------===//

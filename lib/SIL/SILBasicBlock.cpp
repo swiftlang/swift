@@ -237,7 +237,7 @@ void SILBasicBlock::eraseArgument(int Index) {
   ArgumentList.erase(ArgumentList.begin() + Index);
 }
 
-/// \brief Splits a basic block into two at the specified instruction.
+/// Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator
 /// stay as part of the original basic block. The old basic block is left
@@ -251,7 +251,7 @@ SILBasicBlock *SILBasicBlock::split(iterator I) {
   return New;
 }
 
-/// \brief Move the basic block to after the specified basic block in the IR.
+/// Move the basic block to after the specified basic block in the IR.
 void SILBasicBlock::moveAfter(SILBasicBlock *After) {
   assert(getParent() && getParent() == After->getParent() &&
          "Blocks must be in the same function");

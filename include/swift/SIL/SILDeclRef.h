@@ -70,7 +70,7 @@ enum ForDefinition_t : bool {
   ForDefinition = true
 };
 
-/// \brief A key for referencing a Swift declaration in SIL.
+/// A key for referencing a Swift declaration in SIL.
 ///
 /// This can currently be either a reference to a ValueDecl for functions,
 /// methods, constructors, and other named entities, or a reference to a
@@ -85,7 +85,7 @@ struct SILDeclRef {
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
-    /// \brief This constant references the FuncDecl or AbstractClosureExpr
+    /// This constant references the FuncDecl or AbstractClosureExpr
     /// in loc.
     Func,
 
@@ -258,13 +258,13 @@ struct SILDeclRef {
     return kind == Kind::Initializer || kind == Kind::Destroyer;
   }
 
-  /// \brief True if the function should be treated as transparent.
+  /// True if the function should be treated as transparent.
   bool isTransparent() const;
-  /// \brief True if the function should have its body serialized.
+  /// True if the function should have its body serialized.
   IsSerialized_t isSerialized() const;
-  /// \brief True if the function has noinline attribute.
+  /// True if the function has noinline attribute.
   bool isNoinline() const;
-  /// \brief True if the function has __always inline attribute.
+  /// True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
   /// \return True if the function has an effects attribute.
@@ -273,10 +273,10 @@ struct SILDeclRef {
   /// \return the effects kind of the function.
   EffectsKind getEffectsAttribute() const;
 
-  /// \brief Return the expected linkage of this declaration.
+  /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
-  /// \brief Return the hash code for the SIL declaration.
+  /// Return the hash code for the SIL declaration.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(loc.getOpaqueValue(),
                               static_cast<int>(kind),

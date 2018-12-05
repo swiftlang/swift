@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Defines macros used for metaprogramming with the serialized records
+/// Defines macros used for metaprogramming with the serialized records
 /// in the "decls-and-types" block of serialized ASTs.
 ///
 /// You should define one of the following sets of macros:
