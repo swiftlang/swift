@@ -1,4 +1,5 @@
-// RUN: rm -rf %t && cp -r %S/Inputs/bindings-build-record/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/bindings-build-record/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s -check-prefix=CHECK-ALL-BUILT

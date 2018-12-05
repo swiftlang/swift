@@ -1,5 +1,6 @@
-// RUN: rm -rf %t && cp -r %S/Inputs/bindings-build-record/ %t
-// RUN: %S/Inputs/touch.py 443865900 %t/*
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/bindings-build-record/* %t
+// RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=MUST-EXEC
 

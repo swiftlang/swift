@@ -1,7 +1,8 @@
 /// other +==> main
 /// other | main
 
-// RUN: rm -rf %t && cp -r %S/Inputs/one-way-provides-before/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/one-way-provides-before/* %t
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...
@@ -28,7 +29,8 @@
 // CHECK-THIRD: Handled other.swift
 // CHECK-THIRD-NOT: Handled main.swift
 
-// RUN: rm -rf %t && cp -r %S/Inputs/one-way-provides-before/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/one-way-provides-before/* %t
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...

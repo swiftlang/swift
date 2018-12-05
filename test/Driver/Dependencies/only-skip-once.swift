@@ -1,5 +1,7 @@
 // XFAIL: linux
-// RUN: rm -rf %t && cp -r %S/Inputs/only-skip-once/ %t
+
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/only-skip-once/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && %target-swiftc_driver -driver-show-job-lifecycle -output-file-map %t/output-file-map.json -incremental main.swift file1.swift file2.swift -j1 2>&1 | %FileCheck -check-prefix=CHECK-INITIAL %s
