@@ -176,6 +176,10 @@ option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
   the type checker so that it always compiles with optimization. This eases
   debugging after type checking occurs by speeding up type checking" FALSE)
 
+option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+       "Generate .swiftinterface files alongside .swiftmodule files"
+       FALSE)
+
 #
 # User-configurable Android specific options.
 #
