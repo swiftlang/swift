@@ -1,6 +1,4 @@
-// RUN: %empty-directory(%t)
-
-// RUN: %target-run-simple-swift %s
+// RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
 
