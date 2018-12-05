@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 using namespace llvm;
-using namespace llvm::support;
 using namespace swift;
 
 class ExponentialGrowthAppendingBinaryByteStreamTest : public testing::Test {};
@@ -27,7 +26,7 @@ class ExponentialGrowthAppendingBinaryByteStreamTest : public testing::Test {};
 // unittests/BinaryStreamTests.cpp in the LLVM project
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, ReadAndWrite) {
   StringRef Strings[] = {"1", "2", "3", "4"};
-  ExponentialGrowthAppendingBinaryByteStream Stream(support::little);
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
   BinaryStreamWriter Writer(Stream);
   BinaryStreamReader Reader(Stream);
@@ -76,7 +75,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, ReadAndWrite) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteAtInvalidOffset) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
   EXPECT_EQ(0U, Stream.getLength());
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't', 'T', 'e', 's', 't'};
@@ -97,7 +96,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteAtInvalidOffset) {
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, InitialSizeZero) {
   // Test that the stream also works with an initial size of 0, which doesn't
   // grow when doubled.
-  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
   auto Test = makeArrayRef(InputData).take_front(4);
@@ -106,7 +105,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, InitialSizeZero) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, GrowMultipleSteps) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
   // Test that the buffer can grow multiple steps at once, e.g. 1 -> 2 -> 4
   std::vector<uint8_t> InputData = {'T', 'e', 's', 't'};
@@ -116,7 +115,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, GrowMultipleSteps) {
 }
 
 TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteIntoMiddle) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
   // Test that the stream resizes correctly if we write into its middle
   std::vector<uint8_t> InitialData = {'T', 'e', 's', 't'};
@@ -143,16 +142,16 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteIntoMiddle) {
   EXPECT_EQ(6u, Stream.getLength());
 }
 
-TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteRaw) {
-  ExponentialGrowthAppendingBinaryByteStream Stream(llvm::support::little);
+TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteInteger) {
+  auto Stream = ExponentialGrowthAppendingBinaryByteStream();
 
-  // Test the writeRaw method
+  // Test the writeInteger method
   std::vector<uint8_t> InitialData = {'H', 'e', 'l', 'l', 'o'};
   auto InitialDataRef = makeArrayRef(InitialData);
   EXPECT_THAT_ERROR(Stream.writeBytes(0, InitialDataRef), Succeeded());
   EXPECT_EQ(InitialDataRef, Stream.data());
 
-  EXPECT_THAT_ERROR(Stream.writeRaw(5, (uint8_t)' '), Succeeded());
+  EXPECT_THAT_ERROR(Stream.writeInteger(5, (uint8_t)' '), Succeeded());
   std::vector<uint8_t> AfterFirstInsert = {'H', 'e', 'l', 'l', 'o', ' '};
   auto AfterFirstInsertRef = makeArrayRef(AfterFirstInsert);
   EXPECT_EQ(AfterFirstInsertRef, Stream.data());
@@ -162,7 +161,7 @@ TEST_F(ExponentialGrowthAppendingBinaryByteStreamTest, WriteRaw) {
                       'o' << 8 |
                       'r' << 16 |
                       'l' << 24;
-  EXPECT_THAT_ERROR(Stream.writeRaw(6, ToInsert), Succeeded());
+  EXPECT_THAT_ERROR(Stream.writeInteger(6, ToInsert), Succeeded());
   std::vector<uint8_t> AfterSecondInsert = {'H', 'e', 'l', 'l', 'o', ' ',
                                             'w', 'o', 'r', 'l'};
   auto AfterSecondInsertRef = makeArrayRef(AfterSecondInsert);
