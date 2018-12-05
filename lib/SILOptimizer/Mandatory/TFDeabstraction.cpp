@@ -158,7 +158,6 @@ namespace {
     void checkAttributesAndFormGraphOps();
     void
     evaluateAttributesAndDoPacking(GraphOperationInst *origInst,
-                                   GraphOperationInfo &opInfo,
                                    DenseMap<SILValue, SymbolicValue> &constants,
                                    GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
@@ -2003,18 +2002,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
     if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
-      GraphOperationInfo opInfo(graphOpInst);
-      // Do not translate this special inst into a graph op, since it will get
-      // removed at the beginning of the partition pass.
-      // TODO: remove this inst in the getForFunction() call above, once
-      // the partition pass is folded into deabstraction.
-      // FIXME: consider defining constexpr strings for these literals.
-      if (opInfo.getOperationName() == "tfc.configureTPU" ||
-          opInfo.getOperationName() == "tfc.configureGPU" ||
-          opInfo.getOperationName() == "tfc.configureCPU")
-        continue;
-      evaluateAttributesAndDoPacking(graphOpInst, opInfo, constants,
-                                     deviceInfo);
+      evaluateAttributesAndDoPacking(graphOpInst, constants, deviceInfo);
       // evaluateAttributesAndDoPacking deletes inst. So, continue as the rest
       // of the loop is irrelevant. (This also avoid memory errors.)
       continue;
@@ -2266,11 +2254,19 @@ static bool collectInnermostTensorFlowDTypes(
 /// This deletes the underlying inst in `opInfo` when a GraphOperation is
 /// created successfully.
 void TFDeabstraction::evaluateAttributesAndDoPacking(
-    GraphOperationInst *origInst, GraphOperationInfo &opInfo,
-    DenseMap<SILValue, SymbolicValue> &constants,
+    GraphOperationInst *origInst, DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
-  assert(opInfo.getInst() == origInst &&
-         "Instruction and GraphOperationInfo don't match.");
+  GraphOperationInfo opInfo(origInst);
+  // Do not translate this special inst into a graph op, since it will get
+  // removed at the beginning of the partition pass.
+  // TODO: remove this inst in the getForFunction() call above, once
+  // the partition pass is folded into deabstraction.
+  // FIXME: consider defining constexpr strings for these literals.
+  if (opInfo.getOperationName() == "tfc.configureTPU" ||
+      opInfo.getOperationName() == "tfc.configureGPU" ||
+      opInfo.getOperationName() == "tfc.configureCPU")
+    return;
+
   auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(origInst);
