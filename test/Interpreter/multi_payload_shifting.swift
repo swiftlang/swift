@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -o %t/a.out %s
-// RUN: %target-run %t/a.out 2>&1
+// RUN: %target-run-simple-swift %s
 
 // REQUIRES: executable_test
 
