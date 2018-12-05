@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import argparse
+import difflib
 import os
 import sys
 
@@ -100,7 +101,6 @@ def main():
         sys.exit(1)
 
     # Check if the two syntax trees are the same
-    import difflib
     lines = difflib.unified_diff(open(incremental_serialized_file).readlines(),
                                  open(post_edit_serialized_file).readlines(),
                                  fromfile=incremental_serialized_file,
