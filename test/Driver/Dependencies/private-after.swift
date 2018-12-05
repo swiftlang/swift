@@ -1,6 +1,8 @@
 /// a --> b ==> c | a ==> d |    e ==> b |       f ==> g
 /// a --> b ==> c | a ==> d +==> e +==> b, e --> f ==> g
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/private-after/* %t
 // RUN: touch -t 201401240005 %t/*.swift

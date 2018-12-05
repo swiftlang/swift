@@ -1,5 +1,7 @@
 /// main <==> other
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/mutual/* %t
 // RUN: touch -t 201401240005 %t/*

@@ -1,5 +1,7 @@
 /// bad ==> main | bad --> other
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/fail-simple/* %t
 // RUN: touch -t 201401240005 %t/*

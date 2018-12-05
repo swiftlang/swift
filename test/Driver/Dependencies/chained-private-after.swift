@@ -1,6 +1,8 @@
 /// other --> main ==> yet-another
 /// other ==>+ main ==> yet-another
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/chained-private-after/* %t
 // RUN: touch -t 201401240005 %t/*.swift

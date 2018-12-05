@@ -1,5 +1,7 @@
 /// a ==> depends-on-a-ext, depends-on-a-foo | a-ext ==> depends-on-a-ext
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/nominal-members/* %t
 // RUN: touch -t 201401240005 %t/*

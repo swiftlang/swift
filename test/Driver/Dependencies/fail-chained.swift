@@ -1,5 +1,7 @@
 /// a ==> bad ==> c ==> d | b --> bad --> e ==> f
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/fail-chained/* %t
 // RUN: touch -t 201401240005 %t/*

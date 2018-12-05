@@ -1,5 +1,7 @@
 // a ==> b --> c ==> d | e ==> c
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/private/* %t
 // RUN: touch -t 201401240005 %t/*

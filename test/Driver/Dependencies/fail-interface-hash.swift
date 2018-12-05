@@ -1,5 +1,7 @@
 /// main ==> depends-on-main | bad ==> depends-on-bad
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/fail-interface-hash/* %t
 // RUN: touch -t 201401240005 %t/*

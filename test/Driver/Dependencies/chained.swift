@@ -1,5 +1,7 @@
 // other ==> main ==> yet-another
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/chained/* %t
 // RUN: touch -t 201401240005 %t/*

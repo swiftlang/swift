@@ -4,6 +4,8 @@
 /// "./other1-external" ==> other
 /// "./other2-external" ==> other
 
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-external/* %t
 // RUN: touch -t 201401240005 %t/*
