@@ -827,6 +827,22 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
   return theClass;
 }
 
+const ClassMetadata *
+swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
+  // If it's an ordinary class, return it.
+  if (auto theClass = dyn_cast<ClassMetadata>(theMetadata)) {
+    return theClass;
+  }
+
+  // Unwrap ObjC class wrappers.
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+    return wrapper->Class;
+  }
+
+  // Not an ObjC class after all.
+  return nil;
+}
+
 #endif
 
 /***************************************************************************/
