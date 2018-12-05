@@ -79,6 +79,38 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
   return all_of(out, [](SILValue v) { return isa<SILFunctionArgument>(v); });
 }
 
+// Eliminate a copy of a borrowed value, if:
+//
+// 1. All of the copies users do not consume the copy (and thus can accept a
+//    borrowed value instead).
+// 2. The copies's non-destroy_value users are strictly contained within the
+//    scope of the borrowed value.
+//
+// Example:
+//
+//   %0 = @guaranteed (argument or instruction)
+//   %1 = copy_value %0
+//   apply %f(%1) : $@convention(thin) (@guaranteed ...) ...
+//   other_non_consuming_use %1
+//   destroy_value %1
+//   end_borrow %0 (if an instruction)
+//
+// =>
+//
+//   %0 = @guaranteed (argument or instruction)
+//   apply %f(%0) : $@convention(thin) (@guaranteed ...) ...
+//   other_non_consuming_use %0
+//   end_borrow %0 (if an instruction)
+//
+// NOTE: This means that the destroy_value technically can be after the
+// end_borrow. In practice, this will not be the case but we use this to avoid
+// having to reason about the ordering of the end_borrow and destroy_value.
+//
+// NOTE: Today we only perform this for guaranteed parameters since this enables
+// us to avoid doing the linear lifetime check to make sure that all destroys
+// are within the borrow scope.
+//
+// TODO: This needs a better name.
 static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   SmallVector<SILValue, 16> borrowIntroducers;
 
