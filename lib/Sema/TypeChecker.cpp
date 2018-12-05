@@ -304,15 +304,18 @@ static void prepareGenericParamList(GenericParamList *genericParams) {
 /// context have been configured.
 static void configureOuterGenericParams(const GenericContext *dc) {
   auto genericParams = dc->getGenericParams();
-  if (!genericParams) return;
 
-  if (genericParams->getOuterParameters()) return;
+  // If we already configured the outer parameters, we're done.
+  if (genericParams && genericParams->getOuterParameters())
+    return;
 
   DeclContext *outerDC = dc->getParent();
   while (!outerDC->isModuleScopeContext()) {
     if (auto outerDecl = outerDC->getAsDecl()) {
       if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
-        genericParams->setOuterParameters(outerGenericDC->getGenericParams());
+        if (genericParams)
+          genericParams->setOuterParameters(outerGenericDC->getGenericParams());
+
         configureOuterGenericParams(outerGenericDC);
         return;
       }
