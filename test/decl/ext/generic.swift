@@ -192,3 +192,13 @@ struct A<T, U, V> {
 extension A.B.C where T == V, X == Z.Assoc2 {
   func f() { }
 }
+
+// Extensions of nested non-generics within generics.
+extension A.B {
+  struct D { }
+}
+
+extension A.B.D {
+  func g() { }
+}
+
