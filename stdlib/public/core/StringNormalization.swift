@@ -111,19 +111,19 @@ internal enum NormalizationResult {
     var nextReadPosition: String.Index
   }
   struct BufferResizeRequest {
-    var newOutputBufferSize: Int
-    var newPreNormalScratchBufferSize: Int
-    var newPostNormalScratchBufferSize: Int
+    var outputBufferSize: Int
+    var icuInputBufferSize: Int
+    var icuOutputBufferSize: Int
   }
   
   static func bufferTooSmall(count: Int) -> NormalizationResult {
     let outputBufferSize = count * 9
-    let preNormalBufferSize = count
-    let postNormalBufferSize = count * 3
+    let icuInputBufferSize = count
+    let icuOutputBufferSize = count * 3
     let resizeRequest = BufferResizeRequest(
-      newOutputBufferSize: outputBufferSize, 
-      newPreNormalScratchBufferSize: preNormalBufferSize,
-      newPostNormalScratchBufferSize: postNormalBufferSize
+      outputBufferSize: outputBufferSize, 
+      icuInputBufferSize: icuInputBufferSize,
+      icuOutputBufferSize: icuOutputBufferSize
     )
     return .bufferTooSmall(resizeRequest)
   }
