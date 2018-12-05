@@ -4187,6 +4187,28 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   return lookupResult;
 }
 
+// Exposes TypeChecker functionality for querying protocol conformance.
+//
+// Invoking TypeChecker::conformsToProtocol from the ModuleDecl bypasses
+// certain functionality that only applies to the diagnostic type checker:
+//
+// - ConformanceCheckFlags skips dependence checking.
+//
+// - Passing an invalid SourceLoc skips diagnostics.
+//
+// - Type::subst will be a nop, because 'source' type is already fully
+// substituted in SIL. Consequently, TypeChecker::LookUpConformance, which
+// is only valid during type checking, will never be invoked.
+//
+// - mapTypeIntoContext will be a nop.
+Optional<ProtocolConformanceRef>
+ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
+
+  auto flags = ConformanceCheckFlags::SuppressDependencyTracking;
+
+  return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
+}
+
 void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
                                       DeclContext *dc) {
   if (conformance.isAbstract()) return;
