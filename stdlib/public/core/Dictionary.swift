@@ -794,8 +794,8 @@ extension Dictionary {
       }
     }
     _modify {
+      defer { _fixLifetime(self) }
       yield &_variant[key]
-      _fixLifetime(self)
     }
   }
 }
@@ -898,8 +898,8 @@ extension Dictionary {
         native._insert(at: bucket, key: key, value: value)
       }
       let address = native._values + bucket.offset
+      defer { _fixLifetime(self) }
       yield &address.pointee
-      _fixLifetime(self)
     }
   }
 
@@ -1272,14 +1272,10 @@ extension Dictionary {
       return Values(_dictionary: self)
     }
     _modify {
-      var values: Values
-      do {
-        var temp = _Variant(dummy: ())
-        swap(&temp, &_variant)
-        values = Values(_variant: temp)
-      }
+      var values = Values(_variant: _Variant(dummy: ()))
+      swap(&values._variant, &_variant)
+      defer { self._variant = values._variant }
       yield &values
-      self._variant = values._variant
     }
   }
 
@@ -1462,8 +1458,8 @@ extension Dictionary {
         let native = _variant.ensureUniqueNative()
         let bucket = native.validatedBucket(for: position)
         let address = native._values + bucket.offset
+        defer { _fixLifetime(self) }
         yield &address.pointee
-        _fixLifetime(self)
       }
     }
 
@@ -1846,8 +1842,8 @@ extension Dictionary.Index {
       }
       let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
+      defer { _variant = .cocoa(cocoa) }
       yield &cocoa
-      _variant = .cocoa(cocoa)
     }
   }
 #endif

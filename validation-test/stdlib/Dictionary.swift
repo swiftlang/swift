@@ -29,6 +29,8 @@ extension Dictionary {
 // Check that the generic parameters are called 'Key' and 'Value'.
 protocol TestProtocol1 {}
 
+struct TestError: Error {}
+
 extension Dictionary where Key : TestProtocol1, Value : TestProtocol1 {
   var _keyValueAreTestProtocol1: Bool {
     fatalError("not implemented")
@@ -145,6 +147,14 @@ func getCOWSlowEquatableDictionary()
   return d
 }
 
+func expectUnique<T: AnyObject>(_ v: inout T) {
+  expectTrue(isKnownUniquelyReferenced(&v))
+}
+
+func expectUnique<T: AnyObject>(_ v: inout T?) {
+  guard v != nil else { return }
+  expectTrue(isKnownUniquelyReferenced(&v))
+}
 
 DictionaryTestSuite.test("COW.Fast.IndexesDontAffectUniquenessCheck") {
   var d = getCOWFastDictionary()
@@ -335,6 +345,10 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
   }
 }
 
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKey.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  expectUnique(&d[TestKeyTy(20)])
+}
 
 DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   do {
@@ -855,6 +869,71 @@ DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotCopyValue") {
   }
 }
 
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+
+  expectUnique(&d[TestKeyTy(20), default: TestEquatableValueTy(0)])
+  expectUnique(&d[TestKeyTy(40), default: TestEquatableValueTy(0)])
+}
+
+func bumpValue(_ value: inout TestEquatableValueTy) {
+  value = TestEquatableValueTy(value.value + 1)
+}
+
+func bumpValueAndThrow(_ value: inout TestEquatableValueTy) throws {
+  value = TestEquatableValueTy(value.value + 1)
+  throw TestError()
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Insertion.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  bumpValue(&d[TestKeyTy(40), default: TestEquatableValueTy(1040)])
+  expectEqual(TestEquatableValueTy(1041), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Mutation.modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  bumpValue(&d[TestKeyTy(10), default: TestEquatableValueTy(2000)])
+  expectEqual(TestEquatableValueTy(1011), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Insertion.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try bumpValueAndThrow(
+      &d[TestKeyTy(40), default: TestEquatableValueTy(1040)])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1041), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.DefaultedSubscript.Mutation.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try bumpValueAndThrow(
+      &d[TestKeyTy(10), default: TestEquatableValueTy(2000)])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1011), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+
 DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   let d = getCOWFastDictionary()
   let identity1 = d._rawIdentifier()
@@ -1351,7 +1430,7 @@ DictionaryTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Keys and Values collection tests.
 //===---
 
-DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Fast.Values.AccessDoesNotReallocate") {
   var d1 = getCOWFastDictionary()
   let identity1 = d1._rawIdentifier()
   
@@ -1380,7 +1459,61 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   { $0 == $1 }
 }
 
-DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.Values.Modify") {
+  var d1 = getCOWSlowEquatableDictionary()
+  var d2: [TestKeyTy: TestEquatableValueTy] = [
+    TestKeyTy(40): TestEquatableValueTy(1040),
+    TestKeyTy(50): TestEquatableValueTy(1050),
+    TestKeyTy(60): TestEquatableValueTy(1060),
+  ]
+  d1.values = d2.values
+  expectEqual(d1, d2)
+  expectNil(d1[TestKeyTy(10)])
+  expectNil(d1[TestKeyTy(20)])
+  expectNil(d1[TestKeyTy(30)])
+  expectEqual(TestEquatableValueTy(1040), d1[TestKeyTy(40)])
+  expectEqual(TestEquatableValueTy(1050), d1[TestKeyTy(50)])
+  expectEqual(TestEquatableValueTy(1060), d1[TestKeyTy(60)])
+}
+
+@inline(never)
+func replaceValuesThenThrow<K: Hashable, V>(
+  _ v: inout Dictionary<K, V>.Values,
+  with v2: Dictionary<K, V>.Values
+) throws {
+  v = v2
+  throw TestError()
+}
+
+DictionaryTestSuite.test("COW.Slow.Values.ModifyThrow") {
+  var d1 = getCOWSlowEquatableDictionary()
+  var d2: [TestKeyTy: TestEquatableValueTy] = [
+    TestKeyTy(40): TestEquatableValueTy(1040),
+    TestKeyTy(50): TestEquatableValueTy(1050),
+    TestKeyTy(60): TestEquatableValueTy(1060),
+  ]
+  do {
+    try replaceValuesThenThrow(&d1.values, with: d2.values)
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(d1, d2)
+  expectNil(d1[TestKeyTy(10)])
+  expectNil(d1[TestKeyTy(20)])
+  expectNil(d1[TestKeyTy(30)])
+  expectEqual(TestEquatableValueTy(1040), d1[TestKeyTy(40)])
+  expectEqual(TestEquatableValueTy(1050), d1[TestKeyTy(50)])
+  expectEqual(TestEquatableValueTy(1060), d1[TestKeyTy(60)])
+}
+
+DictionaryTestSuite.test("COW.Slow.Values.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  expectUnique(&d.values[i])
+}
+
+DictionaryTestSuite.test("COW.Fast.Keys.AccessDoesNotReallocate") {
   let d1 = getCOWFastDictionary()
   let identity1 = d1._rawIdentifier()
   
@@ -1436,7 +1569,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(40)] = TestEquatableValueTy(1040)
@@ -1445,7 +1578,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(10)] = TestEquatableValueTy(2010)
@@ -1454,7 +1587,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(10)] = nil
@@ -1463,7 +1596,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(40)] = nil
@@ -1479,12 +1612,24 @@ extension Optional {
   }
 
   @inline(never)
+  mutating func setWrappedThenThrow(to value: Wrapped) throws {
+    self = .some(value)
+    throw TestError()
+  }
+
+  @inline(never)
   mutating func clear() {
     self = .none
   }
+
+  @inline(never)
+  mutating func clearThenThrow() throws {
+    self = .none
+    throw TestError()
+  }
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion_modify") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion.modify") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(40)].setWrapped(to: TestEquatableValueTy(1040))
@@ -1493,7 +1638,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion_modify") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation_modify") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation.modify") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(10)].setWrapped(to: TestEquatableValueTy(2010))
@@ -1502,7 +1647,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation_modify") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal_modify") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal.modify") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(10)].clear()
@@ -1511,10 +1656,70 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal_modify") {
   // Note: Leak tests are done in tearDown.
 }
 
-DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop_modify") {
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop.modify") {
   var d = getCOWSlowEquatableDictionary()
 
   d[TestKeyTy(40)].clear()
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Insertion.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(40)].setWrappedThenThrow(to: TestEquatableValueTy(1040))
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Mutation.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(10)].setWrappedThenThrow(to: TestEquatableValueTy(2010))
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Removal.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(10)].clearThenThrow()
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys.Noop.modifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+
+  do {
+    try d[TestKeyTy(40)].clearThenThrow()
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+
   expectNil(d[TestKeyTy(40)])
 
   // Note: Leak tests are done in tearDown.
@@ -4917,6 +5122,31 @@ DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged") {
   }
 }
 #endif
+
+DictionaryTestSuite.test("Values.Subscript.Uniqueness") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  expectUnique(&d.values[i])
+}
+
+DictionaryTestSuite.test("Values.Subscript.Modify") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  bumpValue(&d.values[i])
+  expectEqual(TestEquatableValueTy(1021), d[TestKeyTy(20)])
+}
+
+DictionaryTestSuite.test("Values.Subscript.ModifyThrow") {
+  var d = getCOWSlowEquatableDictionary()
+  let i = d.index(forKey: TestKeyTy(20))!
+  do {
+    try bumpValueAndThrow(&d.values[i])
+    expectTrue(false, "Did not throw")
+  } catch {
+    expectTrue(error is TestError)
+  }
+  expectEqual(TestEquatableValueTy(1021), d[TestKeyTy(20)])
+}
 
 DictionaryTestSuite.test("RemoveAt.InvalidatesIndices") {
   var d = getCOWFastDictionary()
