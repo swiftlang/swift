@@ -4199,6 +4199,8 @@ void DifferentiationTask::createVJP() {
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
   vjp = fb.createFunction(
       linkage, vjpName, vjpType, original->getGenericEnvironment(),
       original->getLocation(), original->isBare(), original->isTransparent(),
