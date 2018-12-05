@@ -43,7 +43,7 @@ optional chaining etc.
 ````
 ✅ Array.append.Array.Int?
 ✅ Flatten.Array.Tuple4.for-in.reserved
-✅ OCB.NSArray.as!.Array.NSString
+✅ Bridging.NSArray.as!.Array.NSString
 ````
 
 Note: Special characters that could be interpreted by the shell require escaping
@@ -97,16 +97,15 @@ Use periods to separate the name components in variants derived from specialised
 generic types or significant method chains.
 
 ````
-⛔️ InsertCharacterStartIndex
 ⛔️ InsertCharacterTowardsEndIndexNonASCII
 ````
 
 There's no need to be literal with type names. **Be descriptive**:
 
 ````
-✅ Flatten.Array.Tuple4.lazy.flatMap
-✅ String.insert.ASCIIChar.StartIndex
 ✅ String.insert.EmojiChar.NearEnd
+✅ String.insert.ASCIIChar.StartIndex
+✅ Flatten.Array.Tuple4.lazy.flatMap
 ````
 
 </details><p><!-- spacer --></p></li>
@@ -129,18 +128,16 @@ Use **`Val`** and **`Ref`** as short descriptors for variants that compare value
 types (`struct`, `Int`) with reference types (often named with `Class` in the
 legacy-style).
 Prefer **`Char`** to `Character`, which can be combined with codepage or
-language prefix/suffix when necessary (`ASCIIChar`). For benchmarks that measure
-`String`'s Unicode performance for various languages, use
+language prefix/suffix when necessary (`EmojiChar`, `ASCIIChar`). For benchmarks
+that measure `String`'s Unicode performance for various languages, use
 [two letter codes](https://en.wikipedia.org/wiki/ISO_639-1) instead of spelling
 out the whole language names.
 
-*In a pinch*, it's OK to use short C-style naming prefixes like `OCB` (for
-Objective-C Bridging) or consistent abbreviations in the benchmark family like
-`Str` and `Arr`, but *only if* it helps to fit a system with descriptive
-names into 40 characters:
+When necessary, use *consistent* abbreviations like `Str` and `Arr` within the
+benchmark family, to fit a system with descriptive names into 40 characters:
 
 ````
-✅ OCB.NSDict.as!.Dictionary.NSString.NSNum
+✅ Bridging.NSDict.as!.Dict.NSString.NSNum
 ✅ Seq.prefixWhile.AnySeq.UnfoldSeq.lazy
 ````
 
