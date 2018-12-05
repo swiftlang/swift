@@ -876,16 +876,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
   return tensor;
 }
 
-/// Check whether the specified TensorFlow status object is valid or not.  If
-/// valid return false.  If invalid, emit a diagnostic and return true.
-static bool checkStatus(SILFunction &fn, SILLocation loc, TF_Status *status,
-                        Diag<StringRef> id = diag::tf_lowering_error) {
-  if (TF_GetCode(status) == TF_OK)
-    return false;
-  diagnose(fn, loc, id, TF_Message(status));
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
