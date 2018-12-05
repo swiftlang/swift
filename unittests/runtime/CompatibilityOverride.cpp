@@ -168,6 +168,11 @@ TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
   ASSERT_EQ(Result, nullptr);  
 }
 
+TEST_F(CompatibilityOverrideTest, test_swift_conformsToSwiftProtocol) {
+  auto Result = swift_conformsToSwiftProtocol(nullptr, nullptr, StringRef());
+  ASSERT_EQ(Result, nullptr);
+}
+
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
   Demangler demangler;
   auto Result = swift_getTypeByMangledNode(demangler, nullptr, nullptr,
