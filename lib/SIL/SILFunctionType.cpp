@@ -1265,7 +1265,9 @@ static CanSILFunctionType getSILFunctionType(
   auto silExtInfo = SILFunctionType::ExtInfo()
     .withRepresentation(extInfo.getSILRepresentation())
     .withIsPseudogeneric(pseudogeneric)
-    .withNoEscape(extInfo.isNoEscape());
+    // SWIFT_ENABLE_TENSORFLOW
+    .withNoEscape(extInfo.isNoEscape())
+    .withDifferentiability(extInfo.getDifferentiability());
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,

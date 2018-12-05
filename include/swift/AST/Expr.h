@@ -2822,6 +2822,28 @@ public:
   }
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+class AutoDiffFunctionExpr : public ImplicitConversionExpr {
+public:
+  AutoDiffFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::AutoDiffFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AutoDiffFunction;
+  }
+};
+
+class AutoDiffFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+public:
+  AutoDiffFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::AutoDiffFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AutoDiffFunctionExtractOriginal;
+  }
+};
+
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.
 ///
