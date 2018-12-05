@@ -121,6 +121,7 @@ SILLocation getUserSourceLocation(const SILInstruction *inst);
 //===--------------------------------------------------------------------===//
 // Other stuff
 //===--------------------------------------------------------------------===//
+bool isStatefulOp(const GraphOperationInst* inst);
 
 /// Create a "Const" tensor operation containing the specified scalars, with
 /// the specified shape and elementType (setting dtype).  The resultType is

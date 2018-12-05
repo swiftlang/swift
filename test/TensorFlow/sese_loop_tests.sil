@@ -33,6 +33,29 @@ bb2:                                              // Preds: bb1
 // CHECK: --- XLA CFG Canonicalize end
 
 //--------------------------------------------------------------------------
+// A test to make sure we do not canonicalize a loop if it is in the required
+// form and the header has no side-effecting ops.
+sil private @$noSideEffectHeader : $@callee_owned () -> () {
+bb0:
+  br bb1                                          // id: %0
+
+bb1:                                              // Preds: bb1 bb0
+  %1 = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0, __device: "ALL_DEVICES"}: $Builtin.Int1
+  cond_br %1, bb1, bb2                            // id: %2
+
+bb2:                                              // Preds: bb1
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+} // end sil function '$noSideEffectHEader'
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}$noSideEffectHeader{{.*}}
+// CHECK: [sequence
+// CHECK:   <while Preheader: bb0, Header: bb1, exit: [[EXIT:bb[0-9]+]]
+// CHECK:     block {{bb[0-9]+}}>
+// CHECK:   block [[EXIT]]]
+// CHECK: --- XLA CFG Canonicalize end
+
+//--------------------------------------------------------------------------
 // Following tests Check that the loop canonicalization is done if header has
 // communication with the host even if the loop is in the desired form.
 
@@ -87,6 +110,37 @@ bb3:                                              // Preds: bb1
   return %5 : $Builtin.Int32                      // id: %10
 } // end sil function 'sendToHost'
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}sendToHost{{.*}}
+// CHECK: [sequence
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
+// CHECK:     [sequence
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
+
+
+// header with stateful tensorflow op.
+sil private @statefulTensorOp : $@convention(thin) @callee_owned () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0          // user: %3
+  %1 = integer_literal $Builtin.Int32, 10         // user: %6
+  %2 = integer_literal $Builtin.Int32, 1          // user: %5
+  br bb1(%0 : $Builtin.Int32)                     // id: %3
+
+// %4                                             // user: %5
+bb1(%4 : $Builtin.Int32):                         // Preds: bb2 bb0
+  %5 = graph_op "AssignVariableOp"(%4 : $Builtin.Int32) {__device: "/device:CPU:0"} : $Builtin.Int32
+  %6 = graph_op "cmp_slt_Int32"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %6, bb2, bb3                            // id: %8
+
+bb2:                                              // Preds: bb1
+  br bb1(%5 : $Builtin.Int32)                     // id: %9
+
+bb3:                                              // Preds: bb1
+  return %5 : $Builtin.Int32                      // id: %10
+}
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}statefulTensorOp{{.*}}
 // CHECK: [sequence
 // CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence

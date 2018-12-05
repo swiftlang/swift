@@ -1320,11 +1320,7 @@ bool SingleExitLoopTransformer::transform() {
     bool hasEffectfulOps = false;
     for (const SILInstruction &inst : *loop->getHeader()) {
       if (auto graphOp = dyn_cast<GraphOperationInst>(&inst)) {
-        StringRef name = graphOp->getName().str();
-        // FIXME: generalize the logic for deciding side-effecting ops.
-        if (name.startswith("tfc.SendToHost") ||
-            name.startswith("tfc.RecvFromHost") ||
-            name.startswith("WriteScalarSummary")) {
+        if (isStatefulOp(graphOp)) {
           hasEffectfulOps = true;
           break;
         }
