@@ -112,9 +112,9 @@ internal enum NormalizationResult {
     var nextReadPosition: String.Index
   }
   struct BufferResizeRequest {
-    var outputBufferSize: Int
-    var icuInputBufferSize: Int
-    var icuOutputBufferSize: Int
+    var output: Int
+    var icuInput: Int
+    var icuOutput: Int
   }
   
   static func bufferTooSmall(count: Int) -> NormalizationResult {
@@ -123,9 +123,9 @@ internal enum NormalizationResult {
     let icuInputBufferSize = count
     let icuOutputBufferSize = count * _Normalization._maxNFCExpansionFactor
     let resizeRequest = BufferResizeRequest(
-      outputBufferSize: outputBufferSize, 
-      icuInputBufferSize: icuInputBufferSize,
-      icuOutputBufferSize: icuOutputBufferSize
+      output: outputBufferSize, 
+      icuInput: icuInputBufferSize,
+      icuOutput: icuOutputBufferSize
     )
     return .bufferTooSmall(resizeRequest)
   }

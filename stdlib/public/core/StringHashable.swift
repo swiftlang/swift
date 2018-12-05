@@ -52,13 +52,67 @@ extension _StringGutsSlice {
         hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
     } else {
-      self.withNFCCodeUnitsIterator_2 {
-        let selfIter = $0
-        for cu in selfIter { hasher.combine(cu) }
-      }
+      var output = _FixedArray16<UInt8>(allZeros: ())
+      var icuInput = _FixedArray16<UInt16>(allZeros: ())
+      var icuOutput = _FixedArray16<UInt16>(allZeros: ())
+      _normalizeHashImpl(
+        outputBuffer: _castOutputBuffer(&output),
+        icuInputBuffer: _castOutputBuffer(&icuInput),
+        icuOutputBuffer: _castOutputBuffer(&icuOutput),
+        hasher: &hasher
+      )
     }
 
     hasher.combine(0xFF as UInt8) // terminator
+  }
+  
+  internal func _normalizeHashImpl(
+    outputBuffer: UnsafeMutableBufferPointer<UInt8>,
+    icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    hasher: inout Hasher
+  ) {
+    var outputBuffer = outputBuffer
+    var icuInputBuffer = icuInputBuffer
+    var icuOutputBuffer = icuOutputBuffer
+    
+    var index = self.range.lowerBound
+    let cachedEndIndex = self.range.upperBound
+    
+    let normalize: (String.Index, _StringGuts, UnsafeMutableBufferPointer<UInt8>,
+      UnsafeMutableBufferPointer<UInt16>, UnsafeMutableBufferPointer<UInt16>
+    ) -> NormalizationResult
+    if _fastPath(self.isFastUTF8) {
+      normalize = fastNormalize
+    } else {
+      normalize = foreignNormalize
+    }
+    
+    var bufferCleanup: (() -> ())? = nil
+    
+    while index != cachedEndIndex {
+      let result = normalize(index, self._guts, outputBuffer, icuInputBuffer, icuOutputBuffer)
+      switch result {
+      case let .success(r):
+        for i in 0..<r.amountFilled {
+          hasher.combine(outputBuffer[i])
+        }
+        index = r.nextReadPosition
+      case let .bufferTooSmall(resize):
+        _internalInvariant(bufferCleanup == nil)
+        outputBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: resize.output)
+        icuInputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuInput)
+        icuOutputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuOutput)
+        bufferCleanup = {
+          outputBuffer.deallocate()
+          icuInputBuffer.deallocate()
+          icuOutputBuffer.deallocate()
+        }
+      }
+    }
+    if let cleanup = bufferCleanup {
+      cleanup()
+    }
   }
 }
 

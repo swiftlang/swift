@@ -43,6 +43,15 @@ private func _unsafeBufferPointerCast<T, U>(
 }
 
 internal func _castOutputBuffer(
+  _ ptr: UnsafeMutablePointer<_FixedArray16<UInt8>>,
+  endingAt endIdx: Int = 16
+) -> UnsafeMutableBufferPointer<UInt8> {
+  let bufPtr: UnsafeMutableBufferPointer<UInt8> =
+    _unsafeMutableBufferPointerCast(
+      ptr, 16)
+  return UnsafeMutableBufferPointer<UInt8>(rebasing: bufPtr[..<endIdx])
+}
+internal func _castOutputBuffer(
   _ ptr: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>,
   endingAt endIdx: Int = _Normalization._SegmentOutputBuffer.capacity
 ) -> UnsafeMutableBufferPointer<UInt16> {
