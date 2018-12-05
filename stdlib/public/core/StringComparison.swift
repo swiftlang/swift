@@ -12,151 +12,246 @@
 
 import SwiftShims
 
-
-@usableFromInline
+@inlinable @inline(__always) // top-level fastest-paths
 @_effects(readonly)
 internal func _stringCompare(
-  _ lhs: _StringGuts, _ rhs: _StringGuts,
-  expecting: _StringComparisonResult
+  _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
 ) -> Bool {
-  _internalInvariant(expecting == .equal || expecting == .less)
-  if lhs.rawBits == rhs.rawBits {
-    return expecting == .equal
-  }
-  if _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) {
-    let isNFC = lhs.isNFC && rhs.isNFC
-    return lhs.withFastUTF8 { utf8Left in
-      return rhs.withFastUTF8 { utf8Right in
-        if isNFC {
-          let cmp = _binaryCompare(utf8Left, utf8Right)
-          if expecting == .equal {
-            return cmp == 0
-          }
-          _internalInvariant(expecting == .less)
-          return cmp < 0
-        }
-
-        return _stringCompare(utf8Left, utf8Right, expecting: expecting)
-      }
-    }
-  }
-  return _stringCompareSlow(
-    lhs, 0..<lhs.count, rhs, 0..<rhs.count, expecting: expecting)
+  if lhs.rawBits == rhs.rawBits { return expecting == .equal }
+  return _stringCompareInternal(lhs, rhs, expecting: expecting)
 }
 
 @usableFromInline
+@_effects(readonly)
+internal func _stringCompareInternal(
+  _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
+) -> Bool {
+  guard _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) else {
+    return _stringCompareSlow(lhs, rhs, expecting: expecting)
+  }
+
+  let isNFC = lhs.isNFC && rhs.isNFC
+  return lhs.withFastUTF8 { lhsUTF8 in
+    return rhs.withFastUTF8 { rhsUTF8 in
+      return _stringCompareFastUTF8(
+        lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
+    }
+  }
+}
+
+@inlinable @inline(__always) // top-level fastest-paths
 @_effects(readonly)
 internal func _stringCompare(
   _ lhs: _StringGuts, _ lhsRange: Range<Int>,
   _ rhs: _StringGuts, _ rhsRange: Range<Int>,
   expecting: _StringComparisonResult
 ) -> Bool {
-  _internalInvariant(expecting == .equal || expecting == .less)
   if lhs.rawBits == rhs.rawBits && lhsRange == rhsRange {
     return expecting == .equal
   }
-  if _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) {
-    let isNFC = lhs.isNFC && rhs.isNFC
-    return lhs.withFastUTF8(range: lhsRange) { utf8Left in
-      return rhs.withFastUTF8(range: rhsRange) { utf8Right in
-        if isNFC {
-          let cmp = _binaryCompare(utf8Left, utf8Right)
-          if expecting == .equal {
-            return cmp == 0
-          }
-          _internalInvariant(expecting == .less)
-          return cmp < 0
-        }
+  return _stringCompareInternal(
+    lhs, lhsRange, rhs, rhsRange, expecting: expecting)
+}
 
-        return _stringCompare(utf8Left, utf8Right, expecting: expecting)
-      }
+@usableFromInline
+@_effects(readonly)
+internal func _stringCompareInternal(
+  _ lhs: _StringGuts, _ lhsRange: Range<Int>,
+  _ rhs: _StringGuts, _ rhsRange: Range<Int>,
+  expecting: _StringComparisonResult
+) -> Bool {
+  guard _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) else {
+    return _stringCompareSlow(
+      lhs, lhsRange, rhs, rhsRange, expecting: expecting)
+  }
+
+  let isNFC = lhs.isNFC && rhs.isNFC
+  return lhs.withFastUTF8(range: lhsRange) { lhsUTF8 in
+    return rhs.withFastUTF8(range: rhsRange) { rhsUTF8 in
+      return _stringCompareFastUTF8(
+        lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
     }
   }
-  return _stringCompareSlow(lhs, lhsRange, rhs, rhsRange, expecting: expecting)
 }
 
-@usableFromInline
 @_effects(readonly)
-internal func _stringCompareSlow(
-  _ lhs: _StringGuts, _ lhsRange: Range<Int>?,
-  _ rhs: _StringGuts, _ rhsRange: Range<Int>?,
-  expecting: _StringComparisonResult
+private func _stringCompareFastUTF8(
+  _ utf8Left: UnsafeBufferPointer<UInt8>,
+  _ utf8Right: UnsafeBufferPointer<UInt8>,
+  expecting: _StringComparisonResult,
+  bothNFC: Bool
 ) -> Bool {
-  return _StringGutsSlice(lhs, lhsRange ?? 0..<lhs.count).compare(
-    with: _StringGutsSlice(rhs, rhsRange ?? 0..<rhs.count),
-    expecting: expecting)
+  if _fastPath(bothNFC) {
+    let cmp = _binaryCompare(utf8Left, utf8Right)
+    return _lexicographicalCompare(cmp, 0, expecting: expecting)
+  }
+
+  return _stringCompareFastUTF8Abnormal(
+    utf8Left, utf8Right, expecting: expecting)
 }
 
-@usableFromInline
 @_effects(readonly)
-internal func _stringCompare(
-  _ left: UnsafeBufferPointer<UInt8>,
-  _ right: UnsafeBufferPointer<UInt8>,
+private func _stringCompareFastUTF8Abnormal(
+  _ utf8Left: UnsafeBufferPointer<UInt8>,
+  _ utf8Right: UnsafeBufferPointer<UInt8>,
   expecting: _StringComparisonResult
 ) -> Bool {
-  _internalInvariant(expecting == .equal || expecting == .less)
-
-  if _binaryCompare(left, right) == 0 {
-    return expecting == .equal
-  }
-
-  // Do a binary scan finding the point of divergence. From there, see if we can
-  // determine our answer right away, otherwise back up to the beginning of the
-  // current normalization segment and fall back to the slow path.
-  var idx = 0
-  let end = Swift.min(left.count, right.count)
-  let leftPtr = left.baseAddress._unsafelyUnwrappedUnchecked
-  let rightPtr = right.baseAddress._unsafelyUnwrappedUnchecked
-  while idx < end {
-    guard leftPtr[idx] == rightPtr[idx] else { break }
-    idx &+= 1
-  }
-  _internalInvariant(idx != left.count || idx != right.count,
-    "should of been cought by prior binary compare")
-  if idx == end {
+  // Do a binary-equality prefix scan, to skip over long common prefixes.
+  guard let diffIdx = _findDiffIdx(utf8Left, utf8Right) else {
     // We finished one of our inputs.
     //
     // TODO: This gives us a consistent and good ordering, but technically it
     // could differ from our stated ordering if combination with a prior scalar
     // did not produce a greater-value scalar. Consider checking normality.
-    return expecting == _lexicographicalCompare(left.count, right.count)
+    return _lexicographicalCompare(
+      utf8Left.count, utf8Right.count, expecting: expecting)
   }
 
-  // Back up to nearest scalar boundary and check if normal and end of segment.
-  // If so, we have our answer.
-  while _isContinuation(left[_unchecked: idx]) && idx > 0 { idx &-= 1 }
+  let scalarDiffIdx = _scalarAlign(utf8Left, diffIdx)
+  _internalInvariant(scalarDiffIdx == _scalarAlign(utf8Right, diffIdx))
 
-  // TODO: Refactor this into a function, handle these boundary condition as
-  // early returns...
-  if !_isContinuation(right[_unchecked: idx]) {
-    let (leftScalar, leftLen) = _decodeScalar(left, startingAt: idx)
-    let (rightScalar, rightLen) = _decodeScalar(right, startingAt: idx)
-    _internalInvariant(leftScalar != rightScalar)
+  let (leftScalar, leftLen) = _decodeScalar(utf8Left, startingAt: scalarDiffIdx)
+  let (rightScalar, rightLen) = _decodeScalar(
+    utf8Right, startingAt: scalarDiffIdx)
 
-    let nfcQC = leftScalar._isNFCQCYes && rightScalar._isNFCQCYes
-    let isSegmentEnd = left.hasNormalizationBoundary(before: idx + leftLen)
-                    && right.hasNormalizationBoundary(before: idx + rightLen)
-    if _fastPath(nfcQC && isSegmentEnd) {
-      return expecting == _lexicographicalCompare(leftScalar, rightScalar)
+  // Very frequent fast-path: point of binary divergence is a NFC single-scalar
+  // segment. Check that we diverged at the start of a segment, and the next
+  // scalar is both NFC and its own segment.
+  if _fastPath(
+    leftScalar._isNFCStarter && rightScalar._isNFCStarter &&
+    utf8Left.hasNormalizationBoundary(before: scalarDiffIdx &+ leftLen) &&
+    utf8Right.hasNormalizationBoundary(before: scalarDiffIdx &+ rightLen)
+  ) {
+    guard expecting == .less else {
+      // We diverged
+      _internalInvariant(expecting == .equal)
+      return false
     }
+    return _lexicographicalCompare(
+      leftScalar.value, rightScalar.value, expecting: .less)
   }
 
-  // TODO: Back up to start of segment, and slow-path resume from there
+  // Back up to the nearest normalization boundary before doing a slow
+  // normalizing compare.
+  let boundaryIdx = Swift.min(
+    _findBoundary(utf8Left, before: diffIdx),
+    _findBoundary(utf8Right, before: diffIdx))
+  _internalInvariant(boundaryIdx <= diffIdx)
 
-  return _StringGutsSlice(_StringGuts(left, isASCII: false)).compare(with:
-    _StringGutsSlice(_StringGuts(right, isASCII: false)), expecting: expecting)
+  return _stringCompareSlow(
+    UnsafeBufferPointer(rebasing: utf8Left[boundaryIdx...]),
+    UnsafeBufferPointer(rebasing: utf8Right[boundaryIdx...]),
+    expecting: expecting)
+}
+
+@_effects(readonly)
+private func _stringCompareSlow(
+  _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
+) -> Bool {
+  return _stringCompareSlow(
+    lhs, 0..<lhs.count, rhs, 0..<rhs.count, expecting: expecting)
+}
+
+@_effects(readonly)
+private func _stringCompareSlow(
+  _ lhs: _StringGuts, _ lhsRange: Range<Int>,
+  _ rhs: _StringGuts, _ rhsRange: Range<Int>,
+  expecting: _StringComparisonResult
+) -> Bool {
+  // TODO: Just call the normalizer directly with range
+
+  return _StringGutsSlice(lhs, lhsRange).compare(
+    with: _StringGutsSlice(rhs, rhsRange),
+    expecting: expecting)
+}
+
+@_effects(readonly)
+private func _stringCompareSlow(
+  _ leftUTF8: UnsafeBufferPointer<UInt8>,
+  _ rightUTF8: UnsafeBufferPointer<UInt8>,
+  expecting: _StringComparisonResult
+) -> Bool {
+  // TODO: Just call the normalizer directly
+
+  let left = _StringGutsSlice(_StringGuts(leftUTF8, isASCII: false))
+  let right = _StringGutsSlice(_StringGuts(rightUTF8, isASCII: false))
+  return left.compare(with: right, expecting: expecting)
+}
+
+// Return the point of binary divergence. If they have no binary difference
+// (even if one is longer), returns nil.
+@_effects(readonly)
+private func _findDiffIdx(
+  _ left: UnsafeBufferPointer<UInt8>, _ right: UnsafeBufferPointer<UInt8>
+) -> Int? {
+  let count = Swift.min(left.count, right.count)
+  var idx = 0
+  while idx < count {
+    guard left[_unchecked: idx] == right[_unchecked: idx] else {
+      return idx
+    }
+    idx &+= 1
+  }
+  return nil
+}
+
+@_effects(readonly)
+@inline(__always)
+private func _lexicographicalCompare<I: FixedWidthInteger>(
+  _ lhs: I, _ rhs: I, expecting: _StringComparisonResult
+) -> Bool {
+  return expecting == .equal ? lhs == rhs : lhs < rhs
+}
+
+@_effects(readonly)
+private func _findBoundary(
+  _ utf8: UnsafeBufferPointer<UInt8>, before: Int
+) -> Int {
+  var idx = before
+  _internalInvariant(idx >= 0)
+
+  // End of string is a normalization boundary
+  guard idx < utf8.count else {
+    _internalInvariant(before == utf8.count)
+    return utf8.count
+  }
+
+  // Back up to scalar boundary
+  while _isContinuation(utf8[_unchecked: idx]) {
+    idx &-= 1
+  }
+
+  while true {
+    if idx == 0 { return 0 }
+
+    let scalar = _decodeScalar(utf8, startingAt: idx).0
+    if scalar._hasNormalizationBoundaryBefore { return idx }
+
+    idx &-= _utf8ScalarLength(utf8, endingAt: idx)
+  }
 }
 
 @_frozen
 @usableFromInline
 internal enum _StringComparisonResult {
-  case less
   case equal
-  case greater
+  case less
 
   @inlinable @inline(__always)
   internal init(signedNotation int: Int) {
-    self = int < 0 ? .less : int == 0 ? .equal : .greater
+    _internalInvariant(int <= 0)
+    self = int == 0 ? .equal : .less
+  }
+
+  @inlinable @inline(__always)
+  static func ==(
+    _ lhs: _StringComparisonResult, _ rhs: _StringComparisonResult
+  ) -> Bool {
+    switch (lhs, rhs) {
+      case (.equal, .equal): return true
+      case (.less, .less): return true
+      default: return false
+    }
   }
 }
 
@@ -192,7 +287,7 @@ extension _StringGutsSlice {
 
 // Perform a binary comparison of bytes in memory. Return value is negative if
 // less, 0 if equal, positive if greater.
-@inlinable @inline(__always) // Memcmp wrapper
+@_effects(readonly)
 internal func _binaryCompare<UInt8>(
   _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
 ) -> Int {
@@ -209,26 +304,10 @@ internal func _binaryCompare<UInt8>(
 
 // Double dispatch functions
 extension _StringGutsSlice {
-  @usableFromInline
   @_effects(readonly)
   internal func compare(
     with other: _StringGutsSlice, expecting: _StringComparisonResult
   ) -> Bool {
-    if self._guts.rawBits == other._guts.rawBits
-    && self._offsetRange == other._offsetRange {
-      return expecting == .equal
-    }
-
-    if _fastPath(self.isNFCFastUTF8 && other.isNFCFastUTF8) {
-      Builtin.onFastPath() // aggressively inline / optimize
-      return self.withFastUTF8 { nfcSelf in
-        return other.withFastUTF8 { nfcOther in
-          return expecting == _StringComparisonResult(
-            signedNotation: _binaryCompare(nfcSelf, nfcOther))
-        }
-      }
-    }
-
     if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
       Builtin.onFastPath() // aggressively inline / optimize
       let isEqual = self.withFastUTF8 { utf8Self in
@@ -239,35 +318,21 @@ extension _StringGutsSlice {
       if isEqual { return expecting == .equal }
     }
 
-    return expecting == _slowCompare(with: other)
+    return _slowCompare(with: other, expecting: expecting)
   }
 
   @inline(never) // opaque slow-path
   @_effects(readonly)
   internal func _slowCompare(
-    with other: _StringGutsSlice
-  ) -> _StringComparisonResult {
+    with other: _StringGutsSlice,
+    expecting: _StringComparisonResult
+  ) -> Bool {
     return self.withNFCCodeUnitsIterator_2 {
       var selfIter = $0
       return other.withNFCCodeUnitsIterator_2 {
         let otherIter = $0
-        return selfIter.compare(with: otherIter)
+        return selfIter.compare(with: otherIter, expecting: expecting)
       }
     }
   }
 }
-
-@inline(__always)
-internal func _lexicographicalCompare<I: FixedWidthInteger>(
-  _ lhs: I, _ rhs: I
-) -> _StringComparisonResult {
-  return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
-}
-@inline(__always)
-internal func _lexicographicalCompare(
-  _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> _StringComparisonResult {
-  return _lexicographicalCompare(lhs.value, rhs.value)
-}
-
-

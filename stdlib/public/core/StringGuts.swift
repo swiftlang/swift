@@ -153,18 +153,11 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal func withFastUTF8<R>(
-    range: Range<Int>?,
+    range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { wholeUTF8 in
-      let slicedUTF8: UnsafeBufferPointer<UInt8>
-      if let r = range {
-        slicedUTF8 = UnsafeBufferPointer(rebasing: wholeUTF8[r])
-      } else {
-        slicedUTF8 = wholeUTF8
-      }
-
-      return try f(slicedUTF8)
+      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
