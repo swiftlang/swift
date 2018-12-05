@@ -719,9 +719,10 @@ llvm::Value *irgen::emitGatherSpareBits(IRGenFunction &IGF,
     llvm::Value *newBits;
     if (u > usedBits)
       newBits = IGF.Builder.CreateLShr(spareBits, u - usedBits);
-    else if (u < usedBits)
-      newBits = IGF.Builder.CreateShl(spareBits, usedBits - u);
-    else
+    else if (u < usedBits) {
+      newBits = IGF.Builder.CreateZExtOrTrunc(spareBits, destTy);
+      newBits = IGF.Builder.CreateShl(newBits, usedBits - u);
+    } else
       newBits = spareBits;
     newBits = IGF.Builder.CreateZExtOrTrunc(newBits, destTy);
 
