@@ -30,13 +30,13 @@
 
 // FILE-ADDED: inputs: ["./added.swift"], output: {{[{].*[}]}}, condition: newly-added{{$}}
 
-// RUN: %S/Inputs/touch.py 443865960 %t/main.swift
+// RUN: %{python} %S/Inputs/touch.py 443865960 %t/main.swift
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=BUILD-RECORD-PLUS-CHANGE
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading{{$}}
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
 
-// RUN: %S/Inputs/touch.py 443865900 %t/*
+// RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=FILE-REMOVED
 // FILE-REMOVED: inputs: ["./main.swift"], output: {{[{].*[}]$}}
 // FILE-REMOVED: inputs: ["./other.swift"], output: {{[{].*[}]$}}
