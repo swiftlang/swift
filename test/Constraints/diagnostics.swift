@@ -708,9 +708,10 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  _ = a + b // expected-error {{unavailable}}
-  a += a + // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist}}
+  _ = a + b // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (UInt32, UInt32), (Int, Int)}}
+  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
     b
+  a += b  // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist with these partially matching parameter lists: (inout UInt32, UInt32), (inout Int, Int)}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
