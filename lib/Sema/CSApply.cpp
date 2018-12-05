@@ -6867,12 +6867,29 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // FunctionConversionExpr in its full generality.
     if (fromFunc) {
       // SWIFT_ENABLE_TENSORFLOW
+      auto fromEI = fromFunc->getExtInfo();
+      // Handle implicit conversion from @autodiff.
+      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiability(
+            FunctionTypeDifferentiability::Bidirectional))
+                ->castTo<FunctionType>();
+        expr = cs.cacheType(new (tc.Context)
+                            AutoDiffFunctionExpr(expr, fromFunc));
+      }
+      // Handle implicit conversion to @autodiff.
+      else if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
+        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiability(
+            FunctionTypeDifferentiability::None))
+                ->castTo<FunctionType>();
+        expr = cs.cacheType(new (tc.Context)
+            AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
+      }
+      
       // If we have a ClosureExpr, then we can safely propagate tensorflow
       // convention to the closure expression.
       // NOTE: we also need to check if the closure captures any values.
       // However, capture information is not available at this point. Therefore,
       // the check currently happens in the SILGen phase.
-      auto fromEI = fromFunc->getExtInfo();
       if (toEI.getRepresentation() ==
               AnyFunctionType::Representation::TensorFlow &&
           fromEI.getRepresentation() !=

@@ -506,6 +506,9 @@ namespace {
                                         SGFContext C);
 
     // SWIFT_ENABLE_TENSORFLOW
+    RValue visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E, SGFContext C);
+    RValue visitAutoDiffFunctionExtractOriginalExpr(
+        AutoDiffFunctionExtractOriginalExpr *E, SGFContext C);
     RValue visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C);
   };
 } // end anonymous namespace
@@ -5716,6 +5719,28 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
+                                                SGFContext C) {
+  // TODO(rxwei): Use the parameter indices and order specified in E's function
+  // type.
+  auto *fnTy = E->getType()->castTo<AnyFunctionType>();
+  auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto *diffFunc = SGF.B.createAutoDiffFunction(E,
+      SmallBitVector(fnTy->getNumParams(), true), 1, orig.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+}
+
+RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
+    AutoDiffFunctionExtractOriginalExpr *E, SGFContext C) {
+  auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  llvm::outs() << "Difffunc subexpr type = " << E->getSubExpr()->getType() << '\n';
+  llvm::outs() << "Difffunc = " << diffFunc.getValue() << '\n';
+  llvm::outs().flush();
+  auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
+      E, diffFunc.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));
+}
+
 RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
   SILValue condition;
   {
