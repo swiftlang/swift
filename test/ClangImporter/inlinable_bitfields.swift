@@ -13,4 +13,4 @@ public func g(_ m: MM) -> UInt32 {
 
 // Just make sure this is a definition and not a declaration...
 
-// CHECK: define internal i32 @"$ModRM$rm$getter"([[INT]] %.coerce)
+// CHECK: define internal i32 @"$ModRM$rm$getter"
