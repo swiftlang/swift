@@ -136,8 +136,6 @@ internal enum NormalizationResult {
   }
 }
 
-func unimplemented() -> Never { fatalError("Unimplemented function called") }
-
 internal func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
@@ -234,18 +232,14 @@ internal func transcodeToUTF8(
     //a single segment at this point
     
     readIndex += length
-    guard scalar.withUTF8CodeUnits({ utf8 in 
-      for cu in utf8 {
-        if writeIndex < outputCount {
-          outputBuffer[writeIndex] = cu
-          writeIndex += 1
-        } else {
-          return false
-        }
+    
+    for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
+      if writeIndex < outputCount {
+        outputBuffer[writeIndex] = cu
+        writeIndex &+= 1
+      } else {
+        return nil
       }
-      return true
-    }) else {
-      return nil
     }
   }
   return (readIndex, writeIndex)
