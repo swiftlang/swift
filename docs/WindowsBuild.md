@@ -166,17 +166,13 @@ pushd "%swift_source_dir%/build/Ninja-DebugAssert/lldb-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/lldb"^
   -DCMAKE_BUILD_TYPE=Debug^
   -DLLDB_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
-  -DLLDB_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
   -DLLDB_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
-  -DLLDB_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_CLANG_SOURCE="%swift_source_dir%/clang"^
-  -DLLDB_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_SWIFT_SOURCE="%swift_source_dir%/swift"^
+  -DLLDB_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
+  -DLLDB_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
   -DLLDB_PATH_TO_SWIFT_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"^
-  -DCMAKE_C_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
-  -DCMAKE_CXX_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
-  -DCMAKE_C_FLAGS="/Z7"^
-  -DCMAKE_CXX_FLAGS="/Z7 -Wno-c++98-compat"^
   -DLLVM_ENABLE_ASSERTIONS=YES
 popd
 cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
