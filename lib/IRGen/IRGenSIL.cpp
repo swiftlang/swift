@@ -1979,12 +1979,31 @@ void IRGenSILFunction::visitGradientInst(GradientInst *i) {
 }
 
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  // The original function and associated functions can be thin or thick.
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  for (auto &assocFnOp : i->getAssociatedFunctions())
+    e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
+  setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::
 visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
-  llvm_unreachable("FIXME: handle this");
+  unsigned assocFnOffset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  unsigned structFieldOffset = assocFnOffset + 1;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto adFnExp = getLoweredExplosion(i->getFunctionOperand());
+  Explosion e;
+  e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)adFnExp.claimAll();
+  setLoweredExplosion(i, e);
 }
 
 // The code structure resembles

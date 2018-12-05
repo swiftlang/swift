@@ -673,9 +673,13 @@ getAssociatedFunctionType(SILValue function,
                           SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getExtInfo().isDifferentiable());
+  auto originalFnTy =
+      fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiability(
+          FunctionTypeDifferentiability::None));
   // FIXME: Get indices from the @autodiff function type.
-  auto assocFnTy = fnTy->getAutoDiffAssociatedFunctionType(
-      SmallBitVector(), differentiationOrder, kind, module,
+  auto assocFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+      SmallBitVector(originalFnTy->getNumParameters(), true),
+      differentiationOrder, kind, module,
       LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(assocFnTy);
 }
