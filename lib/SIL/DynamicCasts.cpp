@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -93,15 +94,10 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  auto conformance = M->lookupConformance(source, TargetProtocol);
-  if (conformance) {
-    // A conditional conformance can have things that need to be evaluated
-    // dynamically.
-    if (conformance->getConditionalRequirements().empty())
-      return DynamicCastFeasibility::WillSucceed;
-
-    return DynamicCastFeasibility::MaySucceed;
-  }
+  // If conformsToProtocol returns a valid conformance, then all requirements
+  // were proven by the type checker.
+  if (M->conformsToProtocol(source, TargetProtocol))
+    return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
   if (!SourceNominalTy)
@@ -127,6 +123,22 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
       // protocol, then we can still return WillFail.
       return DynamicCastFeasibility::MaySucceed;
     }
+  }
+
+  // The WillFail conditions below assume any possible conformance on the
+  // nominal source type has been ruled out. The prior conformsToProtocol query
+  // identified any definite conformance. Now check if there is already a known
+  // conditional conformance on the nominal type with requirements that were
+  // not proven.
+  //
+  // TODO: The TypeChecker can easily prove that some requirements cannot be
+  // met. Returning WillFail in those cases would be more optimal. To do that,
+  // the conformsToProtocol interface needs to be reformulated as a query, and
+  // the implementation, including checkGenericArguments, needs to be taught to
+  // recognize that types with archetypes may potentially succeed.
+  if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
+    assert(!conformance->getConditionalRequirements().empty());
+    return DynamicCastFeasibility::MaySucceed;
   }
 
   // If the source type is file-private or target protocol is file-private,
