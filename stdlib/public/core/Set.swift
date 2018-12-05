@@ -1367,8 +1367,8 @@ extension Set.Index {
       }
       let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
+      defer { _variant = .cocoa(cocoa) }
       yield &cocoa
-      _variant = .cocoa(cocoa)
     }
   }
 #endif
