@@ -275,7 +275,7 @@ const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
 
   // Otherwise, lookup the ID and Type and store them in the map.
   StringRef NameRef = getBuiltinBaseName(getASTContext(), ID.str(), Info.Types);
-  Info.ID = (llvm::Intrinsic::ID)getLLVMIntrinsicID(NameRef);
+  Info.ID = getLLVMIntrinsicID(NameRef);
 
   return Info;
 }

@@ -45,10 +45,12 @@ bool BuiltinInfo::isReadNone() const {
 }
 
 bool IntrinsicInfo::hasAttribute(llvm::Attribute::AttrKind Kind) const {
-  // FIXME: We should not be relying on the global LLVM context.
-  llvm::AttributeList attrs =
-      llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  return (attrs.hasAttribute(llvm::AttributeList::FunctionIndex, Kind));
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
+  if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
+    // FIXME: We should not be relying on the global LLVM context.
+    Attrs = llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
+  }
+  return Attrs.hasFnAttribute(Kind);
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -1223,10 +1225,7 @@ static const char *const IntrinsicNameTable[] = {
 #include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
-/// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
-/// removed (e.g. like "bswap") return the LLVM IR IntrinsicID for the intrinsic
-/// or 0 if the intrinsic name doesn't match anything.
-unsigned swift::getLLVMIntrinsicID(StringRef InName) {
+llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
   // Swift intrinsic names start with int_.
@@ -1319,12 +1318,11 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
 
 /// \returns true on success, false on failure.
 static bool
-getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
+getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
+                                 ArrayRef<Type> TypeArgs,
                                  ASTContext &Context,
                                  SmallVectorImpl<Type> &ArgElts,
-                                 Type &ResultTy, FunctionType::ExtInfo &Info) {
-  llvm::Intrinsic::ID ID = (llvm::Intrinsic::ID)iid;
-  
+                                 Type &ResultTy) {
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   SmallVector<IITDescriptor, 8> Table;
   getIntrinsicInfoTableEntries(ID, Table);
@@ -1346,7 +1344,6 @@ getSwiftFunctionTypeForIntrinsic(unsigned iid, ArrayRef<Type> TypeArgs,
   // Translate LLVM function attributes to Swift function attributes.
   llvm::AttributeList attrs =
       llvm::Intrinsic::getAttributes(getGlobalLLVMContext(), ID);
-  Info = FunctionType::ExtInfo();
   if (attrs.hasAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
@@ -1437,13 +1434,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   // If this is the name of an LLVM intrinsic, cons up a swift function with a
   // type that matches the IR types.
-  if (unsigned ID = getLLVMIntrinsicID(OperationName)) {
+  if (llvm::Intrinsic::ID ID = getLLVMIntrinsicID(OperationName)) {
     SmallVector<Type, 8> ArgElts;
     Type ResultTy;
-    FunctionType::ExtInfo Info;
-    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy,
-                                         Info))
-      return getBuiltinFunction(Id, ArgElts, ResultTy, Info);
+    if (getSwiftFunctionTypeForIntrinsic(ID, Types, Context, ArgElts, ResultTy))
+      return getBuiltinFunction(Id, ArgElts, ResultTy);
   }
   
   // If this starts with fence, we have special suffixes to handle.
