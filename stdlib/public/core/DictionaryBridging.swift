@@ -365,7 +365,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       if stop != 0 { return }
     }
   }
-
+  
   @objc
   internal var count: Int {
     return native.count

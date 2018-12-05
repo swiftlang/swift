@@ -30,7 +30,6 @@ template <class FromTy> struct DestType;
 #define BRIDGE_TYPE(FROM, TO) \
 template <> struct DestType<FROM> { using type = TO; }
 
-BRIDGE_TYPE(_swift_shims_CFAllocatorRef, CFAllocatorRef);
 BRIDGE_TYPE(_swift_shims_CFStringRef, CFStringRef);
 BRIDGE_TYPE(_swift_shims_UniChar *, UniChar *);
 BRIDGE_TYPE(_swift_shims_CFStringEncoding, CFStringEncoding);
@@ -75,12 +74,13 @@ swift::_swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef theString) {
   return CFStringGetLength(cast(theString));
 }
 
+extern "C" CFAllocatorRef const kCFAllocatorSystemDefault;
+
 _swift_shims_CFStringRef
 swift::_swift_stdlib_CFStringCreateWithSubstring(
-                                         _swift_shims_CFAllocatorRef alloc,
                                          _swift_shims_CFStringRef str,
                                          _swift_shims_CFRange range) {
-  return cast(CFStringCreateWithSubstring(cast(alloc), cast(str), cast(range)));
+  return cast(CFStringCreateWithSubstring(kCFAllocatorSystemDefault, cast(str), cast(range)));
 }
 
 _swift_shims_CFComparisonResult
@@ -108,17 +108,15 @@ swift::_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef theStr
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFAllocatorRef alloc,
-                                        _swift_shims_CFStringRef theString) {
-  return cast(CFStringCreateCopy(cast(alloc), cast(theString)));
+swift::_swift_stdlib_CFStringCreateCopy(_swift_shims_CFStringRef theString) {
+  return cast(CFStringCreateCopy(kCFAllocatorSystemDefault, cast(theString)));
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateWithBytes(
-    _swift_shims_CFAllocatorRef _Nullable alloc, const uint8_t *bytes,
+swift::_swift_stdlib_CFStringCreateWithBytes(const uint8_t *bytes,
     _swift_shims_CFIndex numBytes, _swift_shims_CFStringEncoding encoding,
     _swift_shims_Boolean isExternalRepresentation) {
-  return cast(CFStringCreateWithBytes(cast(alloc), bytes, numBytes,
+  return cast(CFStringCreateWithBytes(kCFAllocatorSystemDefault, bytes, numBytes,
                                       cast(encoding),
                                       isExternalRepresentation));
 }
@@ -136,7 +134,6 @@ swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
 
 extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
 extern "C" CFHashCode CFStringHashNSString(id str);
-
 
 _swift_shims_CFHashCode
 swift::_swift_stdlib_CFStringHashNSString(id _Nonnull obj) {

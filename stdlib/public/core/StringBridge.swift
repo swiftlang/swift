@@ -26,7 +26,7 @@ internal typealias _CocoaString = AnyObject
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
-  let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
+  let result = _swift_stdlib_CFStringCreateCopy(source) as AnyObject
   return result
 }
 
@@ -274,7 +274,7 @@ extension String {
       return _guts.asSmall.withUTF8 { bufPtr in
         // TODO(String bridging): worth isASCII check for different encoding?
         return _swift_stdlib_CFStringCreateWithBytes(
-            nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
             bufPtr.count,
             kCFStringEncodingUTF8, 0)
         as AnyObject

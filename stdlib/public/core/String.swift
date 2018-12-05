@@ -842,3 +842,11 @@ extension String {
     }
   }
 }
+
+extension String {
+  //SPI: NSDictionary bridging
+  @inlinable public
+  var _isKnownNFC:Bool {
+    return _guts.isNFC
+  }
+}

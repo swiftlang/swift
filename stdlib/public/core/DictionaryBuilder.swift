@@ -27,6 +27,13 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
     _target = _NativeDictionary(capacity: count)
     _requestedCount = count
   }
+  
+  @inlinable
+  public mutating func add(possibleDuplicateKey newKey: Key, value: Value) {
+    _precondition(_target.count < _requestedCount,
+      "Can't add more members than promised")
+    _target.setValue(value, forKey: newKey, isUnique: true)
+  }
 
   @inlinable
   public mutating func add(key newKey: Key, value: Value) {

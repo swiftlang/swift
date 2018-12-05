@@ -13,6 +13,17 @@
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 
+@objc internal protocol _NSDictionaryEnumerationHack {
+  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  func enumerateKeysAndObjects(
+    options: Int,
+    using block: @convention(block) (
+    Unmanaged<AnyObject>,
+    Unmanaged<AnyObject>,
+    UnsafeMutablePointer<UInt8>
+    ) -> Void)
+}
+
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
@@ -62,64 +73,100 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(
-    _ d: NSDictionary,
+    _ x: NSDictionary,
     result: inout Dictionary?
   ) {
     if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
-        d as AnyObject) {
+        x as AnyObject) {
       result = native
       return
     }
 
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = [Key : Value](_cocoaDictionary: d)
-      return
-    }
-
-    if Key.self == String.self {
-      // String and NSString have different concepts of equality, so
-      // string-keyed NSDictionaries may generate key collisions when bridged
-      // over to Swift. See rdar://problem/35995647
-      var dict = Dictionary(minimumCapacity: d.count)
-      d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
-        let key = Swift._forceBridgeFromObjectiveC(
-          anyKey as AnyObject, Key.self)
-        let value = Swift._forceBridgeFromObjectiveC(
-          anyValue as AnyObject, Value.self)
-        // FIXME: Log a warning if `dict` already had a value for `key`
-        dict[key] = value
-      })
-      result = dict
+      result = [Key : Value](_cocoaDictionary: x)
       return
     }
 
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
-      let anyObjectKey = anyKey as AnyObject
-      let anyObjectValue = anyValue as AnyObject
-      builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
-    })
+    let fastSelf = unsafeBitCast(x, to: _NSDictionaryEnumerationHack.self)
+    var builder = _DictionaryBuilder<Key, Value>(count: x.count)
+    fastSelf.enumerateKeysAndObjects(options: 0) { (anyKey, anyValue, stopPtr) in
+      anyKey._withUnsafeGuaranteedRef { (anyKey) in
+        anyValue._withUnsafeGuaranteedRef { (anyValue) in
+          let key = Swift._forceBridgeFromObjectiveC(
+                  anyKey, Key.self)
+          let value = Swift._forceBridgeFromObjectiveC(
+                  anyValue, Value.self)
+          // String and NSString have different concepts of equality, so
+          // string-keyed NSDictionaries may generate key collisions when bridged
+          // over to Swift. See rdar://problem/35995647
+          if Key.self == String.self &&
+                !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
+            // FIXME: Log a warning if `dict` already had a value for `key`
+              builder.add(
+                possibleDuplicateKey: key,
+                value: value)
+          } else {
+            builder.add(
+                key: key,
+                value: value)
+          }
+        }
+      }
+    }
     result = builder.take()
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     _ x: NSDictionary,
     result: inout Dictionary?
-  ) -> Bool {
-    let anyDict = x as [NSObject : AnyObject]
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = Swift._dictionaryDownCastConditional(anyDict)
-      return result != nil
+    ) -> Bool {
+    
+    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
+      x as AnyObject) {
+      result = native
+      return true
     }
-
-    result = anyDict as? Dictionary
-    return result != nil
+    
+    var success = true
+    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
+    // may not be backed by an NSDictionary.
+    let fastSelf = unsafeBitCast(x, to: _NSDictionaryEnumerationHack.self)
+    var builder = _DictionaryBuilder<Key, Value>(count: x.count)
+    fastSelf.enumerateKeysAndObjects(options: 0) { (anyKey, anyValue, stopPtr) in
+      anyKey._withUnsafeGuaranteedRef { (anyKey) in
+        anyValue._withUnsafeGuaranteedRef { (anyValue) in
+          guard let key = Swift._conditionallyBridgeFromObjectiveC(
+            anyKey, Key.self),
+            let value = Swift._conditionallyBridgeFromObjectiveC(
+              anyValue, Value.self) else {
+                stopPtr.pointee = 1
+                success = false
+                return
+          }
+          // String and NSString have different concepts of equality, so
+          // string-keyed NSDictionaries may generate key collisions when bridged
+          // over to Swift. See rdar://problem/35995647
+          if Key.self == String.self &&
+            !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
+            // FIXME: Log a warning if `dict` already had a value for `key`
+            builder.add(
+              possibleDuplicateKey: key,
+              value: value)
+          } else {
+            builder.add(
+              key: key,
+              value: value)
+          }
+        }
+      }
+    }
+    if success {
+      result = builder.take()
+    }
+    return success
   }
 
   @_effects(readonly)
