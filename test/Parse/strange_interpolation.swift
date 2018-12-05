@@ -1,5 +1,10 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4.2
-// RUN: %target-run-simple-swift -swift-version 4.2 %s | %FileCheck %s
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -swift-version 4.2 %s -o %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// REQUIRES: executable_test
 
  let x = 1
 
