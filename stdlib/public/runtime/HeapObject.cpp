@@ -61,7 +61,7 @@ using namespace swift;
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
-#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__)
+#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || defined(__powerpc64__) || defined(__ppc__) || defined(__PPC__) || defined(__LITTLE_ENDIAN__)
   // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   // On s390x it is theoretically possible to have high bit set but in practice
