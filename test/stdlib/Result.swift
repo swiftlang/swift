@@ -56,7 +56,7 @@ ResultTests.test("Construction") {
   }()
 
   expectEqual(string, string1)
-  expectEqual(error, .err)
+  expectEqual(.err, error)
 }
 
 ResultTests.test("Throwing Initialization and Unwrapping") {
