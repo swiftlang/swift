@@ -5194,7 +5194,10 @@ public:
     return BodyKind(Bits.AbstractFunctionDecl.BodyKind);
   }
 
-  using BodySynthesizer = void (*)(AbstractFunctionDecl *);
+  struct BodySynthesizer {
+    void (* Fn)(AbstractFunctionDecl *, void *);
+    void *Context;
+  };
 
 private:
   ParameterList *Params;
@@ -5318,7 +5321,8 @@ public:
   BraceStmt *getBody(bool canSynthesize = true) const {
     if (canSynthesize && getBodyKind() == BodyKind::Synthesize) {
       const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-      (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this));
+      (Synthesizer.Fn)(const_cast<AbstractFunctionDecl *>(this),
+                       Synthesizer.Context);
     }
     if (getBodyKind() == BodyKind::Parsed ||
         getBodyKind() == BodyKind::TypeChecked) {
@@ -5350,9 +5354,10 @@ public:
   }
 
   /// Note that parsing for the body was delayed.
-  void setBodySynthesizer(BodySynthesizer synthesizer) {
+  void setBodySynthesizer(void (* fn)(AbstractFunctionDecl *, void *),
+                         void *context = nullptr) {
     assert(getBodyKind() == BodyKind::None);
-    Synthesizer = synthesizer;
+    Synthesizer = {fn, context};
     setBodyKind(BodyKind::Synthesize);
   }
 

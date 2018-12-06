@@ -59,7 +59,8 @@ static Type deriveRawRepresentable_Raw(DerivedConformance &derived) {
   return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
 }
 
-static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
+static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
+                                           void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
@@ -188,7 +189,7 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
 }
 
 static void
-deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
+deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
