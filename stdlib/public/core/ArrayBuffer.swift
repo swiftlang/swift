@@ -354,24 +354,22 @@ extension _ArrayBuffer {
     return element
   }
 
-  /// Get or set the value of the ith element.
+  /// Get or set the value of the ith element without index validation.
+  /// Mutations assume self is uniquely referenced.
   @inlinable
   internal subscript(i: Int) -> Element {
-    get {
-      return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
+    @inline(__always)
+    _read {
+      if _fastPath(_isNativeTypeChecked) {
+        yield _nativeTypeChecked[i]
+      } else {
+        yield unsafeBitCast(_getElementSlowPath(i), to: Element.self)
+      }
     }
-    
-    nonmutating set {
-      if _fastPath(_isNative) {
-        _native[i] = newValue
-      }
-      else {
-        var refCopy = self
-        refCopy.replaceSubrange(
-          i..<(i + 1),
-          with: 1,
-          elementsOf: CollectionOfOne(newValue))
-      }
+    @inline(__always)
+    nonmutating _modify {
+      _internalInvariant(_isNative, "must be a native buffer")
+      yield &_native[i]
     }
   }
 
