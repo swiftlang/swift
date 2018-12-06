@@ -4466,6 +4466,23 @@ void DifferentiationTask::createVJP() {
                          SILDebugScope(original->getLocation(), vjp));
   attr->setVJPName(vjp->getName());
 
+  // Work around a bad interaction between VJPs, TFDeabstraction, and SIL
+  // optimizations.
+  //
+  // The bad interaction is: TFDeabstraction cannot inline the functions that
+  // the VJP partially applies. When run in "-Onone" mode, this is fine (but
+  // inefficient), because we just generate sends/recvs to handle it. But in
+  // "-O" mode, later SIL optimization passes:
+  // - fold the partial applications and inline them, or
+  // - specialize the partial_apply callees.
+  // In either case, the inlined/specialized bodies haven't been deabstracted,
+  // so partitioning crashes when it sees them.
+  //
+  // TODO: Fix this problem in a way that allows inlining/specialization of
+  // VJPs. Teaching TFDeabstraction to fold partial applications might work.
+  vjp->setInlineStrategy(NoInline);
+  vjp->addSemanticsAttr("optimize.sil.specialize.generic.never");
+
   LLVM_DEBUG(llvm::dbgs() << "  vjp type: "
                           << vjp->getLoweredFunctionType() << "\n");
 
