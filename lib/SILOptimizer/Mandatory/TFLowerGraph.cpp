@@ -369,85 +369,6 @@ private: // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
   llvm::StringSet<> usedOpNames;
 
-  /// Provides the context for creating the dataset / iterator node stack, along
-  /// with an infeed enqueue node consuming the output of the iterator.
-  struct DatasetCreationContext {
-    /// The instruction corresponding to the graph_op
-    /// tfc.makeIteratorGetNextWithDatasets.
-    SILInstruction *datasetInst = nullptr;
-
-    /// Specifies which (hard-coded) iterator stack to create.
-    enum DataSource {
-      // Use a fake iterator stack that's non-file-based, for unit testing only.
-      FAKE = 0,
-      // Read an MNIST file dataset.
-      MNIST = 1,
-      // Reads an Imagenet file dataset.
-      IMAGENET = 2
-    };
-    DataSource dataSource;
-
-    /// The file path for Imagenet or MNIST data. Olny defined when dataSource
-    /// is not FAKE.
-    StringRef filePath;
-
-    /// The batch size for each IteratorGetNext call.
-    int batchSize;
-
-    /// Metadata for the infeed enqueue node creation.
-    /// FIXME: Assess whether to use SmallVector.
-    std::vector<int64_t> dims;
-    std::vector<int> numDims;
-    std::vector<int64_t *> dimPtrs;
-    std::vector<TF_DataType> infeedInputDtypes;
-
-  public:
-    DatasetCreationContext(SILInstruction *datasetInst, DataSource dataSource,
-                           StringRef filePath, int batchSize,
-                           ArrayRef<int64_t> dims, ArrayRef<int> numDims,
-                           ArrayRef<TF_DataType> dTypes)
-        : datasetInst(datasetInst), dataSource(dataSource), filePath(filePath),
-          batchSize(batchSize), dims(dims), numDims(numDims),
-          infeedInputDtypes(dTypes) {
-      assert(numDims.size() == dTypes.size());
-      auto dimPtr = this->dims.data();
-      for (unsigned shape = 0; shape != numDims.size(); ++shape) {
-        dimPtrs.push_back(dimPtr);
-        dimPtr += numDims[shape];
-      }
-    }
-
-    /// Returns the number of tensors produced by the dataset / iterator stack.
-    int getNumTensors() const { return infeedInputDtypes.size(); }
-
-    /// `desc` can be the partially constructed infeed enqueue or dequeue node.
-    void setInfeedTypeAndShapeList(TF_OperationDescription *desc) {
-      TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
-                         infeedInputDtypes.size());
-      TF_SetAttrShapeList(desc, "shapes", dimPtrs.data(), numDims.data(),
-                          dimPtrs.size());
-    }
-
-    TF_Operation *makeIteratorGetNextWithDatasets(TF_Graph *resultGraph,
-                                                  TF_Status *status) {
-      if (dataSource == FAKE) {
-        // For unit testing.
-        return TF_MakeFakeIteratorGetNextWithDatasets(resultGraph, status);
-      }
-      return TF_MakeFileBasedIteratorGetNextWithDatasets(
-          resultGraph, filePath.str().c_str(), batchSize, dataSource == MNIST,
-          status);
-    }
-  };
-
-  /// When non-NULL, uses TF dataset / iterators mechanism to feed input
-  /// data. Current requirements / restrictions:
-  /// 1. Only supported in the TPU TF graph generation mode with infeed support.
-  /// 2. All input tensors of the TF graph must be supplied via this mechanism
-  /// (in other words, the generated TF graph should require 0 input from other
-  /// Placeholders, etc).
-  std::unique_ptr<DatasetCreationContext> datasetCreationContext;
-
   /// Adds TPU config-related nodes to the graph, and sets `*metadataNode` to
   /// the created TPUReplicateMetadata node.
   ///
@@ -592,18 +513,6 @@ public: // Lowering functionality.
   GLStatus lowerConditionalRegion(ConditionalSESERegion *r);
 
 private: // Helpers for lowering.
-  /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
-  ///
-  /// FIXME: Dissolve this builtin into a set of finer-grained, composable
-  /// features.
-  template <typename Inst>
-  GLStatus createDatasetCreationContext(Inst *inst,
-                                        std::vector<SILOpResult> &results);
-  template <typename Inst> GLStatus visitTFDataset(Inst *inst);
-
-  // TODO: remove this after we complete proper dataset/iterator support.
-  bool createDatasetIteratorNodesWithInfeedEnqueue();
-
   GLStatus visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo);
   GLStatus visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo);
   // D2D means device-to-device.
@@ -879,44 +788,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
 //===----------------------------------------------------------------------===//
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
-
-bool TFGraphFunctionLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
-  assert(datasetCreationContext);
-  TF_Operation *getnextOp =
-      datasetCreationContext->makeIteratorGetNextWithDatasets(resultGraph,
-                                                              status);
-
-  // If the node builder failed, then the tfop definition is wrong, report
-  // an error in a way that can hopefully be fixed - pointing to the op
-  // definition in the Swift code, and emitting the TensorFlow error
-  // information.
-  if (checkStatus(getUserSourceLocation(
-                      datasetCreationContext->datasetInst->getDebugLocation()),
-                  diag::tfop_incorrect_definition))
-    return true;
-
-  // Add infeed enqueue to consume the output of the iterator.
-  {
-    auto infeedOpName = funcNodeBaseName + "/InfeedEnqueueTuple";
-    auto *desc = TF_NewOperation(resultGraph, "InfeedEnqueueTuple",
-                                 infeedOpName.c_str());
-    int numInputs = datasetCreationContext->getNumTensors();
-    std::vector<TF_Output> infeedInputs;
-    infeedInputs.reserve(numInputs);
-    for (int i = 0; i < numInputs; ++i) {
-      infeedInputs.push_back({getnextOp, i});
-    }
-    TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
-    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
-    TF_SetAttrInt(desc, "device_ordinal", 0);
-    datasetCreationContext->setInfeedTypeAndShapeList(desc);
-    /*TF_Operation* enqueue =*/TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn.getLocation()))
-      return true;
-  }
-
-  return false;
-}
 
 /// If `type` is Tensor<T> or TensorHandle<T>, return the TF_DataType
 /// corresponding to element type T. Otherwise, return 0.
@@ -1415,101 +1286,6 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   }
 }
 
-template <>
-GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
-    GraphOperationInst *inst, std::vector<SILOpResult> &outputResults) {
-  GraphOperationInfo graphOpInfo(inst);
-  // Type check and process the first attribute: dataSource.
-  auto dataSource = llvm::StringSwitch<DatasetCreationContext::DataSource>(
-                        graphOpInfo.getStringAttr(0, "dataSource"))
-                        .Case("fake", DatasetCreationContext::FAKE)
-                        .Case("mnist", DatasetCreationContext::MNIST)
-                        .Default(DatasetCreationContext::IMAGENET);
-
-  // Type check and process the second attribute: filePath.
-  // When dataSource is FAKE, this attribute needs to be present, but is not
-  // used.
-  StringRef filePath = (dataSource == DatasetCreationContext::FAKE)
-                           ? ""
-                           : graphOpInfo.getStringAttr(1, "filePath");
-  // Type check and process the third attribute: batchSize
-  int batchSize = graphOpInfo.getIntAttr(2, "batchSize");
-
-  // Type check and process the fourth attribute: outputShapes
-  auto attr = inst->getAttribute(3);
-  SmallVector<int64_t, 8> dims;
-  SmallVector<int, 3> numDims;
-  SmallVector<int64_t *, 8> dimPtrs;
-  decodeShapeArray(SILFn.getASTContext(), attr.value, dims, numDims, dimPtrs);
-
-  // Even when this built-in returns multiple tensors, they are always presented
-  // by a single tuple.
-  std::vector<TF_DataType> outputTypes;
-  for (const SILValue &result : inst->getResults()) {
-    auto outputType = result->getType().getASTType();
-    auto tfType = getTFDataTypeFromTensorGenericType(outputType);
-    if (tfType == 0) {
-      internalError(getUserSourceLocation(inst->getDebugLocation()),
-                    "Encountered a non-tensor type during dataset creation.",
-                    diag::tfop_invalid_tfop);
-      return GLStatus::Error;
-    }
-    outputTypes.push_back(static_cast<TF_DataType>(tfType));
-    outputResults.emplace_back(result, 0);
-  }
-
-  if (outputTypes.size() != numDims.size()) {
-    internalError(getUserSourceLocation(inst->getDebugLocation()),
-                  "Must specify the same number of shapes and output tensors.",
-                  diag::tfop_invalid_tfop);
-    return GLStatus::Error;
-  }
-
-  // Defer the creation of the dataset / iterator related nodes, along with the
-  // associated infeed enqueue till the creation of top level function
-  // nodes. Here we fill in the dataset creation context, and then create an
-  // infeed dequeue node to feed the user(s) of `inst`.
-  datasetCreationContext.reset(new DatasetCreationContext(
-      inst, dataSource, filePath, batchSize, dims, numDims, outputTypes));
-
-  return GLStatus::Success;
-}
-
-template <typename Inst>
-GLStatus TFGraphFunctionLowering::visitTFDataset(Inst *inst) {
-  // FIXME: Also support dataset/iterator outside of TPU context.
-  if (thisDeviceType != DeviceType::TPU || !deviceInfo.isTPUInfeedEnabled) {
-    internalError(
-        getUserSourceLocation(inst->getDebugLocation()),
-        "Builtin tfc.makeIteratorGetNextWithDatasets can only be used when "
-        "generating TPU TF graphs with infeed support.",
-        diag::tfop_invalid_tfop);
-    return GLStatus::Error;
-  }
-
-  std::vector<SILOpResult> outputResults;
-  GLStatus datasetStatus = createDatasetCreationContext(inst, outputResults);
-  if (datasetStatus != GLStatus::Success) {
-    // Error is already recorded.
-    return datasetStatus;
-  }
-  {
-    auto &graphFn = getCurrentGraphFunction();
-    auto *desc = TF_NewOperation(graphFn.getGraph(), "InfeedDequeueTuple",
-                                 "InfeedDequeueTuple");
-    markNodeAsTPUReplicated(desc);
-    datasetCreationContext->setInfeedTypeAndShapeList(desc);
-    auto *dequeue = TF_FinishOperation(desc, status);
-    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
-      return GLStatus::Error;
-
-    for (int i = 0, n = outputResults.size(); i != n; ++i) {
-      addValueMapping(outputResults[i], {dequeue, i});
-    }
-  }
-  return GLStatus::Success;
-}
-
 void TFGraphFunctionLowering::handleFunctionAttribute(
     TF_OperationDescription *op, const std::string &opName, SILLocation loc,
     StringRef silFuncName) {
@@ -1544,10 +1320,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     return visitGraphOpD2DTensorRecvInst(decoder);
   else if (opName == "tfc.D2DTensorSend")
     return visitGraphOpD2DTensorSendInst(decoder);
-
-  // Dataset creation
-  if (opName.startswith("tfc.makeIteratorGetNextWithDatasets"))
-    return visitTFDataset<GraphOperationInst>(inst);
 
   auto &graphFn = getCurrentGraphFunction();
 
@@ -2783,11 +2555,6 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
     }
     /*TF_Operation *outputNode =*/TF_FinishOperation(outputDesc, status);
     if (checkStatus(SILFn.getLocation()))
-      return true;
-  }
-
-  if (datasetCreationContext) {
-    if (createDatasetIteratorNodesWithInfeedEnqueue())
       return true;
   }
 
