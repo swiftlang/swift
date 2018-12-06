@@ -89,6 +89,9 @@ enum class FixKind : uint8_t {
   /// @autoclosure conversions are unsupported starting from
   /// Swift version 5.
   AutoClosureForwarding,
+
+  /// Remove `!` or `?` because base is not an optional type.
+  RemoveUnwrap,
 };
 
 class ConstraintFix {
@@ -406,6 +409,23 @@ public:
 
   static AutoClosureForwarding *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
+};
+
+class RemoveUnwrap final : public ConstraintFix {
+  Type BaseType;
+
+public:
+  RemoveUnwrap(ConstraintSystem &cs, Type baseType, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveUnwrap, locator), BaseType(baseType) {}
+
+  std::string getName() const override {
+    return "remove unwrap operator `!` or `?`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
+                              ConstraintLocator *locator);
 };
 
 } // end namespace constraints

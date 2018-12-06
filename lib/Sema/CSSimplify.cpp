@@ -2979,10 +2979,27 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
     return SolutionKind::Unsolved;
   }
   
-  // If the base type is not optional, the constraint fails.
+
   Type objectTy = optTy->getOptionalObjectType();
-  if (!objectTy)
-    return SolutionKind::Error;
+  // If the base type is not optional, let's attempt a fix (if possible)
+  // and assume that `!` is just not there.
+  if (!objectTy) {
+    // Let's see if we can apply a specific fix here.
+    if (shouldAttemptFixes()) {
+      auto *fix =
+          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      // If the fix was successful let's record
+      // "fixed" object type and continue.
+      objectTy = optTy;
+    } else {
+      // If fixes are not allowed, no choice but to fail.
+      return SolutionKind::Error;
+    }
+  }
   
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
@@ -5427,6 +5444,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
   case FixKind::AutoClosureForwarding:
+  case FixKind::RemoveUnwrap:
     llvm_unreachable("handled elsewhere");
   }
 

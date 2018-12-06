@@ -292,3 +292,13 @@ func se0213() {
   _ = Q("who")!.foo // Ok
   _ = Q?("how") // Ok
 }
+
+func rdar45218255(_ i: Int) {
+  struct S<T> {
+    init(_:[T]) {}
+  }
+
+  _ = i!           // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{8-9=}}
+  _ = [i!]         // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{9-10=}}
+  _ = S<Int>([i!]) // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{16-17=}}
+}

@@ -1184,6 +1184,14 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{cannot force unwrap value of non-optional type 'Bool'}} {{18-19=}}
+    // expected-error@-2 {{cannot force unwrap value of non-optional type 'Bool'}} {{24-25=}}
+    // expected-error@-3 {{cannot force unwrap value of non-optional type 'Bool'}} {{36-37=}}
+    // expected-error@-4 {{cannot force unwrap value of non-optional type 'Bool'}} {{48-49=}}
+  }
+
+  let _ = [i, j, k].reduce(0 as Int?) {
+    $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
