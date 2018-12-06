@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -429,6 +430,14 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
     VD = VD->getOverriddenDecl();
 
   VD->print(Printer, PO);
+}
+
+void SwiftLangSupport::printFullyAnnotatedGenericReq(
+    const swift::GenericSignature *Sig, llvm::raw_ostream &OS) {
+  assert(Sig);
+  FullyAnnotatedDeclarationPrinter Printer(OS);
+  PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
+  Sig->print(Printer, PO);
 }
 
 void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
