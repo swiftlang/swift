@@ -23,18 +23,6 @@ func test() {
 // CHECK:        key.modulename: "Swift"
 // CHECK-NEXT: },
 
-// CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
-// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
-// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
-// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
-// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
-// CHECK-NEXT:   key.moduleimportdepth: 1,
-// CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK-NOT:    key.modulename
-// CHECK:        key.modulename: "Swift"
-// CHECK-NEXT: },
-
 // FooHelper.FooHelperExplicit == 1
 // CHECK-LABEL:  key.name: "fooHelperExplicitFrameworkFunc1(:)",
 // CHECK-NEXT:   key.sourcetext: "fooHelperExplicitFrameworkFunc1(<#T##a: Int32##Int32#>)",
