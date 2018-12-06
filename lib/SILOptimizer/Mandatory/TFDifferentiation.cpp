@@ -4222,6 +4222,9 @@ void DifferentiationTask::createVJP() {
   auto originalConv = original->getConventions();
   auto primalConv = primal->getConventions();
 
+  // Keep track of some stack allocation to clean up.
+  SmallVector<SILValue, 2> stackAllocsToCleanUp;
+
   // Validate signatures.
 #ifndef NDEBUG
   auto adjointConv = adjoint->getConventions();
@@ -4291,6 +4294,21 @@ void DifferentiationTask::createVJP() {
   // === Call primal with original arguments. ===
   SmallVector<SILValue, 8> primalArgs;
 
+  // Allocate space for indirect checkpoint results, and pass the addresses to
+  // the primal.
+  unsigned remainingIndirectCheckpointResults =
+      primalConv.getNumIndirectSILResults() -
+      originalConv.getNumIndirectSILResults();
+  for (auto silType : primalConv.getIndirectSILResultTypes()) {
+    if (remainingIndirectCheckpointResults == 0)
+      break;
+    auto type = vjp->mapTypeIntoContext(silType.getObjectType());
+    auto resultBuf = builder.createAllocStack(loc, type);
+    primalArgs.push_back(resultBuf);
+    stackAllocsToCleanUp.push_back(resultBuf);
+    --remainingIndirectCheckpointResults;
+  }
+
   // Tell the primal to put its indirect results in the vjp indirect result
   // buffers. This assumes that the primal indirect results are exactly the vjp
   // indirect results, an assumption that we check in assertions above.
@@ -4312,10 +4330,8 @@ void DifferentiationTask::createVJP() {
   if (primalConv.getNumDirectSILResults() == 1)
     primalDirectResults.push_back(primalApply);
   else {
-    auto tupleSILTy = primalConv.getSILResultType();
     for (unsigned i : range(primalConv.getNumDirectSILResults())) {
-      auto val = builder.createTupleExtract(loc, primalApply, i,
-                                            tupleSILTy.getTupleElementType(i));
+      auto val = builder.createTupleExtract(loc, primalApply, i);
       primalDirectResults.push_back(val);
     }
   }
@@ -4348,6 +4364,10 @@ void DifferentiationTask::createVJP() {
   auto *adjointPartialApply = builder.createPartialApply(
       loc, adjointRef, vjp->getForwardingSubstitutionMap(), partialAdjointArgs,
       ParameterConvention::Direct_Guaranteed);
+
+  // === Clean up the stack allocations. ===
+  for (auto alloc : reversed(stackAllocsToCleanUp))
+    builder.createDeallocStack(loc, alloc);
 
   // === Return the direct results. ===
   // (Note that indirect results have already been filled in by the application
