@@ -362,6 +362,11 @@ public protocol Sequence {
   __consuming func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
+  
+  @inlinable
+  func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?  
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -1092,17 +1097,24 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-      var it = self.makeIterator()
-      guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
-      for idx in buffer.startIndex..<buffer.count {
-        guard let x = it.next() else {
-          return (it, idx)
-        }
-        ptr.initialize(to: x)
-        ptr += 1
+    var it = self.makeIterator()
+    guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
+    for idx in buffer.startIndex..<buffer.count {
+      guard let x = it.next() else {
+        return (it, idx)
       }
-      return (it,buffer.endIndex)
+      ptr.initialize(to: x)
+      ptr += 1
     }
+    return (it,buffer.endIndex)
+  }
+    
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }  
 }
 
 // FIXME(ABI)#182

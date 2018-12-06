@@ -214,3 +214,4 @@ Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<Sel
 Func Sequence.reduce(into:_:) has parameter 0 changing from Default to Owned
 
 Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has been added as a protocol requirement
+Func Sequence.withContiguousStorageIfAvailable(_:) has been added as a protocol requirement
