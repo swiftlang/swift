@@ -319,28 +319,27 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inlinable
   @inline(__always)
   internal func getElement(_ i: Int) -> Element {
-    _internalInvariant(i >= 0 && i < count, "Array index out of range")
-    return firstElementAddress[i]
+    return getElementAddress(i).pointee
   }
 
-  /// Get or set the value of the ith element.
+  @inlinable
+  @inline(__always)
+  internal func getElementAddress(_ i: Int) -> UnsafeMutablePointer<Element> {
+    _internalInvariant(i >= 0 && i < count, "Array index out of range")
+    return firstElementAddress + i
+  }
+
+  /// Get or set the value of the ith element without index validation.
+  /// Mutations assume self is uniquely referenced.
   @inlinable
   internal subscript(i: Int) -> Element {
     @inline(__always)
-    get {
-      return getElement(i)
+    _read {
+      yield getElementAddress(i).pointee
     }
     @inline(__always)
-    nonmutating set {
-      _internalInvariant(i >= 0 && i < count, "Array index out of range")
-
-      // FIXME: Manually swap because it makes the ARC optimizer happy.  See
-      // <rdar://problem/16831852> check retain/release order
-      // firstElementAddress[i] = newValue
-      var nv = newValue
-      let tmp = nv
-      nv = firstElementAddress[i]
-      firstElementAddress[i] = tmp
+    nonmutating _modify {
+      yield &getElementAddress(i).pointee
     }
   }
 
