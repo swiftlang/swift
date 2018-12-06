@@ -510,3 +510,38 @@ extension String.Index {
     return target._guts.isOnUnicodeScalarBoundary(self)
   }
 }
+
+// Choice Collection algorithms
+extension String.UTF8View {
+  @inlinable
+  public func map<T>(
+    _ transform: (UInt8) throws -> T
+  ) rethrows -> [T] {
+    guard _fastPath(_guts.isFastUTF8) else { return try _foreignMap(transform) }
+    return try _guts.withFastUTF8 { utf8 in
+      return try Array<T>(_unsafeUninitializedCapacity: utf8.count) {
+        buffer, count in
+        count = utf8.count
+
+        var i = 0
+        while i < utf8.count {
+          buffer[_unchecked: i] = try transform(utf8[_unchecked: i])
+          i &+= 1
+        }
+      }
+    }
+  }
+
+  @inline(never)
+  @usableFromInline
+  internal func _foreignMap<T>(
+    _ transform: (UInt8) throws -> T
+  ) rethrows -> [T] {
+    var result = Array<T>()
+    result.reserveCapacity(_guts.count)
+    for cu in self {
+      result.append(try transform(cu))
+    }
+    return result
+  }
+}

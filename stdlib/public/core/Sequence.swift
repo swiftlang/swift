@@ -594,8 +594,10 @@ extension Sequence {
     var iterator = self.makeIterator()
 
     // Add elements up to the initial capacity without checking for regrowth.
-    for _ in 0..<initialCapacity {
-      result.append(try transform(iterator.next()!))
+    var i = 0
+    while i < initialCapacity {
+      result.append(try transform(iterator.next()._unsafelyUnwrappedUnchecked))
+      i &+= 1
     }
     // Add remaining elements, if any.
     while let element = iterator.next() {

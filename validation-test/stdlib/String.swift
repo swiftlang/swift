@@ -2220,4 +2220,36 @@ StringTests.test("NormalizationCheck") {
   expectEqual(expectedCodeUnits, nfcCodeUnits)
 }
 
+@inline(never)
+func mapUTF8<C: Collection>(
+  _ c: C,
+  _ f: (UInt8) -> UInt8
+) -> [UInt8] where C.Element == UInt8 {
+  return c.map(f)
+}
+
+StringTests.test("UTF8View map") {
+  for test in comparisonTestCases {
+    for string in test.strings {
+      let largerString = "🧀🧀🧀🧀🧀" + string
+      func plus1(_ x: UInt8) -> UInt8 { return x &+ 1 }
+
+      let result = Array(string.utf8).map(plus1)
+      let largerResult = Array(largerString.utf8).map(plus1)
+
+      expectEqual(result, string.utf8.map(plus1))
+      expectEqual(result, mapUTF8(string.utf8, plus1))
+      expectEqual(largerResult, largerString.utf8.map(plus1))
+      expectEqual(largerResult, mapUTF8(largerString.utf8, plus1))
+
+      expectEqual(result, NSSlowString(string: string).utf8.map(plus1))
+      expectEqual(result, mapUTF8(NSSlowString(string: string).utf8, plus1))
+      expectEqual(
+        largerResult, NSSlowString(string: largerString).utf8.map(plus1))
+      expectEqual(
+        largerResult, mapUTF8(NSSlowString(string: largerString).utf8, plus1))
+    }
+  }
+}
+
 runAllTests()
