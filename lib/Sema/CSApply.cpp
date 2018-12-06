@@ -3880,6 +3880,8 @@ namespace {
           
           expr->setSubExpr(coercedSubExpr);
         }
+      } else {
+        assert(cs.getType(subExpr)->is<LValueType>());
       }
       
       return replacement;
