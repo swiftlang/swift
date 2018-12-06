@@ -79,8 +79,8 @@ several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
-supported host development operating systems.
+macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are currently
+supported as host development operating systems.
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
