@@ -401,7 +401,10 @@ extension Array {
 
   @inlinable
   @_semantics("array.get_element_address")
-  internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
+  internal func _getElementAddress(
+    _ index: Int,
+    matchingSubscriptCheck: _DependenceToken
+  ) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
   }
 }
@@ -694,7 +697,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
-    get {
+    _read {
       // This call may be hoisted or eliminated by the optimizer.  If
       // there is an inout violation, this value may be stale so needs to be
       // checked again below.
@@ -705,9 +708,17 @@ extension Array: RandomAccessCollection, MutableCollection {
       let token = _checkSubscript(
         index, wasNativeTypeChecked: wasNativeTypeChecked)
 
-      return _getElement(
-        index, wasNativeTypeChecked: wasNativeTypeChecked,
-        matchingSubscriptCheck: token)
+      if _fastPath(wasNativeTypeChecked) {
+        yield _getElementAddress(
+          index,
+          matchingSubscriptCheck: token
+        ).pointee
+      } else {
+        yield _getElement(
+          index,
+          wasNativeTypeChecked: false,
+          matchingSubscriptCheck: token)
+      }
     }
     _modify {
       _makeMutableAndUnique() // makes the array native, too
