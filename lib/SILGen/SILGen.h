@@ -307,6 +307,9 @@ public:
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
 
+  /// Emit the self-conformance witness table for a protocol.
+  void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
+
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
