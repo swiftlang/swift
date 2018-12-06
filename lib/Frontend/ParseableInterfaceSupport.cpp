@@ -157,6 +157,10 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
   // by making them non-fatal).
   SubInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
 
+  // Disable this; deinitializers always get printed with `@objc` even in
+  // modules that don't import Foundation.
+  SubInvocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+
   // Calculate an output filename that includes a hash of relevant key data, and
   // wire up the SubInvocation's InputsAndOutputs to contain both input and
   // output filenames.
