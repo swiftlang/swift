@@ -304,9 +304,16 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal func getElement(_ i: Int) -> Element {
-    _internalInvariant(i >= startIndex, "slice index is out of range (before startIndex)")
+    return getElementAddress(i).pointee
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func getElementAddress(_ i: Int) -> UnsafeMutablePointer<Element> {
+    _internalInvariant(i >= startIndex,
+      "slice index is out of range (before startIndex)")
     _internalInvariant(i < endIndex, "slice index is out of range")
-    return subscriptBaseAddress[i]
+    return subscriptBaseAddress + i
   }
 
   /// Access the element at `position`.
@@ -314,14 +321,12 @@ internal struct _SliceBuffer<Element>
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @inlinable
-  internal subscript(position: Int) -> Element {
-    get {
-      return getElement(position)
+  internal subscript(index: Int) -> Element {
+    _read {
+      yield getElementAddress(index).pointee
     }
-    nonmutating set {
-      _internalInvariant(position >= startIndex, "slice index is out of range (before startIndex)")
-      _internalInvariant(position < endIndex, "slice index is out of range")
-      subscriptBaseAddress[position] = newValue
+    _modify {
+      yield &getElementAddress(index).pointee
     }
   }
 
