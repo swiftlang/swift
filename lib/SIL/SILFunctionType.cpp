@@ -250,12 +250,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     // TODO: If this is a tuple, recursively get the associated types of its
     // components.
 
+    // Try to get the associated type, and return it if found (if the result is
+    // non-null and non-`DependentMemberType`).
     auto assocTy = dependentType->substBaseType(type, lookupConformance);
-    if (assocTy && !assocTy->is<DependentMemberType>()) {
-      auto canAssocTy = assocTy->getCanonicalType();
-      if (!canAssocTy->is<DependentMemberType>())
-        return canAssocTy;
-    }
+    if (assocTy && !assocTy->is<DependentMemberType>())
+      return assocTy->getCanonicalType();
 
     // When the type does not have an associated type, fallback to treating it
     // as its own Tangent/Cotangent.

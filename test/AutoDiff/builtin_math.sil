@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -emit-sil -O %s
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 import Builtin
