@@ -600,3 +600,6 @@ Var Dictionary.values has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
 Var String.Index._offset has been removed (deprecated)
 Var String.Index._utf16Index has been removed (deprecated)
+
+Func Array._getElementAddress(_:) has been renamed to Func Array._getElementAddress(_:matchingSubscriptCheck:)
+Func ArraySlice._getElementAddress(_:) has been renamed to Func ArraySlice._getElementAddress(_:matchingSubscriptCheck:)
