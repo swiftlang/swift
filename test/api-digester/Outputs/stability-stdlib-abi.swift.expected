@@ -600,3 +600,5 @@ Var Dictionary.values has been removed
 Var FixedWidthInteger.allZeros has been removed (deprecated)
 Var String.Index._offset has been removed (deprecated)
 Var String.Index._utf16Index has been removed (deprecated)
+
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has been added as a protocol requirement
