@@ -90,6 +90,10 @@ extension _StringGuts {
     @inline(__always) get { return _object.isSmall }
   }
 
+  internal var isSmallASCII: Bool {
+    @inline(__always) get { return _object.isSmall && _object.smallIsASCII }
+  }
+
   @inlinable
   internal var asSmall: _SmallString {
     @inline(__always) get { return _SmallString(_object) }
