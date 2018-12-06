@@ -381,15 +381,14 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   ///   writing is O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
-    get {
+    _read {
       _checkSubscript_native(index)
-      return _buffer.getElement(index)
+      yield _buffer[index]
     }
     _modify {
       _makeMutableAndUnique()
       _checkSubscript_native(index)
-      let address = _buffer.subscriptBaseAddress + index
-      yield &address.pointee
+      yield &_buffer[index]
     }
   }
 
