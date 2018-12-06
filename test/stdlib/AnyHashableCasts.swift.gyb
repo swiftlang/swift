@@ -84,9 +84,15 @@ testCases = [
   ("AnyHashable(5)", "Any", "Int", "5"),
   ("HashableStruct(value: 5)", "HashableStruct", "AnyHashable",
    "AnyHashable(HashableStruct(value: 5))"),
+  ("HashableStruct(value: 5)", "AnyHashable", "HashableStruct",
+   "AnyHashable(HashableStruct(value: 5))"),
   ("HashableClass(value: 5)", "HashableClass", "AnyHashable",
    "AnyHashable(HashableClass(value: 5))"),
+  ("HashableClass(value: 5)", "AnyHashable", "HashableClass",
+   "AnyHashable(HashableClass(value: 5))"),
   ("HashableEnum.value(5)", "HashableEnum", "AnyHashable",
+   "AnyHashable(HashableEnum.value(5))"),
+  ("HashableEnum.value(5)", "AnyHashable", "HashableEnum",
    "AnyHashable(HashableEnum.value(5))"),
 ]
 }%
