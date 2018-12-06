@@ -52,8 +52,8 @@ protected:
                   bool &isFramework);
 
   virtual std::error_code
-  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
-                  StringRef ModuleDocFilename,
+  openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
+                  StringRef ModuleFilename, StringRef ModuleDocFilename,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch);
@@ -129,8 +129,8 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
   {}
 
   std::error_code
-  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
-                  StringRef ModuleDocFilename,
+  openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
+                  StringRef ModuleFilename, StringRef ModuleDocFilename,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch) override;
