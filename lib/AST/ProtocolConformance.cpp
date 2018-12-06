@@ -1297,7 +1297,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   // via the Clang importer, don't add any synthesized conformances.
   auto *file = cast<FileUnit>(getModuleScopeContext());
   if (file->getKind() != FileUnitKind::Source &&
-      file->getKind() != FileUnitKind::ClangModule) {
+      file->getKind() != FileUnitKind::ClangModule &&
+      file->getKind() != FileUnitKind::DWARFModule) {
     return;
   }
 
@@ -1432,9 +1433,12 @@ DeclContext::getLocalConformances(
   if (!nominal)
     return result;
 
-  // Protocols don't have conformances.
-  if (isa<ProtocolDecl>(nominal))
+  // Protocols only have self-conformances.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    if (protocol->requiresSelfConformanceWitnessTable())
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     return { };
+  }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();

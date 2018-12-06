@@ -5,6 +5,7 @@ add_swift_host_tool(sil-passpipeline-dumper
 target_link_libraries(sil-passpipeline-dumper
                       PRIVATE
                         swiftClangImporter
+                        swiftDWARFImporter
                         swiftFrontend
                         swiftSerialization
                         swiftSILGen

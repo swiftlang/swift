@@ -16,6 +16,7 @@ add_swift_host_library(swiftIDE STATIC
   LINK_LIBRARIES
     swiftFrontend
     swiftClangImporter
+    swiftDWARFImporter
     swiftParse
     swiftSema
     swiftIndex)

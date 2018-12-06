@@ -3985,6 +3985,9 @@ public:
              ->existentialConformsToSelfSlow();
   }
 
+  /// Does this protocol require a self-conformance witness table?
+  bool requiresSelfConformanceWitnessTable() const;
+
   /// Find direct Self references within the given requirement.
   ///
   /// \param allowCovariantParameters If true, 'Self' is assumed to be

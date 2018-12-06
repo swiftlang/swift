@@ -1309,7 +1309,8 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
   // Clang decls. Check getKind() directly to avoid a layering dependency.
   //   known-context ::= 'SC'
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
-    if (file->getKind() == FileUnitKind::ClangModule) {
+    if (file->getKind() == FileUnitKind::ClangModule ||
+        file->getKind() == FileUnitKind::DWARFModule) {
       if (decl->getClangDecl())
         return ASTMangler::ObjCContext;
       return ASTMangler::ClangImporterContext;
@@ -2273,7 +2274,8 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
 
     bool needsModule = true;
     if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
-      if (file->getKind() == FileUnitKind::ClangModule) {
+      if (file->getKind() == FileUnitKind::ClangModule ||
+          file->getKind() == FileUnitKind::DWARFModule) {
         if (conformance->getProtocol()->hasClangNode())
           appendOperator("So");
         else

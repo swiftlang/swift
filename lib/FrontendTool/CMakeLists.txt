@@ -15,6 +15,7 @@ add_swift_host_library(swiftFrontendTool STATIC
     swiftPrintAsObjC
     swiftFrontend
     swiftClangImporter
+    swiftDWARFImporter
     swiftOption
     clangAPINotes
     clangBasic

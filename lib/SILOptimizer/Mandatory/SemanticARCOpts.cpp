@@ -181,9 +181,10 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   return true;
 }
 
-bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
-  // If our copy value inst has a single destroy value user, eliminate
-  // it.
+/// If cvi only has destroy value users, then cvi is a dead live range. Lets
+/// eliminate all such dead live ranges.
+static bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+  // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
       dvi->eraseFromParent();
@@ -192,6 +193,38 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
       return true;
     }
   }
+
+  // If all of our copy_value users are destroy_value, zap all of the
+  // instructions. We begin by performing that check and gathering up our
+  // destroy_value.
+  SmallVector<DestroyValueInst *, 16> destroys;
+  if (!all_of(cvi->getUses(), [&](Operand *op) {
+        auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
+        if (!dvi)
+          return false;
+
+        // Stash dvi in destroys so we can easily eliminate it later.
+        destroys.push_back(dvi);
+        return true;
+      })) {
+    return false;
+  }
+
+  // Now that we have a truly dead live range copy value, eliminate it!
+  while (!destroys.empty()) {
+    destroys.pop_back_val()->eraseFromParent();
+    ++NumEliminatedInsts;
+  }
+  cvi->eraseFromParent();
+  ++NumEliminatedInsts;
+  return true;
+}
+
+bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+  // If our copy value inst has only destroy_value users, it is a dead live
+  // range. Try to eliminate them.
+  if (eliminateDeadLiveRangeCopyValue(cvi))
+    return true;
 
   // Then try to perform the guaranteed copy value optimization.
   if (performGuaranteedCopyValueOptimization(cvi))

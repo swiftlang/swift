@@ -537,6 +537,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
       break;
     case FileUnitKind::SerializedAST:
     case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
       OS << " file=\"" << cast<LoadedFile>(this)->getFilename() << "\"";
       break;
     }
