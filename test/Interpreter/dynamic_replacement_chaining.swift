@@ -16,6 +16,7 @@
 // RUN: %target-codesign %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
 // RUN: %target-run %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
 
+// REQUIRES: executable_test
 
 import A
 
