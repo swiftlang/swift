@@ -14,42 +14,42 @@ fileprivate enum Err: Error, Equatable {
 fileprivate let string = "string"
 
 fileprivate extension Result {
-  var value: Value? {
+  var success: Success? {
     switch self {
-    case let .value(value):
-      return value
-    case .error:
+    case let .success(success):
+      return success
+    case .failure:
       return nil
     }
   }
   
-  var error: Error? {
+  var failure: Failure? {
     switch self {
-    case .value:
+    case .success:
       return nil
-    case let .error(error):
-      return error
+    case let .failure(failure):
+      return failure
     }
   }
 }
 
 ResultTests.test("Construction") {
-  let result1: Result<String, Err> = .value(string)
-  let result2: Result<String, Err> = .error(.err)
+  let result1: Result<String, Err> = .success(string)
+  let result2: Result<String, Err> = .failure(.err)
   let string1: String? = {
     switch result1 {
-      case let .value(string): 
+      case let .success(string): 
         return string
-      case .error: 
+      case .failure: 
         expectUnreachable()
         return nil
     }
   }()
   let error: Err? = {
     switch result2 {
-      case let .error(error): 
-        return error
-      case .value: 
+      case let .failure(failure): 
+        return failure
+      case .success: 
         expectUnreachable()
         return nil
     }
@@ -71,11 +71,11 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   let result1 = Result { try throwing() }
   let result2 = Result { try notThrowing() }
   
-  expectEqual(result1.error as? Err, Err.err)
-  expectEqual(result2.value, string)
+  expectEqual(result1.failure as? Err, Err.err)
+  expectEqual(result2.success, string)
     
   do {
-    _ = try result1.unwrapped()
+    _ = try result1.get()
   } catch let error as Err {
     expectEqual(error, Err.err)
   } catch {
@@ -83,16 +83,16 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   }
     
   do {
-    let unwrapped = try result2.unwrapped()
+    let unwrapped = try result2.get()
     expectEqual(unwrapped, string)
   } catch {
     expectUnreachable()
   }
     
   // Test unwrapping strongly typed error.
-  let result3 = Result<String, Err>.error(Err.err)
+  let result3 = Result<String, Err>.failure(Err.err)
   do {
-    _ = try result3.unwrapped()
+    _ = try result3.get()
   } catch let error as Err {
     expectEqual(error, Err.err)
   } catch {
@@ -118,53 +118,53 @@ ResultTests.test("Functional Transforms") {
   }
 
   func resultValueTransform(_ int: Int) -> Result<Int, Err> {
-    return .value(transformDouble(int))
+    return .success(transformDouble(int))
   }
   
   func resultErrorTransform(_ err: Err) -> Result<Int, Err> {
-    return .error(transformError(err))
+    return .failure(transformError(err))
   }
     
-  let result1: Result<Int, Err> = .value(1)
+  let result1: Result<Int, Err> = .success(1)
   let newResult1 = result1.map(transformDouble)
     
-  expectEqual(newResult1, .value(2))
+  expectEqual(newResult1, .success(2))
     
-  let result2: Result<Int, Err> = .error(.err)
+  let result2: Result<Int, Err> = .failure(.err)
   let newResult2 = result2.mapError(transformError)
     
-  expectEqual(newResult2, .error(.derr))
+  expectEqual(newResult2, .failure(.derr))
     
-  let result3: Result<Int, Err> = .value(1)
+  let result3: Result<Int, Err> = .success(1)
   let newResult3 = result3.flatMap(resultValueTransform)
     
-  expectEqual(newResult3, .value(2))
+  expectEqual(newResult3, .success(2))
     
-  let result4: Result<Int, Err> = .error(.derr)
+  let result4: Result<Int, Err> = .failure(.derr)
   let newResult4 = result4.flatMapError(resultErrorTransform)
     
-  expectEqual(newResult4, .error(.err))
+  expectEqual(newResult4, .failure(.err))
 }
 
 ResultTests.test("Equatable") {
-  let result1: Result<Int, Err> = .value(1)
-  let result2: Result<Int, Err> = .error(.err)
+  let result1: Result<Int, Err> = .success(1)
+  let result2: Result<Int, Err> = .failure(.err)
 
-  expectEqual(result1, .value(1))
-  expectNotEqual(result1, .value(2))
-  expectNotEqual(result1, .error(.err))
-  expectNotEqual(result1, .error(.derr))
+  expectEqual(result1, .success(1))
+  expectNotEqual(result1, .success(2))
+  expectNotEqual(result1, .failure(.err))
+  expectNotEqual(result1, .failure(.derr))
 
-  expectNotEqual(result2, .value(1))
-  expectNotEqual(result2, .value(2))
-  expectEqual(result2, .error(.err))
-  expectNotEqual(result2, .error(.derr))
+  expectNotEqual(result2, .success(1))
+  expectNotEqual(result2, .success(2))
+  expectEqual(result2, .failure(.err))
+  expectNotEqual(result2, .failure(.derr))
 }
 
 ResultTests.test("Hashable") {
-  let result1: Result<Int, Err> = .value(1)
-  let result2: Result<Int, Err> = .value(2)
-  let result3: Result<Int, Err> = .error(.err)
+  let result1: Result<Int, Err> = .success(1)
+  let result2: Result<Int, Err> = .success(2)
+  let result3: Result<Int, Err> = .failure(.err)
   checkHashable([result1, result2, result3], equalityOracle: { $0 == $1 })
 }
 
