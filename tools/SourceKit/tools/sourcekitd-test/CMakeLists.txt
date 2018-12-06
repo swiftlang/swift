@@ -15,7 +15,7 @@ add_sourcekit_executable(sourcekitd-test
     clangRewrite clangLex clangBasic
   LLVM_COMPONENT_DEPENDS core support option coverage lto
 )
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
 endif()
 
