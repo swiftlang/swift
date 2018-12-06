@@ -482,11 +482,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // TODO(rxwei): Use the parameter indices and diff order in the @autodiff
     // function type.
     auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(T->getNumParameters(), true),
+        SmallBitVector(T->getNumParameters(), true), /*resultIndex*/ 0,
         /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
         IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(T->getNumParameters(), true),
+        SmallBitVector(T->getNumParameters(), true), /*resultIndex*/ 0,
         /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
         IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return convertTupleType(TupleType::get({origTy, jvpTy, vjpTy}, IGM.Context)
