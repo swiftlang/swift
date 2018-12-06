@@ -1874,6 +1874,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     ],
     key.offset: 427,
     key.length: 187,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:SYsSHRzSH8RawValueSYRpzrlE4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SYsSHRzSH8RawValueSYRpzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:SH\">Hashable</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SYsSHRzSH8RawValueSYRpzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SYsSHRzSH8RawValueSYRpzrlE4Selfxmfp\">Self</ref.generic_type_param>.RawValue : <ref.protocol usr=\"s:SH\">Hashable</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.enum,
       key.name: "C1Cases",
@@ -2236,6 +2237,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.kind: source.lang.swift.decl.extension.protocol,
     key.offset: 1258,
     key.length: 53,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "P6",
@@ -2298,6 +2300,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.kind: source.lang.swift.decl.extension.protocol,
     key.offset: 1417,
     key.length: 79,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:4cake4ProtP4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtP4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "Prot",
@@ -2341,6 +2344,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     ],
     key.offset: 1498,
     key.length: 63,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:4cake4ProtP\">Prot</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake4ProtPAASi7ElementRtzrlE4Selfxmfp\">Self</ref.generic_type_param>.Element == <ref.struct usr=\"s:Si\">Int</ref.struct></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "Prot",
@@ -2431,6 +2435,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.kind: source.lang.swift.decl.extension.enum,
     key.offset: 1707,
     key.length: 76,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:SQ4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:SQ4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.enum,
       key.name: "SE",
@@ -2542,6 +2547,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
     key.kind: source.lang.swift.decl.extension.struct,
     key.offset: 1921,
     key.length: 56,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:4cake2P6P4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:4cake2P6P\">P6</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "S3",

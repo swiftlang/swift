@@ -742,6 +742,7 @@ extension Dictionary.Keys where Key : P1 {
     key.kind: source.lang.swift.decl.extension.protocol,
     key.offset: 160,
     key.length: 35,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:5cake19InitProtoP4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:5cake19InitProtoP4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:5cake19InitProtoP\">InitProto</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "InitProto",
@@ -920,6 +921,7 @@ extension Dictionary.Keys where Key : P1 {
     key.kind: source.lang.swift.decl.extension.protocol,
     key.offset: 493,
     key.length: 118,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:5cake12P2P4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:5cake12P2P4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P2P\">P2</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "P2",
@@ -998,6 +1000,7 @@ extension Dictionary.Keys where Key : P1 {
     ],
     key.offset: 613,
     key.length: 58,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:5cake12P2PA2A2P3RzrlE4Selfxmfp\"><decl.generic_type_param.name>Self</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:5cake12P2PA2A2P3RzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P2P\">P2</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:5cake12P2PA2A2P3RzrlE4Selfxmfp\">Self</ref.generic_type_param> : <ref.protocol usr=\"s:5cake12P3P\">P3</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
       key.name: "P2",
@@ -1050,6 +1053,7 @@ extension Dictionary.Keys where Key : P1 {
     ],
     key.offset: 713,
     key.length: 45,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:SD3Keyxmfp\"><decl.generic_type_param.name>Key</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr=\"s:SD5Valueq_mfp\"><decl.generic_type_param.name>Value</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Key : <ref.protocol usr=\"s:SH\">Hashable</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "Keys",
@@ -1078,6 +1082,7 @@ extension Dictionary.Keys where Key : P1 {
     ],
     key.offset: 760,
     key.length: 60,
+    key.fully_annotated_generic_signature: "&lt;<decl.generic_type_param usr=\"s:SD4KeysV5cake1AC2P1RzrlE3Keyxmfp\"><decl.generic_type_param.name>Key</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr=\"s:SD4KeysV5cake1AC2P1RzrlE5Valueq_mfp\"><decl.generic_type_param.name>Value</decl.generic_type_param.name></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>Key : <ref.protocol usr=\"s:SH\">Hashable</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement>Key : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.generic_type_requirement>&gt;",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "Keys",
