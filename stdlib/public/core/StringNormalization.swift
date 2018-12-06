@@ -103,39 +103,10 @@ internal func _tryNormalize(
   return numericCast(count)
 }
 
-internal enum NormalizationResult {
-  case success(SuccessResult)
-  case bufferTooSmall(BufferResizeRequest) // The size needed to normalize the rest of the string
-  
-  struct SuccessResult {
-    var amountFilled: Int
-    var nextReadPosition: String.Index
-  }
-  struct BufferResizeRequest {
-    var output: Int
-    var icuInput: Int
-    var icuOutput: Int
-  }
-  
-  static func bufferTooSmall(count: Int) -> NormalizationResult {
-    let outputBufferSize = 
-      count * _Normalization._maxNFCExpansionFactor * _Normalization._maxUTF16toUTF8ExpansionFactor
-    let icuInputBufferSize = count
-    let icuOutputBufferSize = count * _Normalization._maxNFCExpansionFactor
-    let resizeRequest = BufferResizeRequest(
-      output: outputBufferSize, 
-      icuInput: icuInputBufferSize,
-      icuOutput: icuOutputBufferSize
-    )
-    return .bufferTooSmall(resizeRequest)
-  }
-  
-  static func success(
-    amountFilled filled: Int, nextReadPosition index: String.Index
-  ) -> NormalizationResult {
-    let successResult = SuccessResult(amountFilled: filled, nextReadPosition: index)
-    return .success(successResult)
-  }
+internal struct NormalizationResult {
+  var amountFilled: Int
+  var nextReadPosition: String.Index
+  var reallocatedBuffers: Bool
 }
 
 private func fastFill(
@@ -246,14 +217,27 @@ private func transcodeToUTF8(
   return (readIndex, writeIndex)
 }
 
+internal func _reallocateBuffers(
+  sourceCount count: Int,
+  outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
+) {
+  let output = count * _Normalization._maxNFCExpansionFactor * _Normalization._maxUTF16toUTF8ExpansionFactor
+  let icuInput = count
+  let icuOutput = count * _Normalization._maxNFCExpansionFactor
+  outputBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: output)
+  icuInputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: icuInput)
+  icuOutputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: icuOutput)
+}
+
 internal func _fastNormalize(
-  _ readIndex: String.Index,
-  _ sourceBuffer: UnsafeBufferPointer<UInt8>,
-  _ outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-  _ icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  _ icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>
+  readIndex: String.Index,
+  sourceBuffer: UnsafeBufferPointer<UInt8>,
+  outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
 ) -> NormalizationResult {
-  let sourceCount = sourceBuffer.count - readIndex.encodedOffset
   let start = readIndex.encodedOffset
   let rebasedSourceBuffer = UnsafeBufferPointer(rebasing: sourceBuffer[start...])
   do {
@@ -262,53 +246,171 @@ internal func _fastNormalize(
         let nextIndex = readIndex.encoded(offsetBy: read)
         _internalInvariant(!_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
 
-        return .success(amountFilled: filled, nextReadPosition: nextIndex)
+        return NormalizationResult(
+          amountFilled: filled, nextReadPosition: nextIndex, reallocatedBuffers: false
+        )
       }
   }
   guard let (read, filled) = transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer)
   else {
-    return .bufferTooSmall(count: sourceBuffer.count)
+    return _fastReallocateBuffers(
+      readIndex: readIndex,
+      sourceBuffer: sourceBuffer,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
   _internalInvariant(!_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
   
   let rebasedICUInputBuffer = UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled])
-  return normalizeImpl(
-    sourceCount, nextIndex, outputBuffer, rebasedICUInputBuffer, icuOutputBuffer
+  guard let normalized = _tryNormalize(rebasedICUInputBuffer, into: icuOutputBuffer) else {
+    return _fastReallocateBuffers(
+      readIndex: readIndex,
+      sourceBuffer: sourceBuffer,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
+  }
+  
+  guard let (_, transcoded) = transcodeToUTF8(
+    UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
+    into: outputBuffer
+  ) else {
+    return _fastReallocateBuffers(
+      readIndex: readIndex,
+      sourceBuffer: sourceBuffer,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
+  }
+
+  return NormalizationResult(
+    amountFilled: transcoded, nextReadPosition: nextIndex, reallocatedBuffers: false
   )
 }
 
 internal func _foreignNormalize(
-  _ readIndex: String.Index,
-  _ guts: _StringGuts,
-  _ outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-  _ icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
-  _ icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>
+  readIndex: String.Index,
+  endIndex: String.Index,
+  guts: _StringGuts,
+  outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
 ) -> NormalizationResult {
-  let sourceCount = guts.count - readIndex.encodedOffset
-  guard let (read, filled) = foreignFill(readIndex, guts, into: icuInputBuffer) else {
-    return .bufferTooSmall(count: guts.count)
+  guard let (read, filled) = foreignFill(
+    readIndex: readIndex, endIndex: endIndex, guts, into: icuInputBuffer
+  ) else {
+    return _foreignReallocateBuffers(
+      readIndex: readIndex,
+      endIndex: endIndex,
+      guts: guts,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
   _internalInvariant(guts.isOnUnicodeScalarBoundary(nextIndex))
   
   let rebasedICUInputBuffer = UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled])
-  return normalizeImpl(
-    sourceCount, nextIndex, outputBuffer, rebasedICUInputBuffer, icuOutputBuffer
+  guard let normalized = _tryNormalize(rebasedICUInputBuffer, into: icuOutputBuffer) else {
+    return _foreignReallocateBuffers(
+      readIndex: readIndex,
+      endIndex: endIndex,
+      guts: guts,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
+  }
+  
+  guard let (_, transcoded) = transcodeToUTF8(
+    UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
+    into: outputBuffer
+  ) else {
+    return _foreignReallocateBuffers(
+      readIndex: readIndex,
+      endIndex: endIndex,
+      guts: guts,
+      outputBuffer: &outputBuffer,
+      icuInputBuffer: &icuInputBuffer,
+      icuOutputBuffer: &icuOutputBuffer
+    )
+  }
+
+  return NormalizationResult(
+    amountFilled: transcoded, nextReadPosition: nextIndex, reallocatedBuffers: false
   )
 }
 
+internal func _foreignReallocateBuffers(
+  readIndex: String.Index,
+  endIndex: String.Index,
+  guts: _StringGuts,
+  outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
+) -> NormalizationResult {
+  let sourceCount = endIndex.encodedOffset - readIndex.encodedOffset
+  _reallocateBuffers(
+    sourceCount: sourceCount,
+    outputBuffer: &outputBuffer,
+    icuInputBuffer: &icuInputBuffer,
+    icuOutputBuffer: &icuOutputBuffer
+  )
+  var result = _foreignNormalize(
+    readIndex: readIndex,
+    endIndex: endIndex,
+    guts: guts,
+    outputBuffer: &outputBuffer,
+    icuInputBuffer: &icuInputBuffer,
+    icuOutputBuffer: &icuOutputBuffer
+  )
+  result.reallocatedBuffers = true
+  return result
+}
+
+internal func _fastReallocateBuffers(
+  readIndex: String.Index,
+  sourceBuffer: UnsafeBufferPointer<UInt8>,
+  outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
+  icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
+  icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
+) -> NormalizationResult {
+  let sourceCount = sourceBuffer.count - readIndex.encodedOffset
+  _reallocateBuffers(
+    sourceCount: sourceCount,
+    outputBuffer: &outputBuffer,
+    icuInputBuffer: &icuInputBuffer,
+    icuOutputBuffer: &icuOutputBuffer
+  )
+  var result = _fastNormalize(
+    readIndex: readIndex,
+    sourceBuffer: sourceBuffer,
+    outputBuffer: &outputBuffer,
+    icuInputBuffer: &icuInputBuffer,
+    icuOutputBuffer: &icuOutputBuffer
+  )
+  result.reallocatedBuffers = true
+  return result
+}
+
 private func foreignFill(
-  _ readIndex: String.Index,
+  readIndex: String.Index,
+  endIndex: String.Index,
   _ guts: _StringGuts,
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
 ) -> (Int, Int)? {
   var index = readIndex
   var writeIndex = 0
   let outputCount = outputBuffer.count
-  let cachedEndIndex = guts.endIndex
+  let cachedEndIndex = endIndex
   while index != cachedEndIndex {
     let (scalar, length) = guts.foreignErrorCorrectedScalar(startingAt: index)
     if scalar._hasNormalizationBoundaryBefore && index != readIndex {
@@ -327,25 +429,4 @@ private func foreignFill(
     }
   }
   return (index.encodedOffset - readIndex.encodedOffset, writeIndex)
-}
-
-private func normalizeImpl(
-  _ sourceCount: Int,
-  _ nextIndex: String.Index,
-  _ outputBuffer: UnsafeMutableBufferPointer<UInt8>,
-  _ icuInputBuffer: UnsafeBufferPointer<UInt16>,
-  _ icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> NormalizationResult {
-  guard let normalized = _tryNormalize(icuInputBuffer, into: icuOutputBuffer) else {
-    return .bufferTooSmall(count: sourceCount)
-  }
-  
-  guard let (_, transcoded) = transcodeToUTF8(
-    UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-    into: outputBuffer
-  ) else {
-    return .bufferTooSmall(count: sourceCount)
-  }
-
-  return .success(amountFilled: transcoded, nextReadPosition: nextIndex)
 }
