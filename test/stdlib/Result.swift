@@ -55,7 +55,7 @@ ResultTests.test("Construction") {
     }
   }()
 
-  expectEqual(string1, string)
+  expectEqual(string, string1)
   expectEqual(error, .err)
 }
 
