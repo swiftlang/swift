@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -differentiation-use-vjp -emit-sil %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -13,7 +13,7 @@ bb0(%0 : @trivial $Float):
 
 sil @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float {
 bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float, %3 : @trivial $Float):
-  return %3 : $Float
+  return %0 : $Float
 }
 
 sil [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
@@ -34,21 +34,24 @@ sil [differentiable source 0 wrt 0] @func_to_diff : $@convention(thin) (Float) -
 bb0(%0 : @trivial $Float):
   %1 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
   %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
+
+  // Note: This apply is not included in the result, so it doesn't get differentiated.
   %3 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
   %4 = apply %3(%2) : $@convention(thin) (Float) -> Float
+
   %5 = tuple (%2 : $Float, %2 : $Float)
   %6 = tuple_extract %5 : $(Float, Float), 0
   return %6 : $Float
 }
 
 // CHECK-LABEL: struct AD__func_to_diff__Type__src_0_wrt_0 {
-// CHECK-NEXT:   @sil_stored var pv_0: AD__nested_func_without_diffattr__Type__src_0_wrt_0
 // CHECK-NEXT:   @sil_stored var v_0: Float
+// CHECK-NEXT:   @sil_stored var pullback_0: (Float) -> Float
 // CHECK-NEXT: }
 
 // CHECK-LABEL: struct AD__nested_func_without_diffattr__Type__src_0_wrt_0 {
-// CHECK-NEXT:   @sil_stored var pv_0: Float
 // CHECK-NEXT:   @sil_stored var v_0: Float
+// CHECK-NEXT:   @sil_stored var pullback_0: (Float) -> Float
 // CHECK-NEXT: }
 
 // CHECK-LABEL: @foo_prim : $@convention(thin) (Float) -> (Float, Float) {
@@ -59,45 +62,71 @@ bb0(%0 : @trivial $Float):
 
 // CHECK-LABEL: @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float {
 // CHECK: bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float):
-// CHECK:   return %3 : $Float
-// CHECK: }
-
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float {
-// CHECK: bb0(%0 : $Float):
 // CHECK:   return %0 : $Float
 // CHECK: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float {
-// CHECK: bb0(%0 : $Float):
-// CHECK:   return %0 : $Float
-// CHECK: }
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float {
-// CHECK: bb0(%0 : $Float):
-// CHECK:   return %0 : $Float
-// CHECK: }
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+
+// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
 
 // CHECK-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
 // CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%0 : $Float, %0 : $Float)
-// CHECK:   %2 = struct $AD__func_to_diff__Type__src_0_wrt_0 (%1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %0 : $Float)
-// CHECK:   %3 = tuple (%2 : $AD__func_to_diff__Type__src_0_wrt_0, %0 : $Float)
-// CHECK:   return %3 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
+// CHECK:   %1 = function_ref @AD__nested_func_without_diffattr__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
+// CHECK:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
+// CHECK:   %5 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK:   %6 = apply %5(%3) : $@convention(thin) (Float) -> Float
+// CHECK:   %7 = tuple (%3 : $Float, %3 : $Float)
+// CHECK:   %8 = tuple_extract %7 : $(Float, Float), 0
+// CHECK:   %9 = struct $AD__func_to_diff__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
+// CHECK:   %10 = tuple (%9 : $AD__func_to_diff__Type__src_0_wrt_0, %8 : $Float)
+// CHECK:   return %10 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
 // CHECK: }
 
 // CHECK-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
 // CHECK: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
-// CHECK:   return %3 : $Float
+// CHECK:   %4 = struct_extract %1 : $AD__func_to_diff__Type__src_0_wrt_0, #AD__func_to_diff__Type__src_0_wrt_0.pullback_0
+// CHECK:   %5 = alloc_stack $Float
+// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
+// CHECK:   store %0 to %7 : $*Float
+// CHECK:   end_access %7 : $*Float
+// CHECK:   end_access %6 : $*Float
+// CHECK:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
+// CHECK:   %12 = load %11 : $*Float
+// CHECK:   end_access %11 : $*Float
+// CHECK:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
+// CHECK:   dealloc_stack %5 : $*Float
+// CHECK:   return %14 : $Float
 // CHECK: }
 
 // CHECK-LABEL: @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
 // CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%0 : $Float, %0 : $Float)
-// CHECK:   %2 = tuple (%1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %0 : $Float)
-// CHECK:   return %2 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
+// CHECK:   %1 = function_ref @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
+// CHECK:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
+// CHECK:   %5 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
+// CHECK:   %6 = tuple (%5 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %3 : $Float)
+// CHECK:   return %6 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
 // CHECK: }
 
 // CHECK-LABEL: @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {
 // CHECK: bb0(%0 : $Float, %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
-// CHECK:   return %3 : $Float
+// CHECK:   %4 = struct_extract %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, #AD__nested_func_without_diffattr__Type__src_0_wrt_0.pullback_0
+// CHECK:   %5 = alloc_stack $Float
+// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
+// CHECK:   store %0 to %7 : $*Float
+// CHECK:   end_access %7 : $*Float
+// CHECK:   end_access %6 : $*Float
+// CHECK:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
+// CHECK:   %12 = load %11 : $*Float
+// CHECK:   end_access %11 : $*Float
+// CHECK:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
+// CHECK:   dealloc_stack %5 : $*Float
+// CHECK:   return %14 : $Float
 // CHECK: }
