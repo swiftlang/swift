@@ -4844,6 +4844,31 @@ namespace {
       }
       return addr;
     }
+    
+    // If there are common spare bits we didn't use for tags, rotate the
+    // extra inhabitant values so that the used tag bits are at the bottom.
+    // This will cleanly separate the used tag values from the extra inhabitants
+    // so we can discriminate them with one comparison. The tag favors high
+    // bits, whereas extra inhabitants count down from -1 using all bits
+    // (capping out at up to 32 spare bits, in which case the lowest 32
+    // bits are used).
+    std::pair<unsigned, unsigned> getRotationAmountsForExtraInhabitants() const{
+      assert([&]{
+        auto maskedBits = PayloadTagBits;
+        maskedBits &= CommonSpareBits;
+        return maskedBits == PayloadTagBits;
+      }());
+
+      unsigned commonSpareBitsCount = CommonSpareBits.count();
+      unsigned payloadTagBitsCount = PayloadTagBits.count();
+      if (commonSpareBitsCount == payloadTagBitsCount
+          || commonSpareBitsCount - payloadTagBitsCount >= 32) {
+        return std::make_pair(0, 0);
+      }
+      unsigned shlAmount = commonSpareBitsCount - payloadTagBitsCount;
+      unsigned shrAmount = std::min(commonSpareBitsCount, 32u) - shlAmount;
+      return {shlAmount, shrAmount};
+    }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
@@ -4859,6 +4884,32 @@ namespace {
         auto payload = EnumPayload::load(IGF, projectPayload(IGF, src),
                                          PayloadSchema);
         tag = payload.emitGatherSpareBits(IGF, CommonSpareBits, 0, 32);
+        
+        // If there are common spare bits we didn't use for tags, rotate the
+        // tag value so that the used tag bits are at the bottom. This will
+        // cleanly separate the used tag values from the extra inhabitants so
+        // we can discriminate them with one comparison. The tag favors high
+        // bits, whereas extra inhabitants count down from -1 using all bits
+        // (capping out at up to 32 spare bits, in which case the lowest 32
+        // bits are used).
+        //
+        // Note that since this is the inverse operation--we're taking the bits
+        // out of a payload and mapping them back to an extra inhabitant index--
+        // the `shr` and `shl` amounts are intentionally swapped here.
+        unsigned shrAmount, shlAmount;
+        std::tie(shrAmount, shlAmount) = getRotationAmountsForExtraInhabitants();
+        if (shrAmount != 0) {
+          assert(getExtraTagBitCountForExtraInhabitants() == 0);
+          auto tagLo = IGF.Builder.CreateLShr(tag, shrAmount);
+          auto tagHi = IGF.Builder.CreateShl(tag, shlAmount);
+          tag = IGF.Builder.CreateOr(tagLo, tagHi);
+          if (CommonSpareBits.count() < 32) {
+            auto mask = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                          (1u << CommonSpareBits.count()) - 1u);
+            tag = IGF.Builder.CreateAnd(tag, mask);
+          }
+        }
+        
         if (getExtraTagBitCountForExtraInhabitants()) {
           auto extraTagAddr = projectExtraTagBitsForExtraInhabitants(IGF, src);
           auto extraTag = IGF.Builder.CreateLoad(extraTagAddr);
@@ -4899,6 +4950,29 @@ namespace {
       }
 
       auto indexValue = IGF.Builder.CreateNot(index);
+      
+      // If there are common spare bits we didn't use for tags, rotate the
+      // tag value so that the used tag bits are at the bottom. This will
+      // cleanly separate the used tag values from the extra inhabitants so
+      // we can discriminate them with one comparison. The tag favors high
+      // bits, whereas extra inhabitants count down from -1 using all bits
+      // (capping out at up to 32 spare bits, in which case the lowest 32
+      // bits are used).
+      unsigned shlAmount, shrAmount;
+      std::tie(shlAmount, shrAmount) = getRotationAmountsForExtraInhabitants();
+
+      if (shlAmount != 0) {
+        assert(getExtraTagBitCountForExtraInhabitants() == 0);
+        if (CommonSpareBits.count() < 32) {
+          auto mask = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                         (1u << CommonSpareBits.count()) - 1u);
+          indexValue = IGF.Builder.CreateAnd(indexValue, mask);
+        }
+        auto indexValueHi = IGF.Builder.CreateShl(indexValue, shlAmount);
+        auto indexValueLo = IGF.Builder.CreateLShr(indexValue, shrAmount);
+        indexValue = IGF.Builder.CreateOr(indexValueHi, indexValueLo);
+      }
+      
       if (CommonSpareBits.count()) {
         // Factor the index value into parts to scatter into the payload and
         // to store in the extra tag bits, if any.
@@ -4952,6 +5026,25 @@ namespace {
       // Count down from all-ones since a small negative number constant is
       // likely to be easier to reify.
       auto mask = ~index;
+      
+      // If there are common spare bits we didn't use for tags, rotate the
+      // tag value so that the used tag bits are at the bottom. This will
+      // cleanly separate the used tag values from the extra inhabitants so
+      // we can discriminate them with one comparison. The tag favors high
+      // bits, whereas extra inhabitants count down from -1 using all bits
+      // (capping out at up to 32 spare bits, in which case the lowest 32
+      // bits are used).
+      unsigned shlAmount, shrAmount;
+      std::tie(shlAmount, shrAmount) = getRotationAmountsForExtraInhabitants();
+      
+      if (shlAmount != 0) {
+        assert(getExtraTagBitCountForExtraInhabitants() == 0);
+        if (CommonSpareBits.count() < 32) {
+          mask &= (1u << CommonSpareBits.count()) - 1;
+        }
+        mask = (mask >> shrAmount) | (mask << shlAmount);
+      }
+      
       auto extraTagMask = getExtraTagBitCountForExtraInhabitants() >= 32
         ? ~0u : (1 << getExtraTagBitCountForExtraInhabitants()) - 1;
 
