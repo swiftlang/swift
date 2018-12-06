@@ -98,9 +98,12 @@ namespace swift {
     /// Support for alternate usage modes
     ///
 
-    /// \brief Enable features useful for running in the debugger.
+    /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
+    bool EnableDWARFImporter = false;
+    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
