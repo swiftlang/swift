@@ -219,6 +219,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // VJP: (T...) -> ((R...),
   //                 (R.CotangentVector...) -> (T.CotangentVector...))
 
+  // RAII that pushes our generic context to `module.Types` so that the calls
+  // `module.Types.getTypeLowering()` below can understand our generic
+  // parameter types.
+  GenericContextScope genericContextScope(module.Types, getGenericSignature());
+
   auto &ctx = getASTContext();
 
   unsigned numParamsWithoutSelf = hasSelfParam() ? getNumParameters() - 1
@@ -263,24 +268,24 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   };
 
   // Given a type, returns its formal SIL parameter info.
-  auto getFormalParameterInfo = [&module](CanType type) -> SILParameterInfo {
-    SILType silTy = SILType::getPrimitiveObjectType(type);
+  auto getFormalParameterInfo = [&](CanType type) -> SILParameterInfo {
+    auto &typeLowering = module.Types.getTypeLowering(type);
     ParameterConvention conv;
-    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+    if (typeLowering.isFormallyPassedIndirectly())
       conv = ParameterConvention::Indirect_In_Guaranteed;
-    else if (silTy.isTrivial(module))
+    else if (typeLowering.isTrivial())
       conv = ParameterConvention::Direct_Unowned;
     else
       conv = ParameterConvention::Direct_Guaranteed;
     return {type, conv};
   };
   // Given a type, returns its formal SIL result info.
-  auto getFormalResultInfo = [&module](CanType type) -> SILResultInfo {
-    SILType silTy = SILType::getPrimitiveObjectType(type);
+  auto getFormalResultInfo = [&](CanType type) -> SILResultInfo {
+    auto &typeLowering = module.Types.getTypeLowering(type);
     ResultConvention conv;
-    if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+    if (typeLowering.isFormallyReturnedIndirectly())
       conv = ResultConvention::Indirect;
-    else if (silTy.isTrivial(module))
+    else if (typeLowering.isTrivial())
       conv = ResultConvention::Unowned;
     else
       conv = ResultConvention::Owned;
@@ -312,7 +317,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       result.getConvention()
     });
     auto differentialType = SILFunctionType::get(
-        getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
+        /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, tangentParams, {},
         tangentResults, None, ctx);
     SmallVector<SILResultInfo, 8> jvpResults(getResults().begin(),
@@ -343,7 +348,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
               getAssociatedType(param.getType(), cotangentDependentType)));
     }
     auto pullbackType = SILFunctionType::get(
-        getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
+        /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, cotangentParams, {},
         cotangentResults, {}, ctx);
     SmallVector<SILResultInfo, 8> vjpResults(getResults().begin(),

@@ -101,9 +101,10 @@ static void createEntryArguments(SILFunction *f) {
   assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
          "Entry already has arguments?!");
   for (auto indResultTy : conv.getIndirectSILResultTypes())
-    entry->createFunctionArgument(indResultTy.getAddressType());
+    entry->createFunctionArgument(
+        f->mapTypeIntoContext(indResultTy).getAddressType());
   for (auto paramTy : conv.getParameterSILTypes())
-    entry->createFunctionArgument(paramTy);
+    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy));
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
@@ -114,33 +115,6 @@ static SILFunction *lookUpOrLinkFunction(StringRef name, SILModule &module) {
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
   return module.findFunction(name, SILLinkage::PublicExternal);
-}
-
-/// Given a type, returns its formal SIL parameter info.
-static SILParameterInfo getFormalParameterInfo(CanType type,
-                                               SILModule &module) {
-  SILType silTy = SILType::getPrimitiveObjectType(type);
-  ParameterConvention conv;
-  if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
-    conv = ParameterConvention::Indirect_In;
-  else if (silTy.isTrivial(module))
-    conv = ParameterConvention::Direct_Unowned;
-  else
-    conv = ParameterConvention::Direct_Guaranteed;
-  return {type, conv};
-}
-
-/// Given a type, returns its formal SIL result info.
-static SILResultInfo getFormalResultInfo(CanType type, SILModule &module) {
-  SILType silTy = SILType::getPrimitiveObjectType(type);
-  ResultConvention conv;
-  if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
-    conv = ResultConvention::Indirect;
-  else if (silTy.isTrivial(module))
-    conv = ResultConvention::Unowned;
-  else
-    conv = ResultConvention::Owned;
-  return {type, conv};
 }
 
 /// Given a function, gather all of its formal results (both direct and
@@ -4101,15 +4075,43 @@ void DifferentiationTask::createEmptyPrimal() {
 }
 
 void DifferentiationTask::createEmptyAdjoint() {
-  // FIXME: Support generics.
-  if (getOriginal()->getLoweredFunctionType()->getGenericSignature())
-    return;
-
   assert(adjointSynthesisState == FunctionSynthesisState::Needed);
   assert(!adjoint);
 
   auto &module = context.getModule();
   auto *original = getOriginal();
+
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // can understand the original function's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, original->getLoweredFunctionType()->getGenericSignature());
+
+  // Given a type, returns its formal SIL parameter info.
+  auto getFormalParameterInfo = [&](CanType type) -> SILParameterInfo {
+    auto &typeLowering = module.Types.getTypeLowering(type);
+    ParameterConvention conv;
+    if (typeLowering.isFormallyPassedIndirectly())
+      conv = ParameterConvention::Indirect_In_Guaranteed;
+    else if (typeLowering.isTrivial())
+      conv = ParameterConvention::Direct_Unowned;
+    else
+      conv = ParameterConvention::Direct_Guaranteed;
+    return {type, conv};
+  };
+  // Given a type, returns its formal SIL result info.
+  auto getFormalResultInfo = [&](CanType type) -> SILResultInfo {
+    auto &typeLowering = module.Types.getTypeLowering(type);
+    ResultConvention conv;
+    if (typeLowering.isFormallyReturnedIndirectly())
+      conv = ResultConvention::Indirect;
+    else if (typeLowering.isTrivial())
+      conv = ResultConvention::Unowned;
+    else
+      conv = ResultConvention::Owned;
+    return {type, conv};
+  };
+
   // Parameters of the adjoint are:
   // - a seed,
   // - a primal value struct,
@@ -4123,7 +4125,7 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   // Add adjoint parameter for the seed.
   adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[getIndices().source].getType(), module));
+      origTy->getResults()[getIndices().source].getType()));
 
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
@@ -4131,12 +4133,12 @@ void DifferentiationTask::createEmptyAdjoint() {
     auto pvType = pi->getPrimalValueStruct()
                     ->getDeclaredInterfaceType()
                     ->getCanonicalType();
-    adjParams.push_back(getFormalParameterInfo(pvType, module));
+    adjParams.push_back(getFormalParameterInfo(pvType));
   }
 
   // Add adjoint parameters for the original results.
   for (auto &origRes : origTy->getResults())
-    adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
+    adjParams.push_back(getFormalParameterInfo(origRes.getType()));
 
   // Add adjoint parameters for the original parameters.
   for (auto &param : origParams)
@@ -4147,13 +4149,13 @@ void DifferentiationTask::createEmptyAdjoint() {
   if (origTy->hasSelfParam() &&
       getIndices().isWrtParameter(selfParamIndex))
     adjResults.push_back(getFormalResultInfo(
-        origParams[selfParamIndex].getType(), module));
+        origParams[selfParamIndex].getType()));
 
   // Add adjoint results for the requested non-self wrt parameters.
   for (auto i : getIndices().parameters.set_bits()) {
     if (origTy->hasSelfParam() && i == selfParamIndex)
       continue;
-    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType()));
   }
 
   auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
@@ -4177,16 +4179,19 @@ void DifferentiationTask::createEmptyAdjoint() {
 }
 
 void DifferentiationTask::createVJP() {
-  // FIXME: Support generics.
-  if (getOriginal()->getLoweredFunctionType()->getGenericSignature())
-    return;
-
   assert(!vjp);
   assert(adjoint);
   assert(primal);
 
+  LLVM_DEBUG(llvm::dbgs() << "Creating VJP:\n"
+                          << "  original type: "
+                          << original->getLoweredFunctionType() << "\n"
+                          << "  primal type: "
+                          << primal->getLoweredFunctionType() << "\n"
+                          << "  adjoint type: "
+                          <<  adjoint->getLoweredFunctionType() << "\n");
+
   auto &module = context.getModule();
-  auto *original = getOriginal();
   auto originalTy = original->getLoweredFunctionType();
 
   // === Create an empty VJP. ===
@@ -4208,27 +4213,107 @@ void DifferentiationTask::createVJP() {
   vjp->setUnqualifiedOwnership();
   vjp->setDebugScope(new (module)
                          SILDebugScope(original->getLocation(), vjp));
-
   attr->setVJPName(vjp->getName());
 
-  // === Start filling in the VJP. ===
-  auto loc = vjp->getLocation();
+  LLVM_DEBUG(llvm::dbgs() << "  vjp type: "
+                          << vjp->getLoweredFunctionType() << "\n");
+
+  // We'll use these conventions frequently.
+  auto originalConv = original->getConventions();
+  auto primalConv = primal->getConventions();
+
+  // Keep track of some stack allocation to clean up.
+  SmallVector<SILValue, 2> stackAllocsToCleanUp;
+
+  // Validate signatures.
+#ifndef NDEBUG
+  auto adjointConv = adjoint->getConventions();
+  auto vjpConv = vjp->getConventions();
+
+  unsigned numOriginalParameters = originalConv.getNumParameters();
+  unsigned numOriginalResults = originalConv.getResults().size();
+  unsigned numCheckpoints = primalConv.getResults().size() - numOriginalResults;
+  unsigned numSeeds = 1;
+  unsigned numWrt = getIndices().parameters.count();
+
+  LLVM_DEBUG(llvm::dbgs() << "  numOriginalParameters: "
+                          << numOriginalParameters << "\n"
+                          << "  numOriginalResults: "
+                          << numOriginalResults << "\n"
+                          << "  numCheckpoints: "
+                          << numCheckpoints << "\n"
+                          << "  numSeeds: "
+                          << numSeeds << "\n");
+
+  assert(primalConv.getNumParameters() == numOriginalParameters &&
+         "unexpected number of primal parameters");
+  assert(vjpConv.getNumParameters() == numOriginalParameters &&
+         "unexpected number of vjp parameters");
+  assert(vjpConv.getResults().size() == numOriginalResults + 1 &&
+         "unexpected number of vjp results");
+  assert(adjointConv.getNumParameters() ==
+             numSeeds + numCheckpoints + numOriginalResults +
+             numOriginalParameters &&
+         "unexpected number of adjoint parameters");
+  assert(adjointConv.getResults().size() == numWrt &&
+         "unexpected number of adjoint results");
+
+  // We assume that primal result conventions (for all results but the optional
+  // checkpoints struct) match the vjp result conventions (for all results but
+  // the pullback), so check that assumption.
+  for (unsigned resultIndex : range(numOriginalResults)) {
+    auto &primalResultInfo =
+        primalConv.getResults()[numCheckpoints + resultIndex];
+    auto &vjpResultInfo = vjpConv.getResults()[resultIndex];
+    assert(primalResultInfo == vjpResultInfo &&
+           "primal result info does not match vjp result info");
+  }
+
+  // We assume that the primal result conventions for checkpoints and original
+  // results match the corresponding adjoint parameter conventions for
+  // checkpoints and original results, so check that assumption.
+  for (unsigned resultIndex : indices(primalConv.getResults())) {
+    auto &primalResultInfo = primalConv.getResults()[resultIndex];
+    auto &adjointParameterInfo =
+        adjointConv.getParameters()[numSeeds + resultIndex];
+    assert(primalResultInfo.isFormalIndirect() ==
+               adjointParameterInfo.isFormalIndirect() &&
+           "primal result directness does not match adjoint parameter "
+           "directness");
+    assert(primalResultInfo.getType() == adjointParameterInfo.getType() &&
+           "primal result type does not match adjoint parameter type");
+  }
+#endif
+
+  // Create the entry block with indirect results and parameters.
   auto *entry = vjp->createBasicBlock();
   createEntryArguments(vjp);
   SILBuilder builder(entry);
+  auto loc = vjp->getLocation();
 
   // === Call primal with original arguments. ===
-  auto primalTy = primal->getLoweredFunctionType();
   SmallVector<SILValue, 8> primalArgs;
-  SmallVector<SILValue, 1> stackAllocsToCleanUp;
 
-  // Add indirect results.
-  for (auto indResInfo : primalTy->getIndirectFormalResults()) {
-    auto objTy = SILType::getPrimitiveObjectType(indResInfo.getType());
-    auto resultBuf = builder.createAllocStack(loc, objTy);
+  // Allocate space for indirect checkpoint results, and pass the addresses to
+  // the primal.
+  unsigned remainingIndirectCheckpointResults =
+      primalConv.getNumIndirectSILResults() -
+      originalConv.getNumIndirectSILResults();
+  for (auto silType : primalConv.getIndirectSILResultTypes()) {
+    if (remainingIndirectCheckpointResults == 0)
+      break;
+    auto type = vjp->mapTypeIntoContext(silType.getObjectType());
+    auto resultBuf = builder.createAllocStack(loc, type);
     primalArgs.push_back(resultBuf);
     stackAllocsToCleanUp.push_back(resultBuf);
+    --remainingIndirectCheckpointResults;
   }
+
+  // Tell the primal to put its indirect results in the vjp indirect result
+  // buffers. This assumes that the primal indirect results are exactly the vjp
+  // indirect results, an assumption that we check in assertions above.
+  for (auto indRes : vjp->getIndirectResults())
+    primalArgs.push_back(indRes);
 
   // Add original parameters.
   for (auto arg : vjp->getArgumentsWithoutIndirectResults())
@@ -4241,15 +4326,12 @@ void DifferentiationTask::createVJP() {
       /*isNonThrowing*/ false);
 
   // Collect the primal's direct results.
-  SILFunctionConventions primalConv(primalTy, module);
   SmallVector<SILValue, 8> primalDirectResults;
   if (primalConv.getNumDirectSILResults() == 1)
     primalDirectResults.push_back(primalApply);
   else {
-    auto tupleSILTy = primalConv.getSILResultType();
     for (unsigned i : range(primalConv.getNumDirectSILResults())) {
-      auto val = builder.createTupleExtract(loc, primalApply, i,
-                                            tupleSILTy.getTupleElementType(i));
+      auto val = builder.createTupleExtract(loc, primalApply, i);
       primalDirectResults.push_back(val);
     }
   }
@@ -4260,10 +4342,17 @@ void DifferentiationTask::createVJP() {
   // Add primal values and original results.
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : primalConv.getResults()) {
-    if (resInfo.isFormalDirect())
+    if (resInfo.isFormalDirect()) {
+      // This assumes that the primal direct results correspond exactly to the
+      // adjoint's direct parameters, an assumption that we check in assertions
+      // above.
       partialAdjointArgs.push_back(primalDirectResults[dirResIdx++]);
-    else
+    } else {
+      // This assumes that the primal indirect results correspond exactly to the
+      // adjoint's indirect parameters, an assumption that we check in
+      // assertions above.
       partialAdjointArgs.push_back(primalArgs[indResIdx++]);
+    }
   }
 
   // Add original parameters.
@@ -4280,19 +4369,21 @@ void DifferentiationTask::createVJP() {
   for (auto alloc : reversed(stackAllocsToCleanUp))
     builder.createDeallocStack(loc, alloc);
 
-  // === Return the original results and the partially applied adjoint. ===
-  // TODO: Indirect original results.
-  auto vjpTy = vjp->getLoweredFunctionType();
-  SILFunctionConventions originalConv(originalTy, module),
-                         vjpConv(vjpTy, module);
+  // === Return the direct results. ===
+  // (Note that indirect results have already been filled in by the application
+  // of the primal).
   SmallVector<SILValue, 8> directResults;
   auto originalDirectResults = ArrayRef<SILValue>(primalDirectResults)
       .take_back(originalConv.getNumDirectSILResults());
   for (auto originalDirectResult : originalDirectResults)
     directResults.push_back(originalDirectResult);
   directResults.push_back(adjointPartialApply);
-  auto tupleRet = builder.createTuple(loc, vjpConv.getSILResultType(), directResults);
-  builder.createReturn(loc, tupleRet);
+  if (directResults.size() > 1) {
+    auto tupleRet = builder.createTuple(loc, directResults);
+    builder.createReturn(loc, tupleRet);
+  } else {
+    builder.createReturn(loc, directResults[0]);
+  }
 }
 
 //===----------------------------------------------------------------------===//
