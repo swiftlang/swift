@@ -77,6 +77,13 @@ CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
+// NOTE: Even though init_existential_ref from a reference counting perspective
+// is not considered to be "owned" since it doesn't affect reference counts,
+// conceptually we want to treat it as an owned value that produces owned
+// things, rather than a forwarding thing since initialization is generally a
+// consuming operation.
+CONSTANT_OWNERSHIP_INST(Owned, InitExistentialRef)
+
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
 // implementations of retain/release nothing happens, so this is safe.
@@ -232,7 +239,6 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
-FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
 FORWARDING_OWNERSHIP_INST(SelectValue)
