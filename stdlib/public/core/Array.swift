@@ -712,8 +712,7 @@ extension Array: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      let address = _buffer.subscriptBaseAddress + index
-      yield &address.pointee
+      yield &_buffer[index]
     }
   }
 
