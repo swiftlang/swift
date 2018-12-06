@@ -124,6 +124,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addGuaranteedARCOpts();
   P.addDiagnoseUnreachable();
   P.addDiagnoseInfiniteRecursion();
+  P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
