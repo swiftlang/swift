@@ -932,6 +932,16 @@ extension ContiguousArray: RangeReplaceableCollection {
       return try body(&bufferPointer)
     }
   }
+  
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
 
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
