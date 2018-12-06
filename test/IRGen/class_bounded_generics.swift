@@ -168,7 +168,7 @@ func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
   // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$s22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
   // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
+  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]], {{.*}})
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
   // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }
@@ -180,7 +180,7 @@ func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
   // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$s22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
   // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
+  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]], {{.*}})
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
   // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }

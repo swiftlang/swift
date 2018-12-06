@@ -98,7 +98,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastClassUnconditional) {
-  auto Result = swift_dynamicCastClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -108,7 +108,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassUnconditional) {
-  auto Result = swift_dynamicCastObjCClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastObjCClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -118,7 +118,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClassUnconditional) {
-  auto Result = swift_dynamicCastForeignClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastForeignClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -128,7 +128,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastUnknownClass) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastUnknownClassUnconditional) {
-  auto Result = swift_dynamicCastUnknownClassUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastUnknownClassUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -138,7 +138,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastMetatype) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastMetatypeUnconditional) {
-  auto Result = swift_dynamicCastMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -148,7 +148,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassMetatype) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastObjCClassMetatypeUnconditional) {
-  auto Result = swift_dynamicCastObjCClassMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastObjCClassMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
@@ -159,7 +159,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_dynamicCastForeignClassMetatype) {
 
 TEST_F(CompatibilityOverrideTest,
        test_swift_dynamicCastForeignClassMetatypeUnconditional) {
-  auto Result = swift_dynamicCastForeignClassMetatypeUnconditional(nullptr, nullptr);
+  auto Result = swift_dynamicCastForeignClassMetatypeUnconditional(nullptr, nullptr, nullptr, 0, 0);
   ASSERT_EQ(Result, nullptr);
 }
 
