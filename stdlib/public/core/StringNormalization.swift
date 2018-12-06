@@ -189,7 +189,8 @@ private func transcodeSegmentToUTF16(
   return (readIndex, writeIndex)
 }
 
-private func transcodeToUTF8(
+//transcodes the UTF16 segment stored in soureceBuffer into the outputBuffer as UTF8
+private func transcodeSegmentToUTF8(
   _ sourceBuffer: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt8>
 ) -> (Int, Int)? {
@@ -276,7 +277,7 @@ internal func _fastNormalize(
     )
   }
   
-  guard let (_, transcoded) = transcodeToUTF8(
+  guard let (_, transcoded) = transcodeSegmentToUTF8(
     UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
     into: outputBuffer
   ) else {
@@ -330,7 +331,7 @@ internal func _foreignNormalize(
     )
   }
   
-  guard let (_, transcoded) = transcodeToUTF8(
+  guard let (_, transcoded) = transcodeSegmentToUTF8(
     UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
     into: outputBuffer
   ) else {
