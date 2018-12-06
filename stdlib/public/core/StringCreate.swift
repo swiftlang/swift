@@ -169,5 +169,16 @@ extension String {
   ) -> String {
     return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
   }
+
+  @usableFromInline
+  internal static func _fromSubstring(
+    _ substring: __shared Substring
+  ) -> String {
+    if substring._offsetRange == substring._wholeString._offsetRange {
+      return substring._wholeString
+    }
+
+    return substring._withUTF8 { return String._uncheckedFromUTF8($0) }
+  }
 }
 
