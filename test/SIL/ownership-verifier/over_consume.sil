@@ -29,6 +29,12 @@ class SuperKlass {
 class Klass : SuperKlass {
 }
 
+typealias AnyObject = Builtin.AnyObject
+
+class ClassProtConformingRef {}
+protocol ClassProt : AnyObject {}
+extension ClassProtConformingRef : ClassProt {}
+
 ///////////
 // Tests //
 ///////////
@@ -452,4 +458,30 @@ bb0(%0 : @owned $Klass):
   dealloc_stack %1 : $*SuperKlass
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'init_existential_ref_not_forwarding'
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0 : $ClassProtConformingRef
+// CHECK: User:   %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+// CHECK: Operand Number: 0
+// CHECK: Conv: guaranteed
+// CHECK: OwnershipMap:
+// CHECK: -- OperandOwnershipKindMap --
+// CHECK: unowned:  No.
+// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: guaranteed:  No.
+// CHECK: any: Yes. Liveness: MustBeLive
+// CHECK-NOT: init_existential_ref %1
+// CHECK: Function: 'init_existential_ref_not_forwarding'
+// CHECK: Error! Found a leaked owned value that was never consumed.
+// CHECK: Value:   %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+// CHECK-NOT: init_existential_ref %1
+sil @init_existential_ref_not_forwarding : $@convention(thin) (@guaranteed ClassProtConformingRef, @owned ClassProtConformingRef) -> @owned (ClassProt, ClassProt) {
+bb0(%0 : @guaranteed $ClassProtConformingRef, %1 : @owned $ClassProtConformingRef):
+  %2 = init_existential_ref %0 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+  %3 = copy_value %2 : $ClassProt
+  %4 = init_existential_ref %1 : $ClassProtConformingRef : $ClassProtConformingRef, $ClassProt
+  %5 = tuple(%3 : $ClassProt, %4 : $ClassProt)
+  return %5 : $(ClassProt, ClassProt)
 }
