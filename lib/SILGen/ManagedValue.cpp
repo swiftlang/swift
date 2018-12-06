@@ -210,6 +210,10 @@ ManagedValue ManagedValue::ensurePlusOne(SILGenFunction &SGF,
 }
 
 bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
+  // If this is an lvalue or in context, the value is not at plus one.
+  if (isLValue() || isInContext())
+    return false;
+
   // If this value is SILUndef, return true. SILUndef can always be passed to +1
   // APIs.
   if (isa<SILUndef>(getValue()))
@@ -229,6 +233,10 @@ bool ManagedValue::isPlusOne(SILGenFunction &SGF) const {
 }
 
 bool ManagedValue::isPlusZero() const {
+  // If this is an lvalue or in context, the value is not at plus one.
+  if (isLValue() || isInContext())
+    return false;
+
   // SILUndef can always be passed to +0 APIs.
   if (isa<SILUndef>(getValue()))
     return true;

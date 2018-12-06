@@ -672,3 +672,24 @@ func dontCrash() {
   let userInfo = ["hello": "world"]
   let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })
 }
+
+@inline(never)
+func takesTwoGeneric<T>(_ fn: (T) -> (), _ a: T) -> T {
+  fn(a)
+  return a
+}
+
+@inline(never)
+func callback(_: __owned AnyObject, _: __owned AnyObject) {}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$syXlyXlIegxx_19function_conversion5FeralCACIeggg_TR : $@convention(thin) (@guaranteed Feral, @guaranteed Feral, @guaranteed @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()) -> () {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Feral, [[ARG1:%.*]] : @guaranteed $Feral, [[ARG2:%.*]] :
+// CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
+// CHECK:   [[ARG0_EXISTENTIAL:%.*]] = init_existential_ref [[ARG0_COPY]]
+// CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
+// CHECK:   [[ARG1_EXISTENTIAL:%.*]] = init_existential_ref [[ARG1_COPY]]
+// CHECK:   apply {{%.*}}([[ARG0_EXISTENTIAL]], [[ARG1_EXISTENTIAL]]) : $@callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()
+// CHECK: } // end sil function '$syXlyXlIegxx_19function_conversion5FeralCACIeggg_TR'
+func test() {
+  let z = takesTwoGeneric(callback, (Feral(), Feral()))
+}

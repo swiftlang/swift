@@ -613,11 +613,20 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             const TypeLowering &existentialTL,
                             ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F,
+                            function_ref<ManagedValue (SGFContext)> inputF,
                             bool allowEmbeddedNSError) {
   // Mark the needed conformances as used.
   for (auto conformance : conformances)
     SGM.useConformance(conformance);
+
+  // A wrapper around inputF that makes sure we are passed a +1 value if we are
+  // passed a value.
+  function_ref<ManagedValue(SGFContext)> F = [&](SGFContext ctx) {
+    auto mv = inputF(ctx);
+    assert((mv.isInContext() || mv.isLValue() || mv.isPlusOne(*this)) &&
+           "Expected a plus one value?!");
+    return mv;
+  };
 
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
