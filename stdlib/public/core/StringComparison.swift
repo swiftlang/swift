@@ -18,9 +18,31 @@ internal func _stringCompare(
   _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
 ) -> Bool {
   if lhs.rawBits == rhs.rawBits { return expecting == .equal }
+  return _stringCompareWithSmolCheck(lhs, rhs, expecting: expecting)
+}
+
+@usableFromInline
+@_effects(readonly)
+internal func _stringCompareWithSmolCheck(
+  _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
+) -> Bool {
+  // ASCII small-string fast-path:
+  if lhs.isSmallASCII && rhs.isSmallASCII {
+    let lhsRaw = lhs.asSmall._storage
+    let rhsRaw = rhs.asSmall._storage
+
+    if lhsRaw.0 != rhsRaw.0 {
+      return _lexicographicalCompare(
+        lhsRaw.0.byteSwapped, rhsRaw.0.byteSwapped, expecting: expecting)
+    }
+    return _lexicographicalCompare(
+      lhsRaw.1.byteSwapped, rhsRaw.1.byteSwapped, expecting: expecting)
+  }
+
   return _stringCompareInternal(lhs, rhs, expecting: expecting)
 }
 
+@inline(never) // Keep `_stringCompareWithSmolCheck` fast-path fast
 @usableFromInline
 @_effects(readonly)
 internal func _stringCompareInternal(
