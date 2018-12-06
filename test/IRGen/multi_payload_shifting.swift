@@ -24,7 +24,7 @@ enum Node {
   case sequence(Sequence)
 }
 
-// CHECK: define internal i32 @"$s22multi_payload_shifting4NodeOwet"(%swift.opaque* noalias %value, i32 %numEmptyCases, %swift.type* %Node) #9 {
+// CHECK: define internal i32 @"$s22multi_payload_shifting4NodeOwet"(%swift.opaque* noalias %value, i32 %numEmptyCases, %swift.type* %Node)
 // CHECK:  [[ADDR:%.*]] = getelementptr inbounds { i64, i64, i64, i8 }, { i64, i64, i64, i8 }* {{.*}}, i32 0, i32 3
 // CHECK:  [[BYTE:%.*]] = load i8, i8* [[ADDR]]
 // Make sure we zext before we shift.
