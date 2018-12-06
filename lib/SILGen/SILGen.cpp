@@ -675,10 +675,10 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 /// Emit a function now, if it's externally usable or has been referenced in
 /// the current TU, or remember how to emit it later if not.
 template<typename /*void (SILFunction*)*/ Fn>
-void emitOrDelayFunction(SILGenModule &SGM,
-                         SILDeclRef constant,
-                         Fn &&emitter,
-                         bool forceEmission = false) {
+static void emitOrDelayFunction(SILGenModule &SGM,
+                                SILDeclRef constant,
+                                Fn &&emitter,
+                                bool forceEmission = false) {
   auto emitAfter = SGM.lastEmittedFunction;
 
   SILFunction *f = nullptr;
@@ -1312,7 +1312,8 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
       case AccessorKind::Read:
         return impl.getReadImpl() != ReadImplKind::Read;
       case AccessorKind::Set:
-        return impl.getWriteImpl() != WriteImplKind::Set;
+        return impl.getWriteImpl() != WriteImplKind::Set &&
+               impl.getWriteImpl() != WriteImplKind::StoredWithObservers;
       case AccessorKind::Modify:
         return impl.getReadWriteImpl() != ReadWriteImplKind::Modify;
 #define ACCESSOR(ID) \
