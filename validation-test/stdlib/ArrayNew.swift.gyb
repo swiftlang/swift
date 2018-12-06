@@ -53,7 +53,7 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
-    ${element_type}(70)
+    ${element_type}(70), ${element_type}(80)
   ]]
   let identityOuter = a._bufferID
   var identityInner = a[0]._bufferID
@@ -82,31 +82,32 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
-  withInoutT(&a) {
-    (x: inout ${array_type}<${array_type}<${element_type}>>) in
+  withInoutT(&a) { (x: inout ${array_type}<${array_type}<${element_type}>>) in
     x[0][2].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
-  withInoutT(&a[0]) {
-    (x: inout ${array_type}<${element_type}>) in
+  withInoutT(&a[0]) { (x: inout ${array_type}<${element_type}>) in
     x[3].value += 1000
   }
 
   checkIdentity(SourceLocStack().withCurrentLoc())
 
   // This will reallocate storage unless Array uses addressors for subscript.
-  //withInoutT(&a[0][4]) {
-  //  (x: inout ${element_type}) in
-  //  x.value += 1000
-  //}
+  withInoutT(&a[0][4]) { (x: inout ${element_type}) in
+    x.value += 1000
+  }
 
-  // FIXME: both of these lines crash the compiler.
-  // <rdar://problem/18439579> Passing an expression based on addressors as
-  // 'inout' crashes SILGen
-  //withInoutT(&a[0][5].value, { $0 += 1000 })
-  //withInoutInt(&a[0][6].value, { $0 += 1000 })
+  checkIdentity(SourceLocStack().withCurrentLoc())
+
+  withInoutT(&a[0][5].value) { $0 += 1000 }
+
+  checkIdentity(SourceLocStack().withCurrentLoc())
+
+  withInoutInt(&a[0][6].value) { $0 += 1000 }
+
+  checkIdentity(SourceLocStack().withCurrentLoc())
 
   // Don't change the last element.
 
@@ -114,9 +115,10 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
   expectEqual(1020, a[0][1].value)
   expectEqual(1030, a[0][2].value)
   expectEqual(1040, a[0][3].value)
-  expectEqual(50, a[0][4].value)
-  expectEqual(60, a[0][5].value)
-  expectEqual(70, a[0][6].value)
+  expectEqual(1050, a[0][4].value)
+  expectEqual(1060, a[0][5].value)
+  expectEqual(1070, a[0][6].value)
+  expectEqual(80, a[0][7].value)
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW")
