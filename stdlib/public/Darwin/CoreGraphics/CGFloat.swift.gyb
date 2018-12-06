@@ -61,14 +61,16 @@ public struct CGFloat {
 }
 
 extension CGFloat : SignedNumeric {
-  // FIXME(integers): implement properly
+
+  @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    fatalError()
+    guard let native = NativeType(exactly: source) else { return nil }
+    self.native = native
   }
 
   @_transparent
   public var magnitude: CGFloat {
-    return CGFloat(Swift.abs(native))
+    return CGFloat(native.magnitude)
   }
 
 }
