@@ -59,6 +59,8 @@ UID_KEYS = [
     KEY('SelectorName', 'key.selector_name'),
     KEY('AnnotatedDecl', 'key.annotated_decl'),
     KEY('FullyAnnotatedDecl', 'key.fully_annotated_decl'),
+    KEY('FullyAnnotatedGenericSignature',
+        'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
