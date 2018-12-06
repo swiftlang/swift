@@ -67,7 +67,7 @@ several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
+macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the currently
 supported host development operating systems.
 
 #### macOS
