@@ -430,6 +430,9 @@ function(_add_variant_link_flags)
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
+    # We provide our own C++ below, so we ask the linker not to do it. However,
+    # we need to add the math library, which is linked implicitly by libc++.
+    list(APPEND result "-nostdlib++" "-lm")
     if("${LFLAGS_ARCH}" MATCHES armv7)
       list(APPEND result "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
