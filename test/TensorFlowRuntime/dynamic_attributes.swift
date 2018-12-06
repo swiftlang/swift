@@ -305,6 +305,8 @@ func check(dataset: VariantHandle) {
   expectEqual(ShapedArray<Int32>([2, 2]), next.1.array)
 }
 
+#if !CUDA
+// TensorSliceDataset not available on GPU.
 DynamicAttributeTests.test("NormalAttribute Array<TensorShape>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
@@ -353,6 +355,7 @@ DynamicAttributeTests.test("NormalAttribute Array<String>") {
   expectEqual(ShapedArray<Float>([1]), parsedA.array)
   expectEqual(ShapedArray<Float>([2]), parsedB.array)
 }
+#endif // !CUDA
 
 DynamicAttributeTests.test("TFDataTypeAttribute TensorDataType") {
   let t1 = Tensor<Int32>(-1)
@@ -364,6 +367,8 @@ DynamicAttributeTests.test("TFDataTypeAttribute TensorDataType") {
   expectEqual(2, t2Result.scalar!)
 }
 
+#if !CUDA
+// TensorSliceDataset not available on GPU.
 DynamicAttributeTests.test("TFDataTypeAttribute Array<TensorDataType>") {
   let elements1 = Tensor<Int32>([[1], [2]])
   let elements2 = Tensor<Int32>([[1, 1], [2, 2]])
@@ -374,6 +379,7 @@ DynamicAttributeTests.test("TFDataTypeAttribute Array<TensorDataType>") {
   )
   check(dataset: dataset)
 }
+#endif // !CUDA
 
 DynamicAttributeTests.test("ShapeAttribute TensorShape") {
   let t = Tensor<Float>([5.0])

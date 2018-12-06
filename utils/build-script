@@ -830,6 +830,9 @@ class BuildScriptInvocation(object):
         if not args.build_tensorflow:
             impl_args += ["--skip-build-tensorflow"]
 
+        if args.enable_tensorflow_gpu:
+            impl_args += ["--enable-tensorflow-gpu"]
+
         if args.enable_tensorflow:
             impl_args += [
                 "--enable-tensorflow",
