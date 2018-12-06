@@ -89,32 +89,31 @@ extension _StringGutsSlice {
     var icuInputBuffer = icuInputBuffer
     var icuOutputBuffer = icuOutputBuffer
     
-    var index = self.range.lowerBound
-    let cachedEndIndex = self.range.upperBound
+    var index = String.Index(encodedOffset: 0)
+    let cachedEndIndex = String.Index(encodedOffset: sourceBuffer.count)
     
-    var bufferCleanup: (() -> ())? = nil
-    while index != cachedEndIndex {
+    var allocatedBuffers = false
+    while index < cachedEndIndex {
       let result = _fastNormalize(index, sourceBuffer, outputBuffer, icuInputBuffer, icuOutputBuffer)
       switch result {
       case let .success(r):
         for i in 0..<r.amountFilled {
           hasher.combine(outputBuffer[i])
         }
+        _internalInvariant(r.nextReadPosition != index)
         index = r.nextReadPosition
       case let .bufferTooSmall(resize):
-        _internalInvariant(bufferCleanup == nil)
+        _internalInvariant(!allocatedBuffers)
         outputBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: resize.output)
         icuInputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuInput)
         icuOutputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuOutput)
-        bufferCleanup = {
-          outputBuffer.deallocate()
-          icuInputBuffer.deallocate()
-          icuOutputBuffer.deallocate()
-        }
+        allocatedBuffers = true
       }
     }
-    if let cleanup = bufferCleanup {
-      cleanup()
+    if allocatedBuffers {
+      outputBuffer.deallocate()
+      icuInputBuffer.deallocate()
+      icuOutputBuffer.deallocate()
     }
   }
   
@@ -131,29 +130,28 @@ extension _StringGutsSlice {
     var index = self.range.lowerBound
     let cachedEndIndex = self.range.upperBound
     
-    var bufferCleanup: (() -> ())? = nil
-    while index != cachedEndIndex {
+    var allocatedBuffers = false
+    while index < cachedEndIndex {
       let result = _foreignNormalize(index, self._guts, outputBuffer, icuInputBuffer, icuOutputBuffer)
       switch result {
       case let .success(r):
         for i in 0..<r.amountFilled {
           hasher.combine(outputBuffer[i])
         }
+        _internalInvariant(r.nextReadPosition != index)
         index = r.nextReadPosition
       case let .bufferTooSmall(resize):
-        _internalInvariant(bufferCleanup == nil)
+        _internalInvariant(!allocatedBuffers)
         outputBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: resize.output)
         icuInputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuInput)
         icuOutputBuffer = UnsafeMutableBufferPointer<UInt16>.allocate(capacity: resize.icuOutput)
-        bufferCleanup = {
-          outputBuffer.deallocate()
-          icuInputBuffer.deallocate()
-          icuOutputBuffer.deallocate()
-        }
+        allocatedBuffers = true
       }
     }
-    if let cleanup = bufferCleanup {
-      cleanup()
+    if allocatedBuffers {
+      outputBuffer.deallocate()
+      icuInputBuffer.deallocate()
+      icuOutputBuffer.deallocate()
     }
   }
 }
