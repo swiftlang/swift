@@ -248,3 +248,13 @@ public struct KeypathStruct {
     // expected-error@-1 {{property 'x' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+@usableFromInline protocol P {
+  typealias T = Int
+}
+
+extension P {
+  @inlinable func f() {
+    _ = T.self // ok, typealias inherits @usableFromInline from P
+  }
+}
+

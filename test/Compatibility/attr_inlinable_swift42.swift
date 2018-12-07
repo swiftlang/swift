@@ -17,3 +17,12 @@ enum InternalEnum {
   case persimmon(String)
 }
 
+@usableFromInline protocol P {
+  typealias T = Int
+}
+
+extension P {
+  @inlinable func f() {
+    _ = T.self // typealiases were not checked in Swift 4.2, but P.T inherits @usableFromInline in Swift 4.2 mode
+  }
+}
