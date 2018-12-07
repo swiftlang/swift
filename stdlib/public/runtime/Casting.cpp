@@ -2436,6 +2436,10 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
                                           cast<StructMetadata>(srcType),
                                           cast<StructMetadata>(targetType),
                                           flags);
+      } else if (isAnyHashableType(srcType)) {
+        // AnyHashable casts for enums.
+        return _dynamicCastFromAnyHashable(dest, src, srcType, targetType,
+                                           flags);
       }
       break;
 
