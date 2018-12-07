@@ -624,7 +624,7 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     ExistentialMetatypeContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self); 
       return castSelf->Flags.getNumWitnessTables();
     }
 
