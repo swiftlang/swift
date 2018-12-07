@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceLoc.h"
@@ -381,6 +382,85 @@ getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
 
+namespace namelookup {
+
+/// Performs a qualified lookup into the given module and, if necessary, its
+/// reexports, observing proper shadowing rules.
+void
+lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
+                           SmallVectorImpl<ValueDecl *> &decls,
+                           NLKind lookupKind,
+                           ResolutionKind resolutionKind,
+                           LazyResolver *typeResolver,
+                           const DeclContext *moduleScopeContext,
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+
+/// Searches through statements and patterns for local variable declarations.
+class FindLocalVal : public StmtVisitor<FindLocalVal> {
+  friend class ASTVisitor<FindLocalVal>;
+
+  const SourceManager &SM;
+  SourceLoc Loc;
+  VisibleDeclConsumer &Consumer;
+
+public:
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
+               VisibleDeclConsumer &Consumer)
+      : SM(SM), Loc(Loc), Consumer(Consumer) {}
+
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+    Consumer.foundDecl(D, Reason);
+  }
+
+  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
+  
+  void checkParameterList(const ParameterList *params);
+
+  void checkGenericParams(GenericParamList *Params);
+
+  void checkSourceFile(const SourceFile &SF);
+
+private:
+  bool isReferencePointInRange(SourceRange R) {
+    return SM.rangeContainsTokenLoc(R, Loc);
+  }
+
+  void visitBreakStmt(BreakStmt *) {}
+  void visitContinueStmt(ContinueStmt *) {}
+  void visitFallthroughStmt(FallthroughStmt *) {}
+  void visitFailStmt(FailStmt *) {}
+  void visitReturnStmt(ReturnStmt *) {}
+  void visitYieldStmt(YieldStmt *) {}
+  void visitThrowStmt(ThrowStmt *) {}
+  void visitPoundAssertStmt(PoundAssertStmt *) {}
+  void visitDeferStmt(DeferStmt *DS) {
+    // Nothing in the defer is visible.
+  }
+
+  void checkStmtCondition(const StmtCondition &Cond);
+
+  void visitIfStmt(IfStmt *S);
+  void visitGuardStmt(GuardStmt *S);
+
+  void visitWhileStmt(WhileStmt *S);
+  void visitRepeatWhileStmt(RepeatWhileStmt *S);
+  void visitDoStmt(DoStmt *S);
+
+  void visitForEachStmt(ForEachStmt *S);
+
+  void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
+  
+  void visitSwitchStmt(SwitchStmt *S);
+
+  void visitCaseStmt(CaseStmt *S);
+
+  void visitDoCatchStmt(DoCatchStmt *S);
+  void visitCatchClauses(ArrayRef<CatchStmt*> clauses);
+  void visitCatchStmt(CatchStmt *S);
+  
+};
+
+} // end namespace namelookup
 } // end namespace swift
 
 #endif
