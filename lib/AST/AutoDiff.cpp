@@ -110,7 +110,7 @@ static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
 /// as a method.
 AutoDiffParameterIndices *
 AutoDiffParameterIndices::create(ASTContext &C, AnyFunctionType *functionType,
-                                 bool isMethod) {
+                                 bool isMethod, bool setAllParams) {
   // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
   // gets called, which causes a small memory leak in the case that the
   // SmallBitVector decides to allocate some heap space.
@@ -119,7 +119,8 @@ AutoDiffParameterIndices::create(ASTContext &C, AnyFunctionType *functionType,
   unsigned paramCount =
       unwrapSelfParameter(functionType, isMethod)->getNumParams() +
       (isMethod ? 1 : 0);
-  return ::new (mem) AutoDiffParameterIndices(paramCount, isMethod);
+  return
+      ::new (mem) AutoDiffParameterIndices(paramCount, isMethod, setAllParams);
 }
 
 /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
