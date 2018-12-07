@@ -128,6 +128,23 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
                      archName, foundArchs);
 }
 
+static std::pair<llvm::SmallString<16>, llvm::SmallString<16>>
+getArchSpecificModuleFileNames(StringRef archName) {
+  llvm::SmallString<16> archFile, archDocFile;
+
+  if (!archName.empty()) {
+    archFile += archName;
+    archFile += '.';
+    archFile += file_types::getExtension(file_types::TY_SwiftModuleFile);
+
+    archDocFile += archName;
+    archDocFile += '.';
+    archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
+  }
+
+  return {archFile, archDocFile};
+}
+
 bool
 SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
@@ -143,19 +160,19 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
   moduleDocFilename +=
       file_types::getExtension(file_types::TY_SwiftModuleDocFile);
 
-  // FIXME: Which name should we be using here? Do we care about CPU subtypes?
-  // FIXME: At the very least, don't hardcode "arch".
-  llvm::SmallString<16> archName{
-      Ctx.LangOpts.getPlatformConditionValue(PlatformConditionKind::Arch)};
-  llvm::SmallString<16> archFile{archName};
-  llvm::SmallString<16> archDocFile{archName};
-  if (!archFile.empty()) {
-    archFile += '.';
-    archFile += file_types::getExtension(file_types::TY_SwiftModuleFile);
+  StringRef archName = Ctx.LangOpts.Target.getArchName();
+  auto archFileNames = getArchSpecificModuleFileNames(archName);
 
-    archDocFile += '.';
-    archDocFile += file_types::getExtension(file_types::TY_SwiftModuleDocFile);
-  }
+  // FIXME: We used to use "major architecture" names for these files---the
+  // names checked in "#if arch(...)". Fall back to that name in the one case
+  // where it's different from what Swift 4.2 supported: 32-bit ARM platforms.
+  // We should be able to drop this once there's an Xcode that supports the
+  // new names.
+  StringRef alternateArchName;
+  if (Ctx.LangOpts.Target.getArch() == llvm::Triple::ArchType::arm)
+    alternateArchName = "arm";
+  auto alternateArchFileNames =
+      getArchSpecificModuleFileNames(alternateArchName);
 
   llvm::SmallString<128> scratch;
   llvm::SmallString<128> currPath;
@@ -169,9 +186,18 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
       currPath = path;
       llvm::sys::path::append(currPath, moduleFilename.str());
       err = openModuleFiles(currPath,
-                            archFile.str(), archDocFile.str(),
+                            archFileNames.first, archFileNames.second,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
+
+      if (err == std::errc::no_such_file_or_directory &&
+          !alternateArchName.empty()) {
+        err = openModuleFiles(currPath,
+                              alternateArchFileNames.first,
+                              alternateArchFileNames.second,
+                              moduleBuffer, moduleDocBuffer,
+                              scratch);
+      }
 
       if (err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
@@ -197,8 +223,17 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
       }
 
       llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
+      auto err = openModuleFiles(currPath,
+                                 archFileNames.first, archFileNames.second,
                                  moduleBuffer, moduleDocBuffer, scratch);
+
+      if (err == std::errc::no_such_file_or_directory &&
+          !alternateArchName.empty()) {
+        err = openModuleFiles(currPath,
+                              alternateArchFileNames.first,
+                              alternateArchFileNames.second,
+                              moduleBuffer, moduleDocBuffer, scratch);
+      }
 
       if (err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
