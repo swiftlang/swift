@@ -427,11 +427,7 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
 }
 
 /// Build an expression that evaluates the specified parameter list as a tuple
-/// or paren expr, suitable for use in an applyexpr.
-///
-/// NOTE: This returns null if a varargs parameter exists in the list, as it
-/// cannot be forwarded correctly yet.
-///
+/// or paren expr, suitable for use in an apply expr.
 static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                          ASTContext &ctx) {
   SmallVector<Identifier, 4> labels;
@@ -2209,7 +2205,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // "computed" in the current AST state.
       if (var->isImplicit() || var->isStatic())
         continue;
-      tc.validateDecl(var);
+
       if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
         continue;
 
@@ -2221,6 +2217,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
+      tc.validateDecl(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
       // If var is a lazy property, its value is provided for the underlying
@@ -2528,7 +2525,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     auto paramTy = decl->getInterfaceType();
     auto substTy = paramTy.subst(subMap);
     decl->setInterfaceType(substTy);
-    decl->setType(GenericEnvironment::mapTypeIntoContext(genericEnv, substTy));
   }
 
   // Create the initializer declaration, inheriting the name,
