@@ -332,7 +332,7 @@ public struct UnsafeRawPointer: _Pointer {
 
 extension UnsafeRawPointer: Strideable {
   // custom version for raw pointers
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
     return UnsafeRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
@@ -937,30 +937,30 @@ public struct UnsafeMutableRawPointer: _Pointer {
 
 extension UnsafeMutableRawPointer: Strideable {
   // custom version for raw pointers
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 
 extension OpaquePointer {
-  @inlinable
+  @_transparent
   public init(_ from: UnsafeMutableRawPointer) {
     self._rawValue = from._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init?(_ from: UnsafeMutableRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init(_ from: UnsafeRawPointer) {
     self._rawValue = from._rawValue
   }
 
-  @inlinable
+  @_transparent
   public init?(_ from: UnsafeRawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
