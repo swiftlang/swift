@@ -541,3 +541,6 @@ Class _StringStorage has changed its super class from _AbstractStringStorage to 
 Constructor _AbstractStringStorage.init() has been removed
 Func _AbstractStringStorage.copy(with:) has been removed
 Func _AbstractStringStorage.getOrComputeBreadcrumbs() has been removed
+
+Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has been added as a protocol requirement
+Func Sequence.withContiguousStorageIfAvailable(_:) has been added as a protocol requirement
