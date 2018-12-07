@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4.2
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
@@ -157,7 +157,7 @@ enum InternalEnum {
   case apple
   case orange
   case pear(InternalEnum)
-  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
+  // expected-error@-1 {{type of enum case in '@usableFromInline' enum must be '@usableFromInline' or public}}
   case persimmon(String)
 }
 
