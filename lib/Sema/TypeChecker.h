@@ -44,7 +44,6 @@ class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
-class SynthesizedFunction;
 enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
@@ -544,9 +543,6 @@ public:
   /// Track the index of the next declaration that needs to be finalized,
   /// from the \c DeclsToFinalize set.
   unsigned NextDeclToFinalize = 0;
-
-  /// The list of functions that need to have their bodies synthesized.
-  llvm::MapVector<FuncDecl*, SynthesizedFunction> FunctionsToSynthesize;
 
   /// The list of protocols that need their requirement signatures computed,
   /// because they were first validated by validateDeclForNameLookup(),
@@ -1272,8 +1268,6 @@ public:
   /// complement of accessors.
   void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
                                             AbstractStorageDecl *storage);
-
-  void synthesizeFunctionBody(SynthesizedFunction fn);
 
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
