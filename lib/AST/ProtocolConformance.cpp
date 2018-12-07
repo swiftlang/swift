@@ -375,16 +375,6 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
   return normalC->getType()->getContextSubstitutionMap(M, DC);
 }
 
-bool ProtocolConformance::isBehaviorConformance() const {
-  return getRootConformance()->isBehaviorConformance();
-}
-
-AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(getRootConformance()))
-    return normal->getBehaviorDecl();
-  return nullptr;
-}
-
 bool RootProtocolConformance::isInvalid() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(isInvalid, ())
 }

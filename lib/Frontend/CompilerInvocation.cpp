@@ -209,9 +209,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
-  Opts.EnableExperimentalPropertyBehaviors |=
-    Args.hasArg(OPT_enable_experimental_property_behaviors);
-
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 

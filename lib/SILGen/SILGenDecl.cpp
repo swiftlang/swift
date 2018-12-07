@@ -1195,10 +1195,6 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
-  // Here we just emit the behavior witness table, if any.
-  
-  if (D->hasBehavior())
-    SGM.emitPropertyBehavior(D);
 }
 
 /// Emit a check that returns 1 if the running OS version is in

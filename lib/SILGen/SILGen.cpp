@@ -1286,9 +1286,6 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  if (vd->hasBehavior())
-    emitPropertyBehavior(vd);
-
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -1367,8 +1364,6 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
     return false;
-  case AccessStrategy::BehaviorStorage:
-    llvm_unreachable("should not occur");
   }
   llvm_unreachable("unhandled strategy");
 }
@@ -1468,12 +1463,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);
-}
-
-void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
-  assert(vd->hasBehavior());
-  // Emit the protocol conformance to the behavior.
-  getWitnessTable(*vd->getBehavior()->Conformance);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

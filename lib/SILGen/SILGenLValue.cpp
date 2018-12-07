@@ -2337,9 +2337,6 @@ namespace {
         return asImpl().emitUsingStorage(typeData);
       }
 
-      case AccessStrategy::BehaviorStorage:
-        return asImpl().emitUsingBehaviorStorage();
-
       case AccessStrategy::DirectToAccessor:
         return asImpl().emitUsingAccessor(strategy.getAccessor(), true);
 
@@ -2519,11 +2516,6 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
-    }
-  
-    void emitUsingBehaviorStorage() {
-      // TODO: Behaviors aren't supported for non-instance properties yet.
-      llvm_unreachable("not implemented");
     }
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options, *this);
 
@@ -2807,10 +2799,6 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
     
-  case AccessStrategy::BehaviorStorage:
-    // We should only access the behavior storage for initialization purposes.
-    assert(accessKind == SGFAccessKind::Write);
-    return SGFAccessKind::ReadWrite;
   }
   llvm_unreachable("bad access strategy");
 }
@@ -3001,17 +2989,6 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         LV.add<OwnershipComponent>(typeData);
       }
     }
-
-    // For behavior initializations, we should have set up a marking proxy that
-    // replaces the access path.
-    void emitUsingBehaviorStorage() {
-      auto addr = SGF.maybeEmitValueOfLocalVarDecl(Storage);
-      assert(addr && addr.isLValue());
-      LV = LValue();
-      auto typeData = getPhysicalStorageTypeData(SGF.SGM, AccessKind, Storage,
-                                                 FormalRValueType);
-      LV.add<ValueComponent>(addr, None, typeData);
-    }
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
             formalRValueType, options, *this,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
@@ -3179,10 +3156,6 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
 
     void emitUsingStorage(LValueTypeData typeData) {
       llvm_unreachable("subscripts never have storage");
-    }
-
-    void emitUsingBehaviorStorage() {
-      llvm_unreachable("subscripts never have behaviors");
     }
   } emitter(SGF, loc, decl, subs, isSuper, accessKind, formalRValueType,
             options, *this, indexExprForDiagnostics, std::move(indices),

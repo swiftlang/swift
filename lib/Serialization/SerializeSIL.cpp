@@ -2090,8 +2090,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
-    llvm_unreachable("todo");
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {

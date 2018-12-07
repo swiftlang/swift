@@ -2452,63 +2452,6 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
 
-// Property behaviors
-ERROR(property_behavior_not_protocol,none,
-      "property behavior name must refer to a protocol", ())
-ERROR(property_behavior_protocol_reqt_ambiguous,none,
-      "property behavior protocol has ambiguous %0 member", (Identifier))
-ERROR(property_behavior_protocol_no_value,none,
-      "property behavior protocol does not have a 'value' property", ())
-ERROR(property_behavior_protocol_no_initStorage,none,
-      "property behavior protocol has a 'storage' requirement but does not "
-      "have a static 'initStorage' method with the expected type %0 or %1",
-      (Type, Type))
-ERROR(property_behavior_unknown_requirement,none,
-      "property behavior protocol %0 has non-behavior requirement %1",
-      (Identifier, DeclBaseName))
-NOTE(property_behavior_unknown_requirement_here,none,
-     "declared here", ())
-NOTE(self_conformance_required_by_property_behavior,none,
-     "conformance to %0 required to contain an instance property with "
-     "behavior %1",
-     (Identifier, Identifier))
-NOTE(value_conformance_required_by_property_behavior,none,
-     "behavior %1 requires property type to conform to protocol %0",
-     (Identifier, Identifier))
-ERROR(property_behavior_with_self_requirement_not_in_type,none,
-      "property behavior %0 can only be used on instance properties "
-      "because it has 'Self' requirements",
-      (Identifier))
-ERROR(property_behavior_with_feature_not_supported,none,
-      "property behavior %0 with %1 is not supported outside of "
-      "type contexts",
-      (Identifier, StringRef))
-ERROR(property_behavior_value_type_doesnt_match,none,
-      "property behavior %0 provides 'value' property implementation with "
-      "type %1 that doesn't match type %2 of declared property %3",
-      (Identifier, Type, Identifier, Type))
-NOTE(property_behavior_value_decl_here,none,
-     "'value' property declared here", ())
-ERROR(property_behavior_invalid_parameter_reqt,none,
-      "property behavior %0 has a 'parameter' requirement that is "
-      "static or generic", (Identifier))
-ERROR(property_behavior_requires_parameter,none,
-      "property behavior %0 requires a parameter in the declaration of %1",
-      (Identifier, Identifier))
-ERROR(property_behavior_invalid_initializer,none,
-      "initializer expression provided, but property behavior %0 does not "
-      "use it",
-      (Identifier))
-ERROR(property_behavior_unsupported_initializer,none,
-      "property behaviors do not support destructuring initialization of "
-      "multiple properties", ())
-ERROR(property_behavior_invalid_parameter,none,
-      "parameter expression provided, but property behavior %0 does not "
-      "use it",
-      (Identifier))
-ERROR(property_behavior_conformance_broken,none,
-      "property behavior for %0 in type %1 is broken", (DeclName, Type))
-
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
 //------------------------------------------------------------------------------

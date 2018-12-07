@@ -123,8 +123,6 @@ public:
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);
 
-  std::string mangleBehaviorInitThunk(const VarDecl *decl);
-
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
   std::string mangleGlobalInit(const VarDecl *decl, int counter,

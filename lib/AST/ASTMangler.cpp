@@ -229,23 +229,6 @@ std::string ASTMangler::mangleClosureWitnessThunk(
   return finalize();
 }
 
-std::string ASTMangler::mangleBehaviorInitThunk(const VarDecl *decl) {
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
-  Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
-  assert(!discriminator.empty());
-  assert(!isNonAscii(discriminator.str()) &&
-         "discriminator contains non-ASCII characters");
-  assert(!clang::isDigit(discriminator.str().front()) &&
-         "not a valid identifier");
-
-  appendContextOf(decl);
-  appendIdentifier(decl->getName().str());
-  appendIdentifier(discriminator.str());
-  appendOperator("TB");
-  return finalize();
-}
-
 std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
   // As a special case, Clang functions and globals don't get mangled at all.
   // FIXME: When we can import C++, use Clang's mangler.
@@ -2263,36 +2246,28 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelContext->getParentModule();
 
-  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
-    appendContextOf(behaviorStorage);
-    FileUnit *fileUnit = cast<FileUnit>(topLevelContext);
-    appendIdentifier(
-              fileUnit->getDiscriminatorForPrivateValue(behaviorStorage).str());
-    appendProtocolName(conformance->getProtocol());
-    appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
-  } else {
-    auto conformingType = conformance->getType();
-    appendType(conformingType->getCanonicalType());
-    
-    appendProtocolName(conformance->getProtocol());
+  auto conformingType = conformance->getType();
+  appendType(conformingType->getCanonicalType());
+  
+  appendProtocolName(conformance->getProtocol());
 
-    bool needsModule = true;
-    if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
-      if (file->getKind() == FileUnitKind::ClangModule ||
-          file->getKind() == FileUnitKind::DWARFModule) {
-        if (conformance->getProtocol()->hasClangNode())
-          appendOperator("So");
-        else
-          appendOperator("SC");
-        needsModule = false;
-      }
+  bool needsModule = true;
+  if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+    if (file->getKind() == FileUnitKind::ClangModule ||
+        file->getKind() == FileUnitKind::DWARFModule) {
+      if (conformance->getProtocol()->hasClangNode())
+        appendOperator("So");
+      else
+        appendOperator("SC");
+      needsModule = false;
     }
-    if (needsModule)
-      appendModule(Mod);
-
-    contextSig =
-      conformingType->getAnyNominal()->getGenericSignatureOfContext();
   }
+  if (needsModule)
+    appendModule(Mod);
+
+  contextSig =
+    conformingType->getAnyNominal()->getGenericSignatureOfContext();
+
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig, contextSig);
   }
