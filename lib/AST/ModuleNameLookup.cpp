@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "NameLookupImpl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
