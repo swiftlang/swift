@@ -1081,6 +1081,8 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
+ERROR(invalid_autoclosure_forwarding,none,
+      "add () to forward @autoclosure parameter", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
