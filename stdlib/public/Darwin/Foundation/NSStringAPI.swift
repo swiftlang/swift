@@ -19,7 +19,7 @@
 //
 // This file is shared between two projects:
 //
-// 1. https://github.com/apple/swift/tree/master/stdlib/public/SDK/Foundation
+// 1. https://github.com/apple/swift/tree/master/stdlib/public/Darwin/Foundation
 // 2. https://github.com/apple/swift-corelibs-foundation/tree/master/Foundation
 //
 // If you change this file, you must update it in both places.
