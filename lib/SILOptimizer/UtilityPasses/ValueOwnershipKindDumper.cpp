@@ -23,16 +23,6 @@
 
 using namespace swift;
 
-static void checkEnumInstIsTrivial(EnumInst *EI) {
-  if (!EI->hasOperand())
-    return;
-
-  if (EI->getOperand()->getType().isTrivial(EI->getModule()))
-    return;
-
-  llvm_unreachable("Found enum with non-trivial operand but trivial ownership?!");
-}
-
 namespace {
 
 class ValueOwnershipKindDumper : public SILFunctionTransform {

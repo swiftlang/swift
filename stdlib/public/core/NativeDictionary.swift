@@ -402,24 +402,32 @@ extension _NativeDictionary {
         // Move the old value out of storage, wrapping it into an optional
         // before yielding it.
         var value: Value? = (_values + bucket.offset).move()
-        yield &value
-        if let value = value {
-          // **Mutation.** Initialize storage to new value.
-          (_values + bucket.offset).initialize(to: value)
-        } else {
-          // **Removal.** We've already deinitialized the value; deinitialize
-          // the key too and register the removal.
-          (_keys + bucket.offset).deinitialize(count: 1)
-          _delete(at: bucket)
+        defer {
+          // This is in a defer block because yield might throw, and we need to
+          // preserve Dictionary's storage invariants when that happens.
+          if let value = value {
+            // **Mutation.** Initialize storage to new value.
+            (_values + bucket.offset).initialize(to: value)
+          } else {
+            // **Removal.** We've already deinitialized the value; deinitialize
+            // the key too and register the removal.
+            (_keys + bucket.offset).deinitialize(count: 1)
+            _delete(at: bucket)
+          }
         }
+        yield &value
       } else {
         var value: Value? = nil
-        yield &value
-        if let value = value {
-          // **Insertion.** Insert the new entry at the correct place.  Note
-          // that `mutatingFind` already ensured that we have enough capacity.
-          _insert(at: bucket, key: key, value: value)
+        defer {
+          // This is in a defer block because yield might throw, and we need to
+          // preserve Dictionary invariants when that happens.
+          if let value = value {
+            // **Insertion.** Insert the new entry at the correct place.  Note
+            // that `mutatingFind` already ensured that we have enough capacity.
+            _insert(at: bucket, key: key, value: value)
+          }
         }
+        yield &value
       }
     }
   }

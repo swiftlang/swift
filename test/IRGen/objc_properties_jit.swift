@@ -14,7 +14,7 @@ extension NSString {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
-// CHECK:         [[NSOBJECT_UNINIT:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_NSString"
+// CHECK:         [[NSOBJECT_UNINIT:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_NSString"
 // CHECK:         [[NSOBJECT:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[NSOBJECT_UNINIT]])
 // CHECK:         [[GET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(classProp)
 // CHECK:         call i8* @class_replaceMethod(%objc_class* @"OBJC_METACLASS_$_NSString", i8* [[GET_CLASS_PROP]]

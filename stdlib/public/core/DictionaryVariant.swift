@@ -95,8 +95,8 @@ extension Dictionary._Variant {
     _modify {
       var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer { object = .init(native: native._storage) }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 

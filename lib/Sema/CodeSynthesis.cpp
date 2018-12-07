@@ -1078,6 +1078,11 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     if (isOnDemandAccessor(storage, kind)) {
       auto synthKind = getSynthKindForAccessorKind(kind);
       triggerSynthesis(*this, storage->getAccessor(kind), synthKind);
+
+      // Make sure SILGen emits the accessor; on-demand accessors have shared
+      // linkage, and if its defined in a different translation unit from the
+      // conformance we cannot simply generate an external declaration.
+      Context.addExternalDecl(storage->getAccessor(kind));
     }
   });
 

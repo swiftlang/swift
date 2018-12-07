@@ -630,9 +630,9 @@ ERROR(serialization_circular_dependency,Fatal,
 ERROR(serialization_missing_shadowed_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
+      "cannot load module '%0' as '%1'", (StringRef, StringRef))
 ERROR(serialization_name_mismatch_repl,none,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
+      "cannot load module '%0' as '%1'", (StringRef, StringRef))
 ERROR(serialization_target_incompatible,Fatal,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))

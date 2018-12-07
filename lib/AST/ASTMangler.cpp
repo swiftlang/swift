@@ -946,23 +946,27 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::SILBox: {
       auto box = cast<SILBoxType>(tybase);
       auto layout = box->getLayout();
-      SmallVector<TupleTypeElt, 4> fieldsList;
+      bool firstField = true;
       for (auto &field : layout->getFields()) {
-        auto fieldTy = field.getLoweredType();
-        // Use the `inout` mangling to represent a mutable field.
-        auto fieldFlag = ParameterTypeFlags().withInOut(field.isMutable());
-        fieldsList.push_back(TupleTypeElt(fieldTy, Identifier(), fieldFlag));
+        appendType(field.getLoweredType());
+        if (field.isMutable()) {
+          // Use the `inout` mangling to represent a mutable field.
+          appendOperator("z");
+        }
+        appendListSeparator(firstField);
       }
-      appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
-                       ->getCanonicalType());
+      if (firstField)
+        appendOperator("y");
 
       if (auto sig = layout->getGenericSignature()) {
-        fieldsList.clear();
+        bool firstType = true;
         for (Type type : box->getSubstitutions().getReplacementTypes()) {
-          fieldsList.push_back(TupleTypeElt(type));
+          appendType(type);
+          appendListSeparator(firstType);
         }
-        appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
-                         ->getCanonicalType());
+        if (firstType)
+          appendOperator("y");
+
         appendGenericSignature(sig);
         appendOperator("XX");
       } else {

@@ -938,10 +938,15 @@ function(_add_swift_library_single target name)
       # target_sources(${target}
       #                PRIVATE
       #                  $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+        set(extension .obj)
+      else()
+        set(extension .o)
+      endif()
       target_sources(${target}
                      PRIVATE
-                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
-      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}"
+                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}")
+      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}"
                                   PROPERTIES
                                     GENERATED 1)
     endif()

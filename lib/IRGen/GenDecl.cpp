@@ -2565,28 +2565,12 @@ getProtocolDescriptorEntityReference(IRGenModule &IGM, ProtocolDecl *protocol) {
 }
 
 static TypeEntityReference
-getObjCClassRefEntityReference(IRGenModule &IGM, ClassDecl *cls) {
-  // A reference to an Objective-C class object.
-  assert(cls->isObjC() && "Must have an Objective-C class here");
-
-  auto kind = TypeReferenceKind::IndirectObjCClass;
-  auto entity = LinkEntity::forObjCClassRef(cls);
-
-  auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
-  assert(!ref.isIndirect());
-
-  return TypeEntityReference(kind, ref.getValue());
-}
-
-static TypeEntityReference
-getRuntimeOnlyClassEntityReference(IRGenModule &IGM, ClassDecl *cls) {
-  assert(cls->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly);
-
-  auto namedClangDecl = Mangle::ASTMangler::getClangDeclForMangling(cls);
-  assert(namedClangDecl);
-
+getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   auto kind = TypeReferenceKind::DirectObjCClassName;
-  auto ref = IGM.getAddrOfGlobalString(namedClangDecl->getName());
+  SmallString<64> objcRuntimeNameBuffer;
+  auto ref = IGM.getAddrOfGlobalString(
+                                 cls->getObjCRuntimeName(objcRuntimeNameBuffer),
+                                 /*willByRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
 }
@@ -2605,7 +2589,7 @@ IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
 
   switch (clas->getForeignClassKind()) {
   case ClassDecl::ForeignKind::RuntimeOnly:
-    return getRuntimeOnlyClassEntityReference(*this, clas);
+    return getObjCClassByNameReference(*this, clas);
 
   case ClassDecl::ForeignKind::CFType:
     return getTypeContextDescriptorEntityReference(*this, clas);
@@ -2613,9 +2597,14 @@ IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
   case ClassDecl::ForeignKind::Normal:
     if (hasKnownSwiftMetadata(*this, clas)) {
       return getTypeContextDescriptorEntityReference(*this, clas);
-    } else {
-      return getObjCClassRefEntityReference(*this, clas);
     }
+
+    // Note: we would like to use an Objective-C class reference, but the
+    // Darwin linker currently has a bug where it will coalesce these symbols
+    // *after* computing a relative offset, causing incorrect relative
+    // offsets in the metadata. Therefore, reference Objective-C classes by
+    // their runtime names.
+    return getObjCClassByNameReference(*this, clas);
   }
   llvm_unreachable("bad foreign type kind");
 }
