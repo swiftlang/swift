@@ -74,7 +74,7 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 
-   // CHECK: load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
+   // CHECK: load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1
@@ -82,7 +82,7 @@ func propertyAccess(b b: B) {
 
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$s7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
-  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]

@@ -265,7 +265,7 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ObjCClassRef: {
     llvm::SmallString<64> tempBuffer;
     StringRef name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(tempBuffer);
-    std::string Result("\01l_OBJC_CLASS_REF_$_");
+    std::string Result("OBJC_CLASS_REF_$_");
     Result.append(name.data(), name.size());
     return Result;
   }
