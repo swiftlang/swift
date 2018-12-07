@@ -1738,13 +1738,13 @@ namespace {
         // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC can be proven.
         fn = conditional
-                 ? tc.Context.getConditionallyBridgeFromObjectiveCBridgeable(&tc)
-                 : tc.Context.getForceBridgeFromObjectiveCBridgeable(&tc);
+                 ? tc.Context.getConditionallyBridgeFromObjectiveCBridgeable()
+                 : tc.Context.getForceBridgeFromObjectiveCBridgeable();
       } else {
         // Retrieve the bridging operation to be used if a static conformance
         // to _BridgedToObjectiveC cannot be proven.
-        fn = conditional ? tc.Context.getConditionallyBridgeFromObjectiveC(&tc)
-                         : tc.Context.getForceBridgeFromObjectiveC(&tc);
+        fn = conditional ? tc.Context.getConditionallyBridgeFromObjectiveC()
+                         : tc.Context.getForceBridgeFromObjectiveC();
       }
 
       if (!fn) {
@@ -3935,7 +3935,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
       // Synthesize a call to _undefined() of appropriate type.
-      FuncDecl *undefinedDecl = ctx.getUndefinedDecl(&tc);
+      FuncDecl *undefinedDecl = ctx.getUndefinedDecl();
       if (!undefinedDecl) {
         tc.diagnose(E->getLoc(), diag::missing_undefined_runtime);
         return nullptr;

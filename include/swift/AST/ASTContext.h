@@ -484,7 +484,7 @@ public:
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
-  FuncDecl *get##Name(LazyResolver *resolver) const;
+  FuncDecl *get##Name() const;
 #include "swift/AST/KnownDecls.def"
 
   /// Get the '+' function on two RangeReplaceableCollection.
@@ -498,21 +498,21 @@ public:
   ///
   /// If this is true, the four methods above all promise to return
   /// non-null.
-  bool hasOptionalIntrinsics(LazyResolver *resolver) const;
+  bool hasOptionalIntrinsics() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for UnsafeMutablePointer<T> function arguments.
   ///
   /// If this is true, the methods getConvert*ToPointerArgument
   /// all promise to return non-null.
-  bool hasPointerArgumentIntrinsics(LazyResolver *resolver) const;
+  bool hasPointerArgumentIntrinsics() const;
 
   /// Check whether the standard library provides all the correct
   /// intrinsic support for array literals.
   ///
   /// If this is true, the method getAllocateUninitializedArray
   /// promises to return non-null.
-  bool hasArrayLiteralIntrinsics(LazyResolver *resolver) const;
+  bool hasArrayLiteralIntrinsics() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConstructorDecl *getBoolBuiltinInitDecl() const;
@@ -531,13 +531,13 @@ public:
   FuncDecl *getArrayReserveCapacityDecl() const;
 
   /// Retrieve the declaration of Swift._unimplementedInitializer.
-  FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
+  FuncDecl *getUnimplementedInitializerDecl() const;
 
   /// Retrieve the declaration of Swift._undefined.
-  FuncDecl *getUndefinedDecl(LazyResolver *resolver) const;
+  FuncDecl *getUndefinedDecl() const;
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
-  FuncDecl *getIsOSVersionAtLeastDecl(LazyResolver *resolver) const;
+  FuncDecl *getIsOSVersionAtLeastDecl() const;
   
   /// Look for the declaration with the given name within the
   /// Swift module.

@@ -1754,13 +1754,13 @@ namespace {
       SmallVector<Type, 2> typeArgs;
       typeArgs.push_back(BaseFormalType);
       if (TypeKind == KPTK_AnyKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtAnyKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtAnyKeyPath();
       } else if (TypeKind == KPTK_PartialKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtPartialKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtPartialKeyPath();
       } else if (TypeKind == KPTK_KeyPath ||
                  TypeKind == KPTK_WritableKeyPath ||
                  TypeKind == KPTK_ReferenceWritableKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtKeyPath();
 
         auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
         assert(keyPathTy->getGenericArgs().size() == 2);
@@ -1790,10 +1790,10 @@ namespace {
       auto keyPathValue = KeyPath;
       FuncDecl *setFn;
       if (TypeKind == KPTK_WritableKeyPath) {
-        setFn = SGF.getASTContext().getSetAtWritableKeyPath(nullptr);
+        setFn = SGF.getASTContext().getSetAtWritableKeyPath();
         assert(base.isLValue());
       } else if (TypeKind == KPTK_ReferenceWritableKeyPath) {
-        setFn = SGF.getASTContext().getSetAtReferenceWritableKeyPath(nullptr);
+        setFn = SGF.getASTContext().getSetAtReferenceWritableKeyPath();
         base = makeBaseConsumableMaterializedRValue(SGF, loc, base);
       } else {
         llvm_unreachable("bad writable type kind");

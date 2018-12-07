@@ -1047,7 +1047,7 @@ void SILGenFunction::ForceTryEmission::finish() {
     // Otherwise, we need to emit it.
     SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
-    if (auto diagnoseError = SGF.getASTContext().getDiagnoseUnexpectedError(nullptr)) {
+    if (auto diagnoseError = SGF.getASTContext().getDiagnoseUnexpectedError()) {
       ASTContext &ctx = SGF.getASTContext();
       auto error = SGF.B.createOwnedPhiArgument(SILType::getExceptionType(ctx));
       auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
@@ -5137,7 +5137,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   
   // Invoke the conversion intrinsic.
   FuncDecl *converter =
-    getASTContext().getConvertInOutToPointerArgument(nullptr);
+    getASTContext().getConvertInOutToPointerArgument();
 
   auto pointerType = pointerInfo.PointerType;
   auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
@@ -5191,12 +5191,12 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   FuncDecl *converter;
   if (accessInfo.AccessKind != SGFAccessKind::ReadWrite) {
     assert(isReadAccess(accessInfo.AccessKind));
-    converter = ctx.getConvertConstArrayToPointerArgument(nullptr);
+    converter = ctx.getConvertConstArrayToPointerArgument();
     if (array.isLValue())
       array = B.createLoadCopy(loc, array);
 
   } else {
-    converter = ctx.getConvertMutableArrayToPointerArgument(nullptr);
+    converter = ctx.getConvertMutableArrayToPointerArgument();
     assert(array.isLValue());
   }
 
@@ -5242,7 +5242,7 @@ std::pair<ManagedValue, ManagedValue>
 SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
                                     Type pointerType) {
   auto &Ctx = getASTContext();
-  FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument(nullptr);
+  FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument();
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
@@ -5263,7 +5263,7 @@ SILGenFunction::emitStringToPointer(SILLocation loc, ManagedValue stringValue,
 RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {
   auto &Ctx = SGF.getASTContext();
-  auto converter = Ctx.getConvertPointerToPointerArgument(nullptr);
+  auto converter = Ctx.getConvertPointerToPointerArgument();
 
   // Get the original pointer value, abstracted to the converter function's
   // expected level.

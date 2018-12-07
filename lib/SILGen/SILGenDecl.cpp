@@ -1222,7 +1222,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
   // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
   FuncDecl *versionQueryDecl =
-      getASTContext().getIsOSVersionAtLeastDecl(nullptr);
+      getASTContext().getIsOSVersionAtLeastDecl();
   assert(versionQueryDecl);
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);

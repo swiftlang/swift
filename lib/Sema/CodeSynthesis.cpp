@@ -2272,7 +2272,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
 /// Create a stub body that emits a fatal error message.
 static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
-  auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
+  auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl();
   auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!unimplementedInitDecl) {
     tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
