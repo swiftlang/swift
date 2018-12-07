@@ -203,10 +203,10 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   getter->setImplicit();
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
-  if (selfDecl) {
+  // Note that we don't re-parent the 'self' declaration to be part of
+  // the getter until we synthesize the body of the getter later.
+  if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
-    selfDecl->setDeclContext(getter);
-  }
 
   // We need to install the generic environment here because:
   // 1) validating the getter will change the implicit self decl's DC to it,
@@ -1292,6 +1292,7 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
+  Get->getImplicitSelfDecl()->setDeclContext(Get);
   InitValue->walk(RecontextualizeClosures(Get));
 
   // Wrap the initializer in a LazyInitializerExpr to avoid problems with
