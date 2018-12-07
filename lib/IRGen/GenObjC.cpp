@@ -1124,7 +1124,6 @@ static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
 /// type encoding, and IMP pointer.
 SILFunction *irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
                                                   AbstractFunctionDecl *method,
-                                                  bool extendedEncoding,
                                                   bool concrete,
                                                   llvm::Constant *&selectorRef,
                                                   llvm::Constant *&atEncoding,
@@ -1138,7 +1137,7 @@ SILFunction *irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// the return type @encoding and every parameter type @encoding, glued with
   /// numbers that used to represent stack offsets for each of these elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  atEncoding = getObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
+  atEncoding = getObjCEncodingForMethodType(IGM, methodType, /*extended*/false);
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
@@ -1315,10 +1314,8 @@ void irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractFunctionDecl *method) {
   llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto silFn = emitObjCMethodDescriptorParts(IGM, method,
-                                /*extended*/ false,
-                                /*concrete*/ true,
-                                selectorRef, atEncoding, impl);
+  auto silFn = emitObjCMethodDescriptorParts(IGM, method, /*concrete*/ true,
+                                             selectorRef, atEncoding, impl);
   buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
 
   if (silFn && silFn->hasObjCReplacement()) {

@@ -109,7 +109,6 @@ namespace irgen {
   /// method or constructor implementation.
   SILFunction *emitObjCMethodDescriptorParts(IRGenModule &IGM,
                                              AbstractFunctionDecl *method,
-                                             bool extendedEncoding,
                                              bool concrete,
                                              llvm::Constant *&selectorRef,
                                              llvm::Constant *&atEncoding,
