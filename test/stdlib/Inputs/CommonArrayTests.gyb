@@ -325,6 +325,87 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 }
 
 //===----------------------------------------------------------------------===//
+// _withUnsafeMutableBufferPointerIfSupported()
+//===----------------------------------------------------------------------===//
+
+struct WithContiguousMutableStorageIfAvailableTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let withContiguousMutableStorageIfAvailableTests = [
+  WithContiguousMutableStorageIfAvailableTest([]),
+  WithContiguousMutableStorageIfAvailableTest([ 10 ]),
+  WithContiguousMutableStorageIfAvailableTest([ 10, 20, 30, 40, 50 ]),
+]
+
+${Suite}.test("${ArrayType}/withContiguousMutableStorageIfAvailable")
+  .code {
+  for test in withContiguousMutableStorageIfAvailableTests {
+    var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
+    do {
+      // Read.
+      var result = a.withContiguousMutableStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
+        return OpaqueValue(Array(bufferPointer))
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(test.sequence, a.map { $0.value })
+    }
+    do {
+      // Read and write.
+      var result = a.withContiguousMutableStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
+        let result = OpaqueValue(Array(bufferPointer))
+        for i in bufferPointer.indices {
+          bufferPointer[i] = OpaqueValue(bufferPointer[i].value * 10)
+        }
+        return result
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(
+        test.sequence.map { $0 * 10 },
+        a.map { $0.value })
+    }
+  }
+  // FIXME: tests for arrays bridged from Objective-C.
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/1")
+  .code {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (bufferPointer) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: buffer.baseAddress, count: 0)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/ReplacingTheBufferTraps/2")
+  .code {
+  var a = getFresh${ArrayType}([ OpaqueValue(10) ])
+  var result = a._withUnsafeMutableBufferPointerIfSupported {
+    (bufferPointer) -> OpaqueValue<Int> in
+    // buffer = UnsafeMutableBufferPointer(start: nil, count: 1)
+    // FIXME: does not trap since the buffer is not passed inout.
+    // expectCrashLater()
+    return OpaqueValue(42)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // withUnsafeMutableBytes
 //===----------------------------------------------------------------------===//
 

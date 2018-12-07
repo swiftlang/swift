@@ -112,6 +112,9 @@ public class SequenceLog {
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
     TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailable = TypeIndexed(0)
+  public static var withContiguousMutableStorageIfAvailableNonNilReturns =
+    TypeIndexed(0)
   // RangeReplaceableCollection
   public static var init_ = TypeIndexed(0)
   public static var initRepeating = TypeIndexed(0)
@@ -385,6 +388,17 @@ extension LoggingMutableCollection: MutableCollection {
     return result
   }
 
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    MutableCollectionLog.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    }
+    return result
+  }
+
 }
 
 public typealias LoggingMutableBidirectionalCollection<
@@ -501,10 +515,10 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 > = LoggingRangeReplaceableCollection<Base>
 
 //===----------------------------------------------------------------------===//
-// Collections that count calls to `_withUnsafeMutableBufferPointerIfSupported`
+// Collections that count calls to `withContiguousMutableStorageIfAvailable`
 //===----------------------------------------------------------------------===//
 
-/// Interposes between `_withUnsafeMutableBufferPointerIfSupported` method calls
+/// Interposes between `withContiguousMutableStorageIfAvailable` method calls
 /// to increment a counter. Calls to this method from within dispatched methods
 /// are uncounted by the standard logging collection wrapper.
 public struct BufferAccessLoggingMutableCollection<
@@ -584,6 +598,17 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
     if result != nil {
       Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType] += 1
+    }
+    return result
+  }
+  
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    Log.withContiguousMutableStorageIfAvailable[selfType] += 1
+    let result = try base.withContiguousMutableStorageIfAvailable(body)
+    if result != nil {
+      Log.withContiguousMutableStorageIfAvailable[selfType] += 1
     }
     return result
   }

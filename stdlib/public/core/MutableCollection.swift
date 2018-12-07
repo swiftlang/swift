@@ -180,12 +180,33 @@ where SubSequence: MutableCollection
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+
+  /// Call `body(p)`, where `p` is a pointer to the collection's
+  /// mutable contiguous storage.  If no such storage exists, it is
+  /// first created.  If the collection does not support an internal
+  /// representation in a form of mutable contiguous storage, `body` is not
+  /// called and `nil` is returned.
+  ///
+  /// Often, the optimizer can eliminate bounds- and uniqueness-checks
+  /// within an algorithm, but when that fails, invoking the
+  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// speed.
+  mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }
+
+  @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
