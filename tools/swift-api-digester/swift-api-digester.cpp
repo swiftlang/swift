@@ -941,9 +941,9 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
                          llvm::raw_ostream &OS) {
-    if (Left && isa<SDKNodeType>(Left))
+    if (Left && !isa<SDKNodeDecl>(Left))
       return;
-    if (Right && isa<SDKNodeType>(Right))
+    if (Right && !isa<SDKNodeDecl>(Right))
       return;
     StringRef Arrow = "  <-------->  ";
     switch (Reason) {
