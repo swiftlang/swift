@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang %target-cc-options -g -O0 -isysroot %sdk -I %swift_src_root/stdlib/public/SDK/os -framework Foundation %swift_src_root/stdlib/public/SDK/os/format.m %swift_src_root/stdlib/public/SDK/os/os_trace_blob.c %s -o %t/os_log_format
+// RUN: %clang %target-cc-options -g -O0 -isysroot %sdk -I %swift_src_root/stdlib/public/Darwin/os -framework Foundation %swift_src_root/stdlib/public/Darwin/os/format.m %swift_src_root/stdlib/public/Darwin/os/os_trace_blob.c %s -o %t/os_log_format
 // RUN: %target-run %t/os_log_format | %FileCheck %s
 
 // REQUIRES: objc_interop
