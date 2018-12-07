@@ -71,12 +71,12 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 
   void
   configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
-                                       StringRef InPath,
+                                       Identifier ModuleName, StringRef InPath,
                                        llvm::SmallString<128> &OutPath);
 
   std::error_code
-  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
-                  StringRef ModuleDocFilename,
+  openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
+                  StringRef ModuleFilename, StringRef ModuleDocFilename,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch) override;
