@@ -1,4 +1,3 @@
-include(AddSwiftBlocksSupport)
 
 function(add_sourcekit_symbol_exports target_name export_file)
   # Makefile.rules contains special cases for different platforms.
@@ -75,10 +74,9 @@ function(add_sourcekit_default_compiler_flags target)
 
   # Set compilation and link flags.
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
-      COMPILE_FLAGS " ${c_compile_flags}")
+      COMPILE_FLAGS " ${c_compile_flags} -fblocks")
   set_property(TARGET "${target}" APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
-  swift_add_blocks_support("${target}")
 endfunction()
 
 # Add a new SourceKit library.

@@ -52,32 +52,39 @@ static int Errors;
 
 // Add methods to class SwiftObject that can be called by performSelector: et al
 
-#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-// mangled Swift._SwiftObject
-#define SwiftObject _TtCs12_SwiftObject
-#define SwiftObjectDemangledName "Swift._SwiftObject"
-#else
-// Pre-stable ABI uses un-mangled name for SwiftObject.
-#define SwiftObjectDemangledName "SwiftObject"
-#endif
+static const char *SwiftObjectDemangledName;
 
-@interface SwiftObject /* trust me, I know what I'm doing */ @end
-@implementation SwiftObject (MethodsToPerform)
--(id) perform0 {
+static id Perform0(id self, SEL sel) {
     return self;
 }
 
--(id) perform1:(id)one {
+static id Perform1(id self, SEL sel, id one) {
   expectTrue ([one isEqual:@1]);
   return self;
 }
 
--(id) perform2:(id)one :(id)two {
+static id Perform2(id self, SEL sel, id one, id two) {
   expectTrue ([one isEqual:@1]);
   expectTrue ([two isEqual:@2]);
   return self;
 }
-@end
+
+static __attribute__((constructor))
+void HackSwiftObject()
+{
+    SwiftObjectDemangledName = "Swift._SwiftObject";
+    Class cls = objc_getClass(SwiftObjectDemangledName);
+    // FIXME: Remove this fallback after we enable
+    // SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT everywhere.
+    if (!cls) {
+        SwiftObjectDemangledName = "SwiftObject";
+        cls = objc_getClass(SwiftObjectDemangledName);
+    }
+
+    class_addMethod(cls, @selector(perform0), (IMP)Perform0, "@@:");
+    class_addMethod(cls, @selector(perform1:), (IMP)Perform1, "@@:@");
+    class_addMethod(cls, @selector(perform2::), (IMP)Perform2, "@@:@@");
+}
 
 void TestSwiftObjectNSObject(id c, id d)
 {
@@ -411,10 +418,10 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c description] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S description] isEqual:@ SwiftObjectDemangledName]);
+  expectTrue ([[S description] isEqual:@(SwiftObjectDemangledName)]);
   expectTrue ([[D_meta description] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta description] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta description] isEqual:@ SwiftObjectDemangledName]);
+  expectTrue ([[S_meta description] isEqual:@(SwiftObjectDemangledName)]);
 
   // NSLog() calls -description and also some private methods.
   // This output is checked by FileCheck in SwiftObjectNSObject.swift.
@@ -429,10 +436,10 @@ void TestSwiftObjectNSObject(id c, id d)
   expectTrue ([[c debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
   expectTrue ([[D debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S debugDescription] isEqual:@ SwiftObjectDemangledName]);
+  expectTrue ([[S debugDescription] isEqual:@(SwiftObjectDemangledName)]);
   expectTrue ([[D_meta debugDescription] isEqual:@"SwiftObjectNSObject.D"]);
   expectTrue ([[C_meta debugDescription] isEqual:@"SwiftObjectNSObject.C"]);
-  expectTrue ([[S_meta debugDescription] isEqual:@ SwiftObjectDemangledName]);
+  expectTrue ([[S_meta debugDescription] isEqual:@(SwiftObjectDemangledName)]);
 
 
   printf("NSObjectProtocol.performSelector\n");
