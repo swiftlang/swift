@@ -1396,7 +1396,19 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
   lastEmittedConformance = root;
 }
 
+static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
+  auto *dc = d->getDeclContext();
+  if (auto *sf = dyn_cast<SourceFile>(dc->getModuleScopeContext()))
+    if (M.isWholeModule() || M.getAssociatedContext() == sf)
+      return true;
+
+  return false;
+}
+
 void SILGenModule::emitExternalDefinition(Decl *d) {
+  if (isDeclaredInPrimaryFile(M, d))
+    return;
+
   switch (d->getKind()) {
   case DeclKind::Func:
   case DeclKind::Accessor: {
