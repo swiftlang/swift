@@ -17,6 +17,8 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
+#include "swift/Runtime/CMakeConfig.h"
+
 /// \macro SWIFT_RUNTIME_GNUC_PREREQ
 /// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
 /// available.
