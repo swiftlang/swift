@@ -4106,27 +4106,33 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
+#define DECL_OR_ACCESSOR "%select{%0|%0 for}"
+
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
-        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
-     none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not public",
+     (DescriptiveDeclKind, DeclName, bool))
 
 NOTE(resilience_decl_declared_here,
-     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not '@usableFromInline' or public",
+     (DescriptiveDeclKind, DeclName, bool))
+
+#undef DECL_OR_ACCESSOR
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "

@@ -248,6 +248,15 @@ public struct KeypathStruct {
     // expected-error@-1 {{property 'x' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+
+public struct HasInternalSetProperty {
+  public internal(set) var x: Int // expected-note {{setter for 'x' is not '@usableFromInline' or public}}
+
+  @inlinable public mutating func setsX() {
+    x = 10 // expected-error {{setter for 'x' is internal and cannot be referenced from an '@inlinable' function}}
+  }
+}
+
 @usableFromInline protocol P {
   typealias T = Int
 }
