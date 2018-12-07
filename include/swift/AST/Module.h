@@ -1315,6 +1315,9 @@ public:
     return nullptr;
   }
 
+  /// Returns the Swift module that overlays a Clang module.
+  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+
   virtual bool isSystemModule() const { return false; }
 
   /// Retrieve the set of generic signatures stored within this module.

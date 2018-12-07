@@ -24,7 +24,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -437,10 +436,10 @@ bool NormalProtocolConformance::isRetroactive() const {
 
     // Consider the overlay module to be the "home" of a nominal type
     // defined in a Clang module.
-    if (auto nominalClangModule =
-          dyn_cast<ClangModuleUnit>(nominal->getModuleScopeContext())) {
+    if (auto nominalLoadedModule =
+          dyn_cast<LoadedFile>(nominal->getModuleScopeContext())) {
       if (auto clangLoader = nominal->getASTContext().getClangModuleLoader()) {
-        if (auto overlayModule = nominalClangModule->getAdapterModule())
+        if (auto overlayModule = nominalLoadedModule->getAdapterModule())
           nominalModule = overlayModule;
       }
     }
@@ -454,7 +453,9 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
-  return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
+  if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
+    return file->getKind() == FileUnitKind::ClangModule;
+  return false;
 }
 
 bool NormalProtocolConformance::isResilient() const {

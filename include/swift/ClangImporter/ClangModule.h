@@ -54,7 +54,7 @@ public:
   bool isTopLevel() const;
 
   /// Returns the Swift module that overlays this Clang module.
-  ModuleDecl *getAdapterModule() const;
+  ModuleDecl *getAdapterModule() const override;
 
   /// Retrieve the "exported" name of the module, which is usually the module
   /// name, but might be the name of the public module through which this
