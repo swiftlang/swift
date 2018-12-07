@@ -38,11 +38,8 @@ func f() {
 f()
 
 // CHECK: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
-// CHECK: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
 
 // CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[TY]])
 
 // CHECK-LLDB: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
-// CHECK-LLDB: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
 // CHECK-LLDB: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[TY]])
-

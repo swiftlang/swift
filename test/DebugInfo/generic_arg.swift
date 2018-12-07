@@ -10,11 +10,11 @@ func foo<T>(_ x: T) -> () {
   // CHECK-SAME: metadata ![[X1:.*]], metadata !DIExpression(DW_OP_deref))
   // CHECK: store %swift.type* %T, %swift.type** %[[T]],
   // CHECK: store %swift.opaque* %0, %swift.opaque** %[[X]],
+  // CHECK: ![[TY2:.*]] = !DICompositeType({{.*}}identifier: "$sxD")
   // CHECK: ![[T1]] = !DILocalVariable(name: "$\CF\84_0_0",
   // CHECK-SAME:                       flags: DIFlagArtificial)
   // CHECK: ![[X1]] = !DILocalVariable(name: "x", arg: 1,
-  // CHECK-SAME:          line: 3, type: ![[TY:.*]])
-  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "$sxD")
+  // CHECK-SAME:          line: 3, type: ![[TY2]])
   _blackHole(x)
 }
 

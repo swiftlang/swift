@@ -74,7 +74,6 @@ func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 // DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
 // DWARF-SAME:             {{.*}}identifier: "$s4enum5TupleOyxG{{z?}}D")
 public enum Tuple<P> {
-  // DWARF: !DICompositeType({{.*}}name: "Tuple",{{.*}}identifier: "$s4enum5TupleOyxGD")
 	case C(P, () -> Tuple)
 }
 
