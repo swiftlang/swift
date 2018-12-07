@@ -2246,7 +2246,7 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
 }
 
 static inline ClassROData *getROData(ClassMetadata *theClass) {
-  return (ClassROData*) (theClass->Data & ~uintptr_t(1));
+  return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
 static void initGenericClassObjCName(ClassMetadata *theClass) {
