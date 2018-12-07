@@ -26,7 +26,11 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
-/// A type-erased key path, from any root type to any resulting value type.
+/// A type-erased key path, from any root type to any resulting value
+/// type. NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
+/// The two must coexist, so it was renamed. The old name must not be
+/// used in the new runtime.
+@objc(_SwiftAnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable
