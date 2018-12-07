@@ -197,7 +197,6 @@
     "Bitset.swift"
   ],
   "Misc": [
-    "Interval.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
