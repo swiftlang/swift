@@ -21,33 +21,35 @@
 
 namespace swift {
 
-/// Find InitExistential from global_addr and copy_addr.
-SILValue findInitExistentialFromGlobalAddrAndCopyAddr(GlobalAddrInst *GAI,
-                                                      CopyAddrInst *CAI);
-
-/// Find InitExistential from global_addr and an apply argument.
-SILValue findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
-                                                   ApplySite Apply, int ArgIdx);
-
-/// Returns the address of an object with which the stack location \p ASI is
-/// initialized. This is either a init_existential_addr or the destination of a
-/// copy_addr. Returns a null value if the address does not dominate the
-/// alloc_stack user \p ASIUser.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
-SILValue getAddressOfStackInit(SILValue allocStackAddr, SILInstruction *ASIUser,
-                               bool &isCopied);
-
-/// Find the init_existential, which could be used to determine a concrete
-/// type of the value used by \p openedUse.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
+/// Record information about an opened archetype.
 ///
-/// FIXME: replace all uses of this with ConcreteExistentialInfo.
-SILInstruction *findInitExistential(Operand &openedUse,
-                                    ArchetypeType *&OpenedArchetype,
-                                    SILValue &OpenedArchetypeDef,
-                                    bool &isCopied);
+/// This is used to determine whether a generic call argument originates from
+/// an opened existential. For example:
+/// %o = open_existential_ref %e : $P & Q to $@opened("PQ") P & Q
+/// %r = apply %f<@opened("PQ") P & Q>(%o)
+///   : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q>
+///     (@guaranteed τ_0_0) -> @owned τ_0_0
+///
+/// When successfull, ConcreteExistentialInfo can be used to determinen the
+/// concrete type of the opened existential.
+struct OpenedArchetypeInfo {
+  ArchetypeType *OpenedArchetype = nullptr;
+  // The opened value.
+  SingleValueInstruction *OpenedArchetypeValue;
+  // The existential value.
+  SILValue ExistentialValue;
+  // True if the openedValue is copied from another stack location
+  bool isOpenedValueCopied = false;
+
+  // Construct a valid instance if the given use originates from a recognizable
+  // OpenedArchetype instruction.
+  OpenedArchetypeInfo(Operand &use);
+
+  bool isValid() const {
+    assert(!OpenedArchetype || (OpenedArchetypeValue && ExistentialValue));
+    return OpenedArchetype;
+  }
+};
 
 /// Record conformance and concrete type info derived from an init_existential
 /// value that is reopened before it's use. This is useful for finding the
@@ -60,20 +62,16 @@ SILInstruction *findInitExistential(Operand &openedUse,
 ///   : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q>
 ///     (@guaranteed τ_0_0) -> @owned τ_0_0
 struct ConcreteExistentialInfo {
-  // The opened type passed as self. `$@opened("PQ")` above.
-  // This is also the replacement type of the method's Self type.
-  ArchetypeType *OpenedArchetype = nullptr;
-  // The definition of the OpenedArchetype.
-  SILValue OpenedArchetypeDef;
-  // True if the openedValue is copied from another stack location
-  bool isCopied;
-  // The init_existential instruction that produces the opened existential.
-  SILInstruction *InitExistential = nullptr;
   // The existential type of the self argument before it is opened,
   // produced by an init_existential.
   CanType ExistentialType;
   // The concrete type of self from the init_existential. `$C` above.
   CanType ConcreteType;
+  // The concrete value used to initialize the opened existential.
+  // `%c` in the above comment.
+  SILValue ConcreteValue;
+  // True if the ConcreteValue is copied from another stack location
+  bool isConcreteValueCopied = false;
   // When ConcreteType is itself an opened existential, record the type
   // definition. May be nullptr for a valid AppliedConcreteType.
   SingleValueInstruction *ConcreteTypeDef = nullptr;
@@ -82,31 +80,20 @@ struct ConcreteExistentialInfo {
   // and includes the full list of existential conformances.
   // signature: <P & Q>, replacement: $C : conformances: [$P, $Q]
   SubstitutionMap ExistentialSubs;
-  // The value of concrete type used to initialize the existential. `%c` above.
-  SILValue ConcreteValue;
 
-  // Search for a recognized pattern in which the given value is an opened
-  // existential that was previously initialized to a concrete type.
-  // Constructs a valid ConcreteExistentialInfo object if successfull.
-  ConcreteExistentialInfo(Operand &openedUse);
+  // Search for a recognized pattern in which the given existential value is
+  // initialized to a concrete type. Constructs a valid ConcreteExistentialInfo
+  // object if successfull.
+  ConcreteExistentialInfo(SILValue existential, SILInstruction *user);
 
   // This constructor initializes a ConcreteExistentialInfo based on already
-  // known ConcreteType and ProtocolDecl pair. It determines the
-  // OpenedArchetypeDef for the ArgOperand that will be used by unchecked_cast
-  // instructions to cast OpenedArchetypeDef to ConcreteType.
-  ConcreteExistentialInfo(Operand &ArgOperand, CanType ConcreteType,
-                          ProtocolDecl *Protocol);
+  // known ConcreteType and ProtocolDecl pair.
+  ConcreteExistentialInfo(SILValue existential, SILInstruction *user,
+                          CanType ConcreteType, ProtocolDecl *Protocol);
 
   /// For scenerios where ConcreteExistentialInfo is created using a known
-  /// ConcreteType and ProtocolDecl, both of InitExistential
-  /// and ConcreteValue can be null. So there is no need for explicit check for
-  /// not null for them instead we assert on (!InitExistential ||
-  /// ConcreteValue). 
-  bool isValid() const {
-    assert(!InitExistential || ConcreteValue);
-    return OpenedArchetype && OpenedArchetypeDef && ConcreteType &&
-           !ExistentialSubs.empty();
-  }
+  /// ConcreteType and ProtocolDecl, ConcreteValue can be null.
+  bool isValid() const { return ConcreteType && !ExistentialSubs.empty(); }
 
   // Do a conformance lookup on ConcreteType with the given requirement, P. If P
   // is satisfiable based on the existential's conformance, return the new
@@ -116,6 +103,27 @@ struct ConcreteExistentialInfo {
     CanType selfTy = P->getSelfInterfaceType()->getCanonicalType();
     return ExistentialSubs.lookupConformance(selfTy, P);
   }
+
+private:
+  void initializeSubstitutionMap(
+      ArrayRef<ProtocolConformanceRef> ExistentialConformances, SILModule *M);
+
+  void initializeConcreteTypeDef(SILInstruction *typeConversionInst);
+};
+
+// Convenience for tracking both the OpenedArchetypeInfo and
+// ConcreteExistentialInfo from the same SILValue.
+struct ConcreteOpenedArchetypeInfo {
+  OpenedArchetypeInfo OAI;
+  // If CEI has a value, it must be valid.
+  Optional<ConcreteExistentialInfo> CEI;
+
+  ConcreteOpenedArchetypeInfo(Operand &use);
+
+  // Provide a whole module type-inferred ConcreteType to fall back on if the
+  // concrete type cannot be determined from data flow.
+  ConcreteOpenedArchetypeInfo(Operand &use, CanType concreteType,
+                              ProtocolDecl *protocol);
 };
 
 } // end namespace swift
