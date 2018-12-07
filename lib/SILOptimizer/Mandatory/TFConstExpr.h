@@ -32,6 +32,7 @@ namespace swift {
 class ApplyInst;
 class Operand;
 class SILInstruction;
+class SILFunction;
 class SILModule;
 class SILNode;
 class SILValue;
@@ -95,6 +96,8 @@ public:
   decodeAllocUninitializedArray(ApplyInst *apply, uint64_t numElements,
                                 SmallVectorImpl<Operand*> &elementsAtInit,
                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts);
+
+  static bool isWellKnownFunction(const SILFunction *fn);
 };
 
 } // end namespace swift

@@ -2618,11 +2618,8 @@ bool TFDeabstractionHelper::isSpecialNoInlineCallee(FullApplySite site,
   if (isArrayUninitialized(site.getInstruction()))
     return true;
 
-  // Never inline _allocateUninitializedArray (even of Tensors).  It is the
-  // entrypoint used by SILGen to represent array allocations.
-  if (callee.getName().contains("_allocateUninitializedArray"))
-    return true;
-  return false;
+  // Check if this is a well-known function in const expr evaluator.
+  return ConstExprEvaluator::isWellKnownFunction(&callee);
 }
 
 namespace {

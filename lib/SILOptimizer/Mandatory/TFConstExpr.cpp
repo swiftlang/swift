@@ -59,7 +59,7 @@ enum class WellKnownFunction {
   ArrayInitEmpty,
 };
 
-static WellKnownFunction classifyFunction(SILFunction *fn) {
+static WellKnownFunction classifyFunction(const SILFunction *fn) {
   if (fn->hasSemanticsAttr("string.makeUTF8"))
     return WellKnownFunction::StringMakeUTF8;
 
@@ -75,6 +75,10 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
   if (mangledName.contains("_allocateUninitializedArray"))
     return WellKnownFunction::AllocateUninitializedArray;
   return WellKnownFunction::Unknown;
+}
+
+bool ConstExprEvaluator::isWellKnownFunction(const SILFunction *fn) {
+  return ::classifyFunction(fn) != WellKnownFunction::Unknown;
 }
 
 //===----------------------------------------------------------------------===//
