@@ -554,7 +554,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   TC.DelayedCircularityChecks.clear();
 
   // Compute captures for functions and closures we visited.
-  for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
+  for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();

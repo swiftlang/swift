@@ -557,7 +557,7 @@ public:
 
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
-  std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
+  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
   /// Local functions that have been captured before their definitions.
   ///
