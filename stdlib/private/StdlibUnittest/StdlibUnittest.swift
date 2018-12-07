@@ -968,7 +968,7 @@ struct _ParentProcess {
             stderrEnd = true
           }
         default:
-          fatalError("unexpected message")
+          fatalError("unexpected message: \(controlMessage[1])")
         }
         line = line[line.startIndex..<index]
         if line.isEmpty {
