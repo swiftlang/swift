@@ -1913,18 +1913,6 @@ static void VisitNodeTypeAlias(
   }
 }
 
-static void VisitNodeInOut(
-    ASTContext *ast,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  VisitNodeResult type_result;
-  VisitNode(ast, cur_node->getFirstChild(), type_result);
-  if (type_result._types.size() == 1 && type_result._types[0]) {
-    result._types.push_back(InOutType::get(type_result._types[0]));
-  } else {
-    result._error = "couldn't resolve referent type";
-  }
-}
-
 static void VisitNodeExistentialMetatype(ASTContext *ast,
                                          Demangle::NodePointer cur_node,
                                          VisitNodeResult &result) {
@@ -2122,9 +2110,6 @@ static void VisitNodeTupleElement(
 
   auto tupleType = tuple_type_result._types.front();
   auto typeFlags = ParameterTypeFlags();
-  typeFlags = typeFlags.withInOut(tupleType->is<InOutType>());
-  if (auto *inOutTy = tupleType->getAs<InOutType>())
-    tupleType = inOutTy->getObjectType();
   Identifier idName =
       tuple_name.empty() ? Identifier() : ast->getIdentifier(tuple_name);
   result._tuple_type_element = TupleTypeElt(tupleType, idName, typeFlags);
@@ -2363,10 +2348,6 @@ static void VisitNode(
   case Demangle::Node::Kind::Setter:
   case Demangle::Node::Kind::WillSet: // out of order on purpose
     VisitNodeSetterGetter(ast, node, result);
-    break;
-
-  case Demangle::Node::Kind::InOut:
-    VisitNodeInOut(ast, node, result);
     break;
 
   case Demangle::Node::Kind::ExistentialMetatype:
