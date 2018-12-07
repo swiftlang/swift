@@ -2264,44 +2264,42 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
   }
 
-  // Type-check the constructor declaration.
-  tc.validateDecl(ctor);
-
   return ctor;
 }
 
 /// Create a stub body that emits a fatal error message.
-static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
-  auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl();
+static void synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
+  auto *ctor = cast<ConstructorDecl>(fn);
+  auto &ctx = ctor->getASTContext();
+
+  auto unimplementedInitDecl = ctx.getUnimplementedInitializerDecl();
   auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!unimplementedInitDecl) {
-    tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
+    ctx.Diags.diagnose(classDecl->getLoc(),
+                       diag::missing_unimplemented_init_runtime);
     return;
   }
 
   // Create a call to Swift._unimplementedInitializer
   auto loc = classDecl->getLoc();
-  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl,
-                                          DeclNameLoc(loc),
-                                          /*Implicit=*/true);
+  Expr *ref = new (ctx) DeclRefExpr(unimplementedInitDecl,
+                                   DeclNameLoc(loc),
+                                   /*Implicit=*/true);
 
   llvm::SmallString<64> buffer;
-  StringRef fullClassName = tc.Context.AllocateCopy(
+  StringRef fullClassName = ctx.AllocateCopy(
                               (classDecl->getModuleContext()->getName().str() +
                                "." +
                                classDecl->getName().str()).toStringRef(buffer));
 
-  Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
-                                                       /*Implicit=*/true);
-  Expr *call = CallExpr::createImplicit(tc.Context, fn, { className },
-                                        { tc.Context.Id_className });
-  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
+  Expr *className = new (ctx) StringLiteralExpr(fullClassName, loc,
+                                                /*Implicit=*/true);
+  Expr *call = CallExpr::createImplicit(ctx, ref, { className },
+                                        { ctx.Id_className });
+  ctor->setBody(BraceStmt::create(ctx, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
                                   /*implicit=*/true));
-
-  // Note that this is a stub implementation.
-  ctor->setStubImplementation(true);
 }
 
 static std::tuple<GenericEnvironment *, GenericParamList *, SubstitutionMap>
@@ -2476,6 +2474,39 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
     ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
+static void synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn,
+                                             void *context) {
+  auto *ctor = cast<ConstructorDecl>(fn);
+  auto &ctx = ctor->getASTContext();
+
+  auto *bodyParams = ctor->getParameters();
+  auto *superclassCtor = (ConstructorDecl *) context;
+
+  // Reference to super.init.
+  auto *selfDecl = ctor->getImplicitSelfDecl();
+  Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
+                                          /*Implicit=*/true);
+  Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
+                                               superclassCtor->getFullName(),
+                                               DeclNameLoc(),
+                                               /*Implicit=*/true);
+
+  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
+
+  Expr *superCall =
+    CallExpr::create(ctx, ctorRef, ctorArgs,
+                     superclassCtor->getFullName().getArgumentNames(), { },
+                     /*hasTrailingClosure=*/false, /*implicit=*/true);
+  if (superclassCtor->hasThrows()) {
+    superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
+                                  /*implicit=*/true);
+  }
+  ctor->setBody(BraceStmt::create(ctx, SourceLoc(),
+                                  ASTNode(superCall),
+                                  SourceLoc(),
+                                  /*implicit=*/true));
+}
+
 ConstructorDecl *
 swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
@@ -2556,37 +2587,19 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
-    createStubBody(tc, ctor);
+    ctor->setBodySynthesizer(synthesizeStubBody);
+
+    // Note that this is a stub implementation.
+    ctor->setStubImplementation(true);
+
+    // Stub constructors don't appear in the vtable.
     ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
   // Form the body of a chaining designated initializer.
   assert(kind == DesignatedInitKind::Chaining);
-
-  // Reference to super.init.
-  auto *selfDecl = ctor->getImplicitSelfDecl();
-  Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
-                                          /*Implicit=*/true);
-  Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
-                                               superclassCtor->getFullName(),
-                                               DeclNameLoc(),
-                                               /*Implicit=*/true);
-
-  auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
-
-  Expr *superCall =
-    CallExpr::create(ctx, ctorRef, ctorArgs,
-                     superclassCtor->getFullName().getArgumentNames(), { },
-                     /*hasTrailingClosure=*/false, /*implicit=*/true);
-  if (superclassCtor->hasThrows()) {
-    superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
-                                  /*implicit=*/true);
-  }
-  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
-                                  ASTNode(superCall),
-                                  SourceLoc(),
-                                  /*implicit=*/true));
+  ctor->setBodySynthesizer(synthesizeDesignatedInitOverride, superclassCtor);
 
   return ctor;
 }
