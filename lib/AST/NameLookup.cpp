@@ -37,6 +37,7 @@
 #define DEBUG_TYPE "namelookup"
 
 using namespace swift;
+using namespace swift::namelookup;
 
 void VisibleDeclConsumer::anchor() {}
 void VectorDeclConsumer::anchor() {}
@@ -2695,9 +2696,6 @@ swift::getDirectlyInheritedNominalTypeDecls(
   return result;
 }
 
-namespace swift {
-namespace namelookup {
-
 void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
   switch (Pat->getKind()) {
   case PatternKind::Tuple:
@@ -2885,6 +2883,3 @@ void FindLocalVal::visitCatchStmt(CatchStmt *S) {
     checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
   visit(S->getBody());
 }
-
-} // end namespace namelookup
-} // end namespace swift
