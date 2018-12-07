@@ -5555,9 +5555,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  /// If this FuncDecl is an accessor for a property, this indicates
-  /// which property and what kind of accessor.
-  BehaviorRecord *BehaviorParamDecl = nullptr;
   OperatorDecl *Operator = nullptr;
 
 protected:
@@ -5704,16 +5701,6 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  /// Get the property behavior this function serves as a parameter for, if
-  /// any.
-  BehaviorRecord *getParamBehavior() const {
-    return BehaviorParamDecl;
-  }
-  
-  void setParamBehavior(BehaviorRecord *behavior) {
-    BehaviorParamDecl = behavior;
-  }
-  
   OperatorDecl *getOperatorDecl() const {
     return Operator;
   }
