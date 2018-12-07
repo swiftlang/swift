@@ -1969,21 +1969,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      ConstraintKind subKind = ConstraintKind::Equal;
       // A.Type < B.Type if A < B and both A and B are classes.
-      if (isa<MetatypeType>(meta1) &&
-          meta1->getInstanceType()->mayHaveSuperclass() &&
-          meta2->getInstanceType()->getClassOrBoundGenericClass())
-        subKind = std::min(kind, ConstraintKind::Subtype);
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes.
-      else if (isa<ExistentialMetatypeType>(meta1))
-        subKind = std::min(kind, ConstraintKind::Subtype);
-      
-      return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        subKind, subflags,
-                        locator.withPathElement(
-                          ConstraintLocator::InstanceType));
+      // and Q.Type are both existential metatypes
+      auto subKind = std::min(kind, ConstraintKind::Subtype);
+      // If instance types can't have a subtype relationship
+      // it means that such types can be simply equated.
+      auto instanceType1 = meta1->getInstanceType();
+      auto instanceType2 = meta2->getInstanceType();
+      if (isa<MetatypeType>(meta1) &&
+          !(instanceType1->mayHaveSuperclass() &&
+            instanceType2->getClassOrBoundGenericClass())) {
+        subKind = ConstraintKind::Equal;
+      }
+
+      return matchTypes(
+          instanceType1, instanceType2, subKind, subflags,
+          locator.withPathElement(ConstraintLocator::InstanceType));
     }
 
     case TypeKind::Function: {
