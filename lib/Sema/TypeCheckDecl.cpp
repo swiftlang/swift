@@ -1008,13 +1008,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    // We used to not apply the solution to lazy bindings here, but that's
-    // unnecessary: the code for building lazy getters already has to handle
-    // initializers which have had solutions applied, and not applying the
-    // solution blocks other diagnostics if we decide not to synthesize the
-    // getter.
-    bool skipApplyingSolution = false;
-    if (tc.typeCheckPatternBinding(binding, entryNumber, skipApplyingSolution))
+    if (tc.typeCheckPatternBinding(binding, entryNumber))
       return;
   }
 
@@ -2644,7 +2638,7 @@ public:
           // If we got a default initializer, install it and re-type-check it
           // to make sure it is properly coerced to the pattern type.
           PBD->setInit(i, defaultInit);
-          TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
+          TC.typeCheckPatternBinding(PBD, i);
         }
       }
     }
@@ -2733,7 +2727,7 @@ public:
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
-        TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
+        TC.typeCheckPatternBinding(PBD, i);
     }
   }
 
