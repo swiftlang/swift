@@ -318,17 +318,6 @@ extension SignedNumeric {
   }
 }
 
-
-/// Returns the absolute value of the given number.
-///
-/// - Parameter x: A signed number.
-/// - Returns: The absolute value of `x`.
-@inlinable
-public func abs<T : SignedNumeric>(_ x: T) -> T
-  where T.Magnitude == T {
-  return x.magnitude
-}
-
 /// Returns the absolute value of the given number.
 ///
 /// The absolute value of `x` must be representable in the same type. In
@@ -344,6 +333,10 @@ public func abs<T : SignedNumeric>(_ x: T) -> T
 /// - Returns: The absolute value of `x`.
 @inlinable
 public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
+  if T.self == T.Magnitude.self {
+    return unsafeBitCast(x.magnitude, to: T.self)
+  }
+
   return x < (0 as T) ? -x : x
 }
 
