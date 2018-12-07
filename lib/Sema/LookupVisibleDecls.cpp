@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "NameLookupImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -30,10 +29,6 @@
 #include <set>
 
 using namespace swift;
-
-void VisibleDeclConsumer::anchor() {}
-void VectorDeclConsumer::anchor() {}
-void NamedDeclConsumer::anchor() {}
 
 namespace {
 struct LookupState {
