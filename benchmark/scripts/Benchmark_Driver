@@ -496,7 +496,7 @@ class BenchmarkDoctor(object):
         num_samples = self._adjusted_1s_samples(r.samples.min)
 
         def capped(s):
-            return min(s, 2048)
+            return min(s, 200)
         run_args = [(capped(num_samples), 1), (capped(num_samples / 2), 2)]
         opts = self.driver.args.optimization
         opts = opts if isinstance(opts, list) else [opts]

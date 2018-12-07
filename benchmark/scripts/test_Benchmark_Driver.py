@@ -533,7 +533,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         Num-samples for Benchmark Driver are calibrated to be powers of two,
         take measurements for approximately 1s
-        based on short initial runtime sampling. Capped at 2k samples.
+        based on short initial runtime sampling. Capped at 200 samples.
         """
         driver = BenchmarkDriverMock(tests=['B1'], responses=([
             # calibration run, returns a stand-in for PerformanceTestResult
@@ -541,10 +541,10 @@ class TestBenchmarkDoctor(unittest.TestCase):
                   verbose=True), _PTR(min=300))] +
             # 5x i1 series, with 300 μs runtime its possible to take 4098
             # samples/s, but it should be capped at 2k
-            ([(_run('B1', num_samples=2048, num_iters=1,
+            ([(_run('B1', num_samples=200, num_iters=1,
                     verbose=True, measure_memory=True), _PTR(min=300))] * 5) +
             # 5x i2 series
-            ([(_run('B1', num_samples=2048, num_iters=2,
+            ([(_run('B1', num_samples=200, num_iters=2,
                     verbose=True, measure_memory=True), _PTR(min=300))] * 5)
         ))
         doctor = BenchmarkDoctor(self.args, driver)
@@ -561,7 +561,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assert_contains(
             ['Calibrating num-samples for B1:',
              'Runtime 300 μs yields 4096 adjusted samples per second.',
-             'Measuring B1, 5 x i1 (2048 samples), 5 x i2 (2048 samples)'],
+             'Measuring B1, 5 x i1 (200 samples), 5 x i2 (200 samples)'],
             self.logs['debug'])
 
     def test_benchmark_name_matches_capital_words_conventions(self):
