@@ -237,7 +237,12 @@ public:
   getBitMaskForNoPayloadElements() const = 0;
 
   /// \group Indirect enum operations
-  
+
+  /// Customization point for allocating the enum value on the stack. Only used
+  /// for non-fixed-size enums.
+  virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                                     const llvm::Twine &name) const;
+
   /// Return the enum case tag for the given value. Payload cases come first,
   /// followed by non-payload cases. Used for the getEnumTag value witness.
   virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
