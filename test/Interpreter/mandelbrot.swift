@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -o %t/libcomplex.%target-dylib-extension -emit-module %S/complex.swift -module-link-name complex
+// RUN: %target-build-swift -emit-library -o %t/%{target-shared-library-prefix}complex%{target-shared-library-suffix} -emit-module %S/complex.swift -module-link-name complex
 // RUN: %target-jit-run %s -I %t -L %t | %FileCheck %s
 
 // RUN: grep -v import %s > %t/main.swift

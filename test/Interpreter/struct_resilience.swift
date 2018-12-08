@@ -1,20 +1,20 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
-// RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-codesign %t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}
 
 // RUN: %target-build-swift %s -lresilient_struct -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
 // RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension
+// RUN: %target-run %t/main %t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
-// RUN: %target-codesign %t/libresilient_struct_wmo.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_struct_wmo%{target-shared-library-suffix}) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-codesign %t/%{target-shared-library-prefix}resilient_struct_wmo%{target-shared-library-suffix}
 
 // RUN: %target-build-swift %s -lresilient_struct_wmo -I %t -L %t -o %t/main2 -Xlinker -rpath -Xlinker %t -module-name main
 // RUN: %target-codesign %t/main2
 
-// RUN: %target-run %t/main2 %t/libresilient_struct_wmo.%target-dylib-extension
+// RUN: %target-run %t/main2 %t/%{target-shared-library-prefix}resilient_struct_wmo%{target-shared-library-suffix}
 
 // REQUIRES: executable_test
 
