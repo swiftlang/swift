@@ -1,8 +1,8 @@
-//===--- UnsafeRawBufferPointer.swift.gyb ---------------------*- swift -*-===//
+//===--- UnsafeRawBufferPointer.swift -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,43 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-%import gyb
-
-% for mutable in (True, False):
-%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
-%  Mutable = 'Mutable' if mutable else ''
-
-/// A ${Mutable.lower()} nonowning collection interface to the bytes in a
+/// A  nonowning collection interface to the bytes in a
 /// region of memory.
 ///
-/// You can use an `${Self}` instance in low-level operations to eliminate
+/// You can use an `UnsafeRawBufferPointer` instance in low-level operations to eliminate
 /// uniqueness checks and release mode bounds checks. Bounds checks are always
 /// performed in debug mode.
 ///
-%  if mutable:
-/// An `${Self}` instance is a view of the raw bytes in a region of memory.
-/// Each byte in memory is viewed as a `UInt8` value independent of the type
-/// of values held in that memory. Reading from and writing to memory through
-/// a raw buffer are untyped operations. Accessing this collection's bytes
-/// does not bind the underlying memory to `UInt8`.
-///
-/// In addition to its collection interface, an `${Self}` instance also supports
-/// the following methods provided by `UnsafeMutableRawPointer`, including
-/// bounds checks in debug mode:
-///
-/// - `load(fromByteOffset:as:)`
-/// - `storeBytes(of:toByteOffset:as:)`
-/// - `copyMemory(from:)`
-%  else:
-/// An `${Self}` instance is a view of the raw bytes in a region of memory.
+/// An `UnsafeRawBufferPointer` instance is a view of the raw bytes in a region of memory.
 /// Each byte in memory is viewed as a `UInt8` value independent of the type
 /// of values held in that memory. Reading from memory through a raw buffer is
 /// an untyped operation.
 ///
-/// In addition to its collection interface, an `${Self}` instance also supports
+/// In addition to its collection interface, an `UnsafeRawBufferPointer` instance also supports
 /// the `load(fromByteOffset:as:)` method provided by `UnsafeRawPointer`,
 /// including bounds checks in debug mode.
-%  end
 ///
 /// To access the underlying memory through typed operations, the memory must
 /// be bound to a trivial type.
@@ -60,16 +38,16 @@
 ///   not produce valid copies and can only be done by calling a C API, such as
 ///   `memmove()`.
 ///
-/// ${Self} Semantics
+/// UnsafeRawBufferPointer Semantics
 /// =================
 ///
-/// An `${Self}` instance is a view into memory and does not own the memory
-/// that it references. Copying a variable or constant of type `${Self}` does
+/// An `UnsafeRawBufferPointer` instance is a view into memory and does not own the memory
+/// that it references. Copying a variable or constant of type `UnsafeRawBufferPointer` does
 /// not copy the underlying memory. However, initializing another collection
-/// with an `${Self}` instance copies bytes out of the referenced memory and
+/// with an `UnsafeRawBufferPointer` instance copies bytes out of the referenced memory and
 /// into the new collection.
 ///
-/// The following example uses `someBytes`, an `${Self}` instance, to
+/// The following example uses `someBytes`, an `UnsafeRawBufferPointer` instance, to
 /// demonstrate the difference between assigning a buffer pointer and using a
 /// buffer pointer as the source for another collection's elements. Here, the
 /// assignment to `destBytes` creates a new, nonowning buffer pointer
@@ -84,21 +62,12 @@
 ///
 ///     var byteArray: [UInt8] = Array(destBytes)
 ///     byteArray += someBytes[n..<someBytes.count]
-% if mutable:
-///
-/// Assigning into a ranged subscript of an `${Self}` instance copies bytes
-/// into the memory. The next `n` bytes of the memory that `someBytes`
-/// references are copied in this code:
-///
-///     destBytes[0..<n] = someBytes[n..<(n + n)]
-% end
 @_fixed_layout
-public struct Unsafe${Mutable}RawBufferPointer {
+public struct UnsafeRawBufferPointer {
   @usableFromInline
-  internal let _position, _end: Unsafe${Mutable}RawPointer?
+  internal let _position, _end: UnsafeRawPointer?
 }
 
-%if not mutable:
 extension UnsafeRawBufferPointer {
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
@@ -131,14 +100,9 @@ extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
     return result
   }
 }
-%else:
-extension UnsafeMutableRawBufferPointer {
-  public typealias Iterator = UnsafeRawBufferPointer.Iterator
-}
-%end
 
-extension Unsafe${Mutable}RawBufferPointer: Sequence {
-  public typealias SubSequence = Slice<${Self}>
+extension UnsafeRawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<UnsafeRawBufferPointer>
 
   /// Returns an iterator over the bytes of this sequence.
   @inlinable
@@ -147,7 +111,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
+extension UnsafeRawBufferPointer: Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8
@@ -163,7 +127,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   /// The "past the end" position---that is, the position one greater than the
   /// last valid subscript argument.
   ///
-  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
+  /// The `endIndex` property of an `UnsafeRawBufferPointer`
   /// instance is always identical to `count`.
   @inlinable
   public var endIndex: Index {
@@ -187,13 +151,6 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
       _debugPrecondition(i < endIndex)
       return _position!.load(fromByteOffset: i, as: UInt8.self)
     }
-%  if mutable:
-    nonmutating set {
-      _debugPrecondition(i >= 0)
-      _debugPrecondition(i < endIndex)
-      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
-    }
-%  end # mutable
   }
 
   /// Accesses the bytes in the specified memory region.
@@ -207,7 +164,376 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
       _debugPrecondition(bounds.upperBound <= endIndex)
       return Slice(base: self, bounds: bounds)
     }
-%  if mutable:
+  }
+
+  /// The number of bytes in the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @inlinable
+  public var count: Int {
+    if let pos = _position {
+      return _end! - pos
+    }
+    return 0
+  }
+}
+
+extension UnsafeRawBufferPointer: RandomAccessCollection { }
+
+extension UnsafeRawBufferPointer {
+  /// Deallocates the memory block previously allocated at this buffer pointer’s 
+  /// base address. 
+  ///
+  /// This buffer pointer's `baseAddress` must be `nil` or a pointer to a memory 
+  /// block previously returned by a Swift allocation method. If `baseAddress` is 
+  /// `nil`, this function does nothing. Otherwise, the memory must not be initialized 
+  /// or `Pointee` must be a trivial type. This buffer pointer's byte `count` must 
+  /// be equal to the originally allocated size of the memory block.
+  @inlinable
+  public func deallocate() {
+    _position?.deallocate()
+  }
+
+  /// Returns a new instance of the given type, read from the buffer pointer's
+  /// raw memory at the specified byte offset.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the next four bytes.
+  ///
+  ///     let a = someBytes.load(as: Int32.self)
+  ///     let b = someBytes.load(fromByteOffset: 4, as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the buffer
+  /// pointer's memory region---that is, `offset + MemoryLayout<T>.size` must
+  /// be less than or equal to the buffer pointer's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset, in bytes, into the buffer pointer's memory at
+  ///     which to begin reading data for the new instance. The buffer pointer
+  ///     plus `offset` must be properly aligned for accessing an instance of
+  ///     type `T`. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @inlinable
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    _debugPrecondition(offset >= 0, "UnsafeRawBufferPointer.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "UnsafeRawBufferPointer.load out of bounds")
+    return baseAddress!.load(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Creates a buffer over the specified number of contiguous bytes starting
+  /// at the given pointer.
+  ///
+  /// - Parameters:
+  ///   - start: The address of the memory that starts the buffer. If `starts`
+  ///     is `nil`, `count` must be zero. However, `count` may be zero even
+  ///     for a non-`nil` `start`.
+  ///   - count: The number of bytes to include in the buffer. `count` must not
+  ///     be negative.
+  @inlinable
+  public init(start: UnsafeRawPointer?, count: Int) {
+    _precondition(count >= 0, "UnsafeRawBufferPointer with negative count")
+    _precondition(count == 0 || start != nil,
+      "UnsafeRawBufferPointer has a nil start and nonzero count")
+    _position = start
+    _end = start.map { $0 + count }
+  }
+
+  /// Creates a new buffer over the same memory as the given buffer.
+  ///
+  /// - Parameter bytes: The buffer to convert.
+  @inlinable
+  public init(_ bytes: UnsafeMutableRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+
+  /// Creates a new buffer over the same memory as the given buffer.
+  ///
+  /// - Parameter bytes: The buffer to convert.
+  @inlinable
+  public init(_ bytes: UnsafeRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+
+  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
+  ///
+  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
+  ///   buffer's type `T` must be a trivial type.
+  @inlinable
+  public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    self.init(start: buffer.baseAddress!,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+
+  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
+  ///
+  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
+  ///   buffer's type `T` must be a trivial type.
+  @inlinable
+  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
+    self.init(start: buffer.baseAddress!,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
+  ///
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
+  ///
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// After this code has executed, the following are true:
+  ///
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
+  @inlinable
+  public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
+  ///
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
+  ///
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// After this code has executed, the following are true:
+  ///
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
+  @inlinable
+  public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+
+  /// A pointer to the first byte of the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @inlinable
+  public var baseAddress: UnsafeRawPointer? {
+    return _position
+  }
+
+  /// Binds this buffer’s memory to the specified type and returns a typed buffer 
+  /// of the bound memory.
+  ///
+  /// Use the `bindMemory(to:)` method to bind the memory referenced
+  /// by this buffer to the type `T`. The memory must be uninitialized or
+  /// initialized to a type that is layout compatible with `T`. If the memory
+  /// is uninitialized, it is still uninitialized after being bound to `T`.
+  ///
+  /// - Warning: A memory location may only be bound to one type at a time. The
+  ///   behavior of accessing memory as a type unrelated to its bound type is
+  ///   undefined.
+  ///
+  /// - Parameters:
+  ///   - type: The type `T` to bind the memory to.
+  /// - Returns: A typed buffer of the newly bound memory. The memory in this
+  ///   region is bound to `T`, but has not been modified in any other way.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
+  @_transparent
+  @discardableResult
+  public func bindMemory<T>(
+    to type: T.Type
+  ) -> UnsafeBufferPointer<T> {
+    guard let base = _position else {
+      return UnsafeBufferPointer<T>(start: nil, count: 0)
+    }
+
+    let capacity = count / MemoryLayout<T>.stride
+    Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
+    return UnsafeBufferPointer<T>(
+      start: UnsafePointer<T>(base._rawValue), count: capacity)
+  }
+}
+
+extension UnsafeRawBufferPointer: CustomDebugStringConvertible {
+  /// A textual representation of the buffer, suitable for debugging.
+  public var debugDescription: String {
+    return "UnsafeRawBufferPointer"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+  }
+}
+
+extension UnsafeRawBufferPointer {
+  @available(*, unavailable, 
+    message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
+    get { return UnsafeRawBufferPointer(start: nil, count: 0) }
+  }
+}
+
+/// A mutable nonowning collection interface to the bytes in a
+/// region of memory.
+///
+/// You can use an `UnsafeMutableRawBufferPointer` instance in low-level operations to eliminate
+/// uniqueness checks and release mode bounds checks. Bounds checks are always
+/// performed in debug mode.
+///
+/// An `UnsafeMutableRawBufferPointer` instance is a view of the raw bytes in a region of memory.
+/// Each byte in memory is viewed as a `UInt8` value independent of the type
+/// of values held in that memory. Reading from and writing to memory through
+/// a raw buffer are untyped operations. Accessing this collection's bytes
+/// does not bind the underlying memory to `UInt8`.
+///
+/// In addition to its collection interface, an `UnsafeMutableRawBufferPointer` instance also supports
+/// the following methods provided by `UnsafeMutableRawPointer`, including
+/// bounds checks in debug mode:
+///
+/// - `load(fromByteOffset:as:)`
+/// - `storeBytes(of:toByteOffset:as:)`
+/// - `copyMemory(from:)`
+///
+/// To access the underlying memory through typed operations, the memory must
+/// be bound to a trivial type.
+///
+/// - Note: A *trivial type* can be copied bit for bit with no indirection
+///   or reference-counting operations. Generally, native Swift types that do
+///   not contain strong or weak references or other forms of indirection are
+///   trivial, as are imported C structs and enums. Copying memory that
+///   contains values of nontrivial types can only be done safely with a typed
+///   pointer. Copying bytes directly from nontrivial, in-memory values does
+///   not produce valid copies and can only be done by calling a C API, such as
+///   `memmove()`.
+///
+/// UnsafeMutableRawBufferPointer Semantics
+/// =================
+///
+/// An `UnsafeMutableRawBufferPointer` instance is a view into memory and does not own the memory
+/// that it references. Copying a variable or constant of type `UnsafeMutableRawBufferPointer` does
+/// not copy the underlying memory. However, initializing another collection
+/// with an `UnsafeMutableRawBufferPointer` instance copies bytes out of the referenced memory and
+/// into the new collection.
+///
+/// The following example uses `someBytes`, an `UnsafeMutableRawBufferPointer` instance, to
+/// demonstrate the difference between assigning a buffer pointer and using a
+/// buffer pointer as the source for another collection's elements. Here, the
+/// assignment to `destBytes` creates a new, nonowning buffer pointer
+/// covering the first `n` bytes of the memory that `someBytes`
+/// references---nothing is copied:
+///
+///     var destBytes = someBytes[0..<n]
+///
+/// Next, the bytes referenced by `destBytes` are copied into `byteArray`, a
+/// new `[UInt]` array, and then the remainder of `someBytes` is appended to
+/// `byteArray`:
+///
+///     var byteArray: [UInt8] = Array(destBytes)
+///     byteArray += someBytes[n..<someBytes.count]
+///
+/// Assigning into a ranged subscript of an `UnsafeMutableRawBufferPointer` instance copies bytes
+/// into the memory. The next `n` bytes of the memory that `someBytes`
+/// references are copied in this code:
+///
+///     destBytes[0..<n] = someBytes[n..<(n + n)]
+@_fixed_layout
+public struct UnsafeMutableRawBufferPointer {
+  @usableFromInline
+  internal let _position, _end: UnsafeMutableRawPointer?
+}
+
+extension UnsafeMutableRawBufferPointer {
+  public typealias Iterator = UnsafeRawBufferPointer.Iterator
+}
+
+extension UnsafeMutableRawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<UnsafeMutableRawBufferPointer>
+
+  /// Returns an iterator over the bytes of this sequence.
+  @inlinable
+  public func makeIterator() -> Iterator {
+    return Iterator(_position: _position, _end: _end)
+  }
+}
+
+extension UnsafeMutableRawBufferPointer: MutableCollection {
+  // TODO: Specialize `index` and `formIndex` and
+  // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
+  public typealias Element = UInt8
+  public typealias Index = Int
+  public typealias Indices = Range<Int>
+
+  /// Always zero, which is the index of the first byte in a nonempty buffer.
+  @inlinable
+  public var startIndex: Index {
+    return 0
+  }
+
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
+  ///
+  /// The `endIndex` property of an `UnsafeMutableRawBufferPointer`
+  /// instance is always identical to `count`.
+  @inlinable
+  public var endIndex: Index {
+    return count
+  }
+
+  @inlinable
+  public var indices: Indices {
+    return startIndex..<endIndex
+  }
+
+  /// Accesses the byte at the given offset in the memory region as a `UInt8`
+  /// value.
+  ///
+  /// - Parameter i: The offset of the byte to access. `i` must be in the range
+  ///   `0..<count`.
+  @inlinable
+  public subscript(i: Int) -> Element {
+    get {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position!.load(fromByteOffset: i, as: UInt8.self)
+    }
+    nonmutating set {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
+    }
+  }
+
+  /// Accesses the bytes in the specified memory region.
+  ///
+  /// - Parameter bounds: The range of byte offsets to access. The upper and
+  ///   lower bounds of the range must be in the range `0...count`.
+  @inlinable
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      return Slice(base: self, bounds: bounds)
+    }
     nonmutating set {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
@@ -219,10 +545,8 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
           byteCount: newValue.count)
       }
     }
-%  end # mutable
   }
 
-% if mutable:
   /// Exchanges the byte values at the specified indices
   /// in this buffer's memory.
   ///
@@ -245,7 +569,6 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
     pj.storeBytes(of: tmp, toByteOffset: 0, as: UInt8.self)
   }
 
-% end # mutable
   /// The number of bytes in the buffer.
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
@@ -259,10 +582,9 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
+extension UnsafeMutableRawBufferPointer: RandomAccessCollection { }
 
-extension Unsafe${Mutable}RawBufferPointer {
-%  if mutable:
+extension UnsafeMutableRawBufferPointer {
   /// Returns a newly allocated buffer with the given size, in bytes.
   ///
   /// The memory referenced by the new buffer is allocated, but not
@@ -282,7 +604,6 @@ extension Unsafe${Mutable}RawBufferPointer {
       byteCount: byteCount, alignment: alignment)
     return UnsafeMutableRawBufferPointer(start: base, count: byteCount)
   }
-%  end # mutable
 
   /// Deallocates the memory block previously allocated at this buffer pointer’s 
   /// base address. 
@@ -325,13 +646,12 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   memory.
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
-    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.load out of bounds")
+      "UnsafeMutableRawBufferPointer.load out of bounds")
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
-%  if mutable:
   /// Stores a value's bytes into the buffer pointer's raw memory at the
   /// specified byte offset.
   ///
@@ -359,11 +679,13 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///     with `type`.
   @inlinable
   public func storeBytes<T>(
-    of value: T, toByteOffset offset: Int = 0, as: T.Type
+    of value: T,
+    toByteOffset offset: Int = 0,
+    as: T.Type
   ) {
-    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.storeBytes out of bounds")
+      "UnsafeMutableRawBufferPointer.storeBytes out of bounds")
 
     baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
@@ -384,7 +706,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @inlinable
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
-      "${Self}.copyMemory source has too many elements")
+      "UnsafeMutableRawBufferPointer.copyMemory source has too many elements")
     baseAddress?.copyMemory(from: source.baseAddress!, byteCount: source.count)
   }
 
@@ -405,7 +727,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func copyBytes<C : Collection>(from source: C
   ) where C.Element == UInt8 {
     _debugPrecondition(source.count <= self.count,
-      "${Self}.copyBytes source has too many elements")
+      "UnsafeMutableRawBufferPointer.copyBytes source has too many elements")
     guard let position = _position else {
       return
     }
@@ -414,7 +736,6 @@ extension Unsafe${Mutable}RawBufferPointer {
         of: byteValue, toByteOffset: index, as: UInt8.self)
     }
   }
-%  end # mutable
 
   /// Creates a buffer over the specified number of contiguous bytes starting
   /// at the given pointer.
@@ -426,10 +747,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
   @inlinable
-  public init(start: Unsafe${Mutable}RawPointer?, count: Int) {
-    _precondition(count >= 0, "${Self} with negative count")
+  public init(start: UnsafeMutableRawPointer?, count: Int) {
+    _precondition(count >= 0, "UnsafeMutableRawBufferPointer with negative count")
     _precondition(count == 0 || start != nil,
-      "${Self} has a nil start and nonzero count")
+      "UnsafeMutableRawBufferPointer has a nil start and nonzero count")
     _position = start
     _end = start.map { $0 + count }
   }
@@ -442,7 +763,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     self.init(start: bytes.baseAddress, count: bytes.count)
   }
 
-%  if mutable:
   /// Creates a new mutable buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
@@ -451,15 +771,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     self.init(start: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
       count: bytes.count)
   }
-%  else:
-  /// Creates a new buffer over the same memory as the given buffer.
-  ///
-  /// - Parameter bytes: The buffer to convert.
-  @inlinable
-  public init(_ bytes: UnsafeRawBufferPointer) {
-    self.init(start: bytes.baseAddress, count: bytes.count)
-  }
-%  end # !mutable
 
   /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
   ///
@@ -470,46 +781,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     self.init(start: buffer.baseAddress!,
       count: buffer.count * MemoryLayout<T>.stride)
   }
-
-%  if not mutable:
-  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
-  ///
-  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
-  ///   buffer's type `T` must be a trivial type.
-  @inlinable
-  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
-    self.init(start: buffer.baseAddress!,
-      count: buffer.count * MemoryLayout<T>.stride)
-  }
-%  end # !mutable
-
-%  if not mutable:
-  /// Creates a raw buffer over the same memory as the given raw buffer slice,
-  /// with the indices rebased to zero.
-  ///
-  /// The new buffer represents the same region of memory as the slice, but its
-  /// indices start at zero instead of at the beginning of the slice in the
-  /// original buffer. The following code creates `slice`, a slice covering
-  /// part of an existing buffer instance, then rebases it into a new `rebased`
-  /// buffer.
-  ///
-  ///     let slice = buffer[n...]
-  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
-  ///
-  /// After this code has executed, the following are true:
-  ///
-  /// - `rebased.startIndex == 0`
-  /// - `rebased[0] == slice[n]`
-  /// - `rebased[0] == buffer[n]`
-  /// - `rebased.count == slice.count`
-  ///
-  /// - Parameter slice: The raw buffer slice to rebase.
-  @inlinable
-  public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
-    self.init(start: slice.base.baseAddress! + slice.startIndex,
-      count: slice.count)
-  }
-%  end # !mutable
 
   /// Creates a raw buffer over the same memory as the given raw buffer slice,
   /// with the indices rebased to zero.
@@ -542,12 +813,10 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @inlinable
-  public var baseAddress: Unsafe${Mutable}RawPointer? {
+  public var baseAddress: UnsafeMutableRawPointer? {
     return _position
   }
 
-  %  if mutable:
-  
   /// Initializes the memory referenced by this buffer with the given value,
   /// binds the memory to the value's type, and returns a typed buffer of the
   /// initialized memory.
@@ -642,7 +911,6 @@ extension Unsafe${Mutable}RawBufferPointer {
                   start: base.assumingMemoryBound(to: S.Element.self), 
                   count: idx / elementStride))
   }
-  %  end # mutable
 
   /// Binds this buffer’s memory to the specified type and returns a typed buffer 
   /// of the bound memory.
@@ -665,47 +933,43 @@ extension Unsafe${Mutable}RawBufferPointer {
   @discardableResult
   public func bindMemory<T>(
     to type: T.Type
-  ) -> Unsafe${Mutable}BufferPointer<T> {
+  ) -> UnsafeMutableBufferPointer<T> {
     guard let base = _position else {
-      return Unsafe${Mutable}BufferPointer<T>(start: nil, count: 0)
+      return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
     }
 
     let capacity = count / MemoryLayout<T>.stride
     Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
-    return Unsafe${Mutable}BufferPointer<T>(
-      start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
+    return UnsafeMutableBufferPointer<T>(
+      start: UnsafeMutablePointer<T>(base._rawValue), count: capacity)
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
+extension UnsafeMutableRawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
-    return "${Self}"
+    return "UnsafeMutableRawBufferPointer"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 
-extension ${Self} {
+extension UnsafeMutableRawBufferPointer {
   @available(*, unavailable, 
-    message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
-  public subscript(bounds: Range<Int>) -> ${Self} {
-    get { return ${Self}(start: nil, count: 0) }
-%  if mutable:
+    message: "use 'UnsafeMutableRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> UnsafeMutableRawBufferPointer {
+    get { return UnsafeMutableRawBufferPointer(start: nil, count: 0) }
+
     nonmutating set {}
-%  end # mutable
+
   }
 
-%  if mutable:
   @available(*, unavailable, 
     message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
     get { return UnsafeRawBufferPointer(start: nil, count: 0) }
     nonmutating set {}
   }
-%  end # mutable
 }
-
-% end # for mutable
 
 /// Invokes the given closure with a mutable buffer pointer covering the raw
 /// bytes of the given argument.
@@ -731,8 +995,7 @@ extension ${Self} {
 public func withUnsafeMutableBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-) rethrows -> Result
-{
+) rethrows -> Result {
   return try withUnsafeMutablePointer(to: &value) {
     return try body(UnsafeMutableRawBufferPointer(
         start: $0, count: MemoryLayout<T>.size))
@@ -766,8 +1029,7 @@ public func withUnsafeMutableBytes<T, Result>(
 public func withUnsafeBytes<T, Result>(
   of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
-) rethrows -> Result
-{
+) rethrows -> Result {
   return try withUnsafePointer(to: &value) {
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
@@ -801,7 +1063,3 @@ public func withUnsafeBytes<T, Result>(
   let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try body(buffer)
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

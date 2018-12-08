@@ -179,8 +179,8 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
-  UnsafeBufferPointer.swift.gyb
-  UnsafeRawBufferPointer.swift.gyb
+  UnsafeBufferPointer.swift
+  UnsafeRawBufferPointer.swift
   UnsafePointer.swift
   UnsafeRawPointer.swift
   UTFEncoding.swift
