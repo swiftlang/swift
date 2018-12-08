@@ -198,7 +198,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     @inline(__always) get {
       // TODO(String performance): In-vector-register operation
       return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+        let rebased = utf8[_uncheckedRebasing: bounds]
         return _SmallString(rebased)._unsafelyUnwrappedUnchecked
       }
     }
@@ -214,7 +214,7 @@ extension _SmallString {
     return try Swift.withUnsafeBytes(of: &raw) { rawBufPtr in
       let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         .assumingMemoryBound(to: UInt8.self)
-      return try f(UnsafeBufferPointer(start: ptr, count: self.count))
+      return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: self.count))
     }
   }
 
@@ -229,7 +229,7 @@ extension _SmallString {
       let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         .assumingMemoryBound(to: UInt8.self)
       return try f(UnsafeMutableBufferPointer(
-        start: ptr, count: _SmallString.capacity))
+        _uncheckedStart: ptr, count: _SmallString.capacity))
     }
 
     _internalInvariant(len <= _SmallString.capacity)

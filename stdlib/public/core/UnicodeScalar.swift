@@ -462,7 +462,8 @@ extension Unicode.Scalar {
     }
     return try Swift.withUnsafePointer(to: &codeUnits) {
       return try $0.withMemoryRebound(to: UInt16.self, capacity: 2) {
-        return try body(UnsafeBufferPointer(start: $0, count: utf16Count))
+        return try body(UnsafeBufferPointer(
+          _uncheckedStart: $0, count: utf16Count))
       }
     }
   }
@@ -476,7 +477,8 @@ extension Unicode.Scalar {
     var (codeUnits, utf8Count) = encodedScalar._bytes
     return try Swift.withUnsafePointer(to: &codeUnits) {
       return try $0.withMemoryRebound(to: UInt8.self, capacity: 4) {
-        return try body(UnsafeBufferPointer(start: $0, count: utf8Count))
+        return try body(UnsafeBufferPointer(
+          _uncheckedStart: $0, count: utf8Count))
       }
     }
   }

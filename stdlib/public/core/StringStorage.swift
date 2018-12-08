@@ -62,7 +62,8 @@ extension _AbstractStringStorage {
       uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
     str._copyUTF16CodeUnits(
-      into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
+      into: UnsafeMutableBufferPointer(
+        _uncheckedStart: buffer, count: range.count),
       range: range)
   }
 
@@ -76,10 +77,8 @@ extension _AbstractStringStorage {
       fallthrough
     case (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
-      let buffer =
-        UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
-      buffer.initialize(from: UnsafeBufferPointer(start: start, count: count))
-      buffer[count] = 0
+      outputPtr.initialize(_uncheckedFrom: start, count: count)
+      outputPtr[count] = 0
       return 1
     default:
       return  _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
@@ -416,7 +415,7 @@ extension _StringStorage {
     let storage = _StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-    storage.mutableStart.initialize(from: addr, count: bufPtr.count)
+    storage.mutableStart.initialize(_uncheckedFrom: addr, count: bufPtr.count)
     storage._invariantCheck()
     return storage
   }
@@ -458,7 +457,7 @@ extension _StringStorage {
 
   private var codeUnits: UnsafeBufferPointer<UInt8> {
     @inline(__always) get {
-      return UnsafeBufferPointer(start: start, count: count)
+      return UnsafeBufferPointer(_uncheckedStart: start, count: count)
     }
   }
 
@@ -485,7 +484,7 @@ extension _StringStorage {
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     @inline(__always) get {
       return UnsafeMutableBufferPointer(
-        start: mutableEnd, count: unusedCapacity)
+        _uncheckedStart: mutableEnd, count: unusedCapacity)
     }
   }
 
@@ -559,7 +558,7 @@ extension _StringStorage {
     _internalInvariant(self.capacity >= other.count)
     let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
     let srcCount = other.count
-    self.mutableEnd.initialize(from: srcAddr, count: srcCount)
+    self.mutableEnd.initialize(_uncheckedFrom: srcAddr, count: srcCount)
     _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 
@@ -570,8 +569,8 @@ extension _StringStorage {
     var srcCount = 0
     while let cu = other.next() {
       _internalInvariant(self.unusedCapacity >= 1)
-      unusedStorage[srcCount] = cu
-      srcCount += 1
+      unusedStorage[_unchecked: srcCount] = cu
+      srcCount &+= 1
     }
     _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
@@ -590,7 +589,7 @@ extension _StringStorage {
     let lowerPtr = mutableStart + lower
     let upperPtr = mutableStart + upper
     let tailCount = mutableEnd - upperPtr
-    lowerPtr.moveInitialize(from: upperPtr, count: tailCount)
+    lowerPtr.moveInitialize(_uncheckedFrom: upperPtr, count: tailCount)
 
     _postRRCAdjust(
       newCount: self.count &- (upper &- lower), newIsASCII: self.isASCII)
@@ -605,7 +604,7 @@ extension _StringStorage {
   ) -> Int {
     _internalInvariant(dst >= mutableStart && src <= mutableEnd)
     let tailCount = mutableEnd - src
-    dst.moveInitialize(from: src, count: tailCount)
+    dst.moveInitialize(_uncheckedFrom: src, count: tailCount)
     return tailCount
   }
 
@@ -624,7 +623,7 @@ extension _StringStorage {
 
     // Copy in the contents.
     lowerPtr.moveInitialize(
-      from: UnsafeMutablePointer(
+      _uncheckedFrom: UnsafeMutablePointer(
         mutating: replacement.baseAddress._unsafelyUnwrappedUnchecked),
       count: replCount)
 

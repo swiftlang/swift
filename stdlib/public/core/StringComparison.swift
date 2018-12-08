@@ -161,8 +161,8 @@ private func _stringCompareFastUTF8Abnormal(
   _internalInvariant(boundaryIdx <= diffIdx)
 
   return _stringCompareSlow(
-    UnsafeBufferPointer(rebasing: utf8Left[boundaryIdx...]),
-    UnsafeBufferPointer(rebasing: utf8Right[boundaryIdx...]),
+    utf8Left[_uncheckedRebasing: boundaryIdx..<utf8Left.count],
+    utf8Right[_uncheckedRebasing: boundaryIdx..<utf8Right.count],
     expecting: expecting)
 }
 

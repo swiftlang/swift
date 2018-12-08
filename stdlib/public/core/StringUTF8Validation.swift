@@ -178,20 +178,21 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
   repeat {
     _internalInvariant(brokenRange.count > 0, "broken range empty")
     _internalInvariant(remainingInput.count > 0, "empty remaining input doesn't need to be repaired")
-    let goodChunk = remainingInput[..<brokenRange.startIndex]
+    let goodChunk = remainingInput[_uncheckedRebasing: 0..<brokenRange.startIndex]
 
     // very likely this capacity reservation does not actually do anything because we reserved space for the entire
     // input plus up to five replacement characters up front
     result.reserveCapacity(result.count + remainingInput.count + replacementCharacterCount)
 
     // we can now safely append the next known good bytes and a replacement character
-    result.appendInPlace(UnsafeBufferPointer(rebasing: goodChunk),
+    result.appendInPlace(goodChunk,
                          isASCII: false /* appending replacement character anyway, so let's not bother */)
     Unicode.Scalar._replacementCharacter.withUTF8CodeUnits {
       result.appendInPlace($0, isASCII: false)
     }
 
-    remainingInput = UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
+    remainingInput = remainingInput[
+      _uncheckedRebasing: brokenRange.endIndex..<remainingInput.count]
     switch validateUTF8(remainingInput) {
     case .success:
       result.appendInPlace(remainingInput, isASCII: false)

@@ -745,6 +745,16 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
+    moveInitialize(_uncheckedFrom: source, count: count)
+  }
+
+  // Skip all debug and runtime checks
+  @inlinable
+  internal func moveInitialize(
+    _uncheckedFrom source: UnsafeMutablePointer, count: Int
+  ) {
+    _internalInvariant(
+      count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
       // initialize forward from a disjoint or following overlapping range.
       Builtin.takeArrayFrontToBack(
@@ -786,6 +796,20 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.initialize with negative count")
     _debugPrecondition(
+      UnsafePointer(self) + count <= source ||
+      source + count <= UnsafePointer(self),
+      "UnsafeMutablePointer.initialize overlapping range")
+    initialize(_uncheckedFrom: source, count: count)
+  }
+
+  // Skip all debug and runtime checks
+  @inlinable
+  internal func initialize(
+    _uncheckedFrom source: UnsafePointer<Pointee>, count: Int
+  ) {
+    _internalInvariant(
+      count >= 0, "UnsafeMutablePointer.initialize with negative count")
+    _internalInvariant(
       UnsafePointer(self) + count <= source ||
       source + count <= UnsafePointer(self),
       "UnsafeMutablePointer.initialize overlapping range")

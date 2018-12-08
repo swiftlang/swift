@@ -977,7 +977,8 @@ extension _StringObject {
   internal var nativeUTF8: UnsafeBufferPointer<UInt8> {
     @inline(__always) get {
       _internalInvariant(largeFastIsNative)
-      return UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
+      return UnsafeBufferPointer(
+        _uncheckedStart: nativeUTF8Start, count: largeCount)
     }
   }
 
@@ -1000,7 +1001,8 @@ extension _StringObject {
     @_effects(releasenone) @inline(never) get {
       _internalInvariant(largeFastIsShared)
       let start = self.getSharedUTF8Start()
-      return UnsafeBufferPointer(start: start, count: largeCount)
+      return UnsafeBufferPointer(
+        _uncheckedStart: start, count: largeCount)
     }
   }
 
@@ -1099,7 +1101,7 @@ extension _StringObject {
         return sharedUTF8
       }
       return UnsafeBufferPointer(
-        start: self.nativeUTF8Start, count: self.largeCount)
+        _uncheckedStart: self.nativeUTF8Start, count: self.largeCount)
     }
   }
 

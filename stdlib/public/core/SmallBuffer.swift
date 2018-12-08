@@ -50,7 +50,8 @@ extension _SmallBuffer {
       return withUnsafeBytes(of: _inlineStorage) {
         let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
         let bufPtr = UnsafeBufferPointer(
-          start: rawPtr.assumingMemoryBound(to: T.self), count: capacity)
+          _uncheckedStart: rawPtr.assumingMemoryBound(to: T.self),
+          count: capacity)
         return bufPtr[_unchecked: i]
       }
     }
@@ -60,7 +61,8 @@ extension _SmallBuffer {
       withUnsafeMutableBytes(of: &_inlineStorage) {
         let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
         let bufPtr = UnsafeMutableBufferPointer(
-          start: rawPtr.assumingMemoryBound(to: T.self), count: capacity)
+          _uncheckedStart: rawPtr.assumingMemoryBound(to: T.self),
+          count: capacity)
         bufPtr[_unchecked: i] = newValue
       }
     }

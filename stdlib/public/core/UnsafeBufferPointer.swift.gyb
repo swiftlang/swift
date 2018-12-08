@@ -360,6 +360,19 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     }
 %  end
   }
+
+  // Skip all debug and runtime checks
+  @inlinable // unsafe-performance
+  internal subscript(
+    _uncheckedRebasing bounds: Range<Int>
+  ) -> Unsafe${Mutable}BufferPointer<Element> {
+    _internalInvariant(bounds.lowerBound >= startIndex)
+    _internalInvariant(bounds.upperBound <= endIndex)
+    let position = _position._unsafelyUnwrappedUnchecked + bounds.lowerBound
+    return Unsafe${Mutable}BufferPointer(
+      _uncheckedStart: position, count: bounds.count)
+  }
+
 % if mutable:
 
   /// Exchanges the values at the specified indices of the buffer.
@@ -401,6 +414,20 @@ extension Unsafe${Mutable}BufferPointer {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
     _precondition(
+      count == 0 || start != nil,
+      "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
+    _position = start
+    self.count = count
+  }
+
+  // Skip all debug and runtime checks
+  @inlinable // unsafe-performance
+  internal init(
+    _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?, count: Int
+  ) {
+    _internalInvariant(
+      count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
+    _internalInvariant(
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     _position = start

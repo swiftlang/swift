@@ -408,7 +408,7 @@ extension String {
         let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
         return String._fromUTF8Repairing(
           UnsafeBufferPointer(
-            start: ptr.assumingMemoryBound(to: UInt8.self),
+            _uncheckedStart: ptr.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
       }
       return

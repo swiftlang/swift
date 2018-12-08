@@ -210,7 +210,7 @@ extension _StringGuts {
     }
 
     if let utf16Ptr = _stdlib_binary_CFStringGetCharactersPtr(cocoa) {
-      let utf16 = UnsafeBufferPointer(start: utf16Ptr, count: count)
+      let utf16 = UnsafeBufferPointer(_uncheckedStart: utf16Ptr, count: count)
       return _measureCharacterStrideICU(of: utf16, startingAt: i)
     }
 
@@ -276,7 +276,7 @@ extension _StringGuts {
     }
 
     if let utf16Ptr = _stdlib_binary_CFStringGetCharactersPtr(cocoa) {
-      let utf16 = UnsafeBufferPointer(start: utf16Ptr, count: count)
+      let utf16 = UnsafeBufferPointer(_uncheckedStart: utf16Ptr, count: count)
       return _measureCharacterStrideICU(of: utf16, endingAt: i)
     }
 

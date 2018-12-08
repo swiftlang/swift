@@ -1110,7 +1110,7 @@ extension Unicode.Scalar.Properties {
       }
       _internalInvariant(count == correctSize, "inconsistent ICU behavior")
       return String._fromASCII(
-        UnsafeBufferPointer(rebasing: bufPtr[..<count]))
+        UnsafeBufferPointer(bufPtr[_uncheckedRebasing: 0..<count]))
     }
   }
 

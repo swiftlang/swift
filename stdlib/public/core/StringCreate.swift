@@ -130,7 +130,7 @@ extension String {
     return try self.withUnsafeBytes { rawBufPtr in
       let rawPtr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
       return try body(UnsafeBufferPointer(
-        start: rawPtr.assumingMemoryBound(to: UInt8.self),
+        _uncheckedStart: rawPtr.assumingMemoryBound(to: UInt8.self),
         count: rawBufPtr.count))
     }
   }
