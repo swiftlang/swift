@@ -942,6 +942,10 @@ void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
   Out << "<default-associated-conformance-descriptor>";
 }
 
+void Remangler::mangleBaseConformanceDescriptor(Node *node) {
+  Out << "<base-conformance-descriptor>";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   Out << "Wt";
   mangleChildNodes(node); // protocol conformance, identifier
@@ -955,8 +959,12 @@ void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
   Out << "WT";
   assert(node->getNumChildren() == 3);
   mangleChildNode(node, 0); // protocol conformance
-  mangleChildNode(node, 1); // identifier
+  mangleChildNode(node, 1); // type
   mangleProtocolWithoutPrefix(node->begin()[2]); // type
+}
+
+void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
+  Out << "<base-witness-table-accessor>";
 }
 
 void Remangler::mangleReabstractionThunkHelper(Node *node) {

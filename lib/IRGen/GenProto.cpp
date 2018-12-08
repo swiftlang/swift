@@ -995,14 +995,9 @@ static bool hasDependentTypeWitness(
   return false;
 }
 
-static bool hasDependentTypeWitness(const RootProtocolConformance *root) {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(root))
-    return hasDependentTypeWitness(normal);
-  return false; // no associated types
-}
-
 static bool isDependentConformance(
               const RootProtocolConformance *rootConformance,
+              bool considerResilience,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
@@ -1015,7 +1010,7 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient, this is always true.
-  if (isResilientConformance(conformance))
+  if (considerResilience && isResilientConformance(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1033,6 +1028,7 @@ static bool isDependentConformance(
     if (assocConformance.isAbstract() ||
         isDependentConformance(assocConformance.getConcrete()
                                  ->getRootConformance(),
+                               considerResilience,
                                visited))
       return true;
   }
@@ -1048,9 +1044,10 @@ static bool isDependentConformance(
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(const RootProtocolConformance *conformance) {
+static bool isDependentConformance(const RootProtocolConformance *conformance,
+                                   bool considerResilience) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
-  return ::isDependentConformance(conformance, visited);
+  return ::isDependentConformance(conformance, considerResilience, visited);
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -1323,17 +1320,23 @@ public:
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
 #ifndef NDEBUG
       auto &entry = SILEntries.front();
+#endif
+      SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
+
+#ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
              && "sil witness table does not match protocol");
       auto piIndex = PI.getBaseIndex(baseProto);
       assert((size_t)piIndex.getValue() ==
-              Table.size() - WitnessTableFirstRequirementOffset &&
+             Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
-      
-      SILEntries = SILEntries.slice(1);
 
       // TODO: Use the witness entry instead of falling through here.
 
@@ -1473,6 +1476,7 @@ public:
 
   private:
     void addConditionalConformances() {
+      assert(NextPrivateDataIndex == 0);
       for (auto conditional : SILConditionalConformances) {
         // We don't actually need to know anything about the specific
         // conformances here, just make sure we get right private data slots.
@@ -1755,6 +1759,22 @@ void WitnessTableBuilder::collectResilientWitnesses(
       continue;
     }
 
+    // Inherited conformance witnesses.
+    if (entry.getKind() == SILWitnessTable::BaseProtocol) {
+      const auto &witness = entry.getBaseProtocolWitness();
+      auto baseProto = witness.Requirement;
+      auto proto = SILWT->getProtocol();
+      CanType selfType = proto->getProtocolSelfType()->getCanonicalType();
+      AssociatedConformance requirement(proto, selfType, baseProto);
+      ProtocolConformanceRef inheritedConformance =
+        ConformanceInContext.getAssociatedConformance(selfType, baseProto);
+      llvm::Constant *witnessEntry =
+        getAssociatedConformanceWitness(requirement, ConcreteType,
+                                        inheritedConformance);
+      resilientWitnesses.push_back(witnessEntry);
+      continue;
+    }
+
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
 
@@ -1772,10 +1792,9 @@ void WitnessTableBuilder::collectResilientWitnesses(
 }
 
 llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
-  // We need an instantiation function if the base conformance
+  // We need an instantiation function if any base conformance
   // is non-dependent.
-  if (SpecializedBaseConformances.empty() &&
-      ConditionalRequirementPrivateDataIndices.empty())
+  if (SpecializedBaseConformances.empty())
     return nullptr;
 
   assert(isa<NormalProtocolConformance>(Conformance) &&
@@ -1803,19 +1822,12 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
                                 IGF.IGM.WitnessTablePtrPtrTy),
       PointerAlignment);
 
-  /// Run through the conditional conformance witness tables, pulling them out
-  /// of the slice and putting them into the private data of the witness table.
+  // Register local type data for the conditional conformance witness tables.
   for (auto idx : indices(ConditionalRequirementPrivateDataIndices)) {
     Address conditionalTablePtr =
         IGF.Builder.CreateConstArrayGEP(conditionalTables, idx, PointerSize);
-    Address slot = getAddressOfPrivateDataSlot(
-        IGF, wtable, ConditionalRequirementPrivateDataIndices[idx]);
     auto conditionalTable = IGF.Builder.CreateLoad(conditionalTablePtr);
-    auto coercedSlot =
-        IGF.Builder.CreateElementBitCast(slot, conditionalTable->getType());
-    IGF.Builder.CreateStore(conditionalTable, coercedSlot);
 
-    // Register local type data for the conditional conformance witness table.
     const auto &condConformance = SILConditionalConformances[idx];
     CanType reqTypeInContext =
       Conformance.getDeclContext()
@@ -1906,9 +1918,7 @@ namespace {
       Flags = Flags.withNumConditionalRequirements(numConditional);
 
       // Relative reference to the witness table.
-      auto witnessTableRef =
-        ConstantReference(Description.pattern, ConstantReference::Direct);
-      B.addRelativeAddress(witnessTableRef);
+      B.addRelativeAddressOrNull(Description.pattern);
     }
 
     void addFlags() {
@@ -1980,6 +1990,15 @@ namespace {
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedConformanceDescriptor(requirement));
           B.addRelativeAddress(assocConformanceDescriptor);
+        } else if (entry.getKind() == SILWitnessTable::BaseProtocol) {
+          // Associated conformance descriptor for a base protocol.
+          const auto &witness = entry.getBaseProtocolWitness();
+          auto proto = SILWT->getProtocol();
+          BaseConformance requirement(proto, witness.Requirement);
+          auto baseConformanceDescriptor =
+            IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+              LinkEntity::forBaseConformanceDescriptor(requirement));
+          B.addRelativeAddress(baseConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;
@@ -2152,7 +2171,7 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
   // so in theory we could allocate them on a BumpPtrAllocator. But there's not
   // a good one for us to use. (The ASTContext's outlives the IRGenModule in
   // batch mode.)
-  if (isDependentConformance(rootConformance) ||
+  if (isDependentConformance(rootConformance, /*considerResilience=*/true) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
       isSynthesizedNonUnique(rootConformance)) {
@@ -2220,22 +2239,32 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
-  bool isDependent = isDependentConformance(conf);
-  auto global = cast<llvm::GlobalVariable>(
-    isDependent
-      ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
-                                     initializer)
-      : getAddrOfWitnessTable(conf, initializer));
-  global->setConstant(isConstantWitnessTable(wt));
-  global->setAlignment(getWitnessTableAlignment().getValue());
+  llvm::GlobalVariable *global = nullptr;
+  unsigned tableSize;
+  if (!isResilientConformance(conf)) {
+    bool isDependent =
+      isDependentConformance(conf, /*considerResilience=*/false);
+    global = cast<llvm::GlobalVariable>(
+      isDependent
+        ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
+                                       initializer)
+        : getAddrOfWitnessTable(conf, initializer));
+    global->setConstant(isConstantWitnessTable(wt));
+    global->setAlignment(getWitnessTableAlignment().getValue());
+    tableSize = wtableBuilder.getTableSize();
+  } else {
+    initializer.abandon();
+    tableSize = 0;
+  }
 
   // Collect the information that will go into the protocol conformance
   // descriptor.
-  ConformanceDescription description(conf, wt, global,
-                                     wtableBuilder.getTableSize(),
+  ConformanceDescription description(conf, wt, global, tableSize,
                                      wtableBuilder.getTablePrivateSize(),
                                      wtableBuilder.requiresSpecialization(),
-                                     hasDependentTypeWitness(conf));
+                                     isDependentConformance(
+                                       conf,
+                                       /*considerResilience=*/false));
 
   // Build the instantiation function, we if need one.
   description.instantiationFn = wtableBuilder.buildInstantiationFunction();

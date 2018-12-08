@@ -162,6 +162,7 @@ bool Context::hasSwiftCallingConvention(llvm::StringRef MangledName) {
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ObjCAttribute:
       return false;
     default:

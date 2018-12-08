@@ -319,6 +319,8 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::BaseConformanceDescriptor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -1637,6 +1639,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::BaseConformanceDescriptor:
+    Printer << "base conformance descriptor for ";
+    print(Node->getChild(0));
+    Printer << ": ";
+    print(Node->getChild(1));
+    return nullptr;
   case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
@@ -1646,6 +1654,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(1));
     Printer << " : ";
     print(Node->getChild(2));
+    Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::BaseWitnessTableAccessor:
+    Printer << "base witness table accessor for ";
+    print(Node->getChild(1));
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;

@@ -585,6 +585,11 @@ void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
   Buffer << "TN";
 }
 
+void Remangler::mangleBaseConformanceDescriptor(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Tb";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   mangleChildNodes(node); // protocol conformance, identifier
   Buffer << "Wt";
@@ -596,8 +601,13 @@ void Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node) {
 }
 
 void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
-  mangleChildNodes(node); // protocol conformance, identifier, type
+  mangleChildNodes(node); // protocol conformance, type, protocol
   Buffer << "WT";
+}
+
+void Remangler::mangleBaseWitnessTableAccessor(Node *node) {
+  mangleChildNodes(node); // protocol conformance, protocol
+  Buffer << "Wb";
 }
 
 void Remangler::mangleAutoClosureType(Node *node) {
