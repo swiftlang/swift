@@ -201,7 +201,7 @@ set(SWIFTLIB_SOURCES
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
   CollectionOfOne.swift
-  ExistentialCollection.swift.gyb
+  ExistentialCollection.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
