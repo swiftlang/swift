@@ -984,6 +984,27 @@ namespace {
           CallArgs.insert(arg);
       }
 
+      // FIXME(diagnostics): `InOutType` could appear here as a result
+      // of successful re-typecheck of the one of the sub-expressions e.g.
+      // `let _: Int = { (s: inout S) in s.bar() }`. On the first
+      // attempt to type-check whole expression `s.bar()` - is going
+      // to have a base which points directly to declaration of `S`.
+      // But when diagnostics attempts to type-check `s.bar()` standalone
+      // its base would be tranformed into `InOutExpr -> DeclRefExr`,
+      // and `InOutType` is going to be recorded in constraint system.
+      if (!expr->isImplicit()) {
+        if (isa<MemberRefExpr>(expr) || isa<DynamicMemberRefExpr>(expr)) {
+          auto *LE = cast<LookupExpr>(expr);
+          if (auto *IOE = dyn_cast<InOutExpr>(LE->getBase()))
+            LE->setBase(IOE->getSubExpr());
+        }
+
+        if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(expr)) {
+          if (auto *IOE = dyn_cast<InOutExpr>(DSCE->getBase()))
+            DSCE->setBase(IOE->getSubExpr());
+        }
+      }
+
       // Local function used to finish up processing before returning. Every
       // return site should call through here.
       auto finish = [&](bool recursive, Expr *expr) {
