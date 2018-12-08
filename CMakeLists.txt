@@ -1024,6 +1024,8 @@ if(SWIFT_INCLUDE_TOOLS)
   # Refer to the large comment above the add_subdirectory(stdlib) call.
   # https://bugs.swift.org/browse/SR-5975
   add_subdirectory(tools)
+elseif(SWIFT_BUILD_STDLIB)
+  add_subdirectory(include/swift/Runtime)
 endif()
 
 add_subdirectory(utils)
