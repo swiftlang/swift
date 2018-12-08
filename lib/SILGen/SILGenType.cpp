@@ -1015,9 +1015,6 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
-    if (vd->hasBehavior())
-      SGM.emitPropertyBehavior(vd);
-
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
@@ -1104,8 +1101,6 @@ public:
   }
 
   void visitVarDecl(VarDecl *vd) {
-    if (vd->hasBehavior())
-      SGM.emitPropertyBehavior(vd);
     if (vd->hasStorage()) {
       assert(vd->isStatic() && "stored property in extension?!");
       return emitTypeMemberGlobalVariable(SGM, vd);

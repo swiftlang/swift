@@ -325,7 +325,48 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported/Replacing
 }
 
 //===----------------------------------------------------------------------===//
-// _withUnsafeMutableBufferPointerIfSupported()
+// withContiguousStorageIfAvailableTests()
+//===----------------------------------------------------------------------===//
+
+struct WithContiguousStorageIfAvailableTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+let withContiguousStorageIfAvailableTests = [
+  WithContiguousStorageIfAvailableTest([]),
+  WithContiguousStorageIfAvailableTest([ 10 ]),
+  WithContiguousStorageIfAvailableTest([ 10, 20, 30, 40, 50 ]),
+]
+
+${Suite}.test("${ArrayType}/withContiguousStorageIfAvailable")
+  .code {
+  for test in withContiguousStorageIfAvailableTests {
+    var a = getFresh${ArrayType}(test.sequence.map(OpaqueValue.init))
+    do {
+      // Read.
+      var result = a.withContiguousStorageIfAvailable {
+        (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
+        return OpaqueValue(Array(bufferPointer))
+      }
+      expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
+      expectEqualSequence(test.sequence, result!.value.map { $0.value })
+      expectEqualSequence(test.sequence, a.map { $0.value })
+    }
+  }
+  // FIXME: tests for arrays bridged from Objective-C.
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousMutableStorageIfAvailableTests()
 //===----------------------------------------------------------------------===//
 
 struct WithContiguousMutableStorageIfAvailableTest {

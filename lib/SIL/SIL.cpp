@@ -75,10 +75,6 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 SILLinkage
 swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
-  // Behavior conformances are always private.
-  if (C->isBehaviorConformance())
-    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
-
   // If the conformance was synthesized by the ClangImporter, give it
   // shared linkage.
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))

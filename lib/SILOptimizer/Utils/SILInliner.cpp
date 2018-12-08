@@ -910,7 +910,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   }
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("not valid in canonical sil");
   case SILInstructionKind::ObjectInst:
     llvm_unreachable("not valid in a function");

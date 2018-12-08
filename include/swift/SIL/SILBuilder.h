@@ -863,21 +863,6 @@ public:
     return createMarkUninitialized(Loc, src, MarkUninitializedInst::RootSelf);
   }
   
-  MarkUninitializedBehaviorInst *
-  createMarkUninitializedBehavior(SILLocation Loc,
-                                  SILValue initStorageFunc,
-                                  SubstitutionMap initStorageSubs,
-                                  SILValue storage,
-                                  SILValue setterFunc,
-                                  SubstitutionMap setterSubs,
-                                  SILValue self,
-                                  SILType ty) {
-    return insert(MarkUninitializedBehaviorInst::create(getModule(),
-         getSILDebugLocation(Loc),
-         initStorageFunc, initStorageSubs, storage,
-         setterFunc, setterSubs, self, ty));
-  }
-
   MarkFunctionEscapeInst *createMarkFunctionEscape(SILLocation Loc,
                                                    ArrayRef<SILValue> vars) {
     return insert(

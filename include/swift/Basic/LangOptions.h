@@ -213,9 +213,6 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
-    /// Enable experimental property behavior feature.
-    bool EnableExperimentalPropertyBehaviors = false;
-
     /// Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;

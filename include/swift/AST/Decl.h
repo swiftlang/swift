@@ -4160,38 +4160,6 @@ public:
   }
 };
 
-/// Information about a behavior instantiated by a storage declaration.
-///
-/// TODO: Accessors, composed behaviors
-struct alignas(1 << 3) BehaviorRecord {
-  // The behavior name.
-  TypeRepr *ProtocolName;
-  // The parameter expression, if any.
-  Expr *Param;
-  
-  Optional<NormalProtocolConformance *> Conformance = None;
-  // The 'value' property from the behavior protocol that provides the property
-  // implementation.
-  VarDecl *ValueDecl = nullptr;
-  
-  // Storage declaration and initializer for use by definite initialization.
-  VarDecl *StorageDecl = nullptr;
-  ConcreteDeclRef InitStorageDecl = nullptr;
-  
-  bool needsInitialization() const {
-    assert((bool)StorageDecl == (bool)InitStorageDecl
-           && "DI state not consistent");
-    return StorageDecl != nullptr;
-  }
-  
-  BehaviorRecord(TypeRepr *ProtocolName,
-                 Expr *Param)
-    : ProtocolName(ProtocolName), Param(Param)
-  {}
-  
-  SourceLoc getLoc() const;
-};
-
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
@@ -4257,8 +4225,6 @@ private:
   };
 
   llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
-  llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
-    BehaviorInfo;
 
   void setFieldsFromImplInfo(StorageImplInfo implInfo) {
     Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
@@ -4400,9 +4366,6 @@ public:
   ///
   /// This should only be used by the ClangImporter.
   void setComputedSetter(AccessorDecl *Set);
-
-  /// Add a behavior to a property.
-  void addBehavior(TypeRepr *Type, Expr *Param);
 
   /// Add a synthesized getter.
   void setSynthesizedGetter(AccessorDecl *getter);
@@ -4546,28 +4509,6 @@ public:
   /// Do we need to use resilient access patterns when accessing this
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
-
-  /// Does the storage use a behavior?
-  bool hasBehavior() const {
-    return BehaviorInfo.getPointer() != nullptr;
-  }
-  
-  /// Does the storage use a behavior, and require definite initialization
-  /// analysis.
-  bool hasBehaviorNeedingInitialization() const {
-    if (auto behavior = getBehavior()) {
-      return behavior->needsInitialization();
-    }
-    return false;
-  }
-  
-  /// Get the behavior info.
-  const BehaviorRecord *getBehavior() const {
-    return BehaviorInfo.getPointer();
-  }
-  BehaviorRecord *getMutableBehavior() {
-    return BehaviorInfo.getPointer();
-  }
 
   void setIsValidKeyPathComponent(bool value) {
     Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent = true;
@@ -5560,9 +5501,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  /// If this FuncDecl is an accessor for a property, this indicates
-  /// which property and what kind of accessor.
-  BehaviorRecord *BehaviorParamDecl = nullptr;
   OperatorDecl *Operator = nullptr;
 
 protected:
@@ -5709,16 +5647,6 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  /// Get the property behavior this function serves as a parameter for, if
-  /// any.
-  BehaviorRecord *getParamBehavior() const {
-    return BehaviorParamDecl;
-  }
-  
-  void setParamBehavior(BehaviorRecord *behavior) {
-    BehaviorParamDecl = behavior;
-  }
-  
   OperatorDecl *getOperatorDecl() const {
     return Operator;
   }

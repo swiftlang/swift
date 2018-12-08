@@ -1050,6 +1050,20 @@ SequenceTypeTests.test("underestimatedCount/Sequence/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
+// withContiguousStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+SequenceTypeTests.test("withContiguousMutableStorageIfAvailable")
+.code {
+  let s = [ 1, 2, 3 ].map(OpaqueValue.init)
+  let tester = SequenceLog.dispatchTester(s)
+  let result = tester.withContiguousStorageIfAvailable { buf in
+    buf.reduce(0) { $0 + $1.value }
+  }
+  expectEqual(6, result)
+  expectCustomizable(tester, tester.log.withContiguousStorageIfAvailable)
+}
+
+//===----------------------------------------------------------------------===//
 // _copyToContiguousArray()
 //===----------------------------------------------------------------------===//
 SequenceTypeTests.test("_copyToContiguousArray/OverestimatedCount")

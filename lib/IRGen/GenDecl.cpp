@@ -2723,20 +2723,12 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
 
 /// Emit the protocol conformance list and return it.
 llvm::Constant *IRGenModule::emitProtocolConformances() {
-  // Emit the conformances.
-  bool anyReflectedConformances = false;
-  for (const auto &record : ProtocolConformances) {
-    // Emit the protocol conformance now.
-    emitProtocolConformance(record);
-
-    if (record.conformance->isBehaviorConformance())
-      continue;
-
-    anyReflectedConformances = true;
-  }
-
-  if (!anyReflectedConformances)
+  if (ProtocolConformances.empty())
     return nullptr;
+
+  // Emit the conformances.
+  for (const auto &record : ProtocolConformances)
+    emitProtocolConformance(record);
 
   // Define the global variable for the conformance list.
   ConstantInitBuilder builder(*this);
@@ -2744,11 +2736,6 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
   for (const auto &record : ProtocolConformances) {
     auto conformance = record.conformance;
-
-    // Behavior conformances cannot be reflected.
-    if (conformance->isBehaviorConformance())
-      continue;
-
     auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
     auto descriptor =
       getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());

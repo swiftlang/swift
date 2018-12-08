@@ -121,8 +121,6 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
     return false;
-  if (isa<MarkUninitializedBehaviorInst>(I))
-    return false;
 
   if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
     return false;

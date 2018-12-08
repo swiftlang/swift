@@ -302,9 +302,6 @@ ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(behavior_multiple_vars,none,
-      "applying property behavior with parameter to multiple variables is "
-      "not supported", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -860,10 +857,6 @@ ERROR(parameter_specifier_repeated,none,
 ERROR(parameter_let_var_as_attr,none,
       "'%0' as a parameter attribute is not allowed",
       (StringRef))
-
-
-ERROR(expected_behavior_name,none,
-      "expected behavior name after '[' in property declaration", ())
 
 
 WARNING(parameter_extraneous_double_up,none,

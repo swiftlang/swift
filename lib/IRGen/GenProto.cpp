@@ -2273,10 +2273,6 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Record this conformance descriptor.
   addProtocolConformance(std::move(description));
 
-  // Behavior conformances can't be reflected.
-  if (conf->isBehaviorConformance())
-    return;
-
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
   if (requiresForeignTypeMetadata(conformingType)) {

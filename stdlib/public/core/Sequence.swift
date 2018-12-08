@@ -363,7 +363,6 @@ public protocol Sequence {
     initializing ptr: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
   
-  @inlinable
   func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?  

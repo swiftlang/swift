@@ -80,10 +80,6 @@ public:
     /// that storage directly.
     Storage,
 
-    /// The decl is a VarDecl with storage defined by a property behavior;
-    /// this access may initialize or reassign the storage based on dataflow.
-    BehaviorStorage,
-
     /// Directly call an accessor of some sort.  The strategy includes
     /// an accessor kind.
     DirectToAccessor,
@@ -107,7 +103,7 @@ private:
 
   AccessStrategy(Kind kind)
     : TheKind(kind) {
-    assert(kind == Storage || kind == BehaviorStorage);
+    assert(kind == Storage);
   }
 
   AccessStrategy(Kind kind, AccessorKind accessor)
@@ -129,10 +125,6 @@ private:
 public:
   static AccessStrategy getStorage() {
     return { Storage };
-  }
-
-  static AccessStrategy getBehaviorStorage() {
-    return { BehaviorStorage };
   }
 
   static AccessStrategy getAccessor(AccessorKind accessor, bool dispatched) {

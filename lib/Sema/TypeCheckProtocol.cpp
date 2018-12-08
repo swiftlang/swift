@@ -5643,25 +5643,6 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   }
 }
 
-void TypeChecker::recordKnownWitness(NormalProtocolConformance *conformance,
-                                     ValueDecl *req, ValueDecl *witness) {
-  // Match the witness. This should never fail, but it does allow renaming
-  // (because property behaviors rely on renaming).
-  validateDecl(witness);
-  auto dc = conformance->getDeclContext();
-  WitnessChecker::RequirementEnvironmentCache oneUseCache;
-  auto match = matchWitness(*this, oneUseCache, conformance->getProtocol(),
-                            conformance, dc, req, witness);
-  if (match.Kind != MatchKind::ExactMatch &&
-      match.Kind != MatchKind::RenamedMatch) {
-    diagnose(witness, diag::property_behavior_conformance_broken,
-             witness->getFullName(), conformance->getType());
-    return;
-  }
-
-  conformance->setWitness(req, match.getWitness(Context));
-}
-
 Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformanceRef conformance,
                                  Identifier name,
