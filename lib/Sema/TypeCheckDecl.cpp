@@ -3918,7 +3918,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             });
 
         if (mentionsItself) {
-          diagnose(defaultDefinition.getLoc(), diag::recursive_type_reference,
+          diagnose(defaultDefinition.getLoc(), diag::recursive_decl_reference,
                    assocType->getDescriptiveKind(), assocType->getName());
           diagnose(assocType, diag::kind_declared_here, DescriptiveDeclKind::Type);
         }

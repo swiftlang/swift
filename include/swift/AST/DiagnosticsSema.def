@@ -1875,6 +1875,9 @@ NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not "
      "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
+NOTE(protocol_witness_circularity,none,
+     "candidate references itself", ())
+
 NOTE(protocol_conformance_here,none,
      "%select{|class }0%1 declares conformance to protocol %2 here",
      (bool, DeclName, DeclName))
@@ -1982,8 +1985,8 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(recursive_type_reference,none,
-      "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
+ERROR(recursive_decl_reference,none,
+      "%0 %1 references itself", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,

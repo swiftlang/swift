@@ -166,6 +166,11 @@ enum class MatchKind : uint8_t {
   /// The witness is invalid or has an invalid type.
   WitnessInvalid,
 
+  /// The witness is currently being type checked and this type checking in turn
+  /// triggered conformance checking, so the witness cannot be considered as a
+  /// candidate.
+  Circularity,
+
   /// The kind of the witness and requirement differ, e.g., one
   /// is a function and the other is a variable.
   KindConflict,
@@ -405,6 +410,7 @@ struct RequirementMatch {
       return true;
 
     case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
     case MatchKind::MissingRequirement:
@@ -435,6 +441,7 @@ struct RequirementMatch {
       return true;
 
     case MatchKind::WitnessInvalid:
+    case MatchKind::Circularity:
     case MatchKind::KindConflict:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::SettableConflict:
