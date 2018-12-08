@@ -5891,21 +5891,24 @@ ObjCSelector DestructorDecl::getObjCSelector() const {
 
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
-  if (StartLoc.isInvalid() ||
-      getBodyKind() == BodyKind::Synthesize)
+
+  if (StartLoc.isInvalid())
     return SourceRange();
 
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };
 
-  if (auto *B = getBody()) {
+  if (auto *B = getBody(/*canSynthesize=*/false)) {
     if (!B->isImplicit())
       return { StartLoc, B->getEndLoc() };
   }
 
   if (isa<AccessorDecl>(this))
     return StartLoc;
+
+  if (getBodyKind() == BodyKind::Synthesize)
+    return SourceRange();
 
   auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
   if (TrailingWhereClauseSourceRange.isValid())

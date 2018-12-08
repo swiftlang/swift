@@ -42,59 +42,6 @@ class TypeChecker;
 
 class ObjCReason;
 
-/// A function which needs to have its body synthesized.
-///
-/// This class exists in expectation that someone will need to add more
-/// information to it.
-class SynthesizedFunction {
-public:
-  enum Kind {
-    Getter,
-    Setter,
-    ReadCoroutine,
-    ModifyCoroutine,
-    LazyGetter,
-    LazySetter,
-  };
-
-private:
-  FuncDecl *Fn;
-  Kind K;
-
-  using Members = ExternalUnionMembers<void, VarDecl*>;
-  static Members::Index getIndexForKind(Kind kind) {
-    switch (kind) {
-    case Kind::Getter:
-    case Kind::Setter:
-    case Kind::ReadCoroutine:
-    case Kind::ModifyCoroutine:
-      return Members::indexOf<void>();
-    case Kind::LazyGetter:
-    case Kind::LazySetter:
-      return Members::indexOf<VarDecl*>();
-    }
-    llvm_unreachable("bad kind");
-  };
-  ExternalUnion<Kind, Members, getIndexForKind> Extra;
-  static_assert(decltype(Extra)::union_is_trivially_copyable,
-                "expected all members to be trivial");
-
-public:
-  SynthesizedFunction(FuncDecl *fn, Kind kind) : Fn(fn), K(kind) {
-    assert(getIndexForKind(kind) == Members::indexOf<void>() &&
-           "this storage kind requires extra data");
-  }
-
-  SynthesizedFunction(FuncDecl *fn, Kind kind, VarDecl *var) : Fn(fn), K(kind) {
-    Extra.emplace<VarDecl*>(K, var);
-  }
-
-  FuncDecl *getDecl() const { return Fn; }
-  Kind getKind() const { return K; }
-
-  VarDecl *getLazyTargetVariable() const { return Extra.get<VarDecl*>(K); }
-};
-
 // These are implemented in TypeCheckDecl.cpp.
 void makeFinal(ASTContext &ctx, ValueDecl *D);
 

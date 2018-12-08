@@ -512,7 +512,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
 ///
 /// \param encodeDecl The function decl whose body to synthesize.
-static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
+static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -749,7 +749,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
 ///
 /// \param initDecl The function decl whose body to synthesize.
-static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
+static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -1024,7 +1024,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
-  initDecl->setBodySynthesizer(deriveBodyDecodable_init);
+  initDecl->setBodySynthesizer(&deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
   if (classDecl && !classDecl->getAttrs().hasAttribute<FinalAttr>()) {

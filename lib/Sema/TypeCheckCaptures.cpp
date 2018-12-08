@@ -283,15 +283,14 @@ public:
         // recontextualized into it, so treat it as if it's already there.
         if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
           if (auto lazyVar = init->getInitializedLazyVar()) {
-            // Referring to the 'self' parameter is fine.
-            if (D == init->getImplicitSelfDecl())
-              return { false, DRE };
-
-            // Otherwise, act as if we're in the getter.
-            auto getter = lazyVar->getGetter();
-            assert(getter && "lazy variable without getter");
-            TmpDC = getter;
-            continue;
+            // If we have a getter with a body, we're already re-parented
+            // everything so pretend we're inside the getter.
+            if (auto getter = lazyVar->getGetter()) {
+              if (getter->getBody(/*canSynthesize=*/false)) {
+                TmpDC = getter;
+                continue;
+              }
+            }
           }
         }
 
