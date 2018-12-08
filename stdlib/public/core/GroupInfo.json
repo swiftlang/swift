@@ -160,9 +160,18 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Int.swift",
+      "Int8.swift",
+      "Int16.swift",
+      "Int32.swift",
+      "Int64.swift",
       "Integers.swift",
-      "IntegerTypes.swift",
-      "IntegerParsing.swift"],
+      "IntegerParsing.swift",
+      "UInt.swift",
+      "UInt8.swift",
+      "UInt16.swift",
+      "UInt32.swift",
+      "UInt64.swift"],
     "Floating": [
       "Double.swift",
       "Float.swift",

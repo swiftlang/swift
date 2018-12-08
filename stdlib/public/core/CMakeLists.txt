@@ -83,9 +83,13 @@ set(SWIFTLIB_ESSENTIAL
   ICU.swift
   Indices.swift
   InputStream.swift
+  Int.swift
+  Int8.swift
+  Int16.swift
+  Int32.swift
+  Int64.swift
   IntegerParsing.swift
   Integers.swift
-  IntegerTypes.swift.gyb
   Join.swift
   KeyPath.swift
   KeyValuePairs.swift
@@ -171,6 +175,11 @@ set(SWIFTLIB_ESSENTIAL
   Substring.swift
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
+  UInt.swift
+  UInt8.swift
+  UInt16.swift
+  UInt32.swift
+  UInt64.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
   UnicodeEncoding.swift

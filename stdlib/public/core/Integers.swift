@@ -3727,3 +3727,70 @@ extension SignedInteger where Self : FixedWidthInteger {
     return lhs.subtractingReportingOverflow(rhs).partialValue
   }
 }
+
+internal struct _IntegerAnyHashableBox<
+  Base: FixedWidthInteger
+>: _AnyHashableBox {
+  internal let _value: Base
+
+  internal init(_ value: Base) {
+    self._value = value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    // We need to follow NSNumber semantics here; the AnyHashable forms of
+    // integer types holding the same mathematical value should compare equal.
+    // Sign-extend value to a 64-bit integer. This will generate hash conflicts
+    // between, say -1 and UInt.max, but that's fine.
+    if _value < 0 {
+      return _IntegerAnyHashableBox<Int64>(Int64(truncatingIfNeeded: _value))
+    }
+    return _IntegerAnyHashableBox<UInt64>(UInt64(truncatingIfNeeded: _value))
+  }
+
+  internal func _isEqual(to box: _AnyHashableBox) -> Bool? {
+    if Base.self == UInt64.self {
+      guard let box = box as? _IntegerAnyHashableBox<UInt64> else { return nil }
+      return _value == box._value
+    }
+    if Base.self == Int64.self {
+      guard let box = box as? _IntegerAnyHashableBox<Int64> else { return nil }
+      return _value == box._value
+    }
+    _preconditionFailure("self isn't canonical")
+  }
+
+  internal var _hashValue: Int {
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
+      "self isn't canonical")
+    return _value.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
+      "self isn't canonical")
+    _value.hash(into: &hasher)
+  }
+
+  internal func _rawHashValue(_seed: Int) -> Int {
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
+      "self isn't canonical")
+    return _value._rawHashValue(seed: _seed)
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+}
