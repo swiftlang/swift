@@ -37,6 +37,7 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
+  BuiltinMath.swift
   Character.swift
   CocoaArray.swift
   Collection.swift
@@ -185,7 +186,6 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-  BuiltinMath.swift.gyb
   Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
