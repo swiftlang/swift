@@ -874,10 +874,10 @@ PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPr
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
 PropertyListEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") { TestPropertyListEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey() }
-PropertyListEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey")
-  .xfail(.always("Attempt to re-encode into already encoded container is invalid. This will always fail"))
-  .code {
+PropertyListEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey") {
+  expectCrash() {
     TestPropertyListEncoder().testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey()
+  }
 }
 PropertyListEncoderTests.test("testNestedContainerCodingPaths") { TestPropertyListEncoder().testNestedContainerCodingPaths() }
 PropertyListEncoderTests.test("testSuperEncoderCodingPaths") { TestPropertyListEncoder().testSuperEncoderCodingPaths() }

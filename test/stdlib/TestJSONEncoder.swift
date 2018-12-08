@@ -193,7 +193,6 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let model = Model.testValue
     // This following test would fail as it attempts to re-encode into already encoded container is invalid. This will always fail
     if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
-      let expectedJSON = "{\"top\":{\"first\":\"Johnny Appleseed\",\"second\":\"appleseed@apple.com\"}}".data(using: .utf8)!
       _testEncodeFailure(of: model)
     } else {
       _testEncodeFailure(of: model)
@@ -1713,10 +1712,10 @@ JSONEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestJSONEncode
 JSONEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestJSONEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 JSONEncoderTests.test("testEncodingTopLevelNullableType") { TestJSONEncoder().testEncodingTopLevelNullableType() }
 JSONEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") { TestJSONEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey() }
-JSONEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey")
-  .xfail(.always("Attempt to re-encode into already encoded container is invalid. This will always fail"))
-  .code {
+JSONEncoderTests.test("testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey") {
+  expectCrash() {
     TestJSONEncoder().testEncodingConflictedTypeNestedContainersWithTheSameTopLevelKey()
+  }
 }
 JSONEncoderTests.test("testEncodingOutputFormattingDefault") { TestJSONEncoder().testEncodingOutputFormattingDefault() }
 JSONEncoderTests.test("testEncodingOutputFormattingPrettyPrinted") { TestJSONEncoder().testEncodingOutputFormattingPrettyPrinted() }
