@@ -58,6 +58,7 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryCasting.swift
   DictionaryStorage.swift
   DictionaryVariant.swift
+  Double.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -67,9 +68,10 @@ set(SWIFTLIB_ESSENTIAL
   FixedArray.swift
   FlatMap.swift
   Flatten.swift
+  Float.swift
+  Float80.swift
   FloatingPoint.swift
-  FloatingPointParsing.swift.gyb
-  FloatingPointTypes.swift.gyb
+  FloatingPointParsing.swift
   Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.

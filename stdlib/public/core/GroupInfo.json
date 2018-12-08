@@ -164,9 +164,11 @@
       "IntegerTypes.swift",
       "IntegerParsing.swift"],
     "Floating": [
+      "Double.swift",
+      "Float.swift",
+      "Float80.swift",
       "FloatingPoint.swift",
-      "FloatingPointParsing.swift",
-      "FloatingPointTypes.swift"],
+      "FloatingPointParsing.swift"],
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
