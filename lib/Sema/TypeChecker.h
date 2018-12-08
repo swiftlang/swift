@@ -1269,32 +1269,6 @@ public:
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
-  
-  /// Instantiate the storage implementation for a behavior-backed property.
-  void completePropertyBehaviorStorage(VarDecl *VD,
-                               VarDecl *BehaviorStorage,
-                               FuncDecl *DefaultInitStorage,
-                               FuncDecl *ParamInitStorage,
-                               Type SelfTy,
-                               Type StorageTy,
-                               NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionMap interfaceMap,
-                               SubstitutionMap contextMap);
-  
-  /// Instantiate the parameter implementation for a behavior-backed
-  /// property.
-  void completePropertyBehaviorParameter(VarDecl *VD,
-                               FuncDecl *BehaviorParameter,
-                               NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionMap interfaceMap);
-  
-  /// Instantiate the accessor implementations for a behavior-backed
-  /// property.
-  void completePropertyBehaviorAccessors(VarDecl *VD,
-                                     VarDecl *ValueImpl,
-                                     Type valueTy,
-                                     SubstitutionMap interfaceMap,
-                                     SubstitutionMap contextMap);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
@@ -1794,15 +1768,6 @@ public:
   Type deriveTypeWitness(DeclContext *DC,
                          NominalTypeDecl *nominal,
                          AssociatedTypeDecl *assocType);
-
-  /// Record the witness information into the given conformance that maps
-  /// the given requirement to the given witness declaration.
-  ///
-  /// Use this routine only when the given witness is known to satisfy the
-  /// requirement, e.g., because the witness itself was synthesized. This
-  /// function is not allowed to fail.
-  void recordKnownWitness(NormalProtocolConformance *conformance,
-                          ValueDecl *req, ValueDecl *witness);
 
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.

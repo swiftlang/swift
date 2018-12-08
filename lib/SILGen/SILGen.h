@@ -217,8 +217,6 @@ public:
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
 
-  void emitPropertyBehavior(VarDecl *vd);
-
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
   /// Generate code for a source file of the module.

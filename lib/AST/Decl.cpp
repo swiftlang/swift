@@ -445,8 +445,6 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
-SourceLoc BehaviorRecord::getLoc() const { return ProtocolName->getLoc(); }
-
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
@@ -1669,18 +1667,6 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     }
     llvm_unreachable("bad access kind");
 
-  case AccessSemantics::BehaviorInitialization:
-    // Behavior initialization writes to the property as if it has storage.
-    // SIL definite initialization will introduce the logical accesses.
-    // Reads or inouts go through the ordinary path.
-    switch (accessKind) {
-    case AccessKind::Write:
-      return AccessStrategy::getBehaviorStorage();
-    case AccessKind::Read:
-    case AccessKind::ReadWrite:
-      return getAccessStrategy(AccessSemantics::Ordinary,
-                               accessKind, module, expansion);
-    }
   }
   llvm_unreachable("bad access semantics");
 }
@@ -4442,15 +4428,6 @@ AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
   assert(isAccessor(accessor, AccessorKind::Modify, this));
 
   Accessors.getPointer()->addOpaqueAccessor(accessor);
-}
-
-void AbstractStorageDecl::addBehavior(TypeRepr *Type,
-                                      Expr *Param) {
-  assert(BehaviorInfo.getPointer() == nullptr && "already set behavior!");
-  auto mem = getASTContext().Allocate(sizeof(BehaviorRecord),
-                                      alignof(BehaviorRecord));
-  auto behavior = new (mem) BehaviorRecord{Type, Param};
-  BehaviorInfo.setPointer(behavior);
 }
 
 static Optional<ObjCSelector>

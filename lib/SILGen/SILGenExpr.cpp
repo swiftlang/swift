@@ -3293,8 +3293,6 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // Identify the property by its vtable or wtable slot.
     return SGM.getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage));
   }
-  case AccessStrategy::BehaviorStorage:
-    llvm_unreachable("unpossible");
   }
   llvm_unreachable("unhandled access strategy");
 }

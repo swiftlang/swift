@@ -744,14 +744,6 @@ public:
                  DeclContext *dc,
                  ProtocolConformanceState state);
 
-  /// Produce a new normal conformance for a property behavior.
-  NormalProtocolConformance *
-  getBehaviorConformance(Type conformingType,
-                         ProtocolDecl *protocol,
-                         SourceLoc loc,
-                         AbstractStorageDecl *storage,
-                         ProtocolConformanceState state);
-
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
   getSelfConformance(ProtocolDecl *protocol);

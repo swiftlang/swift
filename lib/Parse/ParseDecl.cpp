@@ -5251,81 +5251,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
         return makeResult(makeParserError());
     }
     
-    // Parse a behavior block if present.
-    if (Context.LangOpts.EnableExperimentalPropertyBehaviors
-        && Tok.is(tok::identifier)
-        && Tok.getRawText().equals("__behavior")) {
-      consumeToken(tok::identifier);
-      auto type = parseType(diag::expected_behavior_name,
-                            /*handle completion*/ true);
-      if (type.isParseError())
-        return makeResult(makeParserError());
-      if (type.hasCodeCompletion())
-        return makeResult(makeParserCodeCompletionStatus());
-      
-      // Parse a following trailing closure argument.
-      // FIXME: Handle generalized parameters.
-      Expr *paramExpr = nullptr;
-      if (Tok.is(tok::l_brace)) {
-        // If we're not in a local context, we'll need a context to parse initializers
-        // into (should we have one).  This happens for properties and global
-        // variables in libraries.
-        PatternBindingInitializer *initContext = nullptr;
-
-        // Record the variables that we're trying to set up.  This allows us
-        // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
-        // decl (even though names aren't injected into scope when the parameter
-        // is parsed).
-        SmallVector<VarDecl *, 4> Vars;
-        Vars.append(DisabledVars.begin(), DisabledVars.end());
-        pattern->collectVariables(Vars);
-        
-        llvm::SaveAndRestore<decltype(DisabledVars)>
-        RestoreCurVars(DisabledVars, Vars);
-        
-        llvm::SaveAndRestore<decltype(DisabledVarReason)>
-        RestoreReason(DisabledVarReason, diag::var_init_self_referential);
-
-        // Set up a decl context for the closure.
-        // This will be recontextualized to a method we synthesize during
-        // type checking.
-        if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
-        Optional<ParseFunctionBody> initParser;
-        Optional<ContextChange> topLevelParser;
-        if (topLevelDecl)
-          topLevelParser.emplace(*this, topLevelDecl,
-                                 &State->getTopLevelContext());
-        if (initContext)
-          initParser.emplace(*this, initContext);
-
-        auto closure = parseExprClosure();
-        PBDEntries.back().setInitContext(initContext);
-
-        if (closure.isParseError())
-          return makeResult(makeParserError());
-        if (closure.hasCodeCompletion())
-          return makeResult(makeParserCodeCompletionStatus());
-        paramExpr = closure.get();
-      }
-
-      unsigned numVars = 0;
-      pattern->forEachVariable([&](VarDecl *VD) {
-        ++numVars;
-        // TODO: Support parameter closure with multiple vars. This is tricky
-        // since the behavior's parameter type may be dependent on the
-        // property type, so we'd need to clone the closure expr for each var
-        // to re-type-check it.
-        if (numVars > 1 && paramExpr) {
-          diagnose(paramExpr->getLoc(), diag::behavior_multiple_vars);
-          paramExpr = nullptr;
-        }
-        
-        VD->addBehavior(type.get(), paramExpr);
-      });
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
-    } else if (Tok.is(tok::l_brace)) {
+    if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
       auto boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc, VarLoc,
                                          PatternInit != nullptr,Attributes,

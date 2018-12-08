@@ -935,9 +935,6 @@ public:
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
   }
-  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *i) {
-    llvm_unreachable("mark_uninitialized_behavior is not valid in canonical SIL");
-  }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
