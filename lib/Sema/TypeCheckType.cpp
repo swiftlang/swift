@@ -2697,6 +2697,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   Type type;
   bool hadError = false;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  auto differentiability =
+      SILParameterDifferentiability::DifferentiableOrNotApplicable;
+
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
 
@@ -2722,6 +2726,15 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    if (attrs.has(TAK_nondiff)) {
+      // TODO: We could diagnose @nondiff on a non-@autodiff function, but we'd
+      // have to pass function differentiability as an argument to
+      // `resolveSILParameter`.
+      attrs.clearAttribute(TAK_nondiff);
+      differentiability = SILParameterDifferentiability::NotDifferentiable;
+    }
+
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
     type = resolveType(repr, options);
@@ -2737,7 +2750,9 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   }
 
   if (hadError) type = ErrorType::get(Context);
-  return SILParameterInfo(type->getCanonicalType(), convention);
+  // SWIFT_ENABLE_TENSORFLOW
+  return SILParameterInfo(type->getCanonicalType(), convention,
+                          differentiability);
 }
 
 bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,

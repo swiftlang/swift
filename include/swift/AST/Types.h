@@ -3476,13 +3476,33 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// Determines whether a differentiable function type is differentiable with
+/// respect to this parameter.
+enum class SILParameterDifferentiability : unsigned {
+  /// The function type is differentiable with respect to this parameter, or
+  /// differentiability is not applicable because the function is not
+  /// differentiable.
+  DifferentiableOrNotApplicable,
+
+  /// The function type is not differentiable with respect to this parameter.
+  NotDifferentiable,
+};
+
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterDifferentiability Differentiability : 1;
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
-  SILParameterInfo(CanType type, ParameterConvention conv)
-    : TypeAndConvention(type, conv) {
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterInfo(
+      CanType type, ParameterConvention conv,
+      SILParameterDifferentiability differentiability =
+          SILParameterDifferentiability::DifferentiableOrNotApplicable)
+    : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
 
@@ -3527,6 +3547,16 @@ public:
     return isGuaranteedParameter(getConvention());
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  SILParameterDifferentiability getDifferentiability() const {
+    return Differentiability;
+  }
+
+  SILParameterInfo getWithDifferentiability(
+      SILParameterDifferentiability differentiability) const {
+    return SILParameterInfo(getType(), getConvention(), differentiability);
+  }
+
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal parameter conventions. The actual SIL type for the argument values
   /// may differ in canonical SIL. In particular, opaque values require indirect
@@ -3537,7 +3567,8 @@ public:
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
-    return SILParameterInfo(type, getConvention());
+    // SWIFT_ENABLE_TENSORFLOW
+    return SILParameterInfo(type, getConvention(), getDifferentiability());
   }
 
   /// Transform this SILParameterInfo by applying the user-provided
@@ -3553,6 +3584,8 @@ public:
   void profile(llvm::FoldingSetNodeID &id) {
     id.AddPointer(getType().getPointer());
     id.AddInteger((unsigned)getConvention());
+    // SWIFT_ENABLE_TENSORFLOW
+    id.AddInteger((unsigned)getDifferentiability());
   }
 
   void dump() const;
@@ -3566,7 +3599,10 @@ public:
   }
 
   bool operator==(SILParameterInfo rhs) const {
-    return getType() == rhs.getType() && getConvention() == rhs.getConvention();
+    // SWIFT_ENABLE_TENSORFLOW
+    return getType() == rhs.getType() &&
+           getConvention() == rhs.getConvention() &&
+           getDifferentiability() == rhs.getDifferentiability();
   }
   bool operator!=(SILParameterInfo rhs) const {
     return !(*this == rhs);
@@ -4168,6 +4204,12 @@ public:
       const SmallBitVector &parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance);
+
+  /// Returns a bit vector that specifices which parameters you can
+  /// differentiate with respect to for this differentiable function type. (e.g.
+  /// which parameters are not @nondiff). The function type must be
+  /// differentiable.
+  SmallBitVector getDifferentiationParameterIndices() const;
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for
