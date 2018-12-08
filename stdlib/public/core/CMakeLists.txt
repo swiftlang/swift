@@ -94,7 +94,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
-  Mirrors.swift.gyb
+  Mirrors.swift
   Misc.swift
   MutableCollection.swift
   NativeDictionary.swift
