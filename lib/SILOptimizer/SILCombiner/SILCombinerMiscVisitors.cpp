@@ -106,23 +106,91 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   return nullptr;
 }
 
+/// Return the enum case injected by an inject_enum_addr if it is the only
+/// instruction which writes to \p Addr.
+static EnumElementDecl *getInjectEnumCaseTo(SILValue Addr) {
+  while (true) {
+    // For everything else than an alloc_stack we cannot easily prove that we
+    // see all writes.
+    if (!isa<AllocStackInst>(Addr))
+      return nullptr;
+
+    SILInstruction *WritingInst = nullptr;
+    int NumWrites = 0;
+    for (auto *Use : getNonDebugUses(Addr)) {
+      SILInstruction *User = Use->getUser();
+      switch (User->getKind()) {
+        // Handle a very narrow set of known not harmful instructions.
+        case swift::SILInstructionKind::DestroyAddrInst:
+        case swift::SILInstructionKind::DeallocStackInst:
+        case swift::SILInstructionKind::SwitchEnumAddrInst:
+          break;
+        case swift::SILInstructionKind::ApplyInst:
+        case swift::SILInstructionKind::TryApplyInst: {
+          // Check if the addr is only passed to in_guaranteed arguments.
+          FullApplySite AI(User);
+          for (Operand &Op : AI.getArgumentOperands()) {
+            if (Op.get() == Addr &&
+                AI.getArgumentConvention(Op) !=
+                  SILArgumentConvention::Indirect_In_Guaranteed)
+              return nullptr;
+          }
+          break;
+        }
+        case swift::SILInstructionKind::InjectEnumAddrInst:
+          WritingInst = User;
+          ++NumWrites;
+          break;
+        case swift::SILInstructionKind::CopyAddrInst:
+          if (Addr == cast<CopyAddrInst>(User)->getDest()) {
+            WritingInst = User;
+            ++NumWrites;
+          }
+          break;
+        default:
+          return nullptr;
+      }
+    }
+    if (NumWrites != 1)
+      return nullptr;
+    if (auto *IEA = dyn_cast<InjectEnumAddrInst>(WritingInst))
+      return IEA->getElement();
+
+    // In case of a copy_addr continue with the source of the copy.
+    Addr = dyn_cast<CopyAddrInst>(WritingInst)->getSrc();
+  }
+}
+
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
+  // Convert switch_enum_addr -> br
+  // if the only thing which writes to the address is an inject_enum_addr.
+  SILValue Addr = SEAI->getOperand();
+  if (EnumElementDecl *EnumCase = getInjectEnumCaseTo(Addr)) {
+    SILBasicBlock *Dest = SEAI->getCaseDestination(EnumCase);
+    // If the only instruction which writes to Addr is an inject_enum_addr we
+    // know that there cannot be an enum payload.
+    assert(Dest->getNumArguments() == 0 &&
+           "didn't expect a payload argument");
+    Builder.createBranch(SEAI->getLoc(), Dest);
+    return eraseInstFromFunction(*SEAI);
+  }
+
+  SILType Ty = Addr->getType();
+  if (!Ty.isLoadable(SEAI->getModule()))
+    return nullptr;
+
   // Promote switch_enum_addr to switch_enum if the enum is loadable.
   //   switch_enum_addr %ptr : $*Optional<SomeClass>, case ...
   //     ->
   //   %value = load %ptr
   //   switch_enum %value
-  SILType Ty = SEAI->getOperand()->getType();
-  if (!Ty.isLoadable(SEAI->getModule()))
-    return nullptr;
-
   SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
   for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
     Cases.push_back(SEAI->getCase(i));
 
   Builder.setCurrentDebugScope(SEAI->getDebugScope());
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : nullptr;
-  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getOperand(),
+  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), Addr,
                                          LoadOwnershipQualifier::Unqualified);
   Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
   return eraseInstFromFunction(*SEAI);
