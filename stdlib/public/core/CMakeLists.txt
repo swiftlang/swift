@@ -63,6 +63,7 @@ set(SWIFTLIB_ESSENTIAL
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
+  ExistentialCollection.swift
   Filter.swift
   FixedArray.swift
   FlatMap.swift
@@ -219,7 +220,6 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-  ExistentialCollection.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
