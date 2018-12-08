@@ -40,6 +40,7 @@ set(SWIFTLIB_ESSENTIAL
   BuiltinMath.swift
   Character.swift
   CocoaArray.swift
+  Codable.swift
   Collection.swift
   CollectionAlgorithms.swift
   Comparable.swift
@@ -186,7 +187,6 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-  Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
