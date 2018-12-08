@@ -1,6 +1,6 @@
 // TODO: Revert to %target-run-simple-swift once we complete send/recv support for resource/variant tensors.
-// RUN: %target-run-send-recv-handle-swift
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-send-recv-handle-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 
@@ -19,15 +19,14 @@ var DatasetGlobalTests = TestSuite("DatasetGlobal")
 // Fatal error: No unary variant device copy function found for direction: 1 and Variant type_name: tensorflow::DatasetVariantWrapper
 #if !CUDA
 
-let scalars = Tensor<Float>([0, 1, 2])
-let dataset = Dataset(elements: scalars)
-var iterator = dataset.makeIterator()
-
 DatasetGlobalTests.testCPUOrGPU("RuntimeConfigTest") {
   expectTrue(_RuntimeConfig.usesTFEagerAPI)
 }
 
 DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
+  let scalars = Tensor<Float>([0, 1, 2])
+  let dataset = Dataset(elements: scalars)
+
   var expectedVal: Float = 0.0
   for item in dataset {
     _hostOp(item)
@@ -37,6 +36,10 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
 }
 
 DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
+  let scalars = Tensor<Float>([0, 1, 2])
+  let dataset = Dataset(elements: scalars)
+  var iterator = dataset.makeIterator()
+
   var expectedVal: Float = 0.0
 	while let item = iterator.next() {
     _hostOp(item)

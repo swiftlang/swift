@@ -1,5 +1,5 @@
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 
 import CTensorFlow
