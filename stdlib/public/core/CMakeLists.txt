@@ -117,6 +117,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Result.swift
   Reverse.swift
+  Runtime.swift
   RuntimeFunctionCounters.swift
   SipHash.swift
   Sequence.swift
@@ -192,7 +193,6 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
-  Runtime.swift.gyb
   UnavailableStringAPIs.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
