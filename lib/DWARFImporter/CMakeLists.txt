@@ -1,8 +1,6 @@
 add_swift_host_library(swiftDWARFImporter STATIC
-  DWARFImporter.cpp
-  LINK_LIBRARIES
+  DWARFImporter.cpp)
+target_link_libraries(swiftDWARFImporter PRIVATE
     swiftAST
     swiftParse
 )
-
-#add_dependencies(swiftDWARFImporter )
