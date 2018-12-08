@@ -719,7 +719,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
-        SGF.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
+        SGF.getASTContext().getBridgeAnythingToObjectiveC()) {
     auto *genericSig = bridgeAnything->getGenericSignature();
     auto subMap = SubstitutionMap::get(
       genericSig,
@@ -1098,7 +1098,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     auto optionalMV =
       SGF.B.createUncheckedBitCast(loc, v, optionalBridgedTy);
     return SGF.emitApplyOfLibraryIntrinsic(loc,
-                           SGF.getASTContext().getBridgeAnyObjectToAny(nullptr),
+                           SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
               .getAsSingleValue(SGF, loc);
   }

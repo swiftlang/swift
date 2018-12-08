@@ -911,13 +911,12 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
 /// Find the implementation for the given "intrinsic" library function.
 static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
-                                      StringRef name,
-                                      LazyResolver *resolver) {
+                                      StringRef name) {
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInSwiftModule(name, results);
   if (results.size() == 1) {
     if (auto FD = dyn_cast<FuncDecl>(results.front())) {
-      if (resolver)
+      if (auto *resolver = ctx.getLazyResolver())
         resolver->resolveDeclSignature(FD);
       return FD;
     }
@@ -1169,14 +1168,12 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
 }
 
 FuncDecl *
-ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
+ASTContext::getUnimplementedInitializerDecl() const {
   if (getImpl().UnimplementedInitializerDecl)
     return getImpl().UnimplementedInitializerDecl;
 
   // Look for the function.
-  Type input, output;
-  auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
-                                   resolver);
+  auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer");
   if (!decl)
     return nullptr;
 
@@ -1190,13 +1187,12 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
 }
 
 FuncDecl *
-ASTContext::getUndefinedDecl(LazyResolver *resolver) const {
+ASTContext::getUndefinedDecl() const {
   if (getImpl().UndefinedDecl)
     return getImpl().UndefinedDecl;
 
   // Look for the function.
-  CanType input, output;
-  auto decl = findLibraryIntrinsic(*this, "_undefined", resolver);
+  auto decl = findLibraryIntrinsic(*this, "_undefined");
   if (!decl)
     return nullptr;
 
@@ -1204,14 +1200,13 @@ ASTContext::getUndefinedDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
+FuncDecl *ASTContext::getIsOSVersionAtLeastDecl() const {
   if (getImpl().IsOSVersionAtLeastDecl)
     return getImpl().IsOSVersionAtLeastDecl;
 
   // Look for the function.
-  Type input, output;
   auto decl =
-      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
+      findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast");
   if (!decl)
     return nullptr;
 
@@ -1333,44 +1328,44 @@ ASTContext::associateInfixOperators(PrecedenceGroupDecl *left,
 
 // Find library intrinsic function.
 static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache, 
-                                     StringRef name, LazyResolver *resolver) {
+                                     StringRef name) {
   if (cache) return cache;
 
   // Look for a generic function.
-  cache = findLibraryIntrinsic(ctx, name, resolver);
+  cache = findLibraryIntrinsic(ctx, name);
   return cache;
 }
 
 #define FUNC_DECL(Name, Id)                                         \
-FuncDecl *ASTContext::get##Name(LazyResolver *resolver) const {     \
-  return findLibraryFunction(*this, getImpl().Get##Name, Id, resolver);  \
+FuncDecl *ASTContext::get##Name() const {     \
+  return findLibraryFunction(*this, getImpl().Get##Name, Id);  \
 }
 #include "swift/AST/KnownDecls.def"
 
-bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
+bool ASTContext::hasOptionalIntrinsics() const {
   return getOptionalDecl() &&
          getOptionalSomeDecl() &&
          getOptionalNoneDecl() &&
-         getDiagnoseUnexpectedNilOptional(resolver);
+         getDiagnoseUnexpectedNilOptional();
 }
 
-bool ASTContext::hasPointerArgumentIntrinsics(LazyResolver *resolver) const {
+bool ASTContext::hasPointerArgumentIntrinsics() const {
   return getUnsafeMutableRawPointerDecl()
     && getUnsafeRawPointerDecl()
     && getUnsafeMutablePointerDecl()
     && getUnsafePointerDecl()
     && (!LangOpts.EnableObjCInterop || getAutoreleasingUnsafeMutablePointerDecl())
-    && getConvertPointerToPointerArgument(resolver)
-    && getConvertMutableArrayToPointerArgument(resolver)
-    && getConvertConstArrayToPointerArgument(resolver)
-    && getConvertConstStringToUTF8PointerArgument(resolver)
-    && getConvertInOutToPointerArgument(resolver);
+    && getConvertPointerToPointerArgument()
+    && getConvertMutableArrayToPointerArgument()
+    && getConvertConstArrayToPointerArgument()
+    && getConvertConstStringToUTF8PointerArgument()
+    && getConvertInOutToPointerArgument();
 }
 
-bool ASTContext::hasArrayLiteralIntrinsics(LazyResolver *resolver) const {
+bool ASTContext::hasArrayLiteralIntrinsics() const {
   return getArrayDecl()
-    && getAllocateUninitializedArray(resolver)
-    && getDeallocateUninitializedArray(resolver);
+    && getAllocateUninitializedArray()
+    && getDeallocateUninitializedArray();
 }
 
 void ASTContext::addExternalDecl(Decl *decl) {
