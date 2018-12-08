@@ -81,9 +81,8 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // to _BridgedToObjectiveC can be proven.
   FuncDecl *BridgeFuncDecl =
       isConditional
-          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable(
-                nullptr)
-          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable(nullptr);
+          ? M.getASTContext().getConditionallyBridgeFromObjectiveCBridgeable()
+          : M.getASTContext().getForceBridgeFromObjectiveCBridgeable();
 
   assert(BridgeFuncDecl && "_forceBridgeFromObjectiveC should exist");
 

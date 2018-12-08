@@ -555,21 +555,21 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
-  if (Context.hasOptionalIntrinsics(this)) return false;
+  if (Context.hasOptionalIntrinsics()) return false;
 
   diagnose(loc, diag::optional_intrinsics_not_found);
   return true;
 }
 
 bool TypeChecker::requirePointerArgumentIntrinsics(SourceLoc loc) {
-  if (Context.hasPointerArgumentIntrinsics(this)) return false;
+  if (Context.hasPointerArgumentIntrinsics()) return false;
 
   diagnose(loc, diag::pointer_argument_intrinsics_not_found);
   return true;
 }
 
 bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
-  if (Context.hasArrayLiteralIntrinsics(this)) return false;
+  if (Context.hasArrayLiteralIntrinsics()) return false;
   
   diagnose(loc, diag::array_literal_intrinsics_not_found);
   return true;

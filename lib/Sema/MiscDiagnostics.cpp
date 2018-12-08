@@ -886,7 +886,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     
     void checkForSuspiciousBitCasts(DeclRefExpr *DRE,
                                     Expr *Parent = nullptr) {
-      if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
+      if (DRE->getDecl() != TC.Context.getUnsafeBitCast())
         return;
       
       if (DRE->getDeclRef().getSubstitutions().empty())

@@ -335,13 +335,13 @@ static StringRef extractExprText(const Expr *E, SourceManager &SM) {
 /// it is in the ifndef.
 #ifndef NDEBUG
 static bool isCallToStandardLibrarySwap(CallExpr *CE, ASTContext &Ctx) {
-  if (CE->getCalledValue() == Ctx.getSwap(nullptr))
+  if (CE->getCalledValue() == Ctx.getSwap())
     return true;
 
   // Is the call module qualified, i.e. Swift.swap(&a[i], &[j)?
   if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(CE->getFn())) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSBIE->getRHS())) {
-      return DRE->getDecl() == Ctx.getSwap(nullptr);
+      return DRE->getDecl() == Ctx.getSwap();
     }
   }
 
@@ -605,7 +605,7 @@ static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
   if (!FD)
     return false;
 
-  return FD == Ctx.getSwap(nullptr);
+  return FD == Ctx.getSwap();
 }
 
 static llvm::cl::opt<bool> ShouldAssertOnFailure(

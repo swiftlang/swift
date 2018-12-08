@@ -4085,8 +4085,8 @@ static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
   if (!callee)
     return nullptr;
 
-  if (callee == ctx.getForceBridgeFromObjectiveC(nullptr) ||
-      callee == ctx.getConditionallyBridgeFromObjectiveC(nullptr))
+  if (callee == ctx.getForceBridgeFromObjectiveC() ||
+      callee == ctx.getConditionallyBridgeFromObjectiveC())
     return cast<TupleExpr>(call->getArg())->getElement(0);
 
   return nullptr;

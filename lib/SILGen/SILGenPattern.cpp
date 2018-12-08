@@ -2540,7 +2540,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                   Type subjectTy,
                                                   const EnumDecl *enumDecl) {
   ASTContext &ctx = SGF.getASTContext();
-  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue(nullptr);
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue();
   if (!diagnoseFailure) {
     SGF.B.createBuiltinTrap(loc);
     return;
@@ -2596,7 +2596,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                                              ManagedValue value,
                                              Type subjectTy) {
   ASTContext &ctx = SGF.getASTContext();
-  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase(nullptr);
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase();
   if (!diagnoseFailure) {
     SGF.B.createBuiltinTrap(loc);
     return;
