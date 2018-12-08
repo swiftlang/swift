@@ -112,7 +112,7 @@ bb0(%0 : @owned $C, %1 : @owned $C & P):
 
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast %T21subclass_existentials1CC* %1 to i8*
 // CHECK-NEXT:  [[CLASS_ADDR:%.*]] = bitcast %swift.type* [[SUPERCLASS]] to i8*
-// CHECK-NEXT:  [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[VALUE]], i8* [[CLASS_ADDR]])
+// CHECK-NEXT:  [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[VALUE]], i8* [[CLASS_ADDR]], {{.*}})
 // CHECK-NEXT:  [[VALUE:%.*]] = bitcast i8* [[RESULT]] to %T21subclass_existentials1DC*
   %3 = unconditional_checked_cast %1 : $C & P to $D
 
@@ -193,7 +193,7 @@ bb0(%0 : $@thick C.Type, %1 : $@thick (C & P).Type):
 // CHECK-NEXT:  [[WTABLE:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 1
   %2 = unconditional_checked_cast %0 : $@thick C.Type to $@thick (D & R).Type
 
-// CHECK-NEXT:  [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatypeUnconditional(%swift.type* %1, %swift.type* [[SUPERCLASS]])
+// CHECK-NEXT:  [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatypeUnconditional(%swift.type* %1, %swift.type* [[SUPERCLASS]], {{.*}})
   %3 = unconditional_checked_cast %1 : $@thick (C & P).Type to $@thick D.Type
 
 // CHECK-NEXT:  ret void

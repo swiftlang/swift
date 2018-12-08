@@ -85,7 +85,7 @@ func downcast(a a: A) -> B {
   // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
-  // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
+  // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]], {{.*}}) [[NOUNWIND:#[0-9]+]]
   return a as! B
 }
 
