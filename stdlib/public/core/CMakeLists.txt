@@ -94,6 +94,7 @@ set(SWIFTLIB_ESSENTIAL
   Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  Mirrors.swift
   Misc.swift
   MutableCollection.swift
   NativeDictionary.swift
@@ -191,7 +192,6 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
-  Mirrors.swift.gyb
   Runtime.swift.gyb
   UnavailableStringAPIs.swift.gyb
   UnsafeBufferPointer.swift.gyb
