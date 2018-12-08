@@ -2026,6 +2026,8 @@ private:
      : TypeBase(TypeKind::Tuple, CanCtx, properties) {
      Bits.TupleType.HasElementWithOwnership = hasElementWithOwnership;
      Bits.TupleType.Count = elements.size();
+     assert(Bits.TupleType.Count == elements.size() &&
+            "tuple element count doesn't fit");
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
   }
