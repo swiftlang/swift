@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4.2
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
@@ -157,7 +157,7 @@ enum InternalEnum {
   case apple
   case orange
   case pear(InternalEnum)
-  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
+  // expected-error@-1 {{type of enum case in '@usableFromInline' enum must be '@usableFromInline' or public}}
   case persimmon(String)
 }
 
@@ -248,3 +248,22 @@ public struct KeypathStruct {
     // expected-error@-1 {{property 'x' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+
+public struct HasInternalSetProperty {
+  public internal(set) var x: Int // expected-note {{setter for 'x' is not '@usableFromInline' or public}}
+
+  @inlinable public mutating func setsX() {
+    x = 10 // expected-error {{setter for 'x' is internal and cannot be referenced from an '@inlinable' function}}
+  }
+}
+
+@usableFromInline protocol P {
+  typealias T = Int
+}
+
+extension P {
+  @inlinable func f() {
+    _ = T.self // ok, typealias inherits @usableFromInline from P
+  }
+}
+
