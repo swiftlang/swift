@@ -760,7 +760,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
     if (!VD->hasInterfaceType()) {
-      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+      VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
                    VD->getName());
       return false;
     }
