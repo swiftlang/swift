@@ -170,7 +170,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
-  UnavailableStringAPIs.swift.gyb
+  UnavailableStringAPIs.swift
   UnicodeEncoding.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
