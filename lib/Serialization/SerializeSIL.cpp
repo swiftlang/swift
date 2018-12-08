@@ -963,10 +963,32 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::AutoDiffFunctionInst: {
-    llvm_unreachable("FIXME: handle this");
+    auto *adfi = cast<AutoDiffFunctionInst>(&SI);
+    SmallVector<unsigned, 4> trailingInfo;
+    auto &paramIndices = adfi->getParameterIndices();
+    for (unsigned i : range(paramIndices.size()))
+      trailingInfo.push_back(paramIndices[i]);
+    for (auto &op : adfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(addValueRef(val));
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+    }
+    SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
+        adfi->getDifferentiationOrder(), adfi->getNumOperands(), trailingInfo);
+    break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    llvm_unreachable("FIXME: handle this");
+    auto *adfei = cast<AutoDiffFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(adfei->getFunctionOperand());
+    auto operandType = adfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        operandRef, operandTypeRef, unsigned(operandType.getCategory()),
+        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
+        (unsigned)adfei->getExtractee(), adfei->getDifferentiationOrder());
+    break;
   }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Serialize attributes.

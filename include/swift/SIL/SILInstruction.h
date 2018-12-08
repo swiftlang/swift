@@ -7655,6 +7655,7 @@ public:
     } rawValue;
     Extractee() = default;
     Extractee(innerty rawValue) : rawValue(rawValue) {}
+    Extractee(uint8_t rawValue) : Extractee((innerty)rawValue) {}
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
   };

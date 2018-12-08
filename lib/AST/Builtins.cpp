@@ -1055,8 +1055,7 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     [=, &Ts](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiability(FunctionTypeDifferentiability::Bidirectional)
-          .withNoEscape();
+          .withDifferentiability(FunctionTypeDifferentiability::Bidirectional);
       if (isThrowing)
         extInfo = extInfo.withThrows();
       SmallVector<FunctionType::Param, 2> params;

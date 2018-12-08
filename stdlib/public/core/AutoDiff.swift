@@ -94,18 +94,58 @@ public extension Differentiable where TangentVector == CotangentVector {
 // Differential Operators
 //===----------------------------------------------------------------------===//
 
-@_transparent @_effects(readnone)
-public func gradient<T : Differentiable, R : FloatingPoint>(
-  of f: /*@autodiff*/ @escaping (T) -> R
-) -> (T) -> T {
-  return #gradient(f)
+@inlinable
+public func valueWithDifferential<T, R>(
+  at x: T, in f: @escaping @autodiff (T) -> R
+) -> (value: R, differential: (T.TangentVector) -> R.TangentVector)
+  where T : Differentiable, R : Differentiable {
+  return Builtin.autodiffGetJVP(f)(x)
 }
 
-@_transparent @_effects(readnone)
-public func gradient<T : Differentiable, R : FloatingPoint>(
-  at x: T, in f: /*@autodiff*/ @escaping (T) -> R
-) -> T {
-  return #gradient(f)(x)
+@inlinable
+public func valueWithPullback<T, R>(
+  at x: T, in f: @escaping @autodiff (T) -> R
+) -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
+  where T : Differentiable, R : Differentiable {
+  return Builtin.autodiffGetVJP(f)(x)
+}
+
+@inlinable
+public func derivative<T, R>(
+  at x: T, in f: @escaping @autodiff (T) -> R
+) -> R.TangentVector
+  where T : BinaryFloatingPoint & Differentiable, R : Differentiable,
+        T.TangentVector == T {
+  let (y, differential) = valueWithDifferential(at: x, in: f)
+  return differential(1)
+}
+
+@inlinable
+public func derivative<T, R>(
+  of f: @escaping @autodiff (T) -> R
+) -> (T) -> R.TangentVector
+  where T : BinaryFloatingPoint & Differentiable, R : Differentiable,
+        T.TangentVector == T {
+  return { x in derivative(at: x, in: f) }
+}
+
+@inlinable
+public func gradient<T, R>(
+  at x: T, in f: @escaping @autodiff (T) -> R
+) -> T.CotangentVector
+  where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  let (y, pullback) = valueWithPullback(at: x, in: f)
+  return pullback(1)
+}
+
+@inlinable
+public func gradient<T, R>(
+  of f: @escaping @autodiff (T) -> R
+) -> (T) -> T.CotangentVector
+  where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x in gradient(at: x, in: f) }
 }
 
 //===----------------------------------------------------------------------===//
