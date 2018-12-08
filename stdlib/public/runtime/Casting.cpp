@@ -294,7 +294,8 @@ static const void *swift_dynamicCastClassImpl(const void *object,
 /// Dynamically cast a class object to a Swift class type.
 static const void *
 swift_dynamicCastClassUnconditionalImpl(const void *object,
-                                        const ClassMetadata *targetType) {
+                                        const ClassMetadata *targetType,
+                                        const char *file, unsigned line, unsigned column) {
   auto value = swift_dynamicCastClass(object, targetType);
   if (value) return value;
 
@@ -571,7 +572,8 @@ swift_dynamicCastMetatypeToObjectConditional(const Metadata *metatype) {
 
 SWIFT_RUNTIME_EXPORT
 id
-swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
+swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
+                                               const char *file, unsigned line, unsigned column) {
   switch (metatype->getKind()) {
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
@@ -1001,18 +1003,19 @@ swift_dynamicCastUnknownClassImpl(const void *object,
 /// sort of class type.
 static const void *
 swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
-                                                  const Metadata *targetType) {
+                                               const Metadata *targetType,
+                                               const char *file, unsigned line, unsigned column) {
   switch (targetType->getKind()) {
   case MetadataKind::Class: {
     auto targetClassType = static_cast<const ClassMetadata *>(targetType);
-    return swift_dynamicCastClassUnconditional(object, targetClassType);
+    return swift_dynamicCastClassUnconditional(object, targetClassType, file, line, column);
   }
 
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
     auto targetClassType
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
-    return swift_dynamicCastObjCClassUnconditional(object, targetClassType);
+    return swift_dynamicCastObjCClassUnconditional(object, targetClassType, file, line, column);
 #else
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
 #endif
@@ -1021,7 +1024,7 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
   case MetadataKind::ForeignClass: {
 #if SWIFT_OBJC_INTEROP
     auto targetClassType = static_cast<const ForeignClassMetadata*>(targetType);
-    return swift_dynamicCastForeignClassUnconditional(object, targetClassType);
+    return swift_dynamicCastForeignClassUnconditional(object, targetClassType, file, line, column);
 #else
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
 #endif
@@ -1127,7 +1130,8 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 
 static const Metadata *
 swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
-                                           const Metadata *targetType) {
+                                           const Metadata *targetType,
+                                           const char *file, unsigned line, unsigned column) {
   auto origSourceType = sourceType;
 
   switch (targetType->getKind()) {
@@ -1151,7 +1155,8 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // land.
       swift_dynamicCastObjCClassMetatypeUnconditional(
                                             (const ClassMetadata*)sourceType,
-                                            (const ClassMetadata*)targetType);
+                                            (const ClassMetadata*)targetType,
+                                            file, line, column);
 #else
       if (!_dynamicCastClassMetatype((const ClassMetadata*)sourceType,
                                      (const ClassMetadata*)targetType))
@@ -1164,7 +1169,8 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Check if the source is a subclass of the target.
       swift_dynamicCastForeignClassMetatypeUnconditional(
                                             (const ClassMetadata*)sourceType,
-                                            (const ClassMetadata*)targetType);
+                                            (const ClassMetadata*)targetType,
+                                            file, line, column);
       // If we returned, then the cast succeeded.
       return origSourceType;
     }
@@ -1186,7 +1192,8 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
       // Check if the source is a subclass of the target.
       swift_dynamicCastForeignClassMetatypeUnconditional(
                                             (const ClassMetadata*)sourceType,
-                                            (const ClassMetadata*)targetType);
+                                            (const ClassMetadata*)targetType,
+                                            file, line, column);
       // If we returned, then the cast succeeded.
       return origSourceType;
     default:
@@ -1209,11 +1216,12 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 /// Do a dynamic cast to the target class.
 static void *_dynamicCastUnknownClass(void *object,
                                       const Metadata *targetType,
+                                      // TODO: carry through source location info
                                       bool unconditional) {
   // The unconditional path avoids some failure logic.
   if (unconditional) {
     return const_cast<void*>(
-          swift_dynamicCastUnknownClassUnconditional(object, targetType));
+          swift_dynamicCastUnknownClassUnconditional(object, targetType, nullptr, 0, 0));
   }
 
   return const_cast<void*>(swift_dynamicCastUnknownClass(object, targetType));
@@ -1228,7 +1236,7 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
   // The unconditional path avoids some failure logic.
   if (flags & DynamicCastFlags::Unconditional) {
     void *result = const_cast<void*>(
-          swift_dynamicCastUnknownClassUnconditional(object, targetType));
+          swift_dynamicCastUnknownClassUnconditional(object, targetType, nullptr, 0, 0));
     *destSlot = result;
 
     if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
@@ -1438,7 +1446,8 @@ static bool _dynamicCastMetatypeToMetatype(OpaqueValue *dest,
   const Metadata *result;
   if (flags & DynamicCastFlags::Unconditional) {
     result = swift_dynamicCastMetatypeUnconditional(metatype,
-                                                    targetType->InstanceType);
+                                                    targetType->InstanceType,
+                                                    nullptr, 0, 0);
   } else {
     result = swift_dynamicCastMetatype(metatype, targetType->InstanceType);
     if (!result) return false;
