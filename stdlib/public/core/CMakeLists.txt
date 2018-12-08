@@ -40,7 +40,7 @@ set(SWIFTLIB_ESSENTIAL
   BuiltinMath.swift
   Character.swift
   CocoaArray.swift
-  Codable.swift.gyb
+  Codable.swift
   Collection.swift
   CollectionAlgorithms.swift
   Comparable.swift
