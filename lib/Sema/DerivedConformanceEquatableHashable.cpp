@@ -303,7 +303,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
 }
 
 static void
-deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -334,7 +334,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl) {
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
 static void
-deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
+                                               void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -389,7 +390,8 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
 static void
-deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
+deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
+                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -503,7 +505,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
+static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
+                                          void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -554,7 +557,7 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl) {
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
 deriveEquatable_eq(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *)) {
+                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -731,7 +734,8 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
 
 static FuncDecl *
 deriveHashable_hashInto(DerivedConformance &derived,
-                        void (*bodySynthesizer)(AbstractFunctionDecl *)) {
+                        void (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
   ASTContext &C = derived.TC.Context;
@@ -792,7 +796,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
 /// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
 static void
-deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // func hash(into hasher: inout Hasher) {
   //   hasher.combine(self.hashValue)
   // }
@@ -817,8 +821,7 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
 /// value.
 static void
 deriveBodyHashable_enum_rawValue_hashInto(
-  AbstractFunctionDecl *hashIntoDecl
-) {
+  AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum: Int {
   //   case A, B, C
   //   @derived func hash(into hasher: inout Hasher) {
@@ -846,8 +849,7 @@ deriveBodyHashable_enum_rawValue_hashInto(
 /// values.
 static void
 deriveBodyHashable_enum_noAssociatedValues_hashInto(
-  AbstractFunctionDecl *hashIntoDecl
-) {
+  AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived func hash(into hasher: inout Hasher) {
@@ -888,8 +890,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 /// values.
 static void
 deriveBodyHashable_enum_hasAssociatedValues_hashInto(
-  AbstractFunctionDecl *hashIntoDecl
-) {
+  AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnumWithAssociatedValues {
   //   case A, B(Int), C(String, Int)
   //   @derived func hash(into hasher: inout Hasher) {
@@ -977,7 +978,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
 /// Derive the body for the 'hash(into:)' method for a struct.
 static void
-deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // struct SomeStruct {
   //   var x: Int
   //   var y: String
@@ -1019,7 +1020,7 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
 
 /// Derive the body for the 'hashValue' getter.
 static void
-deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl) {
+deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -1194,7 +1195,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        void (*bodySynthesizer)(AbstractFunctionDecl *);
+        void (*bodySynthesizer)(AbstractFunctionDecl *, void *);
         if (ED->isObjC())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())

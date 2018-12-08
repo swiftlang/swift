@@ -44,7 +44,6 @@ class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
-class SynthesizedFunction;
 enum class TypeResolutionStage : uint8_t;
 
 namespace constraints {
@@ -258,15 +257,12 @@ enum class TypeCheckExprFlags {
   /// and so we should not visit bodies of non-single expression closures.
   SkipMultiStmtClosures = 0x40,
 
-  /// If set, don't apply a solution.
-  SkipApplyingSolution = 0x100,
-
   /// This is an inout yield.
-  IsInOutYield = 0x200,
+  IsInOutYield = 0x100,
 
-  /// If set, a conversion constraint should be specfied so that the result of
+  /// If set, a conversion constraint should be specified so that the result of
   /// the expression is an optional type.
-  ExpressionTypeMustBeOptional = 0x400,
+  ExpressionTypeMustBeOptional = 0x200,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -545,9 +541,6 @@ public:
   /// from the \c DeclsToFinalize set.
   unsigned NextDeclToFinalize = 0;
 
-  /// The list of functions that need to have their bodies synthesized.
-  llvm::MapVector<FuncDecl*, SynthesizedFunction> FunctionsToSynthesize;
-
   /// The list of protocols that need their requirement signatures computed,
   /// because they were first validated by validateDeclForNameLookup(),
   /// which skips this step.
@@ -564,7 +557,7 @@ public:
 
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
-  std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
+  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
   /// Local functions that have been captured before their definitions.
   ///
@@ -1273,8 +1266,6 @@ public:
   void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
                                             AbstractStorageDecl *storage);
 
-  void synthesizeFunctionBody(SynthesizedFunction fn);
-
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
@@ -1541,10 +1532,8 @@ public:
 
   
   /// Type-check an initialized variable pattern declaration.
-  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
-                        bool skipApplyingSolution);
-  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
-                               bool skipApplyingSolution);
+  bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
+  bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
