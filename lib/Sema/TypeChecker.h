@@ -1266,10 +1266,6 @@ public:
   void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
                                             AbstractStorageDecl *storage);
 
-  /// Provide storage and accessor implementations for the given property,
-  /// which must be lazy.
-  void completeLazyVarImplementation(VarDecl *lazyVar);
-
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
