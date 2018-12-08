@@ -434,7 +434,8 @@ public:
     Builder.CreateCall(protocol_addMethodDescription, getterArgs);
     
     if (prop->isSettable(nullptr)) {
-      emitObjCSetterDescriptorParts(IGM, prop, name, types, imp);
+      emitObjCSetterDescriptorParts(IGM, prop,
+                                    name, types, imp);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
       llvm::Value *setterArgs[] = {
         NewProto, sel, types,

@@ -7,14 +7,14 @@
 
 import Foundation
 
-// CHECK: [[INIT:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
-// CHECK: [[NSNUMBER:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSNumber\2224@0:8@\22NSNumber\2216\00"
-// CHECK: [[NSMUTABLEARRAY_GET:@.*]] = private unnamed_addr constant [24 x i8] c"@\22NSMutableArray\2216@0:8\00"
-// CHECK: [[NSMUTABLEARRAY_SET:@.*]] = private unnamed_addr constant [27 x i8] c"v24@0:8@\22NSMutableArray\2216\00"
-// CHECK: [[SUBSCRIPT:@.*]] = private unnamed_addr constant [11 x i8] c"q24@0:8q16\00"
-// CHECK: [[NSSTRING:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSString\2224@0:8@\22NSString\2216\00"
-// CHECK: [[NSOBJECT:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSObject\2224@0:8@\22NSObject\2216\00"
-// CHECK: [[NSMUTABLESTRING:@.*]] = private unnamed_addr constant [28 x i8] c"v24@0:8@\22NSMutableString\2216\00"
+// CHECK-DAG: [[INIT:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
+// CHECK-DAG: [[NSNUMBER:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSNumber\2224@0:8@\22NSNumber\2216\00"
+// CHECK-DAG: [[NSMUTABLEARRAY_GET:@.*]] = private unnamed_addr constant [24 x i8] c"@\22NSMutableArray\2216@0:8\00"
+// CHECK-DAG: [[NSMUTABLEARRAY_SET:@.*]] = private unnamed_addr constant [27 x i8] c"v24@0:8@\22NSMutableArray\2216\00"
+// CHECK-DAG: [[SUBSCRIPT:@.*]] = private unnamed_addr constant [11 x i8] c"q24@0:8q16\00"
+// CHECK-DAG: [[NSSTRING:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSString\2224@0:8@\22NSString\2216\00"
+// CHECK-DAG: [[NSOBJECT:@.*]] = private unnamed_addr constant [31 x i8] c"@\22NSObject\2224@0:8@\22NSObject\2216\00"
+// CHECK-DAG: [[NSMUTABLESTRING:@.*]] = private unnamed_addr constant [28 x i8] c"v24@0:8@\22NSMutableString\2216\00"
 
 // CHECK-LABEL: @_PROTOCOL_METHOD_TYPES__TtP35objc_protocol_extended_method_types1P_ = private constant [16 x i8*] [
 // -- required instance methods:

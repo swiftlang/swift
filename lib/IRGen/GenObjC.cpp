@@ -1195,7 +1195,8 @@ SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&impl) {
   Selector getterSel(subscript, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
-  atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getGetter());
+  atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCGetterPointer(IGM, subscript, silFn);
   return silFn;
@@ -1270,7 +1271,8 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
 
   Selector setterSel(subscript, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
-  atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getSetter());
+  atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCSetterPointer(IGM, subscript, silFn);
   return silFn;
@@ -1379,8 +1381,8 @@ void irgen::emitObjCGetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractStorageDecl *storage) {
   llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto *silFn = emitObjCGetterDescriptorParts(IGM, storage, selectorRef,
-                                              atEncoding, impl);
+  auto *silFn = emitObjCGetterDescriptorParts(IGM, storage,
+                                              selectorRef, atEncoding, impl);
   buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
   if (silFn && silFn->hasObjCReplacement()) {
     auto replacedSelector =
@@ -1393,8 +1395,8 @@ void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractStorageDecl *storage) {
   llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto *silFn = emitObjCSetterDescriptorParts(IGM, storage, selectorRef,
-                                              atEncoding, impl);
+  auto *silFn = emitObjCSetterDescriptorParts(IGM, storage,
+                                              selectorRef, atEncoding, impl);
   buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
   if (silFn && silFn->hasObjCReplacement()) {
     auto replacedSelector =
