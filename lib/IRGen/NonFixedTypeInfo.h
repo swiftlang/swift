@@ -56,7 +56,6 @@ protected:
     : super(type, align, pod, bt, IsNotFixedSize, abi,
             SpecialTypeInfoKind::None) {}
 
-private:
   /// Bit-cast the given pointer to the right type and assume it as an
   /// address of this type.
   Address getAsBitCastAddress(IRGenFunction &IGF, llvm::Value *addr) const {

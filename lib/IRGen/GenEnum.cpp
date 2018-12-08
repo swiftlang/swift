@@ -175,6 +175,12 @@ EnumImplStrategy::EnumImplStrategy(IRGenModule &IGM,
     NumElements(NumElements) {
 }
 
+StackAddress EnumImplStrategy::allocateStack(IRGenFunction &IGF, SILType T,
+                                             const llvm::Twine &name) const {
+  // Allocate memory on the stack, loading the size from the type metadata for T.
+  return IGF.emitDynamicAlloca(T, name);
+}
+
 void EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
                                             Explosion &params,
                                             Address dest, SILType T,
@@ -2322,6 +2328,19 @@ namespace {
     }
 
   public:
+    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                               const llvm::Twine &name) const override {
+      assert(TIK < Fixed);
+
+      if (ElementsWithNoPayload.size() > 1)
+        return EnumImplStrategy::allocateStack(IGF, T, name);
+
+      llvm::Value *size = emitLoadOfSize(IGF, getPayloadType(IGM, T));
+      size = IGF.Builder.CreateAdd(size, llvm::ConstantInt::get(IGM.SizeTy, 1));
+
+      return IGF.emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), name);
+    }
+
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
               Atomicity atomicity) const override {
       assert(TIK >= Loadable);
@@ -5804,6 +5823,15 @@ namespace {
                          IsBitwiseTakable_t bt,
                          IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, align, pod, bt, abiAccessible) {}
+
+    StackAddress allocateStack(IRGenFunction &IGF, SILType t,
+                               const llvm::Twine &name) const override {
+      auto alloca = Strategy.allocateStack(IGF, t, name);
+      
+      IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
+      return alloca.withAddress(
+          getAsBitCastAddress(IGF, alloca.getAddressPointer()));
+    }
   };
 
   /// TypeInfo for dynamically-sized enum types.
