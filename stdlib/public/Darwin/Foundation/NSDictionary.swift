@@ -24,6 +24,26 @@ import _SwiftFoundationOverlayShims
     ) -> Void)
 }
 
+extension NSDictionary {
+  internal func _fastEnumerateKeysAndObjects(block:
+    (AnyObject, AnyObject)->Bool) -> Bool {
+    var success = true
+    let fastSelf = unsafeBitCast(self, to: _NSDictionaryEnumerationHack.self)
+    fastSelf.enumerateKeysAndObjects(options:0, using:
+      { (anyKey, anyValue, stopPtr) in
+        anyKey._withUnsafeGuaranteedRef { (anyKey) in
+          anyValue._withUnsafeGuaranteedRef { (anyValue) in
+            success = block(anyKey, anyValue)
+            if !success {
+              stopPtr.pointee = 1
+            }
+          }
+        }
+    })
+    return success
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
@@ -71,6 +91,80 @@ extension Dictionary : _ObjectiveCBridgeable {
     return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
                          to: NSDictionary.self)
   }
+  
+  @inline(__always)
+  internal static func _bridgeElement<T>(_ anyKey:AnyObject, _ force: Bool) -> T? {
+    if force {
+      return Swift._forceBridgeFromObjectiveC(anyKey, T.self)
+    } else {
+      return  Swift._conditionallyBridgeFromObjectiveC(anyKey, T.self)
+    }
+  }
+  
+  internal static func _nonverbatimBridgeFromObjectiveC(
+    _ x: NSDictionary,
+    result: inout Dictionary?,
+    force: Bool
+    ) -> Bool {
+    let success:Bool
+    var maybeKey:Key? = nil
+    var maybeKeyString:String? = nil
+    var maybeValue:Value? = nil
+    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
+    // may not be backed by an NSDictionary.
+    if Key.self == String.self {
+      var builder = _DictionaryBuilder<String, Value>(count: x.count)
+      success = x._fastEnumerateKeysAndObjects { (anyKey, anyValue) in
+        maybeValue = _bridgeElement(anyValue, force)
+	guard let value:Value = maybeValue else {
+          return false
+        }
+        
+	maybeKeyString = _bridgeElement(anyKey, force) 
+        guard let key:String = maybeKeyString else {
+          return false
+        }
+        // String and NSString have different concepts of equality, so
+        // string-keyed NSDictionaries may generate key collisions when bridged
+        // over to Swift. See rdar://problem/35995647
+        if key._isKnownNFC {
+          builder.add(
+            key: key,
+            value: value)
+        } else {
+          // FIXME: Log a warning if `dict` already had a value for `key`
+          builder.add(
+            possibleDuplicateKey: key,
+            value: value)
+        }
+        return true
+      }
+      if success {
+        result = unsafeBitCast(builder.take(), to: Dictionary.self)
+      }
+    } else {
+      var builder = _DictionaryBuilder<Key, Value>(count: x.count)
+      success = x._fastEnumerateKeysAndObjects { (anyKey, anyValue) in
+        maybeValue = _bridgeElement(anyValue, force)
+        guard let value:Value = maybeValue else {
+          return false
+        }
+
+	maybeKey = _bridgeElement(anyKey, force)
+        guard let key:Key = maybeKey else {
+          return false
+        }
+        builder.add(
+          key: key,
+          value: value)
+        return true
+      }
+      if success {
+        result = builder.take()
+      }
+    }
+    return success
+  }
 
   public static func _forceBridgeFromObjectiveC(
     _ x: NSDictionary,
@@ -88,35 +182,7 @@ extension Dictionary : _ObjectiveCBridgeable {
       return
     }
 
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    let fastSelf = unsafeBitCast(x, to: _NSDictionaryEnumerationHack.self)
-    var builder = _DictionaryBuilder<Key, Value>(count: x.count)
-    fastSelf.enumerateKeysAndObjects(options: 0) { (anyKey, anyValue, stopPtr) in
-      anyKey._withUnsafeGuaranteedRef { (anyKey) in
-        anyValue._withUnsafeGuaranteedRef { (anyValue) in
-          let key = Swift._forceBridgeFromObjectiveC(
-                  anyKey, Key.self)
-          let value = Swift._forceBridgeFromObjectiveC(
-                  anyValue, Value.self)
-          // String and NSString have different concepts of equality, so
-          // string-keyed NSDictionaries may generate key collisions when bridged
-          // over to Swift. See rdar://problem/35995647
-          if Key.self == String.self &&
-                !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
-            // FIXME: Log a warning if `dict` already had a value for `key`
-              builder.add(
-                possibleDuplicateKey: key,
-                value: value)
-          } else {
-            builder.add(
-                key: key,
-                value: value)
-          }
-        }
-      }
-    }
-    result = builder.take()
+    _ = _nonverbatimBridgeFromObjectiveC(x, result: &result, force: true)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -130,43 +196,7 @@ extension Dictionary : _ObjectiveCBridgeable {
       return true
     }
     
-    var success = true
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    let fastSelf = unsafeBitCast(x, to: _NSDictionaryEnumerationHack.self)
-    var builder = _DictionaryBuilder<Key, Value>(count: x.count)
-    fastSelf.enumerateKeysAndObjects(options: 0) { (anyKey, anyValue, stopPtr) in
-      anyKey._withUnsafeGuaranteedRef { (anyKey) in
-        anyValue._withUnsafeGuaranteedRef { (anyValue) in
-          guard let key = Swift._conditionallyBridgeFromObjectiveC(
-            anyKey, Key.self),
-            let value = Swift._conditionallyBridgeFromObjectiveC(
-              anyValue, Value.self) else {
-                stopPtr.pointee = 1
-                success = false
-                return
-          }
-          // String and NSString have different concepts of equality, so
-          // string-keyed NSDictionaries may generate key collisions when bridged
-          // over to Swift. See rdar://problem/35995647
-          if Key.self == String.self &&
-            !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
-            // FIXME: Log a warning if `dict` already had a value for `key`
-            builder.add(
-              possibleDuplicateKey: key,
-              value: value)
-          } else {
-            builder.add(
-              key: key,
-              value: value)
-          }
-        }
-      }
-    }
-    if success {
-      result = builder.take()
-    }
-    return success
+    return _nonverbatimBridgeFromObjectiveC(x, result: &result, force: false)
   }
 
   @_effects(readonly)
