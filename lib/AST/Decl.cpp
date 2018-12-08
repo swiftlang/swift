@@ -2439,8 +2439,7 @@ bool ValueDecl::isUsableFromInline() const {
       return true;
 
   if (auto *containingProto = dyn_cast<ProtocolDecl>(getDeclContext())) {
-    if (isProtocolRequirement() &&
-        containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
+    if (containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
   }
 

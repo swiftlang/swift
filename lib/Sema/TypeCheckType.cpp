@@ -1515,7 +1515,8 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
       TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
       if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(),
                                    AllowPotentiallyUnavailableProtocol,
-                                   /*SignalOnPotentialUnavailability*/false)) {
+                                   /*SignalOnPotentialUnavailability*/false,
+                                   /*ForInout*/false)) {
         return true;
       }
     }
