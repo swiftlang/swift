@@ -2815,10 +2815,17 @@ namespace {
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
+      if (T.getOptionalObjectType()) {
+        auto payloadT = getPayloadType(IGM, T);
+        getPayloadTypeInfo().collectMetadataForOutlining(collector, payloadT);
+        return;
+      }
+
       if (CopyDestroyKind == Normal) {
         auto payloadT = getPayloadType(IGM, T);
         getPayloadTypeInfo().collectMetadataForOutlining(collector, payloadT);
       }
+
       collector.collectTypeMetadataForLayout(T);
     }
 
