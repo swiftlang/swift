@@ -208,7 +208,7 @@ set(SWIFTLIB_SOURCES
   SliceBuffer.swift
   SIMDVector.swift
   SIMDVectorTypes.swift.gyb
-  Tuple.swift.gyb
+  Tuple.swift
   UnfoldSequence.swift
   VarArgs.swift
   Zip.swift
