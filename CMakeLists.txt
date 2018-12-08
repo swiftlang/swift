@@ -1016,8 +1016,9 @@ endif()
 # https://bugs.swift.org/browse/SR-5975
 add_subdirectory(stdlib)
 
+add_subdirectory(include)
+
 if(SWIFT_INCLUDE_TOOLS)
-  add_subdirectory(include)
   add_subdirectory(lib)
   
   # Always include this after including stdlib/!
