@@ -83,6 +83,7 @@ public class SequenceLog {
   public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
+  public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)  
@@ -212,6 +213,13 @@ extension LoggingSequence: Sequence {
   public var underestimatedCount: Int {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
+  }
+  
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    SequenceLog.withContiguousStorageIfAvailable[selfType] += 1
+    return try base.withContiguousStorageIfAvailable(body)
   }
 
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {

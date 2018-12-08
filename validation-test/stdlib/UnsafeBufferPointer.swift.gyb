@@ -325,17 +325,27 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(-1.0, allocated[count-1])
 }
 
-UnsafeMutableBufferPointerTestSuite.test("withContiguousMutableStorageIfAvailable") {
+UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvailable") {
   let count = 4
   let allocated = UnsafeMutablePointer<Int>.allocate(capacity: count)
   defer { allocated.deallocate() }
   allocated.initialize(repeating: 1, count: count)
 
-  var buffer = UnsafeMutableBufferPointer(start: allocated, count: count)
-  let result = buffer.withContiguousMutableStorageIfAvailable { buffer in
-    return buffer.reduce(0, +)
+  var mutableBuffer = UnsafeMutableBufferPointer(start: allocated, count: count)
+  let executed: ()? = mutableBuffer.withContiguousMutableStorageIfAvailable { buf in
+    for i in 0..<buf.count { buf[i] *= 2 }
   }
-  expectEqual(count, result)
+  expectNotNil(executed)
+  let result1 = mutableBuffer.withContiguousStorageIfAvailable { buf in
+    return buf.reduce(0, +)
+  }
+  expectEqual(count*2, result1)
+
+  let immutableBuffer = UnsafeBufferPointer(start: allocated, count: count)
+  let result2 = immutableBuffer.withContiguousStorageIfAvailable { buf in
+    return buf.reduce(0, +)
+  }
+  expectEqual(result1, result2)
 }
 
 UnsafeMutableBufferPointerTestSuite.test("sort") {
