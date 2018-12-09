@@ -3091,7 +3091,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // We only need to do something here if the declaration context is
   // somehow generic.
   auto ncGenerics = typeDecl->getGenericSignatureOfContext();
-  if (!ncGenerics) return;
+  if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();
