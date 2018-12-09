@@ -1763,9 +1763,8 @@ void ASTMangler::appendFunctionInputType(
     const auto &param = params.front();
     auto type = param.getPlainType();
 
-    // If this is just a single parenthesized type,
-    // to save space in the mangled name, let's encode
-    // it as a single type dropping sugar.
+    // If the sole unlabeled parameter has a non-tuple type, encode
+    // the parameter list as a single type.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
       appendTypeListElement(Identifier(), type, param.getParameterFlags());
