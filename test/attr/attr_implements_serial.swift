@@ -3,8 +3,8 @@
 // RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}AttrImplFP%{target-shared-library-suffix}) -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule %S/attr_implements_fp.swift -Xfrontend -enable-operator-designated-types -Xfrontend -solver-enable-operator-designated-types
 // RUN: %target-build-swift -I %t -o %t/a.out %s %t/main.swift -L %t -Xlinker -rpath -Xlinker %t -lAttrImplFP
 // RUN: %target-codesign %t/a.out
-// RUN: %target-codesign %t/%{target-shared-library-prefix}AttrImplFP%{target-shared-library-suffix}
-// RUN: %target-run %t/a.out %t/%{target-shared-library-prefix}AttrImplFP%{target-shared-library-suffix} | %FileCheck %s
+// RUN: %target-codesign %t/%target-library-name(AttrImplFP)
+// RUN: %target-run %t/a.out %t/%target-library-name(AttrImplFP) | %FileCheck %s
 // REQUIRES: executable_test
 
 // This test just checks that the lookup-table entries for @_implements are

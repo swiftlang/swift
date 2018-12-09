@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
-// RUN: %target-codesign %t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}
+// RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
 // RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_class%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
-// RUN: %target-codesign %t/%{target-shared-library-prefix}resilient_class%{target-shared-library-suffix}
+// RUN: %target-codesign %t/%target-library-name(resilient_class)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -o %t/main -Xlinker -rpath -Xlinker %t
 // RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix} %t/libresilient_class%{target-shared-library-suffix}
+// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/libresilient_class%{target-shared-library-suffix}
 
 
 // REQUIRES: executable_test

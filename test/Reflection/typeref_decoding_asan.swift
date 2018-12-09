@@ -1,7 +1,7 @@
 // REQUIRES: asan_runtime
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -sanitize=address -o %t/%{target-shared-library-prefix}TypesToReflect%{target-shared-library-suffix}
-// RUN: %target-swift-reflection-dump -binary-filename %t/%{target-shared-library-prefix}TypesToReflect%{target-shared-library-suffix} | %FileCheck %s
+// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -sanitize=address -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
 
 // CHECK: FIELDS:
 // CHECK: =======
