@@ -102,4 +102,4 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
 add_subdirectory(public)
 add_subdirectory(private)
-
+add_subdirectory(tools)
