@@ -50,17 +50,19 @@ protected:
 
   void checkTypeAccessImpl(
       Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
-      const DeclContext *useDC,
+      const DeclContext *useDC, bool mayBeInferred,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
       Type type, TypeRepr *typeRepr, const ValueDecl *context,
+      bool mayBeInferred,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
-      const TypeLoc &TL, const ValueDecl *context,
+      const TypeLoc &TL, const ValueDecl *context, bool mayBeInferred,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-    return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context, diagnose);
+    return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context,
+                           mayBeInferred, diagnose);
   }
 
   void checkRequirementAccess(
@@ -144,15 +146,19 @@ public:
 /// \p contextAccessScope. If it isn't, calls \p diagnose with a TypeRepr
 /// representing the offending part of \p TL.
 ///
-/// If \p contextAccessScope is null, checks that \p TL is only made up of
-/// public types.
-///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found. The DeclContext
 /// is never null.
+///
+/// If \p type might be partially inferred even when \p typeRepr is present
+/// (such as for properties), pass \c true for \p mayBeInferred. (This does not
+/// include implicitly providing generic parameters for the Self type, such as
+/// using `Array` to mean `Array<Element>` in an extension of Array.) If
+/// \p typeRepr is known to be absent, it's okay to pass \c false for
+/// \p mayBeInferred.
 void AccessControlCheckerBase::checkTypeAccessImpl(
     Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
-    const DeclContext *useDC,
+    const DeclContext *useDC, bool mayBeInferred,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
@@ -164,17 +170,10 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
-  // TypeRepr checking is more accurate, but we must also look at TypeLocs
-  // without a TypeRepr, for example for 'var' declarations with an inferred
-  // type.
-  auto typeAccessScope =
-    (typeRepr
-     ? TypeReprAccessScopeChecker::getAccessScope(typeRepr,
-                                                  useDC,
-                                                  checkUsableFromInline)
-     : TypeAccessScopeChecker::getAccessScope(type,
-                                              useDC,
-                                              checkUsableFromInline));
+  Optional<AccessScope> typeAccessScope =
+      TypeAccessScopeChecker::getAccessScope(type, useDC,
+                                             checkUsableFromInline);
+  auto downgradeToWarning = DowngradeToWarning::No;
 
   // Note: This means that the type itself is invalid for this particular
   // context, because it references declarations from two incompatible scopes.
@@ -182,20 +181,57 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (!typeAccessScope.hasValue())
     return;
 
-  if (typeAccessScope->isPublic())
-    return;
-  if (typeAccessScope->hasEqualDeclContextWith(contextAccessScope))
-    return;
-  if (contextAccessScope.isChildOf(*typeAccessScope))
-    return;
+  AccessScope problematicAccessScope = *typeAccessScope;
 
-  auto downgradeToWarning = DowngradeToWarning::No;
-  const TypeRepr *complainRepr =
-        TypeAccessScopeDiagnoser::findTypeWithScope(
-            typeRepr,
-            *typeAccessScope,
-            useDC, checkUsableFromInline);
-  diagnose(*typeAccessScope, complainRepr, downgradeToWarning);
+  if (contextAccessScope.hasEqualDeclContextWith(*typeAccessScope) ||
+      contextAccessScope.isChildOf(*typeAccessScope)) {
+
+    // /Also/ check the TypeRepr, if present. This can be important when we're
+    // unable to preserve typealias sugar that's present in the TypeRepr.
+    if (!typeRepr)
+      return;
+
+    Optional<AccessScope> typeReprAccessScope =
+        TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                                   checkUsableFromInline);
+    assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
+    if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
+        contextAccessScope.isChildOf(*typeReprAccessScope)) {
+      // Only if both the Type and the TypeRepr follow the access rules can
+      // we exit; otherwise we have to emit a diagnostic.
+      return;
+    }
+    problematicAccessScope = *typeReprAccessScope;
+
+  } else {
+    // The type violates the rules of access control (with or without taking the
+    // TypeRepr into account).
+
+    if (typeRepr && mayBeInferred &&
+        !TC.getLangOpts().isSwiftVersionAtLeast(5) &&
+        useDC->getParentModule()->getResilienceStrategy() !=
+          ResilienceStrategy::Resilient) {
+      // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
+      // present. However, this is a major hole when generic parameters are
+      // inferred:
+      //
+      //   public let foo: Optional = VeryPrivateStruct()
+      //
+      // Downgrade the error to a warning in this case for source compatibility.
+      Optional<AccessScope> typeReprAccessScope =
+          TypeReprAccessScopeChecker::getAccessScope(typeRepr, useDC,
+                                                     checkUsableFromInline);
+      assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
+      if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
+          contextAccessScope.isChildOf(*typeReprAccessScope)) {
+        downgradeToWarning = DowngradeToWarning::Yes;
+      }
+    }
+  }
+
+  const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
+      typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
+  diagnose(problematicAccessScope, complainRepr, downgradeToWarning);
 }
 
 /// Checks if the access scope of the type described by \p TL is valid for the
@@ -204,15 +240,23 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
 ///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found.
+///
+/// If \p type might be partially inferred even when \p typeRepr is present
+/// (such as for properties), pass \c true for \p mayBeInferred. (This does not
+/// include implicitly providing generic parameters for the Self type, such as
+/// using `Array` to mean `Array<Element>` in an extension of Array.) If
+/// \p typeRepr is known to be absent, it's okay to pass \c false for
+/// \p mayBeInferred.
 void AccessControlCheckerBase::checkTypeAccess(
-    Type type, TypeRepr *typeRepr, const ValueDecl *context,
+    Type type, TypeRepr *typeRepr, const ValueDecl *context, bool mayBeInferred,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
   AccessScope contextAccessScope =
     context->getFormalAccessScope(
       nullptr, checkUsableFromInline);
-  checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, diagnose);
+  checkTypeAccessImpl(type, typeRepr, contextAccessScope, DC, mayBeInferred,
+                      diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -249,16 +293,19 @@ void AccessControlCheckerBase::checkRequirementAccess(
         case RequirementKind::Superclass:
           checkTypeAccessImpl(req.getFirstType(),
                               RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, diagnose);
+                              accessScope, useDC, /*mayBeInferred*/false,
+                              diagnose);
           checkTypeAccessImpl(req.getSecondType(),
                               RequirementRepr::getSecondTypeRepr(reqRepr),
-                              accessScope, useDC, diagnose);
+                              accessScope, useDC, /*mayBeInferred*/false,
+                              diagnose);
           break;
 
         case RequirementKind::Layout:
           checkTypeAccessImpl(req.getFirstType(),
                               RequirementRepr::getFirstTypeRepr(reqRepr),
-                              accessScope, useDC, diagnose);
+                              accessScope, useDC, /*mayBeInferred*/false,
+                              diagnose);
           break;
         }
         return false;
@@ -307,8 +354,7 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(param->getInherited().front().getType(),
                         param->getInherited().front().getTypeRepr(),
-                        accessScope,
-                        DC, callback);
+                        accessScope, DC, /*mayBeInferred*/false, callback);
   }
   callbackACEK = ACEK::Requirement;
 
@@ -409,6 +455,7 @@ public:
       return;
 
     checkTypeAccess(theVar->getInterfaceType(), nullptr, theVar,
+                    /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -442,7 +489,7 @@ public:
     if (!anyVar)
       return;
 
-    checkTypeAccess(TP->getTypeLoc(), anyVar,
+    checkTypeAccess(TP->getTypeLoc(), anyVar, /*mayBeInferred*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -489,7 +536,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
+    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -523,7 +570,7 @@ public:
     std::for_each(assocType->getInherited().begin(),
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccess(requirement, assocType,
+      checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -538,6 +585,7 @@ public:
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+                    /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -599,6 +647,7 @@ public:
       if (rawTypeLocIter == ED->getInherited().end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
+                      /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -654,6 +703,7 @@ public:
       }
 
       checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
+                      /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -699,7 +749,7 @@ public:
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccess(requirement, proto,
+      checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -759,7 +809,7 @@ public:
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(P->getTypeLoc(), SD,
+      checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -773,7 +823,7 @@ public:
       });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD,
+    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -824,7 +874,7 @@ public:
     auto downgradeToWarning = DowngradeToWarning::No;
 
     for (auto *P : *fn->getParameters()) {
-      checkTypeAccess(P->getTypeLoc(), fn,
+      checkTypeAccess(P->getTypeLoc(), fn, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -840,7 +890,7 @@ public:
 
     bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD,
+      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -884,7 +934,7 @@ public:
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(P->getTypeLoc(), EED,
+      checkTypeAccess(P->getTypeLoc(), EED, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -988,6 +1038,7 @@ public:
     checkTypeAccess(theVar->getInterfaceType(), nullptr,
                     fixedLayoutStructContext ? fixedLayoutStructContext
                                              : theVar,
+                    /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1024,6 +1075,7 @@ public:
     checkTypeAccess(TP->getTypeLoc(),
                     fixedLayoutStructContext ? fixedLayoutStructContext
                                              : anyVar,
+                    /*mayBeInferred*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1068,7 +1120,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
+    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1090,7 +1142,7 @@ public:
     std::for_each(assocType->getInherited().begin(),
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccess(requirement, assocType,
+      checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
             const TypeRepr *complainRepr,
             DowngradeToWarning downgradeDiag) {
@@ -1102,6 +1154,7 @@ public:
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1145,6 +1198,7 @@ public:
       if (rawTypeLocIter == ED->getInherited().end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
+                       /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1186,6 +1240,7 @@ public:
         return;
 
       checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
+                       /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1209,7 +1264,7 @@ public:
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
-      checkTypeAccess(requirement, proto,
+      checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1241,7 +1296,7 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(P->getTypeLoc(), SD,
+      checkTypeAccess(P->getTypeLoc(), SD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1254,7 +1309,7 @@ public:
       });
     }
 
-    checkTypeAccess(SD->getElementTypeLoc(), SD,
+    checkTypeAccess(SD->getElementTypeLoc(), SD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1284,7 +1339,7 @@ public:
       : isTypeContext ? FK_Method : FK_Function;
 
     for (auto *P : *fn->getParameters()) {
-      checkTypeAccess(P->getTypeLoc(), fn,
+      checkTypeAccess(P->getTypeLoc(), fn, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1298,7 +1353,7 @@ public:
     }
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
-      checkTypeAccess(FD->getBodyResultTypeLoc(), FD,
+      checkTypeAccess(FD->getBodyResultTypeLoc(), FD, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1316,7 +1371,7 @@ public:
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(P->getTypeLoc(), EED,
+      checkTypeAccess(P->getTypeLoc(), EED, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
