@@ -1551,3 +1551,31 @@ func testOptionalUnwrapNoError() -> Int? {
   x = 0
   return x!
 }
+
+// <https://bugs.swift.org/browse/SR-9451>
+class StrongCycle {
+  var c: StrongCycle
+  var d: Int
+  init(first: ()) {
+    self.d = 10
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+  }
+
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.c' used before being initialized}}
+    self.d = 10
+  }
+}
+
+class WeakCycle {
+  weak var c: WeakCycle?
+  var d: Int
+  init(first: ()) { // FIXME: This is inconsistent with the strong reference behavior above
+    self.d = 10
+    self.c = self
+  }
+  init(second: ()) {
+    self.c = self // expected-error {{variable 'self.d' used before being initialized}}
+    self.d = 10
+  }
+}

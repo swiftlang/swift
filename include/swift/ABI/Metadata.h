@@ -1746,7 +1746,8 @@ struct TargetExistentialTypeMetadata
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
-  using MetadataPointer = ConstTargetMetadataPointer<Runtime, TargetMetadata>;
+  using MetadataPointer =
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
   using TrailingObjects =
           swift::ABI::TrailingObjects<
           TargetExistentialTypeMetadata<Runtime>,

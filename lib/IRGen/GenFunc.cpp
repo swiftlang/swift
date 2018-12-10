@@ -642,11 +642,13 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 CanSILFunctionType substType,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
+  if (param.isFormalIndirect())
+    return false;
+
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
-  auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+  auto &ti = IGF.getTypeInfoForLowered(argType.getASTType());
   // Empty values don't matter.
-  return ti.getSchema().empty() && !param.isFormalIndirect();
+  return ti.getSchema().empty();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially

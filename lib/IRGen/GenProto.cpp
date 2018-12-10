@@ -2799,6 +2799,8 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer) const {
 }
 
 void NecessaryBindings::addTypeMetadata(CanType type) {
+  assert(!isa<InOutType>(type));
+
   // Bindings are only necessary at all if the type is dependent.
   if (!type->hasArchetype()) return;
 
@@ -2817,10 +2819,6 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
     for (const auto &elt : fn.getParams())
       addTypeMetadata(elt.getOldType());
     addTypeMetadata(fn.getResult());
-    return;
-  }
-  if (auto inout = dyn_cast<InOutType>(type)) {
-    addTypeMetadata(inout.getObjectType());
     return;
   }
   if (auto metatype = dyn_cast<MetatypeType>(type)) {
@@ -3091,7 +3089,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
   // We only need to do something here if the declaration context is
   // somehow generic.
   auto ncGenerics = typeDecl->getGenericSignatureOfContext();
-  if (!ncGenerics) return;
+  if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics->getCanonicalSignature();

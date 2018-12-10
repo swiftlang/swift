@@ -189,9 +189,7 @@ public:
       return;
 
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, method,
-                                  /*extended*/false,
-                                  /*concrete*/true,
+    emitObjCMethodDescriptorParts(IGM, method, /*concrete*/true,
                                   name, types, imp);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
@@ -215,8 +213,7 @@ public:
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, constructor, /*extended*/false,
-                                  /*concrete*/true,
+    emitObjCMethodDescriptorParts(IGM, constructor, /*concrete*/true,
                                   name, types, imp);
 
     // When generating JIT'd code, we need to call sel_registerName() to force
@@ -391,9 +388,13 @@ public:
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
+    if (isa<AccessorDecl>(method)) {
+      // Accessors are handled as part of their AbstractStorageDecls.
+      return;
+    }
+
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, method, /*extended*/true,
-                                  /*concrete*/false,
+    emitObjCMethodDescriptorParts(IGM, method, /*concrete*/false,
                                   name, types, imp);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
@@ -438,7 +439,8 @@ public:
     Builder.CreateCall(protocol_addMethodDescription, getterArgs);
     
     if (prop->isSettable(nullptr)) {
-      emitObjCSetterDescriptorParts(IGM, prop, name, types, imp);
+      emitObjCSetterDescriptorParts(IGM, prop,
+                                    name, types, imp);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
       llvm::Value *setterArgs[] = {
         NewProto, sel, types,
@@ -1594,9 +1596,6 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
 
   llvm::Function *fn =
     llvm::Function::Create(signature.getType(), linkInfo.getLinkage(), name);
-  // TODO(compnerd) apply COMDAT to definitions
-  fn->setVisibility(linkInfo.getVisibility());
-  fn->setDLLStorageClass(linkInfo.getDLLStorage());
   fn->setCallingConv(signature.getCallingConv());
 
   if (insertBefore) {
@@ -1604,6 +1603,9 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
   } else {
     IGM.Module.getFunctionList().push_back(fn);
   }
+
+  ApplyIRLinkage({linkInfo.getLinkage(), linkInfo.getVisibility(), linkInfo.getDLLStorage()})
+      .to(fn);
 
   llvm::AttrBuilder initialAttrs;
   IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
