@@ -103,8 +103,6 @@ ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
 
-NOTE(note_swift_version_major, none,
-     "use major version, as in '-swift-version %0'", (unsigned))
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
