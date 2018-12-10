@@ -848,6 +848,10 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
                                   llvm::AttributeList::FunctionIndex, b);
 }
 
+llvm::Constant *IRGenModule::getInt32(uint32_t value) {
+  return llvm::ConstantInt::get(Int32Ty, value);
+}
+
 llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }

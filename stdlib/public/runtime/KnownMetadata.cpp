@@ -157,7 +157,7 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =                     \
                                     BuiltinType<ctypes::Symbol>::Alignment>>::table;
 
 #define BUILTIN_POINTER_TYPE(Symbol, Name)                 \
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
   ValueWitnessTableForBox<pointer_types::Symbol>::table;
 
 #define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                           \
@@ -169,7 +169,7 @@ const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The value-witness table for pointer-aligned unmanaged pointer types.
-const ExtraInhabitantsValueWitnessTable swift::METATYPE_VALUE_WITNESS_SYM(Bo) =
+const ValueWitnessTable swift::METATYPE_VALUE_WITNESS_SYM(Bo) =
   ValueWitnessTableForBox<PointerPointerBox>::table;
 
 /*** Functions ***************************************************************/
@@ -182,12 +182,12 @@ namespace {
     static constexpr unsigned numExtraInhabitants =
       FunctionPointerBox::numExtraInhabitants;
 
-    static void storeExtraInhabitant(char *dest, int index) {
-      FunctionPointerBox::storeExtraInhabitant((void**) dest, index);
+    static void storeExtraInhabitantTag(char *dest, unsigned tag) {
+      FunctionPointerBox::storeExtraInhabitantTag((void**) dest, tag);
     }
 
-    static int getExtraInhabitantIndex(const char *src) {
-      return FunctionPointerBox::getExtraInhabitantIndex((void * const *) src);
+    static unsigned getExtraInhabitantTag(const char *src) {
+      return FunctionPointerBox::getExtraInhabitantTag((void * const *) src);
     }
   };
   /// @noescape function types.
@@ -197,28 +197,28 @@ namespace {
     static constexpr unsigned numExtraInhabitants =
         FunctionPointerBox::numExtraInhabitants;
 
-    static void storeExtraInhabitant(char *dest, int index) {
-      FunctionPointerBox::storeExtraInhabitant((void **)dest, index);
+    static void storeExtraInhabitantTag(char *dest, unsigned tag) {
+      FunctionPointerBox::storeExtraInhabitantTag((void **)dest, tag);
     }
 
-    static int getExtraInhabitantIndex(const char *src) {
-      return FunctionPointerBox::getExtraInhabitantIndex((void *const *)src);
+    static unsigned getExtraInhabitantTag(const char *src) {
+      return FunctionPointerBox::getExtraInhabitantTag((void *const *)src);
     }
   };
 } // end anonymous namespace
 
 /// The basic value-witness table for escaping function types.
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
 
 /// The basic value-witness table for @noescape function types.
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING) =
     ValueWitnessTableForBox<TrivialThickFunctionBox>::table;
 
 /// The basic value-witness table for thin function types.
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING) =
     ValueWitnessTableForBox<FunctionPointerBox>::table;
 

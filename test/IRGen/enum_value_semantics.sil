@@ -95,7 +95,7 @@ enum GenericFixedLayout<T> {
 }
 
 
-// CHECK-LABEL: @"$s20enum_value_semantics20SinglePayloadTrivialOWV" = internal constant [17 x i8*] [
+// CHECK-LABEL: @"$s20enum_value_semantics20SinglePayloadTrivialOWV" = internal constant %swift.enum_vwtable {
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
@@ -104,49 +104,45 @@ enum GenericFixedLayout<T> {
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, i32, %swift.type*)* @"$s20enum_value_semantics20SinglePayloadTrivialOwet" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, i32, %swift.type*)* @"$s20enum_value_semantics20SinglePayloadTrivialOwst" to i8*),
-// CHECK:   i8* inttoptr (i64 9 to i8*),
-// CHECK:   i8* inttoptr (i64 2097159 to i8*),
-// CHECK:   i8* inttoptr (i64 16 to i8*),
-// CHECK:   i8* null,
-// CHECK:   i8* null,
-// CHECK:   i8* null,
+// CHECK:   i64 9,
+// CHECK:   i64 16,
+// CHECK:   i32 2097159,
+// CHECK:   i32 0,
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics20SinglePayloadTrivialOwug" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics20SinglePayloadTrivialOwup" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s20enum_value_semantics20SinglePayloadTrivialOwui" to i8*)
-// CHECK: ]
+// CHECK: }
 
 
 // CHECK-LABEL: @"$s20enum_value_semantics20SinglePayloadTrivialOMf" =
 // CHECK-SAME:   internal constant <{ {{.*}} }> <{
-// CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$s20enum_value_semantics20SinglePayloadTrivialOWV", i32 0, i32 0),
+// CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s20enum_value_semantics20SinglePayloadTrivialOWV", i32 0, i32 0),
 // CHECK-SAME:   i64 513,
 // CHECK-SAME:   {{.*}}* @"$s20enum_value_semantics20SinglePayloadTrivialOMn"
 // CHECK-SAME: }>
 
 
-// CHECK-LABEL: @"$s20enum_value_semantics23SinglePayloadNontrivialOWV" = internal constant [17 x i8*] [
+// CHECK-LABEL: @"$s20enum_value_semantics23SinglePayloadNontrivialOWV" = internal constant %swift.enum_vwtable {
 // CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwCP" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwxx" to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwcp" to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwca" to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy8_8 to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwta" to i8*),
-// CHECK:   i8* inttoptr (i64 8 to i8*),
-// --                         0x250007
-// CHECK:   i8* inttoptr (i64 2424839 to i8*),
-// CHECK:   i8* inttoptr (i64 8 to i8*),
+// CHECK:   i64 8,
+// CHECK:   i64 8,
+// --           0x210007
+// CHECK:   i32 2162695,
 // -- On Darwin, the first 4 GiB are unmapped: 0x7ffffffc
 // -- Otherwise, one can only assume the first page (4 KiB) is unmapped: 0xffd
-// CHECK-ios:       i8* inttoptr (i64 2147483644 to i8*)
-// CHECK-macosx:    i8* inttoptr (i64 2147483644 to i8*)
-// CHECK-watchos:   i8* inttoptr (i64 2147483644 to i8*)
-// CHECK-darwin:    i8* inttoptr (i64 2147483644 to i8*)
-// CHECK-objc-linux-gnu:   i8* inttoptr (i64 2045 to i8*)
-// CHECK-native-linux-gnu: i8* inttoptr (i64 4093 to i8*)
-// CHECK-objc-windows:     i8* inttoptr (i64 2045 to i8*)
-// CHECK-native-windows:   i8* inttoptr (i64 4093 to i8*)
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwxs" to i8*)
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwxg" to i8*)
+// CHECK-ios:       i32 2147483644
+// CHECK-macosx:    i32 2147483644
+// CHECK-watchos:   i32 2147483644
+// CHECK-darwin:    i32 2147483644
+// CHECK-objc-linux-gnu:   i32 2045
+// CHECK-native-linux-gnu: i32 4093
+// CHECK-objc-windows:     i32 2045
+// CHECK-native-windows:   i32 4093
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwug" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwup" to i8*)
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$s20enum_value_semantics23SinglePayloadNontrivialOwui" to i8*)
@@ -155,7 +151,7 @@ enum GenericFixedLayout<T> {
 
 // CHECK-LABEL: @"$s20enum_value_semantics23SinglePayloadNontrivialOMf" =
 // CHECK-SAME: internal constant <{ {{.*}} }> <{
-// CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$s20enum_value_semantics23SinglePayloadNontrivialOWV", i32 0, i32 0),
+// CHECK-SAME:   i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s20enum_value_semantics23SinglePayloadNontrivialOWV", i32 0, i32 0),
 // CHECK-SAME:   i64 513,
 // CHECK-SAME:   {{.*}}* @"$s20enum_value_semantics23SinglePayloadNontrivialOMn"
 // CHECK-SAME: }>
@@ -173,7 +169,7 @@ enum GenericFixedLayout<T> {
 //   Pattern flags.  0x4020_0000 == (MetadataKind::Enum << 21).
 // CHECK-SAME:    i32 1075838976,
 //   Value witness table.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([17 x i8*]* @"$s20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$s20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.enum_vwtable* @"$s20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$s20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
 // CHECK-SAME:  }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
@@ -195,16 +191,6 @@ bb0(%0 : $SinglePayloadNontrivial):
 //
 // No payload enums
 //
-
-
-// -- NoPayload getExtraInhabitants
-// CHECK-LABEL: define internal i32 @"$s20enum_value_semantics9NoPayloadOwxg"
-// CHECK:      [[VALUE:%.*]] = load i8, i8* {{%.*}}, align 1
-// CHECK-NEXT: [[ZEXT:%.*]] = zext i8 [[VALUE]] to i32
-// CHECK-NEXT: [[SUB:%.*]] = sub i32 [[ZEXT]], 3
-// CHECK-NEXT: [[EXTRA:%.*]] = icmp slt i32 [[SUB]], 0
-// CHECK-NEXT: [[RES:%.*]] = select i1 [[EXTRA]], i32 -1, i32 [[SUB]]
-// CHECK-NEXT: ret i32 [[RES]]
 
 
 // -- NoPayload getEnumTag
