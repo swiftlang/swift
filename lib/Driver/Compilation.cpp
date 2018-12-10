@@ -208,7 +208,7 @@ namespace driver {
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
 
-    /// Jobs in the initial set with Condition::Always, or lacking an existing
+    /// Jobs in the initial set with Condition::Always, or lacking existing
     /// .swiftdeps files.
     /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
     SmallVector<const Job *, 16> InitialOutOfDateCommands;
