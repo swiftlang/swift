@@ -635,7 +635,7 @@ bool swift::_checkGenericRequirements(
 
     // Resolve the subject generic parameter.
     const Metadata *subjectType =
-      swift_getTypeByMangledName(req.getParam(), substGenericParam,
+      swift_getTypeByMangledNameInternal(req.getParam(), substGenericParam,
                                  substWitnessTable);
     if (!subjectType)
       return true;
@@ -660,7 +660,7 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::SameType: {
       // Demangle the second type under the given substitutions.
       auto otherType =
-        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+        swift_getTypeByMangledNameInternal(req.getMangledTypeName(), substGenericParam,
                                    substWitnessTable);
       if (!otherType) return true;
 
@@ -687,7 +687,7 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+        swift_getTypeByMangledNameInternal(req.getMangledTypeName(), substGenericParam,
                                    substWitnessTable);
       if (!baseType) return true;
 

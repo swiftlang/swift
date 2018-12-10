@@ -327,7 +327,7 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
-  TypeInfo swift_getTypeByMangledName(
+  TypeInfo swift_getTypeByMangledNameInternal(
                                StringRef typeName,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);

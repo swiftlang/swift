@@ -181,7 +181,7 @@ TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
-  auto Result = swift_getTypeByMangledName("", nullptr, nullptr);
+  auto Result = swift_getTypeByMangledNameInternal("", nullptr, nullptr);
   ASSERT_EQ((const Metadata *)Result, nullptr);
 }
 
