@@ -20,15 +20,15 @@ public enum Result<Success, Failure: Error> {
   /// A failure, storing a `Failure` value.
   case failure(Failure)
   
-  /// Evaluates the given transform closure when this `Result` instance is
-  /// `.success`, passing the value as a parameter.
+  /// Evaluates the given closure when this `Result` instance is `.success`,
+  /// passing the success value as a parameter.
   ///
   /// Use the `map` method with a closure that returns a non-`Result` value.
   ///
-  /// - Parameter transform: A closure that takes the successful value of the
+  /// - Parameter transform: A closure that takes the success value of the
   ///   instance.
-  /// - Returns: A new `Result` instance with the result of the transform, if
-  ///   it was applied.
+  /// - Returns: A `Result` instance with the result of evaluating the given 
+  ///   closure as the new success value if this instance is `.success`.
   public func map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
@@ -40,16 +40,16 @@ public enum Result<Success, Failure: Error> {
     }
   }
   
-  /// Evaluates the given transform closure when this `Result` instance is
-  /// `.failure`, passing the error as a parameter.
+  /// Evaluates the given closure when this `Result` instance is `.failure`,
+  /// passing the failure value as a parameter.
   ///
   /// Use the `mapError` method with a closure that returns a non-`Result`
   /// value.
   ///
   /// - Parameter transform: A closure that takes the failure value of the
   ///   instance.
-  /// - Returns: A new `Result` instance with the result of the transform, if
-  ///   it was applied.
+  /// - Returns: A `Result` instance with the result of evaluating the given
+  ///   closure as the new failure value if this instance is `.failure`.
   public func mapError<NewFailure>(
     _ transform: (Failure) -> NewFailure
   ) -> Result<Success, NewFailure> {
@@ -61,13 +61,13 @@ public enum Result<Success, Failure: Error> {
     }
   }
   
-  /// Evaluates the given transform closure when this `Result` instance is
-  /// `.success`, passing the value as a parameter and flattening the result.
+  /// Evaluates the given closure when this `Result` instance is `.success`,
+  /// passing the success value as a parameter.
   ///
-  /// - Parameter transform: A closure that takes the successful value of the
+  /// - Parameter transform: A closure that takes the success value of the
   ///   instance.
-  /// - Returns: A new `Result` instance, either from the transform or from
-  ///   the previous error value.
+  /// - Returns: A`Result` instance, either from the closure or the previous 
+  ///   `.failure`.
   public func flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
@@ -79,13 +79,13 @@ public enum Result<Success, Failure: Error> {
     }
   }
   
-  /// Evaluates the given transform closure when this `Result` instance is
-  /// `.failure`, passing the error as a parameter and flattening the result.
+  /// Evaluates the given closure when this `Result` instance is `.failure`,
+  /// passing the failure value as a parameter.
   ///
-  /// - Parameter transform: A closure that takes the error value of the
+  /// - Parameter transform: A closure that takes the failure value of the
   ///   instance.
-  /// - Returns: A new `Result` instance, either from the transform or from
-  ///   the previous success value.
+  /// - Returns: A `Result` instance, either from the closure or the previous 
+  ///   `.success`.
   public func flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
@@ -97,10 +97,10 @@ public enum Result<Success, Failure: Error> {
     }
   }
   
-  /// Attempts to get the `success` value as a throwing expression.
+  /// Get the success value as a throwing expression.
   ///
-  /// - Returns: The success value, if the instance is a success.
-  /// - Throws:  The failure value, if the instance is a failure.
+  /// - Returns: The success value, if the instance is `.success`.
+  /// - Throws:  The failure value, if the instance is `.failure`.
   public func get() throws -> Success {
     switch self {
     case let .success(success):
@@ -112,20 +112,20 @@ public enum Result<Success, Failure: Error> {
 }
 
 extension Result where Failure == Swift.Error {
-  /// Create an instance by capturing the output of a throwing closure.
+  /// Create an instance by evaluating a throwing closure, capturing the 
+  /// returned value as a `.success` or any thrown error as `.failure`.
   ///
   /// - Parameter catching: A throwing closure to evaluate.
   @_transparent
   public init(catching body: () throws -> Success) {
     do {
-      let value = try body()
-      self = .success(value)
+      self = .success(try body())
     } catch {
       self = .failure(error)
     }
   }
 }
 
-extension Result : Equatable where Success : Equatable, Failure : Equatable { }
+extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
-extension Result : Hashable where Success : Hashable, Failure : Hashable { }
+extension Result: Hashable where Success: Hashable, Failure: Hashable { }
