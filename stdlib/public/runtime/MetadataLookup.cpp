@@ -1269,15 +1269,31 @@ TypeInfo swift_getTypeByMangledNameImpl(
                                     substWitnessTable);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
-swift_stdlib_getTypeByMangledName(
+swift_getTypeByMangledNameInEnvironment(
                         const char *typeNameStart,
                         size_t typeNameLength,
                         const TargetGenericEnvironment<InProcess> *environment,
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
+                                             substitutions);
+  if (!metadata) return nullptr;
+
+  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const Metadata * _Nullable
+swift_getTypeByMangledNameInContext(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetContextDescriptor<InProcess> *context,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   auto metadata = swift_getTypeByMangledName(typeName, substitutions,
                                              substitutions);
   if (!metadata) return nullptr;
@@ -1301,9 +1317,9 @@ static objc_hook_getClass OldGetClassHook;
 static BOOL
 getObjCClassByMangledName(const char * _Nonnull typeName,
                           Class _Nullable * _Nonnull outClass) {
-  auto metadata = swift_stdlib_getTypeByMangledName(typeName, strlen(typeName),
-                                                    /* no substitutions */
-                                                    nullptr, nullptr);
+  auto metadata = swift_getTypeByMangledNameInEnvironment(typeName, strlen(typeName),
+                                             /* no substitutions */
+                                             nullptr, nullptr);
   if (metadata) {
     auto objcClass =
       reinterpret_cast<Class>(
@@ -1421,9 +1437,8 @@ void SubstGenericParametersFromMetadata::setup() const {
   if (!descriptorPath.empty())
     return;
 
-  if (sourceIsMetadata && base) {
-    auto descriptor = base->getTypeContextDescriptor();
-    numKeyGenericParameters = buildDescriptorPath(descriptor);
+  if (sourceIsMetadata && baseContext) {
+    numKeyGenericParameters = buildDescriptorPath(baseContext);
     return;
   }
 
