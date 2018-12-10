@@ -4206,14 +4206,14 @@ namespace {
                         foundDecl->getBaseName(), protocolDecl->getFullName());
             return E;
         }
-         
+        
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
-                     foundDecl->getDescriptiveKind(), foundDecl->getFullName())
-           .highlight(subExpr->getSourceRange());
+                    foundDecl->getDescriptiveKind(), foundDecl->getFullName())
+          .highlight(subExpr->getSourceRange());
         tc.diagnose(foundDecl, diag::make_decl_objc,
                     foundDecl->getDescriptiveKind())
-           .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
-                        "@objc ");
+          .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                       "@objc ");
         return E;
       } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
         // If this attribute was inferred based on deprecated Swift 3 rules,
