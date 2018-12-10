@@ -61,14 +61,16 @@ public struct CGFloat {
 }
 
 extension CGFloat : SignedNumeric {
-  // FIXME(integers): implement properly
+
+  @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
-    fatalError()
+    guard let native = NativeType(exactly: source) else { return nil }
+    self.native = native
   }
 
   @_transparent
   public var magnitude: CGFloat {
-    return CGFloat(Swift.abs(native))
+    return CGFloat(native.magnitude)
   }
 
 }
@@ -202,6 +204,7 @@ extension CGFloat : BinaryFloatingPoint {
     return CGFloat(native.nextUp)
   }
 
+  @_transparent
   public mutating func negate() {
     native.negate()
   }
@@ -271,22 +274,27 @@ extension CGFloat : BinaryFloatingPoint {
     return native.isFinite
   }
 
+  @_transparent
   public var isZero:  Bool {
     return native.isZero
   }
 
+  @_transparent
   public var isSubnormal:  Bool {
     return native.isSubnormal
   }
 
+  @_transparent
   public var isInfinite:  Bool {
     return native.isInfinite
   }
 
+  @_transparent
   public var isNaN:  Bool {
     return native.isNaN
   }
 
+  @_transparent
   public var isSignalingNaN: Bool {
     return native.isSignalingNaN
   }
@@ -296,18 +304,22 @@ extension CGFloat : BinaryFloatingPoint {
     fatalError("unavailable")
   }
 
+  @_transparent
   public var isCanonical: Bool {
     return true
   }
 
+  @_transparent
   public var floatingPointClass: FloatingPointClassification {
     return native.floatingPointClass
   }
 
+  @_transparent
   public var binade: CGFloat {
     return CGFloat(native.binade)
   }
 
+  @_transparent
   public var significandWidth: Int {
     return native.significandWidth
   }
