@@ -126,7 +126,7 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameter other: Another string.
   public mutating func append(_ other: String) {
-    if self.isEmpty && !_guts.hasNativeStorage {
+    if _slowPath(!_guts.hasNativeStorage && self.isEmpty) {
       self = other
       return
     }

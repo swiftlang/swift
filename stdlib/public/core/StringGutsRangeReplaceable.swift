@@ -156,14 +156,18 @@ extension _StringGuts {
     append(_StringGutsSlice(other))
   }
 
-  internal mutating func append(_ slicedOther: _StringGutsSlice) {
+  internal mutating func append(
+    _ slicedOther: _StringGutsSlice
+  ) {
     defer { self._invariantCheck() }
 
     if self.isSmall && slicedOther._guts.isSmall {
       // TODO: In-register slicing
       let smolSelf = self.asSmall
       if let smol = slicedOther.withFastUTF8({ otherUTF8 in
-        return _SmallString(smolSelf, appending: _SmallString(otherUTF8)!)
+        return _SmallString(
+          smolSelf,
+          appending: _SmallString(otherUTF8)._unsafelyUnwrappedUnchecked)
       }) {
         self = _StringGuts(smol)
         return

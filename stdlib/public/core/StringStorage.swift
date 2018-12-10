@@ -348,11 +348,11 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   return capacity
 #else
   // Bigger than _SmallString, and we need 1 extra for nul-terminator.
-  let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
+  let minCap = 1 &+ Swift.max(desiredCapacity, _SmallString.capacity)
   _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
 
   // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
-  let capacity = ((minCap + 7) & -16) + 8
+  let capacity = ((minCap &+ 7) & -16) &+ 8
   _internalInvariant(
     capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
   return capacity
@@ -547,7 +547,8 @@ extension _StringStorage {
   ) {
     let oldTerminator = self.terminator
     _postRRCAdjust(
-      newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
+      newCount: self.count &+ appendedCount,
+      newIsASCII: self.isASCII && isASCII)
     _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
 
@@ -628,7 +629,8 @@ extension _StringStorage {
       count: replCount)
 
     let isASCII = self.isASCII && _allASCII(replacement)
-    _postRRCAdjust(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
+    _postRRCAdjust(
+      newCount: lower &+ replCount &+ tailCount, newIsASCII: isASCII)
   }
 
 

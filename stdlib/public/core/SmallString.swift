@@ -260,16 +260,18 @@ extension _SmallString {
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
-    let totalCount = base.count + other.count
+    let totalCount = base.count &+ other.count
     guard totalCount <= _SmallString.capacity else { return nil }
 
     // TODO(SIMD): The below can be replaced with just be a couple vector ops
 
     var result = base
     var writeIdx = base.count
-    for readIdx in 0..<other.count {
+    var readIdx = 0
+    while readIdx < other.count {
       result[writeIdx] = other[readIdx]
       writeIdx &+= 1
+      readIdx &+= 1
     }
     _internalInvariant(writeIdx == totalCount)
 
@@ -336,9 +338,11 @@ internal func _bytesToUInt64(
   // owned to guaranteed specializations don't get inlined.)
   var r: UInt64 = 0
   var shift: Int = 0
-  for idx in 0..<c {
+  var idx = 0
+  while idx < c {
     r = r | (UInt64(input[idx]) &<< shift)
     shift = shift &+ 8
+    idx &+= 1
   }
   return r
 }
