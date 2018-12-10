@@ -260,11 +260,7 @@ bb0:
 
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <@sil_weak Optional<SomeClass>>, 0
-  %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass> // expected-note {{variable defined here}}
-
-  // Invalid load to keep the alloc_box around so we can check init semantics.
-  %c_loaded = load_weak %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
-  destroy_value %c_loaded : $Optional<SomeClass>
+  %c = mark_uninitialized [var] %ba : $*@sil_weak Optional<SomeClass>
 
   %f = function_ref @getSomeOptionalClass : $@convention(thin) () -> @owned Optional<SomeClass>
 
