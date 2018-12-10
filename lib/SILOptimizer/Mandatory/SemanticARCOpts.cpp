@@ -28,6 +28,46 @@ using namespace swift;
 
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
 
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static bool isConsumed(SILValue v,
+                       SmallVectorImpl<DestroyValueInst *> &destroys) {
+  assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
+  return !all_of(v->getUses(), [&destroys](Operand *op) {
+    // We know that a copy_value produces an @owned value. Look
+    // through all of our uses and classify them as either
+    // invalidating or not invalidating. Make sure that all of the
+    // invalidating ones are destroy_value since otherwise the
+    // live_range is not complete.
+    auto map = op->getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
+    switch (constraint) {
+    case UseLifetimeConstraint::MustBeInvalidated: {
+      // See if we have a destroy value. If we don't we have an
+      // unknown consumer. Return false, we need this live range.
+      auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
+      if (!dvi)
+        return false;
+
+      // Otherwise, return true and stash this destroy value.
+      destroys.push_back(dvi);
+      return true;
+    }
+    case UseLifetimeConstraint::MustBeLive:
+      // Ok, this constraint can take something owned as live. Lets
+      // see if it can also take something that is guaranteed. If it
+      // can not, then we bail.
+      return map.canAcceptKind(ValueOwnershipKind::Guaranteed);
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
+//                               Implementation
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 struct SemanticARCOptVisitor
@@ -125,36 +165,8 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   // guaranteed value. After that, make sure that our destroys are
   // within the lifetime of our borrowed values.
   SmallVector<DestroyValueInst *, 16> destroys;
-  for (auto *op : cvi->getUses()) {
-    // We know that a copy_value produces an @owned value. Look
-    // through all of our uses and classify them as either
-    // invalidating or not invalidating. Make sure that all of the
-    // invalidating ones are destroy_value since otherwise the
-    // live_range is not complete.
-    auto map = op->getOwnershipKindMap();
-    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
-    switch (constraint) {
-    case UseLifetimeConstraint::MustBeInvalidated:
-      // And we have a destroy_value, track it and continue.
-      if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
-        destroys.push_back(dvi);
-        continue;
-      }
-      // Otherwise, we found a non-destroy value invalidating owned
-      // user... This is not an unnecessary live range.
-      return false;
-    case UseLifetimeConstraint::MustBeLive:
-      // Ok, this constraint can take something owned as live. Lets
-      // see if it can also take something that is guaranteed. If it
-      // can not, then we bail.
-      if (!map.canAcceptKind(ValueOwnershipKind::Guaranteed)) {
-        return false;
-      }
-
-      // Otherwise, continue.
-      continue;
-    }
-  }
+  if (isConsumed(cvi, destroys))
+    return false;
 
   // If we reached this point, then we know that all of our users can
   // accept a guaranteed value and our owned value is destroyed only
