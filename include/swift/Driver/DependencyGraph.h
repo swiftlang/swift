@@ -268,10 +268,10 @@ public:
   /// If you want to see how each node gets added to \p visited, pass a local
   /// MarkTracer instance to \p tracer.
   ///
-  /// Assumes that some edge into the starting node is "cascading."
-  /// Therefore, mark the start. For each
-  /// visited node, add it to \p visited, and mark it if some incoming edge
-  /// cascades. The start node is NOT added to \p visited.
+  /// Conservatively assumes that there exists a "cascading" edge into the
+  /// starting node. Therefore, mark the start. For each visited node, add it to
+  /// \p visited, and mark it if some incoming edge cascades. The start node is
+  /// NOT added to \p visited.
   ///
   /// The traversal routines use
   /// \p visited to avoid endless recursion.
