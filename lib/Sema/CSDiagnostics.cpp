@@ -1206,3 +1206,33 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
 
   return false;
 }
+
+bool AutoClosureForwardingFailure::diagnoseAsError() {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+
+  auto &last = path.back();
+  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+
+  // We need a raw anchor here because `getAnchor()` is simplified
+  // to the argument expression.
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
+      .highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
+  return true;
+}

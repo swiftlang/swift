@@ -20,7 +20,7 @@ extension String {
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   @inlinable
   public init(_ substring: __shared Substring) {
-    self = substring._withUTF8 { return String._uncheckedFromUTF8($0) }
+    self = String._fromSubstring(substring)
   }
 }
 

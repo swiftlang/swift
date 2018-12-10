@@ -202,3 +202,25 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
+
+bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
+  auto failure =
+      AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
+                                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}
+
+bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
+}

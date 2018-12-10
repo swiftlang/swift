@@ -571,6 +571,66 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
 }
 
 Optional<ProtocolConformanceRef>
+ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  assert(type->isExistentialType());
+
+  // If the existential type cannot be represented or the protocol does not
+  // conform to itself, there's no point in looking further.
+  if (!protocol->existentialConformsToSelf())
+    return None;
+
+  auto layout = type->getExistentialLayout();
+
+  // Due to an IRGen limitation, witness tables cannot be passed from an
+  // existential to an archetype parameter, so for now we restrict this to
+  // @objc protocols.
+  if (!layout.isObjC()) {
+    // There's a specific exception for protocols with self-conforming
+    // witness tables, but the existential has to be *exactly* that type.
+    // TODO: synthesize witness tables on-demand for protocol compositions
+    // that can satisfy the requirement.
+    if (protocol->requiresSelfConformanceWitnessTable() &&
+        type->is<ProtocolType>() &&
+        type->castTo<ProtocolType>()->getDecl() == protocol)
+      return ProtocolConformanceRef(protocol);
+
+    return None;
+  }
+
+  // If the existential is class-constrained, the class might conform
+  // concretely.
+  if (auto superclass = layout.explicitSuperclass) {
+    if (auto result = lookupConformance(superclass, protocol))
+      return result;
+  }
+
+  // Otherwise, the existential might conform abstractly.
+  for (auto proto : layout.getProtocols()) {
+    auto *protoDecl = proto->getDecl();
+
+    // If we found the protocol we're looking for, return an abstract
+    // conformance to it.
+    if (protoDecl == protocol)
+      return ProtocolConformanceRef(protocol);
+
+    // If the protocol has a superclass constraint, we might conform
+    // concretely.
+    if (auto superclass = protoDecl->getSuperclass()) {
+      if (auto result = lookupConformance(superclass, protocol))
+        return result;
+    }
+
+    // Now check refined protocols.
+    if (protoDecl->inheritsFrom(protocol))
+      return ProtocolConformanceRef(protocol);
+  }
+
+  // We didn't find our protocol in the existential's list; it doesn't
+  // conform.
+  return None;
+}
+
+Optional<ProtocolConformanceRef>
 ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   ASTContext &ctx = getASTContext();
 
@@ -609,52 +669,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   // An existential conforms to a protocol if the protocol is listed in the
   // existential's list of conformances and the existential conforms to
   // itself.
-  if (type->isExistentialType()) {
-    // If the existential type cannot be represented or the protocol does not
-    // conform to itself, there's no point in looking further.
-    if (!protocol->existentialConformsToSelf())
-      return None;
-
-    auto layout = type->getExistentialLayout();
-
-    // Due to an IRGen limitation, witness tables cannot be passed from an
-    // existential to an archetype parameter, so for now we restrict this to
-    // @objc protocols.
-    if (!layout.isObjC())
-      return None;
-
-    // If the existential is class-constrained, the class might conform
-    // concretely.
-    if (auto superclass = layout.explicitSuperclass) {
-      if (auto result = lookupConformance(superclass, protocol))
-        return result;
-    }
-
-    // Otherwise, the existential might conform abstractly.
-    for (auto proto : layout.getProtocols()) {
-      auto *protoDecl = proto->getDecl();
-
-      // If we found the protocol we're looking for, return an abstract
-      // conformance to it.
-      if (protoDecl == protocol)
-        return ProtocolConformanceRef(protocol);
-
-      // If the protocol has a superclass constraint, we might conform
-      // concretely.
-      if (auto superclass = protoDecl->getSuperclass()) {
-        if (auto result = lookupConformance(superclass, protocol))
-          return result;
-      }
-
-      // Now check refined protocols.
-      if (protoDecl->inheritsFrom(protocol))
-        return ProtocolConformanceRef(protocol);
-    }
-
-    // We didn't find our protocol in the existential's list; it doesn't
-    // conform.
-    return None;
-  }
+  if (type->isExistentialType())
+    return lookupExistentialConformance(type, protocol);
 
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
@@ -669,7 +685,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  if (!nominal) return None;
+  if (!nominal || isa<ProtocolDecl>(nominal)) return None;
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;

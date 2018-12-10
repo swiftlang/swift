@@ -453,6 +453,17 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.typeCheckAbstractFunctionBody(AFD);
     }
 
+    // Synthesize any necessary function bodies.
+    // FIXME: If we're not planning to run SILGen, this is wasted effort.
+    while (!TC.FunctionsToSynthesize.empty()) {
+      auto function = TC.FunctionsToSynthesize.back().second;
+      TC.FunctionsToSynthesize.pop_back();
+      if (function.getDecl()->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.synthesizeFunctionBody(function);
+    }
+
     // Type check external definitions.
     for (unsigned n = TC.Context.ExternalDefinitions.size();
          currentExternalDef != n;
@@ -481,17 +492,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         continue;
 
       TC.validateDecl(decl);
-    }
-
-    // Synthesize any necessary function bodies.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.FunctionsToSynthesize.empty()) {
-      auto function = TC.FunctionsToSynthesize.back().second;
-      TC.FunctionsToSynthesize.pop_back();
-      if (function.getDecl()->isInvalid() || TC.Context.hadError())
-        continue;
-
-      TC.synthesizeFunctionBody(function);
     }
 
     // Validate any referenced declarations for SIL's purposes.

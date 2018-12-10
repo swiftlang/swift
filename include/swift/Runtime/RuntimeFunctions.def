@@ -942,7 +942,7 @@ FUNCTION(DynamicCastClass, swift_dynamicCastClass, C_CC,
 FUNCTION(DynamicCastClassUnconditional, swift_dynamicCastClassUnconditional,
          C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastObjCClass(void*, void*);
@@ -955,7 +955,7 @@ FUNCTION(DynamicCastObjCClass, swift_dynamicCastObjCClass, C_CC,
 FUNCTION(DynamicCastObjCClassUnconditional,
          swift_dynamicCastObjCClassUnconditional, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // void *swift_dynamicCastUnknownClass(void*, void*);
@@ -968,7 +968,7 @@ FUNCTION(DynamicCastUnknownClass, swift_dynamicCastUnknownClass, C_CC,
 FUNCTION(DynamicCastUnknownClassUnconditional,
          swift_dynamicCastUnknownClassUnconditional, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // type *swift_dynamicCastMetatype(type*, type*);
@@ -981,7 +981,7 @@ FUNCTION(DynamicCastMetatype, swift_dynamicCastMetatype, C_CC,
 FUNCTION(DynamicCastMetatypeUnconditional,
          swift_dynamicCastMetatypeUnconditional, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // objc_class *swift_dynamicCastObjCClassMetatype(objc_class*, objc_class*);
@@ -995,7 +995,7 @@ FUNCTION(DynamicCastObjCClassMetatype, swift_dynamicCastObjCClassMetatype,
 FUNCTION(DynamicCastObjCClassMetatypeUnconditional,
          swift_dynamicCastObjCClassMetatypeUnconditional, C_CC,
          RETURNS(ObjCClassPtrTy),
-         ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy, ObjCClassPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadOnly))
 
 // bool swift_dynamicCast(opaque*, opaque*, type*, type*, size_t);
@@ -1011,7 +1011,7 @@ FUNCTION(DynamicCast, swift_dynamicCast, C_CC,
 FUNCTION(DynamicCastTypeToObjCProtocolUnconditional,
          swift_dynamicCastTypeToObjCProtocolUnconditional, C_CC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
 // type* swift_dynamicCastTypeToObjCProtocolConditional(type* object,
@@ -1029,7 +1029,7 @@ FUNCTION(DynamicCastTypeToObjCProtocolConditional,
 FUNCTION(DynamicCastObjCProtocolUnconditional,
          swift_dynamicCastObjCProtocolUnconditional, C_CC,
          RETURNS(ObjCPtrTy),
-         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy),
+         ARGS(ObjCPtrTy, SizeTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind))
 
 // id swift_dynamicCastObjCProtocolConditional(id object,
@@ -1045,7 +1045,7 @@ FUNCTION(DynamicCastObjCProtocolConditional,
 FUNCTION(DynamicCastMetatypeToObjectUnconditional,
          swift_dynamicCastMetatypeToObjectUnconditional, C_CC,
          RETURNS(ObjCPtrTy),
-         ARGS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ReadNone))
 
 // id swift_dynamicCastMetatypeToObjectConditional(type *type);

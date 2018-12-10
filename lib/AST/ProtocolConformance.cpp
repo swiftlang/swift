@@ -112,13 +112,15 @@ ProtocolConformanceRef::subst(Type origType,
   if (substType->isOpenedExistential())
     return *this;
 
-  // If the substituted type is an existential, we have a self-conforming
-  // existential being substituted in place of itself. There's no
-  // conformance information in this case, so just return.
-  if (substType->isObjCExistentialType())
-    return *this;
-
   auto *proto = getRequirement();
+
+  // If the type is an existential, it must be self-conforming.
+  if (substType->isExistentialType()) {
+    auto optConformance =
+      proto->getModuleContext()->lookupExistentialConformance(substType, proto);
+    assert(optConformance && "existential type didn't self-conform");
+    return *optConformance;
+  }
 
   // Check the conformance map.
   if (auto result = conformances(origType->getCanonicalType(),
@@ -390,6 +392,29 @@ bool RootProtocolConformance::isInvalid() const {
 
 SourceLoc RootProtocolConformance::getLoc() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
+}
+
+bool RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
+  auto *dc = getDeclContext();
+  if (dc->getParentModule() == fromModule)
+    return false;
+
+  // If the protocol is weak imported, so are any conformances to it.
+  if (getProtocol()->isWeakImported(fromModule))
+    return true;
+
+  // If the conforming type is weak imported, so are any of its conformances.
+  if (auto *nominal = getType()->getAnyNominal())
+    if (nominal->isWeakImported(fromModule))
+      return true;
+
+  // If the conformance is declared in an extension with the @_weakLinked
+  // attribute, it is weak imported.
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    if (ext->isWeakImported(fromModule))
+      return true;
+
+  return false;
 }
 
 bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
@@ -1407,9 +1432,12 @@ DeclContext::getLocalConformances(
   if (!nominal)
     return result;
 
-  // Protocols don't have conformances.
-  if (isa<ProtocolDecl>(nominal))
+  // Protocols only have self-conformances.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    if (protocol->requiresSelfConformanceWitnessTable())
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     return { };
+  }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();

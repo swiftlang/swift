@@ -651,7 +651,8 @@ public:
                            SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
-                           IsFreeFunctionWitness_t isFree);
+                           IsFreeFunctionWitness_t isFree,
+                           bool isSelfConformance);
   
   /// Convert a block to a native function with a thunk.
   ManagedValue emitBlockToFunc(SILLocation loc,

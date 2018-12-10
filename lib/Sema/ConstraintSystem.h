@@ -3466,6 +3466,13 @@ void simplifyLocator(Expr *&anchor,
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
+/// Retrieve argument at specified index from given expression.
+/// The expression could be "application", "subscript" or "member" call.
+///
+/// \returns argument expression or `nullptr` if given "base" expression
+/// wasn't of one of the kinds listed above.
+Expr *getArgumentExpr(Expr *expr, unsigned index);
+
 class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;

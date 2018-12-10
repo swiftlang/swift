@@ -62,12 +62,16 @@ swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
 /// \param object The object to cast.
 /// \param targetType The type to which we are casting, which is known to be
 /// a Swift class type.
+/// \param file The source filename from which to report failure. May be null.
+/// \param line The source line from which to report failure.
+/// \param column The source column from which to report failure.
 ///
 /// \returns the object.
 SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastClassUnconditional(const void *object,
-                                    const ClassMetadata *targetType);
+                                    const ClassMetadata *targetType,
+                                    const char *file, unsigned line, unsigned column);
 
 #if SWIFT_OBJC_INTEROP
 /// \brief Checked Objective-C-style dynamic cast to a class type.
@@ -103,25 +107,33 @@ swift_dynamicCastForeignClass(const void *object,
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
 /// a class type, but not necessarily valid type metadata.
+/// \param file The source filename from which to report failure. May be null.
+/// \param line The source line from which to report failure.
+/// \param column The source column from which to report failure.
 ///
 /// \returns the object.
 SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastObjCClassUnconditional(const void *object,
-                                        const ClassMetadata *targetType);
+                                        const ClassMetadata *targetType,
+                                        const char *file, unsigned line, unsigned column);
 
 /// \brief Unconditional, checked dynamic cast to a foreign class type.
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
 /// a foreign class type.
+/// \param file The source filename from which to report failure. May be null.
+/// \param line The source line from which to report failure.
+/// \param column The source column from which to report failure.
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
 SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastForeignClassUnconditional(
   const void *object,
-  const ForeignClassMetadata *targetType);
+  const ForeignClassMetadata *targetType,
+  const char *file, unsigned line, unsigned column);
 #endif
 
 /// \brief Checked dynamic cast of a class instance pointer to the given type.
@@ -146,11 +158,16 @@ swift_dynamicCastUnknownClass(const void *object, const Metadata *targetType);
 /// \param targetType The type to which we are casting, which may be either a
 /// class type or a wrapped Objective-C class type.
 ///
+/// \param file The source filename from which to report failure. May be null.
+/// \param line The source line from which to report failure.
+/// \param column The source column from which to report failure.
+///
 /// \returns the object.
 SWIFT_RUNTIME_EXPORT
 const void *
 swift_dynamicCastUnknownClassUnconditional(const void *object,
-                                           const Metadata *targetType);
+                                           const Metadata *targetType,
+                                           const char *file, unsigned line, unsigned column);
 
 SWIFT_RUNTIME_EXPORT
 const Metadata *
@@ -159,7 +176,8 @@ swift_dynamicCastMetatype(const Metadata *sourceType,
 SWIFT_RUNTIME_EXPORT
 const Metadata *
 swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
-                                       const Metadata *targetType);
+                                       const Metadata *targetType,
+                                       const char *file, unsigned line, unsigned column);
 #if SWIFT_OBJC_INTEROP
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
@@ -168,7 +186,8 @@ swift_dynamicCastObjCClassMetatype(const ClassMetadata *sourceType,
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
-                                                const ClassMetadata *targetType);
+                                                const ClassMetadata *targetType,
+                                                const char *file, unsigned line, unsigned column);
 #endif
 
 SWIFT_RUNTIME_EXPORT
@@ -179,7 +198,8 @@ SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_dynamicCastForeignClassMetatypeUnconditional(
   const ClassMetadata *sourceType,
-  const ClassMetadata *targetType);
+  const ClassMetadata *targetType,
+  const char *file, unsigned line, unsigned column);
 
 /// \brief Return the dynamic type of an opaque value.
 ///

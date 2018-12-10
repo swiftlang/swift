@@ -356,6 +356,9 @@ public:
 
   bool isInvalid() const;
 
+  /// Whether this conformance is weak-imported.
+  bool isWeakImported(ModuleDecl *fromModule) const;
+
   bool hasWitness(ValueDecl *requirement) const;
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 

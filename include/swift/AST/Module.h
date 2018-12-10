@@ -385,6 +385,11 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol);
 
+  /// Look for the conformance of the given existential type to the given
+  /// protocol.
+  Optional<ProtocolConformanceRef>
+  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///

@@ -845,13 +845,15 @@ public:
 template <typename Runtime>
 struct TargetMethodOverrideDescriptor {
   /// The class containing the base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>> Class;
+  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>,
+                                    /*nullable*/ true> Class;
 
   /// The base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>> Method;
+  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>,
+                                    /*nullable*/ true> Method;
 
   /// The implementation of the override.
-  TargetRelativeDirectPointer<Runtime, void, /*Nullable=*/true> Impl;
+  TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> Impl;
 };
 
 /// Header for a class vtable override descriptor. This is a variable-sized

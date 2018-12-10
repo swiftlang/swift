@@ -413,6 +413,11 @@ extension FloatingPoint {
   public var isQuietNaN: Bool { return isNaN && !isSignalingNaN }
 }
 
+func genericAbs<T: SignedNumeric & Comparable>(_ x: T) -> T {
+  return abs(x)
+}
+
+
 %for Self in ['Float', 'Double', 'Float80']:
 % if Self == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
@@ -533,6 +538,12 @@ FloatingPoint.test("${Self}.significandWidth") {
   expectEqual(0, ${Self}(2).significandWidth)
   expectEqual(1, ${Self}(3).significandWidth)
 }
+
+FloatingPoint.test("${Self}.absNegativeZero") {
+  expectEqual(abs(${Self}(-0.0)), ${Self}(0.0))
+  expectEqual(genericAbs(${Self}(-0.0)), ${Self}(0.0))
+}
+
 % if Self == 'Float80':
 #endif
 % end

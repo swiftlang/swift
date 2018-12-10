@@ -848,18 +848,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
     assert(anchor);
 
-    auto *call = dyn_cast<ApplyExpr>(anchor);
-    if (!call)
-      return false;
-
-    Expr *argExpr = nullptr;
-    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
-      assert(argsWithLabels.size() == 1);
-      argExpr = PE->getSubExpr();
-    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
-      argExpr = TE->getElement(argIdx);
-    }
-
+    auto *argExpr = getArgumentExpr(anchor, argIdx);
     if (!argExpr)
       return false;
 
@@ -895,11 +884,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // is itself `@autoclosure` function type in Swift < 5,
       // let's fix that up by making it look like argument is
       // called implicitly.
-      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
-        if (param.isAutoClosure() &&
-            isAutoClosureArg(locator.getAnchor(), argIdx)) {
-          argTy = argTy->castTo<FunctionType>()->getResult();
-          cs.increaseScore(SK_FunctionConversion);
+      if (param.isAutoClosure() &&
+          isAutoClosureArg(locator.getAnchor(), argIdx)) {
+        argTy = argTy->castTo<FunctionType>()->getResult();
+        cs.increaseScore(SK_FunctionConversion);
+
+        if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+          auto *fixLoc = cs.getConstraintLocator(loc);
+          if (cs.recordFix(AutoClosureForwarding::create(cs, fixLoc)))
+            return cs.getTypeMatchFailure(loc);
         }
       }
 
@@ -1969,21 +1962,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      ConstraintKind subKind = ConstraintKind::Equal;
       // A.Type < B.Type if A < B and both A and B are classes.
-      if (isa<MetatypeType>(meta1) &&
-          meta1->getInstanceType()->mayHaveSuperclass() &&
-          meta2->getInstanceType()->getClassOrBoundGenericClass())
-        subKind = std::min(kind, ConstraintKind::Subtype);
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes.
-      else if (isa<ExistentialMetatypeType>(meta1))
-        subKind = std::min(kind, ConstraintKind::Subtype);
-      
-      return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        subKind, subflags,
-                        locator.withPathElement(
-                          ConstraintLocator::InstanceType));
+      // and Q.Type are both existential metatypes
+      auto subKind = std::min(kind, ConstraintKind::Subtype);
+      // If instance types can't have a subtype relationship
+      // it means that such types can be simply equated.
+      auto instanceType1 = meta1->getInstanceType();
+      auto instanceType2 = meta2->getInstanceType();
+      if (isa<MetatypeType>(meta1) &&
+          !(instanceType1->mayHaveSuperclass() &&
+            instanceType2->getClassOrBoundGenericClass())) {
+        subKind = ConstraintKind::Equal;
+      }
+
+      return matchTypes(
+          instanceType1, instanceType2, subKind, subflags,
+          locator.withPathElement(ConstraintLocator::InstanceType));
     }
 
     case TypeKind::Function: {
@@ -2984,10 +2979,27 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
     return SolutionKind::Unsolved;
   }
   
-  // If the base type is not optional, the constraint fails.
+
   Type objectTy = optTy->getOptionalObjectType();
-  if (!objectTy)
-    return SolutionKind::Error;
+  // If the base type is not optional, let's attempt a fix (if possible)
+  // and assume that `!` is just not there.
+  if (!objectTy) {
+    // Let's see if we can apply a specific fix here.
+    if (shouldAttemptFixes()) {
+      auto *fix =
+          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      // If the fix was successful let's record
+      // "fixed" object type and continue.
+      objectTy = optTy;
+    } else {
+      // If fixes are not allowed, no choice but to fail.
+      return SolutionKind::Error;
+    }
+  }
   
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
@@ -5431,6 +5443,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
+  case FixKind::AutoClosureForwarding:
+  case FixKind::RemoveUnwrap:
     llvm_unreachable("handled elsewhere");
   }
 

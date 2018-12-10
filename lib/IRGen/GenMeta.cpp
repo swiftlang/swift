@@ -729,6 +729,15 @@ namespace {
               B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
+        if (entry.isBase()) {
+          // Define a base conformance descriptor, which is just an associated
+          // conformance descriptor for a base protocol.
+          BaseConformance conformance(Proto, entry.getBase());
+          IGM.defineBaseConformanceDescriptor(
+              conformance,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
+        }
+
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);

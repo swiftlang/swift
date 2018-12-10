@@ -402,7 +402,9 @@ public:
     if (isInOut && !AFR.isKnownNoEscape() && !isNested) {
       if (D->getBaseName() == D->getASTContext().Id_self) {
         TC.diagnose(DRE->getLoc(),
-          diag::closure_implicit_capture_mutating_self);
+                    diag::closure_implicit_capture_mutating_self);
+        TC.diagnose(DRE->getLoc(),
+                    diag::create_mutating_copy_or_capture_self);
       } else {
         TC.diagnose(DRE->getLoc(),
           diag::closure_implicit_capture_without_noescape);

@@ -146,7 +146,8 @@ Globals
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
-  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc-type-list protocol 'WT' // associated type witness table accessor
+  global ::= protocol-conformance protocol 'Wb' // base protocol witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
@@ -200,6 +201,7 @@ types where the metadata itself has unknown layout.)
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
   global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
   global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
+  global ::= type protocol 'Tb'          // base conformance descriptor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk

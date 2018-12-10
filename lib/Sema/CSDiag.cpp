@@ -3056,9 +3056,13 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
         // Look at each of the arguments assigned to this parameter.
         auto currentParamType = param.getOldType();
 
-        if (param.isAutoClosure())
-          currentParamType =
-              currentParamType->castTo<FunctionType>()->getResult();
+        // Since this is diagnostics, let's make sure that parameter
+        // marked as @autoclosure indeed has a function type, because
+        // it can also be an error type and possibly unresolved type.
+        if (param.isAutoClosure()) {
+          if (auto *funcType = currentParamType->getAs<FunctionType>())
+            currentParamType = funcType->getResult();
+        }
 
         for (auto inArgNo : paramBindings[paramIdx]) {
           // Determine the argument type.

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
@@ -167,13 +167,37 @@ func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
 // These are all arguably invalid; the autoclosure should have to be called.
 // But as long as we allow them, we shouldn't crash.
 func passNonThrowingToNonThrowingAC(_ fn: @autoclosure () -> Int) {
-  takesAutoclosure(fn)
+  takesAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{22-22=()}}
 }
 func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
-  takesThrowingAutoclosure(fn)
+  takesThrowingAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{30-30=()}}
 }
 func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
-  takesThrowingAutoclosure(fn)
+  takesThrowingAutoclosure(fn) // expected-error {{add () to forward @autoclosure parameter}} {{30-30=()}}
+}
+
+func passAutoClosureToSubscriptAndMember(_ fn: @autoclosure () -> Int) {
+  struct S {
+    func bar(_: Int, _ fun: @autoclosure () -> Int) {}
+
+    subscript(_ fn: @autoclosure () -> Int) -> Int { return fn() }
+
+    static func foo(_ fn: @autoclosure () -> Int) {}
+  }
+
+  let s = S()
+  let _ = s.bar(42, fn) // expected-error {{add () to forward @autoclosure parameter}} {{23-23=()}}
+  let _ = s[fn] // expected-error {{add () to forward @autoclosure parameter}} {{15-15=()}}
+  let _ = S.foo(fn) // expected-error {{add () to forward @autoclosure parameter}} {{19-19=()}}
+}
+
+func passAutoClosureToEnumCase(_ fn: @autoclosure () -> Int) {
+  enum E {
+    case baz(@autoclosure () -> Int)
+  }
+
+  let _: E = .baz(42) // Ok
+  let _: E = .baz(fn) // expected-error {{add () to forward @autoclosure parameter}} {{21-21=()}}
 }
 
 // rdar://problem/20591571 - Various type inference problems with @autoclosure

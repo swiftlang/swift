@@ -557,6 +557,12 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (auto *dtor = dyn_cast<DestructorDecl>(this))
     return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
 
+  auto *dc = getDeclContext();
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    return ext->isWeakImported(fromModule);
+  if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
+    return ntd->isWeakImported(fromModule);
+
   // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
@@ -2405,8 +2411,7 @@ bool ValueDecl::isUsableFromInline() const {
       return true;
 
   if (auto *containingProto = dyn_cast<ProtocolDecl>(getDeclContext())) {
-    if (isProtocolRequirement() &&
-        containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
+    if (containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
   }
 
@@ -3863,15 +3868,22 @@ bool ProtocolDecl::requiresClassSlow() {
   return Bits.ProtocolDecl.RequiresClass;
 }
 
+bool ProtocolDecl::requiresSelfConformanceWitnessTable() const {
+  return isSpecificProtocol(KnownProtocolKind::Error);
+}
+
 bool ProtocolDecl::existentialConformsToSelfSlow() {
   // Assume for now that the existential conforms to itself; this
   // prevents circularity issues.
   Bits.ProtocolDecl.ExistentialConformsToSelfValid = true;
   Bits.ProtocolDecl.ExistentialConformsToSelf = true;
 
+  // If it's not @objc, it conforms to itself only if it has a
+  // self-conformance witness table.
   if (!isObjC()) {
-    Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-    return false;
+    bool hasSelfConformance = requiresSelfConformanceWitnessTable();
+    Bits.ProtocolDecl.ExistentialConformsToSelf = hasSelfConformance;
+    return hasSelfConformance;
   }
 
   // Check whether this protocol conforms to itself.

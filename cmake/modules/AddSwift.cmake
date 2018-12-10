@@ -428,6 +428,9 @@ function(_add_variant_link_flags)
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
+    # We provide our own C++ below, so we ask the linker not to do it. However,
+    # we need to add the math library, which is linked implicitly by libc++.
+    list(APPEND result "-nostdlib++" "-lm")
     if("${LFLAGS_ARCH}" MATCHES armv7)
       list(APPEND result "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
@@ -933,10 +936,15 @@ function(_add_swift_library_single target name)
       # target_sources(${target}
       #                PRIVATE
       #                  $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}>)
+      if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
+        set(extension .obj)
+      else()
+        set(extension .o)
+      endif()
       target_sources(${target}
                      PRIVATE
-                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
-      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}"
+                       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}")
+      set_source_files_properties("${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}/swiftrt${extension}"
                                   PROPERTIES
                                     GENERATED 1)
     endif()
@@ -2136,11 +2144,20 @@ function(_add_swift_executable_single name)
   # Find the names of dependency library targets.
   #
   # We don't add the ${ARCH} to the target suffix because we want to link
-  # against fat libraries.
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
-      SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  # against fat libraries.  This only works for the Darwin targets as MachO is
+  # the only format with the fat libraries.
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  else()
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+    set(SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
+  endif()
 
   handle_swift_sources(
       dependency_target

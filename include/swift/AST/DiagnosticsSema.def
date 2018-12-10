@@ -1081,6 +1081,8 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
+ERROR(invalid_autoclosure_forwarding,none,
+      "add () to forward @autoclosure parameter", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -1873,6 +1875,9 @@ NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not "
      "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
+NOTE(protocol_witness_circularity,none,
+     "candidate references itself", ())
+
 NOTE(protocol_conformance_here,none,
      "%select{|class }0%1 declares conformance to protocol %2 here",
      (bool, DeclName, DeclName))
@@ -1980,8 +1985,8 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(recursive_type_reference,none,
-      "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
+ERROR(recursive_decl_reference,none,
+      "%0 %1 references itself", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
@@ -2942,8 +2947,11 @@ ERROR(closure_implicit_capture_without_noescape,none,
       "escaping closures can only capture inout parameters explicitly by value",
       ())
 ERROR(closure_implicit_capture_mutating_self,none,
-      "closure cannot implicitly capture a mutating self parameter",
+      "escaping closure cannot capture a mutating self parameter",
       ())
+NOTE(create_mutating_copy_or_capture_self,none,
+     "create a mutating copy of self, or explicitly capture self for immutability",
+     ())
 ERROR(nested_function_with_implicit_capture_argument,none,
       "nested function with %select{an |}0implicitly captured inout "
       "parameter%select{|s}0 can only be used as a non-escaping argument", (bool))
@@ -4101,27 +4109,33 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
+#define DECL_OR_ACCESSOR "%select{%0|%0 for}"
+
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
-        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
-     none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not public",
+     (DescriptiveDeclKind, DeclName, bool))
 
 NOTE(resilience_decl_declared_here,
-     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not '@usableFromInline' or public",
+     (DescriptiveDeclKind, DeclName, bool))
+
+#undef DECL_OR_ACCESSOR
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
