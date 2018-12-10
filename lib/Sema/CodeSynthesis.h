@@ -49,9 +49,13 @@ void makeFinal(ASTContext &ctx, ValueDecl *D);
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void maybeAddAccessorsToStorage(TypeChecker &TC, AbstractStorageDecl *storage);
+void maybeAddAccessorsToStorage(AbstractStorageDecl *storage);
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
+
+/// Provide storage and accessor implementations for the given property,
+/// which must be lazy.
+void completeLazyVarImplementation(VarDecl *lazyVar);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.
