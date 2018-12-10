@@ -75,3 +75,18 @@ bb0(%0 : $AnyObject):
   %1 = existential_metatype $@objc_metatype AnyObject.Type, %0 : $AnyObject
   return %1 : $@objc_metatype AnyObject.Type
 }
+
+
+public protocol ClassProto : AnyObject {
+  var other: ClassProto? { get }
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @drop_witness_table(%swift.type*, i8**)
+// CHECK:  call %objc_class* @swift_getObjCClassFromMetadata(%swift.type* %0)
+// CHECK:  ret void
+sil @drop_witness_table : $@convention(thin) (@thick ClassProto.Type) -> () {
+bb0(%0 : $@thick ClassProto.Type):
+  %1 = thick_to_objc_metatype %0 : $@thick ClassProto.Type to $@objc_metatype ClassProto.Type
+  %2 = tuple ()
+  return %2 : $()
+}
