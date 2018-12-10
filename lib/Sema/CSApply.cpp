@@ -4090,7 +4090,7 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
-        maybeAddAccessorsToStorage(tc, var);
+        maybeAddAccessorsToStorage(var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {

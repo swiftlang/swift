@@ -2018,7 +2018,7 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
   TC.validateDecl(storage);
 
   // Add any mandatory accessors now.
-  maybeAddAccessorsToStorage(TC, storage);
+  maybeAddAccessorsToStorage(storage);
 
   for (auto accessor : storage->getAllAccessors()) {
     // Are there accessors we can safely ignore here, like maybe observers?
@@ -2124,7 +2124,7 @@ public:
     TC.validateDecl(VD);
 
     // Set up accessors.
-    maybeAddAccessorsToStorage(TC, VD);
+    maybeAddAccessorsToStorage(VD);
 
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
@@ -4292,7 +4292,7 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     // because if they never get validated at all then conformance checkers
     // will complain about selector mismatches.
     if (storage->isObjC()) {
-      maybeAddAccessorsToStorage(*this, storage);
+      maybeAddAccessorsToStorage(storage);
       for (auto accessor : storage->getAllAccessors()) {
         requestMemberLayout(accessor);
       }
@@ -4345,7 +4345,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
       finalizeAbstractStorageDecl(TC, prop);
-      TC.completeLazyVarImplementation(prop);
+      completeLazyVarImplementation(prop);
     }
   }
 

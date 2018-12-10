@@ -620,10 +620,8 @@ static bool checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var,
   auto dc = var->getDeclContext();
   auto proto = getNSCopyingProtocol(ctx, dc);
 
-  // FIXME: Remove this usage of TypeChecker
-  auto &TC = *(TypeChecker *) ctx.getLazyResolver();
-  if (!proto || !TC.conformsToProtocol(type, proto, dc, None)) {
-    TC.diagnose(var->getLoc(), diag::nscopying_doesnt_conform);
+  if (!proto || !TypeChecker::conformsToProtocol(type, proto, dc, None)) {
+    ctx.Diags.diagnose(var->getLoc(), diag::nscopying_doesnt_conform);
     return true;
   }
   return false;
@@ -1337,7 +1335,9 @@ static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
                                          underlyingStorage, ctx);
 }
 
-void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
+void swift::completeLazyVarImplementation(VarDecl *VD) {
+  auto &Context = VD->getASTContext();
+
   assert(VD->getAttrs().hasAttribute<LazyAttr>());
   assert(VD->getReadImpl() == ReadImplKind::Get);
   assert(VD->getWriteImpl() == WriteImplKind::Set);
@@ -1406,13 +1406,13 @@ static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
 void swift::triggerAccessorSynthesis(TypeChecker &TC,
                                      AbstractStorageDecl *storage) {
   auto VD = dyn_cast<VarDecl>(storage);
-  maybeAddAccessorsToStorage(TC, storage);
+  maybeAddAccessorsToStorage(storage);
 
   // Synthesize accessors for lazy, all checking already been performed.
   bool lazy = false;
   if (VD && VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
       !VD->getGetter()->hasBody()) {
-    TC.completeLazyVarImplementation(VD);
+    completeLazyVarImplementation(VD);
     lazy = true;
   }
 
@@ -1466,11 +1466,12 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
 /// Note that the parser synthesizes accessors in some cases:
 ///   - it synthesizes a getter and setter for an observing property
 ///   - it synthesizes a setter for get+mutableAddress
-void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
-                                       AbstractStorageDecl *storage) {
+void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
+  auto &ctx = storage->getASTContext();
+
   // Lazy properties require special handling.
   if (storage->getAttrs().hasAttribute<LazyAttr>()) {
-    maybeAddAccessorsToLazyVariable(cast<VarDecl>(storage), TC.Context);
+    maybeAddAccessorsToLazyVariable(cast<VarDecl>(storage), ctx);
     return;
   }
 
@@ -1487,7 +1488,7 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   if (!dc->isTypeContext()) {
     // dynamic globals need accessors.
     if (dc->isModuleScopeContext() && storage->isNativeDynamic()) {
-      addTrivialAccessorsToStorage(storage, TC.Context);
+      addTrivialAccessorsToStorage(storage, ctx);
       return;
     }
     // Fixed-layout global variables don't get accessors.
@@ -1502,12 +1503,13 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
       auto var = cast<VarDecl>(storage);
 
       if (var->isLet()) {
-        TC.diagnose(var->getLoc(),
-                   diag::protocol_property_must_be_computed_var)
+        ctx.Diags.diagnose(var->getLoc(),
+                           diag::protocol_property_must_be_computed_var)
           .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
           .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
       } else {
-        auto diag = TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+        auto diag = ctx.Diags.diagnose(var->getLoc(),
+                                       diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
 
         if (braces.isValid())
@@ -1517,14 +1519,14 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
       }
     }
 
-    setProtocolStorageImpl(storage, TC.Context);
+    setProtocolStorageImpl(storage, ctx);
     return;
 
   // NSManaged properties on classes require special handling.
   } else if (dc->getSelfClassDecl()) {
     auto var = dyn_cast<VarDecl>(storage);
     if (var && var->getAttrs().hasAttribute<NSManagedAttr>()) {
-      convertNSManagedStoredVarToComputed(var, TC.Context);
+      convertNSManagedStoredVarToComputed(var, ctx);
       return;
     }
 
@@ -1539,13 +1541,13 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   if (auto sourceFile = dc->getParentSourceFile())
     if (sourceFile->Kind == SourceFileKind::SIL) {
       if (storage->getGetter()) {
-        addExpectedOpaqueAccessorsToStorage(storage, TC.Context);
+        addExpectedOpaqueAccessorsToStorage(storage, ctx);
       }
       return;
     }
 
   // Everything else gets mandatory accessors.
-  addTrivialAccessorsToStorage(storage, TC.Context);
+  addTrivialAccessorsToStorage(storage, ctx);
 }
 
 static void synthesizeGetterBody(AccessorDecl *getter,
