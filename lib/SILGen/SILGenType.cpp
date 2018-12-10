@@ -608,18 +608,30 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // The generic environment for the witness thunk.
   auto *genericEnv = witness.getSyntheticEnvironment();
+  CanGenericSignature genericSig;
+  if (genericEnv)
+    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
 
   // The type of the witness thunk.
-  auto substReqtTy =
-        cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubMap)->getCanonicalType());
+  auto reqtSubstTy = cast<AnyFunctionType>(
+    reqtOrigTy->substGenericArgs(reqtSubMap)
+      ->getCanonicalType(genericSig));
 
-  // If there's something to map to for the witness thunk, the conformance
-  // should be phrased in the same terms. This particularly applies to classes
-  // where a thunk for a method in a conformance like `extension Class: P where
-  // T: Q` will go from its native signature of `<τ_0_0 where τ_0_0: Q>` (with T
-  // canonicalised to τ_0_0), to `<τ_0_0, τ_1_0 where τ_0_0: Class<τ_1_0>,
-  // τ_1_0: Q>` (with T now represented by τ_1_0). Find the right conformance by
-  // looking for the conformance of 'Self'.
+  // Generic signatures where all parameters are concrete are lowered away
+  // at the SILFunctionType level.
+  if (genericSig && genericSig->areAllParamsConcrete()) {
+    genericSig = nullptr;
+    genericEnv = nullptr;
+  }
+
+  // Rewrite the conformance in terms of the requirement environment's Self
+  // type, which might have a different generic signature than the type
+  // itself.
+  //
+  // For example, if the conforming type is a class and the witness is defined
+  // in a protocol extension, the generic signature will have an additional
+  // generic parameter representing Self, so the generic parameters of the
+  // class will all be shifted down by one.
   if (reqtSubMap) {
     auto requirement = conformance.getRequirement();
     auto self = requirement->getSelfInterfaceType()->getCanonicalType();
@@ -627,12 +639,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
     conformance = *reqtSubMap.lookupConformance(self, requirement);
   }
 
-  CanAnyFunctionType reqtSubstTy =
-    CanAnyFunctionType::get(genericEnv ? genericEnv->getGenericSignature()
-                                                   ->getCanonicalSignature()
-                                       : nullptr,
-                            substReqtTy->getParams(),
-                            substReqtTy.getResult(),
+  reqtSubstTy =
+    CanAnyFunctionType::get(genericSig,
+                            reqtSubstTy->getParams(),
+                            reqtSubstTy.getResult(),
                             reqtOrigTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
@@ -648,10 +658,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
         witness.getSubstitutions().mapReplacementTypesOutOfContext();
     }
   }
-
-  // FIXME: this needs to pull out the conformances/witness-tables for any
-  // conditional requirements from the witness table and pass them to the
-  // underlying function in the thunk.
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
