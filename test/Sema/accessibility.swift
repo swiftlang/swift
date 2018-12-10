@@ -807,3 +807,7 @@ private extension ClassWithProperties {
     set {}
   }
 }
+
+public var inferredType = PrivateStruct() // expected-error {{variable cannot be declared public because its type 'PrivateStruct' uses a private type}}
+public var inferredGenericParameters: Optional = PrivateStruct() // expected-error {{variable cannot be declared public because its type uses a private type}}
+public var explicitType: Optional<PrivateStruct> = PrivateStruct() // expected-error {{variable cannot be declared public because its type uses a private type}}
