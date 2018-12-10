@@ -3125,12 +3125,12 @@ public:
   /// resulting function will preserve all `ExtInfo` of the original function,
   /// including `@autodiff`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
-      const AutoDiffParameterIndices &indices, unsigned resultIndex,
+      AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance, bool selfUncurried = false);
 
   AnyFunctionType *
-  getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
+  getAutoDiffAdjointFunctionType(AutoDiffParameterIndices *indices,
                                  const TupleType *primalResultTy);
 
   /// \brief True if this type allows an implicit conversion from a function

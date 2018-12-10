@@ -2305,14 +2305,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto uncheckedWrtParams = attr->getParameters();
 
   // We will put the checked wrt param indices here.
-  auto *checkedWrtParamIndices = AutoDiffParameterIndices::create(
-      ctx, originalFnTy,
+  AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
+      originalFnTy,
       /*isMethod*/ original->getImplicitSelfDecl() ? true : false);
 
   if (uncheckedWrtParams.empty()) {
     // If 'wrt:' is not specified, the wrt parameters are all the parameters in
     // the main parameter group. Self is intentionally excluded.
-    checkedWrtParamIndices->setAllNonSelfParameters();
+    autoDiffParameterIndicesBuilder.setAllNonSelfParameters();
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
@@ -2332,7 +2332,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
-        checkedWrtParamIndices->setNonSelfParameter(index);
+        autoDiffParameterIndicesBuilder.setNonSelfParameter(index);
         lastIndex = index;
         break;
       }
@@ -2349,12 +2349,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
-        checkedWrtParamIndices->setSelfParameter();
+        autoDiffParameterIndicesBuilder.setSelfParameter();
         break;
       }
       }
     }
   }
+
+  auto *checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(ctx);
 
   // This can happen when someone puts the attribute on an instance method with
   // no paramters (other than the self parameter), and does not specify a wrt
@@ -2488,7 +2490,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TupleType *primalResultTy =
         primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
     AnyFunctionType *expectedAdjointFnTy =
-        originalFnTy->getAutoDiffAdjointFunctionType(*checkedWrtParamIndices,
+        originalFnTy->getAutoDiffAdjointFunctionType(checkedWrtParamIndices,
                                                      primalResultTy);
 
     auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
@@ -2514,7 +2516,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (attr->getJVP()) {
     AnyFunctionType *expectedJVPFnTy =
         originalFnTy->getAutoDiffAssociatedFunctionType(
-            *checkedWrtParamIndices, /*resultIndex*/ 0,
+            checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
             LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 
@@ -2541,7 +2543,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (attr->getVJP()) {
     AnyFunctionType *expectedVJPFnTy =
         originalFnTy->getAutoDiffAssociatedFunctionType(
-            *checkedWrtParamIndices, /*resultIndex*/ 0,
+            checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
             LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 

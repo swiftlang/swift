@@ -79,6 +79,7 @@ public:
 };
 
 class AnyFunctionType;
+class AutoDiffParameterIndicesBuilder;
 class Type;
 
 /// Identifies a subset of a function's parameters.
@@ -86,7 +87,12 @@ class Type;
 /// Works with AST-level function decls and types. Requires further lowering to
 /// work with SIL-level functions and types. (In particular, tuples must be
 /// exploded).
-class AutoDiffParameterIndices {
+///
+/// Is uniquely allocated within an ASTContext so that it can be hashed and
+/// compared by opaque pointer value.
+class AutoDiffParameterIndices : public llvm::FoldingSetNode {
+  friend AutoDiffParameterIndicesBuilder;
+
   /// Bits corresponding to parameters in the set are "on", and bits
   /// corresponding to parameters not in the set are "off".
   ///
@@ -103,29 +109,19 @@ class AutoDiffParameterIndices {
   ///   Function type: (Self) -> (A, B, C) -> R
   ///   Bits: [A][B][C][Self]
   ///
-  llvm::SmallBitVector indices;
+  const llvm::SmallBitVector indices;
 
   /// Whether the function is a method.
   ///
-  bool isMethodFlag;
-
-  unsigned getNumNonSelfParameters() const;
-
-  AutoDiffParameterIndices(unsigned numIndices, bool isMethodFlag,
-                           bool setAllParams = false)
-      : indices(numIndices, setAllParams), isMethodFlag(isMethodFlag) {}
+  const bool isMethodFlag;
 
   AutoDiffParameterIndices(llvm::SmallBitVector indices, bool isMethodFlag)
       : indices(indices), isMethodFlag(isMethodFlag) {}
 
-public:
-  /// Allocates and initializes an empty `AutoDiffParameterIndices` for the
-  /// given `functionType`. `isMethod` specifies whether to treat the function
-  /// as a method.
-  static AutoDiffParameterIndices *
-  create(ASTContext &C, AnyFunctionType *functionType, bool isMethod,
-         bool setAllParams = false);
+  static AutoDiffParameterIndices *get(llvm::SmallBitVector indices,
+                                       bool isMethodFlag, ASTContext &C);
 
+public:
   bool isMethod() const { return isMethodFlag; }
 
   /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
@@ -145,40 +141,6 @@ public:
 
   /// Tests whether this set of parameters is empty.
   bool isEmpty() const { return indices.none(); }
-
-  /// Adds the indexed parameter to the set. When `isMethodFlag` is not set,
-  /// the indices index into the first parameter list. For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   paramIndex = 0
-  ///   ==> adds "A" to the set.
-  ///
-  /// When `isMethodFlag` is set, the indices index into the first non-self
-  /// parameter list. For example,
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   paramIndex = 0
-  ///   ==> adds "A" to the set.
-  ///
-  void setNonSelfParameter(unsigned parameterIndex);
-
-  /// Adds all the paramaters from the first non-self parameter list to the set.
-  /// For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   ==> adds "A", B", and "C" to the set.
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   ==> adds "A", B", and "C" to the set.
-  ///
-  void setAllNonSelfParameters();
-
-  /// Adds the self parameter to the set. `isMethodFlag` must be set. For
-  /// example,
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   ==> adds "Self" to the set
-  ///
-  void setSelfParameter();
 
   /// Pushes the subset's parameter's types to `paramTypes`, in the order in
   /// which they appear in the function type. For example,
@@ -223,9 +185,64 @@ public:
   llvm::SmallBitVector getLowered(AnyFunctionType *functionType,
                                   bool selfUncurried = false) const;
 
-  bool operator==(const AutoDiffParameterIndices &other) const {
-    return isMethodFlag == other.isMethodFlag && indices == other.indices;
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddBoolean(isMethodFlag);
+    ID.AddInteger(indices.size());
+    for (unsigned setBit : indices.set_bits())
+      ID.AddInteger(setBit);
   }
+};
+
+/// Builder for `AutoDiffParameterIndices`.
+class AutoDiffParameterIndicesBuilder {
+  llvm::SmallBitVector indices;
+  bool isMethodFlag;
+
+  unsigned getNumNonSelfParameters() const;
+
+public:
+  /// Start building an `AutoDiffParameterIndices` for the given function type.
+  /// `isMethod` specifies whether to treat the function as a method.
+  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType, bool isMethod,
+                                  bool setAllParams = false);
+
+  /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
+  /// one if it has already been allocated in the `ASTContext`.
+  AutoDiffParameterIndices *build(ASTContext &C) const;
+
+  /// Adds the indexed parameter to the set. When `isMethodFlag` is not set,
+  /// the indices index into the first parameter list. For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   paramIndex = 0
+  ///   ==> adds "A" to the set.
+  ///
+  /// When `isMethodFlag` is set, the indices index into the first non-self
+  /// parameter list. For example,
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   paramIndex = 0
+  ///   ==> adds "A" to the set.
+  ///
+  void setNonSelfParameter(unsigned parameterIndex);
+
+  /// Adds all the paramaters from the first non-self parameter list to the set.
+  /// For example,
+  ///
+  ///   functionType = (A, B, C) -> R
+  ///   ==> adds "A", B", and "C" to the set.
+  ///
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   ==> adds "A", B", and "C" to the set.
+  ///
+  void setAllNonSelfParameters();
+
+  /// Adds the self parameter to the set. `isMethodFlag` must be set. For
+  /// example,
+  ///   functionType = (Self) -> (A, B, C) -> R
+  ///   ==> adds "Self" to the set
+  ///
+  void setSelfParameter();
 };
 
 /// Differentiability of a function specifies the differentiation mode,
@@ -413,15 +430,24 @@ struct AutoDiffAssociatedFunctionKind {
 
 /// In conjunction with the original function decl, identifies an associated
 /// autodiff function.
-class AutoDiffAssociatedFunctionIdentifier {
-  AutoDiffAssociatedFunctionKind kind;
-  unsigned differentiationOrder;
-  AutoDiffParameterIndices *parameterIndices;
+///
+/// Is uniquely allocated within an ASTContext so that it can be hashed and
+/// compared by opaque pointer value.
+class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
+  const AutoDiffAssociatedFunctionKind kind;
+  const unsigned differentiationOrder;
+  AutoDiffParameterIndices * const parameterIndices;
+
+  AutoDiffAssociatedFunctionIdentifier(
+      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+      AutoDiffParameterIndices *parameterIndices) :
+    kind(kind), differentiationOrder(differentiationOrder),
+    parameterIndices(parameterIndices) {}
 
 public:
   AutoDiffAssociatedFunctionKind getKind() const { return kind; }
   unsigned getDifferentiationOrder() const { return differentiationOrder; }
-  const AutoDiffParameterIndices *getParameterIndices() const {
+  AutoDiffParameterIndices *getParameterIndices() const {
     return parameterIndices;
   }
 
@@ -429,9 +455,10 @@ public:
       AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
       AutoDiffParameterIndices *parameterIndices, ASTContext &C);
 
-  bool operator==(const AutoDiffAssociatedFunctionIdentifier &other) const {
-    return kind == other.kind && differentiationOrder == other.differentiationOrder &&
-           *parameterIndices == *other.parameterIndices;
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddInteger(kind);
+    ID.AddInteger(differentiationOrder);
+    ID.AddPointer(parameterIndices);
   }
 };
 

@@ -3737,7 +3737,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   CanAnyFunctionType witnessOrigTy = getConstantInfo(witness).LoweredType;
   if (autoDiffFuncId) {
     auto associated = witnessOrigTy->getAutoDiffAssociatedFunctionType(
-        *autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
+        autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
         LookUpConformanceInModule(SGM.M.getSwiftModule()),
         /*selfUncurried*/ true);

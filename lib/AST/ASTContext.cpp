@@ -384,6 +384,13 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// A cache of tangent spaces per type.
   llvm::DenseMap<CanType, Optional<TangentSpace>> TangentSpaces;
 
+  /// For uniquifying `AutoDiffParameterIndices` allocations.
+  llvm::FoldingSet<AutoDiffParameterIndices> AutoDiffParameterIndicesSet;
+
+  /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
+  llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
+      AutoDiffAssociatedFunctionIdentifiers;
+
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
@@ -5268,4 +5275,58 @@ Optional<TangentSpace> ASTContext::getTangentSpace(CanType type,
   // Otherwise, the type does not have a tangent space. That is, it does not
   // support differentiation.
   return cache(None);
+}
+
+AutoDiffParameterIndices *
+AutoDiffParameterIndices::get(llvm::SmallBitVector indices, bool isMethodFlag,
+                              ASTContext &C) {
+  auto &foldingSet = C.getImpl().AutoDiffParameterIndicesSet;
+
+  llvm::FoldingSetNodeID id;
+  id.AddBoolean(isMethodFlag);
+  id.AddInteger(indices.size());
+  for (unsigned setBit : indices.set_bits())
+    id.AddInteger(setBit);
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
+  // gets called, which causes a small memory leak in the case that the
+  // SmallBitVector decides to allocate some heap space.
+  void *mem = C.Allocate(sizeof(AutoDiffParameterIndices),
+                         alignof(AutoDiffParameterIndices));
+  auto *newNode = ::new (mem) AutoDiffParameterIndices(indices, isMethodFlag);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+AutoDiffAssociatedFunctionIdentifier *
+AutoDiffAssociatedFunctionIdentifier::get(
+      AutoDiffAssociatedFunctionKind kind,
+      unsigned differentiationOrder,
+      AutoDiffParameterIndices *parameterIndices,
+      ASTContext &C) {
+  auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger((unsigned)kind);
+  id.AddInteger(differentiationOrder);
+  id.AddPointer(parameterIndices);
+
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = C.Allocate(sizeof(AutoDiffAssociatedFunctionIdentifier),
+                         alignof(AutoDiffAssociatedFunctionIdentifier));
+  auto *newNode = ::new (mem) AutoDiffAssociatedFunctionIdentifier(
+      kind, differentiationOrder, parameterIndices);
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
 }

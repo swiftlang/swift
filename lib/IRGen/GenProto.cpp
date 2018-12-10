@@ -1364,7 +1364,7 @@ public:
       auto silWitness = entry.getAutoDiffAssociatedFunctionWitness();
       assert(silWitness.RequirementOriginalMethod == requirementOriginalMethod
              && "sil witness table does not match protocol");
-      assert(*silWitness.RequirementIdentifier == *requirementIdentifier
+      assert(silWitness.RequirementIdentifier == requirementIdentifier
              && "sil witness table does not match protocol");
       auto piIndex = PI.getAutoDiffAssociatedFunctionIndex(
           cast<AbstractFunctionDecl>(requirementOriginalMethod.getDecl()),

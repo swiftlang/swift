@@ -1273,13 +1273,14 @@ namespace {
       }
 
       // Collect differentiation parameter indices.
-      auto *checkedWrtParamIndices = AutoDiffParameterIndices::create(
-          CS.getASTContext(), originalTy, /*isMethod=*/false);
+      AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
+          originalTy, /*isMethod*/ false);
+
 
       // If no parameters are given, then differentiation is done with respect
       // to all parameters in the first parameter group.
       if (GE->getParameters().empty())
-        checkedWrtParamIndices->setAllNonSelfParameters();
+        autoDiffParameterIndicesBuilder.setAllNonSelfParameters();
       // If parameters indices are specified, collect those parameters.
       else {
         int lastIndex = -1;
@@ -1299,10 +1300,13 @@ namespace {
                         originalTy, originalTy->getNumParams());
             return nullptr;
           }
-          checkedWrtParamIndices->setNonSelfParameter(index);
+          autoDiffParameterIndicesBuilder.setNonSelfParameter(index);
           lastIndex = index;
         }
       }
+
+      auto *checkedWrtParamIndices = autoDiffParameterIndicesBuilder.build(
+          CS.getASTContext());
 
       // Collect differentiation parameter types.
       SmallVector<Type, 8> diffParamTypes;
