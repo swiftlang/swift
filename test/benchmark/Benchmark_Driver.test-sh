@@ -1,5 +1,3 @@
-// REQUIRES: rdar_46565291
-
 // REQUIRES: OS=macosx
 // REQUIRES: benchmark
 // REQUIRES: CMAKE_GENERATOR=Ninja
