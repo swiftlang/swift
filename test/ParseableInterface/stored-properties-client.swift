@@ -6,6 +6,8 @@
 // RUN: %target-swift-frontend -typecheck %S/stored-properties.swift -enable-resilience -module-name StoredProperties -emit-parseable-module-interface-path %t/StoredProperties.swiftinterface
 // RUN: %target-swift-frontend -emit-ir %s -I %t -enable-parseable-module-interface | %FileCheck %s -check-prefix RESILIENT -check-prefix COMMON
 
+// REQUIRES: rdar_46486517
+
 import StoredProperties
 
 /// This test makes sure clients of a parseable interface see correct type
