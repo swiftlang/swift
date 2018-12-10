@@ -524,3 +524,28 @@ bb2(%r : $()):
 bb3(%v : $()):
   return %v : $()
 }
+
+struct A1 {
+    let b: () -> ()
+}
+
+struct A2<T>  {
+    let a: T
+}
+
+class  A3 {}
+
+sil @amethod : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+
+sil @repo : $@convention(thin) (@in_guaranteed A2<A3>) -> @owned @callee_guaranteed () -> (@owned A1, @error Error) {
+bb0(%0 : $*A2<A3>):
+  %1 = load %0 : $*A2<A3>
+  %2 = alloc_stack $A2<A3>
+  store %1 to %2 : $*A2<A3>
+  %4 = function_ref @amethod : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  dealloc_stack %2 : $*A2<A3>
+  return %5 : $@callee_guaranteed () -> (@owned A1, @error Error)
+}
+
+sil_vtable A3 {}
