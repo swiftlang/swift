@@ -121,6 +121,14 @@ namespace swift {
                            PersistentParserState *PersistentState = nullptr,
                            DelayedParsingCallbacks *DelayedParseCB = nullptr);
 
+  /// Parse a single buffer into the given source file, until the full source
+  /// contents are parsed.
+  ///
+  /// \return true if the parser found code with side effects.
+  bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+                             PersistentParserState *PersistentState = nullptr,
+                             DelayedParsingCallbacks *DelayedParseCB = nullptr);
+
   /// Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
   void performDelayedParsing(DeclContext *DC,

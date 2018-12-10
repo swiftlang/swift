@@ -1215,6 +1215,8 @@ public:
 
   bool shouldBuildSyntaxTree() const;
 
+  bool canBeParsedInFull() const;
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
