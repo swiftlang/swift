@@ -1829,7 +1829,7 @@ extension BinaryInteger {
 ///     // Prints "0b11001001"
 ///
 /// The `binaryString` implementation uses the static `bitWidth` property and
-/// the right shift operator (`<<`), both of which are available to any type
+/// the right shift operator (`>>`), both of which are available to any type
 /// that conforms to the `FixedWidthInteger` protocol.
 ///
 /// The next example declares a generic `squared` function, which accepts an
