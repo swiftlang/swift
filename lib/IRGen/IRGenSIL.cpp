@@ -4700,6 +4700,8 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
 void IRGenSILFunction::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i){
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *swiftMeta = from.claimNext();
+  // Claim any conformances.
+  (void)from.claimAll();
   CanType instanceType(i->getType().castTo<AnyMetatypeType>().getInstanceType());
   Explosion to;
   llvm::Value *classPtr =
