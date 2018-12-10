@@ -159,6 +159,15 @@ ResultTests.test("Equatable") {
   expectNotEqual(result2, .success(2))
   expectEqual(result2, .failure(.err))
   expectNotEqual(result2, .failure(.derr))
+  
+  let confusables: [Result<Err, Err>] = [
+    .success(.err),
+    .success(.derr),
+    .failure(.err),
+    .failure(.derr)
+  ]
+  
+  checkEquatable(confusables, oracle: { $0 == $1 })
 }
 
 ResultTests.test("Hashable") {
@@ -166,6 +175,14 @@ ResultTests.test("Hashable") {
   let result2: Result<Int, Err> = .success(2)
   let result3: Result<Int, Err> = .failure(.err)
   checkHashable([result1, result2, result3], equalityOracle: { $0 == $1 })
+
+  let confusables: [Result<Err, Err>] = [
+    .success(.err),
+    .success(.derr),
+    .failure(.err),
+    .failure(.derr)
+  ]
+  checkHashable(confusables, equalityOracle: { $0 == $1 })
 }
 
 runAllTests()
