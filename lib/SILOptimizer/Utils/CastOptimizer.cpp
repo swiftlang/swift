@@ -1392,68 +1392,68 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto *SM = Mod.getSwiftModule();
 
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
-    if (Proto) {
-      auto Conformance = SM->lookupConformance(SourceType, Proto);
-      if (Conformance.hasValue() &&
-          Conformance->getConditionalRequirements().empty()) {
-        // SourceType is a non-existential type with a non-conditional
-        // conformance to a protocol represented by the TargetType.
-        //
-        // Conditional conformances are complicated: they may depend on
-        // information not known until runtime. For instance, if `X: P` where `T
-        // == Int` in `func foo<T>(_: T) { ... X<T>() as? P ... }`, the cast
-        // will succeed for `foo(0)` but not for `foo("string")`. There are many
-        // cases where everything is completely static (`X<Int>() as? P`), but
-        // we don't try to handle that at the moment.
-        SILBuilder B(Inst);
-        SmallVector<ProtocolConformanceRef, 1> NewConformances;
-        NewConformances.push_back(Conformance.getValue());
-        ArrayRef<ProtocolConformanceRef> Conformances =
-            Ctx.AllocateCopy(NewConformances);
+    if (!Proto)
+      return false;
 
-        auto ExistentialRepr =
-            Dest->getType().getPreferredExistentialRepresentation(Mod,
-                                                                  SourceType);
+    // SourceType is a non-existential type with a non-conditional
+    // conformance to a protocol represented by the TargetType.
+    //
+    // TypeChecker::conformsToProtocol checks any conditional conformances. If
+    // they depend on information not known until runtime, the conformance
+    // will not be returned. For instance, if `X: P` where `T == Int` in `func
+    // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
+    // `foo(0)` but not for `foo("string")`. There are many cases where
+    // everything is completely static (`X<Int>() as? P`), in which case a
+    // valid conformance will be returned.
+    auto Conformance = SM->conformsToProtocol(SourceType, Proto);
+    if (!Conformance)
+      return false;
 
-        switch (ExistentialRepr) {
-        default:
-          return false;
-        case ExistentialRepresentation::Opaque: {
-          auto ExistentialAddr = B.createInitExistentialAddr(
-              Loc, Dest, SourceType, Src->getType().getObjectType(),
-              Conformances);
-          B.createCopyAddr(Loc, Src, ExistentialAddr, IsTake_t::IsTake,
-                           IsInitialization_t::IsInitialization);
-          break;
-        }
-        case ExistentialRepresentation::Class: {
-          auto Value = B.createLoad(Loc, Src,
-                                    swift::LoadOwnershipQualifier::Unqualified);
-          auto Existential =
-              B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
-                                         SourceType, Value, Conformances);
-          B.createStore(Loc, Existential, Dest,
-                        swift::StoreOwnershipQualifier::Unqualified);
-          break;
-        }
-        case ExistentialRepresentation::Boxed: {
-          auto AllocBox = B.createAllocExistentialBox(Loc, Dest->getType(),
-                                                      SourceType, Conformances);
-          auto Projection =
-              B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
-          // This needs to be a copy_addr (for now) because we must handle
-          // address-only types.
-          B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
-          B.createStore(Loc, AllocBox, Dest,
-                        swift::StoreOwnershipQualifier::Unqualified);
-          break;
-        }
-        };
+    SILBuilder B(Inst);
+    SmallVector<ProtocolConformanceRef, 1> NewConformances;
+    NewConformances.push_back(Conformance.getValue());
+    ArrayRef<ProtocolConformanceRef> Conformances =
+        Ctx.AllocateCopy(NewConformances);
 
-        return true;
-      }
+    auto ExistentialRepr =
+        Dest->getType().getPreferredExistentialRepresentation(Mod, SourceType);
+
+    switch (ExistentialRepr) {
+    default:
+      return false;
+    case ExistentialRepresentation::Opaque: {
+      auto ExistentialAddr = B.createInitExistentialAddr(
+          Loc, Dest, SourceType, Src->getType().getObjectType(), Conformances);
+      B.createCopyAddr(Loc, Src, ExistentialAddr, IsTake_t::IsTake,
+                       IsInitialization_t::IsInitialization);
+      break;
     }
+    case ExistentialRepresentation::Class: {
+      auto Value =
+          B.createLoad(Loc, Src, swift::LoadOwnershipQualifier::Unqualified);
+      auto Existential =
+          B.createInitExistentialRef(Loc, Dest->getType().getObjectType(),
+                                     SourceType, Value, Conformances);
+      B.createStore(Loc, Existential, Dest,
+                    swift::StoreOwnershipQualifier::Unqualified);
+      break;
+    }
+    case ExistentialRepresentation::Boxed: {
+      auto AllocBox = B.createAllocExistentialBox(Loc, Dest->getType(),
+                                                  SourceType, Conformances);
+      auto Projection =
+          B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
+      // This needs to be a copy_addr (for now) because we must handle
+      // address-only types.
+      B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
+      B.createStore(Loc, AllocBox, Dest,
+                    swift::StoreOwnershipQualifier::Unqualified);
+      break;
+    }
+    };
+    return true;
   }
+  // Not a concrete -> existential cast.
   return false;
 }
 
