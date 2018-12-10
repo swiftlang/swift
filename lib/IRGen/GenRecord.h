@@ -303,21 +303,16 @@ public:
   llvm::Value *withExtraInhabitantProvidingField(IRGenFunction &IGF,
          Address structAddr,
          SILType structType,
-         bool isOutlined,
          llvm::Type *resultTy,
-         llvm::function_ref<llvm::Value* (const FieldImpl &field)> body,
-         llvm::function_ref<llvm::Value* ()> outline) const {
+         llvm::function_ref<llvm::Value* (const FieldImpl &field,
+                                          llvm::Value *numXI)> body) const {
     // If we know one field consistently provides extra inhabitants, delegate
     // to that field.
     if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM)){
-      return body(*field);
+      return body(*field, nullptr);
     }
     
     // Otherwise, we have to figure out which field at runtime.
-    // The decision tree could be rather large, so invoke the value witness
-    // unless we're emitting the value witness.
-    if (!isOutlined)
-      return outline();
 
     // The number of extra inhabitants the instantiated type has can be used
     // to figure out which field the runtime chose. The runtime uses the same
@@ -376,7 +371,7 @@ public:
         if (&field != fixedCandidate)
           continue;
         
-        fieldCount = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedCount);
+        fieldCount = IGF.IGM.getInt32(fixedCount);
       } else {
         auto fieldTy = field.getType(IGF.IGM, structType);
         // If this field has the same type as a field we already tested,
@@ -395,7 +390,7 @@ public:
       IGF.Builder.CreateCondBr(equalsCount, yesBB, noBB);
       
       IGF.Builder.emitBlock(yesBB);
-      auto value = body(field);
+      auto value = body(field, instantiatedCount);
       if (contPhi)
         contPhi->addIncoming(value, IGF.Builder.GetInsertBlock());
       IGF.Builder.CreateBr(contBB);
@@ -414,46 +409,6 @@ public:
     return contPhi;
   }
 
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address structAddr,
-                                       SILType structType,
-                                       bool isOutlined) const override {
-    return withExtraInhabitantProvidingField(IGF, structAddr, structType,
-                                             isOutlined,
-                                             IGF.IGM.Int32Ty,
-      [&](const FieldImpl &field) -> llvm::Value* {
-        Address fieldAddr = asImpl().projectFieldAddress(
-                                            IGF, structAddr, structType, field);
-        return field.getTypeInfo().getExtraInhabitantIndex(IGF, fieldAddr,
-                                         field.getType(IGF.IGM, structType),
-                                         false /*not outlined for field*/);
-      },
-      [&]() -> llvm::Value * {
-        return emitGetExtraInhabitantIndexCall(IGF, structType, structAddr);
-      });
-  }
-
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address structAddr,
-                            SILType structType,
-                            bool isOutlined) const override {
-    withExtraInhabitantProvidingField(IGF, structAddr, structType, isOutlined,
-                                      IGF.IGM.VoidTy,
-      [&](const FieldImpl &field) -> llvm::Value* {
-        Address fieldAddr = asImpl().projectFieldAddress(
-                                            IGF, structAddr, structType, field);
-        field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
-                                         field.getType(IGF.IGM, structType),
-                                         false /*not outlined for field*/);
-        return nullptr;
-      },
-      [&]() -> llvm::Value * {
-        emitStoreExtraInhabitantCall(IGF, structType, index, structAddr);
-        return nullptr;
-      });
-  }
-      
   const FieldImpl *
   getFixedExtraInhabitantProvidingField(IRGenModule &IGM) const {
     if (!ExtraInhabitantProvidingField.hasValue()) {
@@ -657,6 +612,33 @@ public:
       fieldMask = fieldMask.zext(targetSize);
     fieldMask = fieldMask.shl(field->getFixedByteOffset().getValueInBits());
     return fieldMask;
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address structAddr,
+                                       SILType structType,
+                                       bool isOutlined) const override {
+    auto field = *asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM);
+    Address fieldAddr =
+      asImpl().projectFieldAddress(IGF, structAddr, structType, field);
+    auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
+    return fieldTI.getExtraInhabitantIndex(IGF, fieldAddr,
+                                     field.getType(IGF.IGM, structType),
+                                     false /*not outlined for field*/);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF,
+                            llvm::Value *index,
+                            Address structAddr,
+                            SILType structType,
+                            bool isOutlined) const override {
+    auto field = *asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM);
+    Address fieldAddr =
+      asImpl().projectFieldAddress(IGF, structAddr, structType, field);
+    auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
+    fieldTI.storeExtraInhabitant(IGF, index, fieldAddr,
+                                 field.getType(IGF.IGM, structType),
+                                 false /*not outlined for field*/);
   }
 };
 

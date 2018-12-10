@@ -16,9 +16,9 @@
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
 //   Allocate 'copy'.
-// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-// CHECK: [[T1:%.*]] = load i8*, i8** [[T0]],
-// CHECK: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to [[INT]]
+// CHECK: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+// CHECK: [[SIZE:%.*]] = load [[INT]], [[INT]]* [[SIZE_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, [[INT]] [[SIZE]],
 // CHECK: [[COPY:%.*]] = bitcast i8* [[ALLOCA]] to [[FOO:%T4main3FooV]]*
 //   Perform 'initializeWithCopy' via the VWT instead of trying to inline it.

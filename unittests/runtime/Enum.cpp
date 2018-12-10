@@ -16,33 +16,55 @@
 
 using namespace swift;
 
+static unsigned byte_getExtraInhabitantTag(const OpaqueValue *src,
+                                           const Metadata *self) {
+  uint8_t byte = *reinterpret_cast<const uint8_t*>(src);
+  if (byte > 253)
+    return byte - 253;
+  return 0;
+}
+
+static unsigned byte_getEnumTagSinglePayload(const OpaqueValue *value,
+                                             unsigned numEmptyCases,
+                                             const Metadata *self) {
+  return swift_getEnumTagSinglePayloadGeneric(value, numEmptyCases, self,
+                                              byte_getExtraInhabitantTag);
+}
+
+static void byte_storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
+                                         const Metadata *self) {
+  assert(tag > 0 && tag <= 2);
+  *reinterpret_cast<uint8_t*>(dest) = 253 + tag;
+}
+
+static void byte_storeEnumTagSinglePayload(OpaqueValue *value,
+                                           unsigned tag,
+                                           unsigned numEmptyCases,
+                                           const Metadata *self) {
+  swift_storeEnumTagSinglePayloadGeneric(value, tag, numEmptyCases, self,
+                                         byte_storeExtraInhabitantTag);
+}
+
+// Just use the normal operations for copying i8.
+#define byte_initializeBufferWithCopyOfBuffer \
+  VALUE_WITNESS_SYM(Bi8_).initializeBufferWithCopyOfBuffer
+#define byte_destroy            VALUE_WITNESS_SYM(Bi8_).destroy
+#define byte_initializeWithCopy VALUE_WITNESS_SYM(Bi8_).initializeWithCopy
+#define byte_assignWithCopy     VALUE_WITNESS_SYM(Bi8_).assignWithCopy
+#define byte_initializeWithTake VALUE_WITNESS_SYM(Bi8_).initializeWithTake
+#define byte_assignWithTake     VALUE_WITNESS_SYM(Bi8_).assignWithTake
+
 // Mock up a value witness table for Builtin.Int8 will 254 and 255 as extra
 // inhabitants.
-ExtraInhabitantsValueWitnessTable Int8WithExtraInhabitantValueWitness
-= {
-  // ValueWitnessTable
-  ValueWitnessTable{
+ValueWitnessTable Int8WithExtraInhabitantValueWitness = {
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) VALUE_WITNESS_SYM(Bi8_).LOWER_ID,
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) byte_##LOWER_ID,
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
-    VALUE_WITNESS_SYM(Bi8_).size,
-    VALUE_WITNESS_SYM(Bi8_).flags.withExtraInhabitants(true),
-    VALUE_WITNESS_SYM(Bi8_).stride
-  },
-  // extraInhabitantFlags
-  ExtraInhabitantFlags().withNumExtraInhabitants(2),
-  // storeExtraInhabitant
-  [](OpaqueValue *dest, int index, const Metadata *self) {
-    *reinterpret_cast<uint8_t*>(dest) = 254 + index;
-  },
-  // getExtraInhabitantIndex
-  [](const OpaqueValue *src, const Metadata *self) -> int {
-    uint8_t byte = *reinterpret_cast<const uint8_t*>(src);
-    if (byte >= 254)
-      return byte - 254;
-    return -1;
-  }
+  VALUE_WITNESS_SYM(Bi8_).size,
+  VALUE_WITNESS_SYM(Bi8_).stride,
+  VALUE_WITNESS_SYM(Bi8_).flags,
+  /*extraInhabitantCount*/ 2
 };
 
 FullMetadata<OpaqueMetadata> XI_TMBi8_ = {
@@ -58,10 +80,10 @@ OpaqueValue *asOpaque(void *v) {
 }
 
 int test_getEnumCaseSinglePayload(std::initializer_list<uint8_t> repr,
-                                       const FullOpaqueMetadata &metadata,
-                                       unsigned numEmptyCases) {
-  return swift_getEnumCaseSinglePayload(asOpaque(repr.begin()),
-                                         &metadata.base, numEmptyCases);
+                                  const FullOpaqueMetadata &metadata,
+                                  unsigned numEmptyCases) {
+  return metadata.base.vw_getEnumTagSinglePayload(asOpaque(repr.begin()),
+                                                  numEmptyCases);
 }
 
 TEST(EnumTest, getEnumCaseSinglePayload) {
@@ -110,10 +132,9 @@ bool test_storeEnumTagSinglePayload(std::initializer_list<uint8_t> after,
   buf.resize(before.size());
   memcpy(buf.data(), before.begin(), before.size());
 
-  swift_storeEnumTagSinglePayload(asOpaque(buf.data()),
-                                   &metadata.base,
-                                   whichCase,
-                                   numEmptyCases);
+  metadata.base.vw_storeEnumTagSinglePayload(asOpaque(buf.data()),
+                                             whichCase,
+                                             numEmptyCases);
 
   return memcmp(buf.data(), after.begin(), after.size()) == 0;
 }

@@ -1876,7 +1876,7 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
   const Metadata *payloadType =
     cast<EnumMetadata>(srcType)->getGenericArgs()[0];
   unsigned enumCase =
-    swift_getEnumCaseSinglePayload(src, payloadType, 1 /*emptyCases=*/);
+    payloadType->vw_getEnumTagSinglePayload(src, /*emptyCases=*/1);
   if (enumCase != 0) {
     // Allow Optional<T>.none -> Optional<U>.none
     if (targetType->getKind() != MetadataKind::Optional) {
@@ -1889,8 +1889,8 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
       cast<EnumMetadata>(targetType)->getGenericArgs()[0];
 
     // Inject the .none tag
-    swift_storeEnumTagSinglePayload(dest, targetPayloadType, enumCase,
-                                    1 /*emptyCases=*/);
+    targetPayloadType->vw_storeEnumTagSinglePayload(dest, enumCase, 
+                                                    /*emptyCases=*/1);
 
     // We don't have to destroy the source, because it was nil.
     return {true, nullptr};
@@ -2314,8 +2314,8 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     const Metadata *payloadType =
       cast<EnumMetadata>(targetType)->getGenericArgs()[0];
     if (swift_dynamicCast(dest, src, srcType, payloadType, flags)) {
-      swift_storeEnumTagSinglePayload(dest, payloadType, 0 /*case*/,
-                                      1 /*emptyCases*/);
+      payloadType->vw_storeEnumTagSinglePayload(dest, /*case*/ 0,
+                                                /*emptyCases*/ 1);
       return true;
     }
     return false;
@@ -2720,8 +2720,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   }
 
   // Initialize the buffer as an empty optional.
-  swift_storeEnumTagSinglePayload((OpaqueValue *)optDestBuffer, targetType, 
-                                  1, 1);
+  targetType->vw_storeEnumTagSinglePayload((OpaqueValue *)optDestBuffer,
+                                           1, 1);
 
   // Perform the bridging operation.
   bool success;
