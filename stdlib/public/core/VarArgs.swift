@@ -144,7 +144,7 @@ internal typealias _VAInt  = Int32
 @inlinable // c-abi
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
-  let builder = _VaListBuilder()
+  let builder = __VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -154,7 +154,7 @@ public func withVaList<R>(_ args: [CVarArg],
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 @inlinable // c-abi
 internal func _withVaList<R>(
-  _ builder: _VaListBuilder,
+  _ builder: __VaListBuilder,
   _ body: (CVaListPointer) -> R
 ) -> R {
   let result = body(builder.va_list())
@@ -185,7 +185,7 @@ internal func _withVaList<R>(
 ///   `va_list` argument.
 @inlinable // c-abi
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
-  let builder = _VaListBuilder()
+  let builder = __VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -423,9 +423,12 @@ extension Float80 : CVarArg, _CVarArgAligned {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout
 @usableFromInline // c-abi
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
   @_fixed_layout // c-abi
   @usableFromInline
   internal struct Header {
@@ -517,9 +520,12 @@ final internal class _VaListBuilder {
 }
 #elseif arch(arm64) && os(Linux)
 
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
   @usableFromInline // FIXME(sil-serialize-all)
   internal init() {
     // Prepare the register save area.
@@ -643,9 +649,12 @@ final internal class _VaListBuilder {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout
 @usableFromInline // c-abi
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal init() {}
@@ -673,16 +682,16 @@ final internal class _VaListBuilder {
   }
 
   // NB: This function *cannot* be @inlinable because it expects to project
-  // and escape the physical storage of `_VaListBuilder.alignedStorageForEmptyVaLists`.
+  // and escape the physical storage of `__VaListBuilder.alignedStorageForEmptyVaLists`.
   // Marking it inlinable will cause it to resiliently use accessors to
-  // project `_VaListBuilder.alignedStorageForEmptyVaLists` as a computed
+  // project `__VaListBuilder.alignedStorageForEmptyVaLists` as a computed
   // property.
   @usableFromInline // c-abi
   internal func va_list() -> CVaListPointer {
     // Use Builtin.addressof to emphasize that we are deliberately escaping this
     // pointer and assuming it is safe to do so.
     let emptyAddr = UnsafeMutablePointer<Int>(
-      Builtin.addressof(&_VaListBuilder.alignedStorageForEmptyVaLists))
+      Builtin.addressof(&__VaListBuilder.alignedStorageForEmptyVaLists))
     return CVaListPointer(_fromUnsafeMutablePointer: storage ?? emptyAddr)
   }
 
