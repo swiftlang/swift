@@ -42,14 +42,19 @@ struct S : Proto {
 
   // CHECK-LABEL: // jvpMSSU protocol witness for Proto.function1(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}jvp009MSSU{{.*}}P9function1{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float) {
-  // CHECK: // function_ref S.dfunction1(_:_:)
+  // CHECK: [[F1_REF_1:%.*]] = function_ref {{.*}}function1{{.*}}
+  // CHECK-NEXT: [[F1_AD_1:%.*]] = autodiff_function [wrt 0 1] [order 1] [[F1_REF_1]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F1_JVP:%.*]] = autodiff_function_extract [jvp] [order 1] [[F1_AD_1]] : $@autodiff @convention(method) (Float, Float, @nondiff S) -> Float
+  // CHECK-NEXT: apply [[F1_JVP]]
   // CHECK: } // end sil function {{.*}}jvp009MSSU{{.*}}P9function1{{.*}}
 
   // CHECK-LABEL: // vjpMSSU protocol witness for Proto.function1(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}vjp009MSSU{{.*}}P9function1{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) {
-  // CHECK: // function_ref S.pfunction1(_:_:)
+  // CHECK: [[F1_REF_2:%.*]] = function_ref {{.*}}function1{{.*}}
+  // CHECK-NEXT: [[F1_AD_2:%.*]] = autodiff_function [wrt 0 1] [order 1] [[F1_REF_2]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F1_VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[F1_AD_2]] : $@autodiff @convention(method) (Float, Float, @nondiff S) -> Float
+  // CHECK-NEXT: apply [[F1_VJP]]
   // CHECK: } // end sil function {{.*}}vjp009MSSU{{.*}}P9function1{{.*}}
-
 
   // The adjoint is not relevant for this test, but specifying a custom
   // adjoint prevents the AD transform from trying and failing to compute an
@@ -73,12 +78,18 @@ struct S : Proto {
 
   // CHECK-LABEL: // jvpMSSS protocol witness for Proto.function2(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}jvp009MSSS{{.*}}P9function2{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (@in_guaranteed S, Float, Float) -> Float) {
-  // CHECK: // function_ref S.dfunction2(_:_:)
+  // CHECK: [[F2_REF_1:%.*]] = function_ref {{.*}}function2{{.*}}
+  // CHECK-NEXT: [[F2_AD_1:%.*]] = autodiff_function [wrt 0 1 2] [order 1] [[F2_REF_1]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F2_JVP:%.*]] = autodiff_function_extract [jvp] [order 1] [[F2_AD_1]] : $@autodiff @convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: apply [[F2_JVP]]
   // CHECK: } // end sil function {{.*}}jvp009MSSS{{.*}}P9function2{{.*}}
 
   // CHECK-LABEL: // vjpMSSS protocol witness for Proto.function2(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}vjp009MSSS{{.*}}P9function2{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (Float) -> (@out S, Float, Float)) {
-  // CHECK: // function_ref S.pfunction2(_:_:)
+  // CHECK: [[F2_REF_2:%.*]] = function_ref {{.*}}function2{{.*}}
+  // CHECK-NEXT: [[F2_AD_2:%.*]] = autodiff_function [wrt 0 1 2] [order 1] [[F2_REF_2]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F2_VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[F2_AD_2]] : $@autodiff @convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: apply [[F2_VJP]]
   // CHECK: } // end sil function {{.*}}vjp009MSSS{{.*}}P9function2{{.*}}
 
 
@@ -104,12 +115,18 @@ struct S : Proto {
 
   // CHECK-LABEL: // jvpMUSU protocol witness for Proto.function3(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}jvp009MUSU{{.*}}P9function3{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-  // CHECK: // function_ref S.dfunction3(_:_:)
+  // CHECK: [[F3_REF_1:%.*]] = function_ref {{.*}}function3{{.*}}
+  // CHECK-NEXT: [[F3_AD_1:%.*]] = autodiff_function [wrt 1] [order 1] [[F3_REF_1]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F3_JVP:%.*]] = autodiff_function_extract [jvp] [order 1] [[F3_AD_1]] : $@autodiff @convention(method) (@nondiff Float, Float, @nondiff S) -> Float
+  // CHECK-NEXT: apply [[F3_JVP]]
   // CHECK: } // end sil function {{.*}}jvp009MUSU{{.*}}P9function3{{.*}}
 
   // CHECK-LABEL: // vjpMUSU protocol witness for Proto.function3(_:_:) in conformance S
   // CHECK-NEXT: sil {{.*}}vjp009MUSU{{.*}}P9function3{{.*}} $@convention(witness_method: Proto) (Float, Float, @in_guaranteed S) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-  // CHECK: // function_ref S.pfunction3(_:_:)
+  // CHECK: [[F3_REF_2:%.*]] = function_ref {{.*}}function3{{.*}}
+  // CHECK-NEXT: [[F3_AD_2:%.*]] = autodiff_function [wrt 1] [order 1] [[F3_REF_2]] : $@convention(method) (Float, Float, S) -> Float
+  // CHECK-NEXT: [[F3_VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[F3_AD_2]] : $@autodiff @convention(method) (@nondiff Float, Float, @nondiff S) -> Float
+  // CHECK-NEXT: apply [[F3_VJP]]
   // CHECK: } // end sil function {{.*}}vjp009MUSU{{.*}}P9function3{{.*}}
 }
 
