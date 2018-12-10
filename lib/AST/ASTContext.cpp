@@ -5188,10 +5188,6 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-bool ASTContext::isDifferentiable(CanType type, ModuleDecl *module) {
-  return getTangentSpace(type, module).hasValue();
-}
-
 Optional<TangentSpace> ASTContext::getTangentSpace(CanType type,
                                                    ModuleDecl *module) {
   auto lookup = getImpl().TangentSpaces.find(type);

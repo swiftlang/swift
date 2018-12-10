@@ -111,8 +111,9 @@ class AutoDiffParameterIndices {
 
   unsigned getNumNonSelfParameters() const;
 
-  AutoDiffParameterIndices(unsigned numIndices, bool isMethodFlag)
-      : indices(numIndices), isMethodFlag(isMethodFlag) {}
+  AutoDiffParameterIndices(unsigned numIndices, bool isMethodFlag,
+                           bool setAllParams = false)
+      : indices(numIndices, setAllParams), isMethodFlag(isMethodFlag) {}
 
   AutoDiffParameterIndices(llvm::SmallBitVector indices, bool isMethodFlag)
       : indices(indices), isMethodFlag(isMethodFlag) {}
@@ -122,7 +123,8 @@ public:
   /// given `functionType`. `isMethod` specifies whether to treat the function
   /// as a method.
   static AutoDiffParameterIndices *
-  create(ASTContext &C, AnyFunctionType *functionType, bool isMethod);
+  create(ASTContext &C, AnyFunctionType *functionType, bool isMethod,
+         bool setAllParams = false);
 
   bool isMethod() const { return isMethodFlag; }
 

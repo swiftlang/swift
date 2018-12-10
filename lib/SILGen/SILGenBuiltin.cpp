@@ -1041,6 +1041,32 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinAutoDiffGetJVP(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              Expr *argument,
+                                              SGFContext C) {
+  auto argVal = SGF.emitRValue(argument);
+  auto jvp = SGF.getBuilder().createAutoDiffFunctionExtract(
+      loc, AutoDiffFunctionExtractee::JVP, /*differentiationOrder*/ 1,
+      std::move(argVal).forwardAsSingleValue(SGF, loc));
+  return SGF.emitManagedRValueWithCleanup(jvp);
+}
+
+static ManagedValue emitBuiltinAutoDiffGetVJP(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              Expr *argument,
+                                              SGFContext C) {
+  auto argVal = SGF.emitRValue(argument);
+  auto vjp = SGF.getBuilder().createAutoDiffFunctionExtract(
+      loc, AutoDiffFunctionExtractee::VJP, /*differentiationOrder*/ 1,
+      std::move(argVal).forwardAsSingleValue(SGF, loc));
+  return SGF.emitManagedRValueWithCleanup(vjp);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

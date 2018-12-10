@@ -375,6 +375,14 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
+// SWIFT_ENABLE_TENSORFLOW
+/// autodifGetJVP has type <T: Differentiable, R: Differentiable>
+///     ((T) -> R) -> (T) -> (R, (T.TangentVector) -> R.TangentVector).
+BUILTIN_SIL_OPERATION(AutoDiffGetJVP, "autodiffGetJVP", Special)
+/// autodifGetVJP has type <T: Differentiable, R: Differentiable>
+///     ((T) -> R) -> (T) -> (R, (R.CotangentVector) -> T.CotangentVector).
+BUILTIN_SIL_OPERATION(AutoDiffGetVJP, "autodiffGetVJP", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

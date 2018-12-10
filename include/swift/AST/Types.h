@@ -3120,6 +3120,10 @@ public:
   ///
   /// Pass `selfUncurried = true` when the function type is for a method whose
   /// self parameter has been uncurried as in (A, B, C, Self) -> R.
+  ///
+  /// \note The original function type (`self`) need not be `@autodiff`, and the
+  /// resulting function will preserve all `ExtInfo` of the original function,
+  /// including `@autodiff`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       const AutoDiffParameterIndices &indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,

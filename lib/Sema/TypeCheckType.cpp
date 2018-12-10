@@ -2381,16 +2381,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
           nondiff = true;
       }
     }
-    // If the outer function is differentiable, arguments that are not marked as
-    // `@nondiff` must be differentiable
-    if (isDifferentiable && !nondiff &&
-        !Context.isDifferentiable(ty->getCanonicalType(),
-                                  DC->getParentModule())) {
-      diagnose(eltTypeRepr->getLoc(),
-               diag::autodiff_attr_argument_not_differentiable)
-          .highlight(eltTypeRepr->getSourceRange())
-          .fixItInsert(eltTypeRepr->getLoc(), "@nondiff ");
-    }
 
     // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
@@ -2469,16 +2459,6 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   case AnyFunctionType::Representation::Swift:
     break;
   }
-  
-  // SWIFT_ENABLE_TENSORFLOW
-  // If the function is marked as `@autodiff`, the result must be a
-  // differentiable type.
-  if (extInfo.isDifferentiable() &&
-      !Context.isDifferentiable(outputTy->getCanonicalType(),
-                                DC->getParentModule()))
-    diagnose(repr->getResultTypeRepr()->getLoc(),
-             diag::autodiff_attr_result_not_differentiable)
-        .highlight(repr->getResultTypeRepr()->getSourceRange());
 
   return fnTy;
 }

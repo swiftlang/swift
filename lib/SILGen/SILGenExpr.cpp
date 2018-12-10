@@ -5733,9 +5733,6 @@ RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
 RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
     AutoDiffFunctionExtractOriginalExpr *E, SGFContext C) {
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  llvm::outs() << "Difffunc subexpr type = " << E->getSubExpr()->getType() << '\n';
-  llvm::outs() << "Difffunc = " << diffFunc.getValue() << '\n';
-  llvm::outs().flush();
   auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
       E, diffFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));

@@ -4188,24 +4188,36 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   auto *cotangentDependentType = DependentMemberType::get(
       differentiableProtocol->getDeclaredInterfaceType(),
       cast<AssociatedTypeDecl>(cotangentLookup[0]));
-  auto getAssociatedType = [&](Type type,
-                               DependentMemberType *dependentType) -> CanType {
-    // Builtins are their own Tangent/Cotangent.
-    if (type->is<BuiltinType>()) return type->getCanonicalType();
 
-    // TODO: If this is a tuple, recursively get the associated types of its
-    // components.
-
-    // Try to get the associated type, and return it if found (if the result is
-    // non-null and non-`DependentMemberType`).
-    auto assocTy = dependentType->substBaseType(type, lookupConformance);
-    if (assocTy && !assocTy->is<DependentMemberType>())
-      return assocTy->getCanonicalType();
-
-    // When the type does not have an associated type, fallback to treating it
-    // as its own Tangent/Cotangent.
-    // TODO: We should eliminate all instances where this happens.
-    return type->getCanonicalType();
+  // `getAssociatedFunctionType` takes a base type and a protocol-dependent type
+  // and returns a canonical type representing the associated type after any
+  // possible substitutions.
+  // For base types that are tuples, applies `getAssociatedFunctionType` to
+  // every element type and a tuple type of new elements.
+  // For base types that are builtins, returns the types themselves.
+  std::function<CanType(Type, DependentMemberType *)> getAssociatedType
+        = [&](Type type, DependentMemberType *dependentType) {
+    // Builtins floats are their own Tangent/Cotangent.
+    if (type->is<BuiltinType>())
+      return type->getCanonicalType();
+    // Tuples' Tangent/Cotangent is a tuple of each element's Tangent/Cotangent.
+    if (auto *tupleTy = type->getAs<TupleType>()) {
+      SmallVector<TupleTypeElt, 8> newElts;
+      for (auto elt : tupleTy->getElements())
+        newElts.push_back(
+            elt.getWithType(getAssociatedType(elt.getType(), dependentType)));
+      return TupleType::get(newElts, ctx)->getCanonicalType();
+    }
+    // If `lookupConformance` is not provided by the caller, try to get the
+    // associated type by substituting the base type for a protocol associated
+    // type, and return it if found (if the result is non-null and
+    // non-`DependentMemberType`).
+    if (lookupConformance)
+      if (auto assocTy = dependentType->substBaseType(type, lookupConformance))
+        return assocTy->getCanonicalType();
+    // Otherwise, just return the base type's dependent member type.
+    return DependentMemberType::get(type, dependentType->getAssocType())
+        ->getCanonicalType();
   };
 
   SmallVector<Type, 8> wrtParamTypes;
