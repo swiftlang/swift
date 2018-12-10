@@ -1650,7 +1650,7 @@ namespace {
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
-      if (!isBuildingProtocol()) return null();
+      assert(isBuildingProtocol());
 
       ConstantInitBuilder builder(IGM);
       auto array = builder.beginArray();
@@ -1670,6 +1670,8 @@ namespace {
 
     void buildExtMethodTypes(ConstantArrayBuilder &array,
                              ArrayRef<MethodDescriptor> methods) {
+      assert(isBuildingProtocol());
+
       for (auto descriptor : methods) {
         assert(descriptor.getKind() == MethodDescriptor::Kind::Method &&
                "cannot emit descriptor for non-method");
