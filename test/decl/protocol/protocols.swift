@@ -511,4 +511,3 @@ extension LetThereBeCrash {
   init() { x = 1 }
   // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
-
