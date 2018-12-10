@@ -92,13 +92,13 @@ return
 This should be rarely used. It informs the SIL optimizer that any code dominated by it should be treated as the innermost loop of a performance critical section of code. It cranks optimizer heuristics to 11. Injudicious use of this will degrade performance and bloat binary size.
 
 
-#### <a name="precondition"></a>`_precondition`, `_debugPrecondition`, and `_sanityCheck`
+#### <a name="precondition"></a>`_precondition`, `_debugPrecondition`, and `_internalInvariant`
 
 These three functions are assertions that will trigger a run time trap if violated.
 
 * `_precondition` executes in all build configurations. Use this for invariant enforcement in all user code build configurations
 * `_debugPrecondition` will execute when **user code** is built with assertions enabled. Use this for invariant enforcement that's useful while debugging, but might be prohibitively expensive when user code is configured without assertions.
-* `_sanityCheck` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
+* `_internalInvariant` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
 
 #### `_fixLifetime`
 
