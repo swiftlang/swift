@@ -151,7 +151,7 @@ OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , swift::,
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),
                         (demangler, node, substGenericParam, substWitnessTable))
-OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , swift::,
+OVERRIDE_METADATALOOKUP(getTypeByMangledNameInternal, TypeInfo, , swift::,
                         (StringRef typeName,
                          SubstGenericParameterFn substGenericParam,
                          SubstDependentWitnessTableFn substWitnessTable),

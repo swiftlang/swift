@@ -91,7 +91,7 @@ func _typeByName(_ name: String) -> Any.Type? {
   }
 }
 
-@_silgen_name("swift_stdlib_getTypeByMangledName")
+@_silgen_name("swift_getTypeByMangledName")
 internal func _getTypeByMangledName(
   _ name: UnsafePointer<UInt8>,
   _ nameLength: UInt,

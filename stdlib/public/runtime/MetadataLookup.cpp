@@ -1217,7 +1217,7 @@ static TypeInfo swift_getTypeByMangledNodeImpl(
   return {type, builder.getReferenceOwnership()};
 }
 
-TypeInfo swift_getTypeByMangledNameImpl(
+TypeInfo swift_getTypeByMangledNameInternalImpl(
                               StringRef typeName,
                               SubstGenericParameterFn substGenericParam,
                               SubstDependentWitnessTableFn substWitnessTable) {
@@ -1269,16 +1269,16 @@ TypeInfo swift_getTypeByMangledNameImpl(
                                     substWitnessTable);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
-swift_stdlib_getTypeByMangledName(
+swift_getTypeByMangledName(
                         const char *typeNameStart,
                         size_t typeNameLength,
                         const TargetGenericEnvironment<InProcess> *environment,
                         const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
-  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
+  auto metadata = swift_getTypeByMangledNameInternal(typeName, substitutions,
                                              substitutions);
   if (!metadata) return nullptr;
 
@@ -1301,9 +1301,9 @@ static objc_hook_getClass OldGetClassHook;
 static BOOL
 getObjCClassByMangledName(const char * _Nonnull typeName,
                           Class _Nullable * _Nonnull outClass) {
-  auto metadata = swift_stdlib_getTypeByMangledName(typeName, strlen(typeName),
-                                                    /* no substitutions */
-                                                    nullptr, nullptr);
+  auto metadata = swift_getTypeByMangledName(typeName, strlen(typeName),
+                                             /* no substitutions */
+                                             nullptr, nullptr);
   if (metadata) {
     auto objcClass =
       reinterpret_cast<Class>(
@@ -1603,7 +1603,7 @@ void swift::gatherWrittenGenericArgs(
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
-          swift_getTypeByMangledName(req.getMangledTypeName(), substitutions,
+          swift_getTypeByMangledNameInternal(req.getMangledTypeName(), substitutions,
                                      substitutions);
       continue;
     }
