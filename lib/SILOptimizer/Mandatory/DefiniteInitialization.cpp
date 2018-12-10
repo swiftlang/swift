@@ -390,6 +390,7 @@ namespace {
     SmallVectorImpl<DIMemoryUse> &Uses;
     TinyPtrVector<SILInstruction *> &StoresToSelf;
     SmallVectorImpl<SILInstruction *> &Destroys;
+    SmallVector<unsigned, 8> NeedsUpdateForInitState;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
@@ -471,7 +472,8 @@ namespace {
                               bool SuperInitDone,
                               bool FailedSelfUse);
 
-    void handleSelfInitUse(DIMemoryUse &Use);
+    void handleSelfInitUse(unsigned UseID);
+
     void updateInstructionForInitState(DIMemoryUse &Use);
 
 
@@ -776,7 +778,7 @@ void LifetimeChecker::doIt() {
       handleEscapeUse(Use);
       break;
     case DIUseKind::SelfInit:
-      handleSelfInitUse(Use);
+      handleSelfInitUse(i);
       break;
     case DIUseKind::LoadForTypeOfSelf:
       handleLoadForTypeOfSelfUse(Use);
@@ -805,6 +807,12 @@ void LifetimeChecker::doIt() {
     ControlVariable = handleConditionalInitAssign();
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
+
+  // handleStoreUse(), handleSelfInitUse() and handleConditionalInitAssign()
+  // postpone lowering of assignment instructions to avoid deleting
+  // instructions that still appear in the Uses list.
+  for (unsigned UseID : NeedsUpdateForInitState)
+    updateInstructionForInitState(Uses[UseID]);
 }
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
@@ -1015,7 +1023,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   
   // Otherwise, we have a definite init or assign.  Make sure the instruction
   // itself is tagged properly.
-  updateInstructionForInitState(Use);
+  NeedsUpdateForInitState.push_back(UseID);
 }
 
 /// Check whether the instruction is an application.
@@ -1756,7 +1764,8 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
 /// handleSelfInitUse - When processing a 'self' argument on a class, this is
 /// a call to self.init or super.init.
-void LifetimeChecker::handleSelfInitUse(DIMemoryUse &Use) {
+void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
+  auto &Use = Uses[UseID];
   auto *Inst = Use.Inst;
 
   assert(TheMemory.isAnyInitSelf());
@@ -1791,7 +1800,7 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &Use) {
 
     // Lower Assign instructions if needed.
     if (isa<AssignInst>(Use.Inst))
-      updateInstructionForInitState(Use);
+      NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
     // superclass initializer runs.
@@ -1851,14 +1860,13 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
-    auto Kind = Use.Kind;
     Use.Inst = nullptr;
     NonLoadUses.erase(Inst);
 
     PartialInitializationKind PartialInitKind;
 
     if (TheMemory.isClassInitSelf() &&
-        Kind == DIUseKind::SelfInit) {
+        Use.Kind == DIUseKind::SelfInit) {
       assert(InitKind == IsInitialization);
       PartialInitKind = PartialInitializationKind::IsReinitialization;
     } else {
@@ -1867,27 +1875,8 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
                          : PartialInitializationKind::IsNotInitialization);
     }
 
-    unsigned FirstElement = Use.FirstElement;
-    unsigned NumElements = Use.NumElements;
-
-    SmallVector<SILInstruction*, 4> InsertedInsts;
-    SILBuilderWithScope B(Inst, &InsertedInsts);
+    SILBuilderWithScope B(Inst);
     lowerAssignInstruction(B, AI, PartialInitKind);
-
-    // If lowering of the assign introduced any new loads or stores, keep track
-    // of them.
-    for (auto I : InsertedInsts) {
-      if (isa<StoreInst>(I)) {
-        NonLoadUses[I] = Uses.size();
-        Uses.push_back(DIMemoryUse(I, Kind, FirstElement, NumElements));
-      } else if (isa<LoadInst>(I)) {
-        // If we have a re-initialization, the value must be a class,
-        // and the load is just there so we can free the uninitialized
-        // object husk; it's not an actual use of 'self'.
-        if (PartialInitKind != PartialInitializationKind::IsReinitialization)
-          Uses.push_back(DIMemoryUse(I, Load, FirstElement, NumElements));
-      }
-    }
     return;
   }
 
@@ -2256,15 +2245,12 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // Finally, now that we know the value is uninitialized on all paths, it is
     // safe to do an unconditional initialization.
     Use.Kind = DIUseKind::Initialization;
-    
-    // Now that the instruction has a concrete "init" form, update it to reflect
-    // that.  Note that this can invalidate the Uses vector and delete
-    // the instruction.
-    updateInstructionForInitState(Use);
+    NeedsUpdateForInitState.push_back(i);
 
-    // Revisit the instruction on the next pass through the loop, so that we
-    // emit a mask update as appropriate.
-    --i;
+    // Update the control variable.
+    APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
+    SILBuilderWithScope SB(Use.Inst);
+    updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, SB);
   }
 
   // At each block that stores to self, mark the self value as having been
