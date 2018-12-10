@@ -11,6 +11,6 @@
 // RUNJUSTONCE-LABEL: Ackermann
 // RUNJUSTONCE-NOT: Ackermann
 
-// RUN: %Benchmark_Driver check 1 \
+// RUN: %Benchmark_Driver check 1 --verbose \
 // RUN:                 | %FileCheck %s --check-prefix DOCTORCHECK
 // DOCTORCHECK: Ackermann
