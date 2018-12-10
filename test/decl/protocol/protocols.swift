@@ -1,4 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
+import ObjectiveC
+
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
