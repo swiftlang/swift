@@ -23,8 +23,6 @@ public enum Result<Success, Failure: Error> {
   /// Evaluates the given closure when this `Result` instance is `.success`,
   /// passing the success value as a parameter.
   ///
-  /// Use the `map` method with a closure that returns a non-`Result` value.
-  ///
   /// - Parameter transform: A closure that takes the success value of the
   ///   instance.
   /// - Returns: A `Result` instance with the result of evaluating the given 
@@ -42,9 +40,6 @@ public enum Result<Success, Failure: Error> {
   
   /// Evaluates the given closure when this `Result` instance is `.failure`,
   /// passing the failure value as a parameter.
-  ///
-  /// Use the `mapError` method with a closure that returns a non-`Result`
-  /// value.
   ///
   /// - Parameter transform: A closure that takes the failure value of the
   ///   instance.
