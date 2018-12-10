@@ -235,10 +235,7 @@ public:
     // Be maximally conservative with dependencies.
     Always,
     // The input changed, or this job was scheduled as non-cascading in the last
-    // build
-    // but didn't get to run.
-    // The scheduled-but-didn't-run condition is detected when the job was not
-    // dirty but its primary output was missing.
+    // build but didn't get to run.
     RunWithoutCascading,
     // The best case: input didn't change, output exists.
     // Only run if it depends on some other thing that changed.
