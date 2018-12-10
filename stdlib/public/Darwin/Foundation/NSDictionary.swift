@@ -103,7 +103,7 @@ extension Dictionary : _ObjectiveCBridgeable {
           // string-keyed NSDictionaries may generate key collisions when bridged
           // over to Swift. See rdar://problem/35995647
           if Key.self == String.self &&
-                !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
+                !(unsafeBitCast(key, to: String.self)._isKnownASCII) {
             // FIXME: Log a warning if `dict` already had a value for `key`
               builder.add(
                 possibleDuplicateKey: key,
@@ -138,10 +138,8 @@ extension Dictionary : _ObjectiveCBridgeable {
     fastSelf.enumerateKeysAndObjects(options: 0) { (anyKey, anyValue, stopPtr) in
       anyKey._withUnsafeGuaranteedRef { (anyKey) in
         anyValue._withUnsafeGuaranteedRef { (anyValue) in
-          guard let key = Swift._conditionallyBridgeFromObjectiveC(
-            anyKey, Key.self),
-            let value = Swift._conditionallyBridgeFromObjectiveC(
-              anyValue, Value.self) else {
+          guard let key = anyKey as? Key,
+            let value = anyValue as? Value else {
                 stopPtr.pointee = 1
                 success = false
                 return
@@ -150,7 +148,7 @@ extension Dictionary : _ObjectiveCBridgeable {
           // string-keyed NSDictionaries may generate key collisions when bridged
           // over to Swift. See rdar://problem/35995647
           if Key.self == String.self &&
-            !(unsafeBitCast(key, to: String.self)._isKnownNFC) {
+            !(unsafeBitCast(key, to: String.self)._isKnownASCII) {
             // FIXME: Log a warning if `dict` already had a value for `key`
             builder.add(
               possibleDuplicateKey: key,

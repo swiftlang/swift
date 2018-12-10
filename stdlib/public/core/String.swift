@@ -846,7 +846,7 @@ extension String {
 extension String {
   //SPI: NSDictionary bridging
   @inlinable public
-  var _isKnownNFC:Bool {
-    return _guts.isNFC
+  var _isKnownASCII:Bool {
+    return _guts.isASCII
   }
 }
