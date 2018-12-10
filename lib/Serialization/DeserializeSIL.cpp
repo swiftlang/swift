@@ -1091,13 +1091,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_AUTODIFF_FUNCTION:
     SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
-                                              NumArguments, ListOfValues);
+                                              /*numParams*/ Attr2, NumArguments,
+                                              ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionInst;
     break;
   case SIL_INST_AUTODIFF_FUNCTION_EXTRACT:
-    SILInstAutoDiffFunctionExtractLayout::readRecord(scratch, ValID,
-                                                     TyID, TyCategory,
-                                                     /*extractee*/ Attr,
+    SILInstAutoDiffFunctionExtractLayout::readRecord(scratch, TyID, TyCategory,
+                                                     ValID, /*extractee*/ Attr,
                                                      /*order*/ Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionExtractInst;
     break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
@@ -1500,16 +1502,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case SILInstructionKind::AutoDiffFunctionInst: {
-    llvm::SmallBitVector paramIndices(ListOfValues.size() - NumArguments);
-    for (unsigned i : range(paramIndices.size()))
-      paramIndices[i] = (bool)ListOfValues[i];
+    auto numParamIndices = ListOfValues.size() - NumArguments * 3;
+    auto paramIndices = ListOfValues.take_front(numParamIndices);
+    auto numParams = Attr2;
+    llvm::SmallBitVector paramIndicesBitVec(numParams);
+    for (unsigned idx : paramIndices)
+      paramIndicesBitVec.set(idx);
     SmallVector<SILValue, 4> operands;
-    for (auto i = paramIndices.size(); i < NumArguments; i += 3) {
-      auto astTy = MF->getType(ListOfValues[i+1]);
-      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+2]);
-      operands.push_back(getLocalValue(ListOfValues[i], silTy));
+    for (auto i = numParamIndices; i < NumArguments * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
-    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndices,
+    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndicesBitVec,
         /*differentiationOrder*/ Attr, operands[0],
         ArrayRef<SILValue>(operands).drop_front());
     break;

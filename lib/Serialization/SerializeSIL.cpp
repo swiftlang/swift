@@ -964,19 +964,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto *adfi = cast<AutoDiffFunctionInst>(&SI);
-    SmallVector<unsigned, 4> trailingInfo;
+    SmallVector<ValueID, 4> trailingInfo;
     auto &paramIndices = adfi->getParameterIndices();
-    for (unsigned i : range(paramIndices.size()))
-      trailingInfo.push_back(paramIndices[i]);
+    for (unsigned idx : paramIndices.set_bits())
+      trailingInfo.push_back(idx);
     for (auto &op : adfi->getAllOperands()) {
       auto val = op.get();
-      trailingInfo.push_back(addValueRef(val));
       trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
       trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
     }
     SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        adfi->getDifferentiationOrder(), adfi->getNumOperands(), trailingInfo);
+        adfi->getDifferentiationOrder(), (unsigned)paramIndices.size(),
+        adfi->getNumOperands(), trailingInfo);
     break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
@@ -984,10 +985,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto operandRef = addValueRef(adfei->getFunctionOperand());
     auto operandType = adfei->getFunctionOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)adfei->getExtractee();
     SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        operandRef, operandTypeRef, unsigned(operandType.getCategory()),
-        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        (unsigned)adfei->getExtractee(), adfei->getDifferentiationOrder());
+        SILAbbrCodes[SILInstAutoDiffFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, adfei->getDifferentiationOrder());
     break;
   }
   case SILInstructionKind::GraphOperationInst: {
@@ -2483,6 +2485,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstGraphOperationLayout>();
   registerSILAbbr<SILInstGradientLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

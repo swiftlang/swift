@@ -295,7 +295,7 @@ namespace sil_block {
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      // SWIFT_ENABLE_TENSORFLOW
-                     BCVBR<8>,    // number of reverse differentiable attributes
+                     BCVBR<8>,    // number of differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
@@ -434,15 +434,16 @@ namespace sil_block {
   using SILInstAutoDiffFunctionLayout = BCRecordLayout<
     SIL_INST_AUTODIFF_FUNCTION,
     BCVBR<8>,             // differentiation order
+    BCVBR<8>,             // number of function parameters
     BCVBR<8>,             // number of operands
-    BCArray<ValueIDField> // operands
+    BCArray<ValueIDField> // parameter indices and operands
   >;
 
   using SILInstAutoDiffFunctionExtractLayout = BCRecordLayout<
     SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
-    ValueIDField,
     TypeIDField,
     SILTypeCategoryField,
+    ValueIDField,
     BCFixed<2>, // extractee
     BCVBR<8>    // order
   >;

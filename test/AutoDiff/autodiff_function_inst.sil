@@ -1,5 +1,10 @@
 // RUN: %target-sil-opt %s | %FileCheck %s
 
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name autodiff_function
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name autodiff_function
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name autodiff_function | %FileCheck %s
+
 sil_stage raw
 
 import Swift
