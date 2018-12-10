@@ -15,89 +15,23 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Syntax/Syntax.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedRawSyntaxRecorder.h"
 
 namespace swift {
 
 using namespace swift::syntax;
 
-/// Cache node for RawSyntax.
-class RawSyntaxCacheNode : public llvm::FoldingSetNode {
-
-  friend llvm::FoldingSetTrait<RawSyntaxCacheNode>;
-
-  /// Associated RawSyntax.
-  RC<RawSyntax> Obj;
-  /// FoldingSet node identifier of the associated RawSyntax.
-  llvm::FoldingSetNodeIDRef IDRef;
-
-public:
-  RawSyntaxCacheNode(RC<RawSyntax> Obj, const llvm::FoldingSetNodeIDRef IDRef)
-      : Obj(Obj), IDRef(IDRef) {}
-
-  /// Retrieve assciated RawSyntax.
-  RC<RawSyntax> get() { return Obj; }
-
-  // Only allow allocation of Node using the allocator in SyntaxArena.
-  void *operator new(size_t Bytes, RC<SyntaxArena> &Arena,
-                     unsigned Alignment = alignof(RawSyntaxCacheNode)) {
-    return Arena->Allocate(Bytes, Alignment);
-  }
-
-  void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-};
-
-class RawSyntaxTokenCache {
-  llvm::FoldingSet<RawSyntaxCacheNode> CachedTokens;
-  std::vector<RawSyntaxCacheNode *> CacheNodes;
-
-public:
-  RC<RawSyntax> getToken(RC<SyntaxArena> &Arena, tok TokKind, OwnedString Text,
-                         llvm::ArrayRef<TriviaPiece> LeadingTrivia,
-                         llvm::ArrayRef<TriviaPiece> TrailingTrivia);
-
-  ~RawSyntaxTokenCache();
-};
-
-} // namespace swift
-
-namespace llvm {
-
-using swift::RawSyntaxCacheNode;
-
-/// FoldingSet traits for RawSyntax wrapper.
-template <> struct FoldingSetTrait<RawSyntaxCacheNode> {
-
-  static inline void Profile(RawSyntaxCacheNode &X, FoldingSetNodeID &ID) {
-    ID.AddNodeID(X.IDRef);
-  }
-
-  static inline bool Equals(RawSyntaxCacheNode &X, const FoldingSetNodeID &ID,
-                            unsigned, FoldingSetNodeID &) {
-    return ID == X.IDRef;
-  }
-  static inline unsigned ComputeHash(RawSyntaxCacheNode &X,
-                                     FoldingSetNodeID &) {
-    return X.IDRef.ComputeHash();
-  }
-};
-
-} // namespace llvm
-
-namespace swift {
+class ParsedSyntax;
+class ParsedTokenSyntax;
 class SourceFile;
-class SyntaxParsingCache;
+enum class tok;
 class Token;
 class DiagnosticEngine;
 
 namespace syntax {
-class RawSyntax;
-enum class SyntaxKind;
+  enum class SyntaxKind;
 }
-
-using namespace swift::syntax;
 
 enum class SyntaxContextKind {
   Decl,
@@ -106,6 +40,11 @@ enum class SyntaxContextKind {
   Type,
   Pattern,
   Syntax,
+};
+
+enum class SyntaxNodeCreationKind {
+  Recorded,
+  Deferred,
 };
 
 constexpr size_t SyntaxAlignInBits = 3;
@@ -141,24 +80,15 @@ public:
     unsigned BufferID;
 
     // Storage for Collected parts.
-    std::vector<RC<RawSyntax>> Storage;
+    std::vector<ParsedRawSyntaxNode> Storage;
 
-    RC<SyntaxArena> Arena;
-
-    /// A cache of nodes that can be reused when creating the current syntax
-    /// tree
-    SyntaxParsingCache *SyntaxCache = nullptr;
-
-    /// Tokens nodes that have already been created and may be reused in other
-    /// parts of the syntax tree.
-    RawSyntaxTokenCache TokenCache;
+    ParsedRawSyntaxRecorder Recorder;
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    const RC<SyntaxArena> &Arena,
-                    SyntaxParsingCache *SyntaxCache)
+                    std::shared_ptr<SyntaxParseActions> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
-          Arena(Arena), SyntaxCache(SyntaxCache) {}
+          Recorder(std::move(spActions)) {}
   };
 
 private:
@@ -173,14 +103,18 @@ private:
     // Construct a result Syntax with specified SyntaxKind.
     CreateSyntax,
 
+    /// Construct a deferred raw node, to be recorded later.
+    DeferSyntax,
+
     // Pass through all parts to the parent context.
     Transparent,
 
     // Discard all parts in the context.
     Discard,
 
-    // The node has been loaded from the cache and all parts shall be discarded.
-    LoadedFromCache,
+    // The node has been found as incremental update and all parts shall be
+    // discarded.
+    SkippedForIncrementalUpdate,
 
     // Construct SourceFile syntax to the specified SF.
     Root,
@@ -213,35 +147,44 @@ private:
     SyntaxContextKind CtxtKind;
   };
 
+  /// true if it's in backtracking context.
+  bool IsBacktracking = false;
+
   // If false, context does nothing.
   bool Enabled;
 
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
-  void createNodeInPlace(SyntaxKind Kind, size_t N);
+  void createNodeInPlace(SyntaxKind Kind, size_t N,
+                         SyntaxNodeCreationKind nodeCreateK);
 
-  ArrayRef<RC<RawSyntax>> getParts() const {
-    return makeArrayRef(getStorage()).drop_front(Offset);
+  ArrayRef<ParsedRawSyntaxNode> getParts() const {
+    return llvm::makeArrayRef(getStorage()).drop_front(Offset);
   }
 
-  RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<RC<RawSyntax>> Parts);
-  RC<RawSyntax> createSyntaxAs(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Parts);
-  RC<RawSyntax> bridgeAs(SyntaxContextKind Kind, ArrayRef<RC<RawSyntax>> Parts);
+  ParsedRawSyntaxNode makeUnknownSyntax(SyntaxKind Kind,
+                                  ArrayRef<ParsedRawSyntaxNode> Parts);
+  ParsedRawSyntaxNode createSyntaxAs(SyntaxKind Kind,
+                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     SyntaxNodeCreationKind nodeCreateK);
+  Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
+                              ArrayRef<ParsedRawSyntaxNode> Parts);
 
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
-                       unsigned BufferID);
+                       unsigned BufferID,
+                       std::shared_ptr<SyntaxParseActions> SPActions);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
+        IsBacktracking(CtxtHolder->IsBacktracking),
         Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
-    assert(CtxtHolder->Mode != AccumulationMode::LoadedFromCache &&
+    assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
            "Cannot create child context for a node loaded from the cache");
     CtxtHolder = this;
   }
@@ -258,14 +201,13 @@ public:
 
   ~SyntaxParsingContext();
 
-  /// Try loading the current node from the \c SyntaxParsingCache by looking up
-  /// if an unmodified node exists at \p LexerOffset of the same kind. If a node
-  /// is found, replace the node that is currently being constructed by the
-  /// parsing context with the node from the cache and return the number of
-  /// bytes the loaded node took up in the original source. The lexer should
-  /// pretend it has read these bytes and continue from the advanced offset.
-  /// If nothing is found \c 0 is returned.
-  size_t loadFromCache(size_t LexerOffset);
+  /// Try looking up if an unmodified node exists at \p LexerOffset of the same
+  /// kind. If a node is found, replace the node that is currently being
+  /// constructed by the parsing context with the found node and return the
+  /// number of bytes the found node took up in the original source. The lexer
+  /// should pretend it has read these bytes and continue from the advanced
+  /// offset. If nothing is found \c 0 is returned.
+  size_t lookupNode(size_t LexerOffset, SourceLoc Loc);
 
   void disable() { Enabled = false; }
   bool isEnabled() const { return Enabled; }
@@ -280,67 +222,65 @@ public:
 
   const RootContextData *getRootData() const { return RootData; }
 
-  std::vector<RC<RawSyntax>> &getStorage() { return getRootData()->Storage; }
+  std::vector<ParsedRawSyntaxNode> &getStorage() { return getRootData()->Storage; }
 
-  const std::vector<RC<RawSyntax>> &getStorage() const {
+  const std::vector<ParsedRawSyntaxNode> &getStorage() const {
     return getRootData()->Storage;
   }
 
-  SyntaxParsingCache *getSyntaxParsingCache() const {
-    return getRootData()->SyntaxCache;
-  }
-
-  RawSyntaxTokenCache &getTokenCache() { return getRootData()->TokenCache; }
-
-  const RC<SyntaxArena> &getArena() const { return getRootData()->Arena; }
-
   const SyntaxParsingContext *getRoot() const;
 
+  ParsedRawSyntaxRecorder &getRecorder() { return getRootData()->Recorder; }
+
   /// Add RawSyntax to the parts.
-  void addRawSyntax(RC<RawSyntax> Raw);
+  void addRawSyntax(ParsedRawSyntaxNode Raw);
 
   /// Add Token with Trivia to the parts.
   void addToken(Token &Tok, Trivia &LeadingTrivia,
                 Trivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
-  void addSyntax(Syntax Node);
+  void addSyntax(ParsedSyntax Node);
+
 
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
     assert(Storage.size() > Offset);
-    if (auto Node = make<Syntax>(Storage.back()).getAs<SyntaxNode>()) {
+    if (SyntaxNode::kindof(Storage.back().getKind())) {
+      auto rawNode = std::move(Storage.back());
       Storage.pop_back();
-      return Node;
+      return SyntaxNode(rawNode);
     }
     return None;
   }
 
-  TokenSyntax popToken() {
-    auto &Storage = getStorage();
-    assert(Storage.size() > Offset);
-    assert(Storage.back()->getKind() == SyntaxKind::Token);
-    auto Node = make<TokenSyntax>(std::move(Storage.back()));
-    Storage.pop_back();
-    return Node;
-  }
+  ParsedTokenSyntax popToken();
 
   /// Create a node using the tail of the collected parts. The number of parts
   /// is automatically determined from \c Kind. Node: limited number of \c Kind
   /// are supported. See the implementation.
-  void createNodeInPlace(SyntaxKind Kind);
+  void createNodeInPlace(SyntaxKind Kind,
+      SyntaxNodeCreationKind nodeCreateK = SyntaxNodeCreationKind::Recorded);
 
   /// Squashing nodes from the back of the pending syntax list to a given syntax
   /// collection kind. If there're no nodes that can fit into the collection kind,
   /// this function does nothing. Otherwise, it creates a collection node in place
   /// to contain all sequential suitable nodes from back.
-  void collectNodesInPlace(SyntaxKind ColletionKind);
+  void collectNodesInPlace(SyntaxKind ColletionKind,
+       SyntaxNodeCreationKind nodeCreateK = SyntaxNodeCreationKind::Recorded);
 
-  /// On destruction, construct a specified kind of RawSyntax node consuming the
+  /// On destruction, construct a specified kind of syntax node consuming the
   /// collected parts, then append it to the parent context.
   void setCreateSyntax(SyntaxKind Kind) {
     Mode = AccumulationMode::CreateSyntax;
+    SynKind = Kind;
+  }
+
+  /// Same as \c setCreateSyntax but create a deferred node instead of a
+  /// recorded one.
+  void setDeferSyntax(SyntaxKind Kind) {
+    Mode = AccumulationMode::DeferSyntax;
     SynKind = Kind;
   }
 
@@ -357,22 +297,21 @@ public:
 
   /// This context is a back tracking context, so we should discard collected
   /// parts on this context.
-  void setBackTracking() { Mode = AccumulationMode::Discard; }
+  void setBackTracking() {
+    Mode = AccumulationMode::Discard;
+    IsBacktracking = true;
+  }
 
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax
   /// parsing context. However, we can explicitly call this function to get
   /// the syntax tree before closing the root context.
-  RC<RawSyntax> finalizeRoot();
+  ParsedRawSyntaxNode finalizeRoot();
 
-  /// Make a missing node corresponding to the given token kind and text, and
+  /// Make a missing node corresponding to the given token kind and
   /// push this node into the context. The synthesized node can help
   /// the creation of valid syntax nodes.
-  void synthesize(tok Kind, StringRef Text = "");
-
-  /// Make a missing node corresponding to the given node kind, and
-  /// push this node into the context.
-  void synthesize(SyntaxKind Kind);
+  void synthesize(tok Kind, SourceLoc Loc);
 
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
   LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,

@@ -18,10 +18,9 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxBuilders.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -1267,8 +1266,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList(
-                SyntaxContext->getArena()));
+            ParsedSyntaxRecorder::recordBlankFunctionCallArgumentList(
+                Tok.getLoc(), SyntaxContext->getRecorder()));
       }
 
       ParserResult<Expr> closure =
@@ -1557,10 +1556,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
       if (SyntaxContext->isEnabled()) {
-        PatternSyntax PatternNode = SyntaxFactory::makeIdentifierPattern(
-            SyntaxContext->popToken(), SyntaxContext->getArena());
-        ExprSyntax ExprNode = SyntaxFactory::makeUnresolvedPatternExpr(
-            PatternNode, SyntaxContext->getArena());
+        auto &rec = SyntaxContext->getRecorder();
+        ParsedPatternSyntax PatternNode =
+            ParsedSyntaxRecorder::recordIdentifierPattern(
+                                          SyntaxContext->popToken(), rec);
+        ParsedExprSyntax ExprNode =
+            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(PatternNode);
         SyntaxContext->addSyntax(ExprNode);
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1668,8 +1669,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList(
-                SyntaxContext->getArena()));
+            ParsedSyntaxRecorder::recordBlankFunctionCallArgumentList(
+                Tok.getLoc(), SyntaxContext->getRecorder()));
       }
 
       ParserResult<Expr> closure =
@@ -2168,8 +2169,9 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
     consumeToken(tok::l_paren);
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList(
-          SyntaxContext->getArena()));
+      SyntaxContext->addSyntax(
+          ParsedSyntaxRecorder::recordBlankDeclNameArgumentList(
+            Tok.getLoc(), SyntaxContext->getRecorder()));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -2215,6 +2217,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
     loc = DeclNameLoc(baseNameLoc);
+    ArgCtxt.setBackTracking();
     ArgsCtxt.setBackTracking();
     return baseName;
   }
@@ -3363,7 +3366,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
-          SyntaxFactory::makeBlankArrayElementList(Context.getSyntaxArena()));
+          ParsedSyntaxRecorder::recordBlankArrayElementList(
+                                Tok.getLoc(), SyntaxContext->getRecorder()));
     RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(

@@ -45,6 +45,19 @@ def make_missing_child(child):
         return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
 
 
+def make_missing_parsed_child(child):
+    """
+    Generates a C++ call to make the parsed raw syntax for a given Child object.
+    """
+    assert(child.is_token())
+    token = child.main_token()
+    tok_kind = token.kind if token else "unknown"
+    tok_text = token.text if token else ""
+    return \
+        'Rec.recordMissingToken(tok::%s, SourceLoc())' % \
+        (tok_kind)
+
+
 def check_child_condition_raw(child):
     """
     Generates a C++ closure to check whether a given raw syntax node can
@@ -73,6 +86,33 @@ def check_child_condition_raw(child):
         result += 'return %s;\n' % ((' || ').join(node_checks))
     else:
         result += 'return %s::kindof(Raw->getKind());' % child.type_name
+    result += '}'
+    return result
+
+
+def check_parsed_child_condition_raw(child):
+    """
+    Generates a C++ closure to check whether a given raw syntax node can
+    satisfy the requirements of child.
+    """
+    result = '[](const ParsedRawSyntaxNode &Raw) {\n'
+    result += ' // check %s\n' % child.name
+    if child.token_choices:
+        result += 'if (!Raw.isToken()) return false;\n'
+        result += 'auto TokKind = Raw.getTokenKind();\n'
+        tok_checks = []
+        for choice in child.token_choices:
+            tok_checks.append("TokKind == tok::%s" % choice.kind)
+        result += 'return %s;\n' % (' || '.join(tok_checks))
+    elif child.text_choices:
+        result += 'return Raw.isToken();\n'
+    elif child.node_choices:
+        node_checks = []
+        for choice in child.node_choices:
+            node_checks.append(check_parsed_child_condition_raw(choice) + '(Raw)')
+        result += 'return %s;\n' % ((' || ').join(node_checks))
+    else:
+        result += 'return Parsed%s::kindof(Raw.getKind());' % child.type_name
     result += '}'
     return result
 

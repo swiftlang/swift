@@ -47,6 +47,7 @@ namespace swift {
   class DiagnosticEngine;
   class Expr;
   class Lexer;
+  class ParsedTypeSyntax;
   class PersistentParserState;
   class SILParserTUStateBase;
   class ScopeInfo;
@@ -60,7 +61,6 @@ namespace swift {
     class AbsolutePosition;
     class RawSyntax;
     enum class SyntaxKind;
-    class TypeSyntax;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
@@ -351,21 +351,24 @@ public:
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
          SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState);
+         PersistentParserState *PersistentState,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
-         PersistentParserState *PersistentState = nullptr);
+         PersistentParserState *PersistentState = nullptr,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
          SILParserTUStateBase *SIL = nullptr,
-         PersistentParserState *PersistentState = nullptr);
+         PersistentParserState *PersistentState = nullptr,
+         std::shared_ptr<SyntaxParseActions> SPActions = nullptr);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
 
   /// Calling this function to finalize libSyntax tree creation without destroying
   /// the parser instance.
-  void finalizeSyntaxTree() {
+  ParsedRawSyntaxNode finalizeSyntaxTree() {
     assert(Tok.is(tok::eof) && "not done parsing yet");
-    SyntaxContext->finalizeRoot();
+    return SyntaxContext->finalizeRoot();
   }
 
   //===--------------------------------------------------------------------===//
@@ -990,12 +993,12 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeCollection();
+  SyntaxParserResult<ParsedTypeSyntax, TypeRepr> parseTypeCollection();
 
-  SyntaxParserResult<syntax::TypeSyntax, OptionalTypeRepr>
+  SyntaxParserResult<ParsedTypeSyntax, OptionalTypeRepr>
   parseTypeOptional(TypeRepr *Base);
 
-  SyntaxParserResult<syntax::TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
+  SyntaxParserResult<ParsedTypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
   parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;

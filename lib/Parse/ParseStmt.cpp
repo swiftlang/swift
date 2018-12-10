@@ -674,7 +674,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc)) {
     // Synthesize a r-brace if the source doesn't have any.
-    LocalContext.synthesize(tok::r_brace);
+    LocalContext.synthesize(tok::r_brace, LBLoc.getAdvancedLoc(1));
   }
 
   return makeParserResult(Status,

@@ -1,0 +1,86 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From ParsedSyntaxBuilders.cpp.gyb.
+//// Do Not Edit Directly!
+//===------------- ParsedSyntaxBuilders.cpp - Parsed Syntax Building ------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Parse/ParsedSyntaxBuilders.h"
+#include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Syntax/SyntaxNodes.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+% for node in SYNTAX_NODES:
+%   if node.is_buildable():
+%     for child in node.children:
+Parsed${node.name}Builder &
+Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.name}) {
+  Layout[cursorIndex(${node.name}::Cursor::${child.name})] =
+    ${child.name}.getRaw();
+  return *this;
+}
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child_node.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+Parsed${node.name}Builder &
+Parsed${node.name}Builder::add${child_elt}(Parsed${child_elt_type} ${child_elt}) {
+  auto &raw = Layout[cursorIndex(${node.name}::Cursor::${child.name})];
+  if (raw.isNull())
+    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()});
+  else
+    raw.addDeferredChild(${child_elt}.getRaw());
+  return *this;
+}
+%       end
+%     end
+
+Parsed${node.name}
+Parsed${node.name}Builder::record() {
+  finishLayout();
+  auto raw = Rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind},
+    Layout);
+  return Parsed${node.name}(raw);
+}
+
+Parsed${node.name}
+Parsed${node.name}Builder::makeDeferred() {
+  finishLayout();
+  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
+    Layout);
+  return Parsed${node.name}(raw);
+}
+
+void Parsed${node.name}Builder::finishLayout() {
+% if node.children:
+%   for (idx, child) in enumerate(node.children):
+%     if not child.is_optional:
+  if (Layout[${idx}].isNull())
+%       if child.is_token():
+    Layout[${idx}] = ${make_missing_parsed_child(child)};
+%       else:
+    llvm_unreachable("need missing non-token nodes ?");
+%       end
+%     end
+%   end
+% end
+}
+
+%   end
+% end

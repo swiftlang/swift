@@ -21,9 +21,9 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1137,8 +1137,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return status;
 
   if (SyntaxContext->isEnabled()) {
-    if (auto UPES = PatternCtx.popIf<UnresolvedPatternExprSyntax>()) {
-      PatternCtx.addSyntax(UPES->getPattern());
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
     } else {
       PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
     }

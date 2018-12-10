@@ -27,6 +27,7 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
@@ -333,12 +334,15 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
 
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+               PersistentParserState *PersistentState,
+               std::shared_ptr<SyntaxParseActions> SPActions)
+    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState,
+             std::move(SPActions)) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
                SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
+               PersistentParserState *PersistentState,
+               std::shared_ptr<SyntaxParseActions> SPActions)
     : Parser(
           std::unique_ptr<Lexer>(new Lexer(
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
@@ -353,7 +357,7 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
               SF.shouldBuildSyntaxTree()
                   ? TriviaRetentionMode::WithTrivia
                   : TriviaRetentionMode::WithoutTrivia)),
-          SF, SIL, PersistentState) {}
+          SF, SIL, PersistentState, std::move(SPActions)) {}
 
 namespace {
 
@@ -472,7 +476,8 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserTUStateBase *SIL,
-               PersistentParserState *PersistentState)
+               PersistentParserState *PersistentState,
+               std::shared_ptr<SyntaxParseActions> SPActions)
   : SourceMgr(SF.getASTContext().SourceMgr),
     Diags(SF.getASTContext().Diags),
     SF(SF),
@@ -484,7 +489,8 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
-                                           L->getBufferID())) {
+                                           L->getBufferID(),
+                                           std::move(SPActions))) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState(Context));
@@ -736,8 +742,11 @@ bool Parser::loadCurrentSyntaxNodeFromCache() {
   }
   unsigned LexerOffset =
       SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
-  unsigned LeadingTriviaOffset = LexerOffset - LeadingTrivia.getTextLength();
-  if (auto TextLength = SyntaxContext->loadFromCache(LeadingTriviaOffset)) {
+  unsigned LeadingTriviaLen = LeadingTrivia.getTextLength();
+  unsigned LeadingTriviaOffset = LexerOffset - LeadingTriviaLen;
+  SourceLoc LeadingTriviaLoc = Tok.getLoc().getAdvancedLoc(-LeadingTriviaLen);
+  if (auto TextLength = SyntaxContext->lookupNode(LeadingTriviaOffset,
+                                                  LeadingTriviaLoc)) {
     L->resetToOffset(LeadingTriviaOffset + TextLength);
     L->lex(Tok, LeadingTrivia, TrailingTrivia);
     return true;
@@ -1038,6 +1047,7 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
 }
 
 struct ParserUnit::Implementation {
+  std::shared_ptr<SyntaxParseActions> SPActions;
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
@@ -1046,8 +1056,10 @@ struct ParserUnit::Implementation {
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                 const LangOptions &Opts, StringRef ModuleName)
-    : LangOpts(Opts),
+                 const LangOptions &Opts, StringRef ModuleName,
+                 std::shared_ptr<SyntaxParseActions> spActions)
+    : SPActions(std::move(spActions)),
+      LangOpts(Opts),
       Diags(SM),
       Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
@@ -1072,16 +1084,20 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        const LangOptions &LangOpts, StringRef ModuleName,
+                       std::shared_ptr<SyntaxParseActions> spActions,
                        SyntaxParsingCache *SyntaxCache)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName)) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName,
+                               std::move(spActions))) {
 
   Impl.SF->SyntaxParsingCache = SyntaxCache;
-  Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, nullptr));
+  Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
+                                  /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                        unsigned Offset, unsigned EndOffset)
-  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
+  : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input",
+                             nullptr)) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
@@ -1091,21 +1107,23 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned Buffer
                       CommentRetentionMode::None,
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));
-  Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF));
+  Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
+    /*PersistentState=*/nullptr, Impl.SPActions));
 }
 
 ParserUnit::~ParserUnit() {
   delete &Impl;
 }
 
-void ParserUnit::parse() {
+OpaqueSyntaxNode ParserUnit::parse() {
   auto &P = getParser();
   bool Done = false;
   while (!Done) {
     P.parseTopLevel();
     Done = P.Tok.is(tok::eof);
   }
-  P.finalizeSyntaxTree();
+  auto rawNode = P.finalizeSyntaxTree();
+  return rawNode.getOpaqueNode();
 }
 
 Parser &ParserUnit::getParser() {
