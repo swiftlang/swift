@@ -94,7 +94,9 @@ public extension Differentiable where TangentVector == CotangentVector {
 // Differential Operators
 //===----------------------------------------------------------------------===//
 
-/*
+// FIXME(rxwei): Fix SR-9458.
+#if false
+
 @inlinable
 public func valueWithDifferential<T, R>(
   at x: T, in f: @escaping @autodiff (T) -> R
@@ -148,7 +150,8 @@ public func gradient<T, R>(
         R.CotangentVector == R {
   return { x in gradient(at: x, in: f) }
 }
- */
+
+#endif
 
 //===----------------------------------------------------------------------===//
 // Builtins
