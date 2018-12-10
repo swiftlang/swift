@@ -1,6 +1,4 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
-import ObjectiveC
-
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -514,17 +512,3 @@ extension LetThereBeCrash {
   // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
 
-protocol SomeProtocol {
-  func someFunction()
-  func anotherFunction()
-}
-
-extension SomeProtocol {
-  func someFunction() {
-    let _ = #selector(anotherFunction) // expected-error {{cannot use 'anotherFunction' as a selector because protocol 'SomeProtocol' is not exposed to Objective-C}} {{none}}
-  }
-
-  func anotherFunction() { 
-    print("Hello world!")
- }
-}
