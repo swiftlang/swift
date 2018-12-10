@@ -570,10 +570,6 @@ public struct CocoaError : _BridgedStoredNSError {
     public init(rawValue: Int) {
       self.rawValue = rawValue
     }
-    
-    public var hashValue: Int {
-      return self.rawValue
-    }
   }
 }
 
@@ -1800,10 +1796,6 @@ public struct URLError : _BridgedStoredNSError {
 
     public init(rawValue: Int) {
       self.rawValue = rawValue
-    }
-
-    public var hashValue: Int {
-      return self.rawValue
     }
   }
 }
