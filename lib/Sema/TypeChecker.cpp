@@ -348,14 +348,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-    if (!genericParams) {
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      ext->diagnose(diag::extension_nongeneric_trailing_where,
-                    nominal->getFullName())
-        .highlight(trailingWhereClause->getSourceRange());
-      ext->setTrailingWhereClause(nullptr);
-    } else {
+    if (genericParams) {
       // Merge the trailing where clause into the generic parameter list.
       // FIXME: Long-term, we'd like clients to deal with the trailing where
       // clause explicitly, but for now it's far more direct to represent
@@ -365,6 +358,9 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
         trailingWhereClause->getWhereLoc(),
         trailingWhereClause->getRequirements());
     }
+
+    // If there's no generic parameter list, the where clause is diagnosed
+    // in typeCheckDecl().
   }
 
   nominal->addExtension(ext);
