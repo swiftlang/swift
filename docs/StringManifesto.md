@@ -1044,7 +1044,7 @@ approach would be to standardize on `format` methods, e.g.:
 
 ### C String Interop
 
-Our support for interoperation with nul-terminated C strings is scattered and
+Our support for interoperation with null-terminated C strings is scattered and
 incoherent, with 6 ways to transform a C string into a `String` and four ways to
 do the inverse.  These APIs should be replaced with the following
 
