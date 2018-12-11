@@ -620,10 +620,21 @@ extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
+    _internalInvariant(hashTable.isValid(source))
+    _internalInvariant(hashTable.isValid(target))
     (_keys + target.offset)
       .moveInitialize(from: _keys + source.offset, count: 1)
     (_values + target.offset)
       .moveInitialize(from: _values + source.offset, count: 1)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func swapEntry(_ left: Bucket, with right: Bucket) {
+    _internalInvariant(hashTable.isValid(left))
+    _internalInvariant(hashTable.isValid(right))
+    swap(&_keys[left.offset], &_keys[right.offset])
+    swap(&_values[left.offset], &_values[right.offset])
   }
 }
 
