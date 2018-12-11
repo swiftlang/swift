@@ -1043,11 +1043,11 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 
 // SWIFT_ENABLE_TENSORFLOW
 /// Specialized emitter for Builtin.addressOfBorrow.
-static ManagedValue emitBuiltinAutoDiffGetJVP(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              SubstitutionMap substitutions,
-                                              Expr *argument,
-                                              SGFContext C) {
+static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SubstitutionMap substitutions,
+                                                Expr *argument,
+                                                SGFContext C) {
   auto argVal = SGF.emitRValue(argument);
   auto jvp = SGF.getBuilder().createAutoDiffFunctionExtract(
       loc, AutoDiffFunctionExtractee::JVP, /*differentiationOrder*/ 1,
@@ -1055,11 +1055,11 @@ static ManagedValue emitBuiltinAutoDiffGetJVP(SILGenFunction &SGF,
   return SGF.emitManagedRValueWithCleanup(jvp);
 }
 
-static ManagedValue emitBuiltinAutoDiffGetVJP(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              SubstitutionMap substitutions,
-                                              Expr *argument,
-                                              SGFContext C) {
+static ManagedValue emitBuiltinAutoDiffApplyVJP(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SubstitutionMap substitutions,
+                                                Expr *argument,
+                                                SGFContext C) {
   auto argVal = SGF.emitRValue(argument);
   auto vjp = SGF.getBuilder().createAutoDiffFunctionExtract(
       loc, AutoDiffFunctionExtractee::VJP, /*differentiationOrder*/ 1,

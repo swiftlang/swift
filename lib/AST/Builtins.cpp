@@ -189,7 +189,9 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericEnvironment *Env) {
+                          GenericEnvironment *Env,
+                          // SWIFT_ENABLE_TENSORFLOW
+                          bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -219,7 +221,8 @@ getBuiltinGenericFunction(Identifier Id,
                                StaticSpellingKind::None,
                                /*FuncLoc=*/SourceLoc(),
                                Name, /*NameLoc=*/SourceLoc(),
-                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                               // SWIFT_ENABLE_TENSORFLOW
+                               /*Throws=*/ Rethrows, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
@@ -229,6 +232,9 @@ getBuiltinGenericFunction(Identifier Id,
   func->setValidationToChecked();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
+  // SWIFT_ENABLE_TENSORFLOW
+  if (Rethrows)
+    func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
 
   return func;
 }
@@ -460,6 +466,8 @@ namespace {
     GenericSignatureBuilder Builder;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
+    // SWIFT_ENABLE_TENSORFLOW
+    bool Rethrows = false;
 
   public:
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
@@ -497,13 +505,18 @@ namespace {
       Builder.addRequirement(req, source, Context.getStdlibModule());
     }
 
+    void setRethrows(bool rethrows = true) {
+      Rethrows = rethrows;
+    }
+
     ValueDecl *build(Identifier name) {
       auto GenericSig = std::move(Builder).computeGenericSignature(SourceLoc());
       auto GenericEnv = GenericSig->createGenericEnvironment();
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv);
+                                       GenericEnv,
+                                       /*Rethrows*/ Rethrows);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -1015,23 +1028,17 @@ static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
-static ValueDecl *getAutoDiffGetAssociatedFunction(
+static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned order, unsigned arity, bool isThrowing = false) {
+    unsigned order, unsigned arity) {
   assert(arity >= 1);
   assert(order == 1 && "higher-order differentiation is not supported yet");
-  // JVP(non-throwing):
-  //   <...T...(arity), R> (@autodiff (...T) -> R)
-  //       -> (...T) -> (R, (...T.TangentVector) -> R.TangentVector)
-  // JVP(throwing):
-  //   <...T...(arity), R> (@autodiff (...T) throws -> R)
-  //       -> (...T) throws -> (R, (...T.TangentVector) -> R.TangentVector)
-  // VJP(non-throwing):
-  //   <...T...(arity), R> (@autodiff (...T) -> R)
-  //       -> (...T) -> (R, (R.CotangentVector) -> ...T.CotangentVector)
-  // VJP(throwing):
-  //   <...T...(arity), R> (@autodiff (...T) throws -> R)
-  //       -> (...T) throws -> (R, (R.CotangentVector) -> ...T.CotangentVector)
+  // JVP:
+  //   <...T...(arity), R> (@autodiff (...T) throws -> R, ...T)
+  //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
+  // VJP:
+  //   <...T...(arity), R> (@autodiff (...T) throws -> R, ...T)
+  //       rethrows -> (R, (R.CotangentVector) -> ...T.CotangentVector)
   BuiltinGenericSignatureBuilder builder(Context,
                                          /*numGenericParams*/ 1 + arity);
   // Look up the Differentiable protocol.
@@ -1040,32 +1047,32 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
   assert(diffableProtoLookup.size() == 1);
   auto *diffableProto = cast<ProtocolDecl>(diffableProtoLookup.front());
   // Create type parameters and add conformance constraints.
-  auto R = makeGenericParam(arity);
-  builder.addConformanceRequirement(R, diffableProto);
-  SmallVector<decltype(R), 2> Ts;
+  auto fnResultGen = makeGenericParam(arity);
+  builder.addConformanceRequirement(fnResultGen, diffableProto);
+  SmallVector<decltype(fnResultGen), 2> fnArgGens;
   for (auto i : range(arity)) {
     auto T = makeGenericParam(i);
     builder.addConformanceRequirement(T, diffableProto);
-    Ts.push_back(T);
+    fnArgGens.push_back(T);
   }
-  // Generator for the argument.
-  BuiltinGenericSignatureBuilder::LambdaGenerator argGen {
+  // Generator for the first argument, i.e. the @autodiff function.
+  BuiltinGenericSignatureBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the
     // function being differentiated.
-    [=, &Ts](BuiltinGenericSignatureBuilder &builder) -> Type {
+    [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
           .withDifferentiability(FunctionTypeDifferentiability::Bidirectional)
-          .withNoEscape();
-      if (isThrowing)
-        extInfo = extInfo.withThrows();
+          .withNoEscape().withThrows();
       SmallVector<FunctionType::Param, 2> params;
-      for (auto &paramGen : Ts)
+      for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, R.build(builder))->withExtInfo(extInfo);
+      return FunctionType::get(params, fnResultGen.build(builder))
+          ->withExtInfo(extInfo);
     }
   };
-  AnyFunctionType *origFnTy = argGen.build(builder)->castTo<AnyFunctionType>();
+  AnyFunctionType *origFnTy =
+      firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->withExtInfo(origFnTy->getExtInfo()
       .withDifferentiability(FunctionTypeDifferentiability::None));
   auto *paramIndices = AutoDiffParameterIndices::create(Context, origFnTy,
@@ -1076,14 +1083,16 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     [=](BuiltinGenericSignatureBuilder &builder) -> Type {
       // TODO(rxwei): Use parameter indices and differentiation order that are
       // stored in the function type.
-      auto *vjpType = origFnTy->getAutoDiffAssociatedFunctionType(
+      return origFnTy->getAutoDiffAssociatedFunctionType(
           *paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-          kind, /*lookupConformance*/ nullptr);
-      vjpType = vjpType->withExtInfo(vjpType->getExtInfo().withNoEscape(false));
-      return vjpType;
+          kind, /*lookupConformance*/ nullptr)
+          ->getResult();
     }
   };
-  builder.addParameter(argGen);
+  builder.addParameter(firstArgGen);
+  for (auto argGen : fnArgGens)
+    builder.addParameter(argGen);
+  // builder.setRethrows();
   builder.setResult(resultGen);
   return builder.build(Id);
 }
@@ -2023,14 +2032,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffPopFromTape(Context, Id);
   case BuiltinValueKind::AutoDiffDestroyTape:
     return getAutoDiffDestroyTape(Context, Id);
-  case BuiltinValueKind::AutoDiffGetJVP:
-    return getAutoDiffGetAssociatedFunction(Context, Id,
-                                            AutoDiffAssociatedFunctionKind::JVP,
-                                            /*order*/ 1, /*arity*/ 1);
-  case BuiltinValueKind::AutoDiffGetVJP:
-    return getAutoDiffGetAssociatedFunction(Context, Id,
-                                            AutoDiffAssociatedFunctionKind::VJP,
-                                            /*order*/ 1, /*arity*/ 1);
+  case BuiltinValueKind::AutoDiffApplyJVP:
+    return getAutoDiffApplyAssociatedFunction(Context, Id,
+        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1);
+  case BuiltinValueKind::AutoDiffApplyVJP:
+    return getAutoDiffApplyAssociatedFunction(Context, Id,
+        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1);
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 
