@@ -4673,27 +4673,18 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   validateExtendedType(ext, *this);
 
-  // Extensions nested inside other declarations are invalid and we
-  // do not bind them.
-  if (!isa<SourceFile>(ext->getDeclContext()))
-     return;
-
-  // If this is not bound to any decls at this point, this extension is in
-  // inactive coditional compilation block. It's not safe to typecheck this
-  // extension. This happens if code completion is triggered in inactive
-  // conditional complation block.
-  if (!ext->alreadyBoundToNominal())
-    return;
-
   if (auto *nominal = ext->getExtendedNominal()) {
+    // If this extension was not already bound, it means it is either in an
+    // inactive conditional compilation block, or otherwise (incorrectly)
+    // nested inside of some other declaration. Make sure the generic
+    // parameter list of the extension exists to maintain invariants.
+    if (!ext->alreadyBoundToNominal())
+      ext->createGenericParamsIfMissing(nominal);
+
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
 
-    if (nominal->getGenericParamsOfContext()) {
-      auto genericParams = ext->getGenericParams();
-      assert(genericParams && "bindExtensionDecl didn't set generic params?");
-
-      // Check generic parameters.
+    if (auto *genericParams = ext->getGenericParams()) {
       GenericEnvironment *env;
       Type extendedType = ext->getExtendedType();
       std::tie(env, extendedType) = checkExtensionGenericParams(
