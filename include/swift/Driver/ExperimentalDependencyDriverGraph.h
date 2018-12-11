@@ -226,9 +226,8 @@ public:
   void verify() const;
 
 private:
-  bool static mapCorruption(const char *msg) {
+  static bool mapCorruption(const char *msg) {
     llvm_unreachable(msg);
-    return false;
   }
 
   /// Read a FrontendGraph belonging to \p job from \p buffer
