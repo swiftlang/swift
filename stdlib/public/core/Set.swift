@@ -921,6 +921,9 @@ extension Set: SetAlgebra {
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
+    // If self is empty we don't need to iterate over other because there's nothing to remove on self.
+    guard !isEmpty else { return }
+
     for item in other {
       remove(item)
     }
@@ -1128,6 +1131,8 @@ extension Set {
   @inlinable
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
+    guard !isEmpty else { return true }
+
     for member in other {
       if contains(member) {
         return false
