@@ -107,12 +107,16 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
-bool swift::parseIntoSourceFile(SourceFile &SF,
+static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
+                                DelayedParsingCallbacks *DelayedParseCB,
+                                bool FullParse) {
+  assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
+         "cannot parse in full with the given parameters!");
+
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
@@ -122,10 +126,34 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
-  bool FoundSideEffects = P.parseTopLevel();
-  *Done = P.Tok.is(tok::eof);
+  bool FoundSideEffects = false;
+  do {
+    bool hasSideEffects = P.parseTopLevel();
+    FoundSideEffects = FoundSideEffects || hasSideEffects;
+    *Done = P.Tok.is(tok::eof);
+  } while (FullParse && !*Done);
 
   return FoundSideEffects;
+}
+
+bool swift::parseIntoSourceFile(SourceFile &SF,
+                                unsigned BufferID,
+                                bool *Done,
+                                SILParserState *SIL,
+                                PersistentParserState *PersistentState,
+                                DelayedParsingCallbacks *DelayedParseCB) {
+  return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
+                                 PersistentState, DelayedParseCB,
+                                 /*FullParse=*/SF.shouldBuildSyntaxTree());
+}
+
+bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+                                    PersistentParserState *PersistentState,
+                                    DelayedParsingCallbacks *DelayedParseCB) {
+  bool Done = false;
+  return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
+                                 PersistentState, DelayedParseCB,
+                                 /*FullParse=*/true);
 }
 
 

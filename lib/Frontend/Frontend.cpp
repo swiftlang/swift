@@ -1056,13 +1056,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    bool Done;
-    do {
-      // Parser may stop at some erroneous constructions like #else, #endif
-      // or '}' in some cases, continue parsing until we are done
-      parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                          &PersistentState, nullptr);
-    } while (!Done);
+    parseIntoSourceFileFull(*NextInput, BufferID, &PersistentState);
   }
 
   // Now parse the main file.
@@ -1071,11 +1065,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
-    bool Done;
-    do {
-      parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                          nullptr, &PersistentState, nullptr);
-    } while (!Done);
+    parseIntoSourceFileFull(MainFile, MainFile.getBufferID().getValue(),
+                            &PersistentState);
   }
 
   assert(Context->LoadedModules.size() == 1 &&

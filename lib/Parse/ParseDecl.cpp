@@ -2410,8 +2410,12 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
                                         SyntaxParsingContext *&SyntaxContext) {
   HasPoundDirective = false;
+  bool isRootCtx = SyntaxContext->isRoot();
   SyntaxParsingContext BlockItemListContext(SyntaxContext,
                                             SyntaxKind::CodeBlockItemList);
+  if (isRootCtx) {
+    BlockItemListContext.setTransparent();
+  }
   SyntaxParsingContext BlockItemContext(SyntaxContext,
                                         SyntaxKind::CodeBlockItem);
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
