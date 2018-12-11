@@ -72,15 +72,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Given a set of AD indices, mangles it into a textual form.
-static std::string mangleADIndices(const SILAutoDiffIndices &indices) {
-  std::string result = "src_" + llvm::utostr(indices.source) + "_wrt_";
-  interleave(indices.parameters.set_bits(),
-             [&](unsigned idx) { result += llvm::utostr(idx); },
-             [&] { result += '_'; });
-  return result;
-}
-
 /// Mangles an AD configuration. The mangling rule looks like
 ///   "grad_src_<src_idx>_wrt_<param_idx0>_<param_idx1>_..._<options>"
 /// ... where options mangle as the following:
@@ -88,7 +79,7 @@ static std::string mangleADIndices(const SILAutoDiffIndices &indices) {
 ///   "_p" : preserving_result
 ///   "_d" : delayed
 static std::string mangleADConfig(const SILAutoDiffConfig &config) {
-  std::string result = "grad_" + mangleADIndices(config.indices);
+  std::string result = "grad_" + config.indices.mangle();
   if (config.isSeedable())
     result += "_s";
   if (config.isPreservingResult())
@@ -2034,7 +2025,7 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
   std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
-                             mangleADIndices(task->getIndices());
+                             task->getIndices().mangle();
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
   auto pvStruct =
@@ -4305,7 +4296,7 @@ void DifferentiationTask::createEmptyPrimal() {
   auto *original = getOriginal();
   auto &module = context.getModule();
   std::string primalName =
-      "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
+      "AD__" + original->getName().str() + "__primal_" + indices.mangle();
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
   primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(primalValueStructDecl, module));
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
@@ -4422,7 +4413,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   }
 
   auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
-                 mangleADIndices(getIndices());
+                 getIndices().mangle();
   auto adjType = SILFunctionType::get(
       origTy->getGenericSignature(), origTy->getExtInfo(),
       origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
@@ -4459,20 +4450,17 @@ void DifferentiationTask::createVJP() {
 
   // === Create an empty VJP. ===
   auto vjpName = "AD__" + original->getName().str() + "__vjp_" +
-                 mangleADIndices(getIndices());
+                 getIndices().mangle();
   auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
       getIndices().parameters, getIndices().source, 1,
       AutoDiffAssociatedFunctionKind::VJP, module,
       LookUpConformanceInModule(module.getSwiftModule()));
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = original->getLinkage();
-  if (linkage == SILLinkage::Public)
-    linkage = SILLinkage::PublicNonABI;
   vjp = fb.createFunction(
-      linkage, vjpName, vjpType, original->getGenericEnvironment(),
-      original->getLocation(), original->isBare(), original->isTransparent(),
-      original->isSerialized());
+      original->getLinkage(), vjpName, vjpType,
+      original->getGenericEnvironment(), original->getLocation(),
+      original->isBare(), original->isTransparent(), original->isSerialized());
   vjp->setUnqualifiedOwnership();
   vjp->setDebugScope(new (module)
                          SILDebugScope(original->getLocation(), vjp));
