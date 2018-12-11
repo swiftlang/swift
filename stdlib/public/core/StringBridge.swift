@@ -21,7 +21,7 @@ internal typealias _CocoaString = AnyObject
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
 
-@usableFromInline // @testable
+@inlinable @inline(__always) // @testable
 @_effects(releasenone)
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString

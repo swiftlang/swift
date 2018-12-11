@@ -12,12 +12,14 @@
 
 import SwiftShims
 
+@usableFromInline
 internal enum _Normalization {
 
   // ICU's NFC unorm2 instance
   //
   // TODO(String performance): Should we cache one on TLS? Is this an expensive
   // call?
+  @usableFromInline
   internal static var _nfcNormalizer: OpaquePointer = {
     var err = __swift_stdlib_U_ZERO_ERROR
     let normalizer = __swift_stdlib_unorm2_getNFCInstance(&err)
@@ -47,10 +49,13 @@ extension Unicode.Scalar {
   // produce new sub-segments.
 
   // Whether this scalar value always has a normalization boundary before it.
-  @inline(__always) // common fast-path
+  @inline(__always) @inlinable // common fast-path
   internal var _hasNormalizationBoundaryBefore: Bool {
     // Fast-path: All scalars up through U+02FF are NFC and have boundaries
     // before them
+    
+    
+    
     if self.value < 0x300 { return true }
 
     _internalInvariant(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
