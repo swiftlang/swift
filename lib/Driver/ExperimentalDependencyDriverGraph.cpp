@@ -35,14 +35,12 @@ using namespace swift;
 
 using namespace swift::experimental_dependencies;
 using namespace swift::driver;
-using namespace swift::driver::experimental_dependencies;
 
 //==============================================================================
 // MARK: Interfacing to Compilation
 //==============================================================================
 
-using LoadResult =
-    driver::experimental_dependencies::DependencyGraphImpl::LoadResult;
+using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
 
 LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);

@@ -36,32 +36,7 @@
 // driver.
 
 namespace swift {
-namespace driver {
 namespace experimental_dependencies {
-
-//==============================================================================
-// MARK: Cross-references to names not in driver namespace
-//==============================================================================
-
-// Awkward... needs to be in driver and experimental_dependencies, but the
-// common code is just in experimental_dependencies.
-
-using Node = swift::experimental_dependencies::Node;
-using NodeKind = swift::experimental_dependencies::NodeKind;
-using FrontendNode = swift::experimental_dependencies::FrontendNode;
-using FrontendGraph = swift::experimental_dependencies::FrontendGraph;
-using DependencyKey = swift::experimental_dependencies::DependencyKey;
-using DeclAspect = swift::experimental_dependencies::DeclAspect;
-
-template <typename Key1, typename Key2, typename Value>
-using TwoStageMap =
-    swift::experimental_dependencies::TwoStageMap<Key1, Key2, Value>;
-
-template <typename Key1, typename Key2, typename Value>
-using BiIndexedTwoStageMap =
-    swift::experimental_dependencies::BiIndexedTwoStageMap<Key1, Key2, Value>;
-
-using DeclAspect = swift::experimental_dependencies::DeclAspect;
 
 //==============================================================================
 // MARK: DriverNode
@@ -147,12 +122,12 @@ class DriverGraph {
   std::unordered_set<std::string> cascadingJobs;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
-  std::unordered_map<std::string, const Job *> jobsBySwiftDeps;
+  std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
 
   /// For debugging, the driver writes out a dot file of the graph every time a
   /// Frontend swiftdeps is read and integrated. In order to keep subsequent
   /// files for the same job distinct, keep a sequence number for each job.
-  std::unordered_map<const Job *, uint> dotFileSequenceNumberByJob;
+  std::unordered_map<const driver::Job *, uint> dotFileSequenceNumberByJob;
 
   /// Encapsulate the invariant between where the node resides in
   /// nodesBySwiftDepsFile and the swiftDeps node instance variable here.
@@ -182,12 +157,12 @@ class DriverGraph {
     return n;
   }
 
-  static StringRef getSwiftDeps(const Job *cmd) {
+  static StringRef getSwiftDeps(const driver::Job *cmd) {
     return cmd->getOutput().getAdditionalOutputForType(
         file_types::TY_SwiftDeps);
   }
 
-  const Job *getJob(Optional<std::string> swiftDeps) const {
+  const driver::Job *getJob(Optional<std::string> swiftDeps) const {
     assert(swiftDeps.hasValue() && "Don't call me for expats.");
     auto iter = jobsBySwiftDeps.find(swiftDeps.getValue());
     assert(iter != jobsBySwiftDeps.end() && "All jobs should be tracked.");
@@ -202,7 +177,7 @@ public:
 
   DriverGraph() = default;
 
-  DependencyGraphImpl::LoadResult loadFromPath(const Job *, StringRef);
+  DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -223,24 +198,24 @@ public:
   // This section contains the interface to the status quo code in the driver.
 
   /// Interface to status quo code in the driver.
-  bool isMarked(const Job *) const;
+  bool isMarked(const driver::Job *) const;
 
   /// Visit closure of every use of \p job, adding each to visited.
   /// Record any "cascading" nodes visited.
   /// "Cascading" means has a use by an interface in another file.
-  void
-  markTransitive(SmallVectorImpl<const Job *> &visited, const Job *node,
-                 DependencyGraph<const Job *>::MarkTracer *tracer = nullptr);
+  void markTransitive(
+      SmallVectorImpl<const driver::Job *> &visited, const driver::Job *node,
+      DependencyGraph<const driver::Job *>::MarkTracer *tracer = nullptr);
 
   /// "Mark" this node only.
-  bool markIntransitive(const Job *);
+  bool markIntransitive(const driver::Job *);
 
   /// Record a new (to this graph) Job.
-  void addIndependentNode(const Job *);
+  void addIndependentNode(const driver::Job *);
 
   std::vector<std::string> getExternalDependencies() const;
 
-  void markExternal(SmallVectorImpl<const Job *> &uses,
+  void markExternal(SmallVectorImpl<const driver::Job *> &uses,
                     StringRef externalDependency);
 
   void verify() const;
@@ -255,7 +230,7 @@ private:
   /// and integrate it into the DriverGraph.
   /// Used both the first time, and to reload the FrontendGraph.
   /// If any changes were observed, indicate same in the return vale.
-  DependencyGraphImpl::LoadResult loadFromBuffer(const Job *,
+  DependencyGraphImpl::LoadResult loadFromBuffer(const driver::Job *,
                                                  llvm::MemoryBuffer &);
 
   /// Integrate a FrontendGraph into the receiver.
@@ -318,9 +293,9 @@ private:
 
   /// For debugging, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
-  void emitDotFileForJob(Optional<DiagnosticEngine *>, const Job *);
+  void emitDotFileForJob(Optional<DiagnosticEngine *>, const driver::Job *);
 
-  std::string dotFilenameForJob(const Job *);
+  std::string dotFilenameForJob(const driver::Job *);
 
   void emitDotFile(Optional<DiagnosticEngine *>, StringRef outputPath);
   void emitDotFile() { emitDotFile(llvm::errs()); }
@@ -332,7 +307,6 @@ private:
   }
 };
 } // namespace experimental_dependencies
-} // namespace driver
 } // namespace swift
 
 #endif /* ExperimentalDependencyGraph_h */
