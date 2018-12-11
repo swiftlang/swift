@@ -57,31 +57,6 @@ AutoDiffAssociatedFunctionKind(StringRef string) {
   rawValue = *result;
 }
 
-Differentiability::Differentiability(AutoDiffMode mode,
-                                     bool wrtSelf,
-                                     llvm::SmallBitVector parameterIndices,
-                                     llvm::SmallBitVector resultIndices)
-    : mode(mode), wrtSelf(wrtSelf), parameterIndices(parameterIndices),
-      resultIndices(resultIndices) {
-}
-
-Differentiability::Differentiability(AutoDiffMode mode,
-                                     AnyFunctionType *type)
-    : mode(mode), wrtSelf(type->getExtInfo().hasSelfParam()),
-      // For now, we assume exactly one result until we figure out how to
-      // model result selection.
-      resultIndices(1) {
-  // If function has self, it must be a curried method type.
-  if (wrtSelf) {
-    auto methodTy = type->getResult()->castTo<AnyFunctionType>();
-    parameterIndices = llvm::SmallBitVector(methodTy->getNumParams());
-  } else {
-    parameterIndices = llvm::SmallBitVector(type->getNumParams());
-  }
-  parameterIndices.set();
-  resultIndices.set();
-}
-
 unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
     unsigned order, AutoDiffAssociatedFunctionKind kind) {
   return (order - 1) * getNumAutoDiffAssociatedFunctions(order) + kind.rawValue;

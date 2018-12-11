@@ -63,8 +63,6 @@ public:
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
-  // SWIFT_ENABLE_TENSORFLOW
-  Optional<std::pair<StringRef, int>> differentiabilityAndOrder = None;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -111,14 +109,6 @@ public:
   
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  bool hasDifferentiability() const {
-    return differentiabilityAndOrder.hasValue();
-  }
-  std::pair<StringRef, int> getDifferentiabilityAndOrder() const {
-    return *differentiabilityAndOrder;
-  }
 
   bool hasOwnership() const {
     return getOwnership() != ReferenceOwnership::Strong;

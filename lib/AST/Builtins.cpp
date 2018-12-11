@@ -1055,8 +1055,7 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     [=, &Ts](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiability(FunctionTypeDifferentiability::Bidirectional)
-          .withNoEscape();
+          .withDifferentiable().withNoEscape();
       if (isThrowing)
         extInfo = extInfo.withThrows();
       SmallVector<FunctionType::Param, 2> params;
@@ -1066,8 +1065,8 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     }
   };
   AnyFunctionType *origFnTy = argGen.build(builder)->castTo<AnyFunctionType>();
-  origFnTy = origFnTy->withExtInfo(origFnTy->getExtInfo()
-      .withDifferentiability(FunctionTypeDifferentiability::None));
+  origFnTy = origFnTy->withExtInfo(
+      origFnTy->getExtInfo().withDifferentiable(false));
   auto *paramIndices = AutoDiffParameterIndices::create(Context, origFnTy,
                                                         /*isMethod*/ false,
                                                         /*setAllParams*/ true);

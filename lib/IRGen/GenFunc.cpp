@@ -476,9 +476,8 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   // SWIFT_ENABLE_TENSORFLOW
   if (T->isDifferentiable()) {
     auto extInfo = T->getExtInfo();
-    auto newExtInfo =
-        extInfo.withDifferentiability(FunctionTypeDifferentiability::None);
-    auto origTy = T->getWithExtInfo(newExtInfo);
+    auto nondiffExtInfo = extInfo.withDifferentiable(false);
+    auto origTy = T->getWithExtInfo(nondiffExtInfo);
     // TODO(rxwei): Use the parameter indices and diff order in the @autodiff
     // function type.
     auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(

@@ -228,45 +228,6 @@ public:
   }
 };
 
-/// Differentiability of a function specifies the differentiation mode,
-/// parameter indices at which the function is differentiable with respect to,
-/// and indices of results which can be differentiated.
-class Differentiability {
-private:
-  // The differentiation mode.
-  AutoDiffMode mode;
-  // Differentiable with respect to `self`, applicable to methods only.
-  bool wrtSelf;
-  // Indices of parameters that are differentiable with respect to.
-  llvm::SmallBitVector parameterIndices;
-  // Indices of results that are differentiable.
-  llvm::SmallBitVector resultIndices;
-
-public:
-  Differentiability(AutoDiffMode mode,
-                    bool wrtSelf,
-                    llvm::SmallBitVector parameterIndices,
-                    llvm::SmallBitVector resultIndices);
-
-  Differentiability(AutoDiffMode mode, AnyFunctionType *type);
-
-  AutoDiffMode getMode() const {
-    return mode;
-  }
-
-  bool isWithRespectToSelf() const {
-    return wrtSelf;
-  }
-
-  const llvm::SmallBitVector &getParameterIndices() const {
-    return parameterIndices;
-  }
-
-  const llvm::SmallBitVector &getResultIndices() const {
-    return resultIndices;
-  }
-};
-
 /// SIL-level automatic differentiation indices. Consists of a source index,
 /// i.e. index of the dependent result to differentiate from, and parameter
 /// indices, i.e. index of independent parameters to differentiate with
