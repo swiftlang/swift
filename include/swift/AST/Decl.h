@@ -1761,6 +1761,8 @@ public:
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
 
+  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
+
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
   }
