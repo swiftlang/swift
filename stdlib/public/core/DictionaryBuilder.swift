@@ -140,10 +140,9 @@ extension _NativeDictionary {
         if found {
           _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
-          // Discard existing entry, then move the current entry in place of it.
-          uncheckedDestroy(at: b)
+          // Discard duplicate entry.
+          uncheckedDestroy(at: bucket)
           _storage._count -= 1
-          moveEntry(from: bucket, to: b)
           bucket.offset -= 1
           continue
         }
