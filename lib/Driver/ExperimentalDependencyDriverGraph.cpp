@@ -346,7 +346,7 @@ void DriverGraph::emitDotFileForJob(Optional<DiagnosticEngine *> DiagsMaybe,
 
 std::string DriverGraph::dotFilenameForJob(const Job *job) {
   StringRef dependenciesFile = getSwiftDeps(job);
-  uint seqNo = dotFileSequenceNumberByJob[job]++;
+  unsigned seqNo = dotFileSequenceNumberByJob[job]++;
   return dependenciesFile.str() + "." + std::to_string(seqNo) + ".dot";
 }
 
@@ -378,7 +378,7 @@ void DriverGraph::verify() const {
   // TODO: disable when not debugging
   std::array<std::unordered_map<DependencyKey, DriverNode *>, 2> nodesByKey;
   nodeMap.verify([&](const std::string &swiftDepsString,
-                     const DependencyKey &key, DriverNode *n, uint index) {
+                     const DependencyKey &key, DriverNode *n, unsigned index) {
     assert(index < nodesByKey.size());
     auto iterInserted =
         nodesByKey[index].insert(std::make_pair(n->getKey(), n));

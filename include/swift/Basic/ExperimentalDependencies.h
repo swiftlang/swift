@@ -277,9 +277,9 @@ public:
   /// Verify the integrity of each map and the cross-map consistency.
   /// Then call \p verifyFn for each entry found in each of the two maps,
   /// passing an index so that the verifyFn knows which map is being tested.
-  void
-  verify(function_ref<void(const Key1 &k1, const Key2 &k2, Value v, uint index)>
-             verifyFn) const {
+  void verify(function_ref<void(const Key1 &k1, const Key2 &k2, Value v,
+                                unsigned index)>
+                  verifyFn) const {
     map1.verify([&](const Key1 &k1, const Key2 &k2, Value v) {
       assertConsistent(map2.find(k2, k1).getValue(), v);
     });

@@ -132,7 +132,7 @@ class DriverGraph {
   /// For debugging, the driver writes out a dot file of the graph every time a
   /// Frontend swiftdeps is read and integrated. In order to keep subsequent
   /// files for the same job distinct, keep a sequence number for each job.
-  std::unordered_map<const driver::Job *, uint> dotFileSequenceNumberByJob;
+  std::unordered_map<const driver::Job *, unsigned> dotFileSequenceNumberByJob;
 
   /// Encapsulate the invariant between where the node resides in
   /// nodesBySwiftDepsFile and the swiftDeps node instance variable here.
