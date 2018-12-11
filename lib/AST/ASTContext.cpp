@@ -5304,10 +5304,8 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
 
 AutoDiffAssociatedFunctionIdentifier *
 AutoDiffAssociatedFunctionIdentifier::get(
-      AutoDiffAssociatedFunctionKind kind,
-      unsigned differentiationOrder,
-      AutoDiffParameterIndices *parameterIndices,
-      ASTContext &C) {
+    AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+    AutoDiffParameterIndices *parameterIndices, ASTContext &C) {
   auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
 
   llvm::FoldingSetNodeID id;

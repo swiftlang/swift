@@ -95,8 +95,8 @@ bb0(%0 : $Float, %1 : $*DifferentiableConformance):
   return %4 : $Float                              // id: %5
 } // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW'
 
-// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-sil private [transparent] [thunk] @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// jvpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s3jvp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // %0                                             // user: %4
 // %1                                             // user: %2
 bb0(%0 : $Float, %1 : $*DifferentiableConformance):
@@ -108,10 +108,10 @@ bb0(%0 : $Float, %1 : $*DifferentiableConformance):
   %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
   %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
   return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
-} // end sil function '$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
+} // end sil function '$s3jvp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
 
-// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-sil private [transparent] [thunk] @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// vjpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s3vjp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // %0                                             // user: %4
 // %1                                             // user: %2
 bb0(%0 : $Float, %1 : $*DifferentiableConformance):
@@ -123,16 +123,16 @@ bb0(%0 : $Float, %1 : $*DifferentiableConformance):
   %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
   %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
   return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
-} // end sil function '$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
+} // end sil function '$s3vjp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
 
 // CHECK-LABEL: sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
 // CHECK:   method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-// CHECK:   autodiff_associated_function jvp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-// CHECK:   autodiff_associated_function vjp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+// CHECK:   autodiff_associated_function jvp 1 SU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+// CHECK:   autodiff_associated_function vjp 1 SU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
 // CHECK: }
 
 sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
   method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-  autodiff_associated_function jvp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-  autodiff_associated_function vjp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  autodiff_associated_function jvp 1 SU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  autodiff_associated_function vjp 1 SU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp007SU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
 }
