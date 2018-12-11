@@ -11,18 +11,18 @@
 
 // RUN: %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 
-// INTEGRATED: swift -frontend -repl
+// INTEGRATED: swift{{c?(\.EXE)?"?}} -frontend -repl
 // INTEGRATED: -module-name REPL
 
 
 // RUN: %swift_driver -sdk "" -lldb-repl -### | %FileCheck -check-prefix=LLDB %s
 // RUN: %swift_driver -sdk "" -lldb-repl -D A -DB -D C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -target %target-triple -### | %FileCheck -check-prefix=LLDB-OPTS %s
 
-// LLDB: lldb{{"?}} {{"?}}--repl=
+// LLDB: lldb{{(\.exe)?"?}} {{"?}}--repl=
 // LLDB-NOT: -module-name
 // LLDB-NOT: -target
 
-// LLDB-OPTS: lldb{{"?}} "--repl=
+// LLDB-OPTS: lldb{{(\.exe)?"?}} "--repl=
 // LLDB-OPTS-DAG: -target {{[^ ]+}}
 // LLDB-OPTS-DAG: -D A -D B -D C -D D
 // LLDB-OPTS-DAG: -sdk /
