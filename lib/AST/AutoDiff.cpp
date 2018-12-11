@@ -113,11 +113,11 @@ AutoDiffParameterIndices::create(ASTContext &C, StringRef string) {
   if (string.size() < 1)
     return nullptr;
 
-  llvm::SmallBitVector indices(string.size() - 1);
+  llvm::SmallBitVector indices(string.size());
   for (unsigned i : range(indices.size())) {
-    if (string[i + 1] == 'S')
+    if (string[i] == 'S')
       indices.set(i);
-    else if (string[i + 1] != 'U')
+    else if (string[i] != 'U')
       return nullptr;
   }
 
