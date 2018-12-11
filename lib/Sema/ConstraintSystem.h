@@ -3829,6 +3829,9 @@ bool exprNeedsParensOutsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
     PrecedenceGroupDecl *followingPG);
 
+/// Determine whether this is a SIMD operator.
+bool isSIMDOperator(ValueDecl *value);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H
