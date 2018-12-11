@@ -5547,6 +5547,32 @@ DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
   d.remove(at: i)
 }
 
+DictionaryTestSuite.test("BulkLoadingInitializer") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c
+    ) { keys, values, count in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i))
+        (v + i).initialize(to: TestEquatableValueTy(i))
+        count += 1
+      }
+    }
+
+    let d2 = Dictionary(
+      uniqueKeysWithValues: (0..<c).map {
+        (TestKeyTy($0), TestEquatableValueTy($0))
+      })
+
+    for i in 0 ..< c {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d1, d2)
+  }
+}
+
 DictionaryTestSuite.setUp {
 #if _runtime(_ObjC)
   // Exercise ARC's autoreleased return value optimization in Foundation.
