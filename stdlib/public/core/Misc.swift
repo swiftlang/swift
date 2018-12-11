@@ -96,9 +96,17 @@ internal func _getTypeByMangledNameUntrusted(
   -> Any.Type?
 
 @_silgen_name("swift_getTypeByMangledNameInEnvironment")
-internal func _getTypeByMangledName(
+public func _getTypeByMangledNameInEnvironment(
   _ name: UnsafePointer<UInt8>,
   _ nameLength: UInt,
   genericEnvironment: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type?
+
+@_silgen_name("swift_getTypeByMangledNameInContext")
+public func _getTypeByMangledNameInContext(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type?
