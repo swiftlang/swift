@@ -5547,10 +5547,11 @@ DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
   d.remove(at: i)
 }
 
-DictionaryTestSuite.test("BulkLoadingInitializer") {
+DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
   for c in [0, 1, 2, 3, 5, 10, 25, 150] {
     let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
-      _unsafeUninitializedCapacity: c
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: false
     ) { keys, values, count in
       let k = keys.baseAddress!
       let v = values.baseAddress!
@@ -5569,7 +5570,35 @@ DictionaryTestSuite.test("BulkLoadingInitializer") {
     for i in 0 ..< c {
       expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
     }
-    expectEqual(d1, d2)
+    expectEqual(d2, d1)
+  }
+}
+
+DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: true
+    ) { keys, values, count in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i / 2))
+        (v + i).initialize(to: TestEquatableValueTy(i / 2))
+        count += 1
+      }
+    }
+
+    let d2 = Dictionary(
+      (0 ..< c).map {
+        (TestKeyTy($0 / 2), TestEquatableValueTy($0 / 2))
+      },
+      uniquingKeysWith: { a, b in a })
+
+    for i in 0 ..< c / 2 {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d2, d1)
   }
 }
 
