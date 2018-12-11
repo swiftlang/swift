@@ -122,7 +122,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   SmallString<128> swiftrtPath = SharedRuntimeLibPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+  llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
   Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
