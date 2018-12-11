@@ -17,6 +17,7 @@
 #define SWIFT_RUNTIME_ENUMIMPL_H
 
 #include "swift/ABI/Enum.h"
+#include "swift/Runtime/Enum.h"
 
 namespace swift {
 
@@ -63,8 +64,8 @@ static inline void small_memset(void *dest, uint8_t value, unsigned count) {
 
 inline unsigned getEnumTagSinglePayloadImpl(
     const OpaqueValue *enumAddr, unsigned emptyCases, const Metadata *payload,
-    size_t payloadSize, size_t payloadNumExtraInhabitants,
-    unsigned (*getExtraInhabitantTag)(const OpaqueValue *, const Metadata *)) {
+    size_t payloadSize, unsigned payloadNumExtraInhabitants,
+    getExtraInhabitantTag_t *getExtraInhabitantTag) {
 
   // If there are extra tag bits, check them.
   if (emptyCases > payloadNumExtraInhabitants) {
@@ -116,7 +117,7 @@ inline unsigned getEnumTagSinglePayloadImpl(
 
   // If there are extra inhabitants, see whether the payload is valid.
   if (payloadNumExtraInhabitants > 0) {
-    return getExtraInhabitantTag(enumAddr, payload);
+    return getExtraInhabitantTag(enumAddr, payloadNumExtraInhabitants, payload);
   }
 
   // Otherwise, we have always have a valid payload.
@@ -126,9 +127,8 @@ inline unsigned getEnumTagSinglePayloadImpl(
 inline void storeEnumTagSinglePayloadImpl(
     OpaqueValue *value, unsigned whichCase, unsigned emptyCases,
     const Metadata *payload, size_t payloadSize,
-    size_t payloadNumExtraInhabitants,
-    void (*storeExtraInhabitantTag)(OpaqueValue *, unsigned whichCase,
-                                    const Metadata *)) {
+    unsigned payloadNumExtraInhabitants,
+    storeExtraInhabitantTag_t *storeExtraInhabitantTag) {
 
   auto *valueAddr = reinterpret_cast<uint8_t *>(value);
   auto *extraTagBitAddr = valueAddr + payloadSize;
@@ -150,7 +150,8 @@ inline void storeEnumTagSinglePayloadImpl(
       return;
 
     // Store the extra inhabitant.
-    storeExtraInhabitantTag(value, whichCase, payload);
+    storeExtraInhabitantTag(value, whichCase, payloadNumExtraInhabitants,
+                            payload);
     return;
   }
 

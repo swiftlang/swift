@@ -1285,6 +1285,7 @@ irgen::emitGetEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
                                       numExtraCases,
                                       metadata,
                                       getExtraInhabitantTagFn});
+  call->setCallingConv(IGF.IGM.SwiftCC);
   return call;
 }
 
@@ -1299,6 +1300,7 @@ irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
 
   auto fnTy = llvm::FunctionType::get(IGM.Int32Ty,
                                       {IGM.OpaquePtrTy,
+                                       IGM.Int32Ty,
                                        IGM.TypeMetadataPtrTy},
                                       false);
 
@@ -1306,9 +1308,11 @@ irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
   auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
                                    "__swift_get_extra_inhabitant_index",
                                    &IGM.Module);
+  fn->setCallingConv(IGM.SwiftCC);
   IRGenFunction IGF(IGM, fn);
   auto parameters = IGF.collectParameters();
   auto ptr = parameters.claimNext();
+  auto xiCount = parameters.claimNext();
   auto metadata = parameters.claimNext();
 
   // Bind the metadata to make any archetypes available.
@@ -1320,7 +1324,7 @@ irgen::getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
                                   objectTI.getStorageType()->getPointerTo());
   Address addr = objectTI.getAddressForPointer(ptr);
 
-  auto tag = emitter(IGF, addr);
+  auto tag = emitter(IGF, addr, xiCount);
   IGF.Builder.CreateRet(tag);
 
   return fn;
@@ -1354,7 +1358,7 @@ irgen::emitStoreEnumTagSinglePayloadGenericCall(IRGenFunction &IGF,
                                       numExtraCases,
                                       metadata,
                                       storeExtraInhabitantTagFn});
-  (void) call;
+  call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
 llvm::Constant *
@@ -1369,6 +1373,7 @@ irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
   auto fnTy = llvm::FunctionType::get(IGM.VoidTy,
                                       {IGM.OpaquePtrTy,
                                        IGM.Int32Ty,
+                                       IGM.Int32Ty,
                                        IGM.TypeMetadataPtrTy},
                                       false);
 
@@ -1376,10 +1381,12 @@ irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
   auto fn = llvm::Function::Create(fnTy, llvm::Function::PrivateLinkage,
                                    "__swift_get_extra_inhabitant_index",
                                    &IGM.Module);
+  fn->setCallingConv(IGM.SwiftCC);
   IRGenFunction IGF(IGM, fn);
   auto parameters = IGF.collectParameters();
   auto ptr = parameters.claimNext();
   auto tag = parameters.claimNext();
+  auto xiCount = parameters.claimNext();
   auto metadata = parameters.claimNext();
 
   // Bind the metadata to make any archetypes available.
@@ -1391,7 +1398,7 @@ irgen::getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,
                                   objectTI.getStorageType()->getPointerTo());
   Address addr = objectTI.getAddressForPointer(ptr);
 
-  emitter(IGF, addr, tag);
+  emitter(IGF, addr, tag, xiCount);
   IGF.Builder.CreateRetVoid();
 
   return fn;

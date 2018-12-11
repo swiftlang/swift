@@ -303,13 +303,14 @@ public:
   llvm::Value *withExtraInhabitantProvidingField(IRGenFunction &IGF,
          Address structAddr,
          SILType structType,
+         llvm::Value *knownStructNumXI,
          llvm::Type *resultTy,
          llvm::function_ref<llvm::Value* (const FieldImpl &field,
                                           llvm::Value *numXI)> body) const {
     // If we know one field consistently provides extra inhabitants, delegate
     // to that field.
     if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM)){
-      return body(*field, nullptr);
+      return body(*field, knownStructNumXI);
     }
     
     // Otherwise, we have to figure out which field at runtime.
@@ -346,7 +347,9 @@ public:
     // Loop through checking to see whether we picked the fixed candidate
     // (if any) or one of the unknown-layout fields.
     llvm::Value *instantiatedCount
-      = emitLoadOfExtraInhabitantCount(IGF, structType);
+      = (knownStructNumXI
+           ? knownStructNumXI
+           : emitLoadOfExtraInhabitantCount(IGF, structType));
     
     auto contBB = IGF.createBasicBlock("chose_field_for_xi");
     llvm::PHINode *contPhi = nullptr;

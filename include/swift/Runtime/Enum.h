@@ -58,6 +58,11 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
                                          const TypeLayout *payload,
                                          unsigned emptyCases);
 
+using getExtraInhabitantTag_t =
+  SWIFT_CC(swift) unsigned (const OpaqueValue *vaue,
+                            unsigned numExtraInhabitants,
+                            const Metadata *payloadType);
+
 /// Implement getEnumTagSinglePayload generically in terms of a
 /// payload type with a getExtraInhabitantIndex function.
 ///
@@ -68,12 +73,17 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
 /// \returns 0 if the payload case is inhabited. If an empty case is inhabited,
 ///          returns a value greater than or equal to one and less than or equal
 ///          emptyCases.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 unsigned swift_getEnumTagSinglePayloadGeneric(const OpaqueValue *value,
                                               unsigned emptyCases,
                                               const Metadata *payloadType,
-               unsigned (*getExtraInhabitantTag)(const OpaqueValue *value,
-                                                 const Metadata *payloadType));
+                                              getExtraInhabitantTag_t *getTag);
+
+using storeExtraInhabitantTag_t =
+  SWIFT_CC(swift) void (OpaqueValue *value,
+                        unsigned whichCase,
+                        unsigned numExtraInhabitants,
+                        const Metadata *payloadType);
 
 /// Implement storeEnumTagSinglePayload generically in terms of a
 /// payload type with a storeExtraInhabitant function.
@@ -86,14 +96,12 @@ unsigned swift_getEnumTagSinglePayloadGeneric(const OpaqueValue *value,
 ///                    case, or a value greater than or equal to one and less
 ///                    than or equal emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 void swift_storeEnumTagSinglePayloadGeneric(OpaqueValue *value,
                                             unsigned whichCase,
                                             unsigned emptyCases,
                                             const Metadata *payloadType,
-                 void (*storeExtraInhabitantTag)(OpaqueValue *value,
-                                                 unsigned whichCase,
-                                                 const Metadata *payloadType));
+                                            storeExtraInhabitantTag_t *storeTag);
 
 /// \brief Initialize the type metadata for a generic, multi-payload
 ///        enum instance.
