@@ -1435,11 +1435,8 @@ void irgen::emitFunctionPartialApplication(
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
     // We might get a struct containing a pointer e.g type <{ %AClass* }>
-    if (!ctx->getType()->isPointerTy())
-      ctx = IGF.coerceValue(ctx, IGF.IGM.RefCountedPtrTy,
-                            IGF.IGM.DataLayout);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    if (ctx->getType() != IGF.IGM.RefCountedPtrTy)
+      ctx = IGF.coerceValue(ctx, IGF.IGM.RefCountedPtrTy, IGF.IGM.DataLayout);
     out.add(ctx);
     return;
   }
