@@ -284,40 +284,30 @@ public:
   }
 };
 
-namespace {
-void finalizeSourceFile(RootContextData &RootData,
+static RC<RawSyntax> finalizeSourceFile(RootContextData &RootData,
                         ArrayRef<RC<RawSyntax>> Parts) {
   SourceFile &SF = RootData.SF;
   RC<SyntaxArena> &Arena = RootData.Arena;
   std::vector<RC<RawSyntax>> AllTopLevel;
   RC<RawSyntax> EOFToken;
 
-  if (SF.hasSyntaxRoot()) {
-    auto SourceRaw = SF.getSyntaxRoot().getRaw();
-    auto Decls =
-        SourceRaw->getChild(SourceFileSyntax::Cursor::Statements)->getLayout();
-    std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
-    EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
-  }
-
   if (!Parts.empty() && Parts.back()->isToken(tok::eof)) {
     EOFToken = Parts.back();
     Parts = Parts.drop_back();
   }
 
+  if (!EOFToken)
+    EOFToken =
+        RawSyntax::missing(tok::eof, OwnedString::makeUnowned(""), Arena);
+
   for (auto RawNode : Parts) {
-    if (RawNode->getKind() != SyntaxKind::CodeBlockItemList)
+    if (RawNode->getKind() != SyntaxKind::CodeBlockItem)
       // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
       // the first place.
       continue;
 
-    auto Items = RawNode->getLayout();
-    std::copy(Items.begin(), Items.end(), std::back_inserter(AllTopLevel));
+    AllTopLevel.push_back(RawNode);
   }
-
-  if (!EOFToken)
-    EOFToken =
-        RawSyntax::missing(tok::eof, OwnedString::makeUnowned(""), Arena);
 
   auto newRaw = SyntaxFactory::createRaw(
       SyntaxKind::SourceFile,
@@ -328,29 +318,36 @@ void finalizeSourceFile(RootContextData &RootData,
       },
       Arena);
   assert(newRaw);
-  SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
   // Verify the tree if specified.
   // Do this only when we see the real EOF token because parseIntoSourceFile()
   // can get called multiple times for single source file.
   if (EOFToken->isPresent() && SF.getASTContext().LangOpts.VerifySyntaxTree) {
     SyntaxVerifier Verifier(RootData);
-    Verifier.verify(SF.getSyntaxRoot());
+    Verifier.verify(make<SourceFileSyntax>(newRaw));
   }
+  return newRaw;
 }
-} // End of anonymous namespace
 
-void SyntaxParsingContext::finalizeRoot() {
+RC<RawSyntax> SyntaxParsingContext::finalizeRoot() {
   if (!Enabled)
-    return;
+    return nullptr;
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
-  finalizeSourceFile(*getRootData(), getParts());
+  auto &RootData = *getRootData();
+  SourceFile &SF = RootData.SF;
+  if (SF.hasSyntaxRoot())
+    return SF.getSyntaxRoot().getRaw();
+
+  auto rawRoot = finalizeSourceFile(RootData, getParts());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
   getStorage().clear();
+
+  SF.setSyntaxRoot(make<SourceFileSyntax>(rawRoot));
+  return rawRoot;
 }
 
 void SyntaxParsingContext::synthesize(tok Kind, StringRef Text) {
@@ -441,7 +438,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   }
 }
 
-bool shouldCacheNode(tok TokKind, OwnedString &Text,
+static bool shouldCacheNode(tok TokKind, OwnedString &Text,
                      llvm::ArrayRef<TriviaPiece> LeadingTrivia,
                      llvm::ArrayRef<TriviaPiece> TrailingTrivia) {
   // Is string_literal with >16 length.

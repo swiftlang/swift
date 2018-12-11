@@ -1561,11 +1561,15 @@ bool SourceFile::shouldCollectToken() const {
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
+  return canBeParsedInFull() && SyntaxInfo->Enable;
+}
+
+bool SourceFile::canBeParsedInFull() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return SyntaxInfo->Enable;
+    return true;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
