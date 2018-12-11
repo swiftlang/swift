@@ -137,7 +137,7 @@ extension _NativeDictionary { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
-    _internalInvariant(hashTable.isOccupied(bucket))
+    _internalInvariant(hashTable.isValid(bucket))
     (_keys + bucket.offset).deinitialize(count: 1)
     (_values + bucket.offset).deinitialize(count: 1)
   }
