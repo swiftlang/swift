@@ -331,25 +331,36 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // For a protocol extension, build the generic parameter list.
-    auto genericParams = proto->createGenericParams(ext);
-    prepareGenericParamList(genericParams);
-    ext->setGenericParams(genericParams);
-  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
-    // Make sure the generic parameters are set up.
-    configureOuterGenericParams(nominal);
+  // Hack to force generic parameter lists of protocols to be created if the
+  // nominal is an (invalid) nested type of a protocol.
+  DeclContext *outerDC = nominal;
+  while (!outerDC->isModuleScopeContext()) {
+    if (auto *proto = dyn_cast<ProtocolDecl>(outerDC))
+      proto->createGenericParamsIfMissing();
 
+    outerDC = outerDC->getParent();
+  }
+
+  configureOuterGenericParams(nominal);
+
+  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+    // For a protocol extension, build the generic parameter list directly
+    // since we want it to have an inheritance clause.
+    ext->setGenericParams(proto->createGenericParams(ext));
+  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
     // Clone the generic parameter list of a generic type.
-    prepareGenericParamList(genericParams);
     ext->setGenericParams(
         cloneGenericParams(ext->getASTContext(), ext, genericParams));
   }
 
+  auto *genericParams = ext->getGenericParams();
+  if (genericParams)
+    prepareGenericParamList(genericParams);
+
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-    if (!(nominal->getGenericParamsOfContext() || isa<ProtocolDecl>(nominal))) {
+    if (!genericParams) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       ext->diagnose(diag::extension_nongeneric_trailing_where,
@@ -361,7 +372,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
       // FIXME: Long-term, we'd like clients to deal with the trailing where
       // clause explicitly, but for now it's far more direct to represent
       // the trailing where clause as part of the requirements.
-      ext->getGenericParams()->addTrailingWhereClause(
+      genericParams->addTrailingWhereClause(
         ext->getASTContext(),
         trailingWhereClause->getWhereLoc(),
         trailingWhereClause->getRequirements());
