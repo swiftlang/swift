@@ -144,14 +144,6 @@ TypeChecker::gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-void
-TypeChecker::prepareGenericParamList(GenericParamList *gp,
-                                     DeclContext *dc) {
-  gp->configureGenericParamDepth();
-  for (auto paramDecl : *gp)
-    checkDeclAttributesEarly(paramDecl);
-}
-
 /// Add the generic parameter types from the given list to the vector.
 static void addGenericParamTypes(GenericParamList *gpList,
                                  SmallVectorImpl<GenericTypeParamType *> &params) {
@@ -472,7 +464,7 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
   // Do some initial configuration of the generic parameter lists that's
   // required in all cases.
   gp->setOuterParameters(dc->getGenericParamsOfContext());
-  tc.prepareGenericParamList(gp, func);
+  gp->configureGenericParamDepth();
 
   // Accessors can always use the generic context of their storage
   // declarations.  This is a compile-time optimization since it lets us
@@ -608,7 +600,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
   GenericSignature *sig;
   if (auto *gp = subscript->getGenericParams()) {
     gp->setOuterParameters(dc->getGenericParamsOfContext());
-    prepareGenericParamList(gp, subscript);
+    gp->configureGenericParamDepth();
 
     // Create the generic signature builder.
     GenericSignatureBuilder builder(Context);
@@ -775,8 +767,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   }
 
   gp->setOuterParameters(dc->getGenericParamsOfContext());
-
-  prepareGenericParamList(gp, typeDecl);
+  gp->configureGenericParamDepth();
 
   // For a protocol, compute the requirement signature first. It will be used
   // by clients of the protocol.

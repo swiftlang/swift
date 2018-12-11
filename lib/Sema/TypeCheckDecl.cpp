@@ -502,11 +502,13 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC) {
+                               DeclContext *owningDC,
+                               TypeChecker &tc) {
   if (!genericParams)
     return;
 
   for (auto gp : *genericParams) {
+    tc.checkDeclAttributesEarly(gp);
     checkInheritanceClause(gp);
   }
 
@@ -645,7 +647,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 
   for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
     auto genericParams = nestedList.rbegin()[i];
-    prepareGenericParamList(genericParams, DC);
+    genericParams->configureGenericParamDepth();
 
     parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
                                         /*allowConcreteGenericParams=*/true,
@@ -2733,7 +2735,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams(), SD);
+      checkGenericParams(SD->getGenericParams(), SD, TC);
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2842,7 +2844,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
-    checkGenericParams(ED->getGenericParams(), ED);
+    checkGenericParams(ED->getGenericParams(), ED, TC);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2879,7 +2881,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
-    checkGenericParams(SD->getGenericParams(), SD);
+    checkGenericParams(SD->getGenericParams(), SD, TC);
 
     TC.addImplicitConstructors(SD);
 
@@ -3007,7 +3009,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
-    checkGenericParams(CD->getGenericParams(), CD);
+    checkGenericParams(CD->getGenericParams(), CD, TC);
 
     {
       // Check for circular inheritance.
@@ -3252,7 +3254,7 @@ public:
     TC.validateDecl(FD);
 
     if (!FD->isInvalid()) {
-      checkGenericParams(FD->getGenericParams(), FD);
+      checkGenericParams(FD->getGenericParams(), FD, TC);
       TC.checkReferencedGenericParams(FD);
       TC.checkProtocolSelfRequirements(FD);
     }
@@ -3330,8 +3332,7 @@ public:
       }
     }
 
-    if (auto genericParams = ED->getGenericParams())
-      checkGenericParams(genericParams, ED);
+    checkGenericParams(ED->getGenericParams(), ED, TC);
 
     validateAttributes(TC, ED);
 
@@ -3379,7 +3380,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD);
+      checkGenericParams(CD->getGenericParams(), CD, TC);
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
