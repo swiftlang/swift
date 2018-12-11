@@ -84,12 +84,16 @@ public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    return  _getTypeByMangledName(nameUTF8.baseAddress!,
-                                  UInt(nameUTF8.endIndex),
-                                  genericEnvironment: nil,
-                                  genericArguments: nil)
+    return  _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
+                                  UInt(nameUTF8.endIndex))
   }
 }
+
+@_silgen_name("swift_stdlib_getTypeByMangledNameUntrusted")
+internal func _getTypeByMangledNameUntrusted(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt)
+  -> Any.Type?
 
 @_silgen_name("swift_getTypeByMangledNameInEnvironment")
 internal func _getTypeByMangledName(
