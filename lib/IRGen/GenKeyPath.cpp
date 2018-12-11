@@ -1305,17 +1305,10 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
                        {},
                        hasSubscriptIndices);
   
-  auto size = fields.getNextOffsetFromGlobal();
-  
   auto var = cast<llvm::GlobalVariable>(
     getAddrOfPropertyDescriptor(prop->getDecl(),
                                 fields.finishAndCreateFuture()));
   var->setConstant(true);
   var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-  // A simple stored component descriptor can fit in four bytes. Anything else
-  // needs pointer alignment.
-  if (size <= Size(4))
-    var->setAlignment(4);
-  else
-    var->setAlignment(getPointerAlignment().getValue());
+  var->setAlignment(4);
 }
