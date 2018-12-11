@@ -5739,6 +5739,7 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
       },
       uniquingKeysWith: { a, b in a })
 
+    expectEqual(d1.count, d2.count)
     for i in 0 ..< c / 2 {
       expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
     }

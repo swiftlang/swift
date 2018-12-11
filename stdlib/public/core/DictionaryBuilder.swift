@@ -95,95 +95,76 @@ extension _NativeDictionary {
     ) -> Void
   ) {
     self.init(capacity: capacity)
-    var count = 0
+    var initializedCount = 0
     initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity),
-      &count)
+      &initializedCount)
     _precondition(count >= 0 && count <= capacity)
-    _storage._count = count
+    _storage._count = initializedCount
 
     // Hash initialized elements and move each of them into their correct
     // buckets.
     //
-    // - The storage is separated into three regions: "before bucket", "bucket
-    //   up to count", and "count and after".
+    // - We have some number of unprocessed elements at the start of the
+    //   key/value buffers -- buckets up to and including `bucket`. Everything
+    //   this region is either unprocessed or in use. There are no uninitialized
+    //   entries in it.
     //
-    // - Everything in the middle region, "bucket up to count" is either
-    //   unprocessed or in use. There are no uninitialized entries in it.
-    //
-    // - Everything in "before bucket" and "count and after" is either
-    //   uninitialized or in use. These regions work like regular dictionary
-    //   storage.
+    // - Everything after `bucket` is either uninitialized or in use. This
+    //   region works exactly like regular dictionary storage.
     //
     // - "in use" is tracked by the bitmap in `hashTable`, the same way it would
     //   be for a working Dictionary.
     //
     // Each iteration of the loop below processes an unprocessed element, and/or
-    // reduces the size of the "bucket up to count" region, while ensuring the
-    // above invariants.
-    var bucket = _HashTable.Bucket(offset: 0)
-    while bucket.offset < count {
+    // reduces the size of the unprocessed region, while ensuring the above
+    // invariants.
+    var bucket = _HashTable.Bucket(offset: initializedCount - 1)
+    while bucket.offset >= 0 {
       if hashTable._isOccupied(bucket) {
         // We've moved an element here in a previous iteration.
-        bucket.offset += 1
+        bucket.offset -= 1
         continue
       }
       // Find the target bucket for this entry and mark it as in use.
-      let target = _preloadEntry(
-        in: bucket,
-        allowingDuplicates: allowingDuplicates)
+      let target: Bucket
+      if _isDebugAssertConfiguration() || allowingDuplicates {
+        let (b, found) = find(_keys[bucket.offset])
+        if found {
+          _internalInvariant(b != bucket)
+          _precondition(allowingDuplicates, "Duplicate keys found")
+          // Discard existing entry, then move the current entry in place of it.
+          uncheckedDestroy(at: b)
+          _storage._count -= 1
+          moveEntry(from: bucket, to: b)
+          bucket.offset -= 1
+          continue
+        }
+        hashTable.insert(b)
+        target = b
+      } else {
+        let hashValue = self.hashValue(for: _keys[bucket.offset])
+        target = hashTable.insertNew(hashValue: hashValue)
+      }
 
-      if target < bucket || target.offset >= count {
-        // The target is in either the "before bucket" or the "count and after"
-        // region.  We can simply move the entry, leaving behind an
-        // uninitialized bucket.
+      if target > bucket {
+        // The target is outside the unprocessed region.  We can simply move the
+        // entry, leaving behind an uninitialized bucket.
         moveEntry(from: bucket, to: target)
-        // Restore invariants by moving the region boundary such that the bucket
-        // becomes part of the "before bucket" region.
-        bucket.offset += 1
+        // Restore invariants by lowering the region boundary.
+        bucket.offset -= 1
       } else if target == bucket {
         // Already in place.
-        bucket.offset += 1
+        bucket.offset -= 1
       } else {
-        // The target bucket is also in the middle region. Swap the current
+        // The target bucket is also in the unprocessed region. Swap the current
         // item into place, then try again with the swapped-in value, so that we
         // don't lose it.
         swapEntry(target, with: bucket)
       }
     }
-    // When the middle region disappears, we're left with a valid Dictionary.
-  }
-
-  /// Find and return the correct bucket for the entry stored in `bucket`, while
-  /// also preparing to place it there. This is for use in the bulk loading
-  /// initializer, `init(_unsafeUninitializedCapacity:, allowingDuplicates:,
-  /// initializingWith:)`.
-  ///
-  /// When this function returns, it is guaranteed that
-  /// - the returned bucket is marked occupied in the hash table's bitmap,
-  /// - any duplicate that was already in the returned bucket is destroyed, and
-  /// - the original item is still in its original bucket.
-  @inlinable
-  @inline(__always)
-  internal func _preloadEntry(
-    in bucket: Bucket,
-    allowingDuplicates: Bool
-  ) -> Bucket {
-    if _isDebugAssertConfiguration() || allowingDuplicates {
-      let (b, found) = find(_keys[bucket.offset])
-      if found {
-        _precondition(allowingDuplicates, "Duplicate keys found")
-        // Discard existing key & value in preparation of overwriting it.
-        uncheckedDestroy(at: b)
-        _storage._count -= 1
-      } else {
-        hashTable.insert(b)
-      }
-      return b
-    }
-
-    let hashValue = self.hashValue(for: _keys[bucket.offset])
-    return hashTable.insertNew(hashValue: hashValue)
+    // When there are no more unprocessed entries, we're left with a valid
+    // Dictionary.
   }
 }
