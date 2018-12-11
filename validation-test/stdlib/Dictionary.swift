@@ -2383,6 +2383,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+  autoreleasepool {
   let nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
@@ -2406,6 +2409,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   _fixLifetime(nsd)
   _fixLifetime(d)
   _fixLifetime(bridgedBack)
+  }
 }
 
 
@@ -3243,9 +3247,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
-autoreleasepoolIfUnoptimizedReturnAutoreleased {
-  // Add an autorelease pool because ParallelArrayDictionary autoreleases
-  // values in objectForKey.
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+autoreleasepool {
 
   let d = getParallelArrayBridgedNonverbatimDictionary()
   let identity1 = d._rawIdentifier()
