@@ -4202,9 +4202,9 @@ namespace {
         // protocol might not be the right thing to do and could lead to
         // problems.
         if (auto protocolDecl = dyn_cast<ProtocolDecl>(foundDecl->getDeclContext())) {
-            tc.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
-                        foundDecl->getBaseName(), protocolDecl->getFullName());
-            return E;
+          tc.diagnose(E->getLoc(), diag::expr_selector_cannot_be_used,
+                      foundDecl->getBaseName(), protocolDecl->getFullName());
+          return E;
         }
         
         tc.diagnose(E->getLoc(), diag::expr_selector_not_objc,
