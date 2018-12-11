@@ -4904,17 +4904,6 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
   return resultType;
 }
 
-/// Visit the given generic parameter lists from the outermost to the innermost,
-/// calling the visitor function for each list.
-static void visitOuterToInner(
-                      GenericParamList *genericParams,
-                      llvm::function_ref<void(GenericParamList *)> visitor) {
-  if (auto outerGenericParams = genericParams->getOuterParameters())
-    visitOuterToInner(outerGenericParams, visitor);
-
-  visitor(genericParams);
-}
-
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static std::pair<GenericEnvironment *, Type>
@@ -4927,12 +4916,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
   Type extInterfaceType =
     formExtensionInterfaceType(tc, ext, type, genericParams,
                                mustInferRequirements);
-
-  // Prepare all of the generic parameter lists for generic signature
-  // validation.
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.prepareGenericParamList(gpList, ext);
-  });
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
