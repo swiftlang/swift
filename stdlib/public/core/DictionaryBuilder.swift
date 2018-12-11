@@ -53,15 +53,21 @@ extension Dictionary {
   /// elements. The closure must return `c`, the number of initialized elements
   /// in both buffers, such that the elements in the range `0..<c` are
   /// initialized and the elements in the range `c..<capacity` are
-  /// uninitialized. The resulting dictionary has a `count` equal to `c`.
+  /// uninitialized.
   ///
-  /// The closure must not add any duplicate keys to the keys buffer.  The
-  /// buffers passed to the closure are only valid for the duration of the call.
-  /// After the closure returns, this initializer moves all initialized elements
-  /// into their correct buckets.
+  /// The resulting dictionary has a `count` less than or equal to `c`. The
+  /// actual count is less iff some of the initialized keys were duplicates.
+  /// (This cannot happen if `allowingDuplicates` is false.)
+  ///
+  /// The buffers passed to the closure are only valid for the duration of the
+  /// call.  After the closure returns, this initializer moves all initialized
+  /// elements into their correct buckets.
   ///
   /// - Parameters:
   ///   - capacity: The capacity of the new dictionary.
+  ///   - allowingDuplicates: If false, then the caller guarantees that all keys
+  ///     are unique. This promise isn't verified -- if it turns out to be
+  ///     false, then the resulting dictionary won't be valid.
   ///   - body: A closure that can initialize the dictionary's elements. This
   ///     closure must return the count of the initialized elements, starting at
   ///     the beginning of the buffer.
@@ -108,8 +114,8 @@ extension _NativeDictionary {
     //
     // - We have some number of unprocessed elements at the start of the
     //   key/value buffers -- buckets up to and including `bucket`. Everything
-    //   this region is either unprocessed or in use. There are no uninitialized
-    //   entries in it.
+    //   in this region is either unprocessed or in use. There are no
+    //   uninitialized entries in it.
     //
     // - Everything after `bucket` is either uninitialized or in use. This
     //   region works exactly like regular dictionary storage.
