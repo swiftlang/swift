@@ -343,13 +343,15 @@ public:
     }
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
-                                          // SWIFT_ENABLE_TENSORFLOW
-                                          /*throws*/ flags.throws(),
-                                   /*differentiable*/ flags.isDifferentiable());
+                                          /*throws*/ flags.throws());
     if (flags.isEscaping())
       einfo = einfo.withNoEscape(false);
     else
       einfo = einfo.withNoEscape(true);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    if (flags.isDifferentiable())
+      einfo = einfo.withDifferentiable(true);
 
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();
