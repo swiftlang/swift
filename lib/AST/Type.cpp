@@ -4102,13 +4102,14 @@ makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
-    const AutoDiffParameterIndices &indices, const TupleType *primalResultTy) {
-  assert(!indices.isEmpty() && "there must be at least one wrt index");
+    AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
+    bool isMethod) {
+  assert(!indices->isEmpty() && "there must be at least one wrt index");
 
   // Compute the return type of the adjoint.
   SmallVector<TupleTypeElt, 8> retElts;
   SmallVector<Type, 8> wrtParamTypes;
-  indices.getSubsetParameterTypes(this, wrtParamTypes);
+  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod);
   for (auto wrtParamType : wrtParamTypes)
     retElts.push_back(wrtParamType);
 
@@ -4121,7 +4122,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   // If this is a method, unwrap the function type so that we can see the
   // non-self parameters.
   AnyFunctionType *unwrapped = this;
-  if (indices.isMethod())
+  if (isMethod)
     unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
 
   // Compute the adjoint parameters.
@@ -4149,16 +4150,16 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
 
   // If this is a method, wrap the adjoint type in an additional "(Self) ->"
   // curry level.
-  if (indices.isMethod())
+  if (isMethod)
     adjoint = makeFunctionType(this, getParams(), adjoint);
 
   return adjoint;
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
-    const AutoDiffParameterIndices &indices, unsigned resultIndex,
+    AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance, bool selfUncurried) {
+    LookupConformanceFn lookupConformance, bool isMethod, bool selfUncurried) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4169,7 +4170,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // type.
 
   assert(differentiationOrder == 1 && "only order 1 currently supported");
-  assert(!indices.isEmpty() && "there must be at least one wrt index");
+  assert(!indices->isEmpty() && "there must be at least one wrt index");
 
   auto &ctx = getASTContext();
 
@@ -4221,12 +4222,12 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   };
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices.getSubsetParameterTypes(this, wrtParamTypes, selfUncurried);
+  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod, selfUncurried);
 
   // If this is a method, unwrap the function type so that we can see the
   // non-self parameters and the final result.
   AnyFunctionType *unwrapped = this;
-  if (indices.isMethod() && !selfUncurried)
+  if (isMethod && !selfUncurried)
     unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
   Type originalResult = unwrapped->getResult();
 
@@ -4298,7 +4299,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 
   // If this is a method, wrap the associated function type in an additional
   // "(Self) ->" curry level.
-  if (indices.isMethod() && !selfUncurried)
+  if (isMethod && !selfUncurried)
     associatedFunction =
         makeFunctionType(this, getParams(), associatedFunction);
 
