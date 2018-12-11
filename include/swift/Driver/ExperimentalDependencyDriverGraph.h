@@ -96,9 +96,14 @@ class DriverGraph {
   NodeMap nodeMap;
 
   /// Since dependency keys use baseNames, they are coarser than individual
-  /// decls. So two decls might map to the same key. Index the second level by
-  /// file. Very useful to find a Node given the key, for instance when finding
-  /// all the nodes affected by a change in one.
+  /// decls. So two decls might map to the same key. Given a use, which is
+  /// denoted by a key, the code needs to find the files to recompile. So, the
+  /// key indexes into the nodeMap, and that yields a submap of nodes keyed by
+  /// file. The set of keys in the submap are the files that must be recompiled
+  /// for the use.
+  /// (In a given file, only one node exists with a given key, but in the future
+  /// that would need to change if/when we can recompile a smaller unit than a
+  /// source file.)
 
   /// Tracks def-use relationships by DependencyKey.
   std::unordered_map<DependencyKey, std::unordered_set<DependencyKey>>
