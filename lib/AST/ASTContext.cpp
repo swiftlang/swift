@@ -5278,12 +5278,10 @@ Optional<TangentSpace> ASTContext::getTangentSpace(CanType type,
 }
 
 AutoDiffParameterIndices *
-AutoDiffParameterIndices::get(llvm::SmallBitVector indices, bool isMethodFlag,
-                              ASTContext &C) {
+AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
   auto &foldingSet = C.getImpl().AutoDiffParameterIndicesSet;
 
   llvm::FoldingSetNodeID id;
-  id.AddBoolean(isMethodFlag);
   id.AddInteger(indices.size());
   for (unsigned setBit : indices.set_bits())
     id.AddInteger(setBit);
@@ -5298,7 +5296,7 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, bool isMethodFlag,
   // SmallBitVector decides to allocate some heap space.
   void *mem = C.Allocate(sizeof(AutoDiffParameterIndices),
                          alignof(AutoDiffParameterIndices));
-  auto *newNode = ::new (mem) AutoDiffParameterIndices(indices, isMethodFlag);
+  auto *newNode = ::new (mem) AutoDiffParameterIndices(indices);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

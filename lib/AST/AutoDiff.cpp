@@ -110,15 +110,10 @@ static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
 /// returns nullptr.
 AutoDiffParameterIndices *
 AutoDiffParameterIndices::create(ASTContext &C, StringRef string) {
-  if (string.size() < 2)
+  if (string.size() < 1)
     return nullptr;
 
-  bool isMethod = false;
   llvm::SmallBitVector indices(string.size() - 1);
-  if (string[0] == 'M')
-    isMethod = true;
-  else if (string[0] != 'F')
-    return nullptr;
   for (unsigned i : range(indices.size())) {
     if (string[i + 1] == 'S')
       indices.set(i);
@@ -126,23 +121,17 @@ AutoDiffParameterIndices::create(ASTContext &C, StringRef string) {
       return nullptr;
   }
 
-  return get(indices, isMethod, C);
+  return get(indices, C);
 }
 
 /// Returns a textual string description of these indices,
 ///
-///   [FM][SU]+
+///   [SU]+
 ///
-/// "F" means that `isMethodFlag` is false
-/// "M" means that `isMethodFlag` is true
 /// "S" means that the corresponding index is set
 /// "U" means that the corresponding index is unset
 std::string AutoDiffParameterIndices::getString() const {
   std::string result;
-  if (isMethodFlag)
-    result += "M";
-  else
-    result += "F";
   for (unsigned i : range(indices.size())) {
     if (indices[i])
       result += "S";
@@ -163,21 +152,23 @@ std::string AutoDiffParameterIndices::getString() const {
 ///   if "Self" and "C" are in the set,
 ///   ==> pushes {Self, C} to `paramTypes`.
 ///
+/// Pass `isMethod = true` when the function is a method.
+///
 /// Pass `selfUncurried = true` when the function type is for a method whose
 /// self parameter has been uncurried as in (A, B, C, Self) -> R.
 ///
 void AutoDiffParameterIndices::getSubsetParameterTypes(
     AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes,
-    bool selfUncurried) const {
-  if (selfUncurried && isMethodFlag) {
-    if (isMethodFlag && indices[indices.size() - 1])
+    bool isMethod, bool selfUncurried) const {
+  if (selfUncurried && isMethod) {
+    if (isMethod && indices[indices.size() - 1])
       paramTypes.push_back(functionType->getParams()[functionType->getNumParams() - 1].getPlainType());
     for (unsigned paramIndex : range(functionType->getNumParams() - 1))
       if (indices[paramIndex])
         paramTypes.push_back(functionType->getParams()[paramIndex].getPlainType());
   } else {
-    AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
-    if (isMethodFlag && indices[indices.size() - 1])
+    AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethod);
+    if (isMethod && indices[indices.size() - 1])
       paramTypes.push_back(functionType->getParams()[0].getPlainType());
     for (unsigned paramIndex : range(unwrapped->getNumParams()))
       if (indices[paramIndex])
@@ -213,16 +204,18 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 ///   ==> returns 1110
 ///   (because the lowered SIL type is (A, B, C, D) -> R)
 ///
+/// Pass `isMethod = true` when the function is a method.
+///
 /// Pass `selfUncurried = true` when the function type is a for method whose
 /// self parameter has been uncurried as in (A, B, C, Self) -> R.
 ///
 llvm::SmallBitVector
 AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
-                                     bool selfUncurried) const {
+                                     bool isMethod, bool selfUncurried) const {
   // Calculate the lowered sizes of all the parameters.
   AnyFunctionType *unwrapped = selfUncurried
       ? functionType
-      : unwrapSelfParameter(functionType, isMethodFlag);
+      : unwrapSelfParameter(functionType, isMethod);
   SmallVector<unsigned, 8> paramLoweredSizes;
   unsigned totalLoweredSize = 0;
   auto addLoweredParamInfo = [&](Type type) {
@@ -232,7 +225,7 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
   };
   for (auto &param : unwrapped->getParams())
     addLoweredParamInfo(param.getPlainType());
-  if (isMethodFlag && !selfUncurried)
+  if (isMethod && !selfUncurried)
     addLoweredParamInfo(functionType->getParams()[0].getPlainType());
 
   // Construct the result by setting each range of bits that corresponds to each
@@ -256,29 +249,29 @@ static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *functionType,
 }
 
 unsigned AutoDiffParameterIndicesBuilder::getNumNonSelfParameters() const {
-  return indices.size() - (isMethodFlag ? 1 : 0);
+  return indices.size() - (isMethod ? 1 : 0);
 }
 
 AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
     AnyFunctionType *functionType, bool isMethod, bool setAllParams) :
     indices(getNumAutoDiffParameterIndices(functionType, isMethod),
             setAllParams),
-    isMethodFlag(isMethod) {
+    isMethod(isMethod) {
 }
 
 AutoDiffParameterIndices *
 AutoDiffParameterIndicesBuilder::build(ASTContext &C) const {
-  return AutoDiffParameterIndices::get(indices, isMethodFlag, C);
+  return AutoDiffParameterIndices::get(indices, C);
 }
 
-/// Adds the indexed parameter to the set. When `isMethodFlag` is not set, the
+/// Adds the indexed parameter to the set. When `isMethod` is not set, the
 /// indices index into the first parameter list. For example,
 ///
 ///   functionType = (A, B, C) -> R
 ///   paramIndex = 0
 ///   ==> adds "A" to the set.
 ///
-/// When `isMethodFlag` is set, the indices index into the first non-self
+/// When `isMethod` is set, the indices index into the first non-self
 /// parameter list. For example,
 ///
 ///   functionType = (Self) -> (A, B, C) -> R
@@ -303,14 +296,14 @@ void AutoDiffParameterIndicesBuilder::setAllNonSelfParameters() {
   indices.set(0, getNumNonSelfParameters());
 }
 
-/// Adds the self parameter to the set. `isMethodFlag` must be set. For
+/// Adds the self parameter to the set. `isMethod` must be set. For
 /// example,
 ///
 ///   functionType = (Self) -> (A, B, C) -> R
 ///   ==> adds "Self" to the set
 ///
 void AutoDiffParameterIndicesBuilder::setSelfParameter() {
-  assert(isMethodFlag &&
+  assert(isMethod &&
          "trying to add self param to non-method parameter indices");
   indices.set(indices.size() - 1);
 }

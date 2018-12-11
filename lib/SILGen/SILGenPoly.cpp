@@ -3739,7 +3739,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     auto associated = witnessOrigTy->getAutoDiffAssociatedFunctionType(
         autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
-        LookUpConformanceInModule(SGM.M.getSwiftModule()),
+        LookUpConformanceInModule(SGM.M.getSwiftModule()), /*isMethod*/ true,
         /*selfUncurried*/ true);
     witnessOrigTy = cast<AnyFunctionType>(associated->getCanonicalType());
   }
@@ -3778,7 +3778,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   llvm::SmallBitVector loweredIndices;
   if (autoDiffFuncId) {
     loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-        witnessSubstTy, /*selfUncurried*/ true);
+        witnessSubstTy, /*isMethod*/ true, /*selfUncurried*/ true);
     origWitnessFTy = origWitnessFTy->getAutoDiffAssociatedFunctionType(
         loweredIndices, /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),

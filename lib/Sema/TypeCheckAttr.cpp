@@ -2299,6 +2299,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Validate the 'wrt:' parameters.
+  bool isMethod = original->getImplicitSelfDecl() ? true : false;
 
   // These are the wrt param indices specified by the user, which have not yet
   // been checked.
@@ -2306,8 +2307,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // We will put the checked wrt param indices here.
   AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
-      originalFnTy,
-      /*isMethod*/ original->getImplicitSelfDecl() ? true : false);
+      originalFnTy, isMethod);
 
   if (uncheckedWrtParams.empty()) {
     // If 'wrt:' is not specified, the wrt parameters are all the parameters in
@@ -2384,7 +2384,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Check that the user has only selected wrt params with allowed types.
   SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
+  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes,
+                                                  isMethod);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
     SourceLoc loc;
@@ -2420,7 +2421,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // primal/adjoint whose results do not conform.
   if (attr->getJVP() || attr->getVJP()) {
     auto *unwrapped = originalFnTy;
-    if (checkedWrtParamIndices->isMethod())
+    if (isMethod)
       unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
     Type originalResult = unwrapped->getResult();
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
@@ -2491,7 +2492,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
     AnyFunctionType *expectedAdjointFnTy =
         originalFnTy->getAutoDiffAdjointFunctionType(checkedWrtParamIndices,
-                                                     primalResultTy);
+                                                     primalResultTy, isMethod);
 
     auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
       TC.validateDeclForNameLookup(adjointCandidate);
@@ -2518,7 +2519,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()),
+            isMethod);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -2545,7 +2547,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()),
+            isMethod);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);

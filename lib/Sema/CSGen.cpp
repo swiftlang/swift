@@ -1312,7 +1312,8 @@ namespace {
       SmallVector<Type, 8> diffParamTypes;
       SmallVector<TupleTypeElt, 8> resultTypes;
       checkedWrtParamIndices->getSubsetParameterTypes(originalTy,
-                                                      diffParamTypes);
+                                                      diffParamTypes,
+                                                      /*isMethod*/ false);
       resultTypes.append(diffParamTypes.begin(), diffParamTypes.end());
 
       // Check that the differentiation parameter types are allowed.

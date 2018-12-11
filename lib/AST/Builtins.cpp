@@ -1077,7 +1077,7 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
       // stored in the function type.
       auto *vjpType = origFnTy->getAutoDiffAssociatedFunctionType(
           paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-          kind, /*lookupConformance*/ nullptr);
+          kind, /*lookupConformance*/ nullptr, /*isMethod*/ false);
       vjpType = vjpType->withExtInfo(vjpType->getExtInfo().withNoEscape(false));
       return vjpType;
     }

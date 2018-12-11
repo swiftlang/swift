@@ -2740,7 +2740,7 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
   ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
   auto loweredParamIndices =
-      E->getCheckedParameterIndices()->getLowered(origTy);
+      E->getCheckedParameterIndices()->getLowered(origTy, /*isMethod*/ false);
   SILAutoDiffConfig config(
       {E->getResultIndex(), loweredParamIndices}, options);
   auto gradInst =

@@ -3127,11 +3127,13 @@ public:
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      LookupConformanceFn lookupConformance, bool selfUncurried = false);
+      LookupConformanceFn lookupConformance, bool isMethod,
+      bool selfUncurried = false);
 
   AnyFunctionType *
   getAutoDiffAdjointFunctionType(AutoDiffParameterIndices *indices,
-                                 const TupleType *primalResultTy);
+                                 const TupleType *primalResultTy,
+                                 bool isMethod);
 
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
