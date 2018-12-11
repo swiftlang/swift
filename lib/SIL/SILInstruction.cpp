@@ -1182,6 +1182,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   if (isa<BeginApplyInst>(this))
     return false;
 
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
+    return false;
+
   // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
