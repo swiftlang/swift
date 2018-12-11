@@ -20,9 +20,8 @@ import SwiftShims
 // Atomics
 //===----------------------------------------------------------------------===//
 
-@_transparent
-public // @testable
-func _stdlib_atomicCompareExchangeStrongPtr(
+@inline(__always)
+internal func _stdlib_atomicCompareExchangeStrongPtr(
   object target: UnsafeMutablePointer<UnsafeRawPointer?>,
   expected: UnsafeMutablePointer<UnsafeRawPointer?>,
   desired: UnsafeRawPointer?) -> Bool {
@@ -64,9 +63,8 @@ func _stdlib_atomicCompareExchangeStrongPtr(
 /// If the conditions above are not met, the code will still compile, but the
 /// compare-and-exchange instruction will operate on the writeback buffer, and
 /// you will get a *race* while doing writeback into shared memory.
-@_transparent
-public // @testable
-func _stdlib_atomicCompareExchangeStrongPtr<T>(
+@inline(__always)
+internal func _stdlib_atomicCompareExchangeStrongPtr<T>(
   object target: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>${optional}>,
   desired: UnsafeMutablePointer<T>${optional}
@@ -82,10 +80,9 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 % end # optional
 
-@_transparent
 @discardableResult
-public // @testable
-func _stdlib_atomicInitializeARCRef(
+@inline(__always)
+internal func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
   var expected: UnsafeRawPointer?
@@ -102,9 +99,8 @@ func _stdlib_atomicInitializeARCRef(
   return wonRace
 }
 
-@_transparent
-public // @testable
-func _stdlib_atomicLoadARCRef(
+@inline(__always)
+internal func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
   let value = Builtin.atomicload_seqcst_Word(target._rawValue)
