@@ -2106,6 +2106,36 @@ bb3:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @resilient_enum_case_propagation
+// CHECK: bb0:
+// CHECK:   br bb2
+// CHECK: bb1:
+// CHECK:   return
+sil @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = alloc_stack $FloatingPointRoundingRule
+  inject_enum_addr %0 : $*FloatingPointRoundingRule, #FloatingPointRoundingRule.toNearestOrEven!enumelt
+  %2 = alloc_stack $FloatingPointRoundingRule
+  copy_addr %0 to [initialization] %2 : $*FloatingPointRoundingRule
+  destroy_addr %0 : $*FloatingPointRoundingRule
+  switch_enum_addr %2 : $*FloatingPointRoundingRule, case #FloatingPointRoundingRule.toNearestOrAwayFromZero!enumelt: bb1, default bb2
+
+bb1:
+  %6 = integer_literal $Builtin.Int64, 1
+  br bb3(%6 : $Builtin.Int64)
+
+bb2:
+  destroy_addr %2 : $*FloatingPointRoundingRule
+  %9 = integer_literal $Builtin.Int64, 0
+  br bb3(%9 : $Builtin.Int64)
+
+bb3(%11 : $Builtin.Int64):
+  dealloc_stack %2 : $*FloatingPointRoundingRule
+  dealloc_stack %0 : $*FloatingPointRoundingRule
+  return %11 : $Builtin.Int64
+}
+
+
 @objc(XX) protocol XX {
 }
 

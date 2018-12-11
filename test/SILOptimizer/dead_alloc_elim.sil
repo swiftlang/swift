@@ -325,8 +325,9 @@ sil @non_trivial_destructor_objc_destructor : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
-// CHECK: alloc_stack
-// CHECK: return
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = tuple ()
+// CHECK-NEXT:   return %0
 sil @non_trivial_destructor_on_stack : $@convention(thin) () -> () {
   %0 = alloc_stack $NonTrivialDestructor
   dealloc_stack %0 : $*NonTrivialDestructor
@@ -358,3 +359,18 @@ sil @trivial_destructor_may_trap : $@convention(thin) () -> () {
   %4 = tuple()
   return %4 : $()
 }
+
+// CHECK-LABEL: sil @remove_dead_enum_stackloc
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = tuple ()
+// CHECK-NEXT:   return %0
+sil @remove_dead_enum_stackloc : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $FloatingPointRoundingRule
+  inject_enum_addr %0 : $*FloatingPointRoundingRule, #FloatingPointRoundingRule.toNearestOrEven!enumelt
+  destroy_addr %0 : $*FloatingPointRoundingRule
+  dealloc_stack %0 : $*FloatingPointRoundingRule
+  %1 = tuple ()
+  return %1 : $()
+}
+

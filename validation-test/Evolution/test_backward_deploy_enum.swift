@@ -5,7 +5,7 @@ import StdlibUnittest
 import backward_deploy_enum
 
 // <rdar://problem/46438568>
-// XFAIL: *
+// REQUIRES: rdar46438568
 
 var BackwardDeployEnumTest = TestSuite("BackwardDeployEnum")
 
