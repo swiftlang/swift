@@ -689,6 +689,21 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
+unsigned GenericParamList::getDepth() const {
+  unsigned depth = 0;
+  for (auto gpList = getOuterParameters();
+       gpList != nullptr;
+       gpList = gpList->getOuterParameters())
+    ++depth;
+  return depth;
+}
+
+void GenericParamList::configureGenericParamDepth() {
+  unsigned depth = getDepth();
+  for (auto param : *this)
+    param->setDepth(depth);
+}
+
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)

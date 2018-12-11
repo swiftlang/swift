@@ -147,11 +147,9 @@ TypeChecker::gatherGenericParamBindingsText(
 void
 TypeChecker::prepareGenericParamList(GenericParamList *gp,
                                      DeclContext *dc) {
-  unsigned depth = gp->getDepth();
-  for (auto paramDecl : *gp) {
+  gp->configureGenericParamDepth();
+  for (auto paramDecl : *gp)
     checkDeclAttributesEarly(paramDecl);
-    paramDecl->setDepth(depth);
-  }
 }
 
 /// Add the generic parameter types from the given list to the vector.

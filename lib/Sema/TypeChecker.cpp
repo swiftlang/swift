@@ -285,21 +285,6 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-/// FIXME: Similar to TypeChecker::prepareGenericParamList(), which needs
-/// to be separated from the type checker.
-static void prepareGenericParamList(GenericParamList *genericParams) {
-  unsigned depth = genericParams->getDepth();
-  for (auto gp : *genericParams) {
-    if (gp->getDepth() == depth)
-      return;
-
-    gp->setDepth(depth);
-  }
-
-  if (auto outerGenericParams = genericParams->getOuterParameters())
-    prepareGenericParamList(outerGenericParams);
-}
-
 /// Ensure that the outer generic parameters of the given generic
 /// context have been configured.
 static void configureOuterGenericParams(const GenericContext *dc) {
@@ -353,9 +338,12 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
         cloneGenericParams(ext->getASTContext(), ext, genericParams));
   }
 
+  // Set the depth of every generic parameter.
   auto *genericParams = ext->getGenericParams();
-  if (genericParams)
-    prepareGenericParamList(genericParams);
+  for (auto *outerParams = genericParams;
+       outerParams != nullptr;
+       outerParams = outerParams->getOuterParameters())
+    outerParams->configureGenericParamDepth();
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
