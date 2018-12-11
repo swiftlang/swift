@@ -95,8 +95,8 @@ extension Dictionary._Variant {
     _modify {
       var native = _NativeDictionary<Key, Value>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer { object = .init(native: native._storage) }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 
@@ -275,6 +275,31 @@ extension Dictionary._Variant: _DictionaryBuffer {
     }
 #endif
     return asNative.value(at: index)
+  }
+}
+
+extension Dictionary._Variant {
+  @inlinable
+  internal subscript(key: Key) -> Value? {
+    @inline(__always)
+    get {
+      return lookup(key)
+    }
+    @inline(__always)
+    _modify {
+#if _runtime(_ObjC)
+      guard isNative else {
+        let cocoa = asCocoa
+        var native = _NativeDictionary<Key, Value>(
+          cocoa, capacity: cocoa.count + 1)
+        self = .init(native: native)
+        yield &native[key, isUnique: true]
+        return
+      }
+#endif
+      let isUnique = isUniquelyReferenced()
+      yield &asNative[key, isUnique: isUnique]
+    }
   }
 }
 
