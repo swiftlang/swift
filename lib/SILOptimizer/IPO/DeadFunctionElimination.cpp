@@ -166,12 +166,6 @@ protected:
           }
         } break;
 
-        // SWIFT_ENABLE_TENSORFLOW
-        case SILWitnessTable::AutoDiffAssociatedFunction:
-          // Be conservative for now.
-          ensureAlive(entry.getAutoDiffAssociatedFunctionWitness().Witness);
-          break;
-
         case SILWitnessTable::AssociatedTypeProtocol: {
           ProtocolConformanceRef CRef =
              entry.getAssociatedTypeProtocolWitness().Witness;

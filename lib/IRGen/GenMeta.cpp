@@ -657,14 +657,6 @@ namespace {
         return { flags, defaultImpl };
       }
 
-      if (entry.isAutoDiffAssociatedFunction()) {
-        assert(!Resilient && "TODO: Resilient autodiff associated funcs");
-        auto flags = getMethodDescriptorFlags<Flags>(
-            entry.getAutoDiffAssociatedFunctionOriginal());
-        // TODO: Default witness.
-        return { flags, nullptr };
-      }
-
       assert(entry.isFunction());
       SILDeclRef func(entry.getFunction());
 
