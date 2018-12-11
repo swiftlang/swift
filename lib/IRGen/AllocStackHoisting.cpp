@@ -57,6 +57,11 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   if (TI.isFixedSize())
     return false;
 
+  // Don't hoist weakly imported (weakly linked) types.
+  auto *nominalDecl = SILTy.getASTType()->getNominalOrBoundGenericNominal();
+  if (nominalDecl->isWeakImported(Mod.getSILModule().getSwiftModule()))
+    return false;
+
   // Don't hoist generics with opened archetypes. We would have to hoist the
   // open archetype instruction which might not be possible.
   return Inst->getTypeDependentOperands().empty();
