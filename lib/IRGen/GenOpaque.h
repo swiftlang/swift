@@ -239,7 +239,8 @@ namespace irgen {
 
   using GetExtraInhabitantTagEmitter =
     llvm::function_ref<llvm::Value*(IRGenFunction &IGF,
-                                    Address addr)>;
+                                    Address addr,
+                                    llvm::Value *xiCount)>;
 
   llvm::Constant *
   getOrCreateGetExtraInhabitantTagFunction(IRGenModule &IGM,
@@ -258,7 +259,8 @@ namespace irgen {
   using StoreExtraInhabitantTagEmitter =
     llvm::function_ref<void(IRGenFunction &IGF,
                             Address addr,
-                            llvm::Value *tag)>;
+                            llvm::Value *tag,
+                            llvm::Value *xiCount)>;
 
   llvm::Constant *
   getOrCreateStoreExtraInhabitantTagFunction(IRGenModule &IGM,

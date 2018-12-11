@@ -808,12 +808,15 @@ struct ValueWitnesses
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
+  SWIFT_CC(swift)
   static void storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
-                                      const Metadata *self) {
+                                      unsigned xiCount, const Metadata *self) {
     Box::storeExtraInhabitantTag((typename Box::type*) dest, tag);
   }
 
+  SWIFT_CC(swift)
   static unsigned getExtraInhabitantTag(const OpaqueValue *src,
+                                        unsigned xiCount,
                                         const Metadata *self) {
     return Box::getExtraInhabitantTag((typename Box::type const *) src);
   }
@@ -898,12 +901,15 @@ struct NonFixedValueWitnesses :
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
+  SWIFT_CC(swift)
   static void storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
-                                      const Metadata *self) {
+                                      unsigned xiCount, const Metadata *self) {
     Box::storeExtraInhabitantTag((typename Box::type*) dest, tag);
   }
 
+  SWIFT_CC(swift)
   static unsigned getExtraInhabitantTag(const OpaqueValue *src,
+                                        unsigned xiCount,
                                         const Metadata *self) {
     return Box::getExtraInhabitantTag((typename Box::type const *) src);
   }

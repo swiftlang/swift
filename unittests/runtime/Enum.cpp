@@ -16,8 +16,11 @@
 
 using namespace swift;
 
+SWIFT_CC(swift)
 static unsigned byte_getExtraInhabitantTag(const OpaqueValue *src,
+                                           unsigned numXI,
                                            const Metadata *self) {
+  assert(numXI == 2);
   uint8_t byte = *reinterpret_cast<const uint8_t*>(src);
   if (byte > 253)
     return byte - 253;
@@ -31,8 +34,10 @@ static unsigned byte_getEnumTagSinglePayload(const OpaqueValue *value,
                                               byte_getExtraInhabitantTag);
 }
 
+SWIFT_CC(swift)
 static void byte_storeExtraInhabitantTag(OpaqueValue *dest, unsigned tag,
-                                         const Metadata *self) {
+                                         unsigned numXI, const Metadata *self) {
+  assert(numXI == 2);
   assert(tag > 0 && tag <= 2);
   *reinterpret_cast<uint8_t*>(dest) = 253 + tag;
 }

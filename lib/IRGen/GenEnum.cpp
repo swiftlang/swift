@@ -3066,15 +3066,13 @@ namespace {
       // double-optionals.
       return emitGetEnumTagSinglePayloadGenericCall(IGF, T, *TI, numEmptyCases,
                                                     addr,
-          [this, T](IRGenFunction &IGF, Address addr) -> llvm::Value* {
+          [this, T](IRGenFunction &IGF, Address addr,
+                    llvm::Value *numXI) -> llvm::Value* {
         auto payloadType = getPayloadType(IGF.IGM, T);
         auto payloadAddr = projectPayloadData(IGF, addr);
 
-        // For the case count, we just load the XI count from the metadata
-        // for the payload type.  We're almost certainly about to call a value
-        // witness on that metadata anyway.
-        auto payloadNumExtraCases =
-          emitLoadOfExtraInhabitantCount(IGF, payloadType);
+        // For the case count, we just use the XI count from the payload type.
+        auto payloadNumExtraCases = numXI;
 
         llvm::Value *tag
           = getPayloadTypeInfo().getEnumTagSinglePayload(IGF,
@@ -3131,15 +3129,12 @@ namespace {
       // double-optionals.
       emitStoreEnumTagSinglePayloadGenericCall(IGF, T, *TI, tag,
                                                numEmptyCases, dest,
-          [this, T](IRGenFunction &IGF, Address dest, llvm::Value *tag) {
+          [this, T](IRGenFunction &IGF, Address dest, llvm::Value *tag,
+                    llvm::Value *payloadNumXI) {
         auto payloadType = getPayloadType(IGF.IGM, T);
         auto payloadDest = projectPayloadData(IGF, dest);
         auto payloadTag = adjustExtraInhabitantTagForPayload(IGF, tag,
                                                              /*nonzero*/false);
-
-        // We know that tag <= numXI, and as long as that's true, storing an
-        // extra inhabitant is always a no-op.
-        auto payloadNumXI = payloadTag;
 
         getPayloadTypeInfo().storeEnumTagSinglePayload(IGF, payloadTag,
                                                        payloadNumXI,

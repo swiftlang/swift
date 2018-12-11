@@ -487,9 +487,10 @@ namespace {
 
       return emitGetEnumTagSinglePayloadGenericCall(IGF, structType, *this,
                                                     numEmptyCases, structAddr,
-        [this,structType](IRGenFunction &IGF, Address structAddr) {
+        [this,structType](IRGenFunction &IGF, Address structAddr,
+                          llvm::Value *structNumXI) {
           return withExtraInhabitantProvidingField(IGF, structAddr, structType,
-                                                   IGF.IGM.Int32Ty,
+                                                   structNumXI, IGF.IGM.Int32Ty,
             [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
               Address fieldAddr = asImpl().projectFieldAddress(
                                            IGF, structAddr, structType, field);
@@ -518,9 +519,9 @@ namespace {
                                                whichCase, numEmptyCases,
                                                structAddr,
         [this,structType](IRGenFunction &IGF, Address structAddr,
-                          llvm::Value *tag) {
+                          llvm::Value *tag, llvm::Value *structNumXI) {
           withExtraInhabitantProvidingField(IGF, structAddr, structType,
-                                            IGF.IGM.VoidTy,
+                                            structNumXI, IGF.IGM.VoidTy,
             [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
               Address fieldAddr = asImpl().projectFieldAddress(
                                            IGF, structAddr, structType, field);

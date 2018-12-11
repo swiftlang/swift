@@ -130,8 +130,7 @@ unsigned
 swift::swift_getEnumTagSinglePayloadGeneric(const OpaqueValue *value,
                                             unsigned emptyCases,
                                             const Metadata *payloadType,
-               unsigned (*getExtraInhabitantTag)(const OpaqueValue *value,
-                                                 const Metadata *payloadType)) {
+                               getExtraInhabitantTag_t *getExtraInhabitantTag) {
   auto size = payloadType->vw_size();
   auto numExtraInhabitants = payloadType->vw_getNumExtraInhabitants();
   return getEnumTagSinglePayloadImpl(value, emptyCases, payloadType, size,
@@ -143,9 +142,7 @@ void swift::swift_storeEnumTagSinglePayloadGeneric(OpaqueValue *value,
                                                    unsigned whichCase,
                                                    unsigned emptyCases,
                                                    const Metadata *payloadType,
-                 void (*storeExtraInhabitantTag)(OpaqueValue *value,
-                                                 unsigned whichCase,
-                                                 const Metadata *payloadType)) {
+                           storeExtraInhabitantTag_t *storeExtraInhabitantTag) {
   auto size = payloadType->vw_size();
   auto numExtraInhabitants = payloadType->vw_getNumExtraInhabitants();
   storeEnumTagSinglePayloadImpl(value, whichCase, emptyCases, payloadType, size,
@@ -305,8 +302,10 @@ static unsigned loadMultiPayloadValue(const OpaqueValue *value,
   return payloadValue;
 }
 
+SWIFT_CC(swift)
 static unsigned getMultiPayloadExtraInhabitantTag(const OpaqueValue *value,
-                                                    const Metadata *enumType) {
+                                                  unsigned enumNumXI,
+                                                  const Metadata *enumType) {
   auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
   unsigned index = ~loadMultiPayloadTag(value, layout, ~0u);
   
@@ -314,8 +313,11 @@ static unsigned getMultiPayloadExtraInhabitantTag(const OpaqueValue *value,
     return 0;
   return index + 1;
 }
+
+SWIFT_CC(swift)
 static void storeMultiPayloadExtraInhabitantTag(OpaqueValue *value,
                                                 unsigned tag,
+                                                unsigned enumNumXI,
                                                 const Metadata *enumType) {
   auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
   storeMultiPayloadTag(value, layout, ~(tag - 1));

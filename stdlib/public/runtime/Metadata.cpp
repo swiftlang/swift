@@ -1309,31 +1309,36 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
+SWIFT_CC(swift)
 static void tuple_storeExtraInhabitantTag(OpaqueValue *tuple,
                                           unsigned tag,
+                                          unsigned xiCount,
                                           const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
   auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
   auto &eltInfo =
     metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
 
   assert(tag >= 1);
-  assert(tag <= eltInfo.Type->vw_getNumExtraInhabitants());
-  eltInfo.Type->vw_storeEnumTagSinglePayload(elt, tag, tag);
+  assert(tag <= xiCount);
+  eltInfo.Type->vw_storeEnumTagSinglePayload(elt, tag, xiCount);
 }
 
+SWIFT_CC(swift)
 static unsigned tuple_getExtraInhabitantTag(const OpaqueValue *tuple,
+                                            unsigned xiCount,
                                             const Metadata *_metatype) {
   auto &metatype = *(const TupleTypeMetadata*) _metatype;
 
   auto cacheEntry = TupleCacheStorage::resolveExistingEntry(&metatype);
   auto &eltInfo =
     metatype.getElement(cacheEntry->ExtraInhabitantProvidingElement);
+  assert(xiCount == eltInfo.Type->vw_getNumExtraInhabitants());
 
   auto *elt = (const OpaqueValue*)((uintptr_t)tuple + eltInfo.Offset);
-  auto xiCount = eltInfo.Type->vw_getNumExtraInhabitants();
   return eltInfo.Type->vw_getEnumTagSinglePayload(elt, xiCount);
 }
 
