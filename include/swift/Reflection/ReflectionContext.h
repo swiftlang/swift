@@ -212,8 +212,8 @@ public:
         ReflStrMdSec.first.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
-    auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(SectBuf.get());
+    auto RemoteStartAddress = static_cast<uintptr_t>(RangeStart);
 
     ReflectionInfo info = {
         {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
@@ -246,6 +246,8 @@ public:
     }
 
     savedBuffers.push_back(std::move(Buf));
+    savedBuffers.push_back(std::move(SectBuf));
+    savedBuffers.push_back(std::move(Sections));
     return true;
   }
 
