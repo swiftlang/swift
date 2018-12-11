@@ -1,5 +1,4 @@
-//===--- ExperimentalDependencyGraph.cpp - Track intra-module dependencies
-//--==//
+//===-- ExperimentalDependencyGraph.cpp - Track intra-module dependencies --==//
 //
 // This source file is part of the Swift.org open source project
 //
