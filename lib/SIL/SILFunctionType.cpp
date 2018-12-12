@@ -351,7 +351,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<SILResultInfo, 8> jvpResults(getResults().begin(),
                                              getResults().end());
     jvpResults.push_back({differentialType, ResultConvention::Owned});
-    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+    return SILFunctionType::get(getGenericSignature(),
+                                getExtInfo(),
                                 getCoroutineKind(), getCalleeConvention(),
                                 getParameters(), getYields(), jvpResults,
                                 getOptionalErrorResult(), ctx);
@@ -382,7 +383,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<SILResultInfo, 8> vjpResults(getResults().begin(),
                                              getResults().end());
     vjpResults.push_back({pullbackType, ResultConvention::Owned});
-    return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+    return SILFunctionType::get(getGenericSignature(),
+                                getExtInfo(),
                                 getCoroutineKind(), getCalleeConvention(),
                                 getParameters(), getYields(), vjpResults,
                                 getOptionalErrorResult(), ctx);
