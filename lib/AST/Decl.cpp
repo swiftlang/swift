@@ -1127,18 +1127,24 @@ void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
 
   configureOuterGenericParams(nominal);
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // For a protocol extension, build the generic parameter list directly
-    // since we want it to have an inheritance clause.
-    setGenericParams(proto->createGenericParams(this));
-  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
-    // Clone the generic parameter list of a generic type.
-    setGenericParams(
-        cloneGenericParams(getASTContext(), this, genericParams));
+  // Create the generic parameter list for the extension by cloning the
+  // generic parameter lists of the nominal and any of its parent types.
+  auto &ctx = getASTContext();
+  auto *genericParams = nominal->getGenericParamsOfContext();
+  if (genericParams != nullptr)
+    genericParams = cloneGenericParams(ctx, this, genericParams);
+  setGenericParams(genericParams);
+
+  // Protocol extensions need an inheritance clause due to how name lookup
+  // is implemented.
+  if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+    auto protoType = proto->getDeclaredType();
+    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    genericParams->getParams().front()->setInherited(
+      ctx.AllocateCopy(selfInherited));
   }
 
   // Set the depth of every generic parameter.
-  auto *genericParams = getGenericParams();
   for (auto *outerParams = genericParams;
        outerParams != nullptr;
        outerParams = outerParams->getOuterParameters())
