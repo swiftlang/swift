@@ -338,38 +338,6 @@ extension Comparable {
   }
 }
 
-extension Strideable where Stride: SignedInteger {  
-  /// Returns a countable closed range that contains both of its bounds.
-  ///
-  /// Use the closed range operator (`...`) to create a closed range of any type
-  /// that conforms to the `Strideable` protocol with an associated signed
-  /// integer `Stride` type, such as any of the standard library's integer
-  /// types. This example creates a `ClosedRange<Int>` from zero up to,
-  /// and including, nine.
-  ///
-  ///     let singleDigits = 0...9
-  ///     print(singleDigits.contains(9))
-  ///     // Prints "true"
-  ///
-  /// You can use sequence or collection methods on the `singleDigits` range.
-  ///
-  ///     print(singleDigits.count)
-  ///     // Prints "10"
-  ///     print(singleDigits.last)
-  ///     // Prints "9"
-  ///
-  /// - Parameters:)`.
-  ///   - minimum: The lower bound for the range.
-  ///   - maximum: The upper bound for the range.
-  @_transparent
-  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
-    // FIXME: swift-3-indexing-model: tests for traps.
-    _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-}
-
 extension ClosedRange: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.
   ///
