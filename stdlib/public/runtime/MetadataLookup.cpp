@@ -1301,6 +1301,23 @@ swift_getTypeByMangledNameInContext(
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
 
+/// Demangle a mangled name, but don't allow symbolic references.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata *_Nullable
+swift_stdlib_getTypeByMangledNameUntrusted(const char *typeNameStart,
+                                           size_t typeNameLength) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  for (char c : typeName) {
+    if (c >= '\x01' && c <= '\x1F')
+      return nullptr;
+  }
+  
+  auto metadata = swift_getTypeByMangledName(typeName, {}, {});
+  if (!metadata) return nullptr;
+
+  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
+}
+
 #if SWIFT_OBJC_INTEROP
 
 // Return the ObjC class for the given type name.
