@@ -799,7 +799,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
     return IGM.FieldDescriptorTy;
-  case Kind::ValueWitnessTable:
+  case Kind::ValueWitnessTable: // TODO: use ValueWitnessTableTy
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
     return IGM.WitnessTableTy;
