@@ -1030,7 +1030,7 @@ static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned order, unsigned arity) {
+    unsigned order, unsigned arity, bool rethrows) {
   assert(arity >= 1);
   assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
@@ -1062,7 +1062,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiable().withNoEscape().withThrows();
+          .withDifferentiable().withNoEscape().withThrows(rethrows);
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1072,9 +1072,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   };
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the associated function type.
-  BuiltinGenericSignatureBuilder firstArgTypeBuilder(Context);
   auto *origFnTy =
-      firstArgGen.build(firstArgTypeBuilder)->castTo<AnyFunctionType>();
+      firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->withExtInfo(
       origFnTy->getExtInfo().withDifferentiable(false));
   auto *paramIndices = AutoDiffParameterIndicesBuilder(
@@ -1090,7 +1089,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   builder.addParameter(firstArgGen);
   for (auto argGen : fnArgGens)
     builder.addParameter(argGen);
-  builder.setRethrows();
+  if (rethrows)
+    builder.setRethrows();
   builder.setResult(resultGen);
   return builder.build(Id);
 }
@@ -2032,10 +2032,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffDestroyTape(Context, Id);
   case BuiltinValueKind::AutoDiffApplyJVP:
     return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1);
+        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1,
+        /*rethrows*/ false);
   case BuiltinValueKind::AutoDiffApplyVJP:
     return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1);
+        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1,
+        /*rethrows*/ false);
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 

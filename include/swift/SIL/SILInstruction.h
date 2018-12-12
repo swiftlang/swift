@@ -7655,6 +7655,7 @@ public:
     } rawValue;
     Extractee() = default;
     Extractee(innerty rawValue) : rawValue(rawValue) {}
+    Extractee(AutoDiffAssociatedFunctionKind kind);
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
   };

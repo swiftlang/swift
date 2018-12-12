@@ -666,6 +666,18 @@ getAssociatedFunction(unsigned differentiationOrder,
   return getAssociatedFunctions()[offset].get();
 }
 
+AutoDiffFunctionExtractInst::Extractee::Extractee(
+    AutoDiffAssociatedFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    rawValue = JVP;
+    return;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    rawValue = VJP;
+    return;
+  }
+}
+
 AutoDiffFunctionExtractInst::Extractee::Extractee(StringRef string) {
   Optional<innerty> result =
       llvm::StringSwitch<Optional<innerty>>(string)

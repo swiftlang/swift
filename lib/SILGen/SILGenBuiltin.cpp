@@ -12,9 +12,13 @@
 
 #include "SpecializedEmitter.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "ArgumentScope.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "ResultPlan.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "SILGenFunction.h"
@@ -1042,17 +1046,39 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
+    AutoDiffAssociatedFunctionKind kind, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, Expr *argument, SGFContext C) {
+  auto *argTuple = cast<TupleExpr>(argument);
+  assert(argTuple->getNumElements() == 2);
+  auto *origFnExpr = argTuple->getElement(0);
+  auto *firstArgExpr = argTuple->getElement(1);
+  auto assocFn = SGF.getBuilder().createAutoDiffFunctionExtract(
+          loc, kind, /*differentiationOrder*/ 1,
+          SGF.emitRValueAsSingleValue(origFnExpr).getUnmanagedValue());
+  auto assocFnType = assocFn->getType().getAs<SILFunctionType>();
+  assert(assocFnType->getNumResults() == 2);
+  SmallVector<SILValue, 2> applyArgs;
+  auto indResBuffer =
+      SGF.getBufferForExprResult(loc, assocFnType->getAllResultsType(), C);
+  applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+  applyArgs.push_back(SGF.emitRValueAsSingleValue(firstArgExpr).forward(SGF));
+  auto differential = SGF.B.createApply(loc, assocFn, SubstitutionMap(),
+                                        applyArgs, /*isNonThrowing*/ false);
+  SGF.B.createStore(loc, differential,
+                    SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                    StoreOwnershipQualifier::Init);
+  return ManagedValue::forLValue(indResBuffer);
+}
+
 static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
                                                 SILLocation loc,
                                                 SubstitutionMap substitutions,
                                                 Expr *argument,
                                                 SGFContext C) {
-  auto argVal = SGF.emitRValue(argument);
-  auto jvp = SGF.getBuilder().createAutoDiffFunctionExtract(
-      loc, AutoDiffFunctionExtractee::JVP, /*differentiationOrder*/ 1,
-      std::move(argVal).forwardAsSingleValue(SGF, loc));
-  return SGF.emitManagedRValueWithCleanup(jvp);
+  return emitBuiltinAutoDiffApplyAssociatedFunction(
+      AutoDiffAssociatedFunctionKind::JVP, SGF, loc, substitutions,
+      argument, C);
 }
 
 static ManagedValue emitBuiltinAutoDiffApplyVJP(SILGenFunction &SGF,
@@ -1060,11 +1086,9 @@ static ManagedValue emitBuiltinAutoDiffApplyVJP(SILGenFunction &SGF,
                                                 SubstitutionMap substitutions,
                                                 Expr *argument,
                                                 SGFContext C) {
-  auto argVal = SGF.emitRValue(argument);
-  auto vjp = SGF.getBuilder().createAutoDiffFunctionExtract(
-      loc, AutoDiffFunctionExtractee::VJP, /*differentiationOrder*/ 1,
-      std::move(argVal).forwardAsSingleValue(SGF, loc));
-  return SGF.emitManagedRValueWithCleanup(vjp);
+  return emitBuiltinAutoDiffApplyAssociatedFunction(
+      AutoDiffAssociatedFunctionKind::VJP, SGF, loc, substitutions,
+      argument, C);
 }
 
 Optional<SpecializedEmitter>
