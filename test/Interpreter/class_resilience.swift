@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_struct%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_class%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_class)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}fixed_layout_class%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(fixed_layout_class)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(fixed_layout_class)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -lfixed_layout_class -o %t/main -Xfrontend -enable-class-resilience -Xlinker -rpath -Xlinker %t
@@ -14,13 +14,13 @@
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/%target-library-name(resilient_class) %t/%target-library-name(fixed_layout_class)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_struct_wmo%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_struct_wmo)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}resilient_class_wmo%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class_wmo)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_class_wmo)
 
-// RUN: %target-build-swift-dylib(%t/%{target-shared-library-prefix}fixed_layout_class_wmo%{target-shared-library-suffix}) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-build-swift-dylib(%t/%target-library-name(fixed_layout_class_wmo)) -Xfrontend -enable-resilience -Xfrontend -enable-class-resilience %S/../Inputs/fixed_layout_class.swift -emit-module -emit-module-path %t/fixed_layout_class.swiftmodule -module-name fixed_layout_class -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(fixed_layout_class_wmo)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_class_wmo -lfixed_layout_class_wmo -Xfrontend -enable-class-resilience -o %t/main2 -Xlinker -rpath -Xlinker %t -module-name main
