@@ -1129,10 +1129,6 @@ public:
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
-  /// Perform semantic checks on the given generic parameter list.
-  void prepareGenericParamList(GenericParamList *genericParams,
-                               DeclContext *dc);
-
   /// Compute the generic signature, generic environment and interface type
   /// of a generic function.
   void validateGenericFuncSignature(AbstractFunctionDecl *func);

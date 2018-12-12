@@ -687,6 +687,21 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
+unsigned GenericParamList::getDepth() const {
+  unsigned depth = 0;
+  for (auto gpList = getOuterParameters();
+       gpList != nullptr;
+       gpList = gpList->getOuterParameters())
+    ++depth;
+  return depth;
+}
+
+void GenericParamList::configureGenericParamDepth() {
+  unsigned depth = getDepth();
+  for (auto param : *this)
+    param->setDepth(depth);
+}
+
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)
@@ -1039,6 +1054,113 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
   return evaluateOrDefault(ctx.evaluator,
     DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
     {AccessLevel::Private, AccessLevel::Private}).second;
+}
+
+/// Clone the given generic parameters in the given list. We don't need any
+/// of the requirements, because they will be inferred.
+static GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                            DeclContext *dc,
+                                            GenericParamList *fromParams) {
+  // Clone generic parameters.
+  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
+  for (auto fromGP : *fromParams) {
+    // Create the new generic parameter.
+    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
+                                               SourceLoc(),
+                                               fromGP->getDepth(),
+                                               fromGP->getIndex());
+    toGP->setImplicit(true);
+
+    // Record new generic parameter.
+    toGenericParams.push_back(toGP);
+  }
+
+  auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
+                                           SourceLoc());
+
+  auto outerParams = fromParams->getOuterParameters();
+  if (outerParams != nullptr)
+    outerParams = cloneGenericParams(ctx, dc, outerParams);
+  toParams->setOuterParameters(outerParams);
+
+  return toParams;
+}
+
+/// Ensure that the outer generic parameters of the given generic
+/// context have been configured.
+static void configureOuterGenericParams(const GenericContext *dc) {
+  auto genericParams = dc->getGenericParams();
+
+  // If we already configured the outer parameters, we're done.
+  if (genericParams && genericParams->getOuterParameters())
+    return;
+
+  DeclContext *outerDC = dc->getParent();
+  while (!outerDC->isModuleScopeContext()) {
+    if (auto outerDecl = outerDC->getAsDecl()) {
+      if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
+        if (genericParams)
+          genericParams->setOuterParameters(outerGenericDC->getGenericParams());
+
+        configureOuterGenericParams(outerGenericDC);
+        return;
+      }
+    }
+
+    outerDC = outerDC->getParent();
+  }
+}
+
+void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
+  if (getGenericParams())
+    return;
+
+  // Hack to force generic parameter lists of protocols to be created if the
+  // nominal is an (invalid) nested type of a protocol.
+  DeclContext *outerDC = nominal;
+  while (!outerDC->isModuleScopeContext()) {
+    if (auto *proto = dyn_cast<ProtocolDecl>(outerDC))
+      proto->createGenericParamsIfMissing();
+
+    outerDC = outerDC->getParent();
+  }
+
+  configureOuterGenericParams(nominal);
+
+  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+    // For a protocol extension, build the generic parameter list directly
+    // since we want it to have an inheritance clause.
+    setGenericParams(proto->createGenericParams(this));
+  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
+    // Clone the generic parameter list of a generic type.
+    setGenericParams(
+        cloneGenericParams(getASTContext(), this, genericParams));
+  }
+
+  // Set the depth of every generic parameter.
+  auto *genericParams = getGenericParams();
+  for (auto *outerParams = genericParams;
+       outerParams != nullptr;
+       outerParams = outerParams->getOuterParameters())
+    outerParams->configureGenericParamDepth();
+
+  // If we have a trailing where clause, deal with it now.
+  // For now, trailing where clauses are only permitted on protocol extensions.
+  if (auto trailingWhereClause = getTrailingWhereClause()) {
+    if (genericParams) {
+      // Merge the trailing where clause into the generic parameter list.
+      // FIXME: Long-term, we'd like clients to deal with the trailing where
+      // clause explicitly, but for now it's far more direct to represent
+      // the trailing where clause as part of the requirements.
+      genericParams->addTrailingWhereClause(
+        getASTContext(),
+        trailingWhereClause->getWhereLoc(),
+        trailingWhereClause->getRequirements());
+    }
+
+    // If there's no generic parameter list, the where clause is diagnosed
+    // in typeCheckDecl().
+  }
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,

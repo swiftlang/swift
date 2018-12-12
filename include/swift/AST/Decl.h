@@ -1422,13 +1422,10 @@ public:
                        Requirements.back().getSourceRange().End);
   }
 
-  /// Retrieve the depth of this generic parameter list.
-  unsigned getDepth() const {
-    unsigned depth = 0;
-    for (auto gp = getOuterParameters(); gp; gp = gp->getOuterParameters())
-      ++depth;
-    return depth;
-  }
+  unsigned getDepth() const;
+
+  /// Configure the depth of the generic parameters in this list.
+  void configureGenericParamDepth();
 
   /// Create a copy of the generic parameter list and all of its generic
   /// parameter declarations. The copied generic parameters are re-parented
@@ -1763,6 +1760,8 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
+
+  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
