@@ -871,7 +871,9 @@ void ASTMangler::appendType(Type type) {
       return appendImplFunctionType(cast<SILFunctionType>(tybase));
 
       // type ::= archetype
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
     case TypeKind::DynamicSelf: {

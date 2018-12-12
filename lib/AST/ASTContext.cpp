@@ -4349,15 +4349,14 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
-      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
+    OpenedArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
       protos.size(),
       layoutSuperclass ? 1 : 0,
-      layoutConstraint ? 1 : 0, 1),
-      alignof(ArchetypeType), arena);
+      layoutConstraint ? 1 : 0),
+      alignof(OpenedArchetypeType), arena);
 
-  // FIXME: Pass in class layout constraint
   auto result =
-      ::new (mem) ArchetypeType(ctx, existential,
+      ::new (mem) OpenedArchetypeType(ctx, existential,
                                 protos, layoutSuperclass,
                                 layoutConstraint, *knownID);
   openedExistentialArchetypes[*knownID] = result;

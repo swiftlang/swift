@@ -1003,7 +1003,7 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
+  auto bindPrimaryArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
 
@@ -1027,7 +1027,7 @@ static void bindArchetypesFromContext(
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
-        bindContextArchetype(selfTy, contextTy);
+        bindPrimaryArchetype(selfTy, contextTy);
       }
       continue;
     }
@@ -1039,7 +1039,7 @@ static void bindArchetypesFromContext(
 
     for (auto *paramTy : genericSig->getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
-      bindContextArchetype(paramTy, contextTy);
+      bindPrimaryArchetype(paramTy, contextTy);
     }
 
     break;

@@ -7935,7 +7935,9 @@ FailureDiagnosis::validateContextualType(Type contextualType,
   // might contain archetypes.
   std::function<bool(Type)> shouldNullifyType = [&](Type type) -> bool {
     switch (type->getDesugaredType()->getKind()) {
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
     case TypeKind::Unresolved:
       return true;
 
