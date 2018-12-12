@@ -1,3 +1,4 @@
+#include "llvm/ADT/STLExtras.h"
 #include <ModuleAnalyzerNodes.h>
 #include <algorithm>
 
@@ -1073,29 +1074,16 @@ Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
     }
     return false;
   };
-  // The relative order of non-final instance functions matters for non-resilient
-  // class.
-  auto isNonfinalFunc = [](Decl *M) {
-    if (auto *FD = dyn_cast<FuncDecl>(M)) {
-      return !isa<AccessorDecl>(FD) && !FD->isFinal();
-    }
-    return false;
-  };
+
   switch (NTD->getKind()) {
   case DeclKind::Enum: {
     return getSimilarMemberCount(NTD, VD, [](Decl *M) {
       return isa<EnumElementDecl>(M);
     });
   }
+  case DeclKind::Class:
   case DeclKind::Struct: {
     return getSimilarMemberCount(NTD, VD, isStored);
-  }
-  case DeclKind::Class: {
-    if (auto count = getSimilarMemberCount(NTD, VD, isStored)) {
-      return count;
-    } else {
-      return getSimilarMemberCount(NTD, VD, isNonfinalFunc);
-    }
   }
   default:
     llvm_unreachable("bad nominal type kind.");
@@ -1535,7 +1523,11 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   for (auto *D: KnownDecls) {
     if (auto *Ext = dyn_cast<ExtensionDecl>(D)) {
       if (HandledExtensions.find(Ext) == HandledExtensions.end()) {
-        ExtensionMap[Ext->getExtendedNominal()].push_back(Ext);
+        auto *NTD = Ext->getExtendedNominal();
+        // Check if the extension is from other modules.
+        if (!llvm::is_contained(Modules, NTD->getModuleContext())) {
+          ExtensionMap[NTD].push_back(Ext);
+        }
       }
     }
   }

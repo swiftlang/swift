@@ -68,7 +68,7 @@ class Z0 {
     // expected-note @+2 {{delegation occurs here}}
 
     self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z0.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'Z0.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -78,7 +78,7 @@ class Z0 {
 struct Z1 {
   init() {
     self.init(5, 5) // expected-error{{cannot invoke 'Z1.init' with an argument list of type '(Int, Int)'}}
-  // expected-note @-1 {{overloads for 'Z1.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+  // expected-note @-1 {{overloads for 'Z1.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -91,7 +91,7 @@ enum Z2 {
 
   init() {
     self.init(5, 5) // expected-error{{cannot invoke 'Z2.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'Z2.init' exist with these partially matching parameter lists: (), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'Z2.init' exist with these partially matching parameter lists: (), (value: Double), (value: Int)}}
   }
 
   init(value: Int) { /* ... */ }
@@ -314,12 +314,12 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
 class TestOverloadSets {
   convenience init() {
     self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int, Int)'}}
-    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (), (a: Z0), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (), (a: Z0), (value: Double), (value: Int)}}
   }
   
   convenience init(a : Z0) {
     self.init(42 as Int8) // expected-error{{argument labels '(_:)' do not match any available overloads}}
-    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Int), (value: Double)}}
+    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Double), (value: Int)}}
   }
   
   init(value: Int) { /* ... */ }
