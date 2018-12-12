@@ -776,14 +776,15 @@ namespace {
     }
 
     void addMethod(SILDeclRef func) {
-      auto decl = cast<AbstractFunctionDecl>(func.getDecl());
-      Entries.push_back(WitnessTableEntry::forFunction(decl));
+      // SWIFT_ENABLE_TENSORFLOW
+      Entries.push_back(WitnessTableEntry::forFunction(func));
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
       for (auto i : range(placeholder->getNumberOfVTableEntries())) {
         (void)i;
-        Entries.push_back(WitnessTableEntry());
+        // SWIFT_ENABLE_TENSORFLOW
+        Entries.push_back(WitnessTableEntry::forPlaceholder());
       }
     }
 
@@ -1318,8 +1319,8 @@ public:
              && "sil witness table does not match protocol");
       assert(entry.getMethodWitness().Requirement == requirement
              && "sil witness table does not match protocol");
-      auto piIndex =
-        PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
+      // SWIFT_ENABLE_TENSORFLOW
+      auto piIndex = PI.getFunctionIndex(requirement);
       assert((size_t)piIndex.getValue() ==
               Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
@@ -3379,7 +3380,8 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
-  auto index = fnProtoInfo.getFunctionIndex(fn);
+  // SWIFT_ENABLE_TENSORFLOW
+  auto index = fnProtoInfo.getFunctionIndex(member);
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                      index.forProtocolWitnessTable());

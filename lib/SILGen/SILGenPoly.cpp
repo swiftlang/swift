@@ -3647,8 +3647,9 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     if (auto *autoDiffFuncId = witness.autoDiffAssociatedFunctionIdentifier) {
       auto originalFn = SGF.emitGlobalFunctionRef(
           loc, witness.asAutoDiffOriginalFunction());
-      /// TODO TODO TODO: Need to get loweredIndices somehow!!
-      llvm::SmallBitVector loweredIndices(10);
+      auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>(),
+          /*isMethod*/ true);
       auto autoDiffFn = SGF.B.createAutoDiffFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
       AutoDiffFunctionExtractInst::Extractee extractee;
