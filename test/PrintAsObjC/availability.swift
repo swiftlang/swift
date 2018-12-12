@@ -102,8 +102,6 @@
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToSimpleProperty' has been renamed to 'simpleProperty'");
 
 // CHECK-NEXT: - (NSInteger)methodReturningInt SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (NSInteger)methodRenamedToMethodWithoutCustomObjCNameWithValue:(NSInteger)value SWIFT_WARN_UNUSED_RESULT
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "methodWithoutCustomObjCNameWithValue:")
 // CHECK-NEXT: - (NSInteger)methodWithoutCustomObjCNameWithValue:(NSInteger)value SWIFT_WARN_UNUSED_RESULT;
 
 // CHECK-NEXT: - (NSInteger)deprecatedMethodRenamedToMethodWithoutCustomObjCNameWithValue:(NSInteger)value SWIFT_WARN_UNUSED_RESULT
@@ -395,9 +393,7 @@
     @objc public func unavailableOnMacOSMethodRenamedToSimpleProperty() {}
 
     @objc(methodReturningInt) public func simpleMethodReturningInt() -> Int { return -1 }
-  
-    @available(*, deprecated, renamed: "methodWithoutCustomObjCName(value:)")
-    @objc public func methodRenamedToMethodWithoutCustomObjCName(value: Int) -> Int { return -1 }
+
     @objc public func methodWithoutCustomObjCName(value: Int) -> Int { return -1 }
 
     @available(*, deprecated, renamed: "methodWithoutCustomObjCName(value:)")
