@@ -1615,8 +1615,8 @@ giveUpFastPath:
       pathTrace.addGenericParam(paramIndex);
 
       ValueDecl *base = values.front();
-      GenericParamList *paramList = nullptr;
 
+      GenericSignature *currentSig = nullptr;
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -1625,49 +1625,46 @@ giveUpFastPath:
             if (ext->getModuleContext() == M &&
                 ext->getGenericSignature()->getCanonicalSignature()
                   == genericSig) {
-              paramList = ext->getGenericParams();
+              currentSig = ext->getGenericSignature();
               break;
             }
           }
-          assert(paramList && "Couldn't find constrained extension");
+          assert(currentSig && "Couldn't find constrained extension");
         } else {
           // Simple case: use the nominal type's generic parameters.
-          paramList = nominal->getGenericParamsOfContext();
+          currentSig = nominal->getGenericSignature();
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
-        paramList = alias->getGenericParams();
+        currentSig = alias->getGenericSignature();
       } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
-        paramList = fn->getGenericParams();
+        currentSig = fn->getGenericSignature();
       } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
-        paramList = subscript->getGenericParams();
+        currentSig = subscript->getGenericSignature();
       }
 
-      if (!paramList) {
+      if (!currentSig) {
         return llvm::make_error<XRefError>(
             "cross-reference to generic param for non-generic type",
             pathTrace, getXRefDeclNameForError());
       }
 
-      unsigned currentDepth = paramList->getDepth();
-      if (currentDepth < depth) {
-        return llvm::make_error<XRefError>(
-            "a containing type has been made non-generic",
-            pathTrace, getXRefDeclNameForError());
-      }
-      while (currentDepth > depth) {
-        paramList = paramList->getOuterParameters();
-        --currentDepth;
-      }
-
-      if (paramIndex >= paramList->size()) {
-        return llvm::make_error<XRefError>(
-            "generic argument index out of bounds",
-            pathTrace, getXRefDeclNameForError());
+      bool found = false;
+      for (auto paramTy : currentSig->getGenericParams()) {
+        if (paramTy->getIndex() == paramIndex &&
+            paramTy->getDepth() == depth) {
+          values.clear();
+          values.push_back(paramTy->getDecl());
+          found = true;
+          break;
+        }
       }
 
-      values.clear();
-      values.push_back(paramList->getParams()[paramIndex]);
-      assert(values.back());
+      if (!found) {
+        return llvm::make_error<XRefError>(
+            "invalid generic argument index or depth",
+            pathTrace, getXRefDeclNameForError());
+      }
+
       break;
     }
 
