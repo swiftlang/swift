@@ -23,6 +23,22 @@ CHANGELOG
 
 Swift 5.0
 ---------
+* [SR-5719][]:
+
+  Starting from `-swift-version 5`, implicit `@autoclosure` function type
+  forwarding has been disabled, and new a diagnostic has been added suggesting
+  to add `()` to call the function value in such case. The call itself would be
+  wrapped in an implicit closure and passed to the corresponding parameter.
+
+  Example:
+
+  ```swift
+  func foo(_ fn: @autoclosure () -> Int) {}
+  func bar(_ fn: @autoclosure () -> Int) {
+    foo(fn)   // Incorrect, `fn` can't be forwarded and has to be called
+    foo(fn()) // Ok
+  }
+  ```
 
 * [SR-7139][]:
 
@@ -7306,3 +7322,4 @@ Swift 1.0
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
+[SR-5719]: <https://bugs.swift.org/browse/SR-5719>
