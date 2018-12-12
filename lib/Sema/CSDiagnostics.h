@@ -630,6 +630,15 @@ public:
   bool diagnoseAsError() override;
 };
 
+class MissingCallFailure final : public FailureDiagnostic {
+public:
+  MissingCallFailure(Expr *root, ConstraintSystem &cs,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 
