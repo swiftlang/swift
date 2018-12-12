@@ -3680,12 +3680,6 @@ ERROR(unreferenced_generic_parameter,none,
 
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
-ERROR(autodiff_attr_invalid_differentiability,none,
-      "invalid differentiability '%0' in '@autodiff' attribute; expected 'forward', 'reverse', 'linear', 'constant', or 'bidirectional'", (StringRef))
-ERROR(autodiff_attr_order_cannot_be_zero,none,
-      "differentiation order cannot be zero; it should be at least first-order", ())
-ERROR(autodiff_attr_order_cannot_be_specified_in_mode,none,
-      "differentiation order cannot be specified in '%0' mode", (StringRef))
 ERROR(autodiff_attr_argument_not_differentiable,none,
       "argument is not differentiable, but the enclosing function type is marked '@autodiff'; did you want to add '@nondiff' to this argument?", ())
 ERROR(autodiff_attr_result_not_differentiable,none,

@@ -6870,16 +6870,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto fromEI = fromFunc->getExtInfo();
       // Handle implicit conversion from @autodiff.
       if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiability(
-            FunctionTypeDifferentiability::Bidirectional))
+        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable())
                 ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
                             AutoDiffFunctionExpr(expr, fromFunc));
       }
       // Handle implicit conversion to @autodiff.
       else if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiability(
-            FunctionTypeDifferentiability::None))
+        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
                 ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));

@@ -483,6 +483,9 @@ ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(malformed_autodiff_parameter_indices,none,
+      "malformed autodiff parameter indices", ())
 
 // SIL Values
 ERROR(sil_value_redefinition,none,

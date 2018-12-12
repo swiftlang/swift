@@ -1978,67 +1978,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Function attributes require a syntactic function type.
   auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Resolve differentiability from a parsed @autodiff attribute.
-  auto resolveDifferentiability = [&]() -> FunctionType::Differentiability {
-    if (!attrs.hasDifferentiability()) {
-      return FunctionType::Differentiability::None;
-    }
-    // WHen empty, it means the user did not specify any differentiation mode.
-    StringRef diffModeString;
-    // When negative, it means the user did not specify any order.
-    int order = -1;
-    std::tie(diffModeString, order) = attrs.getDifferentiabilityAndOrder();
-    // If `diffabilityString` is empty, then differentiability is bidirectional.
-    auto diffability =
-        llvm::StringSwitch<Optional<FunctionType::Differentiability>>
-            (diffModeString)
-            .Case("", FunctionType::Differentiability::Bidirectional)
-            .Case("forward", FunctionType::Differentiability::Forward)
-            .Case("reverse", FunctionType::Differentiability::Reverse)
-            .Case("linear", FunctionType::Differentiability::Linear)
-            .Case("const", FunctionType::Differentiability::Constant)
-          .Case("bidirectional", FunctionType::Differentiability::Bidirectional)
-            .Default(None);
-    // Invalid differentiability.
-    if (!diffability) {
-      diagnose(attrs.getLoc(TAK_autodiff),
-               diag::autodiff_attr_invalid_differentiability,
-               diffModeString);
-      attrs.clearAttribute(TAK_autodiff);
-      return FunctionType::Differentiability::None;
-    }
-    if (order >= 0) {
-      switch (*diffability) {
-      // Linear functions are smooth, and thus do not need a specific
-      // differentiation order.
-      case FunctionType::Differentiability::Linear:
-        diagnose(attrs.getLoc(TAK_autodiff),
-                 diag::autodiff_attr_order_cannot_be_specified_in_mode,
-                 "linear");
-        attrs.clearAttribute(TAK_autodiff);
-        return FunctionType::Differentiability::None;
-      // Constant functions are smooth, and thus do not need a specific
-      // differentiation order.
-      case FunctionType::Differentiability::Constant:
-        diagnose(attrs.getLoc(TAK_autodiff),
-                 diag::autodiff_attr_order_cannot_be_specified_in_mode,
-                 "const");
-        attrs.clearAttribute(TAK_autodiff);
-        return FunctionType::Differentiability::None;
-      default:
-        break;
-      }
-    }
-    if (order == 0) {
-      diagnose(attrs.getLoc(TAK_autodiff),
-               diag::autodiff_attr_order_cannot_be_zero);
-      attrs.clearAttribute(TAK_autodiff);
-      return FunctionType::Differentiability::None;
-    }
-    return *diffability;
-  };
-
   if (!fnRepr) {
     if (attrs.has(TAK_autoclosure)) {
       diagnose(attrs.getLoc(TAK_autoclosure), diag::autoclosure_function_type);
@@ -2101,12 +2040,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    auto diffability = resolveDifferentiability();
-
     // Resolve the function type directly with these attributes.
     SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                     attrs.has(TAK_noescape), diffability);
+                                     // SWIFT_ENABLE_TENSORFLOW
+                                     attrs.has(TAK_noescape),
+                                     attrs.has(TAK_autodiff));
 
     ty = resolveSILFunctionType(fnRepr, options, coroutineKind,
                                 extInfo, calleeConvention,
@@ -2162,15 +2100,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
-    auto diffability = resolveDifferentiability();
-
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
                                   // SWIFT_ENABLE_TENSORFLOW
                                   fnRepr->throws(),
-                                  diffability);
+                                  attrs.has(TAK_autodiff));
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->hasError()) return ty;
@@ -2697,6 +2633,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   Type type;
   bool hadError = false;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  auto differentiability =
+      SILParameterDifferentiability::DifferentiableOrNotApplicable;
+
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
 
@@ -2722,6 +2662,12 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    if (attrs.has(TAK_nondiff)) {
+      attrs.clearAttribute(TAK_nondiff);
+      differentiability = SILParameterDifferentiability::NotDifferentiable;
+    }
+
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
   } else {
     type = resolveType(repr, options);
@@ -2737,7 +2683,9 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   }
 
   if (hadError) type = ErrorType::get(Context);
-  return SILParameterInfo(type->getCanonicalType(), convention);
+  // SWIFT_ENABLE_TENSORFLOW
+  return SILParameterInfo(type->getCanonicalType(), convention,
+                          differentiability);
 }
 
 bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,

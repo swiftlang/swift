@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=autodiff_sil_function_type_parse | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=autodiff_sil_function_type_parse | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+sil @examplefunc : $@convention(thin) (Float, Float, Float) -> Float
+
+sil @examplemethod : $@convention(method) (Float, Float, Float) -> Float
+
+// CHECK-LABEL: sil @test
+sil @test : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @examplefunc : $@convention(thin) (Float, Float, Float) -> Float
+
+  %1 = autodiff_function [wrt 0 1 2] [order 1] %0 : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK: %2 = autodiff_function_extract [vjp] [order 1] %1 : $@autodiff @convention(thin) (Float, Float, Float) -> Float
+  %2 = autodiff_function_extract [vjp] [order 1] %1 : $@autodiff @convention(thin) (Float, Float, Float) -> Float
+
+  %3 = autodiff_function [wrt 0] [order 1] %0 : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK: %4 = autodiff_function_extract [vjp] [order 1] %3 : $@autodiff @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+  %4 = autodiff_function_extract [vjp] [order 1] %3 : $@autodiff @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+
+  %5 = function_ref @examplemethod : $@convention(method) (Float, Float, Float) -> Float
+
+  %6 = autodiff_function [wrt 0 1 2] [order 1] %5 : $@convention(method) (Float, Float, Float) -> Float
+  // CHECK: %7 = autodiff_function_extract [vjp] [order 1] %6 : $@autodiff @convention(method) (Float, Float, Float) -> Float
+  %7 = autodiff_function_extract [vjp] [order 1] %6 : $@autodiff @convention(method) (Float, Float, Float) -> Float
+
+  %8 = autodiff_function [wrt 0] [order 1] %5 : $@convention(method) (Float, Float, Float) -> Float
+  // CHECK: %9 = autodiff_function_extract [vjp] [order 1] %8 : $@autodiff @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
+  %9 = autodiff_function_extract [vjp] [order 1] %8 : $@autodiff @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
+
+  %ret = tuple ()
+  return %ret : $()
+}

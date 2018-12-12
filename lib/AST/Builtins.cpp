@@ -1062,8 +1062,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiability(FunctionTypeDifferentiability::Bidirectional)
-          .withNoEscape().withThrows();
+          .withDifferentiable().withNoEscape().withThrows();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1071,28 +1070,27 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
           ->withExtInfo(extInfo);
     }
   };
-  AnyFunctionType *origFnTy =
-      firstArgGen.build(builder)->castTo<AnyFunctionType>();
-  origFnTy = origFnTy->withExtInfo(origFnTy->getExtInfo()
-      .withDifferentiability(FunctionTypeDifferentiability::None));
-  auto *paramIndices = AutoDiffParameterIndices::create(Context, origFnTy,
-                                                        /*isMethod*/ false,
-                                                        /*setAllParams*/ true);
+  // Eagerly build the type of the first arg, then use that to compute the type
+  // of the associated function type.
+  BuiltinGenericSignatureBuilder firstArgTypeBuilder(Context);
+  auto *origFnTy =
+      firstArgGen.build(firstArgTypeBuilder)->castTo<AnyFunctionType>();
+  origFnTy = origFnTy->withExtInfo(
+      origFnTy->getExtInfo().withDifferentiable(false));
+  auto *paramIndices = AutoDiffParameterIndicesBuilder(
+      origFnTy, /*isMethod*/ false, /*setAllParams*/ true).build(Context);
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen {
     [=](BuiltinGenericSignatureBuilder &builder) -> Type {
-      // TODO(rxwei): Use parameter indices and differentiation order that are
-      // stored in the function type.
       return origFnTy->getAutoDiffAssociatedFunctionType(
-          *paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-          kind, /*lookupConformance*/ nullptr)
-          ->getResult();
+          paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
+          kind, /*lookupConformance*/ nullptr, /*isMethod*/ false)->getResult();
     }
   };
   builder.addParameter(firstArgGen);
   for (auto argGen : fnArgGens)
     builder.addParameter(argGen);
-  // builder.setRethrows();
+  builder.setRethrows();
   builder.setResult(resultGen);
   return builder.build(Id);
 }

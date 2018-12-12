@@ -682,8 +682,7 @@ getExtracteeType(SILValue function, Extractee extractee,
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getExtInfo().isDifferentiable());
   auto originalFnTy =
-      fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiability(
-          FunctionTypeDifferentiability::None));
+      fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiable(false));
   CanSILFunctionType resultFnTy;
   switch (extractee) {
   case Extractee::Original:
@@ -692,16 +691,14 @@ getExtracteeType(SILValue function, Extractee extractee,
     break;
   case Extractee::JVP:
     resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(originalFnTy->getNumParameters(), true),
-        /*resultIndex*/ 0, differentiationOrder,
-        AutoDiffAssociatedFunctionKind::JVP, module,
+        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        differentiationOrder, AutoDiffAssociatedFunctionKind::JVP, module,
         LookUpConformanceInModule(module.getSwiftModule()));
     break;
   case Extractee::VJP:
     resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(originalFnTy->getNumParameters(), true),
-        /*resultIndex*/ 0, differentiationOrder,
-        AutoDiffAssociatedFunctionKind::VJP, module,
+        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        differentiationOrder, AutoDiffAssociatedFunctionKind::VJP, module,
         LookUpConformanceInModule(module.getSwiftModule()));
     break;
   }
