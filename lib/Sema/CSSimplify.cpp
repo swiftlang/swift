@@ -1688,6 +1688,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   type1 = getFixedTypeRecursive(type1, flags, kind == ConstraintKind::Equal);
   type2 = getFixedTypeRecursive(type2, flags, kind == ConstraintKind::Equal);
 
+  // Check whether we have a SIMD type.
+  sawSIMDType = sawSIMDType || isSIMDType(type1) || isSIMDType(type2);
+
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 

@@ -7890,7 +7890,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::ConsiderSIMDOperators);
 
   for (auto *arg : arguments)
     cs.cacheType(arg);

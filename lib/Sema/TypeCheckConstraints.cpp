@@ -3124,7 +3124,9 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                                 Optional<Pattern*> typeFromPattern) {
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem cs(*this, dc,
+                    ConstraintSystemOptions(ConstraintSystemFlags::AllowFixes) |
+                    ConstraintSystemFlags::ConsiderSIMDOperators);
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,

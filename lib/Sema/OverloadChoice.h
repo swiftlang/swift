@@ -228,7 +228,7 @@ public:
 
   /// Retrieve the declaration that corresponds to this overload choice.
   ValueDecl *getDecl() const {
-    return DeclOrKind.get<ValueDecl*>();
+    return DeclOrKind.dyn_cast<ValueDecl*>();
   }
 
   /// Returns true if this is either a decl for an optional that was

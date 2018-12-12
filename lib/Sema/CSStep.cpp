@@ -468,6 +468,15 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
       return true;
   }
 
+  // If we're not supposed to consider SIMD operators, and this is one,
+  // skip it.
+  if (!CS.shouldConsiderSIMDOperators() &&
+      choice->getKind() == ConstraintKind::BindOverload &&
+      isSIMDOperator(choice->getOverloadChoice().getDecl())) {
+    CS.sawSIMDOperator = true;
+    return true;
+  }
+
   return false;
 }
 
@@ -490,6 +499,33 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
 
+static bool isSIMDType(NominalTypeDecl *nominal) {
+  if (!nominal)
+    return false;
+
+  if (nominal->getName().empty())
+    return false;
+
+  return nominal->getName().str().startswith_lower("simd");
+}
+
+bool swift::isSIMDType(Type type) {
+  if (auto nominal = type->getAnyNominal())
+    return ::isSIMDType(nominal);
+
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    if (auto simdProtocol =
+          type->getASTContext().getProtocol(KnownProtocolKind::SIMD)) {
+      for (auto proto : archetype->getConformsTo()) {
+        if (proto == simdProtocol || proto->inheritsFrom(simdProtocol))
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 bool swift::isSIMDOperator(ValueDecl *value) {
   if (!value)
     return false;
@@ -501,14 +537,7 @@ bool swift::isSIMDOperator(ValueDecl *value) {
   if (!func->isOperator())
     return false;
 
-  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return false;
-
-  if (nominal->getName().empty())
-    return false;
-
-  return nominal->getName().str().startswith_lower("simd");
+  return ::isSIMDType(func->getDeclContext()->getSelfNominalTypeDecl());
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(
@@ -563,6 +592,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
       !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
       !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
+    CS.sawSIMDOperator = true;
     return true;
   }
 
