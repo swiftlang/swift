@@ -175,6 +175,8 @@ namespace sil_block {
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
     SIL_INST_GRAPH_OPERATION,
     SIL_INST_GRADIENT,
+    SIL_INST_AUTODIFF_FUNCTION,
+    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -293,7 +295,7 @@ namespace sil_block {
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      // SWIFT_ENABLE_TENSORFLOW
-                     BCVBR<8>,    // number of reverse differentiable attributes
+                     BCVBR<8>,    // number of differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
@@ -427,6 +429,23 @@ namespace sil_block {
     ValueIDField,
     BCFixed<32>,        // result index
     BCArray<BCFixed<1>> // parameter indices
+  >;
+
+  using SILInstAutoDiffFunctionLayout = BCRecordLayout<
+    SIL_INST_AUTODIFF_FUNCTION,
+    BCVBR<8>,             // differentiation order
+    BCVBR<8>,             // number of function parameters
+    BCVBR<8>,             // number of operands
+    BCArray<ValueIDField> // parameter indices and operands
+  >;
+
+  using SILInstAutoDiffFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<2>, // extractee
+    BCVBR<8>    // order
   >;
 
   // SIL instructions with one type. (alloc_stack)

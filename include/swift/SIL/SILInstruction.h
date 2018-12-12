@@ -7648,13 +7648,14 @@ class AutoDiffFunctionExtractInst :
                            SingleValueInstruction> {
 public:
   struct Extractee {
-    enum innerty : uint8_t {
+    enum innerty : unsigned {
       Original = 0,
       JVP = 1,
       VJP = 2
     } rawValue;
     Extractee() = default;
     Extractee(innerty rawValue) : rawValue(rawValue) {}
+    Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
   };
