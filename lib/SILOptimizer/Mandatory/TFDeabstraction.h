@@ -41,6 +41,9 @@ public:
   /// Deabstract all tensorflow convention functions.
   void deabstractAcceleratorOnlyFunctions();
 
+  /// Deabstract all functions other than tensorflow convention functions.
+  void deabstractNonAcceleratorOnlyFunctions();
+
   /// Returns true if this is special callee that should not be inlined for TF analysis.
   static bool isSpecialNoInlineCallee(FullApplySite site, const SILFunction& callee);
 

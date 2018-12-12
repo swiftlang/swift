@@ -4465,9 +4465,6 @@ private:
   /// true on error.
   bool partitionFunction(SILFunction *hostFn,
                          std::unique_ptr<TFFunctionPartition> &partitioner);
-
-  /// Deabstract all functions in the module. Returns true on error.
-  bool deabstractFunctions(SILModule *module);
 };
 
 /// Inserts at the beginning of mainFunc the code needed to register all the
@@ -4532,8 +4529,6 @@ void TFPartition::run() {
   if (!tfModule)
     return;
 
-  deabstractFunctions(module);
-
   SILFunction *mainFunc = nullptr;
   // We use a two-pass design below. The first pass partitions and lowers those
   // partitionable functions into graphs. When we process a function that
@@ -4594,63 +4589,6 @@ void TFPartition::run() {
   if (llvm::TFDynamicCompilation && mainFunc) {
     registerGraphFunctions(mainFunc, bytes);
   }
-}
-
-bool TFPartition::deabstractFunctions(SILModule* module) {
-  // Only tensorflow convention functions should be deabstracted in dynamic
-  // compilation mode, which already happens in the deabsraction pass.
-  if (llvm::TFDynamicCompilation)
-    return false;
-
-  TFDeabstractionHelper deabstractionHelper(*this, module);
-  SmallPtrSet<SILFunction*, 16> partitionedFunctions;
-
-  // Loop over all of the functions in the current module processing them -
-  // iff they look like they could be the top level of a deabstraction
-  // context.
-  for (auto &fn : *module) {
-    // Accelerator-only functions are already deabstracted.
-    if (isAcceleratorOnly(fn))
-      continue;
-
-    if (deabstractionHelper.deabstract(fn, /*forceTFFunctions*/ false))
-      partitionedFunctions.insert(&fn);
-  }
-
-  // Deabstract stragglers that were left out in the previous iteration. These
-  // are functions that are *still* referred to in the code and operate on
-  // tensor values, but have not been partitioned. It can happen in the
-  // following case, for instance, where `foo` is an external function that has
-  // no body and takes or returns Tensors:
-  //   main() {
-  //     foo() { $0 -= 0.1 * $1 }
-  //   }
-  //
-  // In the common case where we have the body of foo(), it gets inlined, and
-  // therefore, the closure gets inlined too. However, if the body of foo() is
-  // not available, the closure never gets inlined. To ensure that the call to
-  // the closure within foo() works correctly, we will have to deabstract and
-  // partition the closure.
-  //
-  // (Note the body of a function may be missing when we are linking against a
-  // library or in the REPL context where the function was defined on a
-  // different REPL line.)
-  //
-  // We are doing this in two phases because we do not want to partition a
-  // function unless it is absolutely necessary. In the first round, we
-  // inline as much of the functions as possible during deabstraction. Many
-  // of the functions would be dead after the first round, but some stragglers
-  // remain as in the example above.
-  for (auto &fn : *module) {
-    // Skip functions that are already deabstracted.
-    if (isAcceleratorOnly(fn) || partitionedFunctions.count(&fn) > 0)
-      continue;
-
-    // Deabstract the function and force deabstraction of functions that were
-    // ignored in the earlier pass only because it operated on tensor values.
-    deabstractionHelper.deabstract(fn, /*forceTFFunctions*/ true);
-  }
-  return false;
 }
 
 bool TFPartition::processFunction(
