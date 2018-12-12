@@ -384,6 +384,10 @@ void verifyKeyPathComponent(SILModule &M,
             "wrapping component should wrap optional");
     break;
   }
+  case KeyPathPatternComponent::Kind::TupleElement: {
+    llvm_unreachable("[technicated]");
+    break;
+  }
   }
   
   baseTy = componentTy;
@@ -4259,6 +4263,7 @@ public:
         case KeyPathPatternComponent::Kind::OptionalChain:
         case KeyPathPatternComponent::Kind::OptionalWrap:
         case KeyPathPatternComponent::Kind::OptionalForce:
+        case KeyPathPatternComponent::Kind::TupleElement:
           hasIndices = false;
           break;
         }

@@ -2132,6 +2132,11 @@ public:
       *this << component.getComponentType();
       break;
     }
+    case KeyPathPatternComponent::Kind::TupleElement: {
+      *this << "tuple_element #" << component.getTupleIndex();
+      *this << " : $" << component.getComponentType();
+      break;
+    }
     }
   }
 };

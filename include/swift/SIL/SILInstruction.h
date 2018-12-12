@@ -2400,6 +2400,7 @@ public:
     OptionalChain,
     OptionalForce,
     OptionalWrap,
+    TupleElement,
   };
   
   // Description of a captured index value and its Hashable conformance for a
@@ -2423,6 +2424,7 @@ private:
   static unsigned getPackedKind(Kind k) {
     switch (k) {
     case Kind::StoredProperty:
+    case Kind::TupleElement:
       return PackedStored;
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2518,6 +2520,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
@@ -2529,6 +2532,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2544,6 +2548,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2559,6 +2564,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
       return SetterAndIdKind.getPointer();
@@ -2572,6 +2578,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2586,6 +2593,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2599,6 +2607,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2620,6 +2629,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2634,10 +2644,26 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
+    case Kind::TupleElement:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return ExternalSubstitutions;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+    
+  unsigned getTupleIndex() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      llvm_unreachable("not a tuple element");
+    case Kind::TupleElement:
+      llvm_unreachable("[technicated]");
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2688,6 +2714,7 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::TupleElement:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);

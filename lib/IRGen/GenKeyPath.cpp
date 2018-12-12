@@ -1105,6 +1105,9 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::OptionalWrap:
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
+  case KeyPathPatternComponent::Kind::TupleElement:
+    llvm_unreachable("[technicated]");
+    break;
   }
 }
 
@@ -1198,6 +1201,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::TupleElement:
       break;
     }
   }
