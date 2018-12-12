@@ -1190,20 +1190,6 @@ ConstraintSystem::getTypeOfMemberReference(
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
-  ParameterTypeFlags baseFlags;
-  // FIXME(diagnostics): `InOutType` could appear here as a result
-  // of successful re-typecheck of the one of the sub-expressions e.g.
-  // `let _: Int = { (s: inout S) in s.bar() }`. On the first
-  // attempt to type-check whole expression `s.bar()` - is going
-  // to have a base which points directly to declaration of `S`.
-  // But when diagnostics attempts to type-check `s.bar()` standalone
-  // its base would be tranformed into `InOutExpr -> DeclRefExr`,
-  // and `InOutType` is going to be recorded in constraint system.
-  if (auto objType = baseObjTy->getInOutObjectType()) {
-    baseObjTy = objType;
-    baseFlags = baseFlags.withInOut(true);
-  }
-
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1215,7 +1201,7 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
-  FunctionType::Param baseObjParam(baseObjTy, Identifier(), baseFlags);
+  FunctionType::Param baseObjParam(baseObjTy);
 
   // Don't open existentials when accessing typealias members of
   // protocols.
