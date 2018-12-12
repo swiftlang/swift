@@ -149,8 +149,8 @@ public protocol AddSubscriptProtocol {
   associatedtype Key
   associatedtype Value
 
-  func get(key key: Key) -> Value
-  mutating func set(key key: Key, value: Value)
+  func get(key: Key) -> Value
+  mutating func set(key: Key, value: Value)
 
 #if AFTER
   @_weakLinked subscript(key: Key) -> Value { get set }

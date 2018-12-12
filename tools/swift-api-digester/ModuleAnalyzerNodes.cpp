@@ -393,6 +393,10 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
   return getSDKContext().buffer(OS.str());
 }
 
+bool SDKNodeDecl::isNonOptionalProtocolRequirement() const {
+  return isProtocolRequirement() && !hasDeclAttribute(DAK_Optional);
+}
+
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
   return std::find(DeclAttributes.begin(), DeclAttributes.end(), DAKind) !=
     DeclAttributes.end();

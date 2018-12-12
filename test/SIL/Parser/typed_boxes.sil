@@ -4,7 +4,7 @@ import Swift
 
 // CHECK-LABEL: sil @alloc_dealloc : $@convention(thin) (Int) -> () {
 sil @alloc_dealloc : $@convention(thin) (Int) -> () {
-entry(%x : @trivial $Int):
+entry(%x : $Int):
   // CHECK: [[B:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   // CHECK: [[PB:%.*]] = project_box [[B]] : $<τ_0_0> { var τ_0_0 } <Int>, 0

@@ -41,7 +41,7 @@ class ModuleDecl;
 class SubstitutableType;
 enum class AllocationArena;
 
-/// \brief Type substitution mapping from substitutable types to their
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -82,7 +82,7 @@ enum class ProtocolConformanceState {
   Checking,
 };
 
-/// \brief Describes how a particular type conforms to a given protocol,
+/// Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
 ///
@@ -92,7 +92,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// The kind of protocol conformance.
   ProtocolConformanceKind Kind;
 
-  /// \brief The type that conforms to the protocol, in the context of the
+  /// The type that conforms to the protocol, in the context of the
   /// conformance definition.
   Type ConformingType;
 
@@ -308,12 +308,6 @@ public:
   void printName(raw_ostream &os,
                  const PrintOptions &PO = PrintOptions()) const;
 
-  /// True if the conformance is for a property behavior instantiation.
-  bool isBehaviorConformance() const;
-
-  /// Get the property declaration for a behavior conformance, if this is one.
-  AbstractStorageDecl *getBehaviorDecl() const;
-
   /// Get any additional requirements that are required for this conformance to
   /// be satisfied, if it is possible for them to be computed.
   Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
@@ -351,10 +345,10 @@ public:
   /// Retrieve the location of this conformance.
   SourceLoc getLoc() const;
 
-  /// Is this a behavior conformance?
-  bool isBehaviorConformance() const;
-
   bool isInvalid() const;
+
+  /// Whether this conformance is weak-imported.
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   bool hasWitness(ValueDecl *requirement) const;
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
@@ -415,23 +409,20 @@ public:
 class NormalProtocolConformance : public RootProtocolConformance,
                                   public llvm::FoldingSetNode
 {
-  /// \brief The protocol being conformed to and its current state.
+  /// The protocol being conformed to and its current state.
   llvm::PointerIntPair<ProtocolDecl *, 2, ProtocolConformanceState>
     ProtocolAndState;
 
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
-  using Context = llvm::PointerUnion<DeclContext *, AbstractStorageDecl *>;
-
   /// The declaration context containing the ExtensionDecl or
-  /// NominalTypeDecl that declared the conformance, or the VarDecl whose
-  /// behavior this conformance represents.
+  /// NominalTypeDecl that declared the conformance.
   ///
   /// Also stores the "invalid" bit.
-  llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
+  llvm::PointerIntPair<DeclContext *, 1, bool> ContextAndInvalid;
 
-  /// \brief The reason that this conformance exists.
+  /// The reason that this conformance exists.
   ///
   /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
   /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
@@ -445,7 +436,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
       SourceKindAndImplyingConformance = {nullptr,
                                           ConformanceEntryKind::Explicit};
 
-  /// \brief The mapping of individual requirements in the protocol over to
+  /// The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
 
@@ -488,18 +479,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
            "ProtocolConformances should store interface types");
   }
 
-  NormalProtocolConformance(Type conformingType,
-                            ProtocolDecl *protocol,
-                            SourceLoc loc, AbstractStorageDecl *behaviorStorage,
-                            ProtocolConformanceState state)
-    : RootProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc),
-      ContextAndInvalid(behaviorStorage, false)
-  {
-    assert(!conformingType->hasArchetype() &&
-           "ProtocolConformances should store interface types");
-  }
-
   void resolveLazyInfo() const;
 
   void differenceAndStoreConditionalRequirements() const;
@@ -514,12 +493,7 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const {
-    auto context = ContextAndInvalid.getPointer();
-    if (auto DC = context.dyn_cast<DeclContext *>()) {
-      return DC;
-    } else {
-      return context.get<AbstractStorageDecl *>()->getDeclContext();
-    }
+    return ContextAndInvalid.getPointer();
   }
 
   /// Get any additional requirements that are required for this conformance to
@@ -603,17 +577,6 @@ public:
   ///
   /// This only matters to the AST verifier.
   bool isLazilyLoaded() const { return Loader != nullptr; }
-
-  /// True if the conformance describes a property behavior.
-  bool isBehaviorConformance() const {
-    return ContextAndInvalid.getPointer().is<AbstractStorageDecl *>();
-  }
-
-  /// Return the declaration using the behavior for this conformance, or null
-  /// if this isn't a behavior conformance.
-  AbstractStorageDecl *getBehaviorDecl() const {
-    return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
-  }
 
   /// A "retroactive" conformance is one that is defined in a module that
   /// is neither the module that defines the protocol nor the module that
@@ -807,12 +770,6 @@ public:
     return conformance->getKind() == ProtocolConformanceKind::Self;
   }
 };
-
-inline bool RootProtocolConformance::isBehaviorConformance() const {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(this))
-    return normal->isBehaviorConformance();
-  return false;
-}
 
 /// Specialized protocol conformance, which projects a generic protocol
 /// conformance to one of the specializations of the generic type.

@@ -12,7 +12,7 @@ struct A {
 }
 _ = A(x: C())
 // CHECK-LABEL: sil hidden @$s7unowned1AV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[X:%.*]] : @owned $C, %1 : @trivial $@thin A.Type):
+// CHECK: bb0([[X:%.*]] : @owned $C, %1 : $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]]
 // CHECK:   destroy_value [[X]]
@@ -29,7 +29,7 @@ struct AddressOnly {
 }
 _ = AddressOnly(x: C(), p: X())
 // CHECK-LABEL: sil hidden @$s7unowned11AddressOnlyV{{[_0-9a-zA-Z]*}}fC
-// CHECK: bb0([[RET:%.*]] : @trivial $*AddressOnly, [[X:%.*]] : @owned $C, {{.*}}):
+// CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : @owned $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   [[X_UNOWNED_COPY:%.*]] = copy_value [[X_UNOWNED]] : $@sil_unowned C

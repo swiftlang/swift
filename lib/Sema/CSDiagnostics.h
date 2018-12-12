@@ -607,6 +607,38 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose situations when there was an attempt to unwrap entity
+/// of non-optional type e.g.
+///
+/// ```swift
+/// let i: Int = 0
+/// _ = i!
+///
+/// struct A { func foo() {} }
+/// func foo(_ a: A) {
+///   a?.foo()
+/// }
+/// ```
+class NonOptionalUnwrapFailure final : public FailureDiagnostic {
+  Type BaseType;
+
+public:
+  NonOptionalUnwrapFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                           ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType) {}
+
+  bool diagnoseAsError() override;
+};
+
+class MissingCallFailure final : public FailureDiagnostic {
+public:
+  MissingCallFailure(Expr *root, ConstraintSystem &cs,
+                     ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

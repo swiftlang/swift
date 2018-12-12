@@ -78,7 +78,7 @@ struct AddressOnlyLet<T> {
 }
 
 // CHECK-LABEL: sil hidden @$s20property_abstraction34getAddressOnlyReabstractedProperty{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@in_guaranteed AddressOnlyLet<Int>) -> @owned @callee_guaranteed (Int) -> Int
-// CHECK: bb0([[ARG:%.*]] : @trivial $*AddressOnlyLet<Int>):
+// CHECK: bb0([[ARG:%.*]] : $*AddressOnlyLet<Int>):
 // CHECK:   [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
 // CHECK:   [[CLOSURE_ORIG:%.*]] = load [copy] [[CLOSURE_ADDR]]
 // CHECK:   [[REABSTRACT:%.*]] = function_ref
@@ -134,7 +134,7 @@ func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
-// CHECK: bb0(%0 : @trivial $*F):
+// CHECK: bb0(%0 : $*F):
 // CHECK:   [[F0:%.*]] = function_ref @$s20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @$s{{.*}}TR :

@@ -54,7 +54,7 @@ class Type;
 class TypeWalker;
 struct ExistentialLayout;
 
-/// \brief Type substitution mapping from substitutable types to their
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 

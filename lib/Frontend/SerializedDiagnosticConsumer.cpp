@@ -41,11 +41,11 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 enum BlockIDs {
-  /// \brief A top-level block which represents any meta data associated
+  /// A top-level block which represents any meta data associated
   /// with the diagnostics, including versioning of the format.
   BLOCK_META = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
-  /// \brief The this block acts as a container for all the information
+  /// The this block acts as a container for all the information
   /// for a specific diagnostic.
   BLOCK_DIAG
 };
@@ -92,42 +92,42 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
         SerializedDiagnosticsPath(serializedDiagnosticsPath),
         EmittedAnyDiagBlocks(false) {}
 
-  /// \brief The byte buffer for the serialized content.
+  /// The byte buffer for the serialized content.
   llvm::SmallString<1024> Buffer;
 
-  /// \brief The BitStreamWriter for the serialized diagnostics.
+  /// The BitStreamWriter for the serialized diagnostics.
   llvm::BitstreamWriter Stream;
 
-  /// \brief The path of the diagnostics file.
+  /// The path of the diagnostics file.
   std::string SerializedDiagnosticsPath;
 
-  /// \brief The set of constructed record abbreviations.
+  /// The set of constructed record abbreviations.
   AbbreviationMap Abbrevs;
 
-  /// \brief A utility buffer for constructing record content.
+  /// A utility buffer for constructing record content.
   RecordData Record;
 
-  /// \brief A text buffer for rendering diagnostic text.
+  /// A text buffer for rendering diagnostic text.
   llvm::SmallString<256> diagBuf;
 
-  /// \brief The collection of files used.
+  /// The collection of files used.
   llvm::DenseMap<const char *, unsigned> Files;
 
   using DiagFlagsTy =
       llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
 
-  /// \brief Map for uniquing strings.
+  /// Map for uniquing strings.
   DiagFlagsTy DiagFlags;
 
-  /// \brief Whether we have already started emission of any DIAG blocks. Once
+  /// Whether we have already started emission of any DIAG blocks. Once
   /// this becomes \c true, we never close a DIAG block until we know that we're
   /// starting another one or we're done.
   bool EmittedAnyDiagBlocks;
 };
 
-/// \brief Diagnostic consumer that serializes diagnostics to a stream.
+/// Diagnostic consumer that serializes diagnostics to a stream.
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
-  /// \brief State shared among the various clones of this diagnostic consumer.
+  /// State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
   bool CalledFinishProcessing = false;
   bool CompilationWasComplete = true;
@@ -197,25 +197,25 @@ public:
                                 ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info) override;
 
-  /// \brief The version of the diagnostics file.
+  /// The version of the diagnostics file.
   enum { Version = 1 };
 
 private:
-  /// \brief Emit bitcode for the preamble.
+  /// Emit bitcode for the preamble.
   void emitPreamble();
 
-  /// \brief Emit bitcode for the BlockInfoBlock (part of the preamble).
+  /// Emit bitcode for the BlockInfoBlock (part of the preamble).
   void emitBlockInfoBlock();
 
-  /// \brief Emit bitcode for metadata block (part of preamble).
+  /// Emit bitcode for metadata block (part of preamble).
   void emitMetaBlock();
 
-  /// \brief Emit bitcode to enter a block for a diagnostic.
+  /// Emit bitcode to enter a block for a diagnostic.
   void enterDiagBlock() {
     State->Stream.EnterSubblock(BLOCK_DIAG, 4);
   }
 
-  /// \brief Emit bitcode to exit a block for a diagnostic.
+  /// Emit bitcode to exit a block for a diagnostic.
   void exitDiagBlock() {
     State->Stream.ExitBlock();
   }
@@ -223,7 +223,7 @@ private:
   // Record identifier for the file.
   unsigned getEmitFile(StringRef Filename);
 
-  /// \brief Add a source location to a record.
+  /// Add a source location to a record.
   void addLocToRecord(SourceLoc Loc,
                       SourceManager &SM,
                       StringRef Filename,
@@ -232,7 +232,7 @@ private:
   void addRangeToRecord(CharSourceRange Range, SourceManager &SM,
                         StringRef Filename, RecordDataImpl &Record);
 
-  /// \brief Emit the message payload of a diagnostic to bitcode.
+  /// Emit the message payload of a diagnostic to bitcode.
   void emitDiagnosticMessage(SourceManager &SM, SourceLoc Loc,
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
@@ -303,7 +303,7 @@ void SerializedDiagnosticConsumer::addRangeToRecord(CharSourceRange Range,
   addLocToRecord(Range.getEnd(), SM, Filename, Record);
 }
 
-/// \brief Map a Swift DiagnosticKind to the diagnostic level expected
+/// Map a Swift DiagnosticKind to the diagnostic level expected
 /// for serialized diagnostics.
 static clang::serialized_diags::Level getDiagnosticLevel(DiagnosticKind Kind) {
   switch (Kind) {
@@ -344,7 +344,7 @@ void SerializedDiagnosticConsumer::emitMetaBlock() {
 }
 
 
-/// \brief Emits a block ID in the BLOCKINFO block.
+/// Emits a block ID in the BLOCKINFO block.
 static void emitBlockID(unsigned ID, const char *Name,
                         llvm::BitstreamWriter &Stream,
                         RecordDataImpl &Record) {
@@ -364,7 +364,7 @@ static void emitBlockID(unsigned ID, const char *Name,
   Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, Record);
 }
 
-/// \brief Emits a record ID in the BLOCKINFO block.
+/// Emits a record ID in the BLOCKINFO block.
 static void emitRecordID(unsigned ID, const char *Name,
                          llvm::BitstreamWriter &Stream,
                          RecordDataImpl &Record) {
@@ -377,7 +377,7 @@ static void emitRecordID(unsigned ID, const char *Name,
   Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, Record);
 }
 
-/// \brief Emit bitcode for abbreviation for source locations.
+/// Emit bitcode for abbreviation for source locations.
 static void
 addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   using namespace llvm;
@@ -387,7 +387,7 @@ addSourceLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Offset;
 }
 
-/// \brief Emit bitcode for abbreviation for source ranges.
+/// Emit bitcode for abbreviation for source ranges.
 static void
 addRangeLocationAbbrev(std::shared_ptr<llvm::BitCodeAbbrev> Abbrev) {
   addSourceLocationAbbrev(Abbrev);

@@ -16,6 +16,13 @@ extension Conformance: P1 where A: P2 {
   func normal() {}
   func generic<T: P3>(_: T) {}
 }
+
+// This is defined below but is emitted before any witness tables.
+// Just make sure it does not have a generic signature.
+//
+// CHECK-LABEL: sil private [transparent] [thunk] @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW : $@convention(witness_method: P1) (@in_guaranteed SameTypeConcrete<Int>) -> ()
+
+
 // CHECK-LABEL: sil_witness_table hidden <A where A : P2> Conformance<A>: P1 module conditional_conformance {
 // CHECK-NEXT:    method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> Conformance<A>
 // CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> Conformance<A>
@@ -34,13 +41,16 @@ extension ConformanceAssoc: P1 where A: P4, A.AT: P2 {
 // CHECK-NEXT:    conditional_conformance (A.AT: P2): dependent
 // CHECK-NEXT:  }
 
-/*
-FIXME: same type constraints are modelled incorrectly.
 struct SameTypeConcrete<B> {}
 extension SameTypeConcrete: P1 where B == Int {
   func normal() {}
   func generic<T: P3>(_: T) {}
 }
+
+// CHECK-LABEL: sil_witness_table hidden <B where B == Int> SameTypeConcrete<B>: P1 module conditional_conformance {
+// CHECK-NEXT:    method #P1.normal!1: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> SameTypeConcrete<A>
+// CHECK-NEXT:    method #P1.generic!1: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> SameTypeConcrete<A>
+// CHECK-NEXT:  }
 
 struct SameTypeGeneric<C, D> {}
 extension SameTypeGeneric: P1 where C == D {
@@ -59,7 +69,6 @@ extension Everything: P1 where G: P2, H == Int, I == J, K == [L] {
   func normal() {}
   func generic<T: P3>(_: T) {}
 }
-*/
 
 struct IsP2: P2 {}
 struct IsNotP2 {}

@@ -7,7 +7,7 @@ class C {
   // Methods have method calling convention.
   // CHECK-LABEL: sil hidden @$s5types1CC3foo1xySi_tF : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[THIS:%[0-9]+]] : @guaranteed $C):
+    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : @guaranteed $C):
     member = x
 
     // CHECK-NOT: copy_value
@@ -25,7 +25,7 @@ struct S {
   mutating
   func foo(x x: Int) {
     var x = x
-    // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[THIS:%[0-9]+]] : @trivial $*S):
+    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
     // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]

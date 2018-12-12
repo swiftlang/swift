@@ -532,9 +532,10 @@ namespace {
   };
 }
 
-const ProtocolConformanceDescriptor *
-swift::_conformsToSwiftProtocol(const Metadata * const type,
-                                const ProtocolDescriptor *protocol) {
+static const ProtocolConformanceDescriptor *
+swift_conformsToSwiftProtocolImpl(const Metadata * const type,
+                                  const ProtocolDescriptor *protocol,
+                                  StringRef module) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -600,7 +601,8 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
 static const WitnessTable *
 swift_conformsToProtocolImpl(const Metadata * const type,
                              const ProtocolDescriptor *protocol) {
-  auto description = _conformsToSwiftProtocol(type, protocol);
+  auto description =
+    swift_conformsToSwiftProtocol(type, protocol, StringRef());
   if (!description)
     return nullptr;
 

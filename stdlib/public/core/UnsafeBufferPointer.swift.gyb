@@ -432,6 +432,25 @@ extension Unsafe${Mutable}BufferPointer {
     return try body(&self)
   }
 
+  @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    let (oldBase, oldCount) = (self.baseAddress, self.count)
+    defer { 
+      _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
+      "UnsafeMutableBufferPointer.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+    } 
+    return try body(&self)
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try body(UnsafeBufferPointer(self))
+  }
+
 %  else:
 
   /// Creates an immutable typed buffer pointer referencing the same memory as the 
@@ -442,6 +461,13 @@ extension Unsafe${Mutable}BufferPointer {
   public init(_ other: UnsafeMutableBufferPointer<Element>) {
     _position = UnsafePointer<Element>(other._position)
     count = other.count
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try body(self)
   }
 
 %  end

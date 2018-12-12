@@ -15,6 +15,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD6 | %FileCheck %s -check-prefix=OVERLOAD6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD7 | %FileCheck %s -check-prefix=OVERLOAD6
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR1 | %FileCheck %s -check-prefix=HASERROR1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR2 | %FileCheck %s -check-prefix=HASERROR2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR3 | %FileCheck %s -check-prefix=HASERROR3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR4 | %FileCheck %s -check-prefix=HASERROR4
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | %FileCheck %s -check-prefix=MEMBER3
@@ -279,6 +284,35 @@ class C3 {
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD6-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
 // OVERLOAD6: End completions
+
+extension C3 {
+  func hasError(a1: C1, b1: TypeInvalid) -> Int {}
+
+  func f7(obj: C3) {
+    let _ = obj.hasError(#^HASERROR1^#
+    let _ = obj.hasError(a1: #^HASERROR2^#
+    let _ = obj.hasError(a1: IC1, #^HASERROR3^#
+    let _ = obj.hasError(a1: IC1, b1: #^HASERROR4^#
+  }
+}
+
+// HASERROR1: Begin completions
+// HASERROR1-DAG: Pattern/CurrModule:                 ['(']{#a1: C1#}, {#b1: <<error type>>#}[')'][#Int#];
+// HASERROR1: End completions
+
+// HASERROR2: Begin completions
+// HASERROR2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#];
+// HASERROR2-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#];
+// HASERROR2: End completions
+
+// HASERROR3: Begin completions
+// HASERROR3-DAG: Keyword/ExprSpecific:               b1: [#Argument name#];
+// HASERROR3: End completions
+
+// HASERROR4: Begin completions
+// HASERROR4-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#];
+// HASERROR4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#];
+// HASERROR4: End completions
 
 class C4 {
   func f1(_ G : Gen) {

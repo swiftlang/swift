@@ -146,7 +146,7 @@ CharacterPropertiesTests.test("Casing") {
 // Some versions of ICU on Linux (62.1) have a bug producing the wrong value
 // when lowercasing "ẞ". Darwin platforms never shipped this version, so
 // conditionally test based on platform.
-#if _runtime(_ObjC)
+#if canImport(Darwin)
   expectEqual("ß", Character("ẞ").lowercased())
 #endif
 

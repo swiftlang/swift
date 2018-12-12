@@ -184,10 +184,10 @@ public class Class1 {
   public required init?() {
     print("hello")
     // CHECK_INIT: call {{.*}}@"$ss5print_9separator10terminatoryypd_S2StF"{{.*}}, !dbg [[printLoc:![0-9]+]]
-    // CHECK_INIT: br label {{.*}}, !dbg [[retnLoc:![0-9]+]]
+    // CHECK_INIT: ret i{{32|64}} 0, !dbg [[retnLoc:![0-9]+]]
 
-    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-4]]
-    // CHECK_INIT: [[retnLoc]] = !DILocation(line: [[@LINE+1]]
+    // CHECK_INIT: [[retnLoc]] = !DILocation(line: 0
+    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-5]]
     return nil
   }
 }

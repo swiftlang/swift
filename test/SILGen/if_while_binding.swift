@@ -350,13 +350,13 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
 // <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
 // CHECK-LABEL: sil hidden @$s16if_while_binding12testCaseBoolyySbSgF
 func testCaseBool(_ value : Bool?) {
-  // CHECK: bb0([[ARG:%.*]] : @trivial $Optional<Bool>):
+  // CHECK: bb0([[ARG:%.*]] : $Optional<Bool>):
   // CHECK: switch_enum [[ARG]] : $Optional<Bool>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_TRAMPOLINE:bb[0-9]+]]
   //
   // CHECK: [[NONE_TRAMPOLINE]]:
   // CHECK:   br [[CONT_BB:bb[0-9]+]]
   //
-  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : @trivial $Bool):
+  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $Bool):
   // CHECK:   [[ISTRUE:%[0-9]+]] = struct_extract [[PAYLOAD]] : $Bool, #Bool._value
   // CHECK:   cond_br [[ISTRUE]], [[TRUE_BB:bb[0-9]+]], [[FALSE_TRAMPOLINE:bb[0-9]+]]
 
@@ -376,7 +376,7 @@ func testCaseBool(_ value : Bool?) {
   // CHECK: [[NO_TRAMPOLINE_2]]:
   // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
 
-  // CHECK: [[SUCC_BB_2]]([[PAYLOAD2:%.*]] : @trivial $Bool):
+  // CHECK: [[SUCC_BB_2]]([[PAYLOAD2:%.*]] : $Bool):
   // CHECK:   [[ISTRUE:%[0-9]+]] = struct_extract [[PAYLOAD2]] : $Bool, #Bool._value
   // CHECK:   cond_br [[ISTRUE]], [[TRUE3_BB:bb[0-9]+]], [[FALSE2_BB:bb[0-9]+]]
 

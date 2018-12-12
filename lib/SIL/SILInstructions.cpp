@@ -483,7 +483,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   }
 
   resultTypes.push_back(SILType::getSILTokenType(F.getASTContext()));
-  resultOwnerships.push_back(ValueOwnershipKind::Trivial);
+  resultOwnerships.push_back(ValueOwnershipKind::Any);
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
@@ -1757,42 +1757,6 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
 ArrayRef<ProtocolConformanceRef>
 InitExistentialMetatypeInst::getConformances() const {
   return {getTrailingObjects<ProtocolConformanceRef>(), NumConformances};
-}
-
-MarkUninitializedBehaviorInst *
-MarkUninitializedBehaviorInst::create(SILModule &M,
-                                      SILDebugLocation DebugLoc,
-                                      SILValue InitStorage,
-                                      SubstitutionMap InitStorageSubs,
-                                      SILValue Storage,
-                                      SILValue Setter,
-                                      SubstitutionMap SetterSubs,
-                                      SILValue Self,
-                                      SILType Ty) {
-  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst),
-                            alignof(MarkUninitializedBehaviorInst));
-  return ::new (mem) MarkUninitializedBehaviorInst(DebugLoc,
-                                                   InitStorage, InitStorageSubs,
-                                                   Storage,
-                                                   Setter, SetterSubs,
-                                                   Self,
-                                                   Ty);
-}
-
-MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
-                                        SILDebugLocation DebugLoc,
-                                        SILValue InitStorage,
-                                        SubstitutionMap InitStorageSubs,
-                                        SILValue Storage,
-                                        SILValue Setter,
-                                        SubstitutionMap SetterSubs,
-                                        SILValue Self,
-                                        SILType Ty)
-  : InstructionBase(DebugLoc, Ty),
-    Operands(this, InitStorage, Storage, Setter, Self),
-    InitStorageSubstitutions(InitStorageSubs),
-    SetterSubstitutions(SetterSubs)
-{
 }
 
 OpenedExistentialAccess swift::getOpenedExistentialAccessFor(AccessKind access) {

@@ -168,7 +168,7 @@ namespace {
                                        DominanceInfo *DT);
     bool dominatorBasedSimplify(DominanceAnalysis *DA);
 
-    /// \brief Remove the basic block if it has no predecessors. Returns true
+    /// Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
     bool removeIfDead(SILBasicBlock *BB);
 
@@ -207,7 +207,7 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
+  SILSSAUpdater SSAUp(SrcBB->getParent()->getModule());
   for (auto AvailValPair : Cloner.AvailVals) {
     ValueBase *Inst = AvailValPair.first;
     if (Inst->use_empty())
@@ -1296,7 +1296,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   return Simplified;
 }
 
-/// \brief Check if replacing an existing edge of the terminator by another
+/// Check if replacing an existing edge of the terminator by another
 /// one which has a DestBB as its destination would create a critical edge.
 static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
   auto SrcSuccs = T->getSuccessors();
@@ -1345,7 +1345,7 @@ static SILValue skipInvert(SILValue Cond, bool &Inverted,
   return Cond;
 }
 
-/// \brief Returns the first cond_fail if it is the first side-effect
+/// Returns the first cond_fail if it is the first side-effect
 /// instruction in this block.
 static CondFailInst *getFirstCondFail(SILBasicBlock *BB) {
   auto It = BB->begin();
@@ -1384,7 +1384,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
   return nullptr;
 }
 
-/// \brief Creates a new cond_fail instruction, optionally with an xor inverted
+/// Creates a new cond_fail instruction, optionally with an xor inverted
 /// condition.
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {

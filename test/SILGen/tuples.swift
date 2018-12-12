@@ -132,7 +132,7 @@ func testTupleUnsplat() {
 // formed with isGuaranteed set.
 extension P {
   // CHECK-LABEL: sil hidden @$s6tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
-  // CHECK: bb0([[TUP0:%.*]] : @guaranteed $C, [[TUP1:%.*]] : @trivial $*Self
+  // CHECK: bb0([[TUP0:%.*]] : @guaranteed $C, [[TUP1:%.*]] : $*Self
   // Allocate space for the RValue.
   // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"
   //

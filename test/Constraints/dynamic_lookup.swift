@@ -210,7 +210,6 @@ type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be us
 
 // Checked casts to AnyObject
 var p: P = Y()
-// expected-warning @+1 {{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
 var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
 
 // Implicit force of an implicitly unwrapped optional

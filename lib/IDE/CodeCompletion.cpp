@@ -1339,7 +1339,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Builder.addTypeAnnotation(ST.getString());
   }
 
-  /// \brief Set to true when we have delivered code completion results
+  /// Set to true when we have delivered code completion results
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
@@ -1636,10 +1636,10 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
 
   bool IncludeInstanceMembers = false;
 
-  /// \brief True if we are code completing inside a static method.
+  /// True if we are code completing inside a static method.
   bool InsideStaticMethod = false;
 
-  /// \brief Innermost method that the code completion point is in.
+  /// Innermost method that the code completion point is in.
   const AbstractFunctionDecl *CurrentMethod = nullptr;
 
   Optional<SemanticContextKind> ForcedSemanticContext = None;
@@ -3248,6 +3248,7 @@ public:
         switch (fileUnit->getKind()) {
         case FileUnitKind::Builtin:
         case FileUnitKind::ClangModule:
+        case FileUnitKind::DWARFModule:
           continue;
         case FileUnitKind::Source:
           collectOperatorsFrom(cast<SourceFile>(fileUnit), results);
@@ -4993,12 +4994,13 @@ void collectPossibleCalleesByQualifiedLookup(
     Type declaredMemberType = VD->getInterfaceType();
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
       if (AFD->getDeclContext()->isTypeContext())
-        declaredMemberType = AFD->getMethodInterfaceType();
+        declaredMemberType =
+            declaredMemberType->castTo<AnyFunctionType>()->getResult();
 
     auto fnType =
         baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
 
-    if (!fnType || fnType->hasError())
+    if (!fnType)
       continue;
     if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
       candidates.emplace_back(AFT, VD);

@@ -24,7 +24,7 @@ class C {}
 // CHECK: [[LOAD4:%[0-9]+]] = load [[ARG2]] : $*Builtin.Int32
 // CHECK: apply {{%[0-9]+}}([[LOAD4]])
 sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
-bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @trivial $*Builtin.Int32):
+bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.Int32):
   %use_native_object_func = function_ref @use_native_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   %use_int32_func = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
@@ -51,7 +51,7 @@ bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @trivial $*Builtin.Int32):
 // CHECK: strong_release [[OLDVAL]]
 // CHECK: store [[ARG4]] to [[ARG3]] : $*Builtin.Int32
 sil @store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> () {
-bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %2 : @trivial $*Builtin.Int32, %3 : @trivial $Builtin.Int32):
+bb0(%0 : $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %2 : $*Builtin.Int32, %3 : $Builtin.Int32):
   %4 = copy_value %1 : $Builtin.NativeObject
   %5 = copy_value %1 : $Builtin.NativeObject
   store %4 to [init] %0 : $*Builtin.NativeObject
@@ -67,7 +67,7 @@ bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %
 // CHECK: unchecked_ref_cast [[BORROWED_VALUE]]
 // CHECK-NOT: end_borrow
 sil @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
-bb0(%0 : @trivial $*Builtin.NativeObject):
+bb0(%0 : $*Builtin.NativeObject):
   %1 = load_borrow %0 : $*Builtin.NativeObject
   %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
   end_borrow %1 : $Builtin.NativeObject

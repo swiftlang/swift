@@ -340,7 +340,7 @@ class C {
 
 // CHECK-LABEL: @readIdentifiedClass
 // CHECK: [read] Class %0 = argument of bb0 : $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @readIdentifiedClass : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.property
@@ -352,7 +352,7 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: @writeIdentifiedClass
 // CHECK: [modify] Class %0 = argument of bb0 : $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @writeIdentifiedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
@@ -365,7 +365,7 @@ bb0(%0 : $C, %1 : $Int):
 
 // CHECK-LABEL: @readWriteIdentifiedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @readWriteIdentifiedClass : $@convention(thin) (Int) -> (Int) {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
@@ -380,7 +380,7 @@ bb0(%0 : $Int):
 
 // CHECK-LABEL: @readIdentifiedNestedClass
 // CHECK: [read] Class %0 = argument of bb0 : $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @readIdentifiedNestedClass : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %1 = ref_element_addr %0 : $C, #C.property
@@ -394,7 +394,7 @@ bb0(%0 : $C):
 
 // CHECK-LABEL: @writeIdentifiedNestedClass
 // CHECK: [modify] Class %0 = argument of bb0 : $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
@@ -409,7 +409,7 @@ bb0(%0 : $C, %1 : $Int):
 
 // CHECK-LABEL: @readWriteIdentifiedNestedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
-// CHECK: Field: @_hasStorage var property: Int
+// CHECK: Field: var property: Int
 sil @readWriteIdentifiedNestedClass : $@convention(thin) (Int) -> (Int) {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
@@ -541,7 +541,7 @@ bb0(%0 : $*Int, %1 : $*Int):
 // Test directly recursive argument access.
 // CHECK-LABEL: @readRecursiveArgument
 // CHECK:   [read] Class %0 = argument of bb0 : $C
-// CHECK:   Field: @_hasStorage var property: Int
+// CHECK:   Field: var property: Int
 sil @readRecursiveArgument : $@convention(thin) (@guaranteed C, Int) -> Int {
 bb0(%0 : $C, %1 : $Int):
   %propaddr = ref_element_addr %0 : $C, #C.property
@@ -556,7 +556,7 @@ bb0(%0 : $C, %1 : $Int):
 // Test a class argument access from an optional caller value.
 // CHECK-LABEL: @readOptionalArgumentInCallee
 // CHECK:   [read] Class   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
-// CHECK:   Field: @_hasStorage var property: Int
+// CHECK:   Field: var property: Int
 sil @readOptionalArgumentInCallee : $@convention(thin) (@guaranteed Optional<C>) -> Int {
 bb0(%0 : $Optional<C>):
   %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
@@ -567,7 +567,7 @@ bb0(%0 : $Optional<C>):
 
 // CHECK-LABEL: @readOptionalArgumentInCalleeHelper
 // CHECK:   [read] Class %0 = argument of bb0 : $C
-// CHECK:   Field: @_hasStorage var property: Int
+// CHECK:   Field: var property: Int
 sil private @readOptionalArgumentInCalleeHelper : $@convention(thin) (@guaranteed C) -> Int {
 bb0(%0 : $C):
   %propaddr = ref_element_addr %0 : $C, #C.property

@@ -374,10 +374,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///   `Pointee`.
   @inlinable
   public var pointee: Pointee {
-    /// Retrieve the value the pointer points to.
-    @_transparent get {
+    @_transparent _read {
       // We can do a strong load normally.
-      return UnsafePointer(self).pointee
+      yield UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -414,9 +413,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
-    get {
+    _read {
       // We can do a strong load normally.
-      return (UnsafePointer<Pointee>(self) + i).pointee
+      yield ((UnsafePointer<Pointee>(self) + i).pointee)
     }
   }
 

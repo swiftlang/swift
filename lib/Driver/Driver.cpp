@@ -1171,7 +1171,7 @@ Driver::translateInputAndPathArgs(const InputArgList &ArgList,
   return DAL;
 }
 
-/// \brief Check that the file referenced by \p Input exists. If it doesn't,
+/// Check that the file referenced by \p Input exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
                                 DiagnosticEngine &Diags, StringRef Input) {

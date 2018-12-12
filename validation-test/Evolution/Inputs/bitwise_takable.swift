@@ -1,5 +1,5 @@
 public protocol Reporter  {
-  func report() -> String;
+  func report() -> String
 }
 public class Subject {
   public var value = 1

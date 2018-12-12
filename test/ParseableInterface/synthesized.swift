@@ -5,10 +5,6 @@ public enum HasRawValue: Int {
   // CHECK-NEXT: case a, b, c
   case a, b = 5, c
   // CHECK-NEXT: public typealias RawValue = Swift.Int
-  // CHECK-NEXT: public var hashValue: Swift.Int {
-  // CHECK-NEXT:   get{{$}}
-  // CHECK-NEXT: }
-  // CHECK-NEXT: public func hash(into hasher: inout Swift.Hasher)
   // CHECK-NEXT: @inlinable public init?(rawValue: Swift.Int)
   // CHECK-NEXT: public var rawValue: Swift.Int {
   // CHECK-NEXT:   @inlinable get{{$}}
@@ -20,10 +16,6 @@ public enum HasRawValue: Int {
   // CHECK-NEXT: case a, b, c
   case a, b = 5, c
   // CHECK-NEXT: public typealias RawValue = Swift.Int
-  // CHECK-NEXT: public var hashValue: Swift.Int {
-  // CHECK-NEXT:   get{{$}}
-  // CHECK-NEXT: }
-  // CHECK-NEXT: public func hash(into hasher: inout Swift.Hasher)
   // CHECK-NEXT: @inlinable public init?(rawValue: Swift.Int)
   // CHECK-NEXT: public var rawValue: Swift.Int {
   // CHECK-NEXT:   @inlinable get{{$}}

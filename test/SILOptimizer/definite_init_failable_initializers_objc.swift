@@ -39,12 +39,15 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
   // CHECK: bb1:
-    // CHECK-NEXT: br bb4
+    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr %2 : $Cat, #Cat.x
+    // CHECK-NEXT: destroy_addr [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type
+    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[METATYPE]] : $@thick Cat.Type
+    // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
+    // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.none!enumelt
+    // CHECK-NEXT: br bb3([[RESULT]] : $Optional<Cat>)
 
   // CHECK: bb2:
-    // ChECK-NEXT br bb3
-
-  // CHECK: bb3:
     // CHECK-NEXT: [[SUPER:%.*]] = upcast %2 : $Cat to $FakeNSObject
     // CHECK-NEXT: [[SUB:%.*]] = unchecked_ref_cast [[SUPER]] : $FakeNSObject to $Cat
     // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method [[SUB]] : $Cat, #FakeNSObject.init!initializer.1.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
@@ -56,18 +59,9 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: br bb5([[RESULT]] : $Optional<Cat>)
+    // CHECK-NEXT: br bb3([[RESULT]] : $Optional<Cat>)
 
-  // CHECK: bb4:
-    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr %2 : $Cat, #Cat.x
-    // CHECK-NEXT: destroy_addr [[FIELD_ADDR]] : $*LifetimeTracked
-    // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type
-    // CHECK-NEXT: dealloc_partial_ref %2 : $Cat, [[METATYPE]] : $@thick Cat.Type
-    // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.none!enumelt
-    // CHECK-NEXT: br bb5([[RESULT]] : $Optional<Cat>)
-
-  // CHECK: bb5([[RESULT:%.*]] : $Optional<Cat>):
+  // CHECK: bb3([[RESULT:%.*]] : $Optional<Cat>):
     // CHECK-NEXT: return [[RESULT]] : $Optional<Cat>
 
   init?(n: Int, after: Bool) {

@@ -110,7 +110,7 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 // CHECK: } // end sil function '$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
 
 // CHECK-LABEL: sil hidden @$ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
-// CHECK: bb0([[ARG0:%.*]] : @trivial $*NotClassBound, [[ARG1:%.*]] : @guaranteed $ClassBound & NotClassBound):
+// CHECK: bb0([[ARG0:%.*]] : $*NotClassBound, [[ARG1:%.*]] : @guaranteed $ClassBound & NotClassBound):
 // CHECK:   [[X_OPENED:%.*]] = open_existential_ref [[ARG1]] : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[ARG0]] : $*NotClassBound, [[OPENED_TYPE]]
 // CHECK:   [[X_OPENED_COPY:%.*]] = copy_value [[X_OPENED]]

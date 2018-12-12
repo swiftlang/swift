@@ -250,7 +250,7 @@ foreach(SDK ${SWIFT_SDKS})
       set(LIT_ARGS "${SWIFT_TEST_EXTRA_ARGS} ${LLVM_LIT_ARGS}")
       separate_arguments(LIT_ARGS)
 
-      if(NOT SWIFT_BUILD_STDLIB)
+      if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
         list(APPEND LIT_ARGS
             "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
       endif()

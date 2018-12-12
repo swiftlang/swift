@@ -313,6 +313,7 @@ public:
                       ArrayRef<Requirement> requirements);
   
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   void dump() const;
   std::string getAsString() const;
 };

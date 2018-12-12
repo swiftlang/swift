@@ -17,13 +17,15 @@ let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 var DictionaryTraps = TestSuite("DictionaryTraps" + testSuiteSuffix)
 
 struct NotBridgedKeyTy : Equatable, Hashable {
+  var value: Int
+
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
-  var value: Int
 }
 
 func == (lhs: NotBridgedKeyTy, rhs: NotBridgedKeyTy) -> Bool {
@@ -37,13 +39,14 @@ struct NotBridgedValueTy {}
 assert(!_isBridgedToObjectiveC(NotBridgedValueTy.self))
 
 class BridgedVerbatimRefTy : Equatable, Hashable {
+  var value: Int
+
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
-  var value: Int
 }
 
 func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
@@ -81,9 +84,13 @@ class TestObjCKeyTy : NSObject {
 }
 
 struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
+  var value: Int
+
   init(_ value: Int) { self.value = value }
 
-  var hashValue: Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
     return TestObjCKeyTy(value)
@@ -110,8 +117,6 @@ struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
-
-  var value: Int
 }
 
 func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {

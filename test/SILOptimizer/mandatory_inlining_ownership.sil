@@ -57,21 +57,22 @@ bb2:
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
-// CHECK: bb{{.*}}([[RET:%.*]] : @trivial $Builtin.Int64):
-// CHECK:   end_borrow [[BORROW]] : $C
-// CHECK:   destroy_value %0 : $C
-// CHECK:   return [[RET]] : $Builtin.Int64
-// CHECK: bb{{.*}}([[ERR:%.*]] : @owned $Error):
+// CHECK: bb{{.*}}:
+// CHECK:   [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK:   throw [[ERR]] : $Error
+// CHECK: bb{{.*}}:
+// CHECK:   end_borrow [[BORROW]] : $C
+// CHECK:   destroy_value %0 : $C
+// CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithThrow'
 sil @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error)
   try_apply %fn(%0) : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error), normal bb1, error bb2
 
-bb1(%4 : @trivial $Builtin.Int64):
+bb1(%4 : $Builtin.Int64):
   destroy_value %0 : $C
   return %4 : $Builtin.Int64
 

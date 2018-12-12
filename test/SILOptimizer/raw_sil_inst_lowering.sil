@@ -12,7 +12,7 @@ class SomeClass {}
 // CHECK: store
 // CHECK: return
 sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
-bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
+bb0(%0 : $*Bool, %1 : $Bool):
   assign %1 to %0 : $*Bool
   %9 = tuple ()
   return %9 : $()
@@ -23,7 +23,7 @@ bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
 // CHECK: store
 // CHECK: return
 sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
-bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
   assign %1 to %0 : $*SomeClass
   %9 = tuple ()
   return %9 : $()

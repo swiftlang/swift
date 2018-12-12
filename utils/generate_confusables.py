@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# utils/update_confusables.py - Utility to update definitions of unicode 
+# utils/update_confusables.py - Utility to update definitions of unicode
 # confusables
 #
 # This source file is part of the Swift.org open source project

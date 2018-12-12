@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Defines XPI - API, SPI, etc
+/// Defines XPI - API, SPI, etc
 ///
 //===----------------------------------------------------------------------===//
 
@@ -39,7 +39,7 @@ class XPISet;
 
 using SymbolFlags = tapi::v1::SymbolFlags;
 
-/// \brief Helper method to create the symbol flags from the XPI flags.
+/// Helper method to create the symbol flags from the XPI flags.
 inline SymbolFlags operator|=(SymbolFlags &lhs,
                               const SymbolFlags &rhs) noexcept {
   lhs = static_cast<SymbolFlags>(static_cast<unsigned>(lhs) |
@@ -47,7 +47,7 @@ inline SymbolFlags operator|=(SymbolFlags &lhs,
   return lhs;
 }
 
-/// \brief The different XPI kinds.
+/// The different XPI kinds.
 enum class XPIKind : unsigned {
   GlobalSymbol,
   ObjectiveCClass,
@@ -58,7 +58,7 @@ enum class XPIKind : unsigned {
   ObjCProtocol,
 };
 
-/// \brief The XPI access permissions/visibility.
+/// The XPI access permissions/visibility.
 enum class XPIAccess : unsigned {
   Unknown,
   Exported,
@@ -70,13 +70,13 @@ enum class XPIAccess : unsigned {
 
 class XPI {
 protected:
-  /// \brief Construct an XPI - the constructor should only be called by a
+  /// Construct an XPI - the constructor should only be called by a
   /// sub-class.
   XPI(XPIKind kind, StringRef name, XPIAccess access,
       SymbolFlags flags = SymbolFlags::None)
       : _name(name), _kind(kind), _access(access), _flags(flags) {}
 
-  /// \brief Construct an XPI - the constructor should only be called by a
+  /// Construct an XPI - the constructor should only be called by a
   /// sub-class.
   XPI(XPIKind kind, StringRef name, XPIAccess access, Architecture arch,
       AvailabilityInfo &info)
@@ -197,13 +197,13 @@ private:
   ArchitectureSet _archs{};
 
 protected:
-  /// \brief The kind of xpi.
+  /// The kind of xpi.
   XPIKind _kind;
 
-  /// \brief The access permission/visibility of this xpi.
+  /// The access permission/visibility of this xpi.
   XPIAccess _access;
 
-  /// \brief Hoisted GlobalSymbol flags.
+  /// Hoisted GlobalSymbol flags.
   SymbolFlags _flags;
 };
 

@@ -16,7 +16,7 @@ throw MyError.A
 // CHECK: builtin "willThrow"([[ERR2]] : $Error)
 // CHECK: br bb2([[ERR2]] : $Error)
 
-// CHECK: bb1([[T0:%.*]] : @trivial $Int32):
+// CHECK: bb1([[T0:%.*]] : $Int32):
 // CHECK: return [[T0]] : $Int32
 
 // CHECK: bb2([[T0:%.*]] : @owned $Error):

@@ -34,7 +34,7 @@ class A {
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
   // CHECK-LABEL: sil hidden @$s15objc_properties1AC{{[_0-9a-zA-Z]*}}fc
-  // CHECK: bb0(%0 : @owned $A, %1 : @trivial $Int, [[OLD_SELF:%.*]] : @owned $A):
+  // CHECK: bb0(%0 : @owned $A, %1 : $Int, [[OLD_SELF:%.*]] : @owned $A):
   // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[OLD_SELF]] : $A
   init(other : A, x : Int) {
     // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
@@ -171,7 +171,7 @@ class HasUnmanaged : NSObject {
   // CHECK: } // end sil function '$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvgTo'
 
   // CHECK-LABEL: sil hidden [thunk] @$s15objc_properties12HasUnmanagedC3refs0D0VyyXlGSgvsTo
-  // CHECK: bb0([[NEW_VALUE:%.*]] : @trivial $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : @unowned $HasUnmanaged):
+  // CHECK: bb0([[NEW_VALUE:%.*]] : $Optional<Unmanaged<AnyObject>>, [[SELF:%.*]] : @unowned $HasUnmanaged):
   // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value [[SELF]] : $HasUnmanaged
   // CHECK-NEXT: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT: // function_ref

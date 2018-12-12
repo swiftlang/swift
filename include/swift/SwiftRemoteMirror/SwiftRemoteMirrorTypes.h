@@ -26,13 +26,13 @@ extern "C" {
 
 typedef uintptr_t swift_typeref_t;
 
-/// \brief Represents one of the Swift reflection sections of an image.
+/// Represents one of the Swift reflection sections of an image.
 typedef struct swift_reflection_section {
   void *Begin;
   void *End;
 } swift_reflection_section_t;
 
-/// \brief Represents the set of Swift reflection sections of an image.
+/// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
 typedef struct swift_reflection_info {
   struct {
@@ -140,7 +140,7 @@ typedef struct swift_childinfo {
   swift_typeref_t TR;
 } swift_childinfo_t;
 
-/// \brief An opaque pointer to a context which maintains state and
+/// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
 

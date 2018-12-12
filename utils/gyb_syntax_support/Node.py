@@ -78,7 +78,7 @@ class Node(object):
 
     def shall_be_omitted_when_empty(self):
         """
-        Returns 'True' if this node shall not be created while parsing if it 
+        Returns 'True' if this node shall not be created while parsing if it
         has no children.
         """
         return self.omit_when_empty

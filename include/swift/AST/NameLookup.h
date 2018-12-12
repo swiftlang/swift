@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceLoc.h"
@@ -83,7 +84,7 @@ public:
   ValueDecl *getBaseDecl() const;
 };
 
-/// \brief This class implements and represents the result of performing
+/// This class implements and represents the result of performing
 /// unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
 public:
@@ -103,7 +104,7 @@ public:
   };
   using Options = OptionSet<Flags>;
 
-  /// \brief Lookup an unqualified identifier \p Name in the context.
+  /// Lookup an unqualified identifier \p Name in the context.
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
@@ -111,7 +112,7 @@ public:
                     SourceLoc Loc = SourceLoc(), Options options = Options());
 
   SmallVector<LookupResultEntry, 4> Results;
-  /// \brief The index of the first result that isn't from the innermost scope
+  /// The index of the first result that isn't from the innermost scope
   /// with results.
   ///
   /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
@@ -119,10 +120,10 @@ public:
   /// remaining elements of Results will be from parent scopes of this one.
   size_t IndexOfFirstOuterResult;
 
-  /// \brief Return true if anything was found by the name lookup.
+  /// Return true if anything was found by the name lookup.
   bool isSuccess() const { return !Results.empty(); }
 
-  /// \brief Get the result as a single type, or a null type if that fails.
+  /// Get the result as a single type, or a null type if that fails.
   TypeDecl *getSingleTypeResult();
 };
 
@@ -277,13 +278,13 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
 };
 
-/// \brief Remove any declarations in the given set that were overridden by
+/// Remove any declarations in the given set that were overridden by
 /// other declarations in that set.
 ///
 /// \returns true if any declarations were removed, false otherwise.
 bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 
-/// \brief Remove any declarations in the given set that are shadowed by
+/// Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.
@@ -381,6 +382,85 @@ getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
 
+namespace namelookup {
+
+/// Performs a qualified lookup into the given module and, if necessary, its
+/// reexports, observing proper shadowing rules.
+void
+lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
+                           SmallVectorImpl<ValueDecl *> &decls,
+                           NLKind lookupKind,
+                           ResolutionKind resolutionKind,
+                           LazyResolver *typeResolver,
+                           const DeclContext *moduleScopeContext,
+                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+
+/// Searches through statements and patterns for local variable declarations.
+class FindLocalVal : public StmtVisitor<FindLocalVal> {
+  friend class ASTVisitor<FindLocalVal>;
+
+  const SourceManager &SM;
+  SourceLoc Loc;
+  VisibleDeclConsumer &Consumer;
+
+public:
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
+               VisibleDeclConsumer &Consumer)
+      : SM(SM), Loc(Loc), Consumer(Consumer) {}
+
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+    Consumer.foundDecl(D, Reason);
+  }
+
+  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
+  
+  void checkParameterList(const ParameterList *params);
+
+  void checkGenericParams(GenericParamList *Params);
+
+  void checkSourceFile(const SourceFile &SF);
+
+private:
+  bool isReferencePointInRange(SourceRange R) {
+    return SM.rangeContainsTokenLoc(R, Loc);
+  }
+
+  void visitBreakStmt(BreakStmt *) {}
+  void visitContinueStmt(ContinueStmt *) {}
+  void visitFallthroughStmt(FallthroughStmt *) {}
+  void visitFailStmt(FailStmt *) {}
+  void visitReturnStmt(ReturnStmt *) {}
+  void visitYieldStmt(YieldStmt *) {}
+  void visitThrowStmt(ThrowStmt *) {}
+  void visitPoundAssertStmt(PoundAssertStmt *) {}
+  void visitDeferStmt(DeferStmt *DS) {
+    // Nothing in the defer is visible.
+  }
+
+  void checkStmtCondition(const StmtCondition &Cond);
+
+  void visitIfStmt(IfStmt *S);
+  void visitGuardStmt(GuardStmt *S);
+
+  void visitWhileStmt(WhileStmt *S);
+  void visitRepeatWhileStmt(RepeatWhileStmt *S);
+  void visitDoStmt(DoStmt *S);
+
+  void visitForEachStmt(ForEachStmt *S);
+
+  void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false);
+  
+  void visitSwitchStmt(SwitchStmt *S);
+
+  void visitCaseStmt(CaseStmt *S);
+
+  void visitDoCatchStmt(DoCatchStmt *S);
+  void visitCatchClauses(ArrayRef<CatchStmt*> clauses);
+  void visitCatchStmt(CatchStmt *S);
+  
+};
+
+} // end namespace namelookup
 } // end namespace swift
 
 #endif

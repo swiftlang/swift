@@ -168,6 +168,11 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
+SILExistentialSpecializer("enable-sil-existential-specializer", 
+                          llvm::cl::Hidden,
+                          llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
@@ -213,6 +218,11 @@ static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
     llvm::cl::init(false),
     llvm::cl::desc("Assume that the input module was compiled with "
                    "-disable-guaranteed-normal-arguments enabled"));
+
+static llvm::cl::opt<bool>
+EnableExperimentalStaticAssert(
+    "enable-experimental-static-assert", llvm::cl::Hidden,
+    llvm::cl::init(false), llvm::cl::desc("Enable experimental #assert"));
 
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
@@ -325,9 +335,13 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
+  Invocation.getLangOptions().EnableExperimentalStaticAssert =
+      EnableExperimentalStaticAssert;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;

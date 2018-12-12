@@ -203,7 +203,7 @@ How to specify files:
         if parsed_arguments.sum_sizes:
             compare_sizes_of_file(old_files, new_files,
                                   parsed_arguments.all_sections,
-                                  parsed_arguments.list_categories, 
+                                  parsed_arguments.list_categories,
                                   csv=csv_out)
         else:
             if len(old_files) != len(new_files):

@@ -48,9 +48,8 @@ struct CustomHashValue: Hashable {
   let x: Int
   let y: Int
 
-  var hashValue: Int { return 0 }
-
   static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true }
+  func hash(into hasher: inout Hasher) {}
 }
 
 func customHashValue() {
@@ -192,7 +191,7 @@ extension OtherFileNonconforming: Hashable {
   static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool {
     return true
   }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}

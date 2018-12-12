@@ -4,13 +4,13 @@
 import Builtin
 
 // CHECK-LABEL: sil @non_trivial : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG1:%[0-9]+]] : @trivial $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @unowned $Builtin.NativeObject):
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @unowned $Builtin.NativeObject):
 // CHECK: load [take] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: load [copy] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: store [[ARG2]] to [init] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: store [[ARG2]] to [assign] [[ARG1]] : $*Builtin.NativeObject
 sil @non_trivial : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
+bb0(%0 : $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
   load [take] %0 : $*Builtin.NativeObject
   load [copy] %0 : $*Builtin.NativeObject
   store %1 to [init] %0 : $*Builtin.NativeObject
@@ -19,12 +19,12 @@ bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @trivial : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
-// CHECK: bb0([[ARG1:%[0-9]+]] : @trivial $*Builtin.Int32, [[ARG2:%[0-9]+]] : @trivial $Builtin.Int32):
+// CHECK-LABEL: sil @trivial_args : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.Int32, [[ARG2:%[0-9]+]] : $Builtin.Int32):
 // CHECK: load [trivial] [[ARG1]] : $*Builtin.Int32
 // CHECK: store [[ARG2]] to [trivial] [[ARG1]] : $*Builtin.Int32
-sil @trivial : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
-bb0(%0 : @trivial $*Builtin.Int32, %1 : @trivial $Builtin.Int32):
+sil @trivial_args : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
   load [trivial] %0 : $*Builtin.Int32
   store %1 to [trivial] %0 : $*Builtin.Int32
   %2 = tuple()

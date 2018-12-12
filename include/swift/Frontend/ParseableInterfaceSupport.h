@@ -61,8 +61,9 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                          DependencyTracker *tracker)
-    : SerializedModuleLoaderBase(ctx, tracker),
+                                          DependencyTracker *tracker,
+                                          ModuleLoadingMode loadMode)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode),
       CacheDir(cacheDir)
   {}
 
@@ -70,12 +71,12 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 
   void
   configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
-                                       StringRef InPath,
+                                       Identifier ModuleName, StringRef InPath,
                                        llvm::SmallString<128> &OutPath);
 
   std::error_code
-  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
-                  StringRef ModuleDocFilename,
+  openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
+                  StringRef ModuleFilename, StringRef ModuleDocFilename,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   llvm::SmallVectorImpl<char> &Scratch) override;
@@ -83,9 +84,10 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir,
-         DependencyTracker *tracker = nullptr) {
+         DependencyTracker *tracker,
+         ModuleLoadingMode loadMode) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
-        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker));
+        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker, loadMode));
   }
 };
 

@@ -227,6 +227,8 @@ static std::string adjustClangTriple(StringRef TripleStr) {
     break;
   }
   OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
+  if (Triple.hasEnvironment())
+    OS << '-' << Triple.getEnvironmentName();
   OS.flush();
   return Result;
 }

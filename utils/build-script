@@ -254,7 +254,7 @@ class BuildScriptInvocation(object):
                     args.android_icu_data is None:
                 diagnostics.fatal(
                     "when building for Android, --android-ndk, "
-                    "--android-ndk-version, --android-icu-uc, "
+                    "--android-api-level, --android-icu-uc, "
                     "--android-icu-uc-include, --android-icu-i18n, "
                     "--android-icu-i18n-include, and --android-icu-data "
                     "must be specified")

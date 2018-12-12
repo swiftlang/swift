@@ -9,7 +9,7 @@ struct ValueAggregate { let x = RefAggregate() }
 
 // CHECK-LABEL: sil hidden @$s6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
 func shared_arguments(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
   // CHECK: [[OWNED_FUNC:%[0-9]+]] = function_ref @$s6shared15owned_arguments7trivial5value3refySi_AA14ValueAggregateVAA03RefH0CtF
@@ -20,7 +20,7 @@ func shared_arguments(trivial : __shared Int, value : __shared ValueAggregate, r
 
 // CHECK-LABEL: sil hidden @$s6shared15owned_arguments7trivial5value3refySi_AA14ValueAggregateVAA03RefH0CtF : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
 func owned_arguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) {
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate):
   // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
   // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$s6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF
@@ -35,7 +35,7 @@ func owned_arguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) 
 
 // CHECK-LABEL: sil hidden @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
 func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[CLO_1:%[0-9]+]] = function_ref @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_
   // CHECK: {{%.*}} = apply [[CLO_1]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   _ = {
@@ -53,7 +53,7 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
   // ======== FIRST CLOSURE ==========
 
   // CHECK-LABEL: sil private @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[SHARED_CALL:%[0-9]+]] = function_ref @$s6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[SHARED_CALL]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: } // end sil function '$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_'
@@ -61,7 +61,7 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
   // ======== SECOND CLOSURE ==========
   
   // CHECK-LABEL:  sil private @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () {
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[COPY_BORROW_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_BORROW_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
   // CHECK: [[OWNED_CALL:%[0-9]+]] = function_ref @$s6shared15owned_arguments7trivial5value3refySi_AA14ValueAggregateVAA03RefH0CtF : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
@@ -71,7 +71,7 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
 
 // CHECK-LABEL: sil hidden @$s6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEF : $@convention(thin) (@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
 func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __shared RefAggregate) -> Void) {
-  // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : @trivial $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
+  // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
   // CHECK: [[OWNED_THUNK:%[0-9]+]] = function_ref @$s6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEFySi_AdFtXEfU_ : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[OWNED_THUNK]]
   // CHECK: [[THICK_OWNED_THUNK:%[0-9]+]] = thin_to_thick_function [[CONVERT]] : $@convention(thin) @noescape (Int, @owned ValueAggregate, @owned RefAggregate) -> () to $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
@@ -86,7 +86,7 @@ func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __
   // ======== REABSTRACTION THUNK =========
   
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIegygg_TR : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[FUNC:%[0-9]+]] : @trivial $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
   // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
   // CHECK: {{%.*}} = apply [[FUNC]]([[TRIVIAL_VAL]], [[COPY_VALUE_VAL]], [[COPY_REF_VAL]]) : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
@@ -97,7 +97,7 @@ func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __
 
 // CHECK-LABEL: sil hidden @$s6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEF : $@convention(thin) (@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
 func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Void) {
-  // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : @trivial $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
+  // CHECK: bb0([[UNUSED_FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
   // CHECK: [[SHARED_THUNK:%[0-9]+]] = function_ref @$s6shared09owned_to_A11_conversionyyySi_AA14ValueAggregateVAA03RefF0CtXEFySih_ADhAFhtXEfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: [[CONVERT:%.*]] = convert_function [[SHARED_THUNK]]
   // CHECK: [[THICK_SHARED_THUNK:%[0-9]+]] = thin_to_thick_function [[CONVERT]] : $@convention(thin) @noescape (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () to $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
@@ -112,7 +112,7 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
   // ======== REABSTRACTION THUNK =========
 
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIegyxx_TR : $@convention(thin) (Int, @owned ValueAggregate, @owned RefAggregate, @noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
-  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[FUNC:%[0-9]+]] : @trivial $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
+  // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()):
   // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
   // CHECK: {{%.*}} = apply [[FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]]) : $@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
@@ -133,7 +133,7 @@ struct Foo {
 
     // CHECK-LABEL: sil hidden @$s6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF : $@convention(method) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @guaranteed Foo) -> () {
     func methodSharedArguments(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
-        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
         // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
         // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
         // CHECK: [[OWNED_FUNC:%[0-9]+]] = function_ref @$s6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF
@@ -144,7 +144,7 @@ struct Foo {
 
     // CHECK-LABEL: sil hidden @$s6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @guaranteed Foo) -> () {
     func methodOwnedArguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) {
-        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
         // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
         // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
         // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$s6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF
@@ -159,7 +159,7 @@ struct Foo {
 
     // CHECK-LABEL: sil hidden @$s6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ : $@convention(method) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @thin Foo.Type) -> () {
     static func staticSharedArguments(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
-        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : @trivial $@thin Foo.Type):
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : $@thin Foo.Type):
         // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
         // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
         // CHECK: [[OWNED_FUNC:%[0-9]+]] = function_ref @$s6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ
@@ -169,7 +169,7 @@ struct Foo {
     }
     // CHECK-LABEL: sil hidden @$s6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @thin Foo.Type) -> () {
     static func staticOwnedArguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) {
-        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : @trivial $@thin Foo.Type):
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : $@thin Foo.Type):
         // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
         // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
         // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$s6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ

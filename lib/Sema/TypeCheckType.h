@@ -327,7 +327,7 @@ public:
   /// no generic signature to resolve types.
   GenericSignature *getGenericSignature() const;
 
-  /// \brief Resolves a TypeRepr to a type.
+  /// Resolves a TypeRepr to a type.
   ///
   /// Performs name binding, checking of generic arguments, and so on in order
   /// to create a well-formed type.

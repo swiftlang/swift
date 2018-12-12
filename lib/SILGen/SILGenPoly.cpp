@@ -1423,7 +1423,7 @@ namespace {
         case ParameterConvention::Direct_Owned:
         case ParameterConvention::Indirect_In:
           if (!input.hasCleanup() &&
-              input.getOwnershipKind() != ValueOwnershipKind::Trivial)
+              input.getOwnershipKind() != ValueOwnershipKind::Any)
             input = input.copyUnmanaged(SGF, Loc);
           break;
 
@@ -1640,8 +1640,8 @@ static ManagedValue manageYield(SILGenFunction &SGF, SILValue value,
     return SGF.emitManagedRValueWithCleanup(value);
   case ParameterConvention::Direct_Guaranteed:
   case ParameterConvention::Direct_Unowned:
-    if (value.getOwnershipKind() == ValueOwnershipKind::Trivial)
-      return ManagedValue::forTrivialObjectRValue(value);
+    if (value.getOwnershipKind() == ValueOwnershipKind::Any)
+      return ManagedValue::forUnmanaged(value);
     return ManagedValue::forBorrowedObjectRValue(value);
   case ParameterConvention::Indirect_In_Guaranteed:
     return ManagedValue::forBorrowedAddressRValue(value);
@@ -2630,8 +2630,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
       Scope S(SGF.Cleanups, CleanupLocation::get(Loc));
 
       // First create an rvalue cleanup for our direct result.
-      assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
-             innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
+      assert(innerResult.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
       executeInnerTuple(innerResult, innerDirectResults);
       // Then allow the cleanups to be emitted in the proper reverse order.
     }
@@ -3575,15 +3574,23 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 enum class WitnessDispatchKind {
   Static,
   Dynamic,
-  Class
+  Class,
+  Witness
 };
 
-static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
+static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
+                                                  bool isSelfConformance) {
   auto *decl = witness.getDecl();
 
+  if (isSelfConformance) {
+    assert(isa<ProtocolDecl>(decl->getDeclContext()));
+    return WitnessDispatchKind::Witness;
+  }
+
   ClassDecl *C = decl->getDeclContext()->getSelfClassDecl();
-  if (!C)
+  if (!C) {
     return WitnessDispatchKind::Static;
+  }
 
   // If the witness is dynamic, go through dynamic dispatch.
   if (decl->isObjCDynamic()) {
@@ -3630,6 +3637,7 @@ getWitnessFunctionType(SILGenModule &SGM,
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
   case WitnessDispatchKind::Dynamic:
+  case WitnessDispatchKind::Witness:
     return SGM.Types.getConstantInfo(witness).SILFnType;
   case WitnessDispatchKind::Class:
     return SGM.Types.getConstantOverrideType(witness);
@@ -3638,11 +3646,21 @@ getWitnessFunctionType(SILGenModule &SGM,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
+static std::pair<CanType, ProtocolConformanceRef>
+getSelfTypeAndConformanceForWitness(SILDeclRef witness, SubstitutionMap subs) {
+  auto protocol = cast<ProtocolDecl>(witness.getDecl()->getDeclContext());
+  auto selfParam = protocol->getProtocolSelfType()->getCanonicalType();
+  auto type = subs.getReplacementTypes()[0];
+  auto conf = *subs.lookupConformance(selfParam, protocol);
+  return {type->getCanonicalType(), conf};
+}
+
 static SILValue
 getWitnessFunctionRef(SILGenFunction &SGF,
                       SILDeclRef witness,
                       CanSILFunctionType witnessFTy,
                       WitnessDispatchKind witnessKind,
+                      SubstitutionMap witnessSubs,
                       SmallVectorImpl<ManagedValue> &witnessParams,
                       SILLocation loc) {
   switch (witnessKind) {
@@ -3650,6 +3668,14 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
+  case WitnessDispatchKind::Witness: {
+    auto typeAndConf =
+      getSelfTypeAndConformanceForWitness(witness, witnessSubs);
+    return SGF.B.createWitnessMethod(loc, typeAndConf.first,
+                                     typeAndConf.second,
+                                     witness,
+                            SILType::getPrimitiveObjectType(witnessFTy));
+  }
   case WitnessDispatchKind::Class: {
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
@@ -3659,13 +3685,32 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
+static ManagedValue
+emitOpenExistentialInSelfConformance(SILGenFunction &SGF, SILLocation loc,
+                                     SILDeclRef witness,
+                                     SubstitutionMap subs, ManagedValue value,
+                                     SILParameterInfo destParameter) {
+  auto typeAndConf = getSelfTypeAndConformanceForWitness(witness, subs);
+  auto archetype = typeAndConf.first->castTo<ArchetypeType>();
+  assert(archetype->isOpenedExistential());
+
+  auto openedTy = destParameter.getSILStorageType();
+  auto state = SGF.emitOpenExistential(loc, value, archetype, openedTy,
+                                       destParameter.isIndirectMutating()
+                                         ? AccessKind::ReadWrite
+                                         : AccessKind::Read);
+
+  return state.Value;
+}
+
 void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SubstitutionMap reqtSubs,
                                          SILDeclRef witness,
                                          SubstitutionMap witnessSubs,
-                                         IsFreeFunctionWitness_t isFree) {
+                                         IsFreeFunctionWitness_t isFree,
+                                         bool isSelfConformance) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -3679,7 +3724,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   FullExpr scope(Cleanups, cleanupLoc);
   FormalEvaluationScope formalEvalScope(*this);
 
-  auto witnessKind = getWitnessDispatchKind(witness);
+  auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
@@ -3704,8 +3749,23 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                           ->getCanonicalType());
   }
 
+  // Get the lowered type of the witness.
+  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
+  auto witnessFTy = origWitnessFTy;
+  if (!witnessSubs.empty())
+    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
+
   auto reqtSubstParams = reqtSubstTy.getParams();
   auto witnessSubstParams = witnessSubstTy.getParams();
+
+  // For a self-conformance, open the self parameter.
+  if (isSelfConformance) {
+    assert(!isFree && "shouldn't have a free witness for a self-conformance");
+    origParams.back() =
+      emitOpenExistentialInSelfConformance(*this, loc, witness, witnessSubs,
+                                           origParams.back(),
+                                           witnessFTy->getSelfParameter());
+  }
 
   // For a free function witness, discard the 'self' parameter of the
   // requirement.
@@ -3716,11 +3776,6 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.
-  auto origWitnessFTy = getWitnessFunctionType(SGM, witness, witnessKind);
-  auto witnessFTy = origWitnessFTy;
-  if (!witnessSubs.empty())
-    witnessFTy = origWitnessFTy->substGenericArgs(SGM.M, witnessSubs);
-
   SmallVector<ManagedValue, 8> witnessParams;
   AbstractionPattern witnessOrigTy(witnessInfo.LoweredType);
   TranslateArguments(*this, loc,
@@ -3733,7 +3788,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   SILValue witnessFnRef = getWitnessFunctionRef(*this, witness,
                                                 origWitnessFTy,
-                                                witnessKind,
+                                                witnessKind, witnessSubs,
                                                 witnessParams, loc);
 
   auto coroutineKind =

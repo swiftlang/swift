@@ -305,9 +305,9 @@ void LoopCloner::collectLoopLiveOutValues(
 }
 
 static void
-updateSSA(SILLoop *Loop,
+updateSSA(SILModule &M, SILLoop *Loop,
           DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
-  SILSSAUpdater SSAUp;
+  SILSSAUpdater SSAUp(M);
   for (auto &MapEntry : LoopLiveOutValues) {
     // Collect out of loop uses of this value.
     auto OrigValue = MapEntry.first;
@@ -335,6 +335,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
+  SILModule &M = Preheader->getParent()->getModule();
 
   auto *Latch = Loop->getLoopLatch();
   if (!Latch)
@@ -409,7 +410,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   }
 
   // Fixup SSA form for loop values used outside the loop.
-  updateSSA(Loop, LoopLiveOutValues);
+  updateSSA(M, Loop, LoopLiveOutValues);
   return true;
 }
 

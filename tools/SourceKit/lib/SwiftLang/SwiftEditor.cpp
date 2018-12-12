@@ -689,6 +689,9 @@ public:
 
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
+    // Collecting syntactic information shouldn't evaluate # conditions.
+    Parser->getParser().State->PerformConditionEvaluation = false;
+
     // If there is a syntax parsing cache, incremental syntax parsing is
     // performed and thus the generated AST may not be up-to-date.
     HasUpToDateAST = CompInv.getMainFileSyntaxParsingCache() == nullptr;

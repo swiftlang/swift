@@ -32,7 +32,7 @@ bb0:
 
 // CHECK-LABEL: sil [serialized] @serialized_callee
 sil [serialized] @serialized_callee : $@convention(method) (@thin S.Type) -> S {
-bb0(%0 : @trivial $@thin S.Type):
+bb0(%0 : $@thin S.Type):
   %1 = alloc_box ${ var S }, var, name "self"
   %2 = mark_uninitialized [rootself] %1 : ${ var S }
   %3 = project_box %2 : ${ var S }, 0

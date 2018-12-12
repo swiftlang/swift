@@ -8,7 +8,7 @@ func use(_: Double) {}
 func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden @{{.*}}physical_tuple_lvalue
-// CHECK: bb0(%0 : @trivial $Int):
+// CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
@@ -33,7 +33,7 @@ func physical_tuple_rvalue() -> Int {
 
 // CHECK-LABEL: sil hidden @$s10properties16tuple_assignment{{[_0-9a-zA-Z]*}}F
 func tuple_assignment(_ a: inout Int, b: inout Int) {
-  // CHECK: bb0([[A_ADDR:%[0-9]+]] : @trivial $*Int, [[B_ADDR:%[0-9]+]] : @trivial $*Int):
+  // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[B_ADDR]]
   // CHECK: [[B:%[0-9]+]] = load [trivial] [[READ]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[A_ADDR]]
@@ -47,7 +47,7 @@ func tuple_assignment(_ a: inout Int, b: inout Int) {
 
 // CHECK-LABEL: sil hidden @$s10properties18tuple_assignment_2{{[_0-9a-zA-Z]*}}F
 func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
-  // CHECK: bb0([[A_ADDR:%[0-9]+]] : @trivial $*Int, [[B_ADDR:%[0-9]+]] : @trivial $*Int, [[X:%[0-9]+]] : @trivial $Int, [[Y:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
   // CHECK: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[XY2]]
@@ -115,7 +115,7 @@ func physical_struct_lvalue(_ c: Int) {
 
 // CHECK-LABEL: sil hidden @$s10properties24physical_subclass_lvalue{{[_0-9a-zA-Z]*}}F
 func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
-  // CHECK: bb0([[ARG1:%.*]] : @guaranteed $RefSubclass, [[ARG2:%.*]] : @trivial $Int):
+  // CHECK: bb0([[ARG1:%.*]] : @guaranteed $RefSubclass, [[ARG2:%.*]] : $Int):
   r.y = a
   // CHECK: [[ARG1_COPY:%.*]] = copy_value [[ARG1]] : $RefSubclass
   // CHECK: [[R_SUP:%[0-9]+]] = upcast [[ARG1_COPY]] : $RefSubclass to $Ref
@@ -172,7 +172,7 @@ func logical_struct_get() -> Int {
 
 // CHECK-LABEL: sil hidden @$s10properties18logical_struct_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_set(_ value: inout Val, z: Int) {
-  // CHECK: bb0([[VAL:%[0-9]+]] : @trivial $*Val, [[Z:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @$s10properties3ValV1z{{[_0-9a-zA-Z]*}}vs
@@ -182,7 +182,7 @@ func logical_struct_set(_ value: inout Val, z: Int) {
 
 // CHECK-LABEL: sil hidden @$s10properties27logical_struct_in_tuple_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
-  // CHECK: bb0([[VAL:%[0-9]+]] : @trivial $*(Int, Val), [[Z:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[WRITE]] : {{.*}}, 1
@@ -193,7 +193,7 @@ func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
 
 // CHECK-LABEL: sil hidden @$s10properties29logical_struct_in_reftype_set{{[_0-9a-zA-Z]*}}F
 func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
-  // CHECK: bb0([[VAL:%[0-9]+]] : @trivial $*Val, [[Z1:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
   // -- val.ref
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[VAL]]
@@ -238,7 +238,7 @@ func reftype_rvalue_set(_ value: Val) {
 
 // CHECK-LABEL: sil hidden @$s10properties27tuple_in_logical_struct_set{{[_0-9a-zA-Z]*}}F
 func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
-  // CHECK: bb0([[VAL:%[0-9]+]] : @trivial $*Val, [[Z1:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[VAL]]
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
@@ -298,7 +298,7 @@ func logical_local_get(_ x: Int) -> Int {
   return prop
 }
 // CHECK-: sil private [[PROP_GET_CLOSURE]]
-// CHECK: bb0(%{{[0-9]+}} : @trivial $Int):
+// CHECK: bb0(%{{[0-9]+}} : $Int):
 
 func logical_generic_local_get<T>(_ x: Int, _: T) {
   var prop1: Int {
@@ -335,7 +335,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   // CHECK: apply [[FUNC_REF]](%0)
 }
 // CHECK: sil private @$s10properties26logical_local_captured_get{{.*}}vg
-// CHECK: bb0(%{{[0-9]+}} : @trivial $Int):
+// CHECK: bb0(%{{[0-9]+}} : $Int):
 
 func inout_arg(_ x: inout Int) {}
 
@@ -355,7 +355,7 @@ func physical_inout(_ x: Int) {
  * reuses temporaries */
 
 // CHECK-LABEL: sil hidden @$s10properties17val_subscript_get{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Val, Int) -> Float
-// CHECK: bb0([[VVAL:%[0-9]+]] : @guaranteed $Val, [[I:%[0-9]+]] : @trivial $Int):
+// CHECK: bb0([[VVAL:%[0-9]+]] : @guaranteed $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(_ v: Val, i: Int) -> Float {
   return v[i]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @$s10properties3ValV{{[_0-9a-zA-Z]*}}ig
@@ -364,7 +364,7 @@ func val_subscript_get(_ v: Val, i: Int) -> Float {
 }
 
 // CHECK-LABEL: sil hidden @$s10properties17val_subscript_set{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @guaranteed $Val, [[I:%[0-9]+]] : @trivial $Int, [[X:%[0-9]+]] : @trivial $Float):
+// CHECK: bb0(%0 : @guaranteed $Val, [[I:%[0-9]+]] : $Int, [[X:%[0-9]+]] : $Float):
 func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
@@ -482,7 +482,7 @@ struct DidSetWillSetTests: ForceAccessors {
     a = x
     a = x
 
-    // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $@thin DidSetWillSetTests.Type):
+    // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
     // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
     // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
@@ -496,7 +496,7 @@ struct DidSetWillSetTests: ForceAccessors {
   var a: Int {
     // CHECK-LABEL: sil private @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
-      // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
 
@@ -531,7 +531,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
     // CHECK-LABEL: sil private @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
-      // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
       // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
 
@@ -563,14 +563,14 @@ struct DidSetWillSetTests: ForceAccessors {
   // This is the synthesized getter and setter for the willset/didset variable.
 
   // CHECK-LABEL: sil hidden [transparent] @$s10properties010DidSetWillC5TestsV1aSivg
-  // CHECK: bb0(%0 : @trivial $DidSetWillSetTests):
+  // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
 
 
   // CHECK-LABEL: sil hidden @$s10properties010DidSetWillC5TestsV1aSivs
-  // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*DidSetWillSetTests):
+  // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: debug_value_addr %1
 
@@ -706,7 +706,7 @@ func local_observing_property(_ arg: Int) {
   localproperty = arg
 
   // Alloc and initialize the property to the argument value.
-  // CHECK: bb0([[ARG:%[0-9]+]] : @trivial $Int)
+  // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
   // CHECK: store [[ARG]] to [trivial] [[PB]]
@@ -716,7 +716,7 @@ func local_observing_property(_ arg: Int) {
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
 // CHECK-LABEL: sil private @$s10properties24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
-// CHECK: bb0(%0 : @trivial $Int, %1 : @guaranteed ${ var Int })
+// CHECK: bb0(%0 : $Int, %1 : @guaranteed ${ var Int })
 // CHECK: [[POINTER:%.*]] = project_box %1 : ${ var Int }, 0
 // CHECK: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
@@ -813,7 +813,7 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // setter of p #1 : Swift.Int in properties.propertyWithDidSetTakingOldValue()
 // CHECK-NEXT: sil {{.*}} @$s10properties32propertyWithDidSetTakingOldValueyyF1pL_Sivs
-// CHECK: bb0([[ARG1:%.*]] : @trivial $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
 // CHECK-NEXT:  debug_value_addr [[ARG2_PB]] : $*Int, var, name "p", argno 2

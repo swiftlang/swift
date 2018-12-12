@@ -61,73 +61,6 @@ TypeVariableType *ConstraintSystem::createTypeVariable(
   return tv;
 }
 
-/// \brief Check whether the given type can be used as a binding for the given
-/// type variable.
-///
-/// \returns the type to bind to, if the binding is okay.
-Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
-                                                    Type type,
-                                                    bool *isNilLiteral) {
-  if (!type)
-    return None;
-
-  // Simplify the type.
-  type = simplifyType(type);
-
-  // If the type references the type variable, don't permit the binding.
-  SmallVector<TypeVariableType *, 4> referencedTypeVars;
-  type->getTypeVariables(referencedTypeVars);
-  if (count(referencedTypeVars, typeVar))
-    return None;
-
-  // If type variable is not allowed to bind to `lvalue`,
-  // let's check if type of potential binding has any
-  // type variables, which are allowed to bind to `lvalue`,
-  // and postpone such type from consideration.
-  if (!typeVar->getImpl().canBindToLValue()) {
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().canBindToLValue())
-        return None;
-    }
-  }
-
-  // If the type is a type variable itself, don't permit the binding.
-  if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
-    if (isNilLiteral) {
-      *isNilLiteral = false;
-
-      // Look for a literal-conformance constraint on the type variable.
-      llvm::SetVector<Constraint *> constraints;
-      getConstraintGraph().gatherConstraints(
-          bindingTypeVar, constraints,
-          ConstraintGraph::GatheringKind::EquivalenceClass,
-          [](Constraint *constraint) -> bool {
-            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-                   constraint->getProtocol()->isSpecificProtocol(
-                       KnownProtocolKind::ExpressibleByNilLiteral);
-          });
-
-      for (auto constraint : constraints) {
-        if (simplifyType(constraint->getFirstType())->isEqual(bindingTypeVar)) {
-          *isNilLiteral = true;
-          break;
-        }
-      }
-    }
-    
-    return None;
-  }
-
-  // Don't bind to a dependent member type, even if it's currently
-  // wrapped in any number of optionals, because binding producer
-  // might unwrap and try to attempt it directly later.
-  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-    return None;
-
-  // Okay, allow the binding (with the simplified type).
-  return type;
-}
-
 Solution ConstraintSystem::finalize() {
   assert(solverState);
 
@@ -301,7 +234,7 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 }
 
-/// \brief Restore the type variable bindings to what they were before
+/// Restore the type variable bindings to what they were before
 /// we attempted to solve this constraint system.
 void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
   auto &savedBindings = *getSavedBindings();
@@ -383,7 +316,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 
 namespace {
 
-/// \brief Truncate the given small vector to the given new size.
+/// Truncate the given small vector to the given new size.
 template<typename T>
 void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
@@ -552,7 +485,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   cs.failedConstraint = nullptr;
 }
 
-/// \brief Solve the system of constraints.
+/// Solve the system of constraints.
 ///
 /// \param allowFreeTypeVariables How to bind free type variables in
 /// the solution.
@@ -893,7 +826,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     }
 
   private:
-    /// \brief Extract type of the element from given collection type.
+    /// Extract type of the element from given collection type.
     ///
     /// \param collection The type of the collection container.
     ///
@@ -1924,6 +1857,9 @@ void ConstraintSystem::partitionDisjunction(
 
   partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
 
+  // Add all the things defined at global scope.
+  appendPartition(globalScope);
+
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
@@ -1933,7 +1869,6 @@ void ConstraintSystem::partitionDisjunction(
   appendPartition(everythingElse);
 
   // Now create the remaining partitions from what we previously collected.
-  appendPartition(globalScope);
   appendPartition(unavailable);
   appendPartition(disabled);
 

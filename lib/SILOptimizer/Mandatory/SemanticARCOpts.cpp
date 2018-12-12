@@ -28,6 +28,46 @@ using namespace swift;
 
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
 
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static bool isConsumed(SILValue v,
+                       SmallVectorImpl<DestroyValueInst *> &destroys) {
+  assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
+  return !all_of(v->getUses(), [&destroys](Operand *op) {
+    // We know that a copy_value produces an @owned value. Look
+    // through all of our uses and classify them as either
+    // invalidating or not invalidating. Make sure that all of the
+    // invalidating ones are destroy_value since otherwise the
+    // live_range is not complete.
+    auto map = op->getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
+    switch (constraint) {
+    case UseLifetimeConstraint::MustBeInvalidated: {
+      // See if we have a destroy value. If we don't we have an
+      // unknown consumer. Return false, we need this live range.
+      auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
+      if (!dvi)
+        return false;
+
+      // Otherwise, return true and stash this destroy value.
+      destroys.push_back(dvi);
+      return true;
+    }
+    case UseLifetimeConstraint::MustBeLive:
+      // Ok, this constraint can take something owned as live. Lets
+      // see if it can also take something that is guaranteed. If it
+      // can not, then we bail.
+      return map.canAcceptKind(ValueOwnershipKind::Guaranteed);
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
+//                               Implementation
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 struct SemanticARCOptVisitor
@@ -79,6 +119,38 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
   return all_of(out, [](SILValue v) { return isa<SILFunctionArgument>(v); });
 }
 
+// Eliminate a copy of a borrowed value, if:
+//
+// 1. All of the copies users do not consume the copy (and thus can accept a
+//    borrowed value instead).
+// 2. The copies's non-destroy_value users are strictly contained within the
+//    scope of the borrowed value.
+//
+// Example:
+//
+//   %0 = @guaranteed (argument or instruction)
+//   %1 = copy_value %0
+//   apply %f(%1) : $@convention(thin) (@guaranteed ...) ...
+//   other_non_consuming_use %1
+//   destroy_value %1
+//   end_borrow %0 (if an instruction)
+//
+// =>
+//
+//   %0 = @guaranteed (argument or instruction)
+//   apply %f(%0) : $@convention(thin) (@guaranteed ...) ...
+//   other_non_consuming_use %0
+//   end_borrow %0 (if an instruction)
+//
+// NOTE: This means that the destroy_value technically can be after the
+// end_borrow. In practice, this will not be the case but we use this to avoid
+// having to reason about the ordering of the end_borrow and destroy_value.
+//
+// NOTE: Today we only perform this for guaranteed parameters since this enables
+// us to avoid doing the linear lifetime check to make sure that all destroys
+// are within the borrow scope.
+//
+// TODO: This needs a better name.
 static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   SmallVector<SILValue, 16> borrowIntroducers;
 
@@ -93,36 +165,8 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   // guaranteed value. After that, make sure that our destroys are
   // within the lifetime of our borrowed values.
   SmallVector<DestroyValueInst *, 16> destroys;
-  for (auto *op : cvi->getUses()) {
-    // We know that a copy_value produces an @owned value. Look
-    // through all of our uses and classify them as either
-    // invalidating or not invalidating. Make sure that all of the
-    // invalidating ones are destroy_value since otherwise the
-    // live_range is not complete.
-    auto map = op->getOwnershipKindMap();
-    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
-    switch (constraint) {
-    case UseLifetimeConstraint::MustBeInvalidated:
-      // And we have a destroy_value, track it and continue.
-      if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
-        destroys.push_back(dvi);
-        continue;
-      }
-      // Otherwise, we found a non-destroy value invalidating owned
-      // user... This is not an unnecessary live range.
-      return false;
-    case UseLifetimeConstraint::MustBeLive:
-      // Ok, this constraint can take something owned as live. Lets
-      // see if it can also take something that is guaranteed. If it
-      // can not, then we bail.
-      if (!map.canAcceptKind(ValueOwnershipKind::Guaranteed)) {
-        return false;
-      }
-
-      // Otherwise, continue.
-      continue;
-    }
-  }
+  if (isConsumed(cvi, destroys))
+    return false;
 
   // If we reached this point, then we know that all of our users can
   // accept a guaranteed value and our owned value is destroyed only
@@ -149,9 +193,10 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   return true;
 }
 
-bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
-  // If our copy value inst has a single destroy value user, eliminate
-  // it.
+/// If cvi only has destroy value users, then cvi is a dead live range. Lets
+/// eliminate all such dead live ranges.
+static bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+  // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
       dvi->eraseFromParent();
@@ -160,6 +205,38 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
       return true;
     }
   }
+
+  // If all of our copy_value users are destroy_value, zap all of the
+  // instructions. We begin by performing that check and gathering up our
+  // destroy_value.
+  SmallVector<DestroyValueInst *, 16> destroys;
+  if (!all_of(cvi->getUses(), [&](Operand *op) {
+        auto *dvi = dyn_cast<DestroyValueInst>(op->getUser());
+        if (!dvi)
+          return false;
+
+        // Stash dvi in destroys so we can easily eliminate it later.
+        destroys.push_back(dvi);
+        return true;
+      })) {
+    return false;
+  }
+
+  // Now that we have a truly dead live range copy value, eliminate it!
+  while (!destroys.empty()) {
+    destroys.pop_back_val()->eraseFromParent();
+    ++NumEliminatedInsts;
+  }
+  cvi->eraseFromParent();
+  ++NumEliminatedInsts;
+  return true;
+}
+
+bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+  // If our copy value inst has only destroy_value users, it is a dead live
+  // range. Try to eliminate them.
+  if (eliminateDeadLiveRangeCopyValue(cvi))
+    return true;
 
   // Then try to perform the guaranteed copy value optimization.
   if (performGuaranteedCopyValueOptimization(cvi))

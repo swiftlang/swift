@@ -16,7 +16,7 @@ struct Triple {
 
 // CHECK-LABEL: sil @TripleTest
 sil @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
-bb0(%0 : @trivial $Int, %1 : @trivial $*Triple):
+bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Triple>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Triple>, 0
   %5 = load [trivial] %1 : $*Triple
@@ -35,7 +35,7 @@ struct Single {
 
 // CHECK-LABEL: sil @SingleTest
 sil @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
-bb0(%0 : @trivial $*Single, %1 : @trivial $Int):
+bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Single>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Single>, 0
   %5 = load [trivial] %0 : $*Single
@@ -98,7 +98,7 @@ sil @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)
 
 // CHECK-LABEL: sil @assign_of_non_primitive_object_element_type
 sil @assign_of_non_primitive_object_element_type : $@convention(thin) (@thick Proto.Type) -> (@owned AStruct, @error Error) {
-bb0(%0 : @trivial $@thick Proto.Type):
+bb0(%0 : $@thick Proto.Type):
   %3 = alloc_stack $AStruct
   %4 = mark_uninitialized [rootself] %3 : $*AStruct
   %7 = function_ref @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)

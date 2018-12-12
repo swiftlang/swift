@@ -465,12 +465,12 @@ enum class OperatorKind {
   Infix,
 };
 
-/// \brief Mangle an identifier using Swift's mangling rules.
+/// Mangle an identifier using Swift's mangling rules.
 void mangleIdentifier(const char *data, size_t length,
                       OperatorKind operatorKind, std::string &out,
                       bool usePunycode = true);
 
-/// \brief Remangle a demangled parse tree.
+/// Remangle a demangled parse tree.
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
@@ -479,7 +479,7 @@ using SymbolicResolver =
   llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
                                             const void *)>;
 
-/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
@@ -491,7 +491,7 @@ std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
 /// we switch to the new mangling for those names as well.
 std::string mangleNodeOld(const NodePointer &root);
 
-/// \brief Transform the node structure to a string.
+/// Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code

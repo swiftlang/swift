@@ -79,7 +79,7 @@ enum class ArchetypeResolutionKind {
   WellFormed,
 };
 
-/// \brief Collects a set of requirements of generic parameters, both explicitly
+/// Collects a set of requirements of generic parameters, both explicitly
 /// stated and inferred, and determines the set of archetypes for each of
 /// the generic parameters.
 class GenericSignatureBuilder {
@@ -244,7 +244,7 @@ public:
     Type getAnchor(GenericSignatureBuilder &builder,
                    TypeArrayView<GenericTypeParamType> genericParams);
 
-    /// \brief Retrieve (or build) the contextual type corresponding to
+    /// Retrieve (or build) the contextual type corresponding to
     /// this equivalence class within the given generic environment.
     Type getTypeInContext(GenericSignatureBuilder &builder,
                           GenericEnvironment *genericEnv);
@@ -365,7 +365,7 @@ private:
                                                    ProtocolDecl *proto);
 
 public:
-  /// \brief Add a new conformance requirement specifying that the given
+  /// Add a new conformance requirement specifying that the given
   /// type conforms to the given protocol.
   ConstraintResult addConformanceRequirement(ResolvedType type,
                                              ProtocolDecl *proto,
@@ -380,7 +380,7 @@ public:
                                       const RequirementSource *source,
                                       bool onlySameTypeConstraints);
 
-  /// \brief Add a new same-type requirement between two fully resolved types
+  /// Add a new same-type requirement between two fully resolved types
   /// (output of \c GenericSignatureBuilder::resolve).
   ///
   /// If the types refer to two concrete types that are fundamentally
@@ -393,7 +393,7 @@ public:
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
-  /// \brief Add a new same-type requirement between two unresolved types.
+  /// Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
   /// not be incompatible concrete types.
@@ -403,7 +403,7 @@ public:
                                     FloatingRequirementSource Source,
                                     UnresolvedHandlingKind unresolvedHandling);
 
-  /// \brief Add a new same-type requirement between two unresolved types.
+  /// Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve. \c
   /// diagnoseMismatch is called if the two types refer to incompatible concrete
@@ -425,14 +425,14 @@ public:
                         FloatingRequirementSource source);
 
 private:
-  /// \brief Add a new superclass requirement specifying that the given
+  /// Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   ConstraintResult addSuperclassRequirementDirect(
                                               ResolvedType type,
                                               Type superclass,
                                               FloatingRequirementSource source);
 
-  /// \brief Add a new type requirement specifying that the given
+  /// Add a new type requirement specifying that the given
   /// type conforms-to or is a superclass of the second type.
   ///
   /// \param inferForModule Infer additional requirements from the types
@@ -451,19 +451,19 @@ private:
   /// \returns true if a new rewrite rule was added, and false otherwise.
   bool addSameTypeRewriteRule(CanType type1, CanType type2);
 
-  /// \brief Add a same-type requirement between two types that are known to
+  /// Add a same-type requirement between two types that are known to
   /// refer to type parameters.
   ConstraintResult addSameTypeRequirementBetweenTypeParameters(
                                          ResolvedType type1, ResolvedType type2,
                                          const RequirementSource *source);
   
-  /// \brief Add a new conformance requirement specifying that the given
+  /// Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
   ConstraintResult addSameTypeRequirementToConcrete(ResolvedType type,
                                         Type concrete,
                                         const RequirementSource *Source);
 
-  /// \brief Add a new same-type requirement specifying that the given two
+  /// Add a new same-type requirement specifying that the given two
   /// types should be the same.
   ///
   /// \param diagnoseMismatch Callback invoked when the types in the same-type
@@ -472,7 +472,7 @@ private:
       Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
-  /// \brief Add a new layout requirement directly on the potential archetype.
+  /// Add a new layout requirement directly on the potential archetype.
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
@@ -555,7 +555,7 @@ public:
   /// signature being built.
   TypeArrayView<GenericTypeParamType> getGenericParams() const;
 
-  /// \brief Add a new generic parameter for which there may be requirements.
+  /// Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
   /// Add the requirements placed on the given abstract type parameter
@@ -564,10 +564,10 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
 
-  /// \brief Add a new generic parameter for which there may be requirements.
+  /// Add a new generic parameter for which there may be requirements.
   void addGenericParameter(GenericTypeParamType *GenericParam);
   
-  /// \brief Add a new requirement.
+  /// Add a new requirement.
   ///
   /// \param inferForModule Infer additional requirements from the types
   /// relative to the given module.
@@ -578,7 +578,7 @@ public:
                                   FloatingRequirementSource source,
                                   ModuleDecl *inferForModule);
 
-  /// \brief Add an already-checked requirement.
+  /// Add an already-checked requirement.
   ///
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
@@ -594,7 +594,7 @@ public:
                                   const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
-  /// \brief Add all of a generic signature's parameters and requirements.
+  /// Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
 
   /// Infer requirements from the given type, recursively.
@@ -628,7 +628,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   void inferRequirements(ModuleDecl &module, ParameterList *params);
 
-  /// \brief Finalize the set of requirements and compute the generic
+  /// Finalize the set of requirements and compute the generic
   /// signature.
   ///
   /// After this point, one cannot introduce new requirements, and the
@@ -759,7 +759,7 @@ private:
   PotentialArchetype *realizePotentialArchetype(UnresolvedType &type);
 
 public:
-  /// \brief Try to resolve the equivalence class of the given type.
+  /// Try to resolve the equivalence class of the given type.
   ///
   /// \param type The type to resolve.
   ///
@@ -773,7 +773,7 @@ public:
                                       ArchetypeResolutionKind resolutionKind,
                                       bool wantExactPotentialArchetype);
 
-  /// \brief Resolve the equivalence class for the given type parameter,
+  /// Resolve the equivalence class for the given type parameter,
   /// which provides information about that type.
   ///
   /// The \c resolutionKind parameter describes how resolution should be
@@ -788,7 +788,7 @@ public:
                       Type type,
                       ArchetypeResolutionKind resolutionKind);
 
-  /// \brief Resolve the given type as far as this Builder knows how.
+  /// Resolve the given type as far as this Builder knows how.
   ///
   /// If successful, this returns either a non-typealias potential archetype
   /// or a Type, if \c type is concrete.
@@ -813,7 +813,7 @@ public:
   /// Verify all of the generic sigantures in the given module.
   static void verifyGenericSignaturesInModule(ModuleDecl *module);
 
-  /// \brief Dump all of the requirements, both specified and inferred.
+  /// Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),
       "only for use within the debugger");
@@ -1515,7 +1515,7 @@ class GenericSignatureBuilder::PotentialArchetype {
     PAIdentifier(GenericParamKey genericParam) : genericParam(genericParam) { }
   } identifier;
 
-  /// \brief The representative of the equivalence class of potential archetypes
+  /// The representative of the equivalence class of potential archetypes
   /// to which this potential archetype belongs, or (for the representative)
   /// the equivalence class itself.
   mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
@@ -1547,28 +1547,28 @@ class GenericSignatureBuilder::PotentialArchetype {
     }
   };
 
-  /// \brief The set of nested types of this archetype.
+  /// The set of nested types of this archetype.
   ///
   /// For a given nested type name, there may be multiple potential archetypes
   /// corresponding to different associated types (from different protocols)
   /// that share a name.
   llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
 
-  /// \brief Construct a new potential archetype for a concrete declaration.
+  /// Construct a new potential archetype for a concrete declaration.
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType)
       : parentOrContext(parent), identifier(assocType) {
     assert(parent != nullptr && "Not a nested type?");
     assert(assocType->getOverriddenDecls().empty());
   }
 
-  /// \brief Construct a new potential archetype for a generic parameter.
+  /// Construct a new potential archetype for a generic parameter.
   PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam)
     : parentOrContext(&ctx), identifier(genericParam)
   {
   }
 
 public:
-  /// \brief Retrieve the representative for this archetype, performing
+  /// Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative() const;
 
@@ -1578,7 +1578,7 @@ public:
 public:
   ~PotentialArchetype();
 
-  /// \brief Retrieve the debug name of this potential archetype.
+  /// Retrieve the debug name of this potential archetype.
   std::string getDebugName() const;
 
   /// Retrieve the parent of this potential archetype, which will be non-null
@@ -1627,7 +1627,7 @@ public:
     return NestedTypes;
   }
 
-  /// \brief Determine the nesting depth of this potential archetype, e.g.,
+  /// Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
 

@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -261,8 +262,12 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
+  //
+  // As a hack, don't apply this at all to coroutine inlining; avoiding
+  // coroutine allocation overheads is extremely valuable.  There might be
+  // more principled ways of getting this effect.
   bool isClassMethodAtOsize = false;
-  if (OptMode == OptimizationMode::ForSize) {
+  if (OptMode == OptimizationMode::ForSize && !isa<BeginApplyInst>(AI)) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
       return false;
@@ -851,7 +856,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   }
 }
 
-/// \brief Attempt to inline all calls smaller than our threshold.
+/// Attempt to inline all calls smaller than our threshold.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // Don't optimize functions that are marked with the opt.never attribute.
@@ -903,6 +908,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     Inliner.inlineFunction(Callee, AI, Args);
     NumFunctionsInlined++;
   }
+  // The inliner splits blocks at call sites. Re-merge trivial branches to
+  // reestablish a canonical CFG.
+  mergeBasicBlocks(Caller);
   return true;
 }
 

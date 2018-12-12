@@ -547,8 +547,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(MarkUninitializedBehaviorInst, mark_uninitialized_behavior,
-                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectValueBufferInst, project_value_buffer,
                     SingleValueInstruction, MayRead, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectBoxInst, project_box,

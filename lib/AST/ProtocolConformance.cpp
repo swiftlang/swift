@@ -24,7 +24,6 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -376,22 +375,35 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
   return normalC->getType()->getContextSubstitutionMap(M, DC);
 }
 
-bool ProtocolConformance::isBehaviorConformance() const {
-  return getRootConformance()->isBehaviorConformance();
-}
-
-AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(getRootConformance()))
-    return normal->getBehaviorDecl();
-  return nullptr;
-}
-
 bool RootProtocolConformance::isInvalid() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(isInvalid, ())
 }
 
 SourceLoc RootProtocolConformance::getLoc() const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
+}
+
+bool RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
+  auto *dc = getDeclContext();
+  if (dc->getParentModule() == fromModule)
+    return false;
+
+  // If the protocol is weak imported, so are any conformances to it.
+  if (getProtocol()->isWeakImported(fromModule))
+    return true;
+
+  // If the conforming type is weak imported, so are any of its conformances.
+  if (auto *nominal = getType()->getAnyNominal())
+    if (nominal->isWeakImported(fromModule))
+      return true;
+
+  // If the conformance is declared in an extension with the @_weakLinked
+  // attribute, it is weak imported.
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    if (ext->isWeakImported(fromModule))
+      return true;
+
+  return false;
 }
 
 bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
@@ -414,12 +426,10 @@ bool NormalProtocolConformance::isRetroactive() const {
 
     // Consider the overlay module to be the "home" of a nominal type
     // defined in a Clang module.
-    if (auto nominalClangModule =
-          dyn_cast<ClangModuleUnit>(nominal->getModuleScopeContext())) {
-      if (auto clangLoader = nominal->getASTContext().getClangModuleLoader()) {
-        if (auto overlayModule = nominalClangModule->getAdapterModule())
-          nominalModule = overlayModule;
-      }
+    if (auto nominalLoadedModule =
+          dyn_cast<LoadedFile>(nominal->getModuleScopeContext())) {
+      if (auto overlayModule = nominalLoadedModule->getAdapterModule())
+        nominalModule = overlayModule;
     }
 
     if (module == nominalModule)
@@ -431,7 +441,9 @@ bool NormalProtocolConformance::isRetroactive() const {
 }
 
 bool NormalProtocolConformance::isSynthesizedNonUnique() const {
-  return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
+  if (auto *file = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext()))
+    return file->getKind() == FileUnitKind::ClangModule;
+  return false;
 }
 
 bool NormalProtocolConformance::isResilient() const {
@@ -1274,7 +1286,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   // via the Clang importer, don't add any synthesized conformances.
   auto *file = cast<FileUnit>(getModuleScopeContext());
   if (file->getKind() != FileUnitKind::Source &&
-      file->getKind() != FileUnitKind::ClangModule) {
+      file->getKind() != FileUnitKind::ClangModule &&
+      file->getKind() != FileUnitKind::DWARFModule) {
     return;
   }
 
@@ -1409,9 +1422,12 @@ DeclContext::getLocalConformances(
   if (!nominal)
     return result;
 
-  // Protocols don't have conformances.
-  if (isa<ProtocolDecl>(nominal))
+  // Protocols only have self-conformances.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    if (protocol->requiresSelfConformanceWitnessTable())
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     return { };
+  }
 
   // Update to record all potential conformances.
   nominal->prepareConformanceTable();

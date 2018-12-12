@@ -414,6 +414,7 @@ public protocol Collection: Sequence {
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
+  @_borrowed
   subscript(position: Index) -> Element { get }
 
   /// Accesses a contiguous subrange of the collection's elements.

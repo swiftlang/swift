@@ -175,6 +175,11 @@ swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 
 }
 
+__swift_uintptr_t
+swift::_swift_stdlib_unsafeAddressOfClass(id _Nonnull obj) {
+  return (__swift_uintptr_t)object_getClass(obj); //TODO: do direct isa access when in the OS
+}
+
 
 #endif
 

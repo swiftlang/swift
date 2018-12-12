@@ -21,7 +21,7 @@ public let HashTest = BenchmarkInfo(
   tags: [.validation, .algorithm])
 
 class Hash {
-  /// \brief C'tor.
+  /// C'tor.
   init(_ bs: Int) {
     blocksize = bs
     messageLength = 0
@@ -29,7 +29,7 @@ class Hash {
     assert(blocksize <= 64, "Invalid block size")
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: String) {
     for c in Msg.unicodeScalars {
       data[dataLength] = UInt8(ascii: c)
@@ -39,7 +39,7 @@ class Hash {
     }
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: [UInt8]) {
     for c in Msg {
       data[dataLength] = c
@@ -65,7 +65,7 @@ class Hash {
   final var data = [UInt8](repeating: 0, count: 64)
   final var blocksize: Int
 
-  /// \brief Hash the internal data.
+  /// Hash the internal data.
   func hash() {
     fatalError("Pure virtual")
   }
@@ -78,7 +78,7 @@ class Hash {
     fatalError("Pure virtual")
   }
 
-  /// \brief Blow the data to fill the block.
+  /// Blow the data to fill the block.
   func fillBlock() {
     fatalError("Pure virtual")
   }
@@ -87,7 +87,7 @@ class Hash {
   final
   var HexTblFast : [UInt8] = [48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102]
 
-  /// \brief Convert a 4-byte integer to a hex string.
+  /// Convert a 4-byte integer to a hex string.
   final
   func toHex(_ In: UInt32) -> String {
     var In = In
@@ -110,13 +110,13 @@ class Hash {
     }
   }
 
-  /// \brief Left-rotate \p x by \p c.
+  /// Left-rotate \p x by \p c.
   final
   func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
     return x &<< c | x &>> (32 &- c)
   }
 
-  /// \brief Right-rotate \p x by \p c.
+  /// Right-rotate \p x by \p c.
   final
   func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
     return x &>> c | x &<< (32 &- c)

@@ -38,7 +38,7 @@ extension Gizmo : Bells {
 }
 
 // CHECK: sil private [transparent] [thunk] @$sSo5GizmoC14objc_witnesses5BellsA2cDP{{[_0-9a-zA-Z]*}}fCTW
-// CHECK: bb0([[SELF:%[0-9]+]] : @trivial $*Gizmo, [[I:%[0-9]+]] : @trivial $Int, [[META:%[0-9]+]] : @trivial $@thick Gizmo.Type):
+// CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>

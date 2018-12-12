@@ -1,0 +1,217 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -enable-sil-existential-specializer -existential-specializer   | %FileCheck %s
+
+// Additional tests for existential_specializer
+
+import Builtin
+import Swift
+import SwiftShims
+
+internal protocol P {
+  func foo() -> Int32
+}
+
+internal class Klass1 : P {
+  @inline(never) func foo() -> Int32
+  init()
+}
+
+internal class Klass2 : P {
+  @inline(never) func foo() -> Int32
+  init()
+}
+
+@inline(never) internal func wrap_foo_ncp(a: inout P, b: inout P) -> Int32
+
+@inline(never) func ncp()
+
+sil hidden [noinline] @$s7dealloc3ncpyyF : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $P, var, name "magic2"
+  %1 = alloc_ref $Klass1
+  %4 = init_existential_addr %0 : $*P, $Klass1
+  store %1 to %4 : $*Klass1
+  %6 = alloc_stack $P, var, name "magic3"
+  %7 = alloc_ref $Klass1
+  %10 = init_existential_addr %6 : $*P, $Klass1
+  store %7 to %10 : $*Klass1
+  %12 = function_ref @$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztF : $@convention(thin) (@in P, @in P) -> Int32
+  %13 = apply %12(%0, %6) : $@convention(thin) (@in P, @in P) -> Int32
+  debug_value %13 : $Int32, let, name "x"
+  %14 = alloc_stack $P, var, name "magic4"
+  %15 = alloc_ref $Klass1
+  %16 = init_existential_addr %14 : $*P, $Klass1
+  store %15 to %16 : $*Klass1
+  %17 = function_ref @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32
+  %18 = apply %17(%14) : $@convention(thin) (@inout P) -> Int32
+  %24 = struct_extract %13 : $Int32, #Int32._value
+  %25 = struct_extract %18 : $Int32, #Int32._value
+  %26 = integer_literal $Builtin.Int1, -1
+  %27 = builtin "sadd_with_overflow_Int32"(%24 : $Builtin.Int32, %25 : $Builtin.Int32, %26 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %28 = tuple_extract %27 : $(Builtin.Int32, Builtin.Int1), 0
+  %29 = tuple_extract %27 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %29 : $Builtin.Int1
+  %31 = struct $Int32 (%28 : $Builtin.Int32)
+  destroy_addr %14 : $*P
+  dealloc_stack %14 : $*P
+  dealloc_stack %6 : $*P
+  dealloc_stack %0 : $*P
+  return %31 : $Int32
+} 
+
+// CHECK-LABEL: sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
+// CHECK: bb0(%0 : $*P):
+// CHECK:  debug_value_addr
+// CHECK:  alloc_stack
+// CHECK:  copy_addr
+// CHECK:  open_existential_addr
+// CHECK:  witness_method
+// CHECK:  apply
+// CHECK:  destroy_addr
+// CHECK:  dealloc_stack
+// CHECK:  return
+// CHECK-LABEL :} // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
+sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
+bb0(%0 : $*P):
+  debug_value_addr %0 : $*P, var, name "a", argno 1
+  %2 = alloc_stack $P                             
+  copy_addr %0 to [initialization] %2 : $*P      
+  %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P
+  %5 = witness_method $@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %4 : $*@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = apply %5<@opened("EE9F89E4-ECF4-11E8-8DDF-D0817AD4059B") P>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %2 : $*P 
+  dealloc_stack %2 : $*P
+  return %6 : $Int32
+} // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
+
+sil shared [noinline] @$s7dealloc6Klass1C3fooSiyFTf4d_n : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 10         
+  %1 = struct $Int32 (%0 : $Builtin.Int32)          
+  return %1 : $Int32                                
+} 
+
+sil_global hidden [let] @$global_var : $P
+
+// CHECK-LABEL: sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
+// CHECK: bb0(%0 : $*P):
+// CHECK:   debug_value_addr
+// CHECK:   alloc_stack
+// CHECK:   copy_addr
+// CHECK:   destroy_addr
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK-LABEL: } // end sil function '$helper'
+sil hidden [noinline] @$helper : $@convention(thin) (@in P) -> Int32 {
+bb0(%0 : $*P):
+  debug_value_addr %0 : $*P, var, name "a", argno 1
+  %4 = alloc_stack $P
+  copy_addr %0 to [initialization] %4 : $*P
+  destroy_addr %0 : $*P
+  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  dealloc_stack %4 : $*P
+  return %8 : $Int32
+}
+
+sil @global_addr_init: $@convention(thin) (Builtin.Int1) -> Int32 {
+bb0(%0 : $Builtin.Int1):
+  alloc_global @$global_var
+  %1 = global_addr @$global_var : $*P
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = init_existential_addr %1 : $*P, $Klass1
+  %3 = alloc_ref $Klass1
+  store %3 to %2 : $*Klass1
+  br bb3
+
+bb2: 
+  %5 = init_existential_addr %1 : $*P, $Klass2
+  %6 = alloc_ref $Klass2
+  store %6 to %5 : $*Klass2
+  br bb3
+
+bb3:
+  %12 = function_ref @$helper : $@convention(thin) (@in P) -> Int32
+  %13 = apply %12(%1) : $@convention(thin) (@in P) -> Int32
+  return %13 : $Int32
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztFTf4ee_n : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> Int32 {
+// CHECK: bb0(%0 : $*τ_0_0, %1 : $*τ_0_1):
+// CHECK:   alloc_stack
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   destroy_addr
+// CHECK:   alloc_stack
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   destroy_addr
+// CHECK:   debug_value_addr
+// CHECK:   debug_value_addr
+// CHECK:   alloc_stack
+// CHECK:   copy_addr
+// CHECK:   destroy_addr
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   alloc_stack
+// CHECK:   copy_addr
+// CHECK:   destroy_addr
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   struct_extract
+// CHECK:   struct_extract
+// CHECK:   integer_literal
+// CHECK:   builtin
+// CHECK:   tuple_extract
+// CHECK:   tuple_extract
+// CHECK:   cond_fail
+// CHECK:   struct
+// CHECK:   dealloc_stack
+// CHECK:   dealloc_stack
+// CHECK:   dealloc_stack
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK-LABEL: } // end sil function '$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztFTf4ee_n'
+sil hidden [noinline] @$s7dealloc12wrap_foo_ncp1a1bSiAA1P_pz_AaE_pztF : $@convention(thin) (@in P, @in P) -> Int32 {
+bb0(%0 : $*P, %1 : $*P):
+  debug_value_addr %0 : $*P, var, name "a", argno 1
+  debug_value_addr %1 : $*P, var, name "b", argno 2
+  %4 = alloc_stack $P
+  copy_addr %0 to [initialization] %4 : $*P
+  destroy_addr %0 : $*P
+  %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
+  %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %9 = alloc_stack $P
+  copy_addr %1 to [initialization] %9 : $*P
+  destroy_addr %1 : $*P
+  %11 = open_existential_addr immutable_access %9 : $*P to $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P
+  %12 = witness_method $@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %11 : $*@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %13 = apply %12<@opened("3CB58FAA-ECED-11E8-9798-D0817AD4059B") P>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %14 = struct_extract %8 : $Int32, #Int32._value
+  %15 = struct_extract %13 : $Int32, #Int32._value
+  %16 = integer_literal $Builtin.Int1, -1
+  %17 = builtin "sadd_with_overflow_Int32"(%14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0
+  %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %19 : $Builtin.Int1
+  %21 = struct $Int32 (%18 : $Builtin.Int32)
+  dealloc_stack %9 : $*P
+  dealloc_stack %4 : $*P
+  return %21 : $Int32
+}
+
+sil_witness_table hidden Klass1: P module dealloc {
+  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+}
+
+sil_witness_table hidden Klass2: P module dealloc {
+  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+}

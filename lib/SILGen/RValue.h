@@ -76,7 +76,7 @@ class RValue {
   CanType type;
   unsigned elementsToBeAdded;
   
-  /// \brief Flag value used to mark an rvalue as invalid.
+  /// Flag value used to mark an rvalue as invalid.
   ///
   /// The reasons why this can be true is:
   ///

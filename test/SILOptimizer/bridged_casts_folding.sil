@@ -15,7 +15,7 @@ sil_vtable NSObjectSubclass {}
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    [[CAST:%.*]] = unconditional_checked_cast [[BRIDGED]] : $NSObject to $NSObjectSubclass
 sil @anyhashable_cast_unconditional : $@convention(thin) (@in AnyHashable) -> @owned NSObjectSubclass {
-entry(%0 : @trivial $*AnyHashable):
+entry(%0 : $*AnyHashable):
   %1 = alloc_stack $NSObjectSubclass
   unconditional_checked_cast_addr AnyHashable in %0 : $*AnyHashable
                                to NSObjectSubclass in %1 : $*NSObjectSubclass
@@ -29,7 +29,7 @@ entry(%0 : @trivial $*AnyHashable):
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    checked_cast_br [[BRIDGED]] : $NSObject to $NSObjectSubclass, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
 sil @anyhashable_cast_take_always : $@convention(thin) (@in AnyHashable, @owned NSObjectSubclass) -> @owned NSObjectSubclass {
-entry(%0 : @trivial $*AnyHashable, %1 : @owned $NSObjectSubclass):
+entry(%0 : $*AnyHashable, %1 : @owned $NSObjectSubclass):
   %2 = alloc_stack $NSObjectSubclass
   checked_cast_addr_br take_always AnyHashable in %0 : $*AnyHashable
                  to NSObjectSubclass in %2 : $*NSObjectSubclass, bb1, bb2
@@ -53,7 +53,7 @@ bb3(%8 : @owned $NSObjectSubclass):
 // CHECK:       [[YES]]{{.*}}:
 // CHECK-NEXT:    destroy_addr %0
 sil @anyhashable_cast_take_on_success : $@convention(thin) (@in AnyHashable, @owned NSObjectSubclass) -> @owned NSObjectSubclass {
-entry(%0 : @trivial $*AnyHashable, %1 : @owned $NSObjectSubclass):
+entry(%0 : $*AnyHashable, %1 : @owned $NSObjectSubclass):
   %2 = alloc_stack $NSObjectSubclass
   checked_cast_addr_br take_on_success AnyHashable in %0 : $*AnyHashable
                  to NSObjectSubclass in %2 : $*NSObjectSubclass, bb1, bb2
@@ -82,7 +82,7 @@ bb3(%8 : @owned $NSObjectSubclass):
 // CHECK:       [[NO]]{{.*}}:
 // CHECK-NOT:    dealloc_stack
 sil @anyhashable_cast_copy_on_success : $@convention(thin) (@in_guaranteed AnyHashable, @owned NSObjectSubclass) -> @owned NSObjectSubclass {
-entry(%0 : @trivial $*AnyHashable, %1 : @owned $NSObjectSubclass):
+entry(%0 : $*AnyHashable, %1 : @owned $NSObjectSubclass):
   %2 = alloc_stack $NSObjectSubclass
   checked_cast_addr_br copy_on_success AnyHashable in %0 : $*AnyHashable
                  to NSObjectSubclass in %2 : $*NSObjectSubclass, bb1, bb2

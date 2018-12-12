@@ -43,7 +43,7 @@ extension LazyFilterSequence.Iterator : _ObjectiveCBridgeable { // expected-erro
 
 
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
@@ -71,14 +71,14 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
 func ==(x: BridgedStruct, y: BridgedStruct) -> Bool { return true }
 
-struct NotBridgedStruct : Hashable { 
-  var hashValue: Int { return 0 }
+struct NotBridgedStruct : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: NotBridgedStruct, y: NotBridgedStruct) -> Bool { return true }
 
 class OtherClass : Hashable { 
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 func ==(x: OtherClass, y: OtherClass) -> Bool { return true }
 

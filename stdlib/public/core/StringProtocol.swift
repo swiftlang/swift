@@ -132,7 +132,6 @@ extension StringProtocol {
     get { return String(self) }
   }
 
-  @inlinable // Eliminate for String, Substring
   internal var _gutsSlice: _StringGutsSlice {
     @_specialize(where Self == String)
     @_specialize(where Self == Substring)
@@ -152,7 +151,8 @@ extension StringProtocol {
     @inline(__always) get {
       let start = startIndex
       let end = endIndex
-      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      _internalInvariant(
+        start.transcodedOffset == 0 && end.transcodedOffset == 0)
       return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
     }
   }

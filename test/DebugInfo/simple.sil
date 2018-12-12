@@ -6,7 +6,7 @@ import Builtin
 import Swift
 
 sil @square : $@convention(thin) (Int32) -> Int32 {
-bb0(%0 : @trivial $Int32):
+bb0(%0 : $Int32):
   debug_value %0 : $Int32, let, name "x" // id: %1
   %3 = struct_extract %0 : $Int32, #Int32._value       // user: %6
   %4 = struct_extract %0 : $Int32, #Int32._value       // user: %6

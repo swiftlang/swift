@@ -40,7 +40,7 @@ protocol P {
 // RHS is formally evaluated.
 // CHECK-LABEL: sil hidden @$s10assignment15copyRightToLeft1pyAA1P_pz_tF : $@convention(thin) (@inout P) -> () {
 func copyRightToLeft(p: inout P) {
-  // CHECK: bb0(%0 : @trivial $*P):
+  // CHECK: bb0(%0 : $*P):
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] %0 : $*P
   // CHECK:   [[READ_OPEN:%.*]] = open_existential_addr immutable_access [[READ]]
   // CHECK:   end_access [[READ]] : $*P

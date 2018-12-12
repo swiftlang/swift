@@ -207,7 +207,7 @@ class Class {}
 protocol HasClassAssoc { associatedtype Assoc : Class }
 
 // CHECK-LABEL: sil hidden @$s16generic_closures027captures_class_constrained_A0_1fyx_5AssocQzAEctAA08HasClassF0RzlF
-// CHECK: bb0([[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed T.Assoc) -> @owned T.Assoc):
+// CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed T.Assoc) -> @owned T.Assoc):
 // CHECK: [[GENERIC_FN:%.*]] = function_ref @$s16generic_closures027captures_class_constrained_A0_1fyx_5AssocQzAEctAA08HasClassF0RzlFA2EcycfU_
 // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
 // CHECK: [[CONCRETE_FN:%.*]] = partial_apply [callee_guaranteed] [[GENERIC_FN]]<T>([[ARG2_COPY]])

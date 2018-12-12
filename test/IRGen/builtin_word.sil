@@ -36,7 +36,7 @@ entry:
 // ARM32:   ret { i32, i64 } %4
 // ARM32: }
 sil @word_zextOrBitCast : $(Builtin.Int32, Builtin.Word) -> (Builtin.Word, Builtin.Int64) {
-entry(%i : @trivial $Builtin.Int32, %w : @trivial $Builtin.Word):
+entry(%i : $Builtin.Int32, %w : $Builtin.Word):
   %j = builtin "zextOrBitCast_Int32_Word"(%i : $Builtin.Int32) : $Builtin.Word
   %v = builtin "zextOrBitCast_Word_Int64"(%w : $Builtin.Word) : $Builtin.Int64
   %t = tuple (%j : $Builtin.Word, %v : $Builtin.Int64)
@@ -58,7 +58,7 @@ entry(%i : @trivial $Builtin.Int32, %w : @trivial $Builtin.Word):
 // ARM32:   ret { i32, i32 } %4
 // ARM32: }
 sil @word_truncOrBitCast : $(Builtin.Word, Builtin.Int64) -> (Builtin.Int32, Builtin.Word) {
-entry(%w : @trivial $Builtin.Word, %i : @trivial $Builtin.Int64):
+entry(%w : $Builtin.Word, %i : $Builtin.Int64):
   %v = builtin "truncOrBitCast_Word_Int32"(%w : $Builtin.Word) : $Builtin.Int32
   %j = builtin "truncOrBitCast_Int64_Word"(%i : $Builtin.Int64) : $Builtin.Word
   %t = tuple (%v : $Builtin.Int32, %j : $Builtin.Word)

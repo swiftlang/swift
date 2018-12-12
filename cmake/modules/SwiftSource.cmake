@@ -303,6 +303,7 @@ function(_compile_swift_files
 
   set(module_file)
   set(module_doc_file)
+  set(interface_file)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
@@ -322,7 +323,11 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
-    set(interface_file "${module_base}.swiftinterface")
+
+    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+      set(interface_file "${module_base}.swiftinterface")
+      list(APPEND swift_flags "-emit-parseable-module-interface")
+    endif()
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
@@ -338,8 +343,13 @@ function(_compile_swift_files
     endif()
   endif()
 
+  set(module_outputs "${module_file}" "${module_doc_file}")
+  if(interface_file)
+    list(APPEND module_outputs "${interface_file}")
+  endif()
+
   swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-    FILES "${module_file}" "${module_doc_file}" "${interface_file}"
+    FILES ${module_outputs}
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
@@ -396,7 +406,6 @@ function(_compile_swift_files
 
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
-  set(module_outputs "${module_file}" "${module_doc_file}" "${interface_file}")
   set(sib_outputs "${sib_file}")
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
@@ -499,15 +508,11 @@ function(_compile_swift_files
     add_custom_command_target(
         module_dependency_target
         COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${interface_file}"
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          "-emit-parseable-module-interface" ${swift_flags} "@${file_path}"
+          ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS

@@ -18,38 +18,9 @@ using namespace swift;
 
 Optional<ValueOwnershipKind>
 swift::mergeSILValueOwnership(ArrayRef<SILValue> values) {
-  // A forwarding inst without operands must be trivial.
-  if (values.empty())
-    return Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial);
-
-  // Find the first index where we have a trivial value.
-  auto iter = find_if(values, [](SILValue v) -> bool {
-    return v.getOwnershipKind() != ValueOwnershipKind::Trivial;
-  });
-  // All trivial.
-  if (iter == values.end()) {
-    return Optional<ValueOwnershipKind>(ValueOwnershipKind::Trivial);
-  }
-
-  // See if we have any Any. If we do, just return that for now.
-  if (any_of(values, [](SILValue v) -> bool {
-        return v.getOwnershipKind() == ValueOwnershipKind::Any;
-      }))
-    return Optional<ValueOwnershipKind>(ValueOwnershipKind::Any);
-
-  unsigned index = std::distance(values.begin(), iter);
-  ValueOwnershipKind base = values[index].getOwnershipKind();
-
-  for (SILValue v : values.slice(index + 1)) {
-    auto opKind = v.getOwnershipKind();
-    if (opKind.merge(ValueOwnershipKind::Trivial))
-      continue;
-
-    auto mergedValue = base.merge(opKind.Value);
-    if (!mergedValue.hasValue()) {
-      return None;
-    }
-  }
-
-  return base;
+  auto range = makeTransformRange(values,
+                                  [](SILValue v) {
+                                    return v.getOwnershipKind();
+                                  });
+  return ValueOwnershipKind::merge(range);
 }

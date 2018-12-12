@@ -245,7 +245,7 @@ public:
     const bool sourceIsMetadata;
 
     union {
-      const Metadata *base;
+      const TargetContextDescriptor<InProcess> *baseContext;
       const TargetGenericEnvironment<InProcess> *environment;
     };
 
@@ -293,9 +293,16 @@ public:
   public:
     /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
-      : sourceIsMetadata(true), base(base),
+      : sourceIsMetadata(true), baseContext(base->getTypeContextDescriptor()),
         genericArgs(base ? (const void * const *)base->getGenericArgs()
                          : nullptr) { }
+    
+    /// Produce substitutions from the given instantiation arguments for the
+    /// given context.
+    explicit SubstGenericParametersFromMetadata(const ContextDescriptor *base,
+                                                const void * const *args)
+      : sourceIsMetadata(true), baseContext(base), genericArgs(args)
+    {}
 
     /// Produce substitutions from the given instantiation arguments for the
     /// given generic environment.
@@ -510,8 +517,9 @@ public:
   /// Determine whether the given type conforms to the given Swift protocol,
   /// returning the appropriate protocol conformance descriptor when it does.
   const ProtocolConformanceDescriptor *
-  _conformsToSwiftProtocol(const Metadata * const type,
-                           const ProtocolDescriptor *protocol);
+  swift_conformsToSwiftProtocol(const Metadata * const type,
+                                const ProtocolDescriptor *protocol,
+                                StringRef module);
 
   /// Retrieve an associated type witness from the given witness table.
   ///

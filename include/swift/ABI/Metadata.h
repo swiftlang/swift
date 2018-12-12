@@ -295,10 +295,9 @@ public:
   // Handle the data witnesses explicitly so we can use more specific
   // types for the flags enums.
   typedef size_t size;
-  typedef ValueWitnessFlags flags;
   typedef size_t stride;
-  typedef ExtraInhabitantFlags extraInhabitantFlags;
-
+  typedef ValueWitnessFlags flags;
+  typedef uint32_t extraInhabitantCount;
 };
 
 struct TypeLayout;
@@ -376,16 +375,9 @@ template <typename Runtime> struct TargetValueWitnessTable {
   
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
-  unsigned getNumExtraInhabitants() const;
-
-  /// Assert that this value witness table is an extra-inhabitants
-  /// value witness table and return it as such.
-  ///
-  /// This has an awful name because it's supposed to be internal to
-  /// this file.  Code outside this file should use LLVM's cast/dyn_cast.
-  /// We don't want to use those here because we need to avoid accidentally
-  /// introducing ABI dependencies on LLVM structures.
-  const struct ExtraInhabitantsValueWitnessTable *_asXIVWT() const;
+  unsigned getNumExtraInhabitants() const {
+    return extraInhabitantCount;
+  }
 
   /// Assert that this value witness table is an enum value witness table
   /// and return it as such.
@@ -608,13 +600,6 @@ public:
   #define DATA_VALUE_WITNESS(LOWER, UPPER, TYPE)
   #include "swift/ABI/ValueWitness.def"
 
-  int vw_getExtraInhabitantIndex(const OpaqueValue *value) const  {
-    return getValueWitnesses()->_asXIVWT()->getExtraInhabitantIndex(value, this);
-  }
-  void vw_storeExtraInhabitant(OpaqueValue *value, int index) const {
-    getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
-  }
-
   unsigned vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
@@ -635,6 +620,10 @@ public:
 
   size_t vw_stride() const {
     return getValueWitnesses()->getStride();
+  }
+
+  unsigned vw_getNumExtraInhabitants() const {
+    return getValueWitnesses()->getNumExtraInhabitants();
   }
 
   /// Allocate an out-of-line buffer if values of this type don't fit in the
@@ -845,13 +834,15 @@ public:
 template <typename Runtime>
 struct TargetMethodOverrideDescriptor {
   /// The class containing the base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>> Class;
+  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>,
+                                    /*nullable*/ true> Class;
 
   /// The base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>> Method;
+  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>,
+                                    /*nullable*/ true> Method;
 
   /// The implementation of the override.
-  TargetRelativeDirectPointer<Runtime, void, /*Nullable=*/true> Impl;
+  TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> Impl;
 };
 
 /// Header for a class vtable override descriptor. This is a variable-sized
@@ -1744,7 +1735,8 @@ struct TargetExistentialTypeMetadata
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
-  using MetadataPointer = ConstTargetMetadataPointer<Runtime, TargetMetadata>;
+  using MetadataPointer =
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
   using TrailingObjects =
           swift::ABI::TrailingObjects<
           TargetExistentialTypeMetadata<Runtime>,
@@ -1955,7 +1947,7 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
 };
 using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance witness.
 ///
 /// Resilient conformances must use a pattern where new requirements
@@ -2006,7 +1998,7 @@ struct TargetResilientWitnessTable final
 };
 using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance, which is embedded in the protocol conformance descriptor.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:

@@ -1,12 +1,12 @@
 
-// RUN: %target-swift-emit-silgen -module-name auto_closures -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name auto_closures -enable-sil-ownership -parse-stdlib -swift-version 5 %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
 
 // CHECK-LABEL: sil hidden @$s13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
-  // CHECK: bb0([[CLOSURE:%.*]] : @trivial $@noescape @callee_guaranteed () -> Bool):
+  // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
   // CHECK: [[RET:%.*]] = apply [[CLOSURE]]()
   // CHECK: return [[RET]]
   return x()

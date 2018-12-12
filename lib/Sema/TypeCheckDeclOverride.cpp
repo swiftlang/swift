@@ -859,11 +859,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       auto matchASD = cast<AbstractStorageDecl>(baseDecl);
       if (matchASD->isSetterAccessibleFrom(dc)) {
         // Match sure we've created the setter.
-        if (!matchASD->getSetter()) {
-          maybeAddAccessorsToStorage(
-                           *static_cast<TypeChecker *>(ctx.getLazyResolver()),
-                           matchASD);
-        }
+        if (!matchASD->getSetter())
+          maybeAddAccessorsToStorage(matchASD);
 
         auto matchSetterAccessScope = matchASD->getSetter()
           ->getFormalAccessScope(dc);
@@ -1205,6 +1202,7 @@ namespace  {
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
+    UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
@@ -1224,7 +1222,6 @@ namespace  {
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
-    UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(Testable)
 
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
@@ -1318,7 +1315,7 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   return OverrideRequiresKeyword::Always;
 }
 
-/// \brief Returns true if the availability of the overriding declaration
+/// Returns true if the availability of the overriding declaration
 /// makes it a safe override, given the availability of the base declaration.
 static bool isAvailabilitySafeForOverride(ValueDecl *override,
                                           ValueDecl *base) {
@@ -1759,13 +1756,9 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
-    ASTContext &ctx = decl->getASTContext();
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      if (auto lazyResolver = ctx.getLazyResolver()) {
-        maybeAddAccessorsToStorage(*static_cast<TypeChecker *>(lazyResolver),
-                                   baseASD);
-      }
+      maybeAddAccessorsToStorage(baseASD);
 
       auto kind = accessor->getAccessorKind();
 

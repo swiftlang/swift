@@ -3,11 +3,11 @@ from Node import Node  # noqa: I201
 
 AVAILABILITY_NODES = [
     # availability-spec-list -> availability-entry availability-spec-list?
-    Node('AvailabilitySpecList', kind='SyntaxCollection', 
+    Node('AvailabilitySpecList', kind='SyntaxCollection',
          element='AvailabilityArgument'),
 
     # Wrapper for all the different entries that may occur inside @available
-    # availability-entry -> '*' ','? 
+    # availability-entry -> '*' ','?
     #                     | identifier ','?
     #                     | availability-version-restriction ','?
     #                     | availability-versioned-argument ','?
@@ -22,11 +22,11 @@ AVAILABILITY_NODES = [
                    node_choices=[
                        Child('Star', kind='SpacedBinaryOperatorToken',
                              text_choices=['*']),
-                       Child('IdentifierRestriction', 
+                       Child('IdentifierRestriction',
                              kind='IdentifierToken'),
-                       Child('AvailabilityVersionRestriction', 
+                       Child('AvailabilityVersionRestriction',
                              kind='AvailabilityVersionRestriction'),
-                       Child('AvailabilityLabeledArgument', 
+                       Child('AvailabilityLabeledArgument',
                              kind='AvailabilityLabeledArgument'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True,
@@ -44,9 +44,9 @@ AVAILABILITY_NODES = [
          a value, e.g. `message: "This has been deprecated"`.
          ''',
          children=[
-             Child('Label', kind='IdentifierToken', 
+             Child('Label', kind='IdentifierToken',
                    description='The label of the argument'),
-             Child('Colon', kind='ColonToken', 
+             Child('Colon', kind='ColonToken',
                    description='The colon separating label and value'),
              Child('Value', kind='Syntax',
                    node_choices=[
@@ -63,7 +63,7 @@ AVAILABILITY_NODES = [
          certain platform to a version, e.g. `iOS 10` or `swift 3.4`.
          ''',
          children=[
-             Child('Platform', kind='IdentifierToken', 
+             Child('Platform', kind='IdentifierToken',
                    classification='Keyword',
                    description='''
                    The name of the OS on which the availability should be \
@@ -73,8 +73,8 @@ AVAILABILITY_NODES = [
              Child('Version', kind='VersionTuple'),
          ]),
 
-    # version-tuple -> integer-literal 
-    #                | float-literal 
+    # version-tuple -> integer-literal
+    #                | float-literal
     #                | float-literal '.' integer-literal
     Node('VersionTuple', kind='Syntax',
          description='''
@@ -98,7 +98,7 @@ AVAILABILITY_NODES = [
                    If the version contains a patch number, the period \
                    separating the minor from the patch number.
                    '''),
-             Child('PatchVersion', kind='IntegerLiteralToken', 
+             Child('PatchVersion', kind='IntegerLiteralToken',
                    is_optional=True, description='''
                    The patch version if specified.
                    '''),

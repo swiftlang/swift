@@ -1395,7 +1395,7 @@ public:
   }
 };
 
-/// \brief Attributes that may be applied to declarations.
+/// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;

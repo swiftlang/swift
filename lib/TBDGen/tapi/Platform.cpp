@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief Implements platform specific helper functions.
+/// Implements platform specific helper functions.
 ///
 //===----------------------------------------------------------------------===//
 

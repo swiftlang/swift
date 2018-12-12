@@ -86,8 +86,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
   if (ThisParent == L2.getContainingBlock()) return;
 
   // Update the parent fields in the instructions.
-  for (; first != last; ++first)
+  for (; first != last; ++first) {
+    SWIFT_FUNC_STAT_NAMED("sil");
     first->ParentBB = ThisParent;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1180,6 +1182,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // begin_apply creates a token that has to be directly used by the
   // corresponding end_apply and abort_apply.
   if (isa<BeginApplyInst>(this))
+    return false;
+
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
     return false;
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.

@@ -113,19 +113,19 @@ public:
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
-  /// \brief Whether we're generating IR for the JIT.
+  /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
-  /// \brief Whether we're generating code for the integrated REPL.
+  /// Whether we're generating code for the integrated REPL.
   unsigned IntegratedREPL : 1;
   
-  /// \brief Whether we should run LLVM optimizations after IRGen.
+  /// Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
-  /// \brief Whether we should run LLVM SLP vectorizer.
+  /// Whether we should run LLVM SLP vectorizer.
   unsigned DisableLLVMSLPVectorizer : 1;
 
   /// Disable frame pointer elimination?

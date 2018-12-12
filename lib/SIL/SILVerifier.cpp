@@ -1691,7 +1691,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(SI->getModule()) ||
-              Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+              Src.getOwnershipKind() == ValueOwnershipKind::Any,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -1869,49 +1869,7 @@ public:
             || isa<PointerToAddressInst>(Src),
             "Mark Uninitialized must be applied to a storage location");
   }
-  
-  void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
-    require(MU->getModule().getStage() == SILStage::Raw,
-            "mark_uninitialized instruction can only exist in raw SIL");
-    auto InitStorage = MU->getInitStorageFunc();
-    auto InitStorageTy = InitStorage->getType().getAs<SILFunctionType>();
-    require(InitStorageTy,
-            "mark_uninitialized initializer must be a function");
-    auto SubstInitStorageTy = InitStorageTy->substGenericArgs(F.getModule(),
-                                             MU->getInitStorageSubstitutions());
-    // FIXME: Destructured value or results?
-    require(SubstInitStorageTy->getResults().size() == 1,
-            "mark_uninitialized initializer must have one result");
-    auto StorageTy = SILType::getPrimitiveAddressType(
-                              SubstInitStorageTy->getSingleResult().getType());
-    requireSameType(StorageTy, MU->getStorage()->getType(),
-                    "storage must be address of initializer's result type");
-    
-    auto Setter = MU->getSetterFunc();
-    auto SetterTy = Setter->getType().getAs<SILFunctionType>();
-    require(SetterTy,
-            "mark_uninitialized setter must be a function");
-    auto SubstSetterTy = SetterTy->substGenericArgs(F.getModule(),
-                                               MU->getSetterSubstitutions());
-    require(SubstSetterTy->getParameters().size() == 2,
-            "mark_uninitialized setter must have a value and self param");
-    requireSameType(fnConv.getSILType(SubstSetterTy->getSelfParameter()),
-                    MU->getSelf()->getType(),
-                    "self type must match setter's self parameter type");
 
-    auto ValueTy = SubstInitStorageTy->getParameters()[0].getType();
-    requireSameType(SILType::getPrimitiveAddressType(ValueTy),
-                    SILType::getPrimitiveAddressType(
-                      SubstSetterTy->getParameters()[0].getType()),
-                    "value parameter type must match between initializer "
-                    "and setter");
-    
-    auto ValueAddrTy = SILType::getPrimitiveAddressType(ValueTy);
-    requireSameType(ValueAddrTy, MU->getType(),
-                    "result of mark_uninitialized_behavior should be address "
-                    "of value parameter to setter and initializer");
-  }
-  
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     require(MFE->getModule().getStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
@@ -4046,6 +4004,13 @@ public:
     require(!(isa<MethodInst>(branchArg) &&
               cast<MethodInst>(branchArg)->getMember().isForeign),
         "branch argument cannot be a witness_method or an objc method_inst");
+    require(!(branchArg->getType().is<SILFunctionType>() &&
+              branchArg->getType()
+                      .castTo<SILFunctionType>()
+                      ->getExtInfo()
+                      .getRepresentation() ==
+                  SILFunctionTypeRepresentation::ObjCMethod),
+            "branch argument cannot be a objective-c method");
     return branchArg->getType() == bbArg->getType();
   }
 
@@ -4656,7 +4621,7 @@ public:
             llvm::all_of(CBI->getTrueArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Trivial;
+                                  ValueOwnershipKind::Any;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }
@@ -4665,7 +4630,7 @@ public:
             llvm::all_of(CBI->getFalseArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Trivial;
+                                  ValueOwnershipKind::Any;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }

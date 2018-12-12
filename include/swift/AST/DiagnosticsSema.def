@@ -550,6 +550,9 @@ ERROR(expr_selector_property_not_settable,none,
       (DescriptiveDeclKind, DeclName))
 ERROR(expr_selector_property_setter_inaccessible,none,
       "setter of %0 %1 is inaccessible", (DescriptiveDeclKind, DeclName))
+ERROR(expr_selector_cannot_be_used,none,
+      "cannot use %0 as a selector because protocol %1 is not exposed to Objective-C",
+      (DeclBaseName, DeclName))
 ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %0 %1 that is not exposed to "
       "Objective-C",
@@ -630,9 +633,9 @@ ERROR(serialization_circular_dependency,Fatal,
 ERROR(serialization_missing_shadowed_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
+      "cannot load module '%0' as '%1'", (StringRef, StringRef))
 ERROR(serialization_name_mismatch_repl,none,
-      "cannot load module '%0' as %1", (StringRef, Identifier))
+      "cannot load module '%0' as '%1'", (StringRef, StringRef))
 ERROR(serialization_target_incompatible,Fatal,
       "module %0 was created for incompatible target %1: %2",
       (Identifier, StringRef, StringRef))
@@ -1363,7 +1366,7 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "should be '@usableFromInline' or public",
         (bool, bool))
 ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
-      "type referenced from a stored property in a @_fixed_layout struct must "
+      "type referenced from a stored property in a '@_fixed_layout' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
@@ -1380,7 +1383,7 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         (bool, bool, Type))
 ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "@_fixed_layout struct must be '@usableFromInline' or public",
+      "'@_fixed_layout' struct must be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
@@ -1875,6 +1878,9 @@ NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not "
      "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
+NOTE(protocol_witness_circularity,none,
+     "candidate references itself", ())
+
 NOTE(protocol_conformance_here,none,
      "%select{|class }0%1 declares conformance to protocol %2 here",
      (bool, DeclName, DeclName))
@@ -1982,8 +1988,8 @@ ERROR(requires_generic_params_made_equal,none,
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
       (Type))
-ERROR(recursive_type_reference,none,
-      "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
+ERROR(recursive_decl_reference,none,
+      "%0 %1 references itself", (DescriptiveDeclKind, DeclBaseName))
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
@@ -2452,63 +2458,6 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
 
-// Property behaviors
-ERROR(property_behavior_not_protocol,none,
-      "property behavior name must refer to a protocol", ())
-ERROR(property_behavior_protocol_reqt_ambiguous,none,
-      "property behavior protocol has ambiguous %0 member", (Identifier))
-ERROR(property_behavior_protocol_no_value,none,
-      "property behavior protocol does not have a 'value' property", ())
-ERROR(property_behavior_protocol_no_initStorage,none,
-      "property behavior protocol has a 'storage' requirement but does not "
-      "have a static 'initStorage' method with the expected type %0 or %1",
-      (Type, Type))
-ERROR(property_behavior_unknown_requirement,none,
-      "property behavior protocol %0 has non-behavior requirement %1",
-      (Identifier, DeclBaseName))
-NOTE(property_behavior_unknown_requirement_here,none,
-     "declared here", ())
-NOTE(self_conformance_required_by_property_behavior,none,
-     "conformance to %0 required to contain an instance property with "
-     "behavior %1",
-     (Identifier, Identifier))
-NOTE(value_conformance_required_by_property_behavior,none,
-     "behavior %1 requires property type to conform to protocol %0",
-     (Identifier, Identifier))
-ERROR(property_behavior_with_self_requirement_not_in_type,none,
-      "property behavior %0 can only be used on instance properties "
-      "because it has 'Self' requirements",
-      (Identifier))
-ERROR(property_behavior_with_feature_not_supported,none,
-      "property behavior %0 with %1 is not supported outside of "
-      "type contexts",
-      (Identifier, StringRef))
-ERROR(property_behavior_value_type_doesnt_match,none,
-      "property behavior %0 provides 'value' property implementation with "
-      "type %1 that doesn't match type %2 of declared property %3",
-      (Identifier, Type, Identifier, Type))
-NOTE(property_behavior_value_decl_here,none,
-     "'value' property declared here", ())
-ERROR(property_behavior_invalid_parameter_reqt,none,
-      "property behavior %0 has a 'parameter' requirement that is "
-      "static or generic", (Identifier))
-ERROR(property_behavior_requires_parameter,none,
-      "property behavior %0 requires a parameter in the declaration of %1",
-      (Identifier, Identifier))
-ERROR(property_behavior_invalid_initializer,none,
-      "initializer expression provided, but property behavior %0 does not "
-      "use it",
-      (Identifier))
-ERROR(property_behavior_unsupported_initializer,none,
-      "property behaviors do not support destructuring initialization of "
-      "multiple properties", ())
-ERROR(property_behavior_invalid_parameter,none,
-      "parameter expression provided, but property behavior %0 does not "
-      "use it",
-      (Identifier))
-ERROR(property_behavior_conformance_broken,none,
-      "property behavior for %0 in type %1 is broken", (DeclName, Type))
-
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
 //------------------------------------------------------------------------------
@@ -2944,8 +2893,11 @@ ERROR(closure_implicit_capture_without_noescape,none,
       "escaping closures can only capture inout parameters explicitly by value",
       ())
 ERROR(closure_implicit_capture_mutating_self,none,
-      "closure cannot implicitly capture a mutating self parameter",
+      "escaping closure cannot capture a mutating self parameter",
       ())
+NOTE(create_mutating_copy_or_capture_self,none,
+     "create a mutating copy of self, or explicitly capture self for immutability",
+     ())
 ERROR(nested_function_with_implicit_capture_argument,none,
       "nested function with %select{an |}0implicitly captured inout "
       "parameter%select{|s}0 can only be used as a non-escaping argument", (bool))
@@ -3455,8 +3407,6 @@ ERROR(pointer_argument_intrinsics_not_found,none,
 ERROR(array_literal_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Array<T>", ())
-ERROR(bool_intrinsics_not_found,none,
-      "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
@@ -4103,27 +4053,33 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
+#define DECL_OR_ACCESSOR "%select{%0|%0 for}"
+
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
 ERROR(resilience_decl_unavailable,
-      none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+      none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
-      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+      (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 WARNING(resilience_decl_unavailable_warn,
-        none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+        none, DECL_OR_ACCESSOR "4 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
         "should not be referenced from " FRAGILE_FUNC_KIND "3",
-        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned, bool))
 
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
-     none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not public",
+     (DescriptiveDeclKind, DeclName, bool))
 
 NOTE(resilience_decl_declared_here,
-     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
+     none, DECL_OR_ACCESSOR "2 %1 is not '@usableFromInline' or public",
+     (DescriptiveDeclKind, DeclName, bool))
+
+#undef DECL_OR_ACCESSOR
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "

@@ -123,8 +123,6 @@ public:
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);
 
-  std::string mangleBehaviorInitThunk(const VarDecl *decl);
-
   std::string mangleGlobalVariableFull(const VarDecl *decl);
 
   std::string mangleGlobalInit(const VarDecl *decl, int counter,
@@ -198,7 +196,7 @@ protected:
 
   void bindGenericParameters(CanGenericSignature sig);
 
-  /// \brief Mangles a sugared type iff we are mangling for the debugger.
+  /// Mangles a sugared type iff we are mangling for the debugger.
   template <class T> void appendSugaredType(Type type) {
     assert(DWARFMangling &&
            "sugared types are only legal when mangling for the debugger");

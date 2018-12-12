@@ -211,7 +211,7 @@ void swift::performDelayedParsing(
     parseDelayedDecl(PersistentState, CodeCompletionFactory);
 }
 
-/// \brief Tokenizes a string literal, taking into account string interpolation.
+/// Tokenizes a string literal, taking into account string interpolation.
 static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
                                 int BufID, std::vector<Token> &Toks) {
@@ -635,7 +635,7 @@ void Parser::skipUntilAnyOperator() {
     skipSingle();
 }
 
-/// \brief Skip until a token that starts with '>', and consume it if found.
+/// Skip until a token that starts with '>', and consume it if found.
 /// Applies heuristics that are suitable when trying to find the end of a list
 /// of generic parameters, generic arguments, or list of types in a protocol
 /// composition.

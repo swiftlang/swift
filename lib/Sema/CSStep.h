@@ -126,7 +126,7 @@ public:
   ///          this step solved or failed.
   virtual StepResult take(bool prevFailed) = 0;
 
-  /// \brief Try to resume previously suspended step.
+  /// Try to resume previously suspended step.
   ///
   /// This happens after "follow-up" steps are done
   /// and all of the required information should be
@@ -144,7 +144,7 @@ public:
   virtual void print(llvm::raw_ostream &Out) = 0;
 
 protected:
-  /// \brief Transition this step into one of the available states.
+  /// Transition this step into one of the available states.
   ///
   /// This is primarily driven by execution of the step itself and
   /// the solver, while it executes the work list.

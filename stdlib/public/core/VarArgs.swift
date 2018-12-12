@@ -90,6 +90,23 @@ internal let _registerSaveWords = _countGPRegisters + _countFPRegisters * _fpReg
 internal let _countGPRegisters = 16
 @usableFromInline
 internal let _registerSaveWords = _countGPRegisters
+
+#elseif arch(arm64) && os(Linux)
+// ARM Procedure Call Standard for aarch64. (IHI0055B)
+// The va_list type may refer to any parameter in a parameter list may be in one
+// of three memory locations depending on its type and position in the argument
+// list :
+// 1. GP register save area x0 - x7
+// 2. 128-bit FP/SIMD register save area q0 - q7
+// 3. Stack argument area
+@usableFromInline
+internal let _countGPRegisters = 8
+@usableFromInline
+internal let _countFPRegisters = 8
+@usableFromInline
+internal let _fpRegisterWords = 16 /  MemoryLayout<Int>.size
+@usableFromInline
+internal let _registerSaveWords = _countGPRegisters + (_countFPRegisters * _fpRegisterWords)
 #endif
 
 #if arch(s390x)
@@ -127,7 +144,7 @@ internal typealias _VAInt  = Int32
 @inlinable // c-abi
 public func withVaList<R>(_ args: [CVarArg],
   _ body: (CVaListPointer) -> R) -> R {
-  let builder = _VaListBuilder()
+  let builder = __VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -137,7 +154,7 @@ public func withVaList<R>(_ args: [CVarArg],
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 @inlinable // c-abi
 internal func _withVaList<R>(
-  _ builder: _VaListBuilder,
+  _ builder: __VaListBuilder,
   _ body: (CVaListPointer) -> R
 ) -> R {
   let result = body(builder.va_list())
@@ -168,7 +185,7 @@ internal func _withVaList<R>(
 ///   `va_list` argument.
 @inlinable // c-abi
 public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
-  let builder = _VaListBuilder()
+  let builder = __VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -406,9 +423,12 @@ extension Float80 : CVarArg, _CVarArgAligned {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout
 @usableFromInline // c-abi
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
   @_fixed_layout // c-abi
   @usableFromInline
   internal struct Header {
@@ -498,14 +518,143 @@ final internal class _VaListBuilder {
                Builtin.addressof(&self.header)))
   }
 }
+#elseif arch(arm64) && os(Linux)
+
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
+@_fixed_layout // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
+final internal class __VaListBuilder {
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal init() {
+    // Prepare the register save area.
+    allocated = _registerSaveWords
+    storage = allocStorage(wordCount: allocated)
+    // Append stack arguments after register save area.
+    count = allocated
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  deinit {
+    if let allocatedStorage = storage {
+      deallocStorage(wordCount: allocated, storage: allocatedStorage)
+    }
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func append(_ arg: CVarArg) {
+    var encoded = arg._cVarArgEncoding
+
+    if arg is _CVarArgPassedAsDouble
+      && fpRegistersUsed < _countFPRegisters {
+      var startIndex = (fpRegistersUsed * _fpRegisterWords)
+      for w in encoded {
+        storage[startIndex] = w
+        startIndex += 1
+      }
+      fpRegistersUsed += 1
+    } else if encoded.count == 1
+      && !(arg is _CVarArgPassedAsDouble)
+      && gpRegistersUsed < _countGPRegisters {
+      var startIndex = ( _fpRegisterWords * _countFPRegisters) + gpRegistersUsed
+      storage[startIndex] = encoded[0]
+      gpRegistersUsed += 1
+    } else {
+      // Arguments in stack slot.
+      appendWords(encoded)
+    }
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func va_list() -> CVaListPointer {
+    let vr_top = storage + (_fpRegisterWords * _countFPRegisters)
+    let gr_top = vr_top + _countGPRegisters
+
+    return CVaListPointer(__stack: gr_top, __gr_top: gr_top,
+                          __vr_top: vr_top, __gr_off: -64, __vr_off: -128)
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func appendWords(_ words: [Int]) {
+    let newCount = count + words.count
+    if newCount > allocated {
+      let oldAllocated = allocated
+      let oldStorage = storage
+      let oldCount = count
+
+      allocated = max(newCount, allocated * 2)
+      let newStorage = allocStorage(wordCount: allocated)
+      storage = newStorage
+      // Count is updated below.
+      if let allocatedOldStorage = oldStorage {
+        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
+        deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
+      }
+    }
+
+    let allocatedStorage = storage!
+    for word in words {
+      allocatedStorage[count] = word
+      count += 1
+    }
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func rawSizeAndAlignment(
+    _ wordCount: Int
+  ) -> (Builtin.Word, Builtin.Word) {
+    return ((wordCount * MemoryLayout<Int>.stride)._builtinWordValue,
+      requiredAlignmentInBytes._builtinWordValue)
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func allocStorage(wordCount: Int) -> UnsafeMutablePointer<Int> {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
+    return UnsafeMutablePointer<Int>(rawStorage)
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal func deallocStorage(
+    wordCount: Int, storage: UnsafeMutablePointer<Int>
+  ) {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
+  }
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal let requiredAlignmentInBytes = MemoryLayout<Double>.alignment
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var count = 0
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var allocated = 0
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var storage: UnsafeMutablePointer<Int>!
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var gpRegistersUsed = 0
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var fpRegistersUsed = 0
+
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var overflowWordsUsed = 0
+}
 
 #else
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout
 @usableFromInline // c-abi
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
 
   @inlinable // c-abi
   internal init() {}
@@ -533,16 +682,16 @@ final internal class _VaListBuilder {
   }
 
   // NB: This function *cannot* be @inlinable because it expects to project
-  // and escape the physical storage of `_VaListBuilder.alignedStorageForEmptyVaLists`.
+  // and escape the physical storage of `__VaListBuilder.alignedStorageForEmptyVaLists`.
   // Marking it inlinable will cause it to resiliently use accessors to
-  // project `_VaListBuilder.alignedStorageForEmptyVaLists` as a computed
+  // project `__VaListBuilder.alignedStorageForEmptyVaLists` as a computed
   // property.
   @usableFromInline // c-abi
   internal func va_list() -> CVaListPointer {
     // Use Builtin.addressof to emphasize that we are deliberately escaping this
     // pointer and assuming it is safe to do so.
     let emptyAddr = UnsafeMutablePointer<Int>(
-      Builtin.addressof(&_VaListBuilder.alignedStorageForEmptyVaLists))
+      Builtin.addressof(&__VaListBuilder.alignedStorageForEmptyVaLists))
     return CVaListPointer(_fromUnsafeMutablePointer: storage ?? emptyAddr)
   }
 

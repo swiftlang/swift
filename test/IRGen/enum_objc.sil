@@ -127,6 +127,3 @@ b:
 x:
   return undef : $()
 }
-
-// Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
-// CHECK: define internal void @"$s9enum_objc17StructWithWeakVarVwxs"

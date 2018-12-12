@@ -2,7 +2,7 @@
 import Swift
 
 // CHECK-LABEL: sil @{{.*}}apply{{.*}} : $@convention(thin) (@noescape @callee_guaranteed () -> Int)
-// bb0(%0 : @trivial $@noescape @callee_guaranteed () -> Int):
+// bb0(%0 : $@noescape @callee_guaranteed () -> Int):
 //   [[B1:%.*]] = begin_borrow %0 : $@noescape @callee_guaranteed () -> Int
 //   [[C1:%.*]] = copy_value %2 : $@noescape @callee_guaranteed () -> Int
 //

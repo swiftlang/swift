@@ -124,7 +124,7 @@ namespace swift {
 
 class DynamicSelfType;
 
-/// \brief Stores information about captured variables.
+/// Stores information about captured variables.
 class CaptureInfo {
   const CapturedValue *Captures;
   DynamicSelfType *DynamicSelf;
@@ -152,7 +152,7 @@ public:
     Count = C.size();
   }
 
-  /// \brief Return a filtered list of the captures for this function,
+  /// Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
   ///

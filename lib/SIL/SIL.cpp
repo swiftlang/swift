@@ -30,14 +30,6 @@
 
 using namespace swift;
 
-SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
-  // Unique these.
-  SILUndef *&Entry = M->UndefValues[Ty];
-  if (Entry == nullptr)
-    Entry = new (*M) SILUndef(Ty);
-  return Entry;
-}
-
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
@@ -83,10 +75,6 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 SILLinkage
 swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
-  // Behavior conformances are always private.
-  if (C->isBehaviorConformance())
-    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
-
   // If the conformance was synthesized by the ClangImporter, give it
   // shared linkage.
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))

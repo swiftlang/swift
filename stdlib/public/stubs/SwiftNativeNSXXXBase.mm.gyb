@@ -93,6 +93,10 @@ SWIFT_RUNTIME_STDLIB_API
   return swift_tryRetain(reinterpret_cast<HeapObject*>(self)) != nullptr;
 }
 
++ (BOOL)automaticallyNotifiesObserversForKey:(NSString *)key {
+  return NO;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {

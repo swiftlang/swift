@@ -33,7 +33,7 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   TypeIndexed.swift
   GetOSVersion.mm
 
-  SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateLibcExtras
+  SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivateThreadExtras SwiftPrivateLibcExtras
   SWIFT_MODULE_DEPENDS_IOS Darwin Foundation
   SWIFT_MODULE_DEPENDS_OSX Darwin Foundation
   SWIFT_MODULE_DEPENDS_TVOS Darwin Foundation

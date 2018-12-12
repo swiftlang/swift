@@ -48,7 +48,7 @@ class HasBlockImpl: HasBlock {
 
 // thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
-// CHECK: bb0(%0 : @trivial $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
+// CHECK: bb0(%0 : $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
 // CHECK:   %{{.*}} = apply %1(%0) : $@convention(block) @noescape (Int) -> Int
 // CHECK:  return %{{.*}} : $Int                               
 // CHECK-LABEL: } // end sil function '$sS2iIyByd_S2iIegyd_TR'
@@ -56,7 +56,7 @@ class HasBlockImpl: HasBlock {
 // --- C global.
 // The verifier should ignore this access.
 // CHECK-LABEL: sil hidden @$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ : $@convention(method) (@thick GlobalProperty.Type) -> @owned CFString {
-// CHECK: bb0(%0 : @trivial $@thick GlobalProperty.Type):
+// CHECK: bb0(%0 : $@thick GlobalProperty.Type):
 // CHECK:   [[GA:%.*]] = global_addr @constCGlobal : $*Optional<CFString>
 // CHECK:   [[STR:%.*]] = load [copy] [[GA]] : $*Optional<CFString>            
 // CHECK: switch_enum [[STR]] : $Optional<CFString>, case #Optional.some!enumelt.1: [[SOMEBB:bb.*]], case #Optional.none!enumelt: bb{{.*}}

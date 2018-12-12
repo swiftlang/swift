@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Note that this file is used by both swift-corelibs-libdispatch and the
-// Dispatch overlay for Darwin in swift/stdlib/public/SDK/Dispatch/.
+// Dispatch overlay for Darwin in swift/stdlib/public/Darwin/Dispatch/.
 //
 //===----------------------------------------------------------------------===//
 

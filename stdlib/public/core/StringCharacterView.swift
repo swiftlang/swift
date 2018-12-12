@@ -234,8 +234,8 @@ extension String {
 
     @inlinable
     internal init(_ guts: _StringGuts) {
-      self._guts = guts
       self._end = guts.count
+      self._guts = guts
     }
 
     @inlinable

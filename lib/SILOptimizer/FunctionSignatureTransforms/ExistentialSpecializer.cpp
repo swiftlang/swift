@@ -101,7 +101,8 @@ static bool findConcreteType(ApplySite AI, int ArgIdx, CanType &ConcreteType) {
     SILValue InitExistential =
         findInitExistentialFromGlobalAddrAndApply(GAI, AI, ArgIdx);
     /// If the Arg is already init_existential, return the concrete type.
-    if (findConcreteTypeFromInitExistential(InitExistential, ConcreteType)) {
+    if (InitExistential &&
+        findConcreteTypeFromInitExistential(InitExistential, ConcreteType)) {
       return true;
     }
   }
@@ -256,6 +257,12 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(ApplySite &Apply) {
   /// Do not optimize always_inlinable functions.
   if (Callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
+
+  /// Ignore externally linked functions with public_external or higher
+  /// linkage.
+  if (isAvailableExternally(Callee->getLinkage())) {
+    return false;
+  }
 
   /// Only choose a select few function representations for specialization.
   switch (Callee->getRepresentation()) {

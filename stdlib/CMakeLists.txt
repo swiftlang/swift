@@ -1,3 +1,10 @@
+
+# Add path for custom CMake modules.
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(AddSwiftStdlib)
+
 # Create convenience targets for the Swift standard library.
 
 # NOTE(compnerd) save the original compiler for the host swiftReflection that
@@ -102,4 +109,4 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
 add_subdirectory(public)
 add_subdirectory(private)
-
+add_subdirectory(tools)

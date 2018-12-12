@@ -713,7 +713,7 @@ public:
     return EffectsKindAttr != EffectsKind::Unspecified;
   }
 
-  /// \brief Set the function side effect information.
+  /// Set the function side effect information.
   void setEffectsKind(EffectsKind E) {
     EffectsKindAttr = E;
   }

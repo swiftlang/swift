@@ -42,25 +42,6 @@ public:
 
   /// The frontend has configured the compiler instance.
   virtual void configuredCompiler(CompilerInstance &instance);
-
-  /// The frontend has performed semantic analysis.
-  virtual void performedSemanticAnalysis(CompilerInstance &instance);
-
-  /// The frontend has performed basic SIL generation.
-  /// SIL diagnostic passes have not yet been applied.
-  virtual void performedSILGeneration(SILModule &module);
-
-  /// The frontend has executed the SIL diagnostic passes.
-  virtual void performedSILDiagnostics(SILModule &module);
-
-  /// The frontend has executed the SIL optimization pipeline.
-  virtual void performedSILOptimization(SILModule &module);
-
-  /// The frontend is about to run the program as an immediate script.
-  virtual void aboutToRunImmediately(CompilerInstance &instance);
-
-  // TODO: maybe enhance this interface to hear about IRGen and LLVM
-  // progress.
 };
 
 /// Perform all the operations of the frontend, exactly as if invoked

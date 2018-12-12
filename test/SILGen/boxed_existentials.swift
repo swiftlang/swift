@@ -192,7 +192,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
 }
 
 // CHECK-LABEL: sil hidden @$s18boxed_existentials14erasure_to_anyyyps5Error_p_sAC_ptF
-// CHECK:       bb0([[OUT:%.*]] : @trivial $*Any, [[GUAR:%.*]] : @guaranteed $Error,
+// CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : @guaranteed $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }

@@ -105,6 +105,12 @@ void TBDGenVisitor::addAssociatedConformanceDescriptor(
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addBaseConformanceDescriptor(
+                                           BaseConformance conformance) {
+  auto entity = LinkEntity::forBaseConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -313,11 +319,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   auto hasResilientAncestor =
-      CD->isResilient(SwiftModule, ResilienceExpansion::Minimal);
+      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
   auto ancestor = CD->getSuperclassDecl();
   while (ancestor && !hasResilientAncestor) {
     hasResilientAncestor |=
-        ancestor->isResilient(SwiftModule, ResilienceExpansion::Maximal);
+        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
     ancestor = ancestor->getSuperclassDecl();
   }
 
@@ -338,7 +344,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
 
-      if (CD->isResilient()) {
+      if (CD->hasResilientMetadata()) {
         if (FirstTime) {
           FirstTime = false;
 
@@ -431,15 +437,18 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
 
-      // Skip inherited requirements.
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType()))
-        continue;
-
-      AssociatedConformance conformance(
-        PD,
-        req.getFirstType()->getCanonicalType(),
-        req.getSecondType()->castTo<ProtocolType>()->getDecl());
-      addAssociatedConformanceDescriptor(conformance);
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
+        BaseConformance conformance(
+          PD,
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addBaseConformanceDescriptor(conformance);
+      } else {
+        AssociatedConformance conformance(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addAssociatedConformanceDescriptor(conformance);
+      }
     }
 
     for (auto *member : PD->getMembers()) {

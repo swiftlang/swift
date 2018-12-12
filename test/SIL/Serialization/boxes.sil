@@ -89,8 +89,8 @@ entry(%0 : @owned ${ var Int }, %1 : @guaranteed $<T> { let T } <Int>):
 
 // CHECK-LABEL: sil hidden [serialized] @address_of_box
 sil hidden [serialized] @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> () {
-// CHECK: %0 : @trivial $*{ var Int }, %1 : @trivial $*<τ_0_0> { let τ_0_0 } <Int>
-entry(%0 : @trivial $*{ var Int }, %1 : @trivial $*<T> { let T } <Int>):
+// CHECK: %0 : $*{ var Int }, %1 : $*<τ_0_0> { let τ_0_0 } <Int>
+entry(%0 : $*{ var Int }, %1 : $*<T> { let T } <Int>):
   unreachable
 }
 

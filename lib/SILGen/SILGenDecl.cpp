@@ -1195,10 +1195,6 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
-  // Here we just emit the behavior witness table, if any.
-  
-  if (D->hasBehavior())
-    SGM.emitPropertyBehavior(D);
 }
 
 /// Emit a check that returns 1 if the running OS version is in
@@ -1222,7 +1218,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 
   // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
   FuncDecl *versionQueryDecl =
-      getASTContext().getIsOSVersionAtLeastDecl(nullptr);
+      getASTContext().getIsOSVersionAtLeastDecl();
   assert(versionQueryDecl);
 
   auto silDeclRef = SILDeclRef(versionQueryDecl);
@@ -1396,7 +1392,19 @@ void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
   lastEmittedConformance = root;
 }
 
+static bool isDeclaredInPrimaryFile(SILModule &M, Decl *d) {
+  auto *dc = d->getDeclContext();
+  if (auto *sf = dyn_cast<SourceFile>(dc->getModuleScopeContext()))
+    if (M.isWholeModule() || M.getAssociatedContext() == sf)
+      return true;
+
+  return false;
+}
+
 void SILGenModule::emitExternalDefinition(Decl *d) {
+  if (isDeclaredInPrimaryFile(M, d))
+    return;
+
   switch (d->getKind()) {
   case DeclKind::Func:
   case DeclKind::Accessor: {

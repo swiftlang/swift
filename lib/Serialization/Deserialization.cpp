@@ -643,8 +643,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   return conformance;
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
-                                               GenericParamList *outerParams) {
+GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -676,13 +675,9 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   if (params.empty())
     return nullptr;
 
-  auto paramList = GenericParamList::create(getContext(), SourceLoc(),
-                                            params, SourceLoc(), { },
-                                            SourceLoc());
-  paramList->setOuterParameters(outerParams ? outerParams :
-                                DC->getGenericParamsOfContext());
-
-  return paramList;
+  return GenericParamList::create(getContext(), SourceLoc(),
+                                  params, SourceLoc(), { },
+                                  SourceLoc());
 }
 
 void ModuleFile::readGenericRequirements(
@@ -1615,8 +1610,8 @@ giveUpFastPath:
       pathTrace.addGenericParam(paramIndex);
 
       ValueDecl *base = values.front();
-      GenericParamList *paramList = nullptr;
 
+      GenericSignature *currentSig = nullptr;
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -1625,49 +1620,46 @@ giveUpFastPath:
             if (ext->getModuleContext() == M &&
                 ext->getGenericSignature()->getCanonicalSignature()
                   == genericSig) {
-              paramList = ext->getGenericParams();
+              currentSig = ext->getGenericSignature();
               break;
             }
           }
-          assert(paramList && "Couldn't find constrained extension");
+          assert(currentSig && "Couldn't find constrained extension");
         } else {
           // Simple case: use the nominal type's generic parameters.
-          paramList = nominal->getGenericParamsOfContext();
+          currentSig = nominal->getGenericSignature();
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
-        paramList = alias->getGenericParams();
+        currentSig = alias->getGenericSignature();
       } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
-        paramList = fn->getGenericParams();
+        currentSig = fn->getGenericSignature();
       } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
-        paramList = subscript->getGenericParams();
+        currentSig = subscript->getGenericSignature();
       }
 
-      if (!paramList) {
+      if (!currentSig) {
         return llvm::make_error<XRefError>(
             "cross-reference to generic param for non-generic type",
             pathTrace, getXRefDeclNameForError());
       }
 
-      unsigned currentDepth = paramList->getDepth();
-      if (currentDepth < depth) {
-        return llvm::make_error<XRefError>(
-            "a containing type has been made non-generic",
-            pathTrace, getXRefDeclNameForError());
-      }
-      while (currentDepth > depth) {
-        paramList = paramList->getOuterParameters();
-        --currentDepth;
-      }
-
-      if (paramIndex >= paramList->size()) {
-        return llvm::make_error<XRefError>(
-            "generic argument index out of bounds",
-            pathTrace, getXRefDeclNameForError());
+      bool found = false;
+      for (auto paramTy : currentSig->getGenericParams()) {
+        if (paramTy->getIndex() == paramIndex &&
+            paramTy->getDepth() == depth) {
+          values.clear();
+          values.push_back(paramTy->getDecl());
+          found = true;
+          break;
+        }
       }
 
-      values.clear();
-      values.push_back(paramList->getParams()[paramIndex]);
-      assert(values.back());
+      if (!found) {
+        return llvm::make_error<XRefError>(
+            "invalid generic argument index or depth",
+            pathTrace, getXRefDeclNameForError());
+      }
+
       break;
     }
 
@@ -3018,20 +3010,28 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     configureStorage(var, opaqueReadOwnership,
                      readImpl, writeImpl, readWriteImpl, accessors);
-
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
-      var->setAccess(*accessLevel);
-    } else {
+    auto accessLevel = getActualAccessLevel(rawAccessLevel);
+    if (!accessLevel) {
       error();
       return nullptr;
     }
 
+    var->setAccess(*accessLevel);
+
     if (var->isSettable(nullptr)) {
-      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
-        var->setSetterAccess(*setterAccess);
-      } else {
+      auto setterAccess = getActualAccessLevel(rawSetterAccessLevel);
+      if (!setterAccess) {
         error();
         return nullptr;
+      }
+      var->setSetterAccess(*setterAccess);
+
+      // If we have a less-accessible setter, honor that by adding the
+      // setter access attribute.
+      if (*setterAccess < *accessLevel) {
+        AddAttribute(
+          new (ctx) SetterAccessAttr(SourceLoc(), SourceLoc(),
+                                     *setterAccess, /*implicit*/true));
       }
     }
 
@@ -3042,6 +3042,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     var->setOverriddenDecl(cast_or_null<VarDecl>(overridden.get()));
     if (var->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+
+    // Add the @_hasStorage attribute if this var has storage.
+    if (var->hasStorage())
+      AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     break;
   }
@@ -3945,10 +3949,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+    while (auto *genericParams = maybeReadGenericParams(DC)) {
+      genericParams->setOuterParameters(outerParams);
+
       // We do this repeatedly to set up the correct DeclContexts for the
       // GenericTypeParamDecls in the list.
       extension->setGenericParams(genericParams);
+
       outerParams = genericParams;
     }
 

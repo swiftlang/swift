@@ -708,9 +708,10 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  _ = a + b // expected-error {{unavailable}}
-  a += a + // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist}}
+  _ = a + b // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (UInt32, UInt32), (Int, Int)}}
+  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
     b
+  a += b  // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist with these partially matching parameter lists: (inout UInt32, UInt32), (inout Int, Int)}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
@@ -1183,6 +1184,14 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{cannot force unwrap value of non-optional type 'Bool'}} {{18-19=}}
+    // expected-error@-2 {{cannot force unwrap value of non-optional type 'Bool'}} {{24-25=}}
+    // expected-error@-3 {{cannot force unwrap value of non-optional type 'Bool'}} {{36-37=}}
+    // expected-error@-4 {{cannot force unwrap value of non-optional type 'Bool'}} {{48-49=}}
+  }
+
+  let _ = [i, j, k].reduce(0 as Int?) {
+    $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }

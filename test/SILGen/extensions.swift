@@ -43,7 +43,7 @@ func extensionMethodCurrying(_ x: Foo) {
 // Extensions of generic types with stored property initializers
 
 // CHECK-LABEL: sil hidden [transparent] @$s10extensions3BoxV1txSgvpfi : $@convention(thin) <T> () -> @out Optional<T>
-// CHECK:      bb0(%0 : @trivial $*Optional<T>):
+// CHECK:      bb0(%0 : $*Optional<T>):
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Optional<T>.Type
 // CHECK:      inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()

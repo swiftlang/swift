@@ -38,7 +38,12 @@ extension Equatable {
     fatalError("hella cray")
   }
 }
-extension Hashable { public var hashValue: Int { fatalError("trill hiphy") } }
+extension Hashable {
+  public func hash(into hasher: inout Hasher) {
+    fatalError("trill hiphy")
+  }
+}
+
 extension CGSize: Hashable {}
 extension CGPoint: Hashable {}
 extension CGRect: Hashable {}

@@ -189,7 +189,7 @@ func takeDefaultArgUnnamed(_ x: Int = 5) { }
 
 // CHECK-LABEL: sil hidden @$s17default_arguments25testTakeDefaultArgUnnamed{{[_0-9a-zA-Z]*}}F
 func testTakeDefaultArgUnnamed(_ i: Int) {
-  // CHECK: bb0([[I:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[I:%[0-9]+]] : $Int):
   // CHECK:   [[FN:%[0-9]+]] = function_ref @$s17default_arguments21takeDefaultArgUnnamedyySiF : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)

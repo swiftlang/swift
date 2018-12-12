@@ -16,11 +16,9 @@ bb1:
   br bb2
 }
 // CHECK:   define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @test0()
-// CHECK:     br
 // CHECK-NOT: }
 // CHECK:     ret i8 7
 // CHECK-NOT: }
-// CHECK:     br
 // CHECK:   }
 
 // Just don't crash on this one.
