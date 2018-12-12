@@ -2205,7 +2205,7 @@ for test in comparisonTestCases {
   }
 }
 
-StringTest.test("Comparison.Substrings") {
+StringTests.test("Comparison.Substrings") {
   let str = "abcdefg"
   let expectedStr = "bcdef"
   let substring = str.dropFirst().dropLast()

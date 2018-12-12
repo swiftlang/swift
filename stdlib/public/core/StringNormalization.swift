@@ -245,8 +245,8 @@ internal func _fastNormalize(
     let (read, filled) = fastFill(rebasedSourceBuffer, outputBuffer)
       if filled > 0 {
         let nextIndex = readIndex.encoded(offsetBy: read)
-        _internalInvariant(!_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
-
+        _internalInvariant(nextIndex.encodedOffset >= sourceBuffer.count || !_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
+        
         return NormalizationResult(
           amountFilled: filled, nextReadPosition: nextIndex, reallocatedBuffers: false
         )
@@ -264,7 +264,7 @@ internal func _fastNormalize(
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
-  _internalInvariant(!_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
+  _internalInvariant(nextIndex.encodedOffset >= sourceBuffer.count || !_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
   
   let rebasedICUInputBuffer = UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled])
   guard let normalized = _tryNormalize(rebasedICUInputBuffer, into: icuOutputBuffer) else {
@@ -289,7 +289,6 @@ internal func _fastNormalize(
       icuOutputBuffer: &icuOutputBuffer
     )
   }
-
   return NormalizationResult(
     amountFilled: transcoded, nextReadPosition: nextIndex, reallocatedBuffers: false
   )

@@ -91,7 +91,6 @@ extension _StringGutsSlice {
     
     var index = String.Index(encodedOffset: 0)
     let cachedEndIndex = String.Index(encodedOffset: sourceBuffer.count)
-    
     var hasBufferOwnership = false
     while index < cachedEndIndex {
       let result = _fastNormalize(
