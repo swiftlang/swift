@@ -346,12 +346,6 @@ public:
   /// This is (unsigned)-1 if none of the outer contexts are generic.
   unsigned getGenericContextDepth() const;
 
-  /// Retrieve the innermost generic parameters of this context or any
-  /// of its parents.
-  ///
-  /// FIXME: Remove this
-  GenericParamList *getGenericParamsOfContext() const;
-
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;

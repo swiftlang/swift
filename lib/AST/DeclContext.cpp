@@ -152,23 +152,6 @@ unsigned DeclContext::getGenericContextDepth() const {
   return depth;
 }
 
-GenericParamList *DeclContext::getGenericParamsOfContext() const {
-  auto dc = this;
-  do {
-    if (auto decl = dc->getAsDecl()) {
-      if (auto GC = decl->getAsGenericContext()) {
-        auto GP = GC->getGenericParams();
-
-        // Extensions do not capture outer generic parameters.
-        if (GP != nullptr || isa<ExtensionDecl>(decl))
-          return GP;
-      }
-    }
-  } while ((dc = dc->getParent()));
-
-  return nullptr;
-}
-
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   auto dc = this;
   do {
@@ -305,7 +288,21 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
-  return getGenericParamsOfContext() != nullptr;
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      if (auto GC = decl->getAsGenericContext()) {
+        if (GC->getGenericParams())
+          return true;
+
+        // Extensions do not capture outer generic parameters.
+        if (isa<ExtensionDecl>(decl))
+          break;
+      }
+    }
+  } while ((dc = dc->getParent()));
+
+  return false;
 }
 
 /// Get the most optimal resilience expansion for the body of this function.
