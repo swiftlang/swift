@@ -464,10 +464,6 @@ enum OverlyLargeSpaceEnum {
   case case9
   case case10
   case case11
-  case case12
-  case case13
-  case case14
-  case case15
 }
 
 enum ContainsOverlyLargeEnum {
@@ -491,10 +487,6 @@ func quiteBigEnough() -> Bool {
   case (.case9, .case9): return true
   case (.case10, .case10): return true
   case (.case11, .case11): return true
-  case (.case12, .case12): return true
-  case (.case13, .case13): return true
-  case (.case14, .case14): return true
-  case (.case15, .case15): return true
   }
 
   // No diagnostic
@@ -511,10 +503,6 @@ func quiteBigEnough() -> Bool {
   case (.case9, _): return true
   case (.case10, _): return true
   case (.case11, _): return true
-  case (.case12, _): return true
-  case (.case13, _): return true
-  case (.case14, _): return true
-  case (.case15, _): return true
   }
 
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
@@ -530,10 +518,6 @@ func quiteBigEnough() -> Bool {
   case (.case9, .case9): return true
   case (.case10, .case10): return true
   case (.case11, .case11): return true
-  case (.case12, .case12): return true
-  case (.case13, .case13): return true
-  case (.case14, .case14): return true
-  case (.case15, .case15): return true
   @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
   }
 
@@ -552,10 +536,6 @@ func quiteBigEnough() -> Bool {
   case (.case9, _): return true
   case (.case10, _): return true
   case (.case11, _): return true
-  case (.case12, _): return true
-  case (.case13, _): return true
-  case (.case14, _): return true
-  case (.case15, _): return true
   }
 
   // No diagnostic
@@ -572,10 +552,6 @@ func quiteBigEnough() -> Bool {
   case (_, .case9): return true
   case (_, .case10): return true
   case (_, .case11): return true
-  case (_, .case12): return true
-  case (_, .case13): return true
-  case (_, .case14): return true
-  case (_, .case15): return true
   }
 
   // No diagnostic
