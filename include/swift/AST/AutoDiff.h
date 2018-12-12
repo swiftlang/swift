@@ -316,6 +316,14 @@ struct SILAutoDiffIndices {
                [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
     s << "))";
   }
+
+  std::string mangle() const {
+    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+    interleave(parameters.set_bits(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    return result;
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,

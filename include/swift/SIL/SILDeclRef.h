@@ -34,6 +34,8 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  // SWIFT_ENABLE_TENSORFLOW
+  class AutoDiffAssociatedFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -149,15 +151,25 @@ struct SILDeclRef {
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
   
+  // SWIFT_ENABLE_TENSORFLOW
+  /// When this is non-null, it modifies the SILDeclRef to refer to the
+  /// corresponding autodiff associated function.
+  AutoDiffAssociatedFunctionIdentifier *autoDiffAssociatedFunctionIdentifier;
+
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func),
                  isCurried(0), isForeign(0), isDirectReference(0),
-                 defaultArgIndex(0) {}
+                 // SWIFT_ENABLE_TENSORFLOW
+                 defaultArgIndex(0),
+                 autoDiffAssociatedFunctionIdentifier(nullptr) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       bool isCurried = false,
-                      bool isForeign = false);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      bool isForeign = false,
+                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId =
+                          nullptr);
   
   /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
@@ -284,7 +296,10 @@ struct SILDeclRef {
       && isCurried == rhs.isCurried
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
-      && defaultArgIndex == rhs.defaultArgIndex;
+      // SWIFT_ENABLE_TENSORFLOW
+      && defaultArgIndex == rhs.defaultArgIndex
+      && autoDiffAssociatedFunctionIdentifier ==
+             rhs.autoDiffAssociatedFunctionIdentifier;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -303,7 +318,9 @@ struct SILDeclRef {
     bool willBeDirect = isDirectReference;
     return SILDeclRef(loc.getOpaqueValue(), kind,
                       curried, willBeDirect, willBeForeign,
-                      defaultArgIndex);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      defaultArgIndex,
+                      autoDiffAssociatedFunctionIdentifier);
   }
   
   /// Returns the foreign (or native) entry point corresponding to the same
@@ -311,7 +328,9 @@ struct SILDeclRef {
   SILDeclRef asForeign(bool foreign = true) const {
     assert(!isCurried);
     return SILDeclRef(loc.getOpaqueValue(), kind,
-                      isCurried, isDirectReference, foreign, defaultArgIndex);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      isCurried, isDirectReference, foreign, defaultArgIndex,
+                      autoDiffAssociatedFunctionIdentifier);
   }
   
   SILDeclRef asDirectReference(bool direct = true) const {
@@ -319,6 +338,26 @@ struct SILDeclRef {
     // The 'direct' distinction only makes sense for curry thunks.
     if (r.isCurried)
       r.isDirectReference = direct;
+    return r;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Returns the entry point for the corresponding autodiff associated
+  /// function.
+  SILDeclRef asAutoDiffAssociatedFunction(
+      AutoDiffAssociatedFunctionIdentifier *id) const {
+    assert(!autoDiffAssociatedFunctionIdentifier);
+    SILDeclRef r = *this;
+    r.autoDiffAssociatedFunctionIdentifier = id;
+    return r;
+  }
+
+  /// Returns the entry point for the original function corresponding to an
+  /// autodiff associated function.
+  SILDeclRef asAutoDiffOriginalFunction() const {
+    assert(autoDiffAssociatedFunctionIdentifier);
+    SILDeclRef r = *this;
+    r.autoDiffAssociatedFunctionIdentifier = nullptr;
     return r;
   }
 
@@ -392,12 +431,16 @@ private:
                       bool isCurried,
                       bool isDirectReference,
                       bool isForeign,
-                      unsigned defaultArgIndex)
+                      // SWIFT_ENABLE_TENSORFLOW
+                      unsigned defaultArgIndex,
+                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind),
       isCurried(isCurried),
       isForeign(isForeign), isDirectReference(isDirectReference),
-      defaultArgIndex(defaultArgIndex)
+      // SWIFT_ENABLE_TENSORFLOW
+      defaultArgIndex(defaultArgIndex),
+      autoDiffAssociatedFunctionIdentifier(autoDiffFuncId)
   {}
 
 };
@@ -421,11 +464,13 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      false, false, false, 0);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      false, false, false, 0, nullptr);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      false, false, false, 0);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      false, false, false, 0, nullptr);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
@@ -435,7 +480,10 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
                     : UnsignedInfo::getHashValue(Val.isCurried);
     unsigned h4 = UnsignedInfo::getHashValue(Val.isForeign);
     unsigned h5 = UnsignedInfo::getHashValue(Val.isDirectReference);
-    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11);
+    // SWIFT_ENABLE_TENSORFLOW
+    unsigned h6 =
+        PointerInfo::getHashValue(Val.autoDiffAssociatedFunctionIdentifier);
+    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 13);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,
                       swift::SILDeclRef const &RHS) {

@@ -112,15 +112,21 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                       bool isCurried, bool isForeign)
+                       // SWIFT_ENABLE_TENSORFLOW
+                       bool isCurried, bool isForeign,
+                       AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId)
   : loc(vd), kind(kind),
     isCurried(isCurried), isForeign(isForeign),
-    isDirectReference(0), defaultArgIndex(0)
+    // SWIFT_ENABLE_TENSORFLOW
+    isDirectReference(0), defaultArgIndex(0),
+    autoDiffAssociatedFunctionIdentifier(autoDiffFuncId)
 {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
-                       bool isCurried, bool asForeign) 
-  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0)
+                       bool isCurried, bool asForeign)
+  // SWIFT_ENABLE_TENSORFLOW
+  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0),
+    autoDiffAssociatedFunctionIdentifier(nullptr)
 {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -601,6 +607,30 @@ static void mangleClangDecl(raw_ostream &buffer,
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffAssociatedFunctionIdentifier) {
+    std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
+    bool isMethod = cast<AbstractFunctionDecl>(getDecl())->getImplicitSelfDecl()
+        ? true : false;
+    auto *functionTy =
+        getDecl()->getInterfaceType()->castTo<AnyFunctionType>();
+    auto silParameterIndices =
+        autoDiffAssociatedFunctionIdentifier->getParameterIndices()->getLowered(
+            functionTy, isMethod);
+    SILAutoDiffIndices indices(/*source*/ 0, silParameterIndices);
+    std::string mangledKind;
+    switch (autoDiffAssociatedFunctionIdentifier->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      mangledKind = "jvp";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      mangledKind = "vjp";
+      break;
+    }
+    return "AD__" + originalMangled + "__" + mangledKind + "_" +
+           indices.mangle();
+  }
+
   using namespace Mangle;
   ASTMangler mangler;
 

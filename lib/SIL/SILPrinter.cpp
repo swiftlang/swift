@@ -343,6 +343,23 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   if (isDirectReference)
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffAssociatedFunctionIdentifier) {
+    auto *autoDiffFuncId = autoDiffAssociatedFunctionIdentifier;
+    OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
+               ? '.' : '!');
+    switch (autoDiffFuncId->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      OS << "jvp.";
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      OS << "vjp.";
+      break;
+    }
+    OS << autoDiffFuncId->getDifferentiationOrder() << "."
+       << autoDiffFuncId->getParameterIndices()->getString();
+  }
 }
 
 void SILDeclRef::dump() const {
