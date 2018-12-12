@@ -59,6 +59,7 @@ add_swift_host_library(swiftAST STATIC
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
+  TypeUninhabited.cpp
   TypeWalker.cpp
   USRGeneration.cpp
 

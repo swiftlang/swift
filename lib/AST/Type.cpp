@@ -139,17 +139,6 @@ bool TypeBase::isUninhabited() {
   return false;
 }
 
-bool TypeBase::isStructurallyUninhabited() {
-  if (isUninhabited()) return true;
-  
-  // Tuples of uninhabited types are uninhabited
-  if (auto *TTy = getAs<TupleType>())
-    for (auto eltTy : TTy->getElementTypes())
-      if (eltTy->isStructurallyUninhabited())
-        return true;
-  return false;
-}
-
 bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
