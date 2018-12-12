@@ -5412,13 +5412,50 @@ namespace {
                                        enumAddr);
     }
 
+    llvm::Value *testResilientTag(IRGenFunction &IGF, llvm::Value *tag,
+                                  EnumElementDecl *Case) const {
+      auto &C = IGM.getLLVMContext();
+
+      // If the enum case is weakly linked check the address of the case
+      // first.
+      llvm::BasicBlock *conditionalBlock = nullptr;
+      llvm::BasicBlock *afterConditionalBlock = nullptr;
+      llvm::BasicBlock *beforeNullPtrCheck = nullptr;
+      if (Case->isWeakImported(IGM.getSwiftModule())) {
+        beforeNullPtrCheck = IGF.Builder.GetInsertBlock();
+        auto address = IGM.getAddrOfEnumCase(Case, NotForDefinition);
+        conditionalBlock = llvm::BasicBlock::Create(C);
+        afterConditionalBlock = llvm::BasicBlock::Create(C);
+        auto *addressVal =
+            IGF.Builder.CreatePtrToInt(address.getAddress(), IGM.IntPtrTy);
+        auto isNullPtr = IGF.Builder.CreateICmpEQ(
+            addressVal, llvm::ConstantInt::get(IGM.IntPtrTy, 0));
+        IGF.Builder.CreateCondBr(isNullPtr, afterConditionalBlock,
+                                 conditionalBlock);
+      }
+      if (conditionalBlock)
+        IGF.Builder.emitBlock(conditionalBlock);
+
+      // Check the tag.
+      auto tagVal = loadResilientTagIndex(IGF, Case);
+      auto matchesTag = IGF.Builder.CreateICmpEQ(tag, tagVal);
+      if (conditionalBlock) {
+        IGF.Builder.CreateBr(afterConditionalBlock);
+        IGF.Builder.emitBlock(afterConditionalBlock);
+        auto phi = IGF.Builder.CreatePHI(IGM.Int1Ty, 2);
+        phi->addIncoming(IGF.Builder.getInt1(false), beforeNullPtrCheck);
+        phi->addIncoming(matchesTag, conditionalBlock);
+        matchesTag = phi;
+      }
+      return matchesTag;
+    }
+
     llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
-      llvm::Value *expectedTag = loadResilientTagIndex(IGF, Case);
-      return IGF.Builder.CreateICmpEQ(tag, expectedTag);
+      return testResilientTag(IGF, tag, Case);
     }
 
     void emitIndirectSwitch(IRGenFunction &IGF,
@@ -5453,8 +5490,8 @@ namespace {
           if (continuationBB)
             IGF.Builder.emitBlock(continuationBB);
 
-          auto tagVal = loadResilientTagIndex(IGF, elt.decl);
-          auto matchesTag = IGF.Builder.CreateICmpEQ(tag, tagVal);
+          // Check the tag.
+          auto matchesTag = testResilientTag(IGF, tag, elt.decl);
 
           // If we are not the last block create a continuation block.
           if (++numCasesEmitted < dests.size())
