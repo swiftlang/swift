@@ -128,21 +128,21 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
-// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
-// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
-// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
-// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, i32* [[FLAGS_ADDR]]
+// CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0
 // CHECK:   br i1 [[ISINLINE]], label %done, label %outline.allocateValueInBuffer
 //
 // CHECK: outline.allocateValueInBuffer:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-// CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
-// CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
-// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 255
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+// CHECK:   [[SIZE:%.*]] = load [[INT]], [[INT]]* [[SIZE_ADDR]]
+// CHECK:   [[ALIGN:%.*]] = and {{.*}}, 255
 // CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]
@@ -158,11 +158,11 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
-// CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
-// CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
-// CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
-// CHECK:   [[ISINLINE:%.*]] = icmp eq {{.*}} [[ISNOTINLINE]], 0
+// CHECK:   [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+// CHECK:   [[FLAGS:%.*]] = load i32, i32* [[FLAGS_ADDR]]
+// CHECK:   [[ISNOTINLINE:%.*]] = and i32 [[FLAGS]], 131072
+// CHECK:   [[ISINLINE:%.*]] = icmp eq i32 [[ISNOTINLINE]], 0
 // CHECK:   br i1 [[ISINLINE]], label %done, label %outline.projectValueInBuffer
 //
 // CHECK: outline.projectValueInBuffer:

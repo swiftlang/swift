@@ -629,7 +629,7 @@ public:
   /// Get the bit width of an integer type for the target platform.
   unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
   unsigned getBuiltinIntegerWidth(BuiltinIntegerWidth w);
-  
+
   Size getPointerSize() const { return PtrSize; }
   Alignment getPointerAlignment() const {
     // We always use the pointer's width as its swift ABI alignment.
@@ -703,6 +703,11 @@ public:
 
   llvm::StructType *getIntegerLiteralTy();
 
+  llvm::StructType *getValueWitnessTableTy();
+  llvm::StructType *getEnumValueWitnessTableTy();
+  llvm::PointerType *getValueWitnessTablePtrTy();
+  llvm::PointerType *getEnumValueWitnessTablePtrTy();
+
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
@@ -733,7 +738,9 @@ private:
   llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
   llvm::StructType *GenericWitnessTableCacheTy = nullptr;
   llvm::StructType *IntegerLiteralTy = nullptr;
-  
+  llvm::PointerType *ValueWitnessTablePtrTy = nullptr;
+  llvm::PointerType *EnumValueWitnessTablePtrTy = nullptr;
+
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
 //--- Types -----------------------------------------------------------------
@@ -1189,6 +1196,7 @@ public:
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
+  llvm::Constant *getInt32(uint32_t value);
   llvm::Constant *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
   llvm::Constant *getBool(bool condition);

@@ -649,7 +649,7 @@ namespace {
         return llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
       }
 
-      return getSingleton()->getExtraInhabitantIndex(IGF,
+      return getFixedSingleton()->getExtraInhabitantIndex(IGF,
                                              getSingletonAddress(IGF, src),
                                              getSingletonType(IGF.IGM, T),
                                              isOutlined);
@@ -663,10 +663,44 @@ namespace {
         // Nothing to store for empty singletons.
         return;
       }
-      getSingleton()->storeExtraInhabitant(IGF, index,
-                                           getSingletonAddress(IGF, dest),
-                                           getSingletonType(IGF.IGM, T),
+      getFixedSingleton()->storeExtraInhabitant(IGF, index,
+                                                getSingletonAddress(IGF, dest),
+                                                getSingletonType(IGF.IGM, T),
+                                                isOutlined);
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
+      if (!getSingleton()) {
+        return getFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                                numEmptyCases, src, T,
+                                                isOutlined);
+      }
+
+      return getSingleton()->getEnumTagSinglePayload(IGF, numEmptyCases,
+                                                getSingletonAddress(IGF, src),
+                                                getSingletonType(IGF.IGM, T),
+                                                isOutlined);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address src, SILType T,
+                                   bool isOutlined) const override {
+      if (!getSingleton()) {
+        storeFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                           index, numEmptyCases, src, T,
                                            isOutlined);
+        return;
+      }
+
+      getSingleton()->storeEnumTagSinglePayload(IGF, index, numEmptyCases,
+                                                getSingletonAddress(IGF, src),
+                                                getSingletonType(IGF.IGM, T),
+                                                isOutlined);
     }
 
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
@@ -1007,7 +1041,9 @@ namespace {
       assert(bits < 32 && "freakishly huge no-payload enum");
 
       size_t shifted = static_cast<size_t>(static_cast<size_t>(1) << bits);
-      return shifted - ElementsWithNoPayload.size();
+      size_t rawCount = shifted - ElementsWithNoPayload.size();
+      return std::min(rawCount,
+                      size_t(ValueWitnessFlags::MaxNumExtraInhabitants));
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
@@ -1060,6 +1096,25 @@ namespace {
       index = IGF.Builder.CreateAdd(index,
                 llvm::ConstantInt::get(payloadTy, ElementsWithNoPayload.size()));
       IGF.Builder.CreateStore(index, dest);
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
+      return getFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                              numEmptyCases, src, T,
+                                              isOutlined);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address src, SILType T,
+                                   bool isOutlined) const override {
+      storeFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                         index, numEmptyCases, src, T,
+                                         isOutlined);
     }
   };
 
@@ -1135,6 +1190,25 @@ namespace {
                               Address dest, SILType T,
                               bool isOutlined) const override {
       llvm_unreachable("no extra inhabitants");
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
+      return getFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                              numEmptyCases, src, T,
+                                              isOutlined);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address src, SILType T,
+                                   bool isOutlined) const override {
+      storeFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                         index, numEmptyCases, src, T,
+                                         isOutlined);
     }
 
     bool isReflectable() const override {
@@ -2927,10 +3001,17 @@ namespace {
                             bool isOutlined) const override {
       auto payload = projectPayloadData(IGF, src);
       llvm::Value *index
-        = getPayloadTypeInfo().getExtraInhabitantIndex(IGF, payload,
+        = getFixedPayloadTypeInfo().getExtraInhabitantIndex(IGF, payload,
                                                    getPayloadType(IGF.IGM, T),
                                                    isOutlined);
 
+      return adjustPayloadExtraInhabitantIndex(IGF, index);
+    }
+
+    /// Given an extra inhabitant index for the payload type, adjust it to
+    /// be an appropriate extra inhabitant index for the enum type.
+    llvm::Value *adjustPayloadExtraInhabitantIndex(IRGenFunction &IGF,
+                                                   llvm::Value *index) const {
       // Offset the payload extra inhabitant index by the number of inhabitants
       // we used. If less than zero, it's a valid value of the enum type.
       index = IGF.Builder.CreateSub(index,
@@ -2947,16 +3028,147 @@ namespace {
                               llvm::Value *index,
                               Address dest, SILType T,
                               bool isOutlined) const override {
-      // Offset the index to skip the extra inhabitants we used.
-      index = IGF.Builder.CreateAdd(index,
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
-
+      index = adjustExtraInhabitantIndexForPayload(IGF, index);
       auto payload = projectPayloadData(IGF, dest);
-      getPayloadTypeInfo().storeExtraInhabitant(IGF, index, payload,
+      getFixedPayloadTypeInfo().storeExtraInhabitant(IGF, index, payload,
                                                 getPayloadType(IGF.IGM, T),
                                                 isOutlined);
     }
-    
+
+    /// Given an extra inhabitant index, adjust it to be an appropriate
+    /// extra inhabitant index for the payload type.
+    llvm::Value *adjustExtraInhabitantIndexForPayload(IRGenFunction &IGF,
+                                                      llvm::Value *index) const{
+      // Skip the extra inhabitants this enum uses.
+      index = IGF.Builder.CreateAdd(index,
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
+      return index;
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address addr, SILType T,
+                                         bool isOutlined) const override {
+      if (TIK >= Fixed) {
+        return getFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                                numEmptyCases, addr, T,
+                                                isOutlined);
+      }
+
+      // If we're not emitting an outlined copy, just call the value witness.
+      if (!isOutlined) {
+        return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, addr);
+      }
+
+      // Otherwise, fall back on a generic implementation.
+      // TODO: consider inlining some of this so that we don't have to
+      // bounce into the runtime when e.g. dynamically working with
+      // double-optionals.
+      return emitGetEnumTagSinglePayloadGenericCall(IGF, T, *TI, numEmptyCases,
+                                                    addr,
+          [this, T](IRGenFunction &IGF, Address addr,
+                    llvm::Value *numXI) -> llvm::Value* {
+        auto payloadType = getPayloadType(IGF.IGM, T);
+        auto payloadAddr = projectPayloadData(IGF, addr);
+
+        // For the case count, we just use the XI count from the payload type.
+        auto payloadNumExtraCases = numXI;
+
+        llvm::Value *tag
+          = getPayloadTypeInfo().getEnumTagSinglePayload(IGF,
+                                                         payloadNumExtraCases,
+                                                         payloadAddr,
+                                                         payloadType,
+                                                         /*outlined*/ false);
+
+        // We need to adjust that for the number of cases we're using
+        // in this enum.
+        return adjustPayloadExtraInhabitantTag(IGF, tag);
+      });
+    }
+
+    /// Given an extra inhabitant tag for the payload type, adjust it to
+    /// be an appropriate extra inhabitant tag for the enum type.
+    llvm::Value *adjustPayloadExtraInhabitantTag(IRGenFunction &IGF,
+                                                 llvm::Value *tag) const {
+      auto numExtraCases = IGF.IGM.getInt32(ElementsWithNoPayload.size());
+
+      // Adjust the tag.
+      llvm::Value *adjustedTag = IGF.Builder.CreateSub(tag, numExtraCases);
+
+      // If tag <= numExtraCases, then this is a valid value of the enum type,
+      // and the proper tag to return is 0.
+      auto isEnumValue = IGF.Builder.CreateICmpULE(tag, numExtraCases);
+      adjustedTag = IGF.Builder.CreateSelect(isEnumValue,
+                                             IGF.IGM.getInt32(0),
+                                             adjustedTag);
+      return adjustedTag;
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *tag,
+                                   llvm::Value *numEmptyCases,
+                                   Address dest, SILType T,
+                                   bool isOutlined) const override {
+      if (TIK >= Fixed) {
+        storeFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                           tag, numEmptyCases, dest, T,
+                                           isOutlined);
+        return;
+      }
+
+      // If we're not emitting an outlined copy, just call the value witness.
+      if (!isOutlined) {
+        emitStoreEnumTagSinglePayloadCall(IGF, T, tag, numEmptyCases, dest);
+        return;
+      }
+
+      // Otherwise, fall back on a generic implementation.
+      // TODO: consider inlining some of this so that we don't have to
+      // bounce into the runtime when e.g. dynamically working with
+      // double-optionals.
+      emitStoreEnumTagSinglePayloadGenericCall(IGF, T, *TI, tag,
+                                               numEmptyCases, dest,
+          [this, T](IRGenFunction &IGF, Address dest, llvm::Value *tag,
+                    llvm::Value *payloadNumXI) {
+        auto payloadType = getPayloadType(IGF.IGM, T);
+        auto payloadDest = projectPayloadData(IGF, dest);
+        auto payloadTag = adjustExtraInhabitantTagForPayload(IGF, tag,
+                                                             /*nonzero*/false);
+
+        getPayloadTypeInfo().storeEnumTagSinglePayload(IGF, payloadTag,
+                                                       payloadNumXI,
+                                                       payloadDest,
+                                                       payloadType,
+                                                       /*outlined*/ false);
+      });
+    }
+
+    /// Given an extra inhabitant tag for the payload type, which is known
+    /// not to be 0, adjust it to be an appropriate extra inhabitant tag
+    /// for the enum type.
+    llvm::Value *adjustExtraInhabitantTagForPayload(IRGenFunction &IGF,
+                                                    llvm::Value *tag,
+                                                    bool isKnownNonZero) const {
+      auto numExtraCases = IGF.IGM.getInt32(ElementsWithNoPayload.size());
+
+      // Adjust the tag.
+      llvm::Value *adjustedTag = IGF.Builder.CreateAdd(tag, numExtraCases);
+
+      // Preserve the zero tag so that we don't pass down a meaningless XI
+      // value that the payload will waste time installing before we
+      // immediately overwrite it.
+      if (!isKnownNonZero) {
+        // If tag <= numExtraCases, then this is a valid value of the enum type,
+        // and the proper tag to return is 0.
+        auto isEnumValue = IGF.Builder.CreateIsNull(tag);
+        adjustedTag = IGF.Builder.CreateSelect(isEnumValue,
+                                               IGF.IGM.getInt32(0),
+                                               adjustedTag);
+      }
+      return adjustedTag;
+    }
+
     APInt
     getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
       auto &payloadTI = getFixedPayloadTypeInfo();
@@ -4874,11 +5086,15 @@ namespace {
                                          Address src,
                                          SILType T,
                                          bool isOutlined) const override {
-      // For dynamic layouts, the runtime provides a value witness to do this.
-      if (TIK < Fixed) {
-        return emitGetExtraInhabitantIndexCall(IGF, T, src);
-      }
-      
+      assert(TIK >= Fixed);
+      return getExtraInhabitantIndexImpl(IGF, src, T, isOutlined,
+                                         getFixedExtraInhabitantCount(IGF.IGM));
+    }
+
+    llvm::Value *getExtraInhabitantIndexImpl(IRGenFunction &IGF,
+                                             Address src, SILType T,
+                                             bool isOutlined,
+                                             unsigned xiCount) const {
       llvm::Value *tag;
       if (CommonSpareBits.count()) {
         auto payload = EnumPayload::load(IGF, projectPayload(IGF, src),
@@ -4932,8 +5148,7 @@ namespace {
                                llvm::ConstantInt::get(IGF.IGM.Int32Ty, maxTag),
                                tag);
       auto isExtraInhabitant = IGF.Builder.CreateICmpULT(index,
-                 llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                        getFixedExtraInhabitantCount(IGF.IGM)));
+                              llvm::ConstantInt::get(IGF.IGM.Int32Ty, xiCount));
       return IGF.Builder.CreateSelect(isExtraInhabitant,
                             index, llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1));
     }
@@ -4943,11 +5158,7 @@ namespace {
                               Address dest,
                               SILType T,
                               bool isOutlined) const override {
-      // For dynamic layouts, the runtime provides a value witness to do this.
-      if (TIK < Fixed) {
-        emitStoreExtraInhabitantCall(IGF, T, index, dest);
-        return;
-      }
+      assert(TIK >= Fixed);
 
       auto indexValue = IGF.Builder.CreateNot(index);
       
@@ -4995,6 +5206,36 @@ namespace {
         IGF.Builder.CreateStore(indexValue, tagAddr);
       }
     }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
+      if (TIK < Fixed) {
+        // For dynamic layouts, the runtime provides a value witness to do this.
+        return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, src);
+      }
+
+      return getFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                              numEmptyCases, src, T,
+                                              isOutlined);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address src, SILType T,
+                                   bool isOutlined) const override {
+      if (TIK < Fixed) {
+        // For dynamic layouts, the runtime provides a value witness to do this.
+        emitStoreEnumTagSinglePayloadCall(IGF, T, index, numEmptyCases, src);
+        return;
+      }
+
+      storeFixedTypeEnumTagSinglePayload(IGF, cast<FixedTypeInfo>(*TI),
+                                         index, numEmptyCases, src, T,
+                                         isOutlined);
+    }
     
     APInt
     getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
@@ -5014,9 +5255,12 @@ namespace {
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       unsigned totalTagBits = CommonSpareBits.count() + getExtraTagBitCountForExtraInhabitants();
       if (totalTagBits >= 32)
-        return INT_MAX;
+        return ValueWitnessFlags::MaxNumExtraInhabitants;
       unsigned totalTags = 1u << totalTagBits;
-      return totalTags - ElementsWithPayload.size() - NumEmptyElementTags;
+      unsigned rawCount =
+        totalTags - ElementsWithPayload.size() - NumEmptyElementTags;
+      return std::min(rawCount,
+                      unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
     }
 
     APInt
@@ -5433,7 +5677,7 @@ namespace {
                                          Address src,
                                          SILType T,
                                          bool isOutlined) const override {
-      return emitGetExtraInhabitantIndexCall(IGF, T, src);
+      llvm_unreachable("resilient enums are never fixed-layout types");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
@@ -5441,7 +5685,22 @@ namespace {
                               Address dest,
                               SILType T,
                               bool isOutlined) const override {
-      emitStoreExtraInhabitantCall(IGF, T, index, dest);
+      llvm_unreachable("resilient enums are never fixed-layout types");
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address src, SILType T,
+                                         bool isOutlined) const override {
+      return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, src);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address src, SILType T,
+                                   bool isOutlined) const override {
+      emitStoreEnumTagSinglePayloadCall(IGF, T, index, numEmptyCases, src);
     }
 
     APInt
@@ -5663,18 +5922,22 @@ namespace {
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return Strategy.mayHaveExtraInhabitants(IGM);
     }
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address src,
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address enumAddr,
                                          SILType T,
                                          bool isOutlined) const override {
-      return Strategy.getExtraInhabitantIndex(IGF, src, T, isOutlined);
+      return Strategy.getEnumTagSinglePayload(IGF, numEmptyCases, enumAddr, T,
+                                              isOutlined);
     }
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address dest,
-                              SILType T,
-                              bool isOutlined) const override {
-      return Strategy.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address enumAddr,
+                                   SILType T,
+                                   bool isOutlined) const override {
+      return Strategy.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases,
+                                                enumAddr, T, isOutlined);
     }
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {
@@ -5682,15 +5945,13 @@ namespace {
     }
   };
 
-  /// TypeInfo for fixed-layout, address-only enum types.
-  class FixedEnumTypeInfo : public EnumTypeInfoBase<FixedTypeInfo> {
+  template <class Base>
+  class FixedEnumTypeInfoBase : public EnumTypeInfoBase<Base> {
+  protected:
+    using EnumTypeInfoBase<Base>::EnumTypeInfoBase;
+
   public:
-    FixedEnumTypeInfo(EnumImplStrategy &strategy,
-                      llvm::StructType *T, Size S, SpareBitVector SB,
-                      Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
-                      IsFixedSize_t alwaysFixedSize)
-      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT,
-                         alwaysFixedSize) {}
+    using EnumTypeInfoBase<Base>::Strategy;
 
     /// \group Methods delegated to the EnumImplStrategy
 
@@ -5708,18 +5969,43 @@ namespace {
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
       return Strategy.getFixedExtraInhabitantMask(IGM);
     }
+
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                         Address src,
+                                         SILType T,
+                                         bool isOutlined) const override {
+      return Strategy.getExtraInhabitantIndex(IGF, src, T, isOutlined);
+    }
+    void storeExtraInhabitant(IRGenFunction &IGF,
+                              llvm::Value *index,
+                              Address dest,
+                              SILType T,
+                              bool isOutlined) const override {
+      return Strategy.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
+    }
+  };
+
+  /// TypeInfo for fixed-layout but address-only enum types.
+  class FixedEnumTypeInfo : public FixedEnumTypeInfoBase<FixedTypeInfo> {
+  public:
+    FixedEnumTypeInfo(EnumImplStrategy &strategy,
+                      llvm::StructType *T, Size S, SpareBitVector SB,
+                      Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                      IsFixedSize_t alwaysFixedSize)
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT,
+                              alwaysFixedSize) {}
   };
 
   /// TypeInfo for loadable enum types.
-  class LoadableEnumTypeInfo : public EnumTypeInfoBase<LoadableTypeInfo> {
+  class LoadableEnumTypeInfo : public FixedEnumTypeInfoBase<LoadableTypeInfo> {
   public:
     // FIXME: Derive spare bits from element layout.
     LoadableEnumTypeInfo(EnumImplStrategy &strategy,
                          llvm::StructType *T, Size S, SpareBitVector SB,
                          Alignment A, IsPOD_t isPOD,
                          IsFixedSize_t alwaysFixedSize)
-      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
-                         alwaysFixedSize) {}
+      : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD,
+                              alwaysFixedSize) {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -5771,20 +6057,6 @@ namespace {
                                Explosion &dest,
                                unsigned offset) const override {
       return Strategy.unpackFromEnumPayload(IGF, payload, dest, offset);
-    }
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return Strategy.getFixedExtraInhabitantCount(IGM);
-    }
-
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index)
-    const override {
-      return Strategy.getFixedExtraInhabitantValue(IGM, bits, index);
-    }
-    
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-      return Strategy.getFixedExtraInhabitantMask(IGM);
     }
     LoadedRef loadRefcountedPtr(IRGenFunction &IGF,
                                 SourceLoc loc, Address addr) const override {

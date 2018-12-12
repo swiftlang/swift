@@ -240,15 +240,16 @@ llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
 unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
   if (SpareBits.none())
     return 0;
-  // The runtime supports a max of 0x7FFFFFFF extra inhabitants, which ought
-  // to be enough for anybody.
+  // Make sure the arithmetic below doesn't overflow.
   if (getFixedSize().getValue() >= 4)
-    return 0x7FFFFFFF;
+    return ValueWitnessFlags::MaxNumExtraInhabitants;
   unsigned spareBitCount = SpareBits.count();
   assert(spareBitCount <= getFixedSize().getValueInBits()
          && "more spare bits than storage bits?!");
   unsigned inhabitedBitCount = getFixedSize().getValueInBits() - spareBitCount;
-  return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  unsigned rawCount = ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  return std::min(rawCount,
+                  unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
 void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
@@ -426,15 +427,26 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
                                                     llvm::Value *numEmptyCases,
                                                     Address enumAddr,
-                                                    SILType T) const {
+                                                    SILType T,
+                                                    bool isOutlined) const {
+  return getFixedTypeEnumTagSinglePayload(IGF, *this, numEmptyCases, enumAddr,
+                                          T, isOutlined);
+}
+
+llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                                     const FixedTypeInfo &ti,
+                                                     llvm::Value *numEmptyCases,
+                                                     Address enumAddr,
+                                                     SILType T,
+                                                     bool isOutlined) {
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
   auto &Builder = IGF.Builder;
 
-  auto *size = getSize(IGF, T);
-  Size fixedSize = getFixedSize();
+  auto *size = ti.getSize(IGF, T);
+  Size fixedSize = ti.getFixedSize();
   auto *numExtraInhabitants =
-      llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
+      llvm::ConstantInt::get(IGM.Int32Ty, ti.getFixedExtraInhabitantCount(IGM));
 
   auto *zero = llvm::ConstantInt::get(IGM.Int32Ty, 0U);
   auto *one = llvm::ConstantInt::get(IGM.Int32Ty, 1U);
@@ -513,8 +525,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.emitBlock(noExtraTagBitsBB);
   // If there are extra inhabitants, see whether the payload is valid.
   llvm::Value *result0;
-  if (mayHaveExtraInhabitants(IGM)) {
-    result0 = getExtraInhabitantIndex(IGF, enumAddr, T, false);
+  if (ti.mayHaveExtraInhabitants(IGM)) {
+    result0 = ti.getExtraInhabitantIndex(IGF, enumAddr, T, false);
     noExtraTagBitsBB = Builder.GetInsertBlock();
   } else {
     result0 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
@@ -605,7 +617,19 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
                                               llvm::Value *whichCase,
                                               llvm::Value *numEmptyCases,
                                               Address enumAddr,
-                                              SILType T) const {
+                                              SILType T,
+                                              bool isOutlined) const {
+  storeFixedTypeEnumTagSinglePayload(IGF, *this, whichCase, numEmptyCases,
+                                     enumAddr, T, isOutlined);
+}
+
+void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
+                                               const FixedTypeInfo &ti,
+                                               llvm::Value *whichCase,
+                                               llvm::Value *numEmptyCases,
+                                               Address enumAddr,
+                                               SILType T,
+                                               bool isOutlined) {
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
   auto &Builder = IGF.Builder;
@@ -616,15 +640,15 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *four = llvm::ConstantInt::get(int32Ty, 4U);
   auto *eight = llvm::ConstantInt::get(int32Ty, 8U);
 
-  auto fixedSize = getFixedSize();
+  auto fixedSize = ti.getFixedSize();
 
   Address valueAddr = Builder.CreateElementBitCast(enumAddr, IGM.Int8Ty);
   Address extraTagBitsAddr =
     Builder.CreateConstByteArrayGEP(valueAddr, fixedSize);
 
   auto *numExtraInhabitants =
-      llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
-  auto *size = getSize(IGF, T);
+      llvm::ConstantInt::get(IGM.Int32Ty, ti.getFixedExtraInhabitantCount(IGM));
+  auto *size = ti.getSize(IGF, T);
 
   // Do we need extra tag bytes.
   auto *entryBB = Builder.GetInsertBlock();
@@ -666,11 +690,11 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.CreateCondBr(isPayload, returnBB, storeInhabitantBB);
 
   Builder.emitBlock(storeInhabitantBB);
-  if (mayHaveExtraInhabitants(IGM)) {
+  if (ti.mayHaveExtraInhabitants(IGM)) {
     // Store an index in the range [0..ElementsWithNoPayload-1].
     auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
-    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
-                         /*outlined*/ false);
+    ti.storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
+                            /*outlined*/ false);
   }
   Builder.CreateBr(returnBB);
 
@@ -726,30 +750,6 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(returnBB);
-}
-
-llvm::Value *irgen::emitGetEnumTagSinglePayload(IRGenFunction &IGF,
-                                                llvm::Value *numEmptyCases,
-                                                Address enumAddr, SILType T) {
-  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-  auto opaqueAddr =
-      IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGF.IGM.OpaquePtrTy);
-
-  return IGF.Builder.CreateCall(IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                                {opaqueAddr, metadata, numEmptyCases});
-}
-
-void irgen::emitStoreEnumTagSinglePayload(IRGenFunction &IGF,
-                                          llvm::Value *whichCase,
-                                          llvm::Value *numEmptyCases,
-                                          Address enumAddr,
-                                          SILType T) {
-  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
-  auto opaqueAddr =
-      IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGF.IGM.OpaquePtrTy);
-
-  IGF.Builder.CreateCall(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
-                         {opaqueAddr, metadata, whichCase, numEmptyCases});
 }
 
 void
