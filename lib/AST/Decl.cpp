@@ -4282,7 +4282,7 @@ void ProtocolDecl::createGenericParamsIfMissing() {
   auto selfDecl = new (ctx) GenericTypeParamDecl(
       this, selfId,
       SourceLoc(),
-      GenericTypeParamDecl::InvalidDepth, /*index=*/0);
+      /*depth=*/getGenericContextDepth() + 1, /*index=*/0);
   auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
