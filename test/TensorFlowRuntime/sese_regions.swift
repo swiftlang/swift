@@ -1,6 +1,6 @@
 // This test has various test cases to check that SESE regions are computed correctly.
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -O %s -verify | %FileCheck %s
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 

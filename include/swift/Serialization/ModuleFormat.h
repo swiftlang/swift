@@ -202,19 +202,6 @@ enum class SILFunctionTypeRepresentation : uint8_t {
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
 
-// SWIFT_ENABLE_TENSORFLOW
-// These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
-enum class FunctionTypeDifferentiability : uint8_t {
-  None = 0,
-  Forward,
-  Reverse,
-  Bidirectional,
-  Linear,
-  Constant,
-};
-using FunctionTypeDifferentiabilityField = BCFixed<3>;
-
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SILCoroutineKind : uint8_t {
@@ -752,7 +739,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    FunctionTypeDifferentiabilityField // differentiability
+    BCFixed<1>   // differentiable?
     // trailed by parameters
   >;
 
@@ -815,8 +802,8 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     // SWIFT_ENABLE_TENSORFLOW
-    GenericSignatureIDField, // generic signture
-    BCFixed<3>           // differentiability
+    BCFixed<1>,          // differentiable?
+    GenericSignatureIDField // generic signture
 
     // trailed by parameters
   >;
@@ -829,7 +816,7 @@ namespace decls_block {
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     // SWIFT_ENABLE_TENSORFLOW
-    FunctionTypeDifferentiabilityField, // differentiability
+    BCFixed<1>,            // differentiable?
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
     BCFixed<30>,           // number of yields

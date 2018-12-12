@@ -261,6 +261,10 @@ public final class _ExecutionContext {
   /// The mutex for preventing potential concurrent access.
   private var mutex: pthread_mutex_t = pthread_mutex_t()
 
+  /// The stack for holding the current device scoping information.
+  @usableFromInline
+  var deviceScopes: [DeviceKind] = [.`default`]
+
   /// Initializes a new execution context by initializing available devices.
   @usableFromInline
   init() {
@@ -1504,6 +1508,67 @@ func _TFCOpSetAttrStringArray(_ op: CTFEOp,
                                 lengthsBuffer.baseAddress, Int32(strings.count))
       }
     }
+  }
+}
+
+/// A TensorFlow device kind.
+public enum DeviceKind {
+  /// Default device.
+  case `default`
+  /// Central processing units.
+  case cpu
+  /// Graphics processing units.
+  case gpu
+  // TODO: TPU?
+}
+
+internal extension _ExecutionContext {
+  var currentDeviceKind: DeviceKind {
+    return sync {
+      deviceScopes.last ?? .default
+    }
+  }
+
+  @usableFromInline
+  func pushDeviceScope(_ kind: DeviceKind) {
+    sync {
+      deviceScopes.append(kind)
+    }
+  }
+
+  @usableFromInline
+  func popDeviceScope() {
+    sync {
+      internalConsistencyCheck(deviceScopes.popLast() != nil)
+    }
+  }
+}
+
+/// Executes a closure, making TensorFlow operations run on a specific kind of
+/// device unless specified otherwise.
+///
+/// - Parameters:
+///   - kind: A kind of device to run TensorFlow operations on.
+///   - body: A closure whose TensorFlow operations are to be executed on the
+///     specified kind of device.
+@inlinable
+public func withDevice<R>(_ kind: DeviceKind,
+                          perform body: () throws -> R) rethrows -> R {
+  _ExecutionContext.global.pushDeviceScope(kind)
+  let result = try body()
+  _ExecutionContext.global.popDeviceScope()
+  return result
+}
+
+@usableFromInline
+@_cdecl("_swift_tfc_OpSetDeviceFromScope")
+func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
+  let context = _ExecutionContext.global
+  let device = context.currentDeviceKind
+  switch device {
+  case .cpu: TFE_OpSetDevice(op, context.cpuDeviceName, status)
+  case .gpu: TFE_OpSetDevice(op, context.gpuDeviceName!, status)
+  default: break
   }
 }
 

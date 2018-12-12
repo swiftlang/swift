@@ -191,7 +191,9 @@ private extension PythonLibrary {
   
   static func loadPythonLibrary(at path: String) -> UnsafeMutableRawPointer? {
     log("Trying to load library at '\(path)'...")
-    let pythonLibraryHandle = dlopen(path, RTLD_LAZY)
+    // Must be RTLD_GLOBAL because subsequent .so files from the imported python
+    // modules may depend on this .so file.
+    let pythonLibraryHandle = dlopen(path, RTLD_LAZY | RTLD_GLOBAL)
     
     if pythonLibraryHandle != nil {
       log("Library at '\(path)' was sucessfully loaded.")

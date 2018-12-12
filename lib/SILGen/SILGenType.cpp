@@ -636,9 +636,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto requirementLoweredType = Types.getConstantInfo(requirement).LoweredType;
   if (autoDiffFuncId) {
     auto associated = requirementLoweredType->getAutoDiffAssociatedFunctionType(
-        *autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
+        autoDiffFuncId->getParameterIndices(), /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
-        LookUpConformanceInModule(M.getSwiftModule()), /*selfUncurried*/ true);
+        LookUpConformanceInModule(M.getSwiftModule()), /*isMethod*/ true,
+        /*selfUncurried*/ true);
     requirementLoweredType = cast<AnyFunctionType>(associated->getCanonicalType());
   }
   auto reqtOrigTy = cast<GenericFunctionType>(requirementLoweredType);

@@ -1055,7 +1055,7 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     [=, &Ts](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiability(FunctionTypeDifferentiability::Bidirectional);
+          .withDifferentiable().withNoEscape();
       if (isThrowing)
         extInfo = extInfo.withThrows();
       SmallVector<FunctionType::Param, 2> params;
@@ -1065,19 +1065,18 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     }
   };
   AnyFunctionType *origFnTy = argGen.build(builder)->castTo<AnyFunctionType>();
-  origFnTy = origFnTy->withExtInfo(origFnTy->getExtInfo()
-      .withDifferentiability(FunctionTypeDifferentiability::None));
-  auto *paramIndices = AutoDiffParameterIndices::create(Context, origFnTy,
-                                                        /*isMethod*/ false,
-                                                        /*setAllParams*/ true);
+  origFnTy = origFnTy->withExtInfo(
+      origFnTy->getExtInfo().withDifferentiable(false));
+  auto *paramIndices = AutoDiffParameterIndicesBuilder(
+      origFnTy, /*isMethod*/ false, /*setAllParams*/ true).build(Context);
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen {
     [=](BuiltinGenericSignatureBuilder &builder) -> Type {
       // TODO(rxwei): Use parameter indices and differentiation order that are
       // stored in the function type.
       auto *vjpType = origFnTy->getAutoDiffAssociatedFunctionType(
-          *paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-          kind, /*lookupConformance*/ nullptr);
+          paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
+          kind, /*lookupConformance*/ nullptr, /*isMethod*/ false);
       vjpType = vjpType->withExtInfo(vjpType->getExtInfo().withNoEscape(false));
       return vjpType;
     }

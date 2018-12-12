@@ -122,7 +122,7 @@ public:
     if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
       return decl == func && Protocol == nullptr &&
              AutoDiffFuncId != nullptr &&
-             *AutoDiffFuncId == *autoDiffFuncId;
+             AutoDiffFuncId == autoDiffFuncId;
     return false;
   }
 

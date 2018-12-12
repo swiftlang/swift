@@ -200,13 +200,41 @@ CanSILFunctionType SILFunctionType::getGradientType(
                               getWitnessMethodConformanceOrNone());
 }
 
+llvm::SmallBitVector
+SILFunctionType::getDifferentiationParameterIndices() const {
+  assert(isDifferentiable());
+  SmallBitVector result(getNumParameters());
+  for (auto paramAndIndex : enumerate(getParameters())) {
+    auto &param = paramAndIndex.value();
+    unsigned index = paramAndIndex.index();
+    if (param.getDifferentiability() ==
+            SILParameterDifferentiability::DifferentiableOrNotApplicable)
+      result.set(index);
+  }
+  return result;
+}
+
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
     unsigned differentiationOrder,
     const SmallBitVector &parameterIndices) {
   // FIXME(rxwei): Handle differentiation order.
-  // FIXME(rxwei): Handle parameter indices.
-  return getWithExtInfo(
-      getExtInfo().withDifferentiability(Differentiability::Bidirectional));
+
+  SmallVector<SILParameterInfo, 8> newParameters;
+  for (auto paramAndIndex : enumerate(getParameters())) {
+    auto &param = paramAndIndex.value();
+    unsigned index = paramAndIndex.index();
+    newParameters.push_back(param.getWithDifferentiability(
+        index < parameterIndices.size() && parameterIndices[index]
+            ? SILParameterDifferentiability::DifferentiableOrNotApplicable
+            : SILParameterDifferentiability::NotDifferentiable));
+  }
+
+  auto newExtInfo = getExtInfo().withDifferentiable();
+
+  return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
+             getCalleeConvention(), newParameters, getYields(), getResults(),
+             getOptionalErrorResult(), getASTContext(),
+             getWitnessMethodConformanceOrNone());
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
@@ -1283,7 +1311,7 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiability(extInfo.getDifferentiability());
+    .withDifferentiable(extInfo.isDifferentiable());
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
