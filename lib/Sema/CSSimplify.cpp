@@ -1896,7 +1896,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return formUnsolvedResult();
 
     case TypeKind::TypeVariable:
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
       // Nothing to do here; handle type variables and archetypes below.
       break;
 
@@ -2608,7 +2610,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:

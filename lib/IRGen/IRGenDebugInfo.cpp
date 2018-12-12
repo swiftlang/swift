@@ -1193,7 +1193,9 @@ private:
     case TypeKind::InOut:
       break;
 
-    case TypeKind::Archetype: {
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       auto L = getDebugLoc(*this, Archetype->getAssocType());
       auto Superclass = Archetype->getSuperclass();
