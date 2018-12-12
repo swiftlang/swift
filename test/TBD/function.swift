@@ -33,13 +33,3 @@ private func privateWithDefault(_: Int = 0) {}
 
 @_silgen_name("silgen_internalNoArgs") internal func internalNoArgsSilgenNameDecl()
 @_silgen_name("silgen_internalSomeArgs") internal func internalSomeArgsSilgenNameDecl(_: Int, x: Int)
-
-// SWIFT_ENABLE_TENSORFLOW
-@differentiable(reverse) public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
-
-@differentiable(reverse) internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
-
-@differentiable(reverse) private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
