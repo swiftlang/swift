@@ -1322,7 +1322,7 @@ ConstraintSystem::getTypeOfMemberReference(
   Type baseOpenedTy = baseObjTy;
 
   if (baseObjTy->isExistentialType()) {
-    ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
+    auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
                                        openedArchetype });
     baseOpenedTy = openedArchetype;

@@ -602,7 +602,7 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
+  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1075,7 +1075,7 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
+  SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
   SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
