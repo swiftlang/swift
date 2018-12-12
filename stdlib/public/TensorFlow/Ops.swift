@@ -275,7 +275,10 @@ public extension Tensor where Scalar : Numeric {
 public func matmul<Scalar : Numeric>(
   _ left: Tensor<Scalar>, _ right: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  return Raw.matMul(left, right)
+  // Default arguments specified explicitly to avoid "external declarations of
+  // SILFunctions with shared visibility is not allowed" SILVerifier error in
+  // "tests/AutoDiff/tensor_autodiff_runtime.swift".
+  return Raw.matMul(left, right, transposeA: false, transposeB: false)
 }
 
 infix operator • : MultiplicationPrecedence

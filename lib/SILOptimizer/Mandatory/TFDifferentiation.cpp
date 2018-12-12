@@ -4466,12 +4466,30 @@ void DifferentiationTask::createVJP() {
                          SILDebugScope(original->getLocation(), vjp));
   attr->setVJPName(vjp->getName());
 
+  // Work around a bad interaction between VJPs, TFDeabstraction, and SIL
+  // optimizations.
+  //
+  // The bad interaction is: TFDeabstraction cannot inline the functions that
+  // the VJP partially applies. When run in "-Onone" mode, this is fine (but
+  // inefficient), because we just generate sends/recvs to handle it. But in
+  // "-O" mode, later SIL optimization passes:
+  // - fold the partial applications and inline them, or
+  // - specialize the partial_apply callees.
+  // In either case, the inlined/specialized bodies haven't been deabstracted,
+  // so partitioning crashes when it sees them.
+  //
+  // TODO: Fix this problem in a way that allows inlining/specialization of
+  // VJPs. Teaching TFDeabstraction to fold partial applications might work.
+  vjp->setInlineStrategy(NoInline);
+  vjp->addSemanticsAttr("optimize.sil.specialize.generic.never");
+
   LLVM_DEBUG(llvm::dbgs() << "  vjp type: "
                           << vjp->getLoweredFunctionType() << "\n");
 
   // We'll use these conventions frequently.
   auto originalConv = original->getConventions();
   auto primalConv = primal->getConventions();
+  auto vjpConv = vjp->getConventions();
 
   // Keep track of some stack allocation to clean up.
   SmallVector<SILValue, 2> stackAllocsToCleanUp;
@@ -4479,7 +4497,6 @@ void DifferentiationTask::createVJP() {
   // Validate signatures.
 #ifndef NDEBUG
   auto adjointConv = adjoint->getConventions();
-  auto vjpConv = vjp->getConventions();
 
   unsigned numOriginalParameters = originalConv.getNumParameters();
   unsigned numOriginalResults = originalConv.getResults().size();
@@ -4538,7 +4555,16 @@ void DifferentiationTask::createVJP() {
 
   // Create the entry block with indirect results and parameters.
   auto *entry = vjp->createBasicBlock();
-  createEntryArguments(vjp);
+  unsigned argumentIndex = 0;
+  for (auto indResultTy : vjpConv.getIndirectSILResultTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(indResultTy).getAddressType(),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  for (auto paramTy : vjpConv.getParameterSILTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(paramTy),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+
   SILBuilder builder(entry);
   auto loc = vjp->getLocation();
 

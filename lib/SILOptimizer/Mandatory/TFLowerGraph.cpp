@@ -2694,6 +2694,8 @@ bool TFGraphLowering::serializeGraphProtoBuf(ASTContext &ctx,
 ///   repl)
 std::string getTFCompatibleFuncName(SILFunction *fn) {
   auto fnName = fn->getName();
+  if (fnName.startswith("AD__"))
+    fnName = fnName.substr(4);
   if (fnName.startswith("$"))
     fnName = fnName.substr(1);
 
