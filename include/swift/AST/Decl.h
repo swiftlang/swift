@@ -4107,10 +4107,6 @@ public:
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  /// Create the implicit generic parameter list for a protocol or
-  /// extension thereof.
-  GenericParamList *createGenericParams(DeclContext *dc);
-
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.
   void createGenericParamsIfMissing();

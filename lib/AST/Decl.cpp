@@ -4297,14 +4297,17 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
-GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
+void ProtocolDecl::createGenericParamsIfMissing() {
+  if (getGenericParams())
+    return;
+
   auto *outerGenericParams = getParent()->getGenericParamsOfContext();
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
   auto selfDecl = new (ctx) GenericTypeParamDecl(
-      dc, selfId,
+      this, selfId,
       SourceLoc(),
       GenericTypeParamDecl::InvalidDepth, /*index=*/0);
   auto protoType = getDeclaredType();
@@ -4316,12 +4319,7 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
-  return result;
-}
-
-void ProtocolDecl::createGenericParamsIfMissing() {
-  if (!getGenericParams())
-    setGenericParams(createGenericParams(this));
+  setGenericParams(result);
 }
 
 void ProtocolDecl::computeRequirementSignature() {
