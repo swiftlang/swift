@@ -2213,6 +2213,18 @@ StringTests.test("Comparison.Substrings") {
   expectEqual(expectedStr, substring)
 }
 
+StringTests.test("Comparison.Substrings/Opaque")
+.skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+.code {
+#if _runtime(_ObjC)
+  let str = "abcdefg"
+  let expectedStr = "bcdef"
+  let substring = str.dropFirst().dropLast()
+  
+  expectEqual(expectedStr, substring)
+#endif
+}
+
 StringTests.test("NormalizationBufferCrashRegressionTest") {
   let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
   let set = Set([str])
