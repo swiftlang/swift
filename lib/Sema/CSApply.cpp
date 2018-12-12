@@ -51,15 +51,11 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
 /// This comes up in computeSubstitutions() when accessing
 /// members via dynamic lookup.
 static bool isOpenedAnyObject(Type type) {
-  auto archetype = type->getAs<ArchetypeType>();
+  auto archetype = type->getAs<OpenedArchetypeType>();
   if (!archetype)
     return false;
 
-  auto existential = archetype->getOpenedExistentialType();
-  if (!existential)
-    return false;
-
-  return existential->isAnyObject();
+  return archetype->getOpenedExistentialType()->isAnyObject();
 }
 
 SubstitutionMap Solution::computeSubstitutions(
@@ -663,7 +659,7 @@ namespace {
     /// Describes an opened existential that has not yet been closed.
     struct OpenedExistential {
       /// The archetype describing this opened existential.
-      ArchetypeType *Archetype;
+      OpenedArchetypeType *Archetype;
 
       /// The existential value being opened.
       Expr *ExistentialValue;
@@ -776,7 +772,7 @@ namespace {
     /// \returns An OpaqueValueExpr that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
     /// metatype).
-    Expr *openExistentialReference(Expr *base, ArchetypeType *archetype,
+    Expr *openExistentialReference(Expr *base, OpenedArchetypeType *archetype,
                                    ValueDecl *member) {
       assert(archetype && "archetype not already opened?");
 
@@ -5228,7 +5224,7 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
   if (fromInstanceType->isExistentialType()) {
     // Coercion from superclass-constrained existential to its
     // concrete superclass.
-    auto fromArchetype = ArchetypeType::getAnyOpened(fromType);
+    auto fromArchetype = OpenedArchetypeType::getAny(fromType);
 
     auto *archetypeVal =
       cs.cacheType(
@@ -5296,7 +5292,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
-    fromType = ArchetypeType::getAnyOpened(fromType);
+    fromType = OpenedArchetypeType::getAny(fromType);
     
     auto *archetypeVal =
       cs.cacheType(
@@ -7234,7 +7230,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             ->castTo<ExistentialMetatypeType>()
             ->getInstanceType();
         }
-        assert(openedInstanceTy->castTo<ArchetypeType>()
+        assert(openedInstanceTy->castTo<OpenedArchetypeType>()
                    ->getOpenedExistentialType()
                    ->isEqual(existentialInstanceTy));
 

@@ -202,7 +202,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   ArchetypeType *openedArchetype = nullptr;
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = ArchetypeType::getAnyOpened(inputType);
+    CanType openedType = OpenedArchetypeType::getAny(inputType);
     SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
     // Unwrap zero or more metatype levels
@@ -586,7 +586,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.explicitSuperclass) {
-      CanType openedType = ArchetypeType::getAnyOpened(inputSubstType);
+      CanType openedType = OpenedArchetypeType::getAny(inputSubstType);
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
       // Unwrap zero or more metatype levels
@@ -2909,7 +2909,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 static CanGenericSignature
 buildThunkSignature(SILGenFunction &SGF,
                     bool inheritGenericSig,
-                    ArchetypeType *openedExistential,
+                    OpenedArchetypeType *openedExistential,
                     GenericEnvironment *&genericEnv,
                     SubstitutionMap &contextSubs,
                     SubstitutionMap &interfaceSubs,
@@ -3009,16 +3009,17 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
   // Does the thunk type involve an open existential type?
-  CanArchetypeType openedExistential;
+  CanOpenedArchetypeType openedExistential;
   auto archetypeVisitor = [&](CanType t) {
     if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
-      if (archetypeTy->getOpenedExistentialType()) {
+      if (auto opened = dyn_cast<OpenedArchetypeType>(archetypeTy)) {
         assert((openedExistential == CanArchetypeType() ||
-                openedExistential == archetypeTy) &&
+                openedExistential == opened) &&
                "one too many open existentials");
-        openedExistential = archetypeTy;
-      } else
+        openedExistential = opened;
+      } else {
         hasArchetypes = true;
+      }
     }
   };
 

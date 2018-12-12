@@ -55,6 +55,7 @@ namespace swift {
   class GenericSignature;
   class Identifier;
   class InOutType;
+  class OpenedArchetypeType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
@@ -548,7 +549,7 @@ public:
 
   /// Determine whether the type involves the given opened existential
   /// archetype.
-  bool hasOpenedExistential(ArchetypeType *opened);
+  bool hasOpenedExistential(OpenedArchetypeType *opened);
 
   /// Determine whether the type is an opened existential type.
   ///
@@ -561,11 +562,11 @@ public:
 
   /// Retrieve the set of opened existential archetypes that occur
   /// within this type.
-  void getOpenedExistentials(SmallVectorImpl<ArchetypeType *> &opened);
+  void getOpenedExistentials(SmallVectorImpl<OpenedArchetypeType *> &opened);
 
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
-  Type eraseOpenedExistential(ArchetypeType *opened);
+  Type eraseOpenedExistential(OpenedArchetypeType *opened);
 
   /// Erase DynamicSelfType from the given type by replacing it with its
   /// underlying type.
@@ -672,7 +673,7 @@ public:
   bool isClassExistentialType();
 
   /// Opens an existential instance or meta-type and returns the opened type.
-  Type openAnyExistentialType(ArchetypeType *&opened);
+  Type openAnyExistentialType(OpenedArchetypeType *&opened);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
@@ -4571,6 +4572,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 template<typename Base, typename...AdditionalTrailingObjects>
 using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
   ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
+
+class PrimaryArchetypeType;
   
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
@@ -4612,80 +4615,16 @@ protected:
   }
 
 public:
-  /// getNew - Create a new nested archetype with the given associated type.
-  ///
-  /// The ConformsTo array will be copied into the ASTContext by this routine.
-  ///
-  /// TODO: Move to NestedArchetypeType
-  static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx, ArchetypeType *Parent,
-                               DependentMemberType *InterfaceType,
-                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass, LayoutConstraint Layout);
-
-  /// getNew - Create a new primary archetype with the given name.
-  ///
-  /// The ConformsTo array will be minimized then copied into the ASTContext
-  /// by this routine.
-  ///
-  /// TODO: Move to PrimaryArchetypeType
-  static CanTypeWrapper<ArchetypeType>
-                        getNew(const ASTContext &Ctx,
-                               GenericEnvironment *GenericEnv,
-                               GenericTypeParamType *InterfaceType,
-                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                               Type Superclass, LayoutConstraint Layout);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type to open.
-  ///
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<ArchetypeType>
-                        getOpened(Type existential,
-                                  Optional<UUID> knownID = None);
-
-  /// Create a new archetype that represents the opened type
-  /// of an existential value.
-  ///
-  /// \param existential The existential type or existential metatype to open.
-  static CanType getAnyOpened(Type existential);
-
-  /// \brief Retrieve the name of this archetype.
+  /// Retrieve the name of this archetype.
   Identifier getName() const;
 
   /// \brief Retrieve the fully-dotted name that should be used to display this
   /// archetype.
   std::string getFullName() const;
 
-  /// \brief Retrieve the parent of this archetype, or null if this is a
-  /// primary archetype.
-  ArchetypeType *getParent() const;
-  
-  /// Retrieve the opened existential type.
-  /// TODO: Remove and leave on only OpenedArchetypeType
-  Type getOpenedExistentialType() const;
-
-  /// Retrieve the generic environment in which this archetype resides.
-  ///
-  /// Note: opened archetypes currently don't have generic environments.
-  ///
-  /// TODO: Remove and leave only on PrimaryArchetypeType
-  GenericEnvironment *getGenericEnvironment() const;
-
   /// Retrieve the interface type of this associated type, which will either
   /// be a GenericTypeParamType or a DependentMemberType.
   Type getInterfaceType() const { return InterfaceType; }
-
-  /// Retrieve the associated type to which this archetype (if it is a nested
-  /// archetype) corresponds.
-  ///
-  /// This associated type will have the same name as the archetype and will
-  /// be a member of one of the protocols to which the parent archetype
-  /// conforms.
-  AssociatedTypeDecl *getAssocType() const;
 
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
@@ -4759,18 +4698,8 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
-  /// isPrimary - Determine whether this is the archetype for a 'primary'
-  /// archetype, e.g., one that is not nested within another archetype and is
-  /// not an opened existential.
-  bool isPrimary() const;
-
   /// getPrimary - Return the primary archetype parent of this archetype.
-  ArchetypeType *getPrimary() const;
-
-  /// Retrieve the ID number of this opened existential.
-  ///
-  /// TODO: Remove and place on OpenedArchetypeType only
-  UUID getOpenedExistentialID() const;
+  PrimaryArchetypeType *getPrimary() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4786,9 +4715,6 @@ protected:
                 Type Superclass, LayoutConstraint Layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
-CanArchetypeType getParent() const {
-  return CanArchetypeType(getPointer()->getParent());
-}
 END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
   
 /// An archetype that represents a primary generic argument inside the generic
@@ -4802,6 +4728,17 @@ class PrimaryArchetypeType final : public ArchetypeType,
   GenericEnvironment *Environment;
 
 public:
+  /// getNew - Create a new primary archetype with the given name.
+  ///
+  /// The ConformsTo array will be minimized then copied into the ASTContext
+  /// by this routine.
+  static CanTypeWrapper<PrimaryArchetypeType>
+                        getNew(const ASTContext &Ctx,
+                               GenericEnvironment *GenericEnv,
+                               GenericTypeParamType *InterfaceType,
+                               SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+                               Type Superclass, LayoutConstraint Layout);
+
   /// Retrieve the generic environment in which this archetype resides.
   GenericEnvironment *getGenericEnvironment() const {
     return Environment;
@@ -4830,6 +4767,23 @@ class OpenedArchetypeType final : public ArchetypeType,
   TypeBase *Opened;
   UUID ID;
 public:
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type to open.
+  ///
+  /// \param knownID When non-empty, the known ID of the archetype. When empty,
+  /// a fresh archetype with a unique ID will be opened.
+  static CanTypeWrapper<OpenedArchetypeType>
+                        get(Type existential,
+                            Optional<UUID> knownID = None);
+
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type or existential metatype to open.
+  static CanType getAny(Type existential);
+
   /// Retrieve the ID number of this opened existential.
   UUID getOpenedExistentialID() const { return ID; }
   
@@ -4860,11 +4814,22 @@ class NestedArchetypeType final : public ArchetypeType,
   ArchetypeType *Parent;
 
 public:
+  /// getNew - Create a new nested archetype with the given associated type.
+  ///
+  /// The ConformsTo array will be copied into the ASTContext by this routine.
+  static CanTypeWrapper<NestedArchetypeType>
+  getNew(const ASTContext &Ctx, ArchetypeType *Parent,
+         DependentMemberType *InterfaceType,
+         SmallVectorImpl<ProtocolDecl *> &ConformsTo,
+         Type Superclass, LayoutConstraint Layout);
+
   /// Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
   ArchetypeType *getParent() const {
     return Parent;
   }
+  
+  AssociatedTypeDecl *getAssocType() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NestedArchetype;
@@ -4878,29 +4843,11 @@ private:
                      Type Superclass, LayoutConstraint Layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
+CanArchetypeType getParent() const {
+  return CanArchetypeType(getPointer()->getParent());
+}
 END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
 
-inline bool ArchetypeType::isPrimary() const {
-  return isa<PrimaryArchetypeType>(this);
-}
-  
-inline UUID ArchetypeType::getOpenedExistentialID() const {
-  return cast<OpenedArchetypeType>(this)->getOpenedExistentialID();
-}
-  
-inline Type ArchetypeType::getOpenedExistentialType() const {
-  if (auto child = dyn_cast<OpenedArchetypeType>(this))
-    return child->getOpenedExistentialType();
-  return nullptr;
-}
-  
-inline ArchetypeType *ArchetypeType::getParent() const {
-  if (auto child = dyn_cast<NestedArchetypeType>(this))
-    return child->getParent();
-  
-  return nullptr;
-}
-  
 template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
@@ -5256,9 +5203,7 @@ inline bool TypeBase::isOpenedExistential() const {
     return false;
 
   CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T))
-    return !archetype->getOpenedExistentialType().isNull();
-  return false;
+  return isa<OpenedArchetypeType>(T);
 }
 
 inline bool TypeBase::isOpenedExistentialWithError() {
@@ -5266,10 +5211,9 @@ inline bool TypeBase::isOpenedExistentialWithError() {
     return false;
 
   CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
+  if (auto archetype = dyn_cast<OpenedArchetypeType>(T)) {
     auto openedExistentialType = archetype->getOpenedExistentialType();
-    return (!openedExistentialType.isNull() &&
-            openedExistentialType->isExistentialWithError());
+    return openedExistentialType->isExistentialWithError();
   }
   return false;
 }

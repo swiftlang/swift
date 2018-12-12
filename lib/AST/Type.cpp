@@ -353,30 +353,24 @@ bool TypeBase::isSpecialized() {
   return false;
 }
 
-bool TypeBase::hasOpenedExistential(ArchetypeType *opened) {
-  assert(opened->getOpenedExistentialType() &&
-         "not an opened existential type");
-
+bool TypeBase::hasOpenedExistential(OpenedArchetypeType *opened) {
   if (!hasOpenedExistential())
     return false;
 
   return getCanonicalType().findIf([&](Type type) -> bool {
-    return opened == dyn_cast<ArchetypeType>(type.getPointer());
+    return opened == dyn_cast<OpenedArchetypeType>(type.getPointer());
   });
 }
 
 void TypeBase::getOpenedExistentials(
-       SmallVectorImpl<ArchetypeType *> &opened) {
+       SmallVectorImpl<OpenedArchetypeType *> &opened) {
   if (!hasOpenedExistential())
     return;
 
   SmallPtrSet<ArchetypeType *, 4> known;
   getCanonicalType().findIf([&](Type type) -> bool {
-    auto archetype = dyn_cast<ArchetypeType>(type.getPointer());
+    auto archetype = dyn_cast<OpenedArchetypeType>(type.getPointer());
     if (!archetype)
-      return false;
-
-    if (!archetype->getOpenedExistentialType())
       return false;
 
     if (known.insert(archetype).second)
@@ -386,10 +380,7 @@ void TypeBase::getOpenedExistentials(
   });
 }
 
-Type TypeBase::eraseOpenedExistential(ArchetypeType *opened) {
-  assert(opened->getOpenedExistentialType() &&
-         "Not an opened existential type?");
-
+Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
   if (!hasOpenedExistential())
     return Type(this);
 
@@ -2377,7 +2368,7 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-ArchetypeType *ArchetypeType::getPrimary() const {
+PrimaryArchetypeType *ArchetypeType::getPrimary() const {
   ArchetypeType *archetype = const_cast<ArchetypeType*>(this);
   while (auto child = dyn_cast<NestedArchetypeType>(archetype)) {
     archetype = child->getParent();
@@ -2424,7 +2415,7 @@ NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
 {
 }
 
-CanArchetypeType ArchetypeType::getNew(
+CanNestedArchetypeType NestedArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
                                    DependentMemberType *InterfaceType,
@@ -2442,12 +2433,12 @@ CanArchetypeType ArchetypeType::getNew(
           ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
       alignof(NestedArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) NestedArchetypeType(
+  return CanNestedArchetypeType(new (mem) NestedArchetypeType(
       Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
-CanArchetypeType
-ArchetypeType::getNew(const ASTContext &Ctx,
+CanPrimaryArchetypeType
+PrimaryArchetypeType::getNew(const ASTContext &Ctx,
                       GenericEnvironment *GenericEnv,
                       GenericTypeParamType *InterfaceType,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
@@ -2465,7 +2456,7 @@ ArchetypeType::getNew(const ASTContext &Ctx,
           ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
       alignof(PrimaryArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) PrimaryArchetypeType(
+  return CanPrimaryArchetypeType(new (mem) PrimaryArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -2602,26 +2593,22 @@ void ArchetypeType::registerNestedType(Identifier name, Type nested) {
 
 static void collectFullName(const ArchetypeType *Archetype,
                             SmallVectorImpl<char> &Result) {
-  if (auto Parent = Archetype->getParent()) {
-    collectFullName(Parent, Result);
+  if (auto nested = dyn_cast<NestedArchetypeType>(Archetype)) {
+    collectFullName(nested->getParent(), Result);
     Result.push_back('.');
   }
   Result.append(Archetype->getName().str().begin(),
                 Archetype->getName().str().end());
 }
 
-AssociatedTypeDecl *ArchetypeType::getAssocType() const {
-  assert(!getOpenedExistentialType());
-  if (auto *depMemTy = InterfaceType->getAs<DependentMemberType>())
-    return depMemTy->getAssocType();
-  return nullptr;
+AssociatedTypeDecl *NestedArchetypeType::getAssocType() const {
+  return InterfaceType->castTo<DependentMemberType>()->getAssocType();
 }
 
 Identifier ArchetypeType::getName() const {
-  assert(!getOpenedExistentialType());
-  if (auto assocType = getAssocType())
-    return assocType->getName();
-
+  if (auto nested = dyn_cast<NestedArchetypeType>(this))
+    return nested->getAssocType()->getName();
+  assert(InterfaceType);
   return InterfaceType->castTo<GenericTypeParamType>()->getName();
 }
 
@@ -2629,16 +2616,6 @@ std::string ArchetypeType::getFullName() const {
   llvm::SmallString<64> Result;
   collectFullName(this, Result);
   return Result.str().str();
-}
-
-GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
-  if (auto child = dyn_cast<NestedArchetypeType>(this)) {
-    return child->getParent()->getGenericEnvironment();
-  }
-  if (auto context = dyn_cast<PrimaryArchetypeType>(this)) {
-    return context->getGenericEnvironment();
-  }
-  return nullptr;
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3013,21 +2990,21 @@ static Type substType(Type derivedType,
       return Type();
     }
 
-    auto archetype = cast<ArchetypeType>(substOrig);
-
-    // Opened existentials cannot be substituted in this manner,
-    // but if they appear in the original type this is not an
-    // error.
-    if (archetype->isOpenedExistential())
-      return Type(type);
-
-    // For archetypes, we can substitute the parent (if present).
-    auto parent = archetype->getParent();
-    if (!parent) {
+    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig)) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
       return Type();
     }
+
+    // Opened existentials cannot be substituted in this manner,
+    // but if they appear in the original type this is not an
+    // error.
+    if (isa<OpenedArchetypeType>(substOrig))
+      return Type(type);
+
+    // For nested archetypes, we can substitute the parent.
+    auto nestedArchetype = cast<NestedArchetypeType>(substOrig);
+    auto parent = nestedArchetype->getParent();
 
     // Substitute into the parent type.
     Type substParent = substType(parent, substitutions,
@@ -3038,10 +3015,10 @@ static Type substType(Type derivedType,
       return Type(type);
 
     // Get the associated type reference from a child archetype.
-    AssociatedTypeDecl *assocType = archetype->getAssocType();
+    AssociatedTypeDecl *assocType = nestedArchetype->getAssocType();
 
     return getMemberForBaseType(lookupConformances, parent, substParent,
-                                assocType, archetype->getName(),
+                                assocType, nestedArchetype->getName(),
                                 options);
   });
 }
@@ -4093,15 +4070,15 @@ SILBoxType::SILBoxType(ASTContext &C,
   assert(Substitutions.isCanonical());
 }
 
-Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
+Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   assert(isAnyExistentialType());
   if (auto metaty = getAs<ExistentialMetatypeType>()) {
-    opened = ArchetypeType::getOpened(metaty->getInstanceType());
+    opened = OpenedArchetypeType::get(metaty->getInstanceType());
     if (metaty->hasRepresentation())
       return MetatypeType::get(opened, metaty->getRepresentation());
     else
       return MetatypeType::get(opened);
   }
-  opened = ArchetypeType::getOpened(this);
+  opened = OpenedArchetypeType::get(this);
   return opened;
 }

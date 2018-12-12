@@ -3194,7 +3194,7 @@ public:
 
     if (!ExprType->getMetatypeInstanceType()->isAnyObject())
       if (ExprType->isAnyExistentialType())
-        ExprType = ArchetypeType::getAnyOpened(ExprType);
+        ExprType = OpenedArchetypeType::getAny(ExprType);
 
     if (WasOptional)
       ExprType = OptionalType::get(ExprType);

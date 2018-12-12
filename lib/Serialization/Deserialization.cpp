@@ -4652,7 +4652,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
                                                          existentialID);
 
-    typeOrOffset = ArchetypeType::getOpened(getType(existentialID));
+    typeOrOffset = OpenedArchetypeType::get(getType(existentialID));
     break;
   }
 

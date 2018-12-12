@@ -1420,11 +1420,15 @@ const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
+  // Get the primary archetype.
+  auto primary = t->getPrimary();
+  
+  // If there is no primary (IOW, it's an opened archetype), the archetype is
+  // an exemplar.
+  if (!primary) return t;
+  
   // Retrieve the generic environment of the archetype.
-  auto genericEnv = t->getGenericEnvironment();
-
-  // If there is no generic environment, the archetype is an exemplar.
-  if (!genericEnv) return t;
+  auto genericEnv = primary->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
@@ -2128,8 +2132,9 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 
 #ifndef NDEBUG
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
-  auto genericEnv = arch->getGenericEnvironment();
-  if (!genericEnv) return true;
+  auto primary = arch->getPrimary();
+  if (!primary) return true;
+  auto genericEnv = primary->getGenericEnvironment();
 
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();

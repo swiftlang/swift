@@ -2194,7 +2194,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (!ty->isExistentialType()) {
       diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
     } else {
-      ty = ArchetypeType::getOpened(ty, attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }

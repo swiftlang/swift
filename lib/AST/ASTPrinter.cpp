@@ -4004,35 +4004,40 @@ public:
     visit(T->getObjectType());
   }
 
-  void visitArchetypeType(ArchetypeType *T) {
-    if (auto existentialTy = T->getOpenedExistentialType()) {
-      if (Options.PrintForSIL)
-        Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-      visit(existentialTy);
-    } else {
-      if (auto parent = T->getParent()) {
-        visit(parent);
-        Printer << ".";
-      }
-
-      if (Options.AlternativeTypeNames) {
-        auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
-        if (found != Options.AlternativeTypeNames->end()) {
-          Printer << found->second.str();
-          return;
-        }
-      }
-
-      auto Name = T->getName();
-      if (Name.empty())
-        Printer << "<anonymous>";
-      else {
-        PrintNameContext context = PrintNameContext::Normal;
-        if (Name == T->getASTContext().Id_Self)
-          context = PrintNameContext::GenericParameter;
-        Printer.printName(Name, context);
+  void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (Options.PrintForSIL)
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
+    visit(T->getOpenedExistentialType());
+  }
+  
+  void printArchetypeCommon(ArchetypeType *T) {
+    if (Options.AlternativeTypeNames) {
+      auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
+      if (found != Options.AlternativeTypeNames->end()) {
+        Printer << found->second.str();
+        return;
       }
     }
+
+    auto Name = T->getName();
+    if (Name.empty())
+      Printer << "<anonymous>";
+    else {
+      PrintNameContext context = PrintNameContext::Normal;
+      if (Name == T->getASTContext().Id_Self)
+        context = PrintNameContext::GenericParameter;
+      Printer.printName(Name, context);
+    }
+  }
+  
+  void visitNestedArchetypeType(NestedArchetypeType *T) {
+    visit(T->getParent());
+    Printer << ".";
+    printArchetypeCommon(T);
+  }
+  
+  void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
+    printArchetypeCommon(T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

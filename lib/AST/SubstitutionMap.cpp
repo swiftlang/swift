@@ -239,8 +239,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
-    if (archetype->isOpenedExistential() ||
-        archetype->getParent() != nullptr)
+    if (!isa<PrimaryArchetypeType>(archetype))
       return Type();
 
     type = cast<GenericTypeParamType>(

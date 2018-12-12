@@ -189,7 +189,7 @@ struct LazyGenericEnvironment {
     return false;
   }
 
-  bool containsPrimaryArchetype(ArchetypeType *archetype) const {
+  bool containsPrimaryArchetype(PrimaryArchetypeType *archetype) const {
     // Assume true so we don't deserialize.
     if (isLazy()) return true;
 
@@ -240,7 +240,7 @@ class Verifier : public ASTWalker {
 
   /// The set of opened existential archetypes that are currently
   /// active.
-  llvm::DenseSet<ArchetypeType *> OpenedExistentialArchetypes;
+  llvm::DenseSet<OpenedArchetypeType *> OpenedExistentialArchetypes;
 
   /// The set of inout to pointer expr that match the following pattern:
   ///
@@ -627,8 +627,8 @@ public:
 
           // We should know about archetypes corresponding to opened
           // existential archetypes.
-          if (archetype->getOpenedExistentialType()) {
-            if (OpenedExistentialArchetypes.count(archetype) == 0) {
+          if (auto opened = dyn_cast<OpenedArchetypeType>(archetype)) {
+            if (OpenedExistentialArchetypes.count(opened) == 0) {
               Out << "Found opened existential archetype "
                   << archetype->getString()
                   << " outside enclosing OpenExistentialExpr\n";
