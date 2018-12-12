@@ -4829,6 +4829,7 @@ public:
       OptionalChain,
       OptionalWrap,
       Identity,
+      TupleElement,
     };
   
   private:
@@ -4845,7 +4846,12 @@ public:
     Expr *SubscriptIndexExpr;
     const Identifier *SubscriptLabelsData;
     const ProtocolConformanceRef *SubscriptHashableConformancesData;
-    unsigned SubscriptSize;
+    
+    union {
+      unsigned SubscriptSize;
+      unsigned FieldNumber;
+    } technicated;
+      
     Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
@@ -4855,13 +4861,14 @@ public:
                        Expr *indexExpr,
                        ArrayRef<Identifier> subscriptLabels,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
+                       unsigned fieldNumber,
                        Kind kind,
                        Type type,
                        SourceLoc loc);
     
   public:
     Component()
-      : Component(nullptr, {}, nullptr, {}, {}, Kind::Invalid,
+      : Component(nullptr, {}, nullptr, {}, {}, 0, Kind::Invalid,
                   Type(), SourceLoc())
     {}
     
@@ -4869,7 +4876,7 @@ public:
     static Component forUnresolvedProperty(DeclName UnresolvedName,
                                            SourceLoc Loc) {
       return Component(nullptr,
-                       UnresolvedName, nullptr, {}, {},
+                       UnresolvedName, nullptr, {}, {}, 0,
                        Kind::UnresolvedProperty,
                        Type(),
                        Loc);
@@ -4895,14 +4902,14 @@ public:
                                          SourceLoc loc) {
       
       return Component(&context,
-                       {}, index, subscriptLabels, {},
+                       {}, index, subscriptLabels, {}, 0,
                        Kind::UnresolvedSubscript,
                        Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::OptionalForce,
                        Type(),
                        BangLoc);
@@ -4910,7 +4917,7 @@ public:
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::OptionalChain,
                        Type(),
                        QuestionLoc);
@@ -4920,7 +4927,7 @@ public:
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(nullptr, property, nullptr, {}, {},
+      return Component(nullptr, property, nullptr, {}, {}, 0,
                        Kind::Property,
                        propertyType,
                        loc);
@@ -4949,7 +4956,7 @@ public:
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::OptionalForce, forcedType,
                        bangLoc);
     }
@@ -4957,7 +4964,7 @@ public:
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::OptionalChain, unwrappedType,
                        questionLoc);
     }
@@ -4966,17 +4973,26 @@ public:
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::OptionalWrap, wrappedType,
                        SourceLoc());
     }
     
     static Component forIdentity(SourceLoc selfLoc) {
-      return Component(nullptr, {}, nullptr, {}, {},
+      return Component(nullptr, {}, nullptr, {}, {}, 0,
                        Kind::Identity, Type(),
                        selfLoc);
     }
     
+    static Component forTupleElement(unsigned fieldNumber,
+                                     Type elementType,
+                                     SourceLoc loc) {
+      return Component(nullptr, {}, nullptr, {}, {}, fieldNumber,
+                       Kind::TupleElement, elementType,
+                       loc);
+    }
+      
+      
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5000,6 +5016,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -5023,6 +5040,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5032,7 +5050,7 @@ public:
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return {SubscriptLabelsData, (size_t)SubscriptSize};
+        return {SubscriptLabelsData, (size_t)technicated.SubscriptSize};
 
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -5041,6 +5059,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5052,7 +5071,7 @@ public:
       case Kind::Subscript:
         if (!SubscriptHashableConformancesData)
           return {};
-        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
+        return {SubscriptHashableConformancesData, (size_t)technicated.SubscriptSize};
 
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
@@ -5062,6 +5081,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5083,6 +5103,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5101,7 +5122,27 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Identity:
+      case Kind::TupleElement:
         llvm_unreachable("no decl ref for this kind");
+      }
+      llvm_unreachable("unhandled kind");
+    }
+      
+    unsigned getFieldNumber() const {
+      switch (getKind()) {
+        case Kind::TupleElement:
+          return technicated.FieldNumber;
+                
+        case Kind::Invalid:
+        case Kind::UnresolvedProperty:
+        case Kind::UnresolvedSubscript:
+        case Kind::OptionalChain:
+        case Kind::OptionalWrap:
+        case Kind::OptionalForce:
+        case Kind::Identity:
+        case Kind::Property:
+        case Kind::Subscript:
+          llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
     }

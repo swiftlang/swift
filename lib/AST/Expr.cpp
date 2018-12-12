@@ -2185,6 +2185,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
                      Expr *indexExpr,
                      ArrayRef<Identifier> subscriptLabels,
                      ArrayRef<ProtocolConformanceRef> indexHashables,
+                     unsigned fieldNumber,
                      Kind kind,
                      Type type,
                      SourceLoc loc)
@@ -2193,10 +2194,16 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
 {
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
+  assert(subscriptLabels.empty() || fieldNumber == 0);
   SubscriptLabelsData = subscriptLabels.data();
   SubscriptHashableConformancesData = indexHashables.empty()
     ? nullptr : indexHashables.data();
-  SubscriptSize = subscriptLabels.size();
+
+  if (subscriptLabels.empty()) {
+    technicated.FieldNumber = fieldNumber;
+  } else {
+    technicated.SubscriptSize = subscriptLabels.size();
+  }
 }
 
 KeyPathExpr::Component
@@ -2205,7 +2212,7 @@ KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
        Type elementType, SourceLoc loc,
        ArrayRef<ProtocolConformanceRef> indexHashables) {
   return Component(&elementType->getASTContext(),
-                   subscript, index, labels, indexHashables,
+                   subscript, index, labels, indexHashables, 0,
                    Kind::Subscript, elementType, loc);
 }
 
@@ -2213,7 +2220,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
     ArrayRef<ProtocolConformanceRef> hashables) {
   switch (getKind()) {
   case Kind::Subscript:
-    assert(hashables.size() == SubscriptSize);
+    assert(hashables.size() == technicated.SubscriptSize);
     SubscriptHashableConformancesData = getComponentType()->getASTContext()
       .AllocateCopy(hashables)
       .data();
@@ -2227,6 +2234,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::UnresolvedProperty:
   case Kind::Property:
   case Kind::Identity:
+  case Kind::TupleElement:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

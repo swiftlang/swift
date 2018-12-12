@@ -359,6 +359,9 @@ public:
                               CanType baseTy,
                               bool forPropertyDescriptor);
 
+  KeyPathPatternComponent
+  emitKeyPathComponentForTupleElement();
+    
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
