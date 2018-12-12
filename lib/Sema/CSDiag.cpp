@@ -7392,26 +7392,9 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   // Produce a specific diagnostic + fixit for this situation.
   if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
     if (baseExpr && baseFTy->getParams().empty()) {
-      SourceLoc insertLoc = baseExpr->getEndLoc();
-
-      if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
-        diagnose(baseExpr->getLoc(), diag::did_not_call_function,
-                 DRE->getDecl()->getBaseName().getIdentifier())
-            .fixItInsertAfter(insertLoc, "()");
-        return true;
-      }
-
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr))
-        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
-          diagnose(baseExpr->getLoc(), diag::did_not_call_method,
-                   DRE->getDecl()->getBaseName().getIdentifier())
-              .fixItInsertAfter(insertLoc, "()");
-          return true;
-        }
-
-      diagnose(baseExpr->getLoc(), diag::did_not_call_function_value)
-          .fixItInsertAfter(insertLoc, "()");
-      return true;
+      auto failure =
+          MissingCallFailure(expr, CS, CS.getConstraintLocator(baseExpr));
+      return failure.diagnoseAsError();
     }
   }
 

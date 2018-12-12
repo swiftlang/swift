@@ -104,9 +104,10 @@ class U {
 
 class T {
     func m1() {
-        // FIXME: should apply nullary function fixit here. {{function produces expected type 'U'; did you mean to call it with '()'?}}
-        // <rdar://problem/17741575>
-        let l = self.m2!.prop1 // expected-error{{cannot force unwrap value of non-optional type '() -> U?'}} {{24-25=}}
+      // <rdar://problem/17741575>
+      let l = self.m2!.prop1
+      // expected-error@-1 {{cannot force unwrap value of non-optional type '() -> U?'}} {{22-23=}}
+      // expected-error@-2 {{method 'm2' was used as a property; add () to call it}}  {{23-23=()}}
     }
 
     func m2() -> U! {
