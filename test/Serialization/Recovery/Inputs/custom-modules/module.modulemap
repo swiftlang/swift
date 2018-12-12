@@ -1,3 +1,11 @@
+module IndirectImport {
+  header "IndirectImport.h"
+  export *
+}
+module IndirectlyImported {
+  header "IndirectlyImported.h"
+}
+
 module Overrides { header "Overrides.h" }
 module ProtocolInheritance { header "ProtocolInheritance.h" }
 module RenameAcrossVersions { header "RenameAcrossVersions.h" }
