@@ -1,4 +1,5 @@
 // REQUIRES: objc_interop
+// UNSUPPORTED: swift_evolve
 
 // FIXME: the test output we're comparing to is specific to macOS.
 // REQUIRES-ANY: OS=macosx

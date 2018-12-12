@@ -6,3 +6,6 @@
 // RUN: %clang -E -P -x c %S/Outputs/stability-stdlib-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
+
+// FIXME: rdar://problem/46617463, rdar://problem/46618883
+// UNSUPPORTED: swift_evolve
