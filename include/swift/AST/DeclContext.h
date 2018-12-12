@@ -336,11 +336,15 @@ public:
   /// - Everything else falls back on getDeclaredInterfaceType().
   Type getSelfInterfaceType() const;
 
-  /// Retrieve the innermost generic parameters of this context or any
-  /// of its parents.
+  /// Visit the generic parameter list of every outer context, innermost first.
+  void forEachGenericContext(
+    llvm::function_ref<void (GenericParamList *)> fn) const;
+
+  /// Returns the depth of this generic context, or in other words,
+  /// the number of nested generic contexts minus one.
   ///
-  /// FIXME: Remove this
-  GenericParamList *getGenericParamsOfContext() const;
+  /// This is (unsigned)-1 if none of the outer contexts are generic.
+  unsigned getGenericContextDepth() const;
 
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.

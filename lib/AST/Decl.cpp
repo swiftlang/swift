@@ -687,17 +687,7 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-unsigned GenericParamList::getDepth() const {
-  unsigned depth = 0;
-  for (auto gpList = getOuterParameters();
-       gpList != nullptr;
-       gpList = gpList->getOuterParameters())
-    ++depth;
-  return depth;
-}
-
-void GenericParamList::configureGenericParamDepth() {
-  unsigned depth = getDepth();
+void GenericParamList::setDepth(unsigned depth) {
   for (auto param : *this)
     param->setDepth(depth);
 }
@@ -1059,13 +1049,13 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
 /// Clone the given generic parameters in the given list. We don't need any
 /// of the requirements, because they will be inferred.
 static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            DeclContext *dc,
+                                            ExtensionDecl *ext,
                                             GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
     // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
+    auto toGP = new (ctx) GenericTypeParamDecl(ext, fromGP->getName(),
                                                SourceLoc(),
                                                fromGP->getDepth(),
                                                fromGP->getIndex());
@@ -1075,40 +1065,28 @@ static GenericParamList *cloneGenericParams(ASTContext &ctx,
     toGenericParams.push_back(toGP);
   }
 
-  auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
-                                           SourceLoc());
-
-  auto outerParams = fromParams->getOuterParameters();
-  if (outerParams != nullptr)
-    outerParams = cloneGenericParams(ctx, dc, outerParams);
-  toParams->setOuterParameters(outerParams);
-
-  return toParams;
+  return GenericParamList::create(ctx, SourceLoc(), toGenericParams,
+                                  SourceLoc());
 }
 
-/// Ensure that the outer generic parameters of the given generic
-/// context have been configured.
-static void configureOuterGenericParams(const GenericContext *dc) {
-  auto genericParams = dc->getGenericParams();
+static GenericParamList *
+createExtensionGenericParams(ASTContext &ctx,
+                             ExtensionDecl *ext,
+                             NominalTypeDecl *nominal) {
+  // Collect generic parameters from all outer contexts.
+  SmallVector<GenericParamList *, 2> allGenericParams;
+  nominal->forEachGenericContext([&](GenericParamList *gpList) {
+    allGenericParams.push_back(
+      cloneGenericParams(ctx, ext, gpList));
+  });
 
-  // If we already configured the outer parameters, we're done.
-  if (genericParams && genericParams->getOuterParameters())
-    return;
-
-  DeclContext *outerDC = dc->getParent();
-  while (!outerDC->isModuleScopeContext()) {
-    if (auto outerDecl = outerDC->getAsDecl()) {
-      if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
-        if (genericParams)
-          genericParams->setOuterParameters(outerGenericDC->getGenericParams());
-
-        configureOuterGenericParams(outerGenericDC);
-        return;
-      }
-    }
-
-    outerDC = outerDC->getParent();
+  GenericParamList *toParams = nullptr;
+  for (auto *gpList : reversed(allGenericParams)) {
+    gpList->setOuterParameters(toParams);
+    toParams = gpList;
   }
+
+  return toParams;
 }
 
 void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
@@ -1125,24 +1103,27 @@ void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
     outerDC = outerDC->getParent();
   }
 
-  configureOuterGenericParams(nominal);
+  // Create the generic parameter list for the extension by cloning the
+  // generic parameter lists of the nominal and any of its parent types.
+  auto &ctx = getASTContext();
+  auto *genericParams = createExtensionGenericParams(ctx, this, nominal);
+  setGenericParams(genericParams);
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // For a protocol extension, build the generic parameter list directly
-    // since we want it to have an inheritance clause.
-    setGenericParams(proto->createGenericParams(this));
-  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
-    // Clone the generic parameter list of a generic type.
-    setGenericParams(
-        cloneGenericParams(getASTContext(), this, genericParams));
+  // Protocol extensions need an inheritance clause due to how name lookup
+  // is implemented.
+  if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+    auto protoType = proto->getDeclaredType();
+    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    genericParams->getParams().front()->setInherited(
+      ctx.AllocateCopy(selfInherited));
   }
 
   // Set the depth of every generic parameter.
-  auto *genericParams = getGenericParams();
+  unsigned depth = nominal->getGenericContextDepth();
   for (auto *outerParams = genericParams;
        outerParams != nullptr;
        outerParams = outerParams->getOuterParameters())
-    outerParams->configureGenericParamDepth();
+    outerParams->setDepth(depth--);
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
@@ -4291,16 +4272,17 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   return mangleObjCRuntimeName(this, buffer);
 }
 
-GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  auto *outerGenericParams = getParent()->getGenericParamsOfContext();
+void ProtocolDecl::createGenericParamsIfMissing() {
+  if (getGenericParams())
+    return;
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
   auto selfDecl = new (ctx) GenericTypeParamDecl(
-      dc, selfId,
+      this, selfId,
       SourceLoc(),
-      GenericTypeParamDecl::InvalidDepth, /*index=*/0);
+      /*depth=*/getGenericContextDepth() + 1, /*index=*/0);
   auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
@@ -4309,13 +4291,7 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   // The generic parameter list itself.
   auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
                                          SourceLoc());
-  result->setOuterParameters(outerGenericParams);
-  return result;
-}
-
-void ProtocolDecl::createGenericParamsIfMissing() {
-  if (!getGenericParams())
-    setGenericParams(createGenericParams(this));
+  setGenericParams(result);
 }
 
 void ProtocolDecl::computeRequirementSignature() {

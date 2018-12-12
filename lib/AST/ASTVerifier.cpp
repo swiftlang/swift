@@ -2762,7 +2762,14 @@ public:
         abort();
       }
 
-      unsigned currentDepth = paramList->getDepth();
+      if (paramList->getOuterParameters() &&
+          !isa<ExtensionDecl>(DC)) {
+        Out << "GenericParamList can only have outer parameters in an "
+               "extension\n";
+        abort();
+      }
+
+      unsigned currentDepth = DC->getGenericContextDepth();
       if (currentDepth < GTPD->getDepth()) {
         Out << "GenericTypeParamDecl has incorrect depth\n";
         abort();

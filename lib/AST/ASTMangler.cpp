@@ -1053,8 +1053,6 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
     if (genericContext->isGeneric()) {
       auto genericParams = subs.getGenericSignature()->getGenericParams();
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
-      assert(genericContext->getGenericParams()->getDepth() == depth &&
-             "Depth mismatch mangling substitution map");
       auto replacements = subs.getReplacementTypes();
       for (unsigned lastGenericParamIdx = genericParams.size();
            (currentGenericParamIdx != lastGenericParamIdx &&

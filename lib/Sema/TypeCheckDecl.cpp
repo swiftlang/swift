@@ -634,28 +634,25 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                     DeclContext *DC) {
+  if (genericParams == nullptr)
+    return nullptr;
 
   SmallVector<GenericParamList *, 2> nestedList;
   for (; genericParams; genericParams = genericParams->getOuterParameters()) {
     nestedList.push_back(genericParams);
   }
 
-  // Since the innermost GenericParamList is in the beginning of the vector,
-  // we process in reverse order to handle the outermost list first.
-  GenericSignature *parentSig = nullptr;
-  GenericEnvironment *parentEnv = nullptr;
+  std::reverse(nestedList.begin(), nestedList.end());
 
-  for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
-    auto genericParams = nestedList.rbegin()[i];
-    genericParams->configureGenericParamDepth();
-
-    parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
-                                        /*allowConcreteGenericParams=*/true,
-                                        /*ext=*/nullptr);
-    parentSig = parentEnv->getGenericSignature();
+  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
+    auto genericParams = nestedList[i];
+    genericParams->setDepth(i);
   }
 
-  return parentEnv;
+  return checkGenericEnvironment(nestedList.back(), DC,
+                                 /*parentSig=*/nullptr,
+                                 /*allowConcreteGenericParams=*/true,
+                                 /*ext=*/nullptr);
 }
 
 /// Build a default initializer for the given type.
@@ -4172,9 +4169,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     proto->computeType();
 
     auto *gp = proto->getGenericParams();
-    unsigned depth = gp->getDepth();
-    for (auto paramDecl : *gp)
-      paramDecl->setDepth(depth);
+    gp->setDepth(proto->getGenericContextDepth());
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);

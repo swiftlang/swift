@@ -1811,7 +1811,6 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
                                              SourceLoc(),
                                              ArrayRef<RequirementRepr>(),
                                              SourceLoc());
-    genericParams->setOuterParameters(classDecl->getGenericParamsOfContext());
 
     // Build a generic signature for the derived class initializer.
     GenericSignatureBuilder builder(ctx);
