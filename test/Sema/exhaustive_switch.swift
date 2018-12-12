@@ -464,6 +464,10 @@ enum OverlyLargeSpaceEnum {
   case case9
   case case10
   case case11
+  case case12
+  case case13
+  case case14
+  case case15
 }
 
 enum ContainsOverlyLargeEnum {
@@ -487,10 +491,14 @@ func quiteBigEnough() -> Bool {
   case (.case9, .case9): return true
   case (.case10, .case10): return true
   case (.case11, .case11): return true
+  case (.case12, .case12): return true
+  case (.case13, .case13): return true
+  case (.case14, .case14): return true
+  case (.case15, .case15): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  // No diagnostic
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -502,20 +510,30 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
+  case (.case11, _): return true
+  case (.case12, _): return true
+  case (.case13, _): return true
+  case (.case14, _): return true
+  case (.case15, _): return true
   }
 
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  case (.case0, _): return true
-  case (.case1, _): return true
-  case (.case2, _): return true
-  case (.case3, _): return true
-  case (.case4, _): return true
-  case (.case5, _): return true
-  case (.case6, _): return true
-  case (.case7, _): return true
-  case (.case8, _): return true
-  case (.case9, _): return true
-  case (.case10, _): return true
+  case (.case0, .case0): return true
+  case (.case1, .case1): return true
+  case (.case2, .case2): return true
+  case (.case3, .case3): return true
+  case (.case4, .case4): return true
+  case (.case5, .case5): return true
+  case (.case6, .case6): return true
+  case (.case7, .case7): return true
+  case (.case8, .case8): return true
+  case (.case9, .case9): return true
+  case (.case10, .case10): return true
+  case (.case11, .case11): return true
+  case (.case12, .case12): return true
+  case (.case13, .case13): return true
+  case (.case14, .case14): return true
+  case (.case15, .case15): return true
   @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
   }
 
@@ -534,6 +552,10 @@ func quiteBigEnough() -> Bool {
   case (.case9, _): return true
   case (.case10, _): return true
   case (.case11, _): return true
+  case (.case12, _): return true
+  case (.case13, _): return true
+  case (.case14, _): return true
+  case (.case15, _): return true
   }
 
   // No diagnostic
@@ -550,6 +572,10 @@ func quiteBigEnough() -> Bool {
   case (_, .case9): return true
   case (_, .case10): return true
   case (_, .case11): return true
+  case (_, .case12): return true
+  case (_, .case13): return true
+  case (_, .case14): return true
+  case (_, .case15): return true
   }
 
   // No diagnostic
@@ -574,7 +600,7 @@ func quiteBigEnough() -> Bool {
   }
 
   // Make sure we haven't just stopped emitting diagnostics.
-  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 12 {{add missing case}} expected-note {{handle unknown values}}
+  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 16 {{add missing case}} expected-note {{handle unknown values}}
   }
 }
 
@@ -603,6 +629,83 @@ func infinitelySized() -> Bool {
   // expected-note@-1 8 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
+  }
+}
+
+func sr6316() {
+  let bool1 = false
+  let bool2 = false
+  let bool3 = false
+  let bool4 = true
+  let bool5 = false
+  let bool6 = true
+  let bool7 = true
+  let bool8 = false
+  let bool9 = false
+
+  switch (bool1, (bool2, bool4, bool6, bool8), (bool3, bool5, bool7, bool9)) {
+  // expected-error@-1 {{switch must be exhaustive}}
+  // expected-note@-2 {{add missing case: '(false, (_, false, true, _), (_, true, _, _))'}}
+  // expected-note@-3 {{add missing case: '(_, (_, true, _, _), (_, false, true, _))'}}
+  case (true, (_, _, _, _), (_, true, true, _)):
+    break
+  case (true, (_, _, _, _), (_, _, false, _)):
+    break
+  case (_, (_, true, true, _), (_, _, false, _)):
+    break
+  case (_, (_, _, false, _), (_, true, true, _)):
+    break
+  case (_, (_, true, true, _), (_, true, true, _)):
+    break
+  case (_, (_, _, false, _), (_, _, false, _)):
+    break
+  case (_, (_, false, _, _), (_, false, _, _)):
+    break
+  }
+}
+
+func sr6652() {
+  enum A {
+    indirect case a([A], foo: Bool)
+    indirect case b(Dictionary<String, Int>)
+    indirect case c(A, foo: [A])
+    indirect case d(if: A, then: A, else: A)
+    indirect case e(A, A, foo: Bool)
+    indirect case f(A)
+    case g(String, foo: Bool)
+    case string(String)
+    case `nil`
+
+    static func eke(_ lhs: A, _ rhs: A) -> Bool { return false }
+  }
+
+  enum B {
+    static func eke(_ lhs: B, _ rhs: B) -> Bool { return false }
+  }
+
+  enum C {
+    static func eke(_ lhs: C, _ rhs: C) -> Bool { return false }
+  }
+
+  enum D {
+    case a(A)
+    case b(B)
+    case c(C)
+    indirect case d([D])
+
+    // No diagnostic
+    static func eke(_ lhs: D, _ rhs: D) -> Bool {
+      switch (lhs, rhs) {
+      case (.a(let r1), .a(let r2)): return A.eke(r1, r2)
+      case (.a, _): return false
+      case (.b(let r1), .b(let r2)): return B.eke(r1, r2)
+      case (.b, _): return false
+      case (.c(let r1),  .c(let r2)): return C.eke(r1, r2)
+      case (.c, _): return false
+      case (.d(let r1),  .d(let r2)): return zip(r1, r2).allSatisfy(D.eke)
+      case (.d, _): return false
+      }
+    }
   }
 }
 
