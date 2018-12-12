@@ -1073,29 +1073,16 @@ Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
     }
     return false;
   };
-  // The relative order of non-final instance functions matters for non-resilient
-  // class.
-  auto isNonfinalFunc = [](Decl *M) {
-    if (auto *FD = dyn_cast<FuncDecl>(M)) {
-      return !isa<AccessorDecl>(FD) && !FD->isFinal();
-    }
-    return false;
-  };
+
   switch (NTD->getKind()) {
   case DeclKind::Enum: {
     return getSimilarMemberCount(NTD, VD, [](Decl *M) {
       return isa<EnumElementDecl>(M);
     });
   }
+  case DeclKind::Class:
   case DeclKind::Struct: {
     return getSimilarMemberCount(NTD, VD, isStored);
-  }
-  case DeclKind::Class: {
-    if (auto count = getSimilarMemberCount(NTD, VD, isStored)) {
-      return count;
-    } else {
-      return getSimilarMemberCount(NTD, VD, isNonfinalFunc);
-    }
   }
   default:
     llvm_unreachable("bad nominal type kind.");
