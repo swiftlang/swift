@@ -122,6 +122,8 @@ const char DeclDeserializationError::ID = '\0';
 void DeclDeserializationError::anchor() {}
 const char XRefError::ID = '\0';
 void XRefError::anchor() {}
+const char XRefNonLoadedModuleError::ID = '\0';
+void XRefNonLoadedModuleError::anchor() {}
 const char OverrideError::ID = '\0';
 void OverrideError::anchor() {}
 const char TypeError::ID = '\0';
@@ -556,6 +558,11 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
+
+    // FIXME: If the module hasn't been loaded, we probably don't want to fall
+    // back to the current module like this.
+    if (!module)
+      module = getAssociatedModule();
 
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(module, proto, conformances);
@@ -1229,8 +1236,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 }
 
 Expected<Decl *>
-ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
+ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
+
+  ModuleDecl *baseModule = getModule(MID);
+  if (!baseModule) {
+    return llvm::make_error<XRefNonLoadedModuleError>(getIdentifier(MID));
+  }
+
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
 
@@ -1550,6 +1563,10 @@ giveUpFastPath:
       GenericSignatureID rawGenericSig;
       XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, rawGenericSig);
       M = getModule(ownerID);
+      if (!M) {
+        return llvm::make_error<XRefError>("module is not loaded",
+                                           pathTrace, getIdentifier(ownerID));
+      }
       pathTrace.addExtension(M);
 
       // Read the generic signature, if we have one.
@@ -1933,14 +1950,15 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
   return getModule(getIdentifier(MID));
 }
 
-ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name) {
+ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
+                                  bool allowLoading) {
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
-    if (!ShadowedModule) {
+    if (!ShadowedModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
@@ -1953,7 +1971,10 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name) {
   SmallVector<ImportDecl::AccessPathElement, 4> importPath;
   for (auto pathElem : name)
     importPath.push_back({ pathElem, SourceLoc() });
-  return getContext().getModule(importPath);
+
+  if (allowLoading)
+    return getContext().getModule(importPath);
+  return getContext().getLoadedModule(importPath);
 }
 
 
@@ -4038,7 +4059,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
-    auto resolved = resolveCrossReference(getModule(baseModuleID), pathLen);
+    auto resolved = resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)
       return resolved;
     declOrOffset = resolved.get();

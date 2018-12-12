@@ -455,7 +455,8 @@ public:
       StringRef moduleNameOrMangledBase;
       if (nameIDOrLength < 0) {
         const ModuleDecl *module = File.getModule(-nameIDOrLength);
-        moduleNameOrMangledBase = module->getName().str();
+        if (module)
+          moduleNameOrMangledBase = module->getName().str();
       } else {
         moduleNameOrMangledBase =
             StringRef(reinterpret_cast<const char *>(data), nameIDOrLength);
@@ -1497,7 +1498,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       assert(!modulePath.back().empty() &&
              "invalid module name (submodules not yet supported)");
     }
-    auto module = getModule(modulePath);
+    auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
@@ -1735,7 +1736,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (AccessPath.size() == 1 && AccessPath[0].first == Ctx.StdlibModuleName)
         continue;
 
-      ModuleDecl *M = Ctx.getModule(AccessPath);
+      ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
 
       auto Kind = ImportKind::Module;
       if (!ScopePath.empty()) {
