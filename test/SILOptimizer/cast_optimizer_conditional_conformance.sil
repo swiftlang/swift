@@ -92,6 +92,68 @@ bb6:
   return %28 : $()
 }
 
+// CHECK-LABEL: sil shared [noinline] @testSpecializedS1Negative : $@convention(thin) (S1<Int8>) -> () {
+// CHECK: bb0(%0 : $S1<Int8>):
+// CHECK: [[EXIS:%.*]] = alloc_stack $HasFoo
+// CHECK: [[VAL:%.*]] = alloc_stack $S1<Int8>
+// CHECK: store %0 to [[VAL]] : $*S1<Int8>
+// CHECK: [[OPT:%.*]] = alloc_stack $Optional<HasFoo>
+// CHECK: [[IEDA:%.*]] = init_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt.1
+// CHECK: checked_cast_addr_br take_always S1<Int8> in [[VAL]] : $*S1<Int8> to HasFoo in [[IEDA]] : $*HasFoo, bb1, bb2
+// bbs...
+// CHECK: switch_enum_addr [[OPT]] : $*Optional<HasFoo>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+// bbs...
+// CHECK: [[UNWRAP:%.*]] = unchecked_take_enum_data_addr [[OPT]] : $*Optional<HasFoo>, #Optional.some!enumelt.1
+// CHECK: copy_addr [take] [[UNWRAP]] to [initialization] [[EXIS]] : $*HasFoo
+// CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access [[EXIS]] : $*HasFoo to $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
+// CHECK: [[WM:%.*]] = witness_method $@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo!1 : <Self where Self : HasFoo> (Self) -> () -> (), [[OPEN]] : $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+// CHECK: apply [[WM]]<@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>([[OPEN]]) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function 'testSpecializedS1Negative'
+sil shared [noinline] @testSpecializedS1Negative : $@convention(thin) (S1<Int8>) -> () {
+bb0(%0 : $S1<Int8>):
+  debug_value %0 : $S1<Int8>, let, name "t", argno 1
+  debug_value %0 : $S1<Int8>, let, name "t", argno 1
+  %3 = alloc_stack $HasFoo
+  %4 = alloc_stack $S1<Int8>
+  store %0 to %4 : $*S1<Int8>
+  %6 = alloc_stack $Optional<HasFoo>
+  %7 = init_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt.1
+  checked_cast_addr_br take_always S1<Int8> in %4 : $*S1<Int8> to HasFoo in %7 : $*HasFoo, bb1, bb2
+
+bb1:
+  inject_enum_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt.1
+  br bb3
+
+bb2:
+  inject_enum_addr %6 : $*Optional<HasFoo>, #Optional.none!enumelt
+  br bb3
+
+bb3:
+  switch_enum_addr %6 : $*Optional<HasFoo>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+
+bb4:
+  %14 = unchecked_take_enum_data_addr %6 : $*Optional<HasFoo>, #Optional.some!enumelt.1
+  copy_addr [take] %14 to [initialization] %3 : $*HasFoo
+  dealloc_stack %6 : $*Optional<HasFoo>
+  dealloc_stack %4 : $*S1<Int8>
+  %18 = open_existential_addr immutable_access %3 : $*HasFoo to $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo
+  %19 = witness_method $@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo, #HasFoo.foo!1 : <Self where Self : HasFoo> (Self) -> () -> (), %18 : $*@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+  %20 = apply %19<@opened("4E16CBC0-FD9F-11E8-A311-D0817AD9F6DD") HasFoo>(%18) : $@convention(witness_method: HasFoo) <τ_0_0 where τ_0_0 : HasFoo> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %3 : $*HasFoo
+  br bb6
+
+bb5:
+  destroy_addr %6 : $*Optional<HasFoo>
+  dealloc_stack %6 : $*Optional<HasFoo>
+  dealloc_stack %4 : $*S1<Int8>
+  br bb6
+
+bb6:
+  dealloc_stack %3 : $*HasFoo
+  %28 = tuple ()
+  return %28 : $()
+}
+
 struct S2<T> {
   init(_: T) {}
 }
