@@ -2200,7 +2200,7 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     ? nullptr : indexHashables.data();
 
   if (subscriptLabels.empty()) {
-    technicated.FieldNumber = fieldNumber;
+    technicated.TupleIndex = fieldNumber;
   } else {
     technicated.SubscriptSize = subscriptLabels.size();
   }

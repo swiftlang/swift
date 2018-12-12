@@ -2620,7 +2620,7 @@ public:
         break;
       case KeyPathExpr::Component::Kind::TupleElement:
         OS << "tuple_element ";
-        OS << "#" << component.getFieldNumber();
+        OS << "#" << component.getTupleIndex();
         OS << " ";
         break;
       }
