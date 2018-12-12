@@ -3060,7 +3060,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             FunctionType::Differentiability::None),
+                             /*differentiable*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, result, None, SGM.getASTContext());
@@ -3198,7 +3198,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             FunctionType::Differentiability::None),
+                             /*differentiable*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, {}, None, SGM.getASTContext());
@@ -3367,7 +3367,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               FunctionType::Differentiability::None),
+                               /*differentiable*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -3536,7 +3536,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               FunctionType::Differentiability::None),
+                               /*differentiable*/ false),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);

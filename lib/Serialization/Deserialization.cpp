@@ -4136,27 +4136,6 @@ getActualSILFunctionTypeRepresentation(uint8_t rep) {
   }
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Translate from the Serialization function type differentiability enum values
-/// to the AST strongly-typed enum.
-static Optional<swift::FunctionType::Differentiability>
-getActualFunctionTypeDifferentiability(uint8_t diff) {
-  switch (diff) {
-#define CASE(THE_DIFF) \
-  case (uint8_t)serialization::FunctionTypeDifferentiability::THE_DIFF: \
-    return swift::FunctionType::Differentiability::THE_DIFF;
-  CASE(None)
-  CASE(Forward)
-  CASE(Reverse)
-  CASE(Bidirectional)
-  CASE(Linear)
-  CASE(Constant)
-#undef CASE
-  default:
-    return None;
-  }
-}
-
 /// Translate from the Serialization coroutine kind enum values to the AST
 /// strongly-typed enum.
 ///
@@ -4488,10 +4467,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   case decls_block::FUNCTION_TYPE:
   case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID resultID;
+    uint8_t rawRepresentation;
+
     // SWIFT_ENABLE_TENSORFLOW
-    uint8_t rawRepresentation, rawDifferentiability;
-    
-    bool autoClosure = false, noescape = false, throws = false;
+    bool autoClosure = false, noescape = false, throws = false,
+         differentiable = false;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
@@ -4501,7 +4481,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                   noescape,
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
-                                                  rawDifferentiability);
+                                                  differentiable);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
@@ -4509,8 +4489,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                          rawRepresentation,
                                                          throws,
                                                          // SWIFT_ENABLE_TENSORFLOW
-                                                         rawGenericSig,
-                                                         rawDifferentiability);
+                                                         differentiable,
+                                                         rawGenericSig);
       genericSig = getGenericSignature(rawGenericSig);
     }
 
@@ -4520,17 +4500,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    auto diffability =
-        getActualFunctionTypeDifferentiability(rawDifferentiability);
-    if (!diffability.hasValue()) {
-      error();
-      return nullptr;
-    }
-    
     auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
-                                      throws, *diffability);
+                                      throws, differentiable);
 
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)
@@ -4866,7 +4838,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     bool pseudogeneric = false;
     bool noescape;
     // SWIFT_ENABLE_TENSORFLOW
-    uint8_t rawDifferentiability;
+    bool differentiable;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numYields;
@@ -4881,7 +4853,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                              pseudogeneric,
                                              noescape,
                                              // SWIFT_ENABLE_TENSORFLOW
-                                             rawDifferentiability,
+                                             differentiable,
                                              hasErrorResult,
                                              numParams,
                                              numYields,
@@ -4897,14 +4869,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    auto differentiability
-      = getActualFunctionTypeDifferentiability(rawDifferentiability);
-    if (!differentiability.hasValue()) {
-      error();
-      return nullptr;
-    }
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
-                                     *differentiability);
+                                     differentiable);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

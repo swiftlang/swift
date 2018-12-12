@@ -229,8 +229,7 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
             : SILParameterDifferentiability::NotDifferentiable));
   }
 
-  auto newExtInfo =
-      getExtInfo().withDifferentiability(Differentiability::Bidirectional);
+  auto newExtInfo = getExtInfo().withDifferentiable();
 
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
@@ -1312,7 +1311,7 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiability(extInfo.getDifferentiability());
+    .withDifferentiable(extInfo.isDifferentiable());
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,
