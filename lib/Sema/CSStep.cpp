@@ -491,6 +491,9 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
 }
 
 bool swift::isSIMDOperator(ValueDecl *value) {
+  if (!value)
+    return false;
+
   auto func = dyn_cast<FuncDecl>(value);
   if (!func)
     return false;
@@ -556,10 +559,8 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // If we have an operator from the SIMDOperators module, and the prior
   // choice was not from the SIMDOperators module, we're done.
   if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      currentChoice->getOverloadChoice().isDecl() &&
       isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      lastSuccessfulChoice->getOverloadChoice().isDecl() &&
       !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
       !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
     return true;

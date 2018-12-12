@@ -1459,7 +1459,7 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
   // Check whether we have any SIMD operators.
   bool foundSIMDOperator = false;
   for (const auto &choice : choices) {
-    if (choice.isDecl() && isSIMDOperator(choice.getDecl())) {
+    if (isSIMDOperator(choice.getDecl())) {
       foundSIMDOperator = true;
       break;
     }
@@ -1471,8 +1471,7 @@ static ArrayRef<OverloadChoice> partitionSIMDOperators(
   scratch.assign(choices.begin(), choices.end());
   std::stable_partition(scratch.begin(), scratch.end(),
                         [](const OverloadChoice &choice) {
-                          return !choice.isDecl() ||
-                                 !isSIMDOperator(choice.getDecl());
+                          return !isSIMDOperator(choice.getDecl());
                         });
 
   return scratch;
