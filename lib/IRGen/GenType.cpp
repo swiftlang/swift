@@ -1678,7 +1678,9 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return createPrimitive(llvmTy, size, align);
   }
 
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::Class:
   case TypeKind::Enum:

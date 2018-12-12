@@ -4566,17 +4566,23 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 
+/// Common trailing objects for all ArchetypeType implementations, used to
+/// store the constraints on the archetype.
+template<typename Base, typename...AdditionalTrailingObjects>
+using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
+  ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
+  
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
 ///
 /// Archetypes are used to represent generic type parameters and their
 /// associated types, as well as the runtime type stored within an
 /// existential container.
-class ArchetypeType final : public SubstitutableType,
-  private llvm::TrailingObjects<ArchetypeType, ProtocolDecl *,
-                                Type, LayoutConstraint, UUID> {
-  friend TrailingObjects;
-
+class ArchetypeType : public SubstitutableType,
+                private llvm::trailing_objects_internal::TrailingObjectsBase
+{
+protected:
+  // Each subclass has these same trailing objects and flags.
   size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
     return Bits.ArchetypeType.NumProtocols;
   }
@@ -4588,23 +4594,29 @@ class ArchetypeType final : public SubstitutableType,
   size_t numTrailingObjects(OverloadToken<LayoutConstraint>) const {
     return Bits.ArchetypeType.HasLayoutConstraint ? 1 : 0;
   }
-
-  size_t numTrailingObjects(OverloadToken<UUID>) const {
-    return getOpenedExistentialType() ? 1 : 0;
-  }
-
-  llvm::PointerUnion3<ArchetypeType *, TypeBase *,
-                      GenericEnvironment *> ParentOrOpenedOrEnvironment;
   Type InterfaceType;
   MutableArrayRef<std::pair<Identifier, Type>> NestedTypes;
 
   void populateNestedTypes() const;
   void resolveNestedType(std::pair<Identifier, Type> &nested) const;
 
+  
+  // Helper to get the trailing objects of one of the subclasses.
+  template<typename Type>
+  const Type *getSubclassTrailingObjects() const;
+  
+  template<typename Type>
+  Type *getSubclassTrailingObjects() {
+    const auto *constThis = this;
+    return const_cast<Type*>(constThis->getSubclassTrailingObjects<Type>());
+  }
+
 public:
   /// getNew - Create a new nested archetype with the given associated type.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
+  ///
+  /// TODO: Move to NestedArchetypeType
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                DependentMemberType *InterfaceType,
@@ -4615,6 +4627,8 @@ public:
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
+  ///
+  /// TODO: Move to PrimaryArchetypeType
   static CanTypeWrapper<ArchetypeType>
                         getNew(const ASTContext &Ctx,
                                GenericEnvironment *GenericEnv,
@@ -4630,7 +4644,7 @@ public:
   /// \param knownID When non-empty, the known ID of the archetype. When empty,
   /// a fresh archetype with a unique ID will be opened.
   static CanTypeWrapper<ArchetypeType>
-                        getOpened(Type existential, 
+                        getOpened(Type existential,
                                   Optional<UUID> knownID = None);
 
   /// Create a new archetype that represents the opened type
@@ -4648,18 +4662,17 @@ public:
 
   /// Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
-  ArchetypeType *getParent() const { 
-    return ParentOrOpenedOrEnvironment.dyn_cast<ArchetypeType *>();
-  }
-
-  /// Retrieve the opened existential type 
-  Type getOpenedExistentialType() const {
-    return ParentOrOpenedOrEnvironment.dyn_cast<TypeBase *>();
-  }
+  ArchetypeType *getParent() const;
+  
+  /// Retrieve the opened existential type.
+  /// TODO: Remove and leave on only OpenedArchetypeType
+  Type getOpenedExistentialType() const;
 
   /// Retrieve the generic environment in which this archetype resides.
   ///
   /// Note: opened archetypes currently don't have generic environments.
+  ///
+  /// TODO: Remove and leave only on PrimaryArchetypeType
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the interface type of this associated type, which will either
@@ -4677,7 +4690,7 @@ public:
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const {
-    return { getTrailingObjects<ProtocolDecl *>(),
+    return { getSubclassTrailingObjects<ProtocolDecl *>(),
              static_cast<size_t>(Bits.ArchetypeType.NumProtocols) };
   }
   
@@ -4690,14 +4703,14 @@ public:
   Type getSuperclass() const {
     if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
-    return *getTrailingObjects<Type>();
+    return *getSubclassTrailingObjects<Type>();
   }
 
   /// Retrieve the layout constraint of this type, if such a requirement exists.
   LayoutConstraint getLayoutConstraint() const {
     if (!Bits.ArchetypeType.HasLayoutConstraint) return LayoutConstraint();
 
-    return *getTrailingObjects<LayoutConstraint>();
+    return *getSubclassTrailingObjects<LayoutConstraint>();
   }
 
   /// Return true if the archetype has any requirements at all.
@@ -4749,51 +4762,159 @@ public:
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., one that is not nested within another archetype and is
   /// not an opened existential.
-  bool isPrimary() const { 
-    return ParentOrOpenedOrEnvironment.is<GenericEnvironment *>();
-  }
+  bool isPrimary() const;
 
   /// getPrimary - Return the primary archetype parent of this archetype.
-  ArchetypeType *getPrimary() const {
-    assert(!getOpenedExistentialType() && "Check for opened existential first");
-
-    auto *archetype = this;
-    while (auto *parent = archetype->getParent())
-      archetype = parent;
-    return const_cast<ArchetypeType *>(archetype);
-  }
+  ArchetypeType *getPrimary() const;
 
   /// Retrieve the ID number of this opened existential.
-  UUID getOpenedExistentialID() const {
-    assert(getOpenedExistentialType() && "Not an opened existential archetype");
-    // The UUID is tail-allocated at the end of opened existential archetypes.
-    return *getTrailingObjects<UUID>();
-  }
+  ///
+  /// TODO: Remove and place on OpenedArchetypeType only
+  UUID getOpenedExistentialID() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Archetype;
+    return T->getKind() >= TypeKind::First_ArchetypeType
+        && T->getKind() <= TypeKind::Last_ArchetypeType;
   }
-
-private:
-  ArchetypeType(
-          const ASTContext &Ctx,
-          llvm::PointerUnion<ArchetypeType *, GenericEnvironment *>
-            ParentOrGenericEnv,
-          Type InterfaceType,
-          ArrayRef<ProtocolDecl *> ConformsTo,
-          Type Superclass, LayoutConstraint Layout);
-
-  ArchetypeType(const ASTContext &Ctx, Type Existential,
-                ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
-                LayoutConstraint Layout, UUID uuid);
+protected:
+  ArchetypeType(TypeKind Kind,
+                const ASTContext &C,
+                RecursiveTypeProperties properties,
+                Type InterfaceType,
+                ArrayRef<ProtocolDecl *> ConformsTo,
+                Type Superclass, LayoutConstraint Layout);
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {
   return CanArchetypeType(getPointer()->getParent());
 }
 END_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
+  
+/// An archetype that represents a primary generic argument inside the generic
+/// context that binds it.
+class PrimaryArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<PrimaryArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+                                  
+  GenericEnvironment *Environment;
 
+public:
+  /// Retrieve the generic environment in which this archetype resides.
+  GenericEnvironment *getGenericEnvironment() const {
+    return Environment;
+  }
+      
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PrimaryArchetype;
+  }
+private:
+  PrimaryArchetypeType(const ASTContext &Ctx,
+                       GenericEnvironment *GenericEnv,
+                       Type InterfaceType,
+                       ArrayRef<ProtocolDecl *> ConformsTo,
+                       Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
+
+/// An archetype that represents the dynamic type of an opened existential.
+class OpenedArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<OpenedArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+      
+  TypeBase *Opened;
+  UUID ID;
+public:
+  /// Retrieve the ID number of this opened existential.
+  UUID getOpenedExistentialID() const { return ID; }
+  
+  /// Retrieve the opened existential type
+  Type getOpenedExistentialType() const {
+    return Opened;
+  }
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OpenedArchetype;
+  }
+  
+private:
+  OpenedArchetypeType(const ASTContext &Ctx, Type Existential,
+                      ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
+                      LayoutConstraint Layout, UUID uuid);
+};
+BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpenedArchetypeType, ArchetypeType)
+
+/// An archetype that is a nested associated type of another archetype.
+class NestedArchetypeType final : public ArchetypeType,
+    private ArchetypeTrailingObjects<NestedArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  
+  ArchetypeType *Parent;
+
+public:
+  /// Retrieve the parent of this archetype, or null if this is a
+  /// primary archetype.
+  ArchetypeType *getParent() const {
+    return Parent;
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::NestedArchetype;
+  }
+
+private:
+  NestedArchetypeType(const ASTContext &Ctx,
+                     ArchetypeType *Parent,
+                     Type InterfaceType,
+                     ArrayRef<ProtocolDecl *> ConformsTo,
+                     Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(NestedArchetypeType, ArchetypeType)
+
+inline bool ArchetypeType::isPrimary() const {
+  return isa<PrimaryArchetypeType>(this);
+}
+  
+inline UUID ArchetypeType::getOpenedExistentialID() const {
+  return cast<OpenedArchetypeType>(this)->getOpenedExistentialID();
+}
+  
+inline Type ArchetypeType::getOpenedExistentialType() const {
+  if (auto child = dyn_cast<OpenedArchetypeType>(this))
+    return child->getOpenedExistentialType();
+  return nullptr;
+}
+  
+inline ArchetypeType *ArchetypeType::getParent() const {
+  if (auto child = dyn_cast<NestedArchetypeType>(this))
+    return child->getParent();
+  
+  return nullptr;
+}
+  
+template<typename Type>
+const Type *ArchetypeType::getSubclassTrailingObjects() const {
+  if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
+    return contextTy->getTrailingObjects<Type>();
+  }
+  if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
+    return openedTy->getTrailingObjects<Type>();
+  }
+  if (auto childTy = dyn_cast<NestedArchetypeType>(this)) {
+    return childTy->getTrailingObjects<Type>();
+  }
+  llvm_unreachable("unhandled ArchetypeType subclass?");
+}
+  
 /// Describes the type of a generic parameter.
 ///
 /// \sa GenericTypeParamDecl
@@ -5391,8 +5512,11 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::ExistentialMetatype:
     return !cast<const AnyMetatypeType>(this)->hasRepresentation();
 
-  case TypeKind::Archetype:
-    return !cast<const ArchetypeType>(this)->isOpenedExistential();
+  case TypeKind::NestedArchetype:
+    return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
+      
+  case TypeKind::OpenedArchetype:
+    return false;
 
   case TypeKind::ProtocolComposition: {
     // 'Any', 'AnyObject' and single protocol compositions are simple

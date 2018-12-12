@@ -36,7 +36,7 @@
 using namespace swift;
 using namespace irgen;
 
-static SILType applyContextArchetypes(IRGenFunction &IGF,
+static SILType applyPrimaryArchetypes(IRGenFunction &IGF,
                                       SILType type) {
   if (!type.hasTypeParameter()) {
     return type;
@@ -58,14 +58,14 @@ static SILType applyContextArchetypes(IRGenFunction &IGF,
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   SILType expectedTy, SILType substTy,
                                   Explosion &in, Explosion &out) {
-  expectedTy = applyContextArchetypes(IGF, expectedTy);
+  expectedTy = applyPrimaryArchetypes(IGF, expectedTy);
 
   ExplosionSchema expectedSchema;
   cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(expectedTy))
     .getSchema(expectedSchema);
 
 #ifndef NDEBUG
-  auto &substTI = IGF.IGM.getTypeInfo(applyContextArchetypes(IGF, substTy));
+  auto &substTI = IGF.IGM.getTypeInfo(applyPrimaryArchetypes(IGF, substTy));
   assert(expectedSchema.size() ==
          cast<LoadableTypeInfo>(substTI).getExplosionSize());
 #endif

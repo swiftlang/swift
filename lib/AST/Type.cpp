@@ -180,7 +180,9 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
                                functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
@@ -2348,24 +2350,15 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
-
-ArchetypeType::ArchetypeType(
-  const ASTContext &Ctx,
-  llvm::PointerUnion<ArchetypeType *, GenericEnvironment *> ParentOrGenericEnv,
-  Type InterfaceType,
-  ArrayRef<ProtocolDecl *> ConformsTo,
-  Type Superclass, LayoutConstraint Layout)
-    : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties::HasArchetype),
-      InterfaceType(InterfaceType) {
-  // Record the parent/generic environment.
-  if (auto parent = ParentOrGenericEnv.dyn_cast<ArchetypeType *>()) {
-    ParentOrOpenedOrEnvironment = parent;
-  } else {
-    ParentOrOpenedOrEnvironment =
-      ParentOrGenericEnv.get<GenericEnvironment *>();
-  }
-
+ArchetypeType::ArchetypeType(TypeKind Kind,
+                             const ASTContext &Ctx,
+                             RecursiveTypeProperties properties,
+                             Type InterfaceType,
+                             ArrayRef<ProtocolDecl *> ConformsTo,
+                             Type Superclass, LayoutConstraint Layout)
+  : SubstitutableType(Kind, &Ctx, properties),
+    InterfaceType(InterfaceType)
+{
   // Set up the bits we need for trailing objects to work.
   Bits.ArchetypeType.ExpandedNestedTypes = false;
   Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
@@ -2374,46 +2367,62 @@ ArchetypeType::ArchetypeType(
 
   // Record the superclass.
   if (Superclass)
-    *getTrailingObjects<Type>() = Superclass;
+    *getSubclassTrailingObjects<Type>() = Superclass;
 
   // Record the layout constraint.
   if (Layout)
-    *getTrailingObjects<LayoutConstraint>() = Layout;
+    *getSubclassTrailingObjects<LayoutConstraint>() = Layout;
 
   // Copy the protocols.
   std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
-                          getTrailingObjects<ProtocolDecl *>());
+                          getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-ArchetypeType::ArchetypeType(const ASTContext &Ctx, Type Existential,
-                             ArrayRef<ProtocolDecl *> ConformsTo,
-                             Type Superclass, LayoutConstraint Layout,
-                             UUID uuid)
-  : SubstitutableType(TypeKind::Archetype, &Ctx,
-                      RecursiveTypeProperties(
-                        RecursiveTypeProperties::HasArchetype |
-                        RecursiveTypeProperties::HasOpenedExistential)),
-    ParentOrOpenedOrEnvironment(Existential.getPointer()) {
-  // Set up the bits we need for trailing objects to work.
-  Bits.ArchetypeType.ExpandedNestedTypes = false;
-  Bits.ArchetypeType.HasSuperclass = static_cast<bool>(Superclass);
-  Bits.ArchetypeType.HasLayoutConstraint = static_cast<bool>(Layout);
-  Bits.ArchetypeType.NumProtocols = ConformsTo.size();
+ArchetypeType *ArchetypeType::getPrimary() const {
+  ArchetypeType *archetype = const_cast<ArchetypeType*>(this);
+  while (auto child = dyn_cast<NestedArchetypeType>(archetype)) {
+    archetype = child->getParent();
+  }
+  return dyn_cast<PrimaryArchetypeType>(archetype);
+}
 
-  // Record the superclass.
-  if (Superclass)
-    *getTrailingObjects<Type>() = Superclass;
+PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
+                                     GenericEnvironment *GenericEnv,
+                                     Type InterfaceType,
+                                     ArrayRef<ProtocolDecl *> ConformsTo,
+                                     Type Superclass, LayoutConstraint Layout)
+  : ArchetypeType(TypeKind::PrimaryArchetype, Ctx,
+                  RecursiveTypeProperties::HasArchetype,
+                  InterfaceType, ConformsTo, Superclass, Layout),
+    Environment(GenericEnv)
+{
+}
 
-  // Record the layout constraint.
-  if (Layout)
-    *getTrailingObjects<LayoutConstraint>() = Layout;
+OpenedArchetypeType::OpenedArchetypeType(const ASTContext &Ctx,
+                                         Type Existential,
+                                         ArrayRef<ProtocolDecl *> ConformsTo,
+                                         Type Superclass,
+                                         LayoutConstraint Layout, UUID uuid)
+  : ArchetypeType(TypeKind::OpenedArchetype, Ctx,
+                  RecursiveTypeProperties::HasArchetype
+                    | RecursiveTypeProperties::HasOpenedExistential,
+                  Type(), ConformsTo, Superclass, Layout),
+    Opened(Existential.getPointer()),
+    ID(uuid)
+{
+}
 
-  // Copy the protocols.
-  std::uninitialized_copy(ConformsTo.begin(), ConformsTo.end(),
-                          getTrailingObjects<ProtocolDecl *>());
-
-  // Record the UUID.
-  *getTrailingObjects<UUID>() = uuid;
+NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
+                                       ArchetypeType *Parent,
+                                       Type InterfaceType,
+                                       ArrayRef<ProtocolDecl *> ConformsTo,
+                                       Type Superclass,
+                                       LayoutConstraint Layout)
+  : ArchetypeType(TypeKind::NestedArchetype, Ctx,
+                  Parent->getRecursiveProperties(),
+                  InterfaceType, ConformsTo, Superclass, Layout),
+    Parent(Parent)
+{
 }
 
 CanArchetypeType ArchetypeType::getNew(
@@ -2430,11 +2439,11 @@ CanArchetypeType ArchetypeType::getNew(
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
-      alignof(ArchetypeType), arena);
+    NestedArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+      alignof(NestedArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(
+  return CanArchetypeType(new (mem) NestedArchetypeType(
       Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -2453,11 +2462,11 @@ ArchetypeType::getNew(const ASTContext &Ctx,
 
   auto arena = AllocationArena::Permanent;
   void *mem = Ctx.Allocate(
-      totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0, 0),
-      alignof(ArchetypeType), arena);
+    PrimaryArchetypeType::totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint>(
+          ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
+      alignof(PrimaryArchetypeType), arena);
 
-  return CanArchetypeType(new (mem) ArchetypeType(
+  return CanArchetypeType(new (mem) PrimaryArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -2624,10 +2633,13 @@ std::string ArchetypeType::getFullName() const {
 }
 
 GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
-  if (auto parent = getParent())
-    return parent->getGenericEnvironment();
-
-  return ParentOrOpenedOrEnvironment.dyn_cast<GenericEnvironment *>();
+  if (auto child = dyn_cast<NestedArchetypeType>(this)) {
+    return child->getParent()->getGenericEnvironment();
+  }
+  if (auto context = dyn_cast<PrimaryArchetypeType>(this)) {
+    return context->getGenericEnvironment();
+  }
+  return nullptr;
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3992,7 +4004,9 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return cast<DynamicSelfType>(type).getSelfType()
         ->getReferenceCounting();
 
-  case TypeKind::Archetype: {
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
