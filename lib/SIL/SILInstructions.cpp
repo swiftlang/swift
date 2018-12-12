@@ -682,7 +682,7 @@ getExtracteeType(SILValue function, Extractee extractee,
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getExtInfo().isDifferentiable());
   auto originalFnTy =
-      fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiable());
+      fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiable(false));
   CanSILFunctionType resultFnTy;
   switch (extractee) {
   case Extractee::Original:

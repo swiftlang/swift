@@ -2664,9 +2664,6 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
     // SWIFT_ENABLE_TENSORFLOW
     if (attrs.has(TAK_nondiff)) {
-      // TODO: We could diagnose @nondiff on a non-@autodiff function, but we'd
-      // have to pass function differentiability as an argument to
-      // `resolveSILParameter`.
       attrs.clearAttribute(TAK_nondiff);
       differentiability = SILParameterDifferentiability::NotDifferentiable;
     }
