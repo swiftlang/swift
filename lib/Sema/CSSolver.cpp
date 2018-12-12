@@ -1857,6 +1857,9 @@ void ConstraintSystem::partitionDisjunction(
 
   partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
 
+  // Add all the things defined at global scope.
+  appendPartition(globalScope);
+
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
@@ -1866,7 +1869,6 @@ void ConstraintSystem::partitionDisjunction(
   appendPartition(everythingElse);
 
   // Now create the remaining partitions from what we previously collected.
-  appendPartition(globalScope);
   appendPartition(unavailable);
   appendPartition(disabled);
 
