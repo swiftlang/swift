@@ -120,11 +120,6 @@ public:
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  std::string mangleAutoDiffAssociatedFunctionWitnessThunk(
-      const ProtocolConformance *Conformance, const ValueDecl *Requirement,
-      const AutoDiffAssociatedFunctionIdentifier *AutoDiffFuncId);
-
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);
 

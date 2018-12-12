@@ -1,0 +1,83 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-sil %s -emit-ir | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol DifferentiableRequirement {
+  @differentiable(reverse)
+  func f(_ x: Float) -> Float
+}
+
+struct DifferentiableConformance : DifferentiableRequirement {
+  @differentiable(reverse, jvp: df, vjp: pf)
+  func f(_ x: Float) -> Float
+  func df(_ x: Float) -> (Float, (Float) -> Float)
+  func pf(_ x: Float) -> (Float, (Float) -> Float)
+}
+
+struct AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0 {
+}
+
+// DifferentiableConformance.f(_:)
+sil hidden [differentiable source 0 wrt 0 primal @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0 adjoint @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 jvp @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF vjp @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF] @$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $Float
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF'
+
+// DifferentiableConformance.df(_:)
+sil hidden @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+// DifferentiableConformance.pf(_:)
+sil hidden @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF'
+
+// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $Float
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW'
+
+// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU
+sil private [transparent] [thunk] @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU'
+
+// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU
+sil private [transparent] [thunk] @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+} // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU'
+
+// AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0
+sil hidden @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0 : $@convention(method) (Float, DifferentiableConformance) -> (@owned AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float) {
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  return undef : $(AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float)
+} // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0'
+
+// AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0
+sil hidden @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 : $@convention(method) (Float, AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, Float, Float, DifferentiableConformance) -> Float {
+bb0(%0 : $Float, %1 : $AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__Type__src_0_wrt_0, %2 : $Float, %3 : $Float, %4 : $DifferentiableConformance):
+  return undef : $Float
+} // end sil function 'AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0'
+
+sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
+  method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  method #DifferentiableRequirement.f!1.jvp.1.SU: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU
+  method #DifferentiableRequirement.f!1.vjp.1.SU: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU
+}
+
+// CHECK: @"$s19witness_table_irgen25DifferentiableConformanceVAA0D11RequirementAAWP" = hidden constant [4 x i8*] [
+// CHECK-SAME:   i8* bitcast (%swift.protocol_conformance_descriptor* @"$s19witness_table_irgen25DifferentiableConformanceVAA0D11RequirementAAMc" to i8*),
+// CHECK-SAME:   i8* bitcast (float (float, %T19witness_table_irgen25DifferentiableConformanceV*, %swift.type*, i8**)* @"$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW" to i8*),
+// CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T19witness_table_irgen25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU" to i8*),
+// CHECK-SAME:   i8* bitcast ({ float, i8*, %swift.refcounted* } (float, %T19witness_table_irgen25DifferentiableConformanceV*, %swift.type*, i8**)* @"AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU" to i8*)
+// CHECK-SAME: ]
