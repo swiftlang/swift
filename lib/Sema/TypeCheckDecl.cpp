@@ -640,14 +640,16 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     nestedList.push_back(genericParams);
   }
 
+  std::reverse(nestedList.begin(), nestedList.end());
+
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
   GenericSignature *parentSig = nullptr;
   GenericEnvironment *parentEnv = nullptr;
 
-  for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
-    auto genericParams = nestedList.rbegin()[i];
-    genericParams->configureGenericParamDepth();
+  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
+    auto genericParams = nestedList[i];
+    genericParams->setDepth(i);
 
     parentEnv = checkGenericEnvironment(genericParams, DC, parentSig,
                                         /*allowConcreteGenericParams=*/true,
@@ -4172,9 +4174,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     proto->computeType();
 
     auto *gp = proto->getGenericParams();
-    unsigned depth = gp->getDepth();
-    for (auto paramDecl : *gp)
-      paramDecl->setDepth(depth);
+    gp->setDepth(proto->getGenericContextDepth());
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);

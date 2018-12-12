@@ -562,8 +562,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                     GenericParamList *outerParams = nullptr);
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,

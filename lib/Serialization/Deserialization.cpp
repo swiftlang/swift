@@ -643,8 +643,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   return conformance;
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
-                                               GenericParamList *outerParams) {
+GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -676,13 +675,9 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   if (params.empty())
     return nullptr;
 
-  auto paramList = GenericParamList::create(getContext(), SourceLoc(),
-                                            params, SourceLoc(), { },
-                                            SourceLoc());
-  paramList->setOuterParameters(outerParams ? outerParams :
-                                DC->getGenericParamsOfContext());
-
-  return paramList;
+  return GenericParamList::create(getContext(), SourceLoc(),
+                                  params, SourceLoc(), { },
+                                  SourceLoc());
 }
 
 void ModuleFile::readGenericRequirements(
@@ -3954,10 +3949,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+    while (auto *genericParams = maybeReadGenericParams(DC)) {
+      genericParams->setOuterParameters(outerParams);
+
       // We do this repeatedly to set up the correct DeclContexts for the
       // GenericTypeParamDecls in the list.
       extension->setGenericParams(genericParams);
+
       outerParams = genericParams;
     }
 

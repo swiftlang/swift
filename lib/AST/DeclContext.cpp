@@ -123,12 +123,42 @@ Type DeclContext::getDeclaredInterfaceType() const {
   return Type();
 }
 
+void DeclContext::forEachGenericContext(
+    llvm::function_ref<void (GenericParamList *)> fn) const {
+  auto dc = this;
+  do {
+    if (auto decl = dc->getAsDecl()) {
+      // Extensions do not capture outer generic parameters.
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+        for (auto *gpList = ext->getGenericParams();
+             gpList != nullptr;
+             gpList = gpList->getOuterParameters()) {
+          fn(gpList);
+        }
+
+        return;
+      }
+
+      if (auto genericCtx = decl->getAsGenericContext())
+        if (auto *gpList = genericCtx->getGenericParams())
+          fn(gpList);
+    }
+  } while ((dc = dc->getParent()));
+}
+
+unsigned DeclContext::getGenericContextDepth() const {
+  unsigned depth = -1;
+  forEachGenericContext([&](GenericParamList *) { ++depth; });
+  return depth;
+}
+
 GenericParamList *DeclContext::getGenericParamsOfContext() const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl()) {
       if (auto GC = decl->getAsGenericContext()) {
         auto GP = GC->getGenericParams();
+
         // Extensions do not capture outer generic parameters.
         if (GP != nullptr || isa<ExtensionDecl>(decl))
           return GP;

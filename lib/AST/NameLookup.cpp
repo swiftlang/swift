@@ -1077,11 +1077,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (shouldReturnBasedOnResults())
             return;
 
-          // Extensions of nested types have multiple levels of
-          // generic parameters, so we have to visit them explicitly.
-          if (!isa<ExtensionDecl>(DC))
-            break;
-
           dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
