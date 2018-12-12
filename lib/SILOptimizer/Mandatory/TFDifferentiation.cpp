@@ -4489,6 +4489,7 @@ void DifferentiationTask::createVJP() {
   // We'll use these conventions frequently.
   auto originalConv = original->getConventions();
   auto primalConv = primal->getConventions();
+  auto vjpConv = vjp->getConventions();
 
   // Keep track of some stack allocation to clean up.
   SmallVector<SILValue, 2> stackAllocsToCleanUp;
@@ -4496,7 +4497,6 @@ void DifferentiationTask::createVJP() {
   // Validate signatures.
 #ifndef NDEBUG
   auto adjointConv = adjoint->getConventions();
-  auto vjpConv = vjp->getConventions();
 
   unsigned numOriginalParameters = originalConv.getNumParameters();
   unsigned numOriginalResults = originalConv.getResults().size();
@@ -4555,7 +4555,16 @@ void DifferentiationTask::createVJP() {
 
   // Create the entry block with indirect results and parameters.
   auto *entry = vjp->createBasicBlock();
-  createEntryArguments(vjp);
+  unsigned argumentIndex = 0;
+  for (auto indResultTy : vjpConv.getIndirectSILResultTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(indResultTy).getAddressType(),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  for (auto paramTy : vjpConv.getParameterSILTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(paramTy),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+
   SILBuilder builder(entry);
   auto loc = vjp->getLocation();
 
