@@ -76,6 +76,16 @@ extension Unicode.Scalar {
   }
 }
 
+extension UnsafeBufferPointer where Element == UInt8 {
+  internal func isOnUnicodeScalarBoundary(_ index: Int) -> Bool {
+    guard index < count else {
+      return true
+    }
+    return !_isContinuation(self[index])
+  }
+  
+}
+
 internal func _tryNormalize(
   _ input: UnsafeBufferPointer<UInt16>,
   into outputBuffer:
@@ -245,7 +255,7 @@ internal func _fastNormalize(
     let (read, filled) = fastFill(rebasedSourceBuffer, outputBuffer)
       if filled > 0 {
         let nextIndex = readIndex.encoded(offsetBy: read)
-        _internalInvariant(nextIndex.encodedOffset >= sourceBuffer.count || !_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
+        _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
         
         return NormalizationResult(
           amountFilled: filled, nextReadPosition: nextIndex, reallocatedBuffers: false
@@ -264,7 +274,7 @@ internal func _fastNormalize(
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
-  _internalInvariant(nextIndex.encodedOffset >= sourceBuffer.count || !_isContinuation(sourceBuffer[nextIndex.encodedOffset]))
+  _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
   
   let rebasedICUInputBuffer = UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled])
   guard let normalized = _tryNormalize(rebasedICUInputBuffer, into: icuOutputBuffer) else {
