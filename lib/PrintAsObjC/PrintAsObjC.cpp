@@ -919,82 +919,74 @@ private:
     auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
 
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
+      if (!renamedParsedDeclName.ContextName.empty()) {
+        return nullptr;
+      }
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
                                declContext->getModuleScopeContext(), nullptr,
                                SourceLoc(),
                                UnqualifiedLookup::Flags::TypeLookup);
       return lookup.getSingleTypeResult();
-    } else {
-      TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-
-      if (!renamedParsedDeclName.ContextName.empty()) {
-        auto contextIdentifier =
-            astContext.getIdentifier(renamedParsedDeclName.ContextName);
-        UnqualifiedLookup specificTypeLookup(
-            contextIdentifier, declContext->getModuleScopeContext(), nullptr,
-            SourceLoc(), UnqualifiedLookup::Flags::TypeLookup);
-        if (!specificTypeLookup.getSingleTypeResult()) {
-          return nullptr;
-        }
-      }
-        
-      const ValueDecl *renamedDecl = nullptr;
-      SmallVector<ValueDecl *, 4> lookupResults;
-      declContext->lookupQualified(typeDecl, renamedDeclName,
-                                   NL_QualifiedDefault, lookupResults);
+    }
+    
+    TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
+    
+    const ValueDecl *renamedDecl = nullptr;
+    SmallVector<ValueDecl *, 4> lookupResults;
+    declContext->lookupQualified(typeDecl, renamedDeclName,
+                                 NL_QualifiedDefault, lookupResults);
+    
+    if (lookupResults.size() == 1) {
+      auto candidate = lookupResults[0];
+      if (!shouldInclude(candidate))
+        return nullptr;
+      if (candidate->getKind() != D->getKind() ||
+          (candidate->isInstanceMember() !=
+           cast<ValueDecl>(D)->isInstanceMember()))
+        return nullptr;
       
-      if (lookupResults.size() == 1) {
-        auto candidate = lookupResults[0];
+      renamedDecl = candidate;
+    } else {
+      for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
-          return nullptr;
+          continue;
+        
         if (candidate->getKind() != D->getKind() ||
             (candidate->isInstanceMember() !=
              cast<ValueDecl>(D)->isInstanceMember()))
-          return nullptr;
-
-        renamedDecl = candidate;
-      } else {
-        for (auto candidate : lookupResults) {
-          if (!shouldInclude(candidate))
+          continue;
+        
+        if (isa<FuncDecl>(candidate)) {
+          auto cParams = cast<FuncDecl>(candidate)->getParameters();
+          auto dParams = cast<FuncDecl>(D)->getParameters();
+          
+          if (cParams->size() != dParams->size())
             continue;
           
-          if (candidate->getKind() != D->getKind() ||
-              (candidate->isInstanceMember() !=
-               cast<ValueDecl>(D)->isInstanceMember()))
-            continue;
-          
-          if (isa<FuncDecl>(candidate)) {
-            auto cParams = cast<FuncDecl>(candidate)->getParameters();
-            auto dParams = cast<FuncDecl>(D)->getParameters();
-            
-            if (cParams->size() != dParams->size())
-              continue;
-            
-            bool hasSameParameterTypes = true;
-            for (auto index : indices(*cParams)) {
-              auto cParamsType = cParams->get(index)->getType();
-              auto dParamsType = dParams->get(index)->getType();
-              if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
-                hasSameParameterTypes = false;
-                break;
-              }
-            }
-            
-            if (!hasSameParameterTypes) {
-              continue;
+          bool hasSameParameterTypes = true;
+          for (auto index : indices(*cParams)) {
+            auto cParamsType = cParams->get(index)->getType();
+            auto dParamsType = dParams->get(index)->getType();
+            if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
+              hasSameParameterTypes = false;
+              break;
             }
           }
           
-          if (renamedDecl) {
-            // If we found a duplicated candidate then we would silently fail.
-            renamedDecl = nullptr;
-            break;
+          if (!hasSameParameterTypes) {
+            continue;
           }
-          renamedDecl = candidate;
         }
+        
+        if (renamedDecl) {
+          // If we found a duplicated candidate then we would silently fail.
+          renamedDecl = nullptr;
+          break;
+        }
+        renamedDecl = candidate;
       }
-      return renamedDecl;
     }
+    return renamedDecl;
   }
 
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
