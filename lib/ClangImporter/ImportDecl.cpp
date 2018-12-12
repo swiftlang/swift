@@ -8053,7 +8053,7 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
-    ext->setGenericParams(protoDecl->createGenericParams(ext));
+    ext->createGenericParamsIfMissing(protoDecl);
 
     auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
     ext->setGenericEnvironment(env);

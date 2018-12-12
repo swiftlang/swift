@@ -420,7 +420,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   };
 
   // Find the depth of the function's own generic parameters.
-  unsigned fnGenericParamsDepth = genericParams->getDepth();
+  unsigned fnGenericParamsDepth = genericParams->getParams().front()->getDepth();
 
   // Check that every generic parameter type from the signature is
   // among referencedGenericParams.
@@ -463,8 +463,7 @@ computeGenericFuncSignature(TypeChecker &tc, AbstractFunctionDecl *func) {
 
   // Do some initial configuration of the generic parameter lists that's
   // required in all cases.
-  gp->setOuterParameters(dc->getGenericParamsOfContext());
-  gp->configureGenericParamDepth();
+  gp->setDepth(func->getGenericContextDepth());
 
   // Accessors can always use the generic context of their storage
   // declarations.  This is a compile-time optimization since it lets us
@@ -599,8 +598,7 @@ TypeChecker::validateGenericSubscriptSignature(SubscriptDecl *subscript) {
 
   GenericSignature *sig;
   if (auto *gp = subscript->getGenericParams()) {
-    gp->setOuterParameters(dc->getGenericParamsOfContext());
-    gp->configureGenericParamDepth();
+    gp->setDepth(subscript->getGenericContextDepth());
 
     // Create the generic signature builder.
     GenericSignatureBuilder builder(Context);
@@ -686,7 +684,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
   GenericSignature *sig;
   if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
-      getExtendedTypeGenericDepth(ext) != genericParams->getDepth()) {
+      getExtendedTypeGenericDepth(ext) !=
+      genericParams->getParams().back()->getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;
     if (recursivelyVisitGenericParams) {
@@ -766,8 +765,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
     return;
   }
 
-  gp->setOuterParameters(dc->getGenericParamsOfContext());
-  gp->configureGenericParamDepth();
+  gp->setDepth(typeDecl->getGenericContextDepth());
 
   // For a protocol, compute the requirement signature first. It will be used
   // by clients of the protocol.

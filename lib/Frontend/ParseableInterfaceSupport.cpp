@@ -814,7 +814,7 @@ public:
                         protoTy->print(out, printOptions);
                       }, [&out] { out << ", "; });
     out << " where "
-        << nominal->getGenericParamsOfContext()->getParams().front()->getName()
+        << nominal->getGenericSignature()->getGenericParams().front()->getName()
         << " : " << DummyProtocolName << " {}\n";
     return true;
   }

@@ -7490,29 +7490,14 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
-/// Add all of the generic parameters from the given parameter list (and it's
-/// outer generic parameter lists) to the given generic signature builder.
-static void addAllGenericParams(GenericSignatureBuilder &builder,
-                                GenericParamList *genericParams) {
-  if (!genericParams) return;
-
-  addAllGenericParams(builder, genericParams->getOuterParameters());
-  for (auto gp : *genericParams)
-    builder.addGenericParameter(gp);
-}
-
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
 
-  if (!proto->hasInterfaceType()) {
-    // FIXME: Overkill.
-    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
-      lazyResolver->resolveDeclSignature(proto);
-  }
-
   // Add all of the generic parameters.
-  addAllGenericParams(builder, proto->getGenericParams());
+  proto->createGenericParamsIfMissing();
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
 
   // Add the conformance of 'self' to the protocol.
   auto selfType =

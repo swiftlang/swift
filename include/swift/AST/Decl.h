@@ -1377,22 +1377,11 @@ public:
   void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
   
-  /// Retrieve the outer generic parameter list, which provides the
-  /// generic parameters of the context in which this generic parameter list
-  /// exists.
+  /// Retrieve the outer generic parameter list.
   ///
-  /// Consider the following generic class:
-  ///
-  /// \code
-  /// class Vector<T> {
-  ///   init<R : Range where R.Element == T>(range : R) { }
-  /// }
-  /// \endcode
-  ///
-  /// The generic parameter list <T> has no outer parameters, because it is
-  /// the outermost generic parameter list. The generic parameter list
-  /// <R : Range...> for the constructor has the generic parameter list <T> as
-  /// its outer generic parameter list.
+  /// This is used for extensions of nested types, and in SIL mode, where a
+  /// single lexical context can have multiple logical generic parameter
+  /// lists.
   GenericParamList *getOuterParameters() const { return OuterParameters; }
 
   /// Set the outer generic parameter list. See \c getOuterParameters
@@ -1422,10 +1411,8 @@ public:
                        Requirements.back().getSourceRange().End);
   }
 
-  unsigned getDepth() const;
-
   /// Configure the depth of the generic parameters in this list.
-  void configureGenericParamDepth();
+  void setDepth(unsigned depth);
 
   /// Create a copy of the generic parameter list and all of its generic
   /// parameter declarations. The copied generic parameters are re-parented
@@ -4106,10 +4093,6 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Create the implicit generic parameter list for a protocol or
-  /// extension thereof.
-  GenericParamList *createGenericParams(DeclContext *dc);
 
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.
