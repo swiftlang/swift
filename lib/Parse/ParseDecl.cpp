@@ -902,7 +902,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_RawDocComment:
   case DAK_ObjCBridged:
-  case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
   case DAK_SynthesizedProtocol:
   case DAK_ClangImporterSynthesizedType:
@@ -1492,6 +1491,34 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                       NameLocs, Names, RParenLoc);
     }
     Attributes.add(attr);
+    break;
+  }
+  case DAK_ObjCRuntimeName: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::objc_runtime_name_must_be_identifier);
+      return false;
+    }
+
+    auto name = Tok.getText();
+
+    consumeToken(tok::identifier);
+
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    Attributes.add(new (Context) ObjCRuntimeNameAttr(name, AtLoc, range,
+                                                     /*implicit*/ false));
     break;
   }
 
