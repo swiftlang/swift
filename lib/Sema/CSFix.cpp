@@ -227,7 +227,8 @@ RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool InsertExplicitCall::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure = MissingCallFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
