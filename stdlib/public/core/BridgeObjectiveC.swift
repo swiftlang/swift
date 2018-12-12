@@ -658,7 +658,7 @@ extension Optional: _Unwrappable {
   }
 }
 
-private let _foundationSwiftValueType = _typeByName("Foundation.__SwiftValue") as? _NSSwiftValue.Type
+private let _foundationSwiftValueType = _typeByName("FoundationSoil.__SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
 internal var _nullPlaceholder: AnyObject {

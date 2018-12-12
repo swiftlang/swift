@@ -173,10 +173,42 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   return t;
 }
 
+static CanType getKnownTypeFromModules4(Optional<CanType> &cacheSlot, ASTContext &C,
+                                        StringRef moduleName1, StringRef moduleName2,
+                                        StringRef moduleName3, StringRef moduleName4,
+                                        StringRef typeName) {
+
+  auto temporaryCacheSlot = Optional<CanType>();
+  auto T = getKnownType(temporaryCacheSlot, C, moduleName1, typeName);
+  
+  if (!T) {
+    temporaryCacheSlot = Optional<CanType>();
+    T = getKnownType(temporaryCacheSlot, C, moduleName2, typeName);
+  }
+  if (!T) {
+    temporaryCacheSlot = Optional<CanType>();
+    T = getKnownType(temporaryCacheSlot, C, moduleName3, typeName);
+  }
+  if (!T) {
+    temporaryCacheSlot = Optional<CanType>();
+    T = getKnownType(temporaryCacheSlot, C, moduleName4, typeName);
+  }
+  
+  cacheSlot = temporaryCacheSlot;
+  return T;
+}
+
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType TypeConverter::get##BridgedType##Type() {         \
     return getKnownType(BridgedType##Ty, M.getASTContext(), \
                         #BridgedModule, #BridgedType);      \
+  }
+#define BRIDGING_KNOWN_TYPE_WITH_MODULES_4(BridgedModule1,BridgedModule2,BridgedModule3,BridgedModule4,BridgedType) \
+  CanType TypeConverter::get##BridgedType##Type() { \
+    return getKnownTypeFromModules4(BridgedType##Ty, M.getASTContext(), \
+                                    #BridgedModule1, #BridgedModule2, \
+                                    #BridgedModule3, #BridgedModule4, \
+                                    #BridgedType); \
   }
 #include "swift/SIL/BridgedTypes.def"
 

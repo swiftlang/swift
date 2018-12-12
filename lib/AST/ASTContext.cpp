@@ -848,7 +848,17 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
 #define GET_FOUNDATION_DECL(NAME) \
 ClassDecl *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
+    ModuleDecl *M = getLoadedModule(Id_SwiftFoundationSoil); \
+    if (!M) { \
+      M = getLoadedModule(Id_SwiftFoundation); \
+    } \
+    if (!M) { \
+      M = getLoadedModule(Id_FoundationSoil); \
+    } \
+    if (!M) { \
+      M = getLoadedModule(Id_Foundation); \
+    } \
+    if (M) { \
       /* Note: use unqualified lookup so we find NSError regardless of */ \
       /* whether it's defined in the Foundation module or the Clang */ \
       /* Foundation module it imports. */ \

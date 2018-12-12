@@ -3539,7 +3539,12 @@ retry_after_fail:
   // a lookup into that Objective-C type.
   if (bridgedType) {
     LookupResult &bridgedLookup = lookupMember(bridgedType, memberName);
+
     ModuleDecl *foundationModule = nullptr;
+    ModuleDecl *foundationSoilModule = nullptr;
+    ModuleDecl *swiftFoundationModule = nullptr;
+    ModuleDecl *swiftFoundationSoilModule = nullptr;
+
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
       // module. Those core APIs are explicitly provided by the
@@ -3553,6 +3558,39 @@ retry_after_fail:
         // Cache the foundation module name so we don't need to look
         // for it again.
         foundationModule = module;
+        continue;
+      }
+      
+      if (foundationSoilModule) {
+        if (module == foundationSoilModule)
+          continue;
+      } else if (ClangModuleUnit::hasClangModule(module) &&
+                 module->getName().str() == "FoundationSoil") {
+        // Cache the foundation module name so we don't need to look
+        // for it again.
+        foundationSoilModule = module;
+        continue;
+      }
+      
+      if (swiftFoundationModule) {
+        if (module == swiftFoundationModule)
+          continue;
+      } else if (ClangModuleUnit::hasClangModule(module) &&
+                 module->getName().str() == "SwiftFoundation") {
+        // Cache the foundation module name so we don't need to look
+        // for it again.
+        swiftFoundationModule = module;
+        continue;
+      }
+      
+      if (swiftFoundationSoilModule) {
+        if (module == swiftFoundationSoilModule)
+          continue;
+      } else if (ClangModuleUnit::hasClangModule(module) &&
+                 module->getName().str() == "SwiftFoundationSoil") {
+        // Cache the foundation module name so we don't need to look
+        // for it again.
+        swiftFoundationSoilModule = module;
         continue;
       }
       
