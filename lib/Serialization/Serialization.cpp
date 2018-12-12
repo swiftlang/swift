@@ -3791,7 +3791,9 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Archetype: {
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
 
     // Opened existential types use a separate layout.
