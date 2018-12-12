@@ -1029,10 +1029,6 @@ endif()
 
 add_subdirectory(utils)
 
-if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
-  add_subdirectory(tools/swift-reflection-test)
-endif()
-
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(SWIFT_BUILD_PERF_TESTSUITE)
     add_subdirectory(benchmark)
