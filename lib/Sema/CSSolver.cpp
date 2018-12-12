@@ -1233,6 +1233,22 @@ ConstraintSystem::solveImpl(Expr *&expr,
   // Try to solve the constraint system using computed suggestions.
   solve(expr, solutions, allowFreeTypeVariables);
 
+  // If we didn't find a solution, and didn't consider SIMD operators even
+  // though we saw both SIMD operators and SIMD types, and aren't opposed
+  // to horrible hacks... try again with SIMD operators enabled.
+  if (solutions.empty() &&
+      !shouldConsiderSIMDOperators() && sawSIMDOperator && sawSIMDType &&
+      !TC.getLangOpts().SolverEnableOperatorDesignatedTypes &&
+      !TC.getLangOpts().DisableConstraintSolverPerformanceHacks) {
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      auto &log = getASTContext().TypeCheckerDebug->getStream();
+      log << "---Retrying with SIMD operators enabled---\n";
+    }
+
+    Options |= ConstraintSystemFlags::ConsiderSIMDOperators;
+    solve(expr, solutions, allowFreeTypeVariables);
+  }
+
   // If there are no solutions let's mark system as unsolved,
   // and solved otherwise even if there are multiple solutions still present.
   return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;

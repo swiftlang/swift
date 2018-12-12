@@ -827,6 +827,9 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
+
+  /// If set, we should consider SIMD operators.
+  ConsiderSIMDOperators = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -969,6 +972,12 @@ public:
 
   /// \brief The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
+
+  /// Whether we saw a SIMD type somewhere in the system.
+  bool sawSIMDType = false;
+
+  /// Whether we saw a SIMD operator somewhere in the constraint system.
+  bool sawSIMDOperator = false;
 
 private:
 
@@ -1798,7 +1807,18 @@ public:
     return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
-  /// \brief Log and record the application of the fix. Return true iff any
+  bool shouldConsiderSIMDOperators() const {
+    auto &ctx = getASTContext();
+    if (ctx.LangOpts.SolverEnableOperatorDesignatedTypes)
+      return true;
+
+    if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+      return true;
+
+    return Options.contains(ConstraintSystemFlags::ConsiderSIMDOperators);
+  }
+
+  /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
 
@@ -3513,6 +3533,8 @@ public:
   operator Constraint *() { return Choice; }
   operator Constraint *() const { return Choice; }
 
+  Constraint *operator->() const { return Choice; }
+
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
@@ -3832,6 +3854,9 @@ bool exprNeedsParensOutsideFollowingOperator(
 
 /// Determine whether this is a SIMD operator.
 bool isSIMDOperator(ValueDecl *value);
+
+/// Determine whether this is a SIMD type.
+bool isSIMDType(Type type);
 
 } // end namespace swift
 
