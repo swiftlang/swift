@@ -449,10 +449,10 @@ extension Set._Variant {
   internal __consuming func intersection(
     _ other: Set<Element>
   ) -> _NativeSet<Element> {
+#if _runtime(_ObjC)
     switch (self.isNative, other._variant.isNative) {
     case (true, true):
       return asNative.intersection(other._variant.asNative)
-#if _runtime(_ObjC)
     case (true, false):
       return asNative.genericIntersection(other)
     case (false, false):
@@ -471,7 +471,9 @@ extension Set._Variant {
         }
       }
       return result
-#endif
     }
+#else
+    return asNative.intersection(other._variant.asNative)
+#endif
   }
 }
