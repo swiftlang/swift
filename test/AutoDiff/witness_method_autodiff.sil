@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -differentiation -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol DiffReq {
+  @differentiable(reverse, wrt: (.0))
+  func f(_ x: Float) -> Float
+}
+
+sil @differentiateWitnessMethod : $@convention(thin) <T where T : DiffReq> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = witness_method $T, #DiffReq.f!1 : <Self where Self : DiffReq> (Self) -> (Float) -> Float : $@convention(witness_method: DiffReq) <τ_0_0 where τ_0_0 : DiffReq> (Float, @in_guaranteed τ_0_0) -> Float
+  %2 = autodiff_function [wrt 0] [order 1] %1 : $@convention(witness_method: DiffReq) <τ_0_0 where τ_0_0 : DiffReq> (Float, @in_guaranteed τ_0_0) -> Float
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @differentiateWitnessMethod
+// CHECK:   [[ORIG_REF:%.*]] = witness_method $T, #DiffReq.f!1
+// CHECK:   [[VJP_REF:%.*]] = witness_method $T, #DiffReq.f!1.vjp.1.SU
+// CHECK:   autodiff_function [wrt 0] [order 1] [[ORIG_REF]] : {{.*}} {undef : {{.*}}, %2 : {{.*}}}
+// CHECK: } // end sil function 'differentiateWitnessMethod'

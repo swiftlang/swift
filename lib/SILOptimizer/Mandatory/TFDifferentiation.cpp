@@ -676,6 +676,12 @@ enum class FunctionSynthesisState {
   Done
 };
 
+/// Stores information about `apply` instructions that `PrimalGen` calculates.
+struct ApplyInfo {
+  /// The differentiation indices that are used to differentiate this apply.
+  SILAutoDiffIndices indices;
+};
+
 /// A differentiation task, specifying the original function and the
 /// `[differentiable]` attribute on the function. PrimalGen and AdjointGen
 /// will synthesize the primal and the adjoint for this task, filling the primal
@@ -711,7 +717,15 @@ private:
   /// differentiation tasks, if it's active. This is filled during primal
   /// synthesis, so that adjoint synthesis does not need to recompute the
   /// original function and differentiation indices.
+  ///
+  /// Note: This is only used when `!DifferentiationUseVJP`.
   DenseMap<ApplyInst *, DifferentiationTask *> associatedTasks;
+
+  /// Mapping from original `apply` instructions to their corresponding
+  /// `ApplyInfo`s.
+  ///
+  /// Note: This is only used when `DifferentiationUseVJP`.
+  DenseMap<ApplyInst *, ApplyInfo> applyInfos;
 
   /// Cache for associated functions.
   SILFunction *primal = nullptr;
@@ -803,6 +817,10 @@ public:
 
   DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
     return associatedTasks;
+  }
+
+  DenseMap<ApplyInst *, ApplyInfo> &getApplyInfos() {
+    return applyInfos;
   }
 
   bool isEqual(const DifferentiationTask &other) const {
@@ -1652,6 +1670,77 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   llvm_unreachable("Unhandled function convertion instruction");
 }
 
+/// Emits a reference to a VJP corresponding to `original`, differentiated with
+/// `indices`. On failure, returns a null `SILValue`.
+///
+/// Creates new differentiation tasks, if necessary, using `invoker` as the
+/// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
+/// `taskCallback` for already-existing tasks), so that the caller can make sure
+/// that the task actually gets executed.
+static SILValue emitVJPReference(
+    ADContext &context, SILBuilder &builder, SILAutoDiffIndices indices,
+    SILValue original, DifferentiationInvoker invoker,
+    std::function<void(DifferentiationTask *)> taskCallback) {
+  if (auto *originalFRI = findReferenceToVisibleFunction(original)) {
+    auto loc = originalFRI->getLoc();
+    auto *originalFn = originalFRI->getReferencedFunction();
+    auto *task = context.lookUpOrRegisterDifferentiationTask(originalFn,
+                                                             indices, invoker);
+    taskCallback(task);
+    auto *vjpRef = builder.createFunctionRef(loc, task->getVJP());
+    return reapplyFunctionConversion(vjpRef, originalFRI, original, builder,
+                                     loc);
+  }
+  if (auto *witnessMethod = dyn_cast<WitnessMethodInst>(original)) {
+    auto loc = witnessMethod->getLoc();
+    auto requirement = witnessMethod->getMember();
+    auto *requirementDecl = requirement.getDecl();
+    auto *diffAttr =
+        requirementDecl->getAttrs().getAttribute<DifferentiableAttr>();
+    if (!diffAttr) {
+      // TODO: If we move diagnostics into this function, then we can tell the
+      // user that differentiation failed because the requirement is not
+      // differentiable.
+      return SILValue();
+    }
+
+    // Check that the requirement indices are the same as the desired indices.
+    auto *requirementParameterIndices = diffAttr->getCheckedParameterIndices();
+    auto loweredRequirementIndices = requirementParameterIndices->getLowered(
+        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>(),
+        /*isMethod*/ true);
+    SILAutoDiffIndices requirementIndices(/*source*/ 0, loweredRequirementIndices);
+
+    // TODO:
+    // If we desire a superset of the available indices, then we should emit a
+    // diagnostic that the requirement can't be differentiated as much as we
+    // want.
+    // If we desire a subset of the available indices, then we should
+    // automatically convert the VJP to a VJP with the desired indices.
+    assert(requirementIndices == indices &&
+           "FIXME: handle the case where the requirement indices are "
+           "different from the desired indices.");
+
+    auto originalType = cast<SILFunctionType>(original->getType().getASTType());
+    auto vjpType = originalType->getAutoDiffAssociatedFunctionType(
+        requirementIndices.parameters, requirementIndices.source,
+        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
+        builder.getModule(),
+        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+    // Emit a witness_method instruction pointing at the VJP.
+    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+        requirementParameterIndices, context.getASTContext());
+    return builder.createWitnessMethod(
+        loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
+        requirement.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        SILType::getPrimitiveObjectType(vjpType));
+  }
+
+  return SILValue();
+}
+
 /// Create a builtin floating point value. The specified type must be a builtin
 /// float type.
 static SILValue createBuiltinFPScalar(intmax_t scalar, CanType type,
@@ -2482,41 +2571,23 @@ public:
 
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
+    getDifferentiationTask()->getApplyInfos().insert({ai, {indices}});
 
-    // Retrieve the original function being called.
-    auto calleeOrigin = ai->getCalleeOrigin();
-    auto *calleeOriginFnRef = dyn_cast<FunctionRefInst>(calleeOrigin);
-    // If callee does not trace back to a `function_ref`, it is an opaque
-    // function. Emit a "not differentiable" diagnostic here.
-    // FIXME: Handle `partial_apply`, `witness_method`.
-    if (!calleeOriginFnRef) {
+    auto vjp = emitVJPReference(
+        context, builder, indices, getMappedValue(ai->getCallee()),
+        /*invoker*/ {ai, synthesis.task},
+        [&](DifferentiationTask *newTask) {
+           primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
+        });
+    if (!vjp) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
 
-    // Find or register a differentiation task for this function.
-    auto *newTask = context.lookUpOrRegisterDifferentiationTask(
-        calleeOriginFnRef->getReferencedFunction(), indices,
-        /*invoker*/ {ai, synthesis.task});
-
-    // Store this task so that AdjointGen can use it.
-    getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
-
-    // If the task is newly created, then we need to schedule a synthesis item
-    // for the primal.
-    primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
-
-    auto *vjpFn = newTask->getVJP();
-    assert(vjpFn);
-    auto *vjp = builder.createFunctionRef(ai->getCallee().getLoc(), vjpFn);
-
-    // TODO: The `visitApplyInstWithoutVJP` reapplies function conversions here,
-    // but all the tests seem to pass without doing that here. Investigate.
-
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> newArgs;
-    auto vjpFnTy = vjpFn->getLoweredFunctionType();
+    auto vjpFnTy = cast<SILFunctionType>(vjp->getType().getASTType());
     auto numVJPParams = vjpFnTy->getNumParameters();
     assert(vjpFnTy->getNumIndirectFormalResults() == 0 &&
            "FIXME: handle vjp with indirect results");
@@ -3478,18 +3549,17 @@ public:
     auto &builder = getBuilder();
     auto loc = remapLocation(ai->getLoc());
 
-    // Look for the task that differentiates the callee.
-    auto &assocTasks = getDifferentiationTask()->getAssociatedTasks();
-    auto assocTaskLookUp = assocTasks.find(ai);
-    // If no task was found, then this task doesn't need to be differentiated.
-    if (assocTaskLookUp == assocTasks.end()) {
+    auto &applyInfos = getDifferentiationTask()->getApplyInfos();
+    auto applyInfoLookUp = applyInfos.find(ai);
+    // If no ApplyInfo was found, then this task doesn't need to be differentiated.
+    if (applyInfoLookUp == applyInfos.end()) {
       // Must not be active.
       assert(
           !activityInfo.isActive(ai, getDifferentiationTask()->getIndices()));
       return;
     }
-    auto *otherTask = assocTaskLookUp->getSecond();
-    auto origTy = otherTask->getOriginal()->getLoweredFunctionType();
+    auto applyInfo = applyInfoLookUp->getSecond();
+    auto origTy = cast<SILFunctionType>(ai->getCallee()->getType().getASTType());
     SILFunctionConventions origConvs(origTy, getModule());
 
     // Get the pullback.
@@ -3552,11 +3622,11 @@ public:
     // self parameter.
     auto selfParamIndex = originalParams.size() - 1;
     if (ai->hasSelfArgument() &&
-        otherTask->getIndices().isWrtParameter(selfParamIndex))
+        applyInfo.indices.isWrtParameter(selfParamIndex))
       addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
                       AdjointValue::getMaterialized(*allResultsIt++));
     // Set adjoints for the remaining non-self original parameters.
-    for (unsigned i : otherTask->getIndices().parameters.set_bits()) {
+    for (unsigned i : applyInfo.indices.parameters.set_bits()) {
       // Do not set the adjoint of the original self parameter because we
       // already added it at the beginning.
       if (ai->hasSelfArgument() && i == selfParamIndex)
@@ -5038,43 +5108,28 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
                                                   ADContext &context) {
   SILFunction *parent = adfi->getFunction();
   auto origFnOperand = adfi->getOriginalFunction();
-  // If it traces back to a `function_ref`, differentiate that.
-  if (auto *originalFRI = findReferenceToVisibleFunction(origFnOperand)) {
-    auto *original = originalFRI->getReferencedFunction();
-    // TODO: Find syntax-level AD invoker from `adfi`.
-    auto *task = context.lookUpOrRegisterDifferentiationTask(
-        original, SILAutoDiffIndices(0, adfi->getParameterIndices()),
-        DifferentiationInvoker(adfi));
-    // Expand the `autodiff_function` instruction by adding the JVP and VJP
-    // functions.
-    SILBuilder builder(adfi);
-    auto loc = parent->getLocation();
-    auto *vjp = task->getVJP();
-    auto *vjpRef = builder.createFunctionRef(loc, vjp);
-    auto finalVJP = reapplyFunctionConversion(
-        vjpRef, originalFRI, origFnOperand, builder, loc);
-    SILValue finalJVP;
-    // TODO: Implement "forward-mode differentiation" to get JVP. Currently it's
-    // just an undef because we won't use it.
-    {
-      auto origFnTy = origFnOperand->getType().getAs<SILFunctionType>();
-      auto jvpType = origFnTy->getAutoDiffAssociatedFunctionType(
-          adfi->getParameterIndices(), /*resultIndex*/ 0,
-          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-          *getModule(),
-          /*lookupConformance*/
-              LookUpConformanceInModule(getModule()->getSwiftModule()));
-      finalJVP = SILUndef::get(SILType::getPrimitiveObjectType(jvpType),
-                             getModule());
-    }
-    auto *newADFI = builder.createAutoDiffFunction(
-        loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
-        origFnOperand, {finalJVP, finalVJP});
-    adfi->replaceAllUsesWith(newADFI);
-    adfi->eraseFromParent();
+  SILBuilder builder(adfi);
+
+  SILValue finalJVP;
+  // TODO: Implement "forward-mode differentiation" to get JVP. Currently it's
+  // just an undef because we won't use it.
+  {
+    auto origFnTy = origFnOperand->getType().getAs<SILFunctionType>();
+    auto jvpType = origFnTy->getAutoDiffAssociatedFunctionType(
+        adfi->getParameterIndices(), /*resultIndex*/ 0,
+        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
+        *getModule(),
+        /*lookupConformance*/
+            LookUpConformanceInModule(getModule()->getSwiftModule()));
+    finalJVP = SILUndef::get(SILType::getPrimitiveObjectType(jvpType),
+                           getModule());
   }
-  // Differentiating opaque functions is not supported yet.
-  else {
+
+  auto finalVJP = emitVJPReference(
+      context, builder, SILAutoDiffIndices(0, adfi->getParameterIndices()),
+      origFnOperand, DifferentiationInvoker(adfi),
+      [](DifferentiationTask *newTask) {});
+  if (!finalVJP) {
     // Find the original differential operator expression. Show an error at the
     // operator, highlight the argument, and show a note at the definition site
     // of the argument.
@@ -5084,6 +5139,13 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
           .highlight(expr->getSubExpr()->getSourceRange());
     return true;
   }
+
+  auto loc = parent->getLocation();
+  auto *newADFI = builder.createAutoDiffFunction(
+      loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
+      origFnOperand, {finalJVP, finalVJP});
+  adfi->replaceAllUsesWith(newADFI);
+  adfi->eraseFromParent();
   PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
   return false;
 }
@@ -5099,8 +5161,8 @@ void Differentiation::run() {
                         SILDifferentiableAttr *>, 8> diffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
   SmallVector<AutoDiffFunctionInst *, 16> autodiffInsts;
-  // Handle each `gradient` instruction and each `differentiable`
-  // attribute in the module.
+  // Handle all the instructions and attributes in the module that trigger
+  // differentiation.
   for (SILFunction &f : module) {
     // If `f` has a `[differentiable]` attribute, it should become a
     // differentiation task.
@@ -5113,10 +5175,6 @@ void Differentiation::run() {
       astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
                             diag::autodiff_incomplete_differentiable_attr);
     }
-    // Not look for `gradient` instructions in transparent functions because
-    // they are to be inlined.
-    if (f.isTransparent())
-      continue;
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
         // If `i` is a `gradient` instruction, i.e. the SIL-level differential
@@ -5129,9 +5187,8 @@ void Differentiation::run() {
     }
   }
 
-  // If there's no `gradient` instruction or no `[differentiable]` attributes,
-  // there's no AD to do.
-  if (gradInsts.empty() && diffAttrs.empty())
+  // If nothing has triggered differentiation, there's nothing to do.
+  if (gradInsts.empty() && diffAttrs.empty() && autodiffInsts.empty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
