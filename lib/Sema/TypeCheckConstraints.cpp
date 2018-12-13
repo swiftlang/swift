@@ -2758,8 +2758,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       auto &cs = solution.getConstraintSystem();
 
       auto converted =
-        solution.convertBooleanTypeToBuiltinI1(expr,
-                                             cs.getConstraintLocator(OrigExpr));
+        solution.getBoolValue(expr, cs.getConstraintLocator(OrigExpr));
       cs.setExprTypes(converted);
       return converted;
     }

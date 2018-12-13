@@ -646,8 +646,7 @@ public:
   /// \param locator Locator used to describe the location of this expression.
   ///
   /// \returns the expression converted to a logic value (Builtin i1).
-  Expr *convertBooleanTypeToBuiltinI1(Expr *expr,
-                                      ConstraintLocator *locator) const;
+  Expr *getBoolValue(Expr *expr, ConstraintLocator *locator) const;
 
   /// Convert the given optional-producing expression to a Bool
   /// indicating whether the optional has a value.

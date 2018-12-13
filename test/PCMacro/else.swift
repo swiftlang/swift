@@ -21,8 +21,8 @@ if (a) {
 
 // CHECK: [8:1-8:14] pc before
 // CHECK-NEXT: [8:1-8:14] pc after
-// CHECK-NEXT: [9:1-9:7] pc before
-// CHECK-NEXT: [9:1-9:7] pc after
+// CHECK-NEXT: [9:1-9:6] pc before
+// CHECK-NEXT: [9:1-9:6] pc after
 // CHECK-NEXT: [11:3-11:7] pc before
 // CHECK-NEXT: [11:3-11:7] pc after
 // CHECK-NEXT: [12:3-12:4] pc before

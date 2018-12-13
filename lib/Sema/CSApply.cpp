@@ -3164,9 +3164,8 @@ namespace {
       cs.setType(expr, resultTy);
 
       // Convert the condition to a logic value.
-      auto cond
-        = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
-                                                 cs.getConstraintLocator(expr));
+      auto cond = solution.getBoolValue(expr->getCondExpr(),
+                                        cs.getConstraintLocator(expr));
       expr->setCondExpr(cond);
 
       // Coerce the then/else branches to the common type.
@@ -8023,9 +8022,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   return result;
 }
 
-Expr *
-Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
-                                        ConstraintLocator *locator) const {
+Expr *Solution::getBoolValue(Expr *expr, ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
 
   // Load lvalues here.
@@ -8041,55 +8038,40 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
   if (type->is<UnresolvedType>())
     return expr;
 
-  // Look for the builtin name. If we don't have it, we need to call the
+  // Look for the property name. If we don't have it, we need to call the
   // general name via the witness table.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isa<AbstractFunctionDecl>(cs.DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
   auto members = tc.lookupMember(cs.DC, type,
-                                 tc.Context.Id_getBuiltinLogicValue,
+                                 ctx.Id_value_,
                                  lookupOptions);
 
-  // Find the builtin method.
+  // Find the _value property
   if (members.size() != 1) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return expr;
   }
-  auto *builtinMethod = dyn_cast<FuncDecl>(members[0].getValueDecl());
-  if (!builtinMethod) {
+  
+  auto *value = dyn_cast<VarDecl>(members[0].getValueDecl());
+  if (!value) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return expr;
   }
 
-  // The method is not generic, so there are no substitutions.
-  tc.validateDeclForNameLookup(builtinMethod);
-  auto builtinMethodType = builtinMethod->getInterfaceType()
-    ->castTo<FunctionType>();
+  // This property is not generic, so there are no substitutions.
+  tc.validateDeclForNameLookup(value);
+  auto builtinType = value->getValueInterfaceType();
 
-  // Form an unbound reference to the builtin method.
-  auto *declRef = new (ctx) DeclRefExpr(builtinMethod,
-                                        DeclNameLoc(expr->getLoc()),
-                                        /*Implicit=*/true);
-  declRef->setFunctionRefKind(FunctionRefKind::DoubleApply);
-  cs.setType(declRef, builtinMethodType);
+  // Form a reference to Bool._value
+  auto *result = new (ctx) MemberRefExpr(expr, expr->getLoc(),
+                                         ConcreteDeclRef(value),
+                                         DeclNameLoc(expr->getLoc()),
+                                         /*implicit*/ true);
 
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
+  cs.setType(result, builtinType);
 
-  // Apply 'self' to get the method value.
-  auto *methodRef = new (ctx) DotSyntaxCallExpr(declRef,
-                                                SourceLoc(),
-                                                expr);
-  cs.setType(methodRef, builtinMethodType->getResult());
-
-  // Apply the empty argument list to get the final result.
-  auto *result = CallExpr::createImplicit(ctx, methodRef,
-                                          { }, { }, getType);
-  cs.setType(result, builtinMethodType->getResult()
-                  ->castTo<FunctionType>()->getResult());
-  cs.setType(result->getArg(), ctx.TheEmptyTupleType);
-
+  // Ensure the property has a type Builtin.Int1
   if (!cs.getType(result)->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return result;

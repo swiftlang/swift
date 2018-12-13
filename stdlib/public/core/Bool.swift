@@ -62,8 +62,8 @@
 /// have a consistent type interface.
 @_fixed_layout
 public struct Bool {
-  @usableFromInline
-  internal var _value: Builtin.Int1
+  
+  public var _value: Builtin.Int1
 
   /// Creates an instance initialized to `false`.
   ///
@@ -167,15 +167,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   @_transparent
   public init(booleanLiteral value: Bool) {
     self = value
-  }
-}
-
-extension Bool {
-  // This is a magic entry point known to the compiler.
-  @_transparent
-  public // COMPILER_INTRINSIC
-  func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
   }
 }
 

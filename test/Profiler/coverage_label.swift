@@ -11,7 +11,7 @@ func foo() { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+19]]:2 : 0
   }
 
   label2: do { // CHECK-DAG: [[@LINE]]:14 -> [[@LINE+7]]:4 : 0
-    x += 3         // CHECK-DAG: [[@LINE+1]]:11 -> [[@LINE+1]]:17 : 0
+    x += 3         // CHECK-DAG: [[@LINE+1]]:11 -> [[@LINE+1]]:16 : 0
     while (true) { // CHECK-DAG: [[@LINE]]:18 -> [[@LINE+3]]:6 : 1
       x += 4
       break label2 // Note: This exit affects the condition counter expr @ L15.

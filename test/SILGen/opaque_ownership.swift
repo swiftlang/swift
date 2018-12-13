@@ -62,7 +62,7 @@ infix operator  == : ComparisonPrecedence
 infix operator  ~= : ComparisonPrecedence
 
 public struct Bool {
-  var _value: Builtin.Int1
+  public var _value: Builtin.Int1
 
   public init() {
     let zero: Int64 = 0
@@ -73,12 +73,6 @@ public struct Bool {
 
   public init(_ value: Bool) {
     self = value
-  }
-}
-
-extension Bool {
-  public func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
   }
 }
 

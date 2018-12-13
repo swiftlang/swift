@@ -323,9 +323,8 @@ label3:
 func test_if_break(_ a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
-  // CHECK: function_ref @$sSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply
-  // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+  // CHECK: [[WHILE_CONDITION:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
+  // CHECK-NEXT: cond_br [[WHILE_CONDITION]], [[LOOPTRUE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   while a {
     if a {
       foo()
@@ -335,9 +334,8 @@ func test_if_break(_ a : Bool) {
   }
 
   // CHECK: [[LOOPTRUE]]:
-  // CHECK: function_ref @$sSb21_getBuiltinLogicValue{{[_0-9a-zA-Z]*}}F
-  // CHECK-NEXT: apply
-  // CHECK-NEXT: cond_br {{.*}}, [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
+  // CHECK: [[IF_CONDITION:%.*]] = struct_extract {{.*}} : $Bool, #Bool._value
+  // CHECK-NEXT: cond_br [[IF_CONDITION]], [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
 
   // [[IFTRUE]]:
   // CHECK: function_ref statements.foo
@@ -473,7 +471,7 @@ func defer_test2(_ cond : Bool) {
   callee3()
   
 // test the condition.
-// CHECK:  [[CONDTRUE:%.*]] = apply {{.*}}(%0)
+// CHECK:  [[CONDTRUE:%.*]] = struct_extract %0 : $Bool, #Bool._value
 // CHECK: cond_br [[CONDTRUE]], [[BODY:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   while cond {
 // CHECK: [[BODY]]:

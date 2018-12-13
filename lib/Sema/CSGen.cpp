@@ -3316,15 +3316,12 @@ namespace {
         // Strip off 'Bool' to 'Builtin.Int1' conversion. Otherwise, we'll have
         // to handle multiple ways of type-checking.
         if (expr->isImplicit()) {
-          if (auto call = dyn_cast<CallExpr>(expr)) {
-            if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
-              auto RefD = DSCE->getFn()->getReferencedDecl().getDecl();
-              if (RefD->getBaseName() == TC.Context.Id_getBuiltinLogicValue &&
-                  RefD->getDeclContext()->getSelfNominalTypeDecl() ==
-                      TC.Context.getBoolDecl()) {
-                expr = DSCE->getBase();
-                continue;
-              }
+          if (auto mfe = dyn_cast<MemberRefExpr>(expr)) {
+            auto member = mfe->getMember().getDecl();
+            if (member->getBaseName() == TC.Context.Id_value_ &&
+                member->getDeclContext() == TC.Context.getBoolDecl()) {
+              expr = mfe->getBase();
+              continue;
             }
           }
         }
