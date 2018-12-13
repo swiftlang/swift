@@ -559,6 +559,17 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  const auto &InputsAndOutputs =
+      Invocation.getFrontendOptions().InputsAndOutputs;
+  assert(InputsAndOutputs.hasSingleInput());
+  StringRef InputPath = InputsAndOutputs.getFilenameOfFirstInput();
+  return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename());
+}
+
 static bool compileLLVMIR(CompilerInvocation &Invocation,
                           CompilerInstance &Instance,
                           UnifiedStatsReporter *Stats) {
@@ -922,6 +933,9 @@ static bool performCompile(CompilerInstance &Instance,
   // avoid touching any other inputs and just parse, emit and exit.
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
+
+  if (Action == FrontendOptions::ActionType::BuildModuleFromParseableInterface)
+    return buildModuleFromParseableInterface(Invocation, Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Invocation, Instance, Stats);

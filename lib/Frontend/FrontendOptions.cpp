@@ -48,6 +48,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
+  case ActionType::BuildModuleFromParseableInterface:
     return true;
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -83,6 +84,7 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::MergeModules:
+  case ActionType::BuildModuleFromParseableInterface:
     return false;
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -170,6 +172,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
 
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
+  case ActionType::BuildModuleFromParseableInterface:
     return TY_SwiftModuleFile;
 
   case ActionType::Immediate:
@@ -207,6 +210,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -242,6 +246,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -277,6 +282,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -309,6 +315,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -347,6 +354,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
@@ -379,15 +387,16 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::DumpAST:
   case ActionType::EmitSyntax:
   case ActionType::PrintAST:
+  case ActionType::EmitImportedModules:
   case ActionType::EmitPCH:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::DumpTypeInfo:
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::Immediate:
   case ActionType::REPL:
-  case ActionType::EmitImportedModules:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -427,6 +436,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitObject:
   case ActionType::EmitImportedModules:
   case ActionType::MergeModules:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::DumpTypeInfo:
     return true;
 
@@ -446,6 +456,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
+  case ActionType::BuildModuleFromParseableInterface:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
   case ActionType::Immediate:
@@ -488,6 +499,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::DumpTypeRefinementContexts:
   case ActionType::EmitImportedModules:
   case ActionType::EmitPCH:
+  case ActionType::BuildModuleFromParseableInterface:
     return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:

@@ -6,3 +6,9 @@
 // RUN: %clang -E -P -x c %S/Outputs/stability-stdlib-abi.swift.expected -o - | sed '/^\s*$/d' | sort > %t.tmp/stability-stdlib-abi.swift.expected
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
+
+// The digester hasn't learned that we've stopped baking non-stored class member
+// order into the ABI. rdar://problem/46617463
+// The digester can incorrectly register a generic signature change when
+// declarations are shuffled. rdar://problem/46618883
+// XFAIL: swift_evolve
