@@ -3230,7 +3230,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
-      if (!VD->hasClangNode() && VD->getImplInfo().isSimpleStored())
+      if (!VD->hasClangNode() && VD->hasStorage())
         return false;
     }
 
@@ -3241,7 +3241,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         auto pattern =
           pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
-          if (!named->getDecl()->getImplInfo().isSimpleStored())
+          if (!named->getDecl()->hasStorage())
             return false;
         }
       }
