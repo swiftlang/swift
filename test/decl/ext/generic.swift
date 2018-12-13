@@ -210,3 +210,16 @@ extension A.B.D {
   func g() { }
 }
 
+// rdar://problem/43955962
+struct OldGeneric<T> {}
+typealias NewGeneric<T> = OldGeneric<T>
+
+extension NewGeneric {
+  static func oldMember() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember() -> NewGeneric {
+    return NewGeneric()
+  }
+}
