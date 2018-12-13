@@ -476,19 +476,18 @@ Type TypeChecker::resolveTypeInContext(
       genericParam->getDeclaredInterfaceType());
   }
 
-  // If we are referring to a type within its own context, and we have either
-  // a generic type with no generic arguments or a non-generic type, use the
-  // type within the context.
-  if (auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
-    if (!isa<ProtocolDecl>(nominalType) &&
-        (!nominalType->getGenericParams() || !isSpecialized)) {
-      for (auto parentDC = fromDC;
+  if (!isSpecialized) {
+    // If we are referring to a type within its own context, and we have either
+    // a generic type with no generic arguments or a non-generic type, use the
+    // type within the context.
+    if (auto *nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      for (auto *parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
           return resolution.mapTypeIntoContext(
-            parentDC->getSelfInterfaceType());
+            parentDC->getDeclaredInterfaceType());
         if (isa<ExtensionDecl>(parentDC)) {
           auto *extendedType = parentNominal;
           while (extendedType != nullptr) {
@@ -496,6 +495,27 @@ Type TypeChecker::resolveTypeInContext(
               return resolution.mapTypeIntoContext(
                 extendedType->getDeclaredInterfaceType());
             extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
+          }
+        }
+      }
+    }
+
+    // If we're inside an extension of a type alias, allow the type alias to be
+    // referenced without generic arguments as well.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      for (auto *parentDC = fromDC;
+            !parentDC->isModuleScopeContext();
+            parentDC = parentDC->getParent()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
+          auto extendedType = ext->getExtendedType();
+          if (auto *aliasType = dyn_cast<NameAliasType>(extendedType.getPointer())) {
+            if (aliasType->getDecl() == aliasDecl) {
+              return resolution.mapTypeIntoContext(
+                  aliasDecl->getDeclaredInterfaceType());
+            }
+
+            extendedType = aliasType->getParent();
+            continue;
           }
         }
       }
