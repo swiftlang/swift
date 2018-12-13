@@ -4251,36 +4251,10 @@ namespace {
 
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
-        // Clone generic parameters.
-        SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-        for (auto fromGP : *objcClass->getGenericParams()) {
-          // Create the new generic parameter.
-          auto toGP = new (Impl.SwiftContext) GenericTypeParamDecl(
-              result, fromGP->getName(), SourceLoc(), fromGP->getDepth(),
-              fromGP->getIndex());
-          toGP->setImplicit(true);
-          toGP->setInherited(
-              Impl.SwiftContext.AllocateCopy(fromGP->getInherited()));
-          // Record new generic parameter.
-          toGenericParams.push_back(toGP);
-        }
+        result->createGenericParamsIfMissing(objcClass);
 
-        auto genericParams = GenericParamList::create(Impl.SwiftContext,
-            SourceLoc(), toGenericParams, SourceLoc());
-        result->setGenericParams(genericParams);
-
-        auto *env = Impl.buildGenericEnvironment(genericParams, result);
+        auto *env = objcClass->getGenericEnvironment();
         result->setGenericEnvironment(env);
-
-        // Calculate the correct bound-generic extended type.
-        SmallVector<Type, 2> genericArgs;
-        for (auto paramTy :
-             env->getGenericSignature()->getInnermostGenericParams()) {
-          genericArgs.push_back(paramTy);
-        }
-        Type extendedType =
-          BoundGenericClassType::get(objcClass, nullptr, genericArgs);
-        result->getExtendedTypeLoc().setType(extendedType);
       }
 
       // Create the extension declaration and record it.
@@ -7944,11 +7918,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   GenericSignatureBuilder builder(SwiftContext);
-  SmallVector<GenericTypeParamType *, 4> allGenericParams;
   for (auto param : *genericParams) {
     builder.addGenericParameter(param);
-    allGenericParams.push_back(
-      param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
   for (auto param : *genericParams) {
     bool result = builder.addGenericParameterRequirements(param);
@@ -8050,9 +8021,7 @@ ClangImporter::Implementation::importDeclContextOf(
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
     ext->createGenericParamsIfMissing(protoDecl);
-
-    auto *env = buildGenericEnvironment(ext->getGenericParams(), ext);
-    ext->setGenericEnvironment(env);
+    ext->setGenericEnvironment(protoDecl->getGenericEnvironment());
   }
 
   // Add the extension to the nominal type.
