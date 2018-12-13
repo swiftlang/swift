@@ -129,7 +129,7 @@ static std::string getCacheHash(ASTContext &Ctx,
 }
 
 static CompilerInvocation
-createInvocationForBuildingFromInterface(ASTContext &Ctx, Identifier ModuleName,
+createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
                                          StringRef CacheDir) {
   auto &SearchPathOpts = Ctx.SearchPathOpts;
   auto &LangOpts = Ctx.LangOpts;
@@ -145,7 +145,7 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, Identifier ModuleName,
   SubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   SubInvocation.setTargetTriple(LangOpts.Target);
   SubInvocation.setClangModuleCachePath(CacheDir);
-  SubInvocation.setModuleName(ModuleName.str());
+  SubInvocation.setModuleName(ModuleName);
 
   // Inhibit warnings from the SubInvocation since we are assuming the user
   // is not in a position to fix them.
@@ -479,7 +479,7 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // Set up a _potential_ sub-invocation to consume the .swiftinterface and emit
   // the .swiftmodule.
   CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleID.first, CacheDir);
+      createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(), CacheDir);
   computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
   configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
@@ -505,6 +505,21 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   }
   LLVM_DEBUG(llvm::dbgs() << "\n");
   return ErrorCode;
+}
+
+bool
+ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+    ASTContext &Ctx, StringRef CacheDir, StringRef ModuleName,
+    StringRef InPath, StringRef OutPath) {
+  CompilerInvocation SubInvocation =
+      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir);
+  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
+
+  auto &FS = *Ctx.SourceMgr.getFileSystem();
+  auto &Diags = Ctx.Diags;
+  return ::buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
+                                              SubInvocation, /*CachePath*/"",
+                                              /*OuterTracker*/nullptr);
 }
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty

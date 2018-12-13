@@ -92,6 +92,17 @@ public:
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
         new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker, loadMode));
   }
+
+  /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
+  /// a swiftmodule file).
+  ///
+  /// A simplified version of the core logic in #openModuleFiles, mostly for
+  /// testing purposes.
+  static bool buildSwiftModuleFromSwiftInterface(ASTContext &Ctx,
+                                                 StringRef CacheDir,
+                                                 StringRef ModuleName,
+                                                 StringRef InPath,
+                                                 StringRef OutPath);
 };
 
 
