@@ -602,3 +602,20 @@ Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has been adde
 Func Sequence.withContiguousStorageIfAvailable(_:) has been added as a protocol requirement
 
 Func Strideable....(_:_:) has been removed
+
+Func _SmallString.computeIsASCII() has been removed
+Func _SmallString.withMutableCapacity(_:) has been removed
+Struct _StringObject.Discriminator has been removed
+Var _SmallString.discriminator has been removed
+Var _StringObject.CountAndFlags._storage has declared type change from UInt to UInt64
+Var _StringObject.CountAndFlags.countMask has declared type change from UInt to UInt64
+Var _StringObject.CountAndFlags.countMask is now static
+Var _StringObject.CountAndFlags.flagsMask has declared type change from UInt to UInt64
+Var _StringObject.CountAndFlags.flagsMask is now static
+Var _StringObject.Nibbles.discriminatorMask has been removed
+Var _StringObject.Nibbles.discriminatorShift has been removed
+Var _StringObject.discriminator has been removed
+Var _StringObject.objectRawBits has been renamed to Var _StringObject.discriminatedObjectRawBits
+Var _StringObject.undiscriminatedObjectRawBits has been removed
+
+

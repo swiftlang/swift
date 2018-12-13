@@ -47,7 +47,7 @@ extension _AbstractStringStorage {
 
 // ObjC interfaces.
 #if _runtime(_ObjC)
-  
+
   @inline(__always)
   @_effects(releasenone)
   internal func _getCharacters(
@@ -57,7 +57,7 @@ extension _AbstractStringStorage {
                   "Range out of bounds")
     _precondition(aRange.location + aRange.length <= Int(count),
                   "Range out of bounds")
-    
+
     let range = Range(
       uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
@@ -98,7 +98,7 @@ extension _AbstractStringStorage {
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
     }
   }
-  
+
   @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
     _ nativeOther: T
@@ -161,13 +161,10 @@ extension _AbstractStringStorage {
       return _cocoaStringCompare(self, other) == 0 ? 1 : 0
     }
   }
-  
+
 #endif //_runtime(_ObjC)
 }
 
-#if arch(i386) || arch(arm)
-private typealias Flags = _StringObject.Flags
-#endif
 private typealias CountAndFlags = _StringObject.CountAndFlags
 
 //
@@ -183,12 +180,15 @@ final internal class _StringStorage
   // nul-terminator.
   internal var _realCapacity: Int
   internal var _count: Int
-  internal var _flags: _StringObject.Flags
+  internal var _flags: UInt16
   internal var _reserved: UInt16
 
-  internal var count: Int {
-    @inline(__always) get { return _count }
-    @inline(__always) set { _count = newValue }
+  @inline(__always)
+  internal var count: Int { return _count }
+
+  @inline(__always)
+  internal var _countAndFlags: _StringObject.CountAndFlags {
+    return CountAndFlags(count: _count, flags: _flags)
   }
 #else
   // The capacity of our allocation. Note that this includes the nul-terminator,
@@ -196,30 +196,20 @@ final internal class _StringStorage
   internal var _realCapacityAndFlags: UInt64
   internal var _countAndFlags: _StringObject.CountAndFlags
 
-  internal var count: Int {
-    @inline(__always) get { return _countAndFlags.count }
-    @inline(__always) set { _countAndFlags.count = newValue }
-  }
+  @inline(__always)
+  internal var count: Int { return _countAndFlags.count }
 
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
+  @inline(__always)
   internal var _realCapacity: Int {
-    @inline(__always) get {
-      return Int(truncatingIfNeeded:
-        _realCapacityAndFlags & _StringObject.Nibbles.largeAddressMask)
-    }
+    return Int(truncatingIfNeeded:
+      _realCapacityAndFlags & CountAndFlags.countMask)
   }
 #endif
 
-  final internal var isASCII: Bool {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-      return _flags.isASCII
-#else
-      return _countAndFlags.isASCII
-#endif
-    }
-  }
+  @inline(__always)
+  final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
@@ -228,7 +218,7 @@ final internal class _StringStorage
   }
 
 #if _runtime(_ObjC)
-  
+
   @objc(length)
   final internal var length: Int {
     @_effects(readonly) @inline(__always) get {
@@ -271,7 +261,7 @@ final internal class _StringStorage
     }
     return nil
   }
-  
+
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
@@ -283,7 +273,7 @@ final internal class _StringStorage
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
-  
+
   @objc(getCString:maxLength:encoding:)
   @_effects(releasenone)
   final internal func getCString(
@@ -307,7 +297,7 @@ final internal class _StringStorage
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
-  
+
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While _StringStorage instances aren't immutable in general,
@@ -406,12 +396,7 @@ extension _StringStorage {
     capacity: Int,
     isASCII: Bool
   ) -> _StringStorage {
-#if arch(i386) || arch(arm)
-    let flags = Flags(isASCII: isASCII)
-    let countAndFlags = CountAndFlags(count: bufPtr.count, flags: flags)
-#else
     let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
-#endif
     _internalInvariant(capacity >= bufPtr.count)
     let storage = _StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
@@ -432,19 +417,17 @@ extension _StringStorage {
 
 // Usage
 extension _StringStorage {
-  @inlinable
-  internal var mutableStart: UnsafeMutablePointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
-    }
+  @inline(__always)
+  private var mutableStart: UnsafeMutablePointer<UInt8> {
+    return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
   private var mutableEnd: UnsafeMutablePointer<UInt8> {
     @inline(__always) get { return mutableStart + count }
   }
 
-  @inlinable
+  @inline(__always)
   internal var start: UnsafePointer<UInt8> {
-    @inline(__always) get { return UnsafePointer(mutableStart) }
+     return UnsafePointer(mutableStart)
   }
 
   private final var end: UnsafePointer<UInt8> {
@@ -507,11 +490,7 @@ extension _StringStorage {
     _internalInvariant(self._realCapacity > self.count, "no room for nul-terminator")
     _internalInvariant(self.terminator.pointee == 0, "not nul terminated")
 
-#if arch(i386) || arch(arm)
-    _flags._invariantCheck()
-#else
     _countAndFlags._invariantCheck()
-#endif
     if isASCII {
       _internalInvariant(_allASCII(self.codeUnits))
     }
@@ -527,12 +506,13 @@ extension _StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
   private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
-#if arch(i386) || arch(arm)
-    self._count = newCount
-    self._flags = Flags(isASCII: newIsASCII)
-#else
-    self._countAndFlags = CountAndFlags(
+    let countAndFlags = CountAndFlags(
       count: newCount, isASCII: newIsASCII)
+#if arch(i386) || arch(arm)
+    self._count = countAndFlags.count
+    self._flags = countAndFlags.flags
+#else
+    self._countAndFlags = countAndFlags
 #endif
     self.terminator.pointee = 0
 
@@ -671,13 +651,11 @@ final internal class _SharedStringStorage
 
 #if arch(i386) || arch(arm)
   internal var _count: Int
-  internal var _flags: _StringObject.Flags
+  internal var _flags: UInt16
 
-  @inlinable
+  @inline(__always)
   internal var _countAndFlags: _StringObject.CountAndFlags {
-    @inline(__always) get {
-      return CountAndFlags(count: _count, flags: _flags)
-    }
+    return CountAndFlags(count: _count, flags: _flags)
   }
 #else
   internal var _countAndFlags: _StringObject.CountAndFlags
@@ -685,15 +663,7 @@ final internal class _SharedStringStorage
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
-  internal var count: Int {
-    @_effects(readonly) @inline(__always) get {
-#if arch(i386) || arch(arm)
-      return _count
-#else
-      return _countAndFlags.count
-#endif
-    }
-  }
+  internal var count: Int { return _countAndFlags.count }
 
   internal init(
     immortal ptr: UnsafePointer<UInt8>,
@@ -710,16 +680,9 @@ final internal class _SharedStringStorage
     super.init()
     self._invariantCheck()
   }
-  
-  final internal var isASCII: Bool {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-      return _flags.isASCII
-#else
-      return _countAndFlags.isASCII
-#endif
-    }
-  }
+
+  @inline(__always)
+  final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
@@ -728,14 +691,14 @@ final internal class _SharedStringStorage
   }
 
 #if _runtime(_ObjC)
-  
+
   @objc(length)
   final internal var length: Int {
     @_effects(readonly) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
-  
+
   @objc
   final internal var hash: UInt {
     @_effects(readonly) get {
@@ -745,14 +708,14 @@ final internal class _SharedStringStorage
       return _cocoaHashString(self)
     }
   }
-  
+
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
-  
+
   @objc(getCharacters:range:)
   @_effects(releasenone)
   final internal func getCharacters(
@@ -760,7 +723,7 @@ final internal class _SharedStringStorage
   ) {
     _getCharacters(buffer, aRange)
   }
-  
+
   @objc
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
@@ -770,7 +733,7 @@ final internal class _SharedStringStorage
       return _cocoaUTF8Encoding
     }
   }
-  
+
   @objc(_fastCStringContents:)
   @_effects(readonly)
   final internal func _fastCStringContents(
@@ -781,7 +744,7 @@ final internal class _SharedStringStorage
     }
     return nil
   }
-  
+
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
@@ -793,7 +756,7 @@ final internal class _SharedStringStorage
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
-  
+
   @objc(getCString:maxLength:encoding:)
   @_effects(releasenone)
   final internal func getCString(
@@ -807,7 +770,7 @@ final internal class _SharedStringStorage
   final internal func isEqual(to other:AnyObject?) -> Int8 {
     return _isEqual(other)
   }
-  
+
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While _StringStorage instances aren't immutable in general,
