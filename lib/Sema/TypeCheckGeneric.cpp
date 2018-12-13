@@ -710,11 +710,11 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
     if (recursivelyVisitGenericParams) {
       visitOuterToInner(genericParams,
                         [&](GenericParamList *gpList) {
-      auto genericParamsDC = gpList->begin()[0]->getDeclContext();
-      TypeResolution structuralResolution =
-        TypeResolution::forStructural(genericParamsDC);
-        checkGenericParamList(*this, &builder, gpList, nullptr,
-                              structuralResolution);
+        auto genericParamsDC = gpList->begin()[0]->getDeclContext();
+        TypeResolution structuralResolution =
+          TypeResolution::forStructural(genericParamsDC);
+          checkGenericParamList(*this, &builder, gpList, nullptr,
+                                structuralResolution);
       });
     } else {
       auto genericParamsDC = genericParams->begin()[0]->getDeclContext();
