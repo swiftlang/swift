@@ -375,18 +375,21 @@ void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
 
 void DriverGraph::verify() const {
   // TODO: disable when not debugging
-  std::array<std::unordered_map<DependencyKey, DriverNode *>, 2> nodesByKey;
+  std::array<std::unordered_map<DependencyKey,
+                                std::unordered_map<std::string, DriverNode *>>,
+             2>
+      nodesByKey;
   nodeMap.verify([&](const std::string &swiftDepsString,
-                     const DependencyKey &key, DriverNode *n, unsigned index) {
-    assert(index < nodesByKey.size());
-    auto iterInserted =
-        nodesByKey[index].insert(std::make_pair(n->getKey(), n));
+                     const DependencyKey &key, DriverNode *n,
+                     unsigned mapIndex) {
+    assert(mapIndex < nodesByKey.size());
+
+    auto &nodesBySwiftDeps = nodesByKey[mapIndex][n->getKey()];
+    auto iterInserted = nodesBySwiftDeps.insert(std::make_pair(
+        n->getSwiftDeps().hasValue() ? n->getSwiftDeps().getValue()
+                                     : std::string(),
+        n));
     if (!iterInserted.second) {
-      llvm::errs() << "Duplicate driver keys: ";
-      iterInserted.first->second->dump();
-      llvm::errs() << " and ";
-      n->dump();
-      llvm::errs() << "\n";
       llvm_unreachable("duplicate driver keys");
     }
     const DependencyKey &nodeKey = n->getKey();
