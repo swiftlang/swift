@@ -500,8 +500,6 @@ private:
                            SILType type, DeclContext *DeclCtx,
                            GenericEnvironment *GE) {
     auto RealType = type.getASTType();
-    if (type.isAddress())
-      RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, GE, RealType,
                                                 IGM.getTypeInfo(type));
     Parameters.push_back(getOrCreateType(DbgTy));
@@ -1192,22 +1190,8 @@ private:
                                   AlignInBits, Flags, MangledName);
     }
 
-    case TypeKind::InOut: {
-      // This is an inout type. Naturally we would be emitting them as
-      // DW_TAG_reference_type types, but LLDB can deal better with
-      // pointer-sized struct that has the appropriate mangled name.
-      auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
-      auto Name = MangledName;
-      if (auto *Decl = ObjectTy->getAnyNominal())
-        Name = Decl->getName().str();
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-        return createPointerSizedStruct(Scope, Name, DT, File, 0, Flags,
-                                        MangledName);
-      } else
-        return createOpaqueStruct(Scope, Name, File, 0, SizeInBits, AlignInBits,
-                                  Flags, MangledName);
-    }
+    case TypeKind::InOut:
+      break;
 
     case TypeKind::Archetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
@@ -1384,10 +1368,6 @@ private:
     case TypeKind::SILBlockStorage: // Not supported at all.
     case TypeKind::SILBox:
       return false;
-    case TypeKind::InOut: {
-      auto *ObjectTy = Ty->castTo<InOutType>()->getObjectType().getPointer();
-      return canMangle(ObjectTy);
-    }
     default:
       return true;
     }
