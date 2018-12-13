@@ -34,7 +34,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  fileprivate init(_cocoaDictionary: __shared AnyObject) {
+  fileprivate init(_cocoaDictionary: __shared NSDictionary) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
