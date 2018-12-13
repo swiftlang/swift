@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -enable-sil-ownership -emit-verbose-sil -warnings-as-errors %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors %s | %FileCheck %s
 
 // CHECK-LABEL: sil [serialized] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {

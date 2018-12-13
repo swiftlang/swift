@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // Check that @usableFromInline entities have public linkage.
 // CHECK-LABEL: sil @$s19versioned_attribute25referencedFromTransparentyyF : $@convention(thin) () -> () {

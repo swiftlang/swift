@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name function_conversion -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name function_conversion -primary-file %s | %FileCheck %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 

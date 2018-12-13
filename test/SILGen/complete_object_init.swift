@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 struct X { }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-sil-ownership > %t.out
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s > %t.out
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s < %t.out
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.out
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-resilience %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
+// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-resilience %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
 @objc public enum CLike: Int {
   case a, b, c

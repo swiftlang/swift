@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name optional -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name optional %s | %FileCheck %s
 
 func testCall(_ f: (() -> ())?) {
   f?()

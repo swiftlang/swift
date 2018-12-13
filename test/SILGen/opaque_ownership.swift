@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
 
 public typealias AnyObject = Builtin.AnyObject
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // Test that the attribute gets set on default argument generators.
 

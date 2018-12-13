@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
 
 //CHECK: [readonly] @func1

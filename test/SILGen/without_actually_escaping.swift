@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name without_actually_escaping -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name without_actually_escaping %s | %FileCheck %s
 
 var escapeHatch: Any = 0
 

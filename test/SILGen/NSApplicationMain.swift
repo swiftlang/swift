@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s -check-prefix=IR
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s
 // RUN: %target-swift-emit-ir -parse-as-library -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -D REFERENCE | %FileCheck %s -check-prefix=IR
 
 // REQUIRES: OS=macosx
