@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s %S/Inputs/attr_objcMembers_other.swift
 // REQUIRES: objc_interop
 
 import Foundation
@@ -24,12 +24,17 @@ extension SubClassOfSomeClassWithObjCMembers {
   func wibble() { }
 }
 
+class SubClassOfOtherClassWithObjCMembers : OtherClassWithObjCMembers {
+  func quux() { }
+}
+
 // @objc should be inferred for everything referenced here.
 func selectorTest() {
   _ = #selector(SomeClassWithObjCMembers.foo)
   _ = #selector(getter: SomeClassWithObjCMembers.bar)
   _ = #selector(SubClassOfSomeClassWithObjCMembers.baz)
   _ = #selector(SubClassOfSomeClassWithObjCMembers.wibble)
+  _ = #selector(SubClassOfOtherClassWithObjCMembers.quux)
 }
 
 @nonobjc extension SomeClassWithObjCMembers {
