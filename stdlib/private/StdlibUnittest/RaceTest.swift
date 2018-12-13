@@ -39,6 +39,7 @@
 import SwiftPrivate
 import SwiftPrivateLibcExtras
 import SwiftPrivateThreadExtras
+import SwiftShims
 #if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
@@ -518,8 +519,8 @@ class _InterruptibleSleep {
   }
 
   deinit {
-    close(readEnd)
-    close(writeEnd)
+    _swift_stdlib_close(readEnd)
+    _swift_stdlib_close(writeEnd)
   }
 
   /// Sleep for durationInSeconds or until another
@@ -546,7 +547,7 @@ class _InterruptibleSleep {
     if completed { return }
 
     let buffer: [UInt8] = [1]
-    let ret = write(writeEnd, buffer, 1)
+    let ret = _swift_stdlib_write(writeEnd, buffer, 1)
     precondition(ret >= 0)
   }
 }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftPrivate
+import SwiftShims
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
@@ -121,7 +122,7 @@ public func spawnChild(_ args: [String])
     let errnoSize = MemoryLayout.size(ofValue: errno)
     var execveErrno = errno
     let writtenBytes = withUnsafePointer(to: &execveErrno) {
-      write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)
+      _swift_stdlib_write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)
     }
 
     let writeErrno = errno
@@ -138,7 +139,7 @@ public func spawnChild(_ args: [String])
     }
 
     // Close the pipe when we're done writing the error.
-    close(childToParentPipe.writeFD)
+    _swift_stdlib_close(childToParentPipe.writeFD)
   }
 #else
   var fileActions = _make_posix_spawn_file_actions_t()
@@ -206,18 +207,18 @@ public func spawnChild(_ args: [String])
 #endif
 
   // Close the read end of the pipe on the parent side.
-  if close(childStdin.readFD) != 0 {
-    preconditionFailure("close() failed")
+  if _swift_stdlib_close(childStdin.readFD) != 0 {
+    preconditionFailure("_swift_stdlib_close() failed")
   }
 
   // Close the write end of the pipe on the parent side.
-  if close(childStdout.writeFD) != 0 {
-    preconditionFailure("close() failed")
+  if _swift_stdlib_close(childStdout.writeFD) != 0 {
+    preconditionFailure("_swift_stdlib_close() failed")
   }
 
   // Close the write end of the pipe on the parent side.
-  if close(childStderr.writeFD) != 0 {
-    preconditionFailure("close() failed")
+  if _swift_stdlib_close(childStderr.writeFD) != 0 {
+    preconditionFailure("_swift_stdlib_close() failed")
   }
 
   return (pid, childStdin.writeFD, childStdout.readFD, childStderr.readFD)
