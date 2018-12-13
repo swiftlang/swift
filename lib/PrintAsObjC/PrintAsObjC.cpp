@@ -956,9 +956,9 @@ private:
              cast<ValueDecl>(D)->isInstanceMember()))
           continue;
         
-        if (isa<FuncDecl>(candidate)) {
-          auto cParams = cast<FuncDecl>(candidate)->getParameters();
-          auto dParams = cast<FuncDecl>(D)->getParameters();
+        if (isa<AbstractFunctionDecl>(candidate)) {
+          auto cParams = cast<AbstractFunctionDecl>(candidate)->getParameters();
+          auto dParams = cast<AbstractFunctionDecl>(D)->getParameters();
           
           if (cParams->size() != dParams->size())
             continue;
