@@ -1644,6 +1644,17 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
   const ConformanceInfo *conformanceI = nullptr;
+
+  // Rewrite (abstract) self conformances to the concrete conformance.
+  if (associatedConformance.isAbstract() && !hasArchetype) {
+    // This must be a self conformance.
+    auto proto = associatedConformance.getRequirement();
+    assert(proto->requiresSelfConformanceWitnessTable());
+    assert(cast<ProtocolType>(associatedType)->getDecl() == proto);
+    auto concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
+    associatedConformance = ProtocolConformanceRef(concreteConformance);
+  }
+
   if (associatedConformance.isConcrete()) {
     assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
 
