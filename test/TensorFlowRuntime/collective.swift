@@ -18,16 +18,8 @@ var CollectiveTests = TestSuite("Collective")
 // TODO: Probably should be disabled for TPU execution.
 CollectiveTests.testAllBackends("SingletonGroup") {
   let x = Tensor<Float>(1.0)
-  let handle: TensorHandle<Float> =
-    #tfop("CollectiveReduce", x,
-          T$dtype: Float.tensorFlowDataType,
-          merge_op: "Add",
-          final_op: "Id",
-          subdiv_offsets: [Int64(0)],
-          group_key: Int64(1),
-          group_size: Int64(1),
-          instance_key: Int64(1))
-  let t = Tensor(handle: handle)
+  let t = Raw.collectiveReduce(x, groupSize: 1, groupKey: 1, instanceKey: 1,
+                               mergeOp: .add, finalOp: .id, subdivOffsets: [0])
   _hostOp(t)
   expectEqualWithScalarTensor(1, t)
 }
