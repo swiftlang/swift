@@ -77,16 +77,16 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (!A->getOpenedExistentialType().isNull())
+  if (isa<OpenedArchetypeType>(A))
     return true;
 
   // Find the primary archetype.
-  A = A->getPrimary();
+  auto P = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (A->getGenericEnvironment() == genericEnv)
+    if (P->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -2015,7 +2015,7 @@ public:
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
       // The lowered type must be the properly-abstracted form of the AST type.
       SILType exType = AEBI->getExistentialType();
-      auto archetype = ArchetypeType::getOpened(exType.getASTType());
+      auto archetype = OpenedArchetypeType::get(exType.getASTType());
 
       auto loweredTy = F.getModule().Types.getLoweredType(
                                       Lowering::AbstractionPattern(archetype),
@@ -3035,7 +3035,7 @@ public:
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     
     auto loweredTy = F.getModule().Types.getLoweredType(
                                 Lowering::AbstractionPattern(archetype),
@@ -3065,7 +3065,7 @@ public:
             "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
         Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
     requireSameType(
@@ -3097,7 +3097,7 @@ public:
     
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
                                        Lowering::AbstractionPattern(archetype),
                                        IEI->getFormalConcreteType());

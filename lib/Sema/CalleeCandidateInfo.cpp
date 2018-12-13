@@ -464,7 +464,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
             allGenericSubstitutions[archetype] = substitution;
             
             // Not yet handling nested archetypes.
-            if (!archetype->isPrimary())
+            if (!isa<PrimaryArchetypeType>(archetype))
               return { CC_ArgumentMismatch, {}};
             
             if (!isSubstitutableFor(substitution, archetype, CS.DC)) {

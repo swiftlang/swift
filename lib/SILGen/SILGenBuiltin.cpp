@@ -308,7 +308,7 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
 
   // If the argument is existential, open it.
   if (argTy->isClassExistentialType()) {
-    auto openedTy = ArchetypeType::getOpened(argTy);
+    auto openedTy = OpenedArchetypeType::get(argTy);
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     arg = SGF.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
   }
@@ -797,7 +797,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
   
   // If the argument is existential, open it.
   if (sourceType->isClassExistentialType()) {
-    auto openedTy = ArchetypeType::getOpened(sourceType);
+    auto openedTy = OpenedArchetypeType::get(sourceType);
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }

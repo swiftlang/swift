@@ -62,11 +62,10 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
     return response;
 
   // If that's not present, this must be an associated type.
-  assert(!archetype->isPrimary() &&
-         "type metadata for primary archetype was not bound in context");
+  auto nested = cast<NestedArchetypeType>(archetype);
 
-  CanArchetypeType parent(archetype->getParent());
-  AssociatedType association(archetype->getAssocType());
+  CanArchetypeType parent(nested->getParent());
+  AssociatedType association(nested->getAssocType());
 
   MetadataResponse response =
     emitAssociatedTypeMetadataRef(IGF, parent, association, request);
@@ -176,10 +175,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // If we don't have an environment, this must be an implied witness table
   // reference.
   // FIXME: eliminate this path when opened types have generic environments.
-  auto environment = archetype->getGenericEnvironment();
-  if (!environment) {
-    assert(archetype->isOpenedExistential() &&
-           "non-opened archetype lacking generic environment?");
+  if (auto opened = dyn_cast<OpenedArchetypeType>(archetype)) {
     SmallVector<ProtocolEntry, 4> entries;
     for (auto p : archetype->getConformsTo()) {
       const ProtocolInfo &impl =
@@ -198,6 +194,8 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
       return wtable;
     });
   }
+  
+  auto environment = archetype->getPrimary()->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the environment for the best
   // path to the conformance.
