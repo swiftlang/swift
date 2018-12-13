@@ -1,4 +1,4 @@
-// swift-tools-version: 4.0
+// swift-interface-format-version: 1.0
 // swift-module-flags: 
 
 // Make sure parse-only works...
@@ -6,7 +6,7 @@
 
 // ...and then make sure parse-and-typecheck-and-serialize works.
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/SmokeTest.swiftmodule %s
+// RUN: %target-swift-frontend -build-module-from-parseable-interface -o %t/SmokeTest.swiftmodule %s
 // RUN: %target-swift-ide-test -print-module -module-to-print SmokeTest -I %t -source-filename x -print-interface > %t/SmokeTest.txt
 // RUN: %FileCheck %s < %t/SmokeTest.txt
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t/SmokeTest.txt

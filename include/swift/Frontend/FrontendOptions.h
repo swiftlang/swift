@@ -126,6 +126,9 @@ public:
     EmitModuleOnly, ///< Emit module only
     MergeModules,   ///< Merge modules only
 
+    /// Build from a swiftinterface, as close to `import` as possible
+    BuildModuleFromParseableInterface,
+
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL
 
