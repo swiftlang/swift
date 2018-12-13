@@ -641,6 +641,20 @@ public struct PythonInterface {
   init() {
     Py_Initialize()   // Initialize Python
     builtins = PythonObject(borrowing: PyEval_GetBuiltins())
+
+    // Runtime Fixes:
+    //
+    // Some Python modules expect to have at least one argument in `sys.argv`.
+    PyRun_SimpleString("import sys; sys.argv = ['']")
+    // Some Python modules require `sys.executable` to return the path
+    // to the Python interpreter executable. In Darwin, Python 3 returns the
+    // main process executable path instead (`CommandLine.arguments[0]`).
+    PyRun_SimpleString("""
+      import sys
+      import os
+      if sys.version_info.major == 3 and sys.platform == 'darwin':
+        sys.executable = os.path.join(sys.exec_prefix, 'bin', 'python3')
+      """)
   }
 
   public func attemptImport(_ name: String) throws -> PythonObject {

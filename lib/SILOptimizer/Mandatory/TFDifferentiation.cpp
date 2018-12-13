@@ -265,6 +265,11 @@ public:
     // a Swift AST node.
     GradientInst,
 
+    // No known invoker. This is the case when the differentiation is requested
+    // from SIL source via a `autodiff_function` instruction **without** being
+    // linked to a Swift AST node.
+    AutoDiffFunctionInst,
+
     // Invoked by the indirect application of differentiation. This case has an
     // associated differentiation task reference.
     IndirectDifferentiation,
@@ -287,9 +292,13 @@ public:
 private:
   Kind kind;
   union Value {
-    /// The instruction associated with the `SILSource` case.
+    /// The instruction associated with the `GradientInst` case.
     GradientInst *gradientInst;
     Value(GradientInst *inst) : gradientInst(inst) {}
+
+    /// The instruction associated with the `AutoDiffFunctionInst` case.
+    AutoDiffFunctionInst *adFuncInst;
+    Value(AutoDiffFunctionInst *inst) : adFuncInst(inst) {}
 
     /// The parent differentiation task associated with the
     /// `IndirectDifferentiation` case.
@@ -322,6 +331,8 @@ private:
 public:
   DifferentiationInvoker(GradientInst *inst)
       : kind(Kind::GradientInst), value(inst) {}
+  DifferentiationInvoker(AutoDiffFunctionInst *inst)
+      : kind(Kind::AutoDiffFunctionInst), value(inst) {}
   DifferentiationInvoker(ApplyInst *applyInst, DifferentiationTask *task)
       : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
   DifferentiationInvoker(ReverseAutoDiffExpr *expr)
@@ -336,6 +347,11 @@ public:
   GradientInst *getGradientInst() const {
     assert(kind == Kind::GradientInst);
     return value.gradientInst;
+  }
+
+  AutoDiffFunctionInst *getAutoDiffFunctionInst() const {
+    assert(kind == Kind::AutoDiffFunctionInst);
+    return value.adFuncInst;
   }
 
   std::pair<ApplyInst *, DifferentiationTask *>
@@ -812,6 +828,9 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   case Kind::GradientInst:
     os << "gradient_inst=(" << *getGradientInst() << ")";
     break;
+  case Kind::AutoDiffFunctionInst:
+    os << "autodiff_function_inst=(" << *getAutoDiffFunctionInst() << ")";
+    break;
   case Kind::IndirectDifferentiation: {
     auto indDiff = getIndirectDifferentiation();
     os << "indirect_differentiation=(apply_inst=(" << *indDiff.first
@@ -1177,6 +1196,7 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
   // associated with any source location, we emit a diagnostic at the
   // instruction source location.
   case DifferentiationInvoker::Kind::GradientInst:
+  case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute:
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
@@ -1293,7 +1313,7 @@ class DifferentiableActivityInfo;
 /// does not matter for the final result.
 ///
 /// Reference:
-/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2017.
+/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
 class DifferentiableActivityAnalysis
     : public FunctionAnalysisBase<DifferentiableActivityInfo> {
 private:
@@ -4466,12 +4486,30 @@ void DifferentiationTask::createVJP() {
                          SILDebugScope(original->getLocation(), vjp));
   attr->setVJPName(vjp->getName());
 
+  // Work around a bad interaction between VJPs, TFDeabstraction, and SIL
+  // optimizations.
+  //
+  // The bad interaction is: TFDeabstraction cannot inline the functions that
+  // the VJP partially applies. When run in "-Onone" mode, this is fine (but
+  // inefficient), because we just generate sends/recvs to handle it. But in
+  // "-O" mode, later SIL optimization passes:
+  // - fold the partial applications and inline them, or
+  // - specialize the partial_apply callees.
+  // In either case, the inlined/specialized bodies haven't been deabstracted,
+  // so partitioning crashes when it sees them.
+  //
+  // TODO: Fix this problem in a way that allows inlining/specialization of
+  // VJPs. Teaching TFDeabstraction to fold partial applications might work.
+  vjp->setInlineStrategy(NoInline);
+  vjp->addSemanticsAttr("optimize.sil.specialize.generic.never");
+
   LLVM_DEBUG(llvm::dbgs() << "  vjp type: "
                           << vjp->getLoweredFunctionType() << "\n");
 
   // We'll use these conventions frequently.
   auto originalConv = original->getConventions();
   auto primalConv = primal->getConventions();
+  auto vjpConv = vjp->getConventions();
 
   // Keep track of some stack allocation to clean up.
   SmallVector<SILValue, 2> stackAllocsToCleanUp;
@@ -4479,7 +4517,6 @@ void DifferentiationTask::createVJP() {
   // Validate signatures.
 #ifndef NDEBUG
   auto adjointConv = adjoint->getConventions();
-  auto vjpConv = vjp->getConventions();
 
   unsigned numOriginalParameters = originalConv.getNumParameters();
   unsigned numOriginalResults = originalConv.getResults().size();
@@ -4538,7 +4575,16 @@ void DifferentiationTask::createVJP() {
 
   // Create the entry block with indirect results and parameters.
   auto *entry = vjp->createBasicBlock();
-  createEntryArguments(vjp);
+  unsigned argumentIndex = 0;
+  for (auto indResultTy : vjpConv.getIndirectSILResultTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(indResultTy).getAddressType(),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  for (auto paramTy : vjpConv.getParameterSILTypes())
+    entry->createFunctionArgument(
+        vjp->mapTypeIntoContext(paramTy),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+
   SILBuilder builder(entry);
   auto loc = vjp->getLocation();
 
@@ -4645,6 +4691,14 @@ void DifferentiationTask::createVJP() {
 /// used in the AST. If no differential operator is found, return nullptr.
 static ReverseAutoDiffExpr *findDifferentialOperator(GradientInst *inst) {
   return inst->getLoc().getAsASTNode<ReverseAutoDiffExpr>();
+}
+
+/// Given an `autodiff_function` instruction, find the corresponding
+/// differential operator used in the AST. If no differential operator is found,
+/// return nullptr.
+static AutoDiffFunctionExpr *findDifferentialOperator(
+    AutoDiffFunctionInst *inst) {
+  return inst->getLoc().getAsASTNode<AutoDiffFunctionExpr>();
 }
 
 // Retrieve or create an empty gradient function based on a `gradient`
@@ -4927,6 +4981,9 @@ private:
   /// pushing a differentiation task onto the global list. Returns true if any
   /// error occurred.
   bool processGradientInst(GradientInst *gi, ADContext &context);
+
+  bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
+                                   ADContext &context);
 };
 } // end anonymous namespace
 
@@ -4977,6 +5034,60 @@ bool Differentiation::processGradientInst(GradientInst *gi,
   return false;
 }
 
+bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
+                                                  ADContext &context) {
+  SILFunction *parent = adfi->getFunction();
+  auto origFnOperand = adfi->getOriginalFunction();
+  // If it traces back to a `function_ref`, differentiate that.
+  if (auto *originalFRI = findReferenceToVisibleFunction(origFnOperand)) {
+    auto *original = originalFRI->getReferencedFunction();
+    // TODO: Find syntax-level AD invoker from `adfi`.
+    auto *task = context.lookUpOrRegisterDifferentiationTask(
+        original, SILAutoDiffIndices(0, adfi->getParameterIndices()),
+        DifferentiationInvoker(adfi));
+    // Expand the `autodiff_function` instruction by adding the JVP and VJP
+    // functions.
+    SILBuilder builder(adfi);
+    auto loc = parent->getLocation();
+    auto *vjp = task->getVJP();
+    auto *vjpRef = builder.createFunctionRef(loc, vjp);
+    auto finalVJP = reapplyFunctionConversion(
+        vjpRef, originalFRI, origFnOperand, builder, loc);
+    SILValue finalJVP;
+    // TODO: Implement "forward-mode differentiation" to get JVP. Currently it's
+    // just an undef because we won't use it.
+    {
+      auto origFnTy = origFnOperand->getType().getAs<SILFunctionType>();
+      auto jvpType = origFnTy->getAutoDiffAssociatedFunctionType(
+          adfi->getParameterIndices(), /*resultIndex*/ 0,
+          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
+          *getModule(),
+          /*lookupConformance*/
+              LookUpConformanceInModule(getModule()->getSwiftModule()));
+      finalJVP = SILUndef::get(SILType::getPrimitiveObjectType(jvpType),
+                             getModule());
+    }
+    auto *newADFI = builder.createAutoDiffFunction(
+        loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
+        origFnOperand, {finalJVP, finalVJP});
+    adfi->replaceAllUsesWith(newADFI);
+    adfi->eraseFromParent();
+  }
+  // Differentiating opaque functions is not supported yet.
+  else {
+    // Find the original differential operator expression. Show an error at the
+    // operator, highlight the argument, and show a note at the definition site
+    // of the argument.
+    if (auto *expr = findDifferentialOperator(adfi))
+      context.diagnose(expr->getSubExpr()->getLoc(),
+                       diag::autodiff_function_not_differentiable)
+          .highlight(expr->getSubExpr()->getSourceRange());
+    return true;
+  }
+  PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
+  return false;
+}
+
 /// AD pass entry.
 void Differentiation::run() {
   auto &module = *getModule();
@@ -4987,6 +5098,7 @@ void Differentiation::run() {
   SmallVector<std::pair<SILFunction *,
                         SILDifferentiableAttr *>, 8> diffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
+  SmallVector<AutoDiffFunctionInst *, 16> autodiffInsts;
   // Handle each `gradient` instruction and each `differentiable`
   // attribute in the module.
   for (SILFunction &f : module) {
@@ -5011,6 +5123,8 @@ void Differentiation::run() {
         // operator, push it to the work list.
         if (auto *gi = dyn_cast<GradientInst>(&i))
           gradInsts.push_back(gi);
+        else if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i))
+          autodiffInsts.push_back(adfi);
       }
     }
   }
@@ -5055,9 +5169,12 @@ void Differentiation::run() {
   // turned into a differentiation task. But we don't back out just yet - primal
   // synthesis and adjoint synthesis for newly created differentiation tasks
   // should still run because they will diagnose more errors.
-  bool errorProcessingGradInsts = false;
+  bool errorProcessingAutoDiffInsts = false;
   for (auto *gi : gradInsts)
-    errorProcessingGradInsts |= processGradientInst(gi, context);
+    errorProcessingAutoDiffInsts |= processGradientInst(gi, context);
+
+  for (auto *adfi : autodiffInsts)
+    errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
 
   // Run primal generation for newly created differentiation tasks. If any error
   // occurs, back out.
@@ -5073,7 +5190,7 @@ void Differentiation::run() {
 
   // If there was any error that occurred during `gradient` instruction
   // processing, back out.
-  if (errorProcessingGradInsts)
+  if (errorProcessingAutoDiffInsts)
     return;
 
   // Fill the body of each empty canonical gradient function.

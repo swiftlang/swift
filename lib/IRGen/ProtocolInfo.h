@@ -13,6 +13,8 @@
 // This file defines types for representing the abstract layout of a
 // protocol.
 //
+// SWIFT_ENABLE_TENSORFLOW (this whole file has been significantly modified)
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_IRGEN_PROTOCOLINFO_H
@@ -39,35 +41,59 @@ namespace irgen {
 /// ProtocolTypeInfo stores one of these for each requirement
 /// introduced by the protocol.
 class WitnessTableEntry {
-public:
-  llvm::PointerUnion<Decl *, TypeBase *> MemberOrAssociatedType;
-  ProtocolDecl *Protocol;
-  // SWIFT_ENABLE_TENSORFLOW
-  /// When this is an entry for an autodiff associated funciton, this stores the
-  /// function's identifier.
-  AutoDiffAssociatedFunctionIdentifier *AutoDiffFuncId;
+  enum WitnessKind {
+    PlaceholderKind,
+    OutOfLineBaseKind,
+    MethodKind,
+    AssociatedTypeKind,
+    AssociatedConformanceKind
+  };
 
-  // SWIFT_ENABLE_TENSORFLOW
-  WitnessTableEntry(
-      llvm::PointerUnion<Decl *, TypeBase *> member, ProtocolDecl *protocol,
-      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId = nullptr)
-    : MemberOrAssociatedType(member), Protocol(protocol),
-      AutoDiffFuncId(autoDiffFuncId) {}
+  struct OutOfLineBaseWitness {
+    ProtocolDecl *Protocol;
+  };
+
+  struct MethodWitness {
+    SILDeclRef Witness;
+  };
+
+  struct AssociatedTypeWitness {
+    AssociatedTypeDecl *Association;
+  };
+
+  struct AssociatedConformanceWitness {
+    TypeBase *AssociatedType;
+    ProtocolDecl *Protocol;
+  };
+
+  WitnessKind Kind;
+  union {
+    OutOfLineBaseWitness OutOfLineBaseEntry;
+    MethodWitness MethodEntry;
+    AssociatedTypeWitness AssociatedTypeEntry;
+    AssociatedConformanceWitness AssociatedConformanceEntry;
+  };
+
+  WitnessTableEntry(WitnessKind Kind) : Kind(Kind) {}
 
 public:
-  WitnessTableEntry() = default;
+  static WitnessTableEntry forPlaceholder() {
+    return WitnessTableEntry(WitnessKind::PlaceholderKind);
+  }
 
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
     assert(proto != nullptr);
-    return WitnessTableEntry({}, proto);
+    WitnessTableEntry entry(WitnessKind::OutOfLineBaseKind);
+    entry.OutOfLineBaseEntry = {proto};
+    return entry;
   }
 
   /// Is this a base-protocol entry?
-  bool isBase() const { return MemberOrAssociatedType.isNull(); }
+  bool isBase() const { return Kind == WitnessKind::OutOfLineBaseKind; }
 
   bool matchesBase(ProtocolDecl *proto) const {
     assert(proto != nullptr);
-    return MemberOrAssociatedType.isNull() && Protocol == proto;
+    return isBase() && OutOfLineBaseEntry.Protocol == proto;
   }
 
   /// Given that this is a base-protocol entry, is the table
@@ -79,128 +105,98 @@ public:
 
   ProtocolDecl *getBase() const {
     assert(isBase());
-    return Protocol;
+    return OutOfLineBaseEntry.Protocol;
   }
 
-  static WitnessTableEntry forFunction(Decl *func) {
-    return WitnessTableEntry(func, nullptr);
+  static WitnessTableEntry forFunction(SILDeclRef declRef) {
+    assert(!declRef.isNull());
+    WitnessTableEntry entry(WitnessKind::MethodKind);
+    entry.MethodEntry = {declRef};
+    return entry;
   }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  static WitnessTableEntry forAutoDiffAssociatedFunction(
-      Decl *func, AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) {
-    return WitnessTableEntry(func, nullptr, autoDiffFuncId);
-  }
-
+  
   bool isFunction() const {
-    auto decl = MemberOrAssociatedType.dyn_cast<Decl*>();
-    // SWIFT_ENABLE_TENSORFLOW
-    return Protocol == nullptr && AutoDiffFuncId == nullptr && decl &&
-           isa<AbstractFunctionDecl>(decl);
+    return Kind == WitnessKind::MethodKind;
   }
 
-  bool matchesFunction(AbstractFunctionDecl *func) const {
-    assert(func != nullptr);
-    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      // SWIFT_ENABLE_TENSORFLOW
-      return decl == func && Protocol == nullptr && AutoDiffFuncId == nullptr;
-    return false;
+  bool matchesFunction(SILDeclRef declRef) const {
+    return isFunction() && MethodEntry.Witness == declRef;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  bool isAutoDiffAssociatedFunction() const {
-    auto decl = MemberOrAssociatedType.dyn_cast<Decl*>();
-    return Protocol == nullptr && AutoDiffFuncId != nullptr && decl &&
-           isa<AbstractFunctionDecl>(decl);
-  }
-
-  bool matchesAutoDiffAssociatedFunction(
-      Decl *func,
-      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) const {
-    assert(func != nullptr);
-    assert(autoDiffFuncId != nullptr);
-    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      return decl == func && Protocol == nullptr &&
-             AutoDiffFuncId != nullptr &&
-             AutoDiffFuncId == autoDiffFuncId;
-    return false;
-  }
-
-  AbstractFunctionDecl *getFunction() const {
+  SILDeclRef getFunction() const {
     assert(isFunction());
-    auto decl = MemberOrAssociatedType.get<Decl*>();
-    return static_cast<AbstractFunctionDecl*>(decl);
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  AbstractFunctionDecl *getAutoDiffAssociatedFunctionOriginal() const {
-    assert(isAutoDiffAssociatedFunction());
-    auto decl = MemberOrAssociatedType.get<Decl*>();
-    return static_cast<AbstractFunctionDecl*>(decl);
+    return MethodEntry.Witness;
   }
 
   static WitnessTableEntry forAssociatedType(AssociatedType ty) {
-    return WitnessTableEntry(ty.getAssociation(), nullptr);
+    WitnessTableEntry entry(WitnessKind::AssociatedTypeKind);
+    entry.AssociatedTypeEntry = {ty.getAssociation()};
+    return entry;
   }
   
   bool isAssociatedType() const {
-    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      // SWIFT_ENABLE_TENSORFLOW
-      return Protocol == nullptr && AutoDiffFuncId == nullptr &&
-             isa<AssociatedTypeDecl>(decl);
-    return false;
+    return Kind == WitnessKind::AssociatedTypeKind;
   }
 
   bool matchesAssociatedType(AssociatedType assocType) const {
-    if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      // SWIFT_ENABLE_TENSORFLOW
-      return decl == assocType.getAssociation() && Protocol == nullptr &&
-             AutoDiffFuncId == nullptr;
-    return false;
+    return isAssociatedType() &&
+           AssociatedTypeEntry.Association == assocType.getAssociation();
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
     assert(isAssociatedType());
-    auto decl = MemberOrAssociatedType.get<Decl*>();
-    return static_cast<AssociatedTypeDecl*>(decl);
+    return AssociatedTypeEntry.Association;
   }
 
-  static WitnessTableEntry forAssociatedConformance(AssociatedConformance conf){
-    return WitnessTableEntry(conf.getAssociation().getPointer(),
-                             conf.getAssociatedRequirement());
+  static WitnessTableEntry forAssociatedConformance(
+      AssociatedConformance conf) {
+    WitnessTableEntry entry(WitnessKind::AssociatedConformanceKind);
+    entry.AssociatedConformanceEntry = {conf.getAssociation().getPointer(),
+                                   conf.getAssociatedRequirement()};
+    return entry;
   }
 
   bool isAssociatedConformance() const {
-    // SWIFT_ENABLE_TENSORFLOW
-    return Protocol != nullptr && AutoDiffFuncId == nullptr &&
-        !MemberOrAssociatedType.isNull();
+    return Kind == WitnessKind::AssociatedConformanceKind;
   }
 
   bool matchesAssociatedConformance(const AssociatedConformance &conf) const {
-    if (auto type = MemberOrAssociatedType.dyn_cast<TypeBase*>())
-      return type == conf.getAssociation().getPointer() &&
-             // SWIFT_ENABLE_TENSORFLOW
-             Protocol == conf.getAssociatedRequirement() &&
-             AutoDiffFuncId == nullptr;
-    return false;
+    return isAssociatedConformance() &&
+           AssociatedConformanceEntry.AssociatedType ==
+               conf.getAssociation().getPointer() &&
+           AssociatedConformanceEntry.Protocol == conf.getAssociatedRequirement();
   }
 
   CanType getAssociatedConformancePath() const {
     assert(isAssociatedConformance());
-    auto type = MemberOrAssociatedType.get<TypeBase*>();
-    return CanType(type);
+    return CanType(AssociatedConformanceEntry.AssociatedType);
   }
 
   ProtocolDecl *getAssociatedConformanceRequirement() const {
     assert(isAssociatedConformance());
-    return Protocol;
+    return AssociatedConformanceEntry.Protocol;
   }
 
   friend bool operator==(WitnessTableEntry left, WitnessTableEntry right) {
-    return left.MemberOrAssociatedType == right.MemberOrAssociatedType &&
-           // SWIFT_ENABLE_TENSORFLOW
-           left.Protocol == right.Protocol &&
-           left.AutoDiffFuncId == right.AutoDiffFuncId;
+    if (left.Kind != right.Kind)
+      return false;
+    switch (left.Kind) {
+    case WitnessKind::PlaceholderKind:
+      return true;
+    case WitnessKind::OutOfLineBaseKind:
+      return left.OutOfLineBaseEntry.Protocol ==
+                 right.OutOfLineBaseEntry.Protocol;
+    case WitnessKind::MethodKind:
+      return left.MethodEntry.Witness == right.MethodEntry.Witness;
+    case WitnessKind::AssociatedTypeKind:
+      return left.AssociatedTypeEntry.Association ==
+                 right.AssociatedTypeEntry.Association;
+    case WitnessKind::AssociatedConformanceKind:
+      return left.AssociatedConformanceEntry.AssociatedType ==
+                 right.AssociatedConformanceEntry.AssociatedType &&
+             left.AssociatedConformanceEntry.Protocol ==
+                 right.AssociatedConformanceEntry.Protocol;
+    }
   }
 };
 
@@ -287,24 +283,10 @@ public:
 
   /// Return the witness index for the witness function for the given
   /// function requirement.
-  WitnessIndex getFunctionIndex(AbstractFunctionDecl *function) const {
+  WitnessIndex getFunctionIndex(SILDeclRef declRef) const {
     assert(getKind() >= ProtocolInfoKind::Full);
     for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesFunction(function))
-        return getNonBaseWitnessIndex(&witness);
-    }
-    llvm_unreachable("didn't find entry for function");
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Return the witness index for the witness function for the given
-  /// autodiff associated function requirement.
-  WitnessIndex getAutoDiffAssociatedFunctionIndex(
-      AbstractFunctionDecl *original,
-      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) const {
-    assert(getKind() >= ProtocolInfoKind::Full);
-    for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesAutoDiffAssociatedFunction(original, autoDiffFuncId))
+      if (witness.matchesFunction(declRef))
         return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for function");

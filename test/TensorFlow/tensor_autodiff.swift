@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -differentiation-use-vjp -O -emit-sil %s | %FileCheck %s
 
 import TensorFlow
 
