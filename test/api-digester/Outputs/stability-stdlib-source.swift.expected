@@ -1,1 +1,4 @@
 Func tryReallocateUniquelyReferenced(buffer:newMinimumCapacity:) has been removed
+
+/* FIXME(SR-9283): TypeAlias UnboundedRange has underlying type change from (UnboundedRange_) -> () to (Never) -> PartialRangeFrom<Never> */
+Enum UnboundedRange_ has been removed

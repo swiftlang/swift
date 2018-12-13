@@ -20,7 +20,7 @@ var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 
 
 var e0 : [Int]
 e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: ((UnboundedRange_) -> ()), (Int), (R), (Range<Int>), (Range<Self.Index>)}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: ((Never) -> PartialRangeFrom<Never>), (Int), (R), (Range<Int>), (Range<Self.Index>)}}
 
 var f0 : [Float]
 var f1 : [(Int,Int)]

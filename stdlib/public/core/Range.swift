@@ -827,22 +827,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // namespace
-public enum UnboundedRange_ {
-  // FIXME: replace this with a computed var named `...` when the language makes
-  // that possible.
-
-  /// Creates an unbounded range expression.
-  ///
-  /// The unbounded range operator (`...`) is valid only within a collection's
-  /// subscript.
-  public static postfix func ... (_: UnboundedRange_) -> () {
-    // This function is uncallable
-  }
-}
-
-/// The type of an unbounded range operator.
-public typealias UnboundedRange = (UnboundedRange_)->()
+public typealias UnboundedRange = (Never) -> PartialRangeFrom<Never>
 
 extension Collection {
   /// Accesses the contiguous subrange of the collection's elements specified
