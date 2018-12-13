@@ -336,7 +336,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (type->getOpenedExistentialType())
+  if (isa<OpenedArchetypeType>(type))
     return;
 
   llvm::Value *data = value.getMetadata();

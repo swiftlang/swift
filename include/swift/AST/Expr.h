@@ -43,6 +43,7 @@ namespace swift {
   class ValueDecl;
   class Decl;
   class DeclRefExpr;
+  class OpenedArchetypeType;
   class Pattern;
   class SubscriptDecl;
   class Stmt;
@@ -2694,7 +2695,7 @@ public:
   /// Retrieve the existential value that is being opened.
   Expr *getExistentialValue() const { return ExistentialValue; }
 
-  /// Set the existential value that is being opened.
+  /// Set the existential val ue that is being opened.
   void setExistentialValue(Expr *expr) { ExistentialValue = expr; }
 
   /// Retrieve the opaque value representing the value (of archetype
@@ -2703,7 +2704,7 @@ public:
 
   /// Retrieve the opened archetype, which can only be referenced
   /// within this expression's subexpression.
-  ArchetypeType *getOpenedArchetype() const;
+  OpenedArchetypeType *getOpenedArchetype() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpenExistential;
