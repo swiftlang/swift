@@ -364,15 +364,23 @@ internal struct _Bitset {
   internal var storage: Storage?
 
   @inlinable
-  internal init(capacity: Int) {
+  internal init(_uninitializedCapacity capacity: Int) {
     _internalInvariant(capacity >= 0)
     self.count = 0
     let wordCount = _UnsafeBitset.wordCount(forCapacity: capacity)
     self.word0 = .empty
-    self.storage = (wordCount > 1
-      ? Storage.allocate(wordCount: wordCount - 1)
-      : nil)
+    if wordCount > 1 {
+      self.storage = Storage.allocateUninitialized(wordCount: wordCount - 1)
+    } else {
+      self.storage = nil
+    }
     _internalInvariant(self.capacity >= capacity)
+  }
+
+  @inlinable
+  internal init(capacity: Int) {
+    self.init(_uninitializedCapacity: capacity)
+    self.storage?.clear()
   }
 }
 
@@ -530,7 +538,9 @@ extension _Bitset.Storage {
   @usableFromInline
   internal typealias Word = _Bitset.Word
 
-  internal static func _allocateUninitialized(
+  @usableFromInline
+  @_effects(releasenone)
+  internal static func allocateUninitialized(
     wordCount: Int
   ) -> _Bitset.Storage {
     let storage = Builtin.allocWithTailElems_1(
@@ -540,20 +550,22 @@ extension _Bitset.Storage {
     return storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
-  internal static func allocate(wordCount: Int) -> _Bitset.Storage {
-    let storage = _allocateUninitialized(wordCount: wordCount)
-    storage._words.initialize(repeating: .empty, count: storage._wordCount)
+  @inlinable
+  internal func clear() {
+    _words.assign(repeating: .empty, count: _wordCount)
+  }
+
+  @inlinable
+  internal func copy() -> _Bitset.Storage {
+    let storage = _Bitset.Storage.allocateUninitialized(wordCount: _wordCount)
+    storage.copy(contentsOf: self.bitset)
     return storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
-  internal func copy() -> _Bitset.Storage {
-    let storage = _Bitset.Storage._allocateUninitialized(wordCount: _wordCount)
-    storage._words.initialize(from: self._words, count: storage._wordCount)
-    return storage
+  @inlinable
+  func copy(contentsOf bitset: _UnsafeBitset) {
+    _internalInvariant(bitset.wordCount == self._wordCount)
+    self._words.assign(from: bitset.words, count: bitset.wordCount)
   }
 
   @inlinable

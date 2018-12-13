@@ -393,4 +393,18 @@ extension Set._Variant {
 #endif
     return asNative.isStrictSubset(of: possibleStrictSuperset)
   }
+
+  @inlinable
+  @inline(__always)
+  internal __consuming func subtracting<S: Sequence>(
+    _ other: S
+  ) -> _NativeSet<Element>
+  where S.Element == Element {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return _NativeSet(asCocoa).subtracting(other)
+    }
+#endif
+    return asNative.subtracting(other)
+  }
 }

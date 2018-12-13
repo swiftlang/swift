@@ -911,9 +911,7 @@ extension Set: SetAlgebra {
     _ other: S
   ) -> Set<Element>
   where S.Element == Element {
-    var newSet = self
-    newSet.subtract(other)
-    return newSet
+    return Set(_native: _variant.subtracting(other))
   }
 
   /// Removes the elements of the given sequence from the set.
