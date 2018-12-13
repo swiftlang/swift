@@ -972,7 +972,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setInsertionPoint(BB);
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
-           Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
+           // SWIFT_ENABLE_TENSORFLOW
+           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
+           IsNonThrowingApply = 0;
   // SWIFT_ENABLE_TENSORFLOW
   unsigned NumArguments = 0;
   unsigned GradResultIndex = 0;
@@ -1086,6 +1088,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstGradientLayout::readRecord(scratch, Attr, TyID, TyCategory, ValID,
                                       GradResultIndex, ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::GradientInst;
+    break;
+  case SIL_INST_AUTODIFF_FUNCTION:
+    SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
+                                              /*numParams*/ Attr2, NumArguments,
+                                              ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionInst;
+    break;
+  case SIL_INST_AUTODIFF_FUNCTION_EXTRACT:
+    SILInstAutoDiffFunctionExtractLayout::readRecord(scratch, TyID, TyCategory,
+                                                     ValID, /*extractee*/ Attr,
+                                                     /*order*/ Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionExtractInst;
     break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
@@ -1488,10 +1502,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case SILInstructionKind::AutoDiffFunctionInst: {
-    llvm_unreachable("FIXME: Unhandled");
+    auto numParamIndices = ListOfValues.size() - NumArguments * 3;
+    auto paramIndices = ListOfValues.take_front(numParamIndices);
+    auto numParams = Attr2;
+    llvm::SmallBitVector paramIndicesBitVec(numParams);
+    for (unsigned idx : paramIndices)
+      paramIndicesBitVec.set(idx);
+    SmallVector<SILValue, 4> operands;
+    for (auto i = numParamIndices; i < NumArguments * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
+    }
+    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndicesBitVec,
+        /*differentiationOrder*/ Attr, operands[0],
+        ArrayRef<SILValue>(operands).drop_front());
+    break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    llvm_unreachable("FIXME: unhandled");
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object);
+    auto val = getLocalValue(ValID, silTy);
+    AutoDiffFunctionExtractee extractee(Attr);
+    auto order = Attr2;
+    ResultVal =
+        Builder.createAutoDiffFunctionExtract(Loc, extractee, order, val);
+    break;
   }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Deserialize attributes.

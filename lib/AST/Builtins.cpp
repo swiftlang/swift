@@ -1075,7 +1075,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   auto *origFnTy =
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->withExtInfo(
-      origFnTy->getExtInfo().withDifferentiable(false));
+      origFnTy->getExtInfo().withDifferentiable(false).withNoEscape(false));
   auto *paramIndices = AutoDiffParameterIndicesBuilder(
       origFnTy, /*isMethod*/ false, /*setAllParams*/ true).build(Context);
   // Generator for the resultant function type, i.e. the AD associated function.

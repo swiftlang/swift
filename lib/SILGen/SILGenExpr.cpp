@@ -5727,7 +5727,7 @@ RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto *diffFunc = SGF.B.createAutoDiffFunction(E,
       SmallBitVector(fnTy->getNumParams(), true), 1, orig.forward(SGF));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(diffFunc));
 }
 
 RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
@@ -5735,7 +5735,7 @@ RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
       E, diffFunc.forward(SGF));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(orig));
 }
 
 RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {

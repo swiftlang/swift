@@ -42,8 +42,6 @@ namespace swift {
 /// - addMethod()
 /// - addConstructor()
 /// - addAssociatedType()
-/// SWIFT_ENABLE_TENSORFLOW
-/// - addAutoDiffAssociatedFunction()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
@@ -148,20 +146,18 @@ public:
     asDerived().addMethod(funcDeclRef);
 
     if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
-      asDerived().addAutoDiffAssociatedFunction(
-          funcDeclRef,
+      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::JVP,
               /*differentiationOrder*/ 1,
               DA->getCheckedParameterIndices(),
-              func->getASTContext()));
-      asDerived().addAutoDiffAssociatedFunction(
-          funcDeclRef,
+              func->getASTContext())));
+      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::VJP,
               /*differentiationOrder*/ 1,
               DA->getCheckedParameterIndices(),
-              func->getASTContext()));
+              func->getASTContext())));
     }
   }
 

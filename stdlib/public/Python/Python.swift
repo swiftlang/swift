@@ -198,7 +198,7 @@ public extension PythonObject {
 @_frozen
 public enum PythonError : Error, Equatable {
   /// A Python runtime exception, produced by calling a Python function.
-  case exception(PythonObject)
+  case exception(PythonObject, traceback: PythonObject?)
 
   /// A failed call on a `PythonObject`.
   /// Reasons for failure include:
@@ -215,9 +215,20 @@ public enum PythonError : Error, Equatable {
 extension PythonError : CustomStringConvertible {
   public var description: String {
     switch self {
-    case .exception(let p): return "Python exception: \(p)"
-    case .invalidCall(let p): return "Invalid Python call: \(p)"
-    case .invalidModule(let m): return "Invalid Python module: \(m)"
+    case .exception(let e, let t):
+      var exceptionDescription = "Python exception: \(e)"
+      if let t = t {
+        let traceback = Python.import("traceback")
+        exceptionDescription += """
+          \nTraceback:
+          \(PythonObject("").join(traceback.format_tb(t)))
+          """
+      }
+      return exceptionDescription
+    case .invalidCall(let e):
+      return "Invalid Python call: \(e)"
+    case .invalidModule(let m):
+      return "Invalid Python module: \(m)"
     }
   }
 }
@@ -235,8 +246,9 @@ private func throwPythonErrorIfPresent() throws {
   PyErr_Fetch(&type, &value, &traceback)
 
   // The value for the exception may not be set but the type always should be.
-  let r = PythonObject(owning: value ?? type!)
-  throw PythonError.exception(r)
+  let resultObject = PythonObject(owning: value ?? type!)
+  let tracebackObject = traceback.flatMap { PythonObject(owning: $0) }
+  throw PythonError.exception(resultObject, traceback: tracebackObject)
 }
 
 /// A `PythonObject` wrapper that enables throwing method calls.
@@ -641,6 +653,20 @@ public struct PythonInterface {
   init() {
     Py_Initialize()   // Initialize Python
     builtins = PythonObject(borrowing: PyEval_GetBuiltins())
+
+    // Runtime Fixes:
+    //
+    // Some Python modules expect to have at least one argument in `sys.argv`.
+    PyRun_SimpleString("import sys; sys.argv = ['']")
+    // Some Python modules require `sys.executable` to return the path
+    // to the Python interpreter executable. In Darwin, Python 3 returns the
+    // main process executable path instead (`CommandLine.arguments[0]`).
+    PyRun_SimpleString("""
+      import sys
+      import os
+      if sys.version_info.major == 3 and sys.platform == 'darwin':
+        sys.executable = os.path.join(sys.exec_prefix, 'bin', 'python3')
+      """)
   }
 
   public func attemptImport(_ name: String) throws -> PythonObject {

@@ -963,10 +963,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::AutoDiffFunctionInst: {
-    llvm_unreachable("FIXME: handle this");
+    auto *adfi = cast<AutoDiffFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto &paramIndices = adfi->getParameterIndices();
+    for (unsigned idx : paramIndices.set_bits())
+      trailingInfo.push_back(idx);
+    for (auto &op : adfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
+        adfi->getDifferentiationOrder(), (unsigned)paramIndices.size(),
+        adfi->getNumOperands(), trailingInfo);
+    break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    llvm_unreachable("FIXME: handle this");
+    auto *adfei = cast<AutoDiffFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(adfei->getFunctionOperand());
+    auto operandType = adfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)adfei->getExtractee();
+    SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstAutoDiffFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee, adfei->getDifferentiationOrder());
+    break;
   }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Serialize attributes.
@@ -2461,6 +2485,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstGraphOperationLayout>();
   registerSILAbbr<SILInstGradientLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionLayout>();
+  registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

@@ -140,7 +140,7 @@ PythonRuntimeTestSuite.test("RangeIteration") {
 }
 
 PythonRuntimeTestSuite.test("Errors") {
-  expectThrows(PythonError.exception("division by zero"), {
+  expectThrows(PythonError.exception("division by zero", traceback: nil), {
     try PythonObject(1).__truediv__.throwing.dynamicallyCall(withArguments: 0)
     // `expectThrows` does not fail if no error is thrown.
     fatalError("No error was thrown.")

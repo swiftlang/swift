@@ -1051,24 +1051,35 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     SubstitutionMap substitutions, Expr *argument, SGFContext C) {
   auto *argTuple = cast<TupleExpr>(argument);
   assert(argTuple->getNumElements() == 2);
-  auto *origFnExpr = argTuple->getElement(0);
-  auto *firstArgExpr = argTuple->getElement(1);
-  auto assocFn = SGF.getBuilder().createAutoDiffFunctionExtract(
-          loc, kind, /*differentiationOrder*/ 1,
-          SGF.emitRValueAsSingleValue(origFnExpr).getUnmanagedValue());
+  auto origFnVal =
+      SGF.emitRValueAsSingleValue(argTuple->getElement(0)).getUnmanagedValue();
+  auto origFnArgVal =
+      SGF.emitRValueAsSingleValue(argTuple->getElement(1)).forward(SGF);
+  auto assocFn = SGF.B.createAutoDiffFunctionExtract(
+          loc, kind, /*differentiationOrder*/ 1, origFnVal);
   auto assocFnType = assocFn->getType().getAs<SILFunctionType>();
   assert(assocFnType->getNumResults() == 2);
-  SmallVector<SILValue, 2> applyArgs;
-  auto indResBuffer =
-      SGF.getBufferForExprResult(loc, assocFnType->getAllResultsType(), C);
-  applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
-  applyArgs.push_back(SGF.emitRValueAsSingleValue(firstArgExpr).forward(SGF));
-  auto differential = SGF.B.createApply(loc, assocFn, SubstitutionMap(),
-                                        applyArgs, /*isNonThrowing*/ false);
-  SGF.B.createStore(loc, differential,
-                    SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
-                    StoreOwnershipQualifier::Init);
-  return ManagedValue::forLValue(indResBuffer);
+  // Emit an l-value when the function has indirect results.
+  if (assocFnType->hasIndirectFormalResults()) {
+    assert(origFnArgVal->getType().isAddress());
+    auto indResBuffer =
+        SGF.getBufferForExprResult(loc, assocFnType->getAllResultsType(), C);
+    SILValue applyArgs[2] {
+      SGF.B.createTupleElementAddr(loc, indResBuffer, 0),
+      origFnArgVal
+    };
+    auto differential = SGF.B.createApply(loc, assocFn, applyArgs,
+                                          /*isNonThrowing*/ false);
+    SGF.B.createStore(loc, differential,
+                      SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                      StoreOwnershipQualifier::Init);
+    return ManagedValue::forLValue(indResBuffer);
+  }
+  // Emit an r-value tuple otherwise.
+  assert(origFnArgVal->getType().isObject());
+  auto resultTuple =
+      SGF.B.createApply(loc, assocFn, {origFnArgVal}, /*isNonThrowing*/ false);
+  return ManagedValue::forUnmanaged(resultTuple);
 }
 
 static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
