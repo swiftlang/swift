@@ -17,23 +17,30 @@ bb0(%0 : @trivial $Float):
 
 sil hidden @bar : $@convention(thin) (Float) -> (Float, Float) {
 bb0(%0 : @trivial $Float):
-  %1 = function_ref @foo : $@convention(thin) (Float) -> Float
-  %2 = gradient [source 0] [wrt 0] %1 : $@convention(thin) (Float) -> Float
-  %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
-  %4 = gradient [source 0] [wrt 0] [preserving_result] %1 : $@convention(thin) (Float) -> Float
-  %5 = apply %4(%3) : $@convention(thin) (Float) -> (Float, Float)
-  return %5 : $(Float, Float)
+  %fref = function_ref @foo : $@convention(thin) (Float) -> Float
+
+  %grad = gradient [source 0] [wrt 0] %fref : $@convention(thin) (Float) -> Float
+  %grad_result = apply %grad(%0) : $@convention(thin) (Float) -> Float
+
+  %value_preserving_grad = gradient [source 0] [wrt 0] [preserving_result] %fref : $@convention(thin) (Float) -> Float
+  %value_and_grad = apply %value_preserving_grad(%0) : $@convention(thin) (Float) -> (Float, Float)
+
+  %adfunc = autodiff_function [wrt 0] [order 1] %fref : $@convention(thin) (Float) -> Float
+
+  return %value_and_grad : $(Float, Float)
 }
 
 // Here all `gradient` instructions have been replaced by `function_ref`s.
 
 // CHECK-LABEL: sil hidden @bar :
-// CHECK: bb0
-// CHECK:   %1 = function_ref @AD__foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
-// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
-// CHECK:   %3 = function_ref @AD__foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
-// CHECK:   %4 = apply %3(%2) : $@convention(thin) (Float) -> (Float, Float)
-// CHECK:   return %4 : $(Float, Float)
+// CHECK:   [[FREF:%.*]] = function_ref @foo : $@convention(thin) (Float) -> Float
+// CHECK:   [[GRAD_REF:%.*]] = function_ref @AD__foo__grad_src_0_wrt_0 : $@convention(thin) (Float) -> Float
+// CHECK:   [[GRAD_RESULT:%.*]] = apply [[GRAD_REF]](%0) : $@convention(thin) (Float) -> Float
+// CHECK:   [[VALUE_PRESERVING_GRAD_REF:%.*]] = function_ref @AD__foo__grad_src_0_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   [[VALUE_PRESERVING_GRAD_RESULT:%.*]] = apply [[VALUE_PRESERVING_GRAD_REF]](%0) : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   [[VJP_REF:%.*]] = function_ref @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   autodiff_function [wrt 0] [order 1] [[FREF]] : $@convention(thin) (Float) -> Float with {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[VJP_REF]] : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+// CHECK:   return [[VALUE_PRESERVING_GRAD_RESULT]] : $(Float, Float)
 // CHECK: }
 
 // CHECK-LABEL:sil hidden @AD__foo__grad_src_0_wrt_0_s_p :
