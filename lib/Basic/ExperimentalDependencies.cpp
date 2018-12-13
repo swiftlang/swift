@@ -56,7 +56,9 @@ private:
   llvm::raw_ostream &out;
 
 public:
-  YAMLEmitter(llvm::raw_ostream &out) : out(out) {}
+  YAMLEmitter(llvm::raw_ostream &out) : out(out) {
+    out << "# Experimental Dependencies\n";
+  }
 
   /// Mark the start of a node.
   void newNode() const { out << "-\n"; }
