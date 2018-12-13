@@ -676,8 +676,9 @@ enum class FunctionSynthesisState {
   Done
 };
 
-/// Stores information about `apply` instructions that `PrimalGen` calculates.
-struct ApplyInfo {
+/// Stores activity information about `apply` instructions that `PrimalGen`
+/// calculates.
+struct NestedApplyActivity {
   /// The differentiation indices that are used to differentiate this apply.
   SILAutoDiffIndices indices;
 };
@@ -722,10 +723,10 @@ private:
   DenseMap<ApplyInst *, DifferentiationTask *> associatedTasks;
 
   /// Mapping from original `apply` instructions to their corresponding
-  /// `ApplyInfo`s.
+  /// `NestedApplyActivity`s.
   ///
   /// Note: This is only used when `DifferentiationUseVJP`.
-  DenseMap<ApplyInst *, ApplyInfo> applyInfos;
+  DenseMap<ApplyInst *, NestedApplyActivity> nestedApplyActivities;
 
   /// Cache for associated functions.
   SILFunction *primal = nullptr;
@@ -819,8 +820,8 @@ public:
     return associatedTasks;
   }
 
-  DenseMap<ApplyInst *, ApplyInfo> &getApplyInfos() {
-    return applyInfos;
+  DenseMap<ApplyInst *, NestedApplyActivity> &getNestedApplyActivities() {
+    return nestedApplyActivities;
   }
 
   bool isEqual(const DifferentiationTask &other) const {
@@ -1670,6 +1671,22 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   llvm_unreachable("Unhandled function convertion instruction");
 }
 
+/// Looks through function conversion instructions to find an underlying witness
+/// method instruction. Returns `nullptr` if `value` does not come from a
+/// `witness_method` or if there are unhandled conversion instructions between
+/// `value` and the `witness_method`..
+static WitnessMethodInst *findWitnessMethod(SILValue value) {
+  if (auto *witnessMethod = dyn_cast<WitnessMethodInst>(value))
+    return witnessMethod;
+  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
+    return findWitnessMethod(thinToThick->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
+    return findWitnessMethod(convertFn->getOperand());
+  if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
+    return findWitnessMethod(partialApply->getCallee());
+  return nullptr;
+}
+
 /// Emits a reference to a VJP corresponding to `original`, differentiated with
 /// `indices`. On failure, returns a null `SILValue`.
 ///
@@ -1681,6 +1698,11 @@ static SILValue emitVJPReference(
     ADContext &context, SILBuilder &builder, SILAutoDiffIndices indices,
     SILValue original, DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
+
+  // TODO: Refactor this function to recursively handle function conversions,
+  // rather than using `findReferenceToVisibleFunction`, `findWitnessMethod`,
+  // and `reapplyFunctionConversion`.
+
   if (auto *originalFRI = findReferenceToVisibleFunction(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
@@ -1691,7 +1713,7 @@ static SILValue emitVJPReference(
     return reapplyFunctionConversion(vjpRef, originalFRI, original, builder,
                                      loc);
   }
-  if (auto *witnessMethod = dyn_cast<WitnessMethodInst>(original)) {
+  if (auto *witnessMethod = findWitnessMethod(original)) {
     auto loc = witnessMethod->getLoc();
     auto requirement = witnessMethod->getMember();
     auto *requirementDecl = requirement.getDecl();
@@ -1721,7 +1743,7 @@ static SILValue emitVJPReference(
            "FIXME: handle the case where the requirement indices are "
            "different from the desired indices.");
 
-    auto originalType = cast<SILFunctionType>(original->getType().getASTType());
+    auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto vjpType = originalType->getAutoDiffAssociatedFunctionType(
         requirementIndices.parameters, requirementIndices.source,
         /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
@@ -1732,10 +1754,13 @@ static SILValue emitVJPReference(
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
         requirementParameterIndices, context.getASTContext());
-    return builder.createWitnessMethod(
+    auto *vjpRef = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirement.asAutoDiffAssociatedFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(vjpType));
+
+    return reapplyFunctionConversion(vjpRef, witnessMethod, original, builder,
+                                     loc);
   }
 
   return SILValue();
@@ -2571,7 +2596,8 @@ public:
 
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
-    getDifferentiationTask()->getApplyInfos().insert({ai, {indices}});
+    getDifferentiationTask()->getNestedApplyActivities().insert({ai,
+                                                                 {indices}});
 
     auto vjp = emitVJPReference(
         context, builder, indices, getMappedValue(ai->getCallee()),
@@ -2587,7 +2613,7 @@ public:
 
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> newArgs;
-    auto vjpFnTy = cast<SILFunctionType>(vjp->getType().getASTType());
+    auto vjpFnTy = vjp->getType().castTo<SILFunctionType>();
     auto numVJPParams = vjpFnTy->getNumParameters();
     assert(vjpFnTy->getNumIndirectFormalResults() == 0 &&
            "FIXME: handle vjp with indirect results");
@@ -3549,17 +3575,18 @@ public:
     auto &builder = getBuilder();
     auto loc = remapLocation(ai->getLoc());
 
-    auto &applyInfos = getDifferentiationTask()->getApplyInfos();
-    auto applyInfoLookUp = applyInfos.find(ai);
-    // If no ApplyInfo was found, then this task doesn't need to be differentiated.
-    if (applyInfoLookUp == applyInfos.end()) {
+    auto &nestedApplyActivities = getDifferentiationTask()->getNestedApplyActivities();
+    auto applyInfoLookUp = nestedApplyActivities.find(ai);
+    // If no NestedApplyActivity was found, then this task doesn't need to be
+    // differentiated.
+    if (applyInfoLookUp == nestedApplyActivities.end()) {
       // Must not be active.
       assert(
           !activityInfo.isActive(ai, getDifferentiationTask()->getIndices()));
       return;
     }
     auto applyInfo = applyInfoLookUp->getSecond();
-    auto origTy = cast<SILFunctionType>(ai->getCallee()->getType().getASTType());
+    auto origTy = ai->getCallee()->getType().castTo<SILFunctionType>();
     SILFunctionConventions origConvs(origTy, getModule());
 
     // Get the pullback.
