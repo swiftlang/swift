@@ -1054,10 +1054,7 @@ static ValueDecl *getAutoDiffGetAssociatedFunction(
     // function being differentiated.
     [=, &Ts](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
-      // FIXME(rxwei): Should be escaping. It's a hack for making direct
-      // applications of the builtin possible.
-      auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiable().withNoEscape();
+      auto extInfo = FunctionType::ExtInfo().withDifferentiable();
       if (isThrowing)
         extInfo = extInfo.withThrows();
       SmallVector<FunctionType::Param, 2> params;

@@ -25,11 +25,11 @@ func apply() {
 // CHECK-SIL: bb0([[DIFFED:%.*]] : @guaranteed $@autodiff @callee_guaranteed (Float) -> Float):
 // CHECK-SIL:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float
 // CHECK-SIL:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@autodiff @callee_guaranteed (Float) -> Float
-// CHECK-SIL:   return [[ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SIL:   [[ORIG_COPY:%.*]] = copy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SIL:   return [[ORIG_COPY]] : $@callee_guaranteed (Float) -> Float
 
 // CHECK-SIL-LABEL: @{{.*}}apply{{.*}}
 // CHECK-SIL:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
 // CHECK-SIL-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
 // CHECK-SIL-NEXT:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
-// CHECK-SIL:   destroy_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float
 
