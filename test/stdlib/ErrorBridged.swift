@@ -70,6 +70,8 @@ ErrorBridgingTests.test("NSCopying") {
   }
 }
 
+// Gated on the availability of NSKeyedArchiver.archivedData(withRootObject:).
+@available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *)
 func archiveAndUnarchiveObject<T: NSCoding>(
   _ object: T
 ) -> T?
@@ -81,11 +83,13 @@ where T: NSObject {
   return unarchiver.decodeObject(of: T.self, forKey: "root")
 }
 ErrorBridgingTests.test("NSCoding") {
-  autoreleasepool {
-    let orig = EnumError.ReallyBadError as NSError
-    let unarchived = archiveAndUnarchiveObject(orig)!
-    expectEqual(orig, unarchived)
-    expectTrue(type(of: unarchived) == NSError.self)
+  if #available(macOS 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+    autoreleasepool {
+      let orig = EnumError.ReallyBadError as NSError
+      let unarchived = archiveAndUnarchiveObject(orig)!
+      expectEqual(orig, unarchived)
+      expectTrue(type(of: unarchived) == NSError.self)
+    }
   }
 }
 
