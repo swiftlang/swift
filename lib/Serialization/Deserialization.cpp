@@ -3019,20 +3019,28 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     configureStorage(var, opaqueReadOwnership,
                      readImpl, writeImpl, readWriteImpl, accessors);
-
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
-      var->setAccess(*accessLevel);
-    } else {
+    auto accessLevel = getActualAccessLevel(rawAccessLevel);
+    if (!accessLevel) {
       error();
       return nullptr;
     }
 
+    var->setAccess(*accessLevel);
+
     if (var->isSettable(nullptr)) {
-      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
-        var->setSetterAccess(*setterAccess);
-      } else {
+      auto setterAccess = getActualAccessLevel(rawSetterAccessLevel);
+      if (!setterAccess) {
         error();
         return nullptr;
+      }
+      var->setSetterAccess(*setterAccess);
+
+      // If we have a less-accessible setter, honor that by adding the
+      // setter access attribute.
+      if (*setterAccess < *accessLevel) {
+        AddAttribute(
+          new (ctx) SetterAccessAttr(SourceLoc(), SourceLoc(),
+                                     *setterAccess, /*implicit*/true));
       }
     }
 
@@ -3043,6 +3051,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     var->setOverriddenDecl(cast_or_null<VarDecl>(overridden.get()));
     if (var->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+
+    // Add the @_hasStorage attribute if this var has storage.
+    if (var->hasStorage())
+      AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     break;
   }
