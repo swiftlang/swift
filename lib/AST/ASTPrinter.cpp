@@ -2108,10 +2108,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       }
     }
 
-    // HACK: If we're just printing a single pattern and it has accessors,
-    //       print the accessors here.
-    if (decl->getNumPatternEntries() == 1) {
-      printAccessors(vd);
+    // If we're just printing a single pattern and it has accessors,
+    // print the accessors here. It is an error to add accessors to a
+    // pattern binding with multiple entries.
+    if (auto var = decl->getSingleVar()) {
+      printAccessors(var);
     }
   }
 }
