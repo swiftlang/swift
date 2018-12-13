@@ -3669,7 +3669,8 @@ namespace {
     int compareWithKey(const Key other) const {
       if (auto r = comparePointers(other.protocol, key.protocol))
         return r;
-      return strcmp(other.type->Name.get(), key.type->Name.get());
+
+      return TypeContextIdentity(other.type).compare(TypeContextIdentity(key.type));
     }
 
     static size_t getExtraAllocationSize(const Key,
