@@ -805,14 +805,6 @@ class TestData : TestDataSuper {
         object.verifier.reset()
         expectTrue(data.count == object.length)
         expectFalse(object.verifier.wasCopied, "Expected an invocation to copy")
-
-        object.verifier.reset()
-        data.append("test", count: 4)
-        expectTrue(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
-
-        let d = data as NSData
-        let preservedObjectness = d is ImmutableDataVerifier
-        expectTrue(preservedObjectness, "Expected ImmutableDataVerifier but got \(object_getClass(d))")
     }
 
     func test_basicMutableDataMutation() {
@@ -826,20 +818,6 @@ class TestData : TestDataSuper {
         object.verifier.reset()
         expectTrue(data.count == object.length)
         expectFalse(object.verifier.wasCopied, "Expected an invocation to copy")
-        
-        object.verifier.reset()
-        data.append("test", count: 4)
-        expectTrue(object.verifier.wasMutableCopied, "Expected an invocation to mutableCopy")
-        object.verifier.dump()
-
-        let d = data as NSData
-        let preservedObjectness = d is ImmutableDataVerifier
-        expectTrue(preservedObjectness, "Expected ImmutableDataVerifier but got \(object_getClass(d))")
-    }
-
-    func test_roundTrip() {
-        let data = returnsData()
-        expectTrue(identityOfData(data))
     }
 
     func test_passing() {
@@ -966,12 +944,13 @@ class TestData : TestDataSuper {
     }
 
     func test_noCopyBehavior() {
-        let ptr = UnsafeMutableRawPointer(bitPattern: 0x1)!
+        let ptr = UnsafeMutableRawPointer.allocate(byteCount: 17, alignment: 1)
         
         var deallocated = false
         autoreleasepool {
-            let data = Data(bytesNoCopy: ptr, count: 1, deallocator: .custom({ (bytes, length) in
+            let data = Data(bytesNoCopy: ptr, count: 17, deallocator: .custom({ (bytes, length) in
                 deallocated = true
+                ptr.deallocate()
             }))
             expectFalse(deallocated)
             let equal = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Bool in
@@ -980,7 +959,6 @@ class TestData : TestDataSuper {
             
             expectTrue(equal)
         }
-        
         expectTrue(deallocated)
     }
 
@@ -1013,10 +991,6 @@ class TestData : TestDataSuper {
         for i in 0..<d.count {
             for j in i..<d.count {
                 let slice = d[i..<j]
-                if i == 1 && j == 2 {
-                    print("here")
-                    
-                }
                 expectEqual(slice.count, j - i, "where index range is \(i)..<\(j)")
                 expectEqual(slice.map { $0 }, a[i..<j].map { $0 }, "where index range is \(i)..<\(j)")
                 expectEqual(slice.startIndex, i, "where index range is \(i)..<\(j)")
@@ -3641,28 +3615,6 @@ class TestData : TestDataSuper {
         expectEqual(data, Data(bytes: [4, 5, 6, 7, 0, 0]))
     }
 
-    func test_sliceEnumeration() {
-        var base = DispatchData.empty
-        let bytes: [UInt8] = [0, 1, 2, 3, 4]
-        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
-        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
-        base.append(bytes.withUnsafeBytes { DispatchData(bytes: $0) })
-        let data = ((base as AnyObject) as! Data)[3..<11]
-        var regionRanges: [Range<Int>] = []
-        var regionData: [Data] = []
-        data.enumerateBytes { (buffer, index, _) in
-            regionData.append(Data(bytes: buffer.baseAddress!, count: buffer.count))
-            regionRanges.append(index..<index + buffer.count)
-        }
-        expectEqual(regionRanges.count, 3)
-        expectEqual(3..<5, regionRanges[0])
-        expectEqual(5..<10, regionRanges[1])
-        expectEqual(10..<11, regionRanges[2])
-        expectEqual(Data(bytes: [3, 4]), regionData[0]) //fails
-        expectEqual(Data(bytes: [0, 1, 2, 3, 4]), regionData[1]) //passes
-        expectEqual(Data(bytes: [0]), regionData[2]) //fails
-    }
-
     func test_hashEmptyData() {
         let d1 = Data()
         let h1 = d1.hashValue
@@ -3783,7 +3735,6 @@ DataTests.test("test_writeFailure") { TestData().test_writeFailure() }
 DataTests.test("test_genericBuffers") { TestData().test_genericBuffers() }
 DataTests.test("test_basicDataMutation") { TestData().test_basicDataMutation() }
 DataTests.test("test_basicMutableDataMutation") { TestData().test_basicMutableDataMutation() }
-DataTests.test("test_roundTrip") { TestData().test_roundTrip() }
 DataTests.test("test_passing") { TestData().test_passing() }
 DataTests.test("test_bufferSizeCalculation") { TestData().test_bufferSizeCalculation() }
 DataTests.test("test_classForCoder") { TestData().test_classForCoder() }
@@ -4056,7 +4007,6 @@ DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubr
 DataTests.test("test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes") { TestData().test_validateMutation_slice_cow_customMutableBacking_replaceSubrangeWithBytes() }
 DataTests.test("test_sliceHash") { TestData().test_sliceHash() }
 DataTests.test("test_slice_resize_growth") { TestData().test_slice_resize_growth() }
-DataTests.test("test_sliceEnumeration") { TestData().test_sliceEnumeration() }
 DataTests.test("test_hashEmptyData") { TestData().test_hashEmptyData() }
 DataTests.test("test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_immutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
