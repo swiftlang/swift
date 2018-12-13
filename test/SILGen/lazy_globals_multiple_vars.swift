@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 // CHECK:       sil private [[INIT_A_B:@globalinit_.*]] :
 // CHECK:         alloc_global @$s26lazy_globals_multiple_vars1aSiv

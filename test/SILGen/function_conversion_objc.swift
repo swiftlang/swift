@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-sil-ownership -enable-source-import -enable-objc-interop -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-objc-interop -verify | %FileCheck %s
 
 import Foundation
 

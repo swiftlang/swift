@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name scalar_to_tuple_args -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name scalar_to_tuple_args %s | %FileCheck %s
 
 func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
 func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name capture_typed_boxes -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name capture_typed_boxes %s | %FileCheck %s
 
 func foo(_ x: Int) -> () -> Int {
   var x = x

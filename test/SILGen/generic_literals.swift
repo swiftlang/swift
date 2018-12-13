@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$s16generic_literals0A14IntegerLiteral1xyx_ts013ExpressibleBycD0RzlF : $@convention(thin) <T where T : ExpressibleByIntegerLiteral> (@in_guaranteed T) -> () {
 func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {

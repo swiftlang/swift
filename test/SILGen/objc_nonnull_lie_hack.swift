@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file -enable-sil-ownership %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file %s | %FileCheck -check-prefix=SILGEN %s
 // RUN: %target-swiftemit-sil -O -sdk %S/Inputs -I %S/Inputs -I %S/Inputs/objc_nonnull_lie_hack/ -enable-source-import -primary-file %s | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: objc_interop
