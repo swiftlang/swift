@@ -3,7 +3,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift %s -lresilient_struct -I %t -L %t -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift %s -lresilient_struct -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_struct)
@@ -11,7 +11,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
 // RUN: %target-codesign %t/%target-library-name(resilient_struct_wmo)
 
-// RUN: %target-build-swift %s -lresilient_struct_wmo -I %t -L %t -o %t/main2 -Xlinker -rpath -Xlinker %t -module-name main
+// RUN: %target-build-swift %s -lresilient_struct_wmo -I %t -L %t -o %t/main2 %target-rpath(%t) -module-name main
 // RUN: %target-codesign %t/main2
 
 // RUN: %target-run %t/main2 %t/%target-library-name(resilient_struct_wmo)
