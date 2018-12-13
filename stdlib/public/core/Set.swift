@@ -298,14 +298,7 @@ extension Set {
   public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Set {
-    // FIXME(performance): Eliminate rehashes by using a bitmap.
-    var result = Set()
-    for element in self {
-      if try isIncluded(element) {
-        result.insert(element)
-      }
-    }
-    return result
+    return try Set(_native: _variant.filter(isIncluded))
   }
 }
 

@@ -613,6 +613,19 @@ extension _NativeSet {
   }
 
   @inlinable
+  internal __consuming func unsafeExtractSubset(
+    using bitset: _Bitset
+  ) -> _NativeSet {
+    if bitset.count == 0 { return _NativeSet() }
+    if bitset.count == self.count { return self }
+    let result = _NativeSet(capacity: bitset.count)
+    for offset in bitset {
+      result._unsafeInsertNew(self.uncheckedElement(at: Bucket(offset: offset)))
+    }
+    return result
+  }
+
+  @inlinable
   internal __consuming func subtracting<S: Sequence>(_ other: S) -> _NativeSet
   where S.Element == Element {
     guard count > 0 else { return _NativeSet() }
@@ -620,6 +633,7 @@ extension _NativeSet {
     // bitset first. This ensures we hash each element (in both sets) only once,
     // and that we'll have an exact count for the result set, preventing
     // rehashings during insertions.
+    defer { _fixLifetime(self) }
     var difference = _Bitset(occupiedBucketsIn: hashTable, count: count)
     for element in other {
       let (bucket, found) = find(element)
@@ -630,11 +644,19 @@ extension _NativeSet {
       }
     }
     _internalInvariant(difference.count > 0)
-    if difference.count == self.count { return self }
-    let result = _NativeSet(capacity: difference.count)
-    for offset in difference {
-      result._unsafeInsertNew(self.uncheckedElement(at: Bucket(offset: offset)))
+    return unsafeExtractSubset(using: difference)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal __consuming func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> _NativeSet<Element> {
+    defer { _fixLifetime(self) }
+    var buckets = _Bitset(capacity: bucketCount)
+    for bucket in hashTable where try isIncluded(uncheckedElement(at: bucket)) {
+      buckets.uncheckedInsert(bucket.offset)
     }
-    return result
+    return unsafeExtractSubset(using: buckets)
   }
 }
