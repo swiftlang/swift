@@ -42,6 +42,7 @@ public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
 // CHECK:   <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:     [sequence
 // CHECK:       {condition Header: {{.*}}
+// CHECK:         block {{.*}}
 // CHECK:         {condition Header: {{.*}}
 // CHECK:           [sequence
 // CHECK:             <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
@@ -52,7 +53,6 @@ public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
 // CHECK:                 block {{.*}}]>
 // CHECK:             block {{.*}}]
 // CHECK:           block {{.*}}}
-// CHECK:         block {{.*}}}
 // CHECK:       block {{.*}}]>
 // CHECK:   block {{.*}}]
 
@@ -70,7 +70,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 		// once.  This corresponds to the loop at depth 2 in the dump of loop info
 		// before canonicalization.
 		repeat {
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
 				// + 1 so that this is not a simple assignment. 
 				// (Simple assignments won't trigger cloning.)
@@ -79,7 +78,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 			}
 			// Crazy way to do `k = i` so that we have a loop when we unroll the body.
 			var k = Tensor<Int32>(0)
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			while k < i {
 				k += 1
 			}
@@ -87,7 +85,6 @@ public func testLoopWithNestedLoopsRequiringUnrolling(
 			// + k so that this is not a simple assignment. 
 			// (Simple assignments won't trigger cloning.)
 			result = i + k
-			// expected-warning @+1 {{value implicitly copied to the host}}
 		} while i <= 100
 		result += 3
 	}
@@ -163,7 +160,6 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 		// once.  This corresponds to the loop at depth 2 in the dump of loop info
 		// before canonicalization.
 		repeat {
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
 				// + 1 so that this is not a simple assignment. 
 				// (Simple assignments won't trigger cloning.)
@@ -173,10 +169,8 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 
 			// Crazy way to do k = i^2 so that we have a doubly loop when we unroll.
 			var k = Tensor<Int32>(0)
-			// expected-warning @+1 {{value implicitly copied to the host}}
 			while k < i {
 				var w = Tensor<Int32>(0)
-				// expected-warning @+1 {{value implicitly copied to the host}}
 				while w < i {
 					w += 1
 				}
@@ -186,7 +180,6 @@ public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 			// + k so that this is not a simple assignment. 
 			// (Simple assignments won't trigger cloning.)
 			result = i + k
-			// expected-warning @+1 {{value implicitly copied to the host}}
 		} while i <= 100
 		result += 3
 	}

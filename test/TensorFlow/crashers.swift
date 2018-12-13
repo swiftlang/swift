@@ -12,11 +12,12 @@ public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tens
   var a = z
   if c {
     if d { fatalError() }
+		// expected-warning @+2 {{method result implicitly copied to the accelerator}}
+    // expected-warning @+1 {{value implicitly copied to the host}}
     a = a + a // expected-note {{value used here}}
   } else {
     if d { fatalError() }
 
-    // expected-warning @+1 {{value implicitly copied to the accelerator}}
     a = someGlobal
   }
 
@@ -229,7 +230,6 @@ public func testMultiResultOp_send_recv() {
   let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
   // Accelerator -> Host
   _hostOp(results.loss)
-  // expected-note @+1{{value used here}}
   let adjustedLoss = results.loss.scalar! + 3.0
   // Host -> Accelerator
   let y = Tensor<Float>(adjustedLoss)
