@@ -12,13 +12,9 @@
 
 #include "SpecializedEmitter.h"
 
-// SWIFT_ENABLE_TENSORFLOW
-#include "ArgumentScope.h"
 #include "Cleanup.h"
 #include "Initialization.h"
 #include "LValue.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "ResultPlan.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "SILGenFunction.h"
