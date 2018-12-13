@@ -130,8 +130,8 @@ legacy-style).
 Prefer **`Char`** to `Character`, which can be combined with codepage or
 language prefix/suffix when necessary (`EmojiChar`, `ASCIIChar`). For benchmarks
 that measure `String`'s Unicode performance for various languages, use
-[two letter codes](https://en.wikipedia.org/wiki/ISO_639-1) instead of spelling
-out the whole language names.
+the [three letter codes](https://en.wikipedia.org/wiki/ISO_639-3) instead of
+spelling out the whole language names.
 
 When necessary, use *consistent* abbreviations like `Str` and `Arr` within the
 benchmark family, to fit a system with descriptive names into 40 characters:
