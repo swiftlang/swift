@@ -889,8 +889,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
     if (auto vd = dyn_cast<VarDecl>(D)) {
       // Don't print @_hasInitialValue if we're printing an initializer
-      // expression.
-      if (vd->isInitExposedToClients())
+      // expression or if the storage is resilient.
+      if (vd->isInitExposedToClients() || vd->isResilient())
         Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
 
       if (!Options.PrintForSIL) {
