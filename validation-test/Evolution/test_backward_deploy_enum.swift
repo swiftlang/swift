@@ -4,9 +4,6 @@
 import StdlibUnittest
 import backward_deploy_enum
 
-// <rdar://problem/46438568>
-// REQUIRES: rdar46438568
-
 var BackwardDeployEnumTest = TestSuite("BackwardDeployEnum")
 
 func checkIt(_ e: ResilientEnum) -> Int {
