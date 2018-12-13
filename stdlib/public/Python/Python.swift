@@ -220,9 +220,9 @@ extension PythonError : CustomStringConvertible {
       if let t = t {
         let traceback = Python.import("traceback")
         exceptionDescription += """
-        \nTraceback:
-        \(PythonObject("").join(traceback.format_tb(t)))
-        """
+          \nTraceback:
+          \(PythonObject("").join(traceback.format_tb(t)))
+          """
       }
       return exceptionDescription
     case .invalidCall(let e):
@@ -246,12 +246,9 @@ private func throwPythonErrorIfPresent() throws {
   PyErr_Fetch(&type, &value, &traceback)
 
   // The value for the exception may not be set but the type always should be.
-  let r = PythonObject(owning: value ?? type!)
-  var t: PythonObject?
-  if let traceback = traceback {
-    t = PythonObject(owning: traceback)
-  }
-  throw PythonError.exception(r, traceback: t)
+  let resultObject = PythonObject(owning: value ?? type!)
+  let tracebackObject = traceback.flatMap { PythonObject(owning: $0) }
+  throw PythonError.exception(resultObject, traceback: tracebackObject)
 }
 
 /// A `PythonObject` wrapper that enables throwing method calls.
