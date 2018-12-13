@@ -118,8 +118,11 @@ enum class TypeResolverContext : uint8_t {
   /// Whether this is the payload subpattern of an enum pattern.
   EnumPatternPayload,
 
-  /// Whether we are checking the underlying type of a typealias.
+  /// Whether we are checking the underlying type of a non-generic typealias.
   TypeAliasDecl,
+
+  /// Whether we are checking the underlying type of a generic typealias.
+  GenericTypeAliasDecl,
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement,
