@@ -223,3 +223,21 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
     return plusOneError()
   }
 }
+
+extension Error {
+  var myError: Error {
+    return self
+  }
+}
+
+// Make sure we don't assert on this.
+// CHECK-LABEL: sil hidden @$s18boxed_existentials4testyyF
+// CHECK:  [[ERROR_ADDR:%.*]] = alloc_stack $Error
+// CHECK:  [[ARRAY_GET:%.*]] = function_ref @$sSayxSicig
+// CHECK:  apply [[ARRAY_GET]]<Error>([[ERROR_ADDR]]
+// CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*Error
+// CHECK:  open_existential_box [[ERROR]]
+func test() {
+  var errors: [Error] = []
+  test_property(errors[0].myError)
+}
