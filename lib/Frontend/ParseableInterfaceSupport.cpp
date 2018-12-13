@@ -107,7 +107,7 @@ getBufferOfDependency(clang::vfs::FileSystem &FS,
 /// with dead entries -- when other factors change, such as the contents of
 /// the .swiftinterface input or its dependencies.
 static std::string getCacheHash(ASTContext &Ctx,
-                                CompilerInvocation &SubInvocation,
+                                const CompilerInvocation &SubInvocation,
                                 StringRef InPath) {
   // Start with the compiler version (which will be either tag names or revs).
   std::string vers = swift::version::getSwiftFullVersion(
@@ -128,15 +128,13 @@ static std::string getCacheHash(ASTContext &Ctx,
   return llvm::APInt(64, H).toString(36, /*Signed=*/false);
 }
 
-void
-ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
-    CompilerInvocation &SubInvocation,
-    Identifier ModuleName,
-    StringRef InPath,
-    llvm::SmallString<128> &OutPath) {
-
+static CompilerInvocation
+createInvocationForBuildingFromInterface(ASTContext &Ctx, Identifier ModuleName,
+                                         StringRef CacheDir) {
   auto &SearchPathOpts = Ctx.SearchPathOpts;
   auto &LangOpts = Ctx.LangOpts;
+
+  CompilerInvocation SubInvocation;
 
   // Start with a SubInvocation that copies various state from our
   // invoking ASTContext.
@@ -161,24 +159,35 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
   // modules that don't import Foundation.
   SubInvocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
-  // Calculate an output filename that includes a hash of relevant key data, and
-  // wire up the SubInvocation's InputsAndOutputs to contain both input and
-  // output filenames.
-  OutPath = CacheDir;
-  llvm::sys::path::append(OutPath, ModuleName.str());
+  return SubInvocation;
+}
+
+/// Calculate an output filename in \p SubInvocation's cache path that includes
+/// a hash of relevant key data.
+static void computeCachedOutputPath(ASTContext &Ctx,
+                                    const CompilerInvocation &SubInvocation,
+                                    StringRef InPath,
+                                    llvm::SmallString<128> &OutPath) {
+  OutPath = SubInvocation.getClangModuleCachePath();
+  llvm::sys::path::append(OutPath, SubInvocation.getModuleName());
   OutPath.append("-");
   OutPath.append(getCacheHash(Ctx, SubInvocation, InPath));
   OutPath.append(".");
   auto OutExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   OutPath.append(OutExt);
+}
 
+void ParseableInterfaceModuleLoader::configureSubInvocationInputsAndOutputs(
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath) {
   auto &SubFEOpts = SubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
   SubFEOpts.EnableParseableModuleInterface = true;
   SubFEOpts.InputsAndOutputs.addPrimaryInputFile(InPath);
   SupplementaryOutputPaths SOPs;
   SOPs.ModuleOutputPath = OutPath.str();
-  StringRef MainOut = "/dev/null";
+
+  // Pick a primary output path that will cause problems to use.
+  StringRef MainOut = "/<unused>";
   SubFEOpts.InputsAndOutputs.setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
@@ -258,6 +267,9 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
     uint64_t Hash = xxHash64(DepBuf->getBuffer());
     Deps.push_back(FileDependency{Size, Hash, DepName});
 
+    if (ModuleCachePath.empty())
+      continue;
+
     // If Dep is itself a .swiftmodule in the cache dir, pull out its deps
     // and include them in our own, so we have a single-file view of
     // transitive deps: removes redundancies, and avoids opening and reading
@@ -290,11 +302,21 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
 
 static bool buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
-    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
-    StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
+    CompilerInvocation &SubInvocation, StringRef ModuleCachePath,
+    DependencyTracker *OuterTracker) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
-    (void)llvm::sys::fs::create_directory(ModuleCachePath);
+    // Note that we don't assume ModuleCachePath is the same as the Clang
+    // module cache path at this point.
+    if (!ModuleCachePath.empty())
+      (void)llvm::sys::fs::create_directory(ModuleCachePath);
+
+    FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
+    const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
+    StringRef InPath = InputInfo.file();
+    const auto &OutputInfo =
+        InputInfo.getPrimarySpecificPaths().SupplementaryOutputs;
+    StringRef OutPath = OutputInfo.ModuleOutputPath;
 
     llvm::BumpPtrAllocator SubArgsAlloc;
     llvm::StringSaver SubArgSaver(SubArgsAlloc);
@@ -343,6 +365,7 @@ static bool buildSwiftModuleFromSwiftInterface(
     LLVM_DEBUG(llvm::dbgs() << "Setting up instance to compile "
                << InPath << " to " << OutPath << "\n");
     CompilerInstance SubInstance;
+    SubInstance.getSourceMgr().setFileSystem(&FS);
 
     ForwardingDiagnosticConsumer FDC(Diags);
     SubInstance.addDiagnosticConsumer(&FDC);
@@ -372,7 +395,6 @@ static bool buildSwiftModuleFromSwiftInterface(
 
     // Setup the callbacks for serialization, which can occur during the
     // optimization pipeline.
-    FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
     SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
     SerializationOpts.OutputPath = OutPathStr.c_str();
@@ -456,15 +478,16 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
   // Set up a _potential_ sub-invocation to consume the .swiftinterface and emit
   // the .swiftmodule.
-  CompilerInvocation SubInvocation;
-  configureSubInvocationAndOutputPaths(SubInvocation, ModuleID.first, InPath,
-                                       OutPath);
+  CompilerInvocation SubInvocation =
+      createInvocationForBuildingFromInterface(Ctx, ModuleID.first, CacheDir);
+  computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
+  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
   // Evaluate if we need to run this sub-invocation, and if so run it.
   if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags, dependencyTracker)) {
-    if (buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
-                                           SubInvocation, InPath, OutPath,
-                                           CacheDir, dependencyTracker))
+    if (::buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
+                                             SubInvocation, CacheDir,
+                                             dependencyTracker))
       return std::make_error_code(std::errc::invalid_argument);
   }
 

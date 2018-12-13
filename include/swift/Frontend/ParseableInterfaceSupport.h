@@ -69,10 +69,13 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 
   std::string CacheDir;
 
-  void
-  configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
-                                       Identifier ModuleName, StringRef InPath,
-                                       llvm::SmallString<128> &OutPath);
+  /// Wire up the SubInvocation's InputsAndOutputs to contain both input and
+  /// output filenames.
+  ///
+  /// This is a method rather than a helper function in the implementation file
+  /// because it accesses non-public bits of FrontendInputsAndOutputs.
+  static void configureSubInvocationInputsAndOutputs(
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath);
 
   std::error_code
   openModuleFiles(AccessPathElem ModuleID, StringRef DirName,
