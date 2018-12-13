@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 

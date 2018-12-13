@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 //
 // A temporary file for testing switch code around ownership. Once SILGenPattern
 // refactoring is complete, this will be merged into the normal pattern file.

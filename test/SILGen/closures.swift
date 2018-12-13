@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 

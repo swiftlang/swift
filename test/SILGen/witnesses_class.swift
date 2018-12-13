@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name witnesses_class -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name witnesses_class %s | %FileCheck %s
 
 protocol Fooable: class {
   func foo()

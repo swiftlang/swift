@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -swift-version 5 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
+// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
 
 // CHECK-LABEL: sil hidden @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
 // IMPLICIT-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {

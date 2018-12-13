@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 // This test checks specific codegen related to normal arguments being passed at
 // +0. Eventually, it should be merged into normal SILGen tests.

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -module-name Swift %s | %FileCheck %s
 
 class C {}
 

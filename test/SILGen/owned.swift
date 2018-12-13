@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // see shared.swift for thunks/conversions between __shared and __owned.
 

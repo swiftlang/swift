@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name noescape_reabstraction -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name noescape_reabstraction %s | %FileCheck %s
 
 struct S {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

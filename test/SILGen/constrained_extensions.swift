@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name constrained_extensions -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name constrained_extensions -primary-file %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name constrained_extensions -O -primary-file %s > /dev/null
 // RUN: %target-swift-emit-ir -module-name constrained_extensions -primary-file %s > /dev/null
 

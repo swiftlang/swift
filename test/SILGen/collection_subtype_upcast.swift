@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name collection_subtype_upcast -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name collection_subtype_upcast -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 

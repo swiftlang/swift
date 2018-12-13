@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [always_inline] @$s13inline_always0b1_A7_calleeyyF : $@convention(thin) () -> ()
 @inline(__always)
