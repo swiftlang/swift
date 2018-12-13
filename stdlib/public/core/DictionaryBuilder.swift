@@ -106,7 +106,7 @@ extension _NativeDictionary {
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity),
       &initializedCount)
-    _precondition(count >= 0 && count <= capacity)
+    _precondition(initializedCount >= 0 && initializedCount <= capacity)
     _storage._count = initializedCount
 
     // Hash initialized elements and move each of them into their correct
