@@ -104,6 +104,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.OmitNameOfInaccessibleProperties = true;
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
+  result.VarInitializers = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -2099,14 +2100,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     }
 
     if (Options.VarInitializers) {
-      // FIXME: Implement once we can pretty-print expressions.
-    }
-
-    auto vd = entry.getAnchoringVarDecl();
-    if (entry.hasInitStringRepresentation() &&
-        vd->isInitExposedToClients()) {
-      SmallString<128> scratch;
-      Printer << " = " << entry.getInitStringRepresentation(scratch);
+      auto vd = entry.getAnchoringVarDecl();
+      if (entry.hasInitStringRepresentation() &&
+          vd->isInitExposedToClients()) {
+        SmallString<128> scratch;
+        Printer << " = " << entry.getInitStringRepresentation(scratch);
+      }
     }
 
     // HACK: If we're just printing a single pattern and it has accessors,
