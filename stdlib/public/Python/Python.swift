@@ -198,7 +198,7 @@ public extension PythonObject {
 @_frozen
 public enum PythonError : Error, Equatable {
   /// A Python runtime exception, produced by calling a Python function.
-  case exception(PythonObject)
+  case exception(PythonObject, traceback: PythonObject?)
 
   /// A failed call on a `PythonObject`.
   /// Reasons for failure include:
@@ -215,9 +215,20 @@ public enum PythonError : Error, Equatable {
 extension PythonError : CustomStringConvertible {
   public var description: String {
     switch self {
-    case .exception(let p): return "Python exception: \(p)"
-    case .invalidCall(let p): return "Invalid Python call: \(p)"
-    case .invalidModule(let m): return "Invalid Python module: \(m)"
+    case .exception(let e, let t):
+      var exceptionDescription = "Python exception: \(e)"
+      if let t = t {
+        let traceback = Python.import("traceback")
+        exceptionDescription += """
+        \nTraceback:
+        \(PythonObject("").join(traceback.format_tb(t)))
+        """
+      }
+      return exceptionDescription
+    case .invalidCall(let e):
+      return "Invalid Python call: \(e)"
+    case .invalidModule(let m):
+      return "Invalid Python module: \(m)"
     }
   }
 }
@@ -236,7 +247,11 @@ private func throwPythonErrorIfPresent() throws {
 
   // The value for the exception may not be set but the type always should be.
   let r = PythonObject(owning: value ?? type!)
-  throw PythonError.exception(r)
+  var t: PythonObject?
+  if let traceback = traceback {
+    t = PythonObject(owning: traceback)
+  }
+  throw PythonError.exception(r, traceback: t)
 }
 
 /// A `PythonObject` wrapper that enables throwing method calls.
