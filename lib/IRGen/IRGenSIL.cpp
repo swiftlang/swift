@@ -1985,9 +1985,6 @@ void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
   e.add(origExp.claimAll());
   for (auto &assocFnOp : i->getAssociatedFunctions())
     e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
-  assert(1 + i->getNumAssociatedFunctions() ==
-             getTypeInfo(i->getType()).getSchema().size() &&
-         "the AD pass hasn't added associated functions to this instruction");
   setLoweredExplosion(i, e);
 }
 
