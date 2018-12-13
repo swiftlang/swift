@@ -483,9 +483,20 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     for (auto enumCase : strategy.getElementsWithPayload()) {
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
+      auto payloadType = enumCase.decl->getArgumentInterfaceType();
+
+      // Strip element flags, such as @autoclosure, vararg, etc.
+      // They are not part of the storage type.
+      if (auto *tupleType = payloadType->getAs<TupleType>()) {
+        SmallVector<TupleTypeElt, 4> elts;
+        for (const auto elt : tupleType->getElements()) {
+          elts.emplace_back(elt.getType(), elt.getName());
+        }
+        payloadType = TupleType::get(elts, enumDecl->getASTContext());
+      }
+  
       addFieldDecl(enumCase.decl,
-                   enumCase.decl->getArgumentInterfaceType()
-                                ->getCanonicalType(),
+                   payloadType->getCanonicalType(),
                    indirect);
     }
 

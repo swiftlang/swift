@@ -6067,12 +6067,8 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
   funcTy = funcTy->getResult()->castTo<FunctionType>();
 
   auto &ctx = getASTContext();
-  SmallVector<TupleTypeElt, 4> elements;
-  for (const auto &param : funcTy->getParams()) {
-    Type eltType = param.getParameterType(/*canonicalVararg=*/false, &ctx);
-    elements.emplace_back(eltType, param.getLabel());
-  }
-  return TupleType::get(elements, ctx);
+  return AnyFunctionType::composeInput(ctx, funcTy->getParams(),
+                                       /*canonicalVararg=*/false);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {

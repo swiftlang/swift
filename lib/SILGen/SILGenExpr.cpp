@@ -2317,6 +2317,39 @@ static void emitTupleShuffleExprInto(RValueEmitter &emitter,
   outerTupleInit->finishInitialization(emitter.SGF);
 }
 
+static ManagedValue emitVarargs(SILGenFunction &SGF,
+                                SILLocation loc,
+                                Type _baseTy,
+                                ArrayRef<ManagedValue> elements,
+                                Type _arrayTy) {
+  auto baseTy = _baseTy->getCanonicalType();
+  auto arrayTy = _arrayTy->getCanonicalType();
+
+  auto varargs = emitBeginVarargs(SGF, loc, baseTy, arrayTy, elements.size(),
+                                  /*expansions*/ {});
+  AbstractionPattern baseAbstraction = varargs.getBaseAbstractionPattern();
+  SILValue basePtr = varargs.getBaseAddress();
+  
+  // Initialize the members.
+  // TODO: If we need to cleanly unwind at this point, we would need to arrange
+  // for the partially-initialized array to be cleaned up somehow, maybe by
+  // poking its count to the actually-initialized size at the point of failure.
+  
+  for (size_t i = 0, size = elements.size(); i < size; ++i) {
+    SILValue eltPtr = basePtr;
+    if (i != 0) {
+      SILValue index = SGF.B.createIntegerLiteral(loc,
+                  SILType::getBuiltinWordType(SGF.F.getASTContext()), i);
+      eltPtr = SGF.B.createIndexAddr(loc, basePtr, index);
+    }
+    ManagedValue v = elements[i];
+    v = SGF.emitSubstToOrigValue(loc, v, baseAbstraction, baseTy);
+    v.forwardInto(SGF, loc, eltPtr);
+  }
+
+  return emitEndVarargs(SGF, loc, std::move(varargs));
+}
+
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                             SGFContext C) {
   assert(!E->isSourceScalar());
@@ -2343,21 +2376,48 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   auto shuffleIndexEnd = E->getElementMapping().end();
   (void)shuffleIndexEnd;
   for (auto &field : outerFields) {
-    (void) field;
     assert(shuffleIndexIterator != shuffleIndexEnd &&
            "ran out of shuffle indexes before running out of fields?!");
     int shuffleIndex = *shuffleIndexIterator++;
     
     assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
            shuffleIndex != TupleShuffleExpr::CallerDefaultInitialize &&
-           shuffleIndex != TupleShuffleExpr::Variadic &&
            "Only argument tuples can have default initializers & varargs");
 
-    // Map from a different tuple element.
+    // If the shuffle index is Variadic, the argument sources are stored
+    // separately.
+    if (shuffleIndex != TupleShuffleExpr::Variadic) {
+      // Map from a different tuple element.
+      result.addElement(
+          std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
+      continue;
+    }
+
+    assert(field.isVararg() && "Cannot initialize nonvariadic element");
+
+    // Okay, we have a varargs tuple element.  The separately-stored variadic
+    // elements feed into the varargs portion of this, which is then
+    // constructed into an Array through an informal protocol captured by the
+    // InjectionFn in the TupleShuffleExpr.
+    assert(E->getVarargsArrayTypeOrNull() &&
+           "no injection type for varargs tuple?!");
+    SmallVector<ManagedValue, 4> variadicValues;
+
+    for (unsigned sourceField : E->getVariadicArgs()) {
+      variadicValues.push_back(
+                     std::move(elements[sourceField]).getAsSingleValue(SGF, E));
+    }
+
+    ManagedValue varargs = emitVarargs(SGF, E, field.getVarargBaseTy(),
+                                       variadicValues,
+                                       E->getVarargsArrayType());
+
     result.addElement(
-        std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
+        RValue(SGF, E, field.getType()->getCanonicalType(), varargs)
+            .ensurePlusOne(SGF, E));
+    break;
   }
-  
+
   return result;
 }
 
