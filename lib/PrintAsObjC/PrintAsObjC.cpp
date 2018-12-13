@@ -933,8 +933,8 @@ private:
     
     const ValueDecl *renamedDecl = nullptr;
     SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl, renamedDeclName,
-                                 NL_QualifiedDefault, lookupResults);
+    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(), renamedDeclName,
+                                 NL_QualifiedDefault, nullptr, lookupResults);
     
     if (lookupResults.size() == 1) {
       auto candidate = lookupResults[0];
