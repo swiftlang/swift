@@ -197,6 +197,7 @@
     "Bitset.swift"
   ],
   "Misc": [
+    "AtomicInt.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",

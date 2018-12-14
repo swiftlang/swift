@@ -30,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
+  AtomicInt.swift.gyb
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
