@@ -137,7 +137,7 @@ namespace {
 using DelayedMemberSet = llvm::SmallSetVector<const ValueDecl *, 32>;
 
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
-                    private TypeVisitor<ObjCPrinter, void, 
+                    private TypeVisitor<ObjCPrinter, void,
                                         Optional<OptionalTypeKind>>
 {
   friend ASTVisitor;
@@ -528,7 +528,7 @@ private:
     return sel.getNumArgs() == 0 &&
            sel.getSelectorPieces().front().str() == "init";
   }
-                                          
+  
   void printAbstractFunctionAsMethod(AbstractFunctionDecl *AFD,
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false) {
@@ -553,7 +553,7 @@ private:
     auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
     // Constructors and methods returning DynamicSelf return
-    // instancetype.    
+    // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
         (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
@@ -774,8 +774,8 @@ private:
     No = false,
     Yes = true
   };
- 
-    /// Returns \c true if anything was printed.
+
+  /// Returns \c true if anything was printed.
   bool printAvailability(const Decl *D, PrintLeadingSpace printLeadingSpace =
                                             PrintLeadingSpace::Yes) {
     bool hasPrintedAnything = false;
@@ -928,14 +928,15 @@ private:
                                UnqualifiedLookup::Flags::TypeLookup);
       return lookup.getSingleTypeResult();
     }
-    
+
     TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-    
+
     const ValueDecl *renamedDecl = nullptr;
     SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(), renamedDeclName,
-                                 NL_QualifiedDefault, nullptr, lookupResults);
-    
+    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
+                                 renamedDeclName, NL_QualifiedDefault, nullptr,
+                                 lookupResults);
+
     if (lookupResults.size() == 1) {
       auto candidate = lookupResults[0];
       if (!shouldInclude(candidate))
@@ -944,40 +945,41 @@ private:
           (candidate->isInstanceMember() !=
            cast<ValueDecl>(D)->isInstanceMember()))
         return nullptr;
-      
+
       renamedDecl = candidate;
     } else {
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
-        
+
         if (candidate->getKind() != D->getKind() ||
             (candidate->isInstanceMember() !=
              cast<ValueDecl>(D)->isInstanceMember()))
           continue;
-        
+
         if (isa<AbstractFunctionDecl>(candidate)) {
           auto cParams = cast<AbstractFunctionDecl>(candidate)->getParameters();
           auto dParams = cast<AbstractFunctionDecl>(D)->getParameters();
-          
+
           if (cParams->size() != dParams->size())
             continue;
-          
+
           bool hasSameParameterTypes = true;
           for (auto index : indices(*cParams)) {
             auto cParamsType = cParams->get(index)->getType();
             auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
+            if (!cParamsType->matchesParameter(dParamsType,
+                                               TypeMatchOptions())) {
               hasSameParameterTypes = false;
               break;
             }
           }
-          
+
           if (!hasSameParameterTypes) {
             continue;
           }
         }
-        
+
         if (renamedDecl) {
           // If we found a duplicated candidate then we would silently fail.
           renamedDecl = nullptr;
@@ -993,7 +995,7 @@ private:
                           bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
 
-    const swift::ValueDecl *renamedDecl =
+    const ValueDecl *renamedDecl =
         getRenameDecl(D, parseDeclName(AvAttr->Rename));
 
     if (renamedDecl) {
@@ -1005,7 +1007,7 @@ private:
       printEncodedString(AvAttr->Rename, includeQuotes);
     }
   }
-    
+
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
     const LangOptions &langOpts = M.getASTContext().LangOpts;
     if (!langOpts.EnableSwift3ObjCInference ||
@@ -1514,9 +1516,9 @@ private:
       MAP(UnsafeMutableRawPointer, "void *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}]
         = { "BOOL", false};
-      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}]
         = { "SEL", true };
       specialNames[{ID_ObjectiveC,
                     ctx.getIdentifier(
@@ -1643,7 +1645,7 @@ private:
     os << clangDecl->getKindName() << " ";
   }
 
-  void visitStructType(StructType *ST, 
+  void visitStructType(StructType *ST,
                        Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
 
@@ -1867,7 +1869,7 @@ private:
     visitExistentialType(PT, optionalKind, /*isMetatype=*/false);
   }
 
-  void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
+  void visitProtocolCompositionType(ProtocolCompositionType *PCT,
                                     Optional<OptionalTypeKind> optionalKind) {
     visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
@@ -1878,7 +1880,7 @@ private:
     visitExistentialType(instanceTy, optionalKind, /*isMetatype=*/true);
   }
 
-  void visitMetatypeType(MetatypeType *MT, 
+  void visitMetatypeType(MetatypeType *MT,
                          Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
@@ -1913,7 +1915,7 @@ private:
     os << cast<clang::ObjCTypeParamDecl>(decl->getClangDecl())->getName();
     printNullability(optionalKind);
   }
-                      
+    
   void printFunctionType(FunctionType *FT, char pointerSigil,
                          Optional<OptionalTypeKind> optionalKind) {
     visitPart(FT->getResult(), OTK_None);
@@ -1922,7 +1924,7 @@ private:
     openFunctionTypes.push_back(FT);
   }
 
-  void visitFunctionType(FunctionType *FT, 
+  void visitFunctionType(FunctionType *FT,
                          Optional<OptionalTypeKind> optionalKind) {
     switch (FT->getRepresentation()) {
     case AnyFunctionType::Representation::Thin:
@@ -1966,18 +1968,18 @@ private:
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitSyntaxSugarType(SyntaxSugarType *SST, 
+  void visitSyntaxSugarType(SyntaxSugarType *SST,
                             Optional<OptionalTypeKind> optionalKind) {
     visitPart(SST->getSinglyDesugaredType(), optionalKind);
   }
 
-  void visitDynamicSelfType(DynamicSelfType *DST, 
+  void visitDynamicSelfType(DynamicSelfType *DST,
                             Optional<OptionalTypeKind> optionalKind) {
     printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
     os << "instancetype";
   }
 
-  void visitReferenceStorageType(ReferenceStorageType *RST, 
+  void visitReferenceStorageType(ReferenceStorageType *RST,
                                  Optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
@@ -2015,7 +2017,7 @@ private:
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
 public:
-  void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
+  void print(Type ty, Optional<OptionalTypeKind> optionalKind,
              Identifier name = Identifier(),
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
@@ -2867,9 +2869,9 @@ public:
       // FIXME: This will end up taking linear time.
       auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
       auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
-      unsigned numLHSMembers = std::distance(lhsMembers.begin(), 
+      unsigned numLHSMembers = std::distance(lhsMembers.begin(),
                                              lhsMembers.end());
-      unsigned numRHSMembers = std::distance(rhsMembers.begin(), 
+      unsigned numRHSMembers = std::distance(rhsMembers.begin(),
                                              rhsMembers.end());
       if (numLHSMembers != numRHSMembers)
         return numLHSMembers < numRHSMembers ? Descending : Ascending;
