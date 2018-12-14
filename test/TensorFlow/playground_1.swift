@@ -17,6 +17,7 @@ let x = 12345678  // a distinctive number to filecheck for.
 // CHECK: [[INT:%.*]] = integer_literal $Builtin.Int64, 12345678
 // CHECK: [[INT2:%.*]] = struct $Int ([[INT]] : $Builtin.Int64)
 // CHECK: store [[INT2]] to [[INTP:%.*]] : $*Int
+//TODO(https://bugs.swift.org/browse/SR-9509): Fix these expectations.
 // HECK: [[INT:%.*]] = load [[INTP]] : $*Int
 // HECK: [[INTP:%.*]] = alloc_stack $Int
 // HECK: store [[INT]] to [[INTP]] : $*Int
