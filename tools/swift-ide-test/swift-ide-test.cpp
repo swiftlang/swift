@@ -2644,7 +2644,8 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.second->getImportedModules(scratch, ModuleDecl::ImportFilter::Public);
+      next.second->getImportedModules(scratch,
+                                      ModuleDecl::ImportFilterKind::Public);
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {

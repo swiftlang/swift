@@ -1021,17 +1021,12 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
                                ModuleDecl::ImportFilter filter) const {
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
   for (auto desc : Imports) {
-    switch (filter) {
-    case ModuleDecl::ImportFilter::All:
-      break;
-    case ModuleDecl::ImportFilter::Public:
-      if (!desc.importOptions.contains(ImportFlags::Exported))
+    if (desc.importOptions.contains(ImportFlags::Exported)) {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Public))
         continue;
-      break;
-    case ModuleDecl::ImportFilter::Private:
-      if (desc.importOptions.contains(ImportFlags::Exported))
+    } else {
+      if (!filter.contains(ModuleDecl::ImportFilterKind::Private))
         continue;
-      break;
     }
 
     modules.push_back(desc.module);
@@ -1277,8 +1272,9 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  auto filter = respectVisibility ? ModuleDecl::ImportFilter::Public
-                                  : ModuleDecl::ImportFilter::All;
+  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
+  if (!respectVisibility)
+    filter |= ModuleDecl::ImportFilterKind::Private;
   topLevel->getImportedModules(stack, filter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
@@ -1332,7 +1328,7 @@ bool FileUnit::forAllVisibleModules(
     // Handle privately visible modules as well.
     // FIXME: Should this apply to all FileUnits?
     SmallVector<ModuleDecl::ImportedModule, 4> imports;
-    SF->getImportedModules(imports, ModuleDecl::ImportFilter::Private);
+    SF->getImportedModules(imports, ModuleDecl::ImportFilterKind::Private);
     for (auto importPair : imports)
       if (!importPair.second->forAllVisibleModules(importPair.first, fn))
         return false;

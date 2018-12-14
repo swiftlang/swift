@@ -703,8 +703,12 @@ void SerializedASTFile::getImportedModules(
 
 void SerializedASTFile::collectLinkLibrariesFromImports(
     ModuleDecl::LinkLibraryCallback callback) const {
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+
   llvm::SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  File.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  File.getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports)
     Import.second->collectLinkLibraries(callback);

@@ -1045,7 +1045,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   // Add private imports to the extra search list.
   SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto FU = dyn_cast<FileUnit>(dc))
-    FU->getImportedModules(extraImports, ModuleDecl::ImportFilter::Private);
+    FU->getImportedModules(extraImports, ModuleDecl::ImportFilterKind::Private);
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;

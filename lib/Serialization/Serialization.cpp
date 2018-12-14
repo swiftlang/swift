@@ -1068,14 +1068,17 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         dep.getPath());
   }
 
+  ModuleDecl::ImportFilter allImportFilter;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  allImportFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  M->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
+  M->getImportedModules(allImports, allImportFilter);
   ModuleDecl::removeDuplicateImports(allImports);
 
   // Collect the public imports as a subset so that we can mark them with an
   // extra flag.
   SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  M->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilterKind::Public);
   llvm::SmallSet<ModuleDecl::ImportedModule, 8,
                  ModuleDecl::OrderImportedModules> publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());

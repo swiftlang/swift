@@ -339,7 +339,7 @@ ImportDepth::ImportDepth(ASTContext &context, CompilerInvocation &invocation) {
   // Private imports from this module.
   // FIXME: only the private imports from the current source file.
   SmallVector<ModuleDecl::ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports, ModuleDecl::ImportFilter::Private);
+  main->getImportedModules(mainImports, ModuleDecl::ImportFilterKind::Private);
   for (auto &import : mainImports) {
     uint8_t depth = 1;
     if (auxImports.count(import.second->getName().str()))

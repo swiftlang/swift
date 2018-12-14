@@ -419,18 +419,19 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
   /// \sa getImportedModules
-  enum class ImportFilter {
-    All,
-    Public,
-    Private
+  enum class ImportFilterKind {
+    Public = 1 << 0,
+    Private = 1 << 1
   };
+  /// \sa getImportedModules
+  using ImportFilter = OptionSet<ImportFilterKind>;
 
   /// Looks up which modules are imported by this module.
   ///
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilter::Public) const;
+                          ImportFilter filter = ImportFilterKind::Public) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -758,7 +759,7 @@ public:
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
+    return getImportedModules(imports, ModuleDecl::ImportFilterKind::Public);
   }
 
   /// Generates the list of libraries needed to link this file, based on its
