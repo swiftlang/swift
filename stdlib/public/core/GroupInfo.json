@@ -197,6 +197,7 @@
     "Bitset.swift"
   ],
   "Misc": [
+    "AtomicInt.swift",
     "Interval.swift",
     "ErrorType.swift",
     "InputStream.swift",
