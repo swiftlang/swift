@@ -3563,7 +3563,11 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 
 /// Validate the underlying type of the given typealias.
 static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
-  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
+  TypeResolutionOptions options(
+    (typeAlias->getGenericParams() ?
+     TypeResolverContext::GenericTypeAliasDecl :
+     TypeResolverContext::TypeAliasDecl));
+
   if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
         /*functionsAreNonCascading*/true)) {
      options |= TypeResolutionFlags::KnownNonCascadingDependency;
@@ -4566,7 +4570,10 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         if (typealias->isBeingValidated()) return;
 
         auto helper = [&] {
-          TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
+          TypeResolutionOptions options(
+            (typealias->getGenericParams() ?
+             TypeResolverContext::GenericTypeAliasDecl :
+             TypeResolverContext::TypeAliasDecl));
           if (validateType(typealias->getUnderlyingTypeLoc(),
                            TypeResolution::forStructural(typealias), options)) {
             typealias->setInvalid();
