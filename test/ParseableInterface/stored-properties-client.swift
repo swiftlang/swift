@@ -17,7 +17,7 @@ import StoredProperties
 // COMMON: %[[BAGOFVARIABLES:T16StoredProperties14BagOfVariablesV]] = type <{ %TSi, %TSb, [{{(3|7)}} x i8], %TSi }>
 
 // This type is non-@_fixed_layout, so it becomes opaque in a resilient module
-// CHECK: %[[HASSTOREDPROPERTIES:T16StoredProperties03HasaB0V]] = type <{ %TSi, %TSi, %TSb, [{{(3|7)}} x i8], %TSi, %TSb }>
+// CHECK: %[[HASSTOREDPROPERTIES:T16StoredProperties03HasaB0V]] = type <{ %TSi, %TSi, %TSb, [{{(3|7)}} x i8], %TSi, %TSb, [{{3|7}} x i8], %TSi }>
 // RESILIENT: %[[HASSTOREDPROPERTIES:swift.opaque]] = type opaque
 
 // COMMON: %[[HASSTOREDPROPERTIESFIXEDLAYOUT:T16StoredProperties03HasaB11FixedLayoutV]] = type <{ %[[BAGOFVARIABLES]], %[[BAGOFVARIABLES]] }>
