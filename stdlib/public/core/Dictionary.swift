@@ -782,7 +782,6 @@ extension Dictionary {
   ///   otherwise, `nil`.
   @inlinable
   public subscript(key: Key) -> Value? {
-    @inline(__always)
     get {
       return _variant.lookup(key)
     }
@@ -819,6 +818,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   ///   dictionary. Each key in `elements` must be unique.
   @inlinable
   @_effects(readonly)
+  @_semantics("optimize.sil.specialize.generic.size.never")
   public init(dictionaryLiteral elements: (Key, Value)...) {
     let native = _NativeDictionary<Key, Value>(capacity: elements.count)
     for (key, value) in elements {
