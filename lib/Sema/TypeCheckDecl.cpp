@@ -4476,26 +4476,21 @@ static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
 
 /// Form the interface type of an extension from the raw type and the
 /// extension's list of generic parameters.
-static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
-                                       Type type,
-                                       GenericParamList *genericParams,
-                                       bool &mustInferRequirements) {
+static Type formExtensionInterfaceType(
+                         TypeChecker &tc, ExtensionDecl *ext,
+                         Type type,
+                         GenericParamList *genericParams,
+                         SmallVectorImpl<std::pair<Type, Type>> &sameTypeReqs,
+                         bool &mustInferRequirements) {
   if (type->is<ErrorType>())
     return type;
 
   // Find the nominal type declaration and its parent type.
-  Type parentType;
-  GenericTypeDecl *genericDecl;
-  if (auto unbound = type->getAs<UnboundGenericType>()) {
-    parentType = unbound->getParent();
-    genericDecl = unbound->getDecl();
-  } else {
-    if (type->is<ProtocolCompositionType>())
-      type = type->getCanonicalType();
-    auto nominalType = type->castTo<NominalType>();
-    parentType = nominalType->getParent();
-    genericDecl = nominalType->getDecl();
-  }
+  if (type->is<ProtocolCompositionType>())
+    type = type->getCanonicalType();
+
+  Type parentType = type->getNominalParent();
+  GenericTypeDecl *genericDecl = type->getAnyGeneric();
 
   // Reconstruct the parent, if there is one.
   if (parentType) {
@@ -4505,7 +4500,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
                                  : genericParams;
     parentType =
       formExtensionInterfaceType(tc, ext, parentType, parentGenericParams,
-                                 mustInferRequirements);
+                                 sameTypeReqs, mustInferRequirements);
   }
 
   // Find the nominal type.
@@ -4523,9 +4518,20 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
     resultType = NominalType::get(nominal, parentType,
                                   nominal->getASTContext());
   } else {
+    auto currentBoundType = type->getAs<BoundGenericType>();
+
     // Form the bound generic type with the type parameters provided.
+    unsigned gpIndex = 0;
     for (auto gp : *genericParams) {
-      genericArgs.push_back(gp->getDeclaredInterfaceType());
+      SWIFT_DEFER { ++gpIndex; };
+
+      auto gpType = gp->getDeclaredInterfaceType();
+      genericArgs.push_back(gpType);
+
+      if (currentBoundType) {
+        sameTypeReqs.push_back({gpType,
+                                currentBoundType->getGenericArgs()[gpIndex]});
+      }
     }
 
     resultType = BoundGenericType::get(nominal, parentType, genericArgs);
@@ -4562,8 +4568,9 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Form the interface type of the extension.
   bool mustInferRequirements = false;
+  SmallVector<std::pair<Type, Type>, 4> sameTypeReqs;
   Type extInterfaceType =
-    formExtensionInterfaceType(tc, ext, type, genericParams,
+    formExtensionInterfaceType(tc, ext, type, genericParams, sameTypeReqs,
                                mustInferRequirements);
 
   // Local function used to infer requirements from the extended type.
@@ -4575,6 +4582,13 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                               extInterfaceType,
                               nullptr,
                               source);
+
+    for (const auto &sameTypeReq : sameTypeReqs) {
+      builder.addRequirement(
+        Requirement(RequirementKind::SameType, sameTypeReq.first,
+                    sameTypeReq.second),
+        source, ext->getModuleContext());
+    }
   };
 
   // Validate the generic type signature.
@@ -4582,9 +4596,18 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          ext->getDeclContext(), nullptr,
                                          /*allowConcreteGenericParams=*/true,
                                          ext, inferExtendedTypeReqs,
-                                         mustInferRequirements);
+                                         (mustInferRequirements ||
+                                            !sameTypeReqs.empty()));
 
   return { env, extInterfaceType };
+}
+
+static bool isNonGenericTypeAliasType(Type type) {
+  // A non-generic typealias can extend a specialized type.
+  if (auto *aliasType = dyn_cast<NameAliasType>(type.getPointer()))
+    return aliasType->getDecl()->getGenericContextDepth() == (unsigned)-1;
+
+  return false;
 }
 
 static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
@@ -4630,20 +4653,22 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
     return;
   }
 
-  // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized()) {
-    tc.diagnose(ext->getLoc(), diag::extension_specialization,
-             extendedType->getAnyNominal()->getName())
+  // Cannot extend function types, tuple types, etc.
+  if (!extendedType->getAnyNominal()) {
+    tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
       .highlight(ext->getExtendedTypeLoc().getSourceRange());
     ext->setInvalid();
     ext->getExtendedTypeLoc().setInvalidType(tc.Context);
     return;
   }
 
-  // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
-    tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+  // Cannot extend a bound generic type, unless it's referenced via a
+  // non-generic typealias type.
+  if (extendedType->isSpecialized() &&
+      !isNonGenericTypeAliasType(extendedType)) {
+    tc.diagnose(ext->getLoc(), diag::extension_specialization,
+                extendedType->getAnyNominal()->getName())
+    .highlight(ext->getExtendedTypeLoc().getSourceRange());
     ext->setInvalid();
     ext->getExtendedTypeLoc().setInvalidType(tc.Context);
     return;

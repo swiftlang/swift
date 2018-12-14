@@ -30,7 +30,7 @@ extension X<Int, Double, String> {
 
 typealias GGG = X<Int, Double, String>
 
-extension GGG { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+extension GGG { } // okay through a typealias
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
