@@ -349,12 +349,160 @@ extension _StringGutsSlice {
     with other: _StringGutsSlice,
     expecting: _StringComparisonResult
   ) -> Bool {
-    return self.withNFCCodeUnitsIterator_2 {
-      var selfIter = $0
-      return other.withNFCCodeUnitsIterator_2 {
-        let otherIter = $0
-        return selfIter.compare(with: otherIter, expecting: expecting)
+    var left_output = _FixedArray16<UInt8>(allZeros: ())
+    var left_icuInput = _FixedArray16<UInt16>(allZeros: ())
+    var left_icuOutput = _FixedArray16<UInt16>(allZeros: ())
+    var right_output = _FixedArray16<UInt8>(allZeros: ())
+    var right_icuInput = _FixedArray16<UInt16>(allZeros: ())
+    var right_icuOutput = _FixedArray16<UInt16>(allZeros: ())
+    if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
+      return self.withFastUTF8 { leftUTF8 in
+        return other.withFastUTF8 { rightUTF8 in
+          _fastNormalizedCompareImpl(
+            left_sourceBuffer: leftUTF8,
+            left_outputBuffer: _castOutputBuffer(&left_output),
+            left_icuInputBuffer: _castOutputBuffer(&left_icuInput),
+            left_icuOutputBuffer: _castOutputBuffer(&left_icuOutput),
+            right_sourceBuffer: rightUTF8,
+            right_outputBuffer: _castOutputBuffer(&right_output),
+            right_icuInputBuffer: _castOutputBuffer(&right_icuInput),
+            right_icuOutputBuffer: _castOutputBuffer(&right_icuOutput),
+            expecting: expecting
+          )
+        }
       }
+    } else {
+      // _foreignNormalizedCompareImpl(
+//         left_sourceBuffer: leftUTF8,
+//         left_outputBuffer: _castOutputBuffer(&left_output),
+//         left_icuInputBuffer: _castOutputBuffer(&left_icuInput),
+//         left_icuOutputBuffer: _castOutputBuffer(&left_icuOutput),
+//         right_sourceBuffer: rightUTF8,
+//         right_outputBuffer: _castOutputBuffer(&right_output),
+//         right_icuInputBuffer: _castOutputBuffer(&right_icuInput),
+//         right_icuOutputBuffer: _castOutputBuffer(&right_icuOutput)
+//       ) == expecting
+      fatalError("UnimplementedSlowPath")
+    }
+  }
+  
+  internal func _fastNormalizedCompareImpl(
+    left_sourceBuffer: UnsafeBufferPointer<UInt8>,
+    left_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
+    left_icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    left_icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    right_sourceBuffer: UnsafeBufferPointer<UInt8>,
+    right_outputBuffer: UnsafeMutableBufferPointer<UInt8>,
+    right_icuInputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    right_icuOutputBuffer: UnsafeMutableBufferPointer<UInt16>,
+    expecting: _StringComparisonResult
+  ) -> Bool {
+    var left_outputBuffer = left_outputBuffer
+    var left_icuInputBuffer = left_icuInputBuffer
+    var left_icuOutputBuffer = left_icuOutputBuffer
+    var right_outputBuffer = right_outputBuffer
+    var right_icuInputBuffer = right_icuInputBuffer
+    var right_icuOutputBuffer = right_icuOutputBuffer
+  
+    var leftNormalizationIndex = String.Index(encodedOffset: 0)
+    var rightNormalizationIndex = String.Index(encodedOffset: 0)
+    var leftBufferIndex = 0
+    var rightBufferIndex = 0
+    var leftBufferCount = 0
+    var rightBufferCount = 0
+    let leftCachedEndIndex = String.Index(encodedOffset: left_sourceBuffer.count)
+    let rightCachedEndIndex = String.Index(encodedOffset: right_sourceBuffer.count)
+  
+    var hasLeftBufferOwnership = false
+    var hasRightBufferOwnership = false
+    
+    if left_sourceBuffer.count == 0 && right_sourceBuffer.count == 0 {
+      return expecting == .equal
+    }
+    if left_sourceBuffer.count == 0 {
+      return expecting == .less
+    }
+    if right_sourceBuffer.count == 0 {
+      return false
+    }
+  
+    defer {
+      if hasLeftBufferOwnership {
+        left_outputBuffer.deallocate()
+        left_icuInputBuffer.deallocate()
+        left_icuOutputBuffer.deallocate()
+      }
+      if hasRightBufferOwnership {
+        right_outputBuffer.deallocate()
+        right_icuInputBuffer.deallocate()
+        right_icuOutputBuffer.deallocate()
+      }
+    }
+  
+    repeat {
+      if leftBufferIndex == leftBufferCount {
+        let result = _fastNormalize(
+          readIndex: leftNormalizationIndex,
+          sourceBuffer: left_sourceBuffer,
+          outputBuffer: &left_outputBuffer,
+          icuInputBuffer: &left_icuInputBuffer,
+          icuOutputBuffer: &left_icuOutputBuffer
+        )
+        _internalInvariant(result.nextReadPosition != leftNormalizationIndex)
+        leftBufferCount = result.amountFilled
+        leftBufferIndex = 0
+        leftNormalizationIndex = result.nextReadPosition
+        if result.reallocatedBuffers {
+          _internalInvariant(!hasLeftBufferOwnership)
+          hasLeftBufferOwnership = true
+        }
+      }
+      if rightBufferIndex == rightBufferCount {
+        let result = _fastNormalize(
+          readIndex: rightNormalizationIndex,
+          sourceBuffer: right_sourceBuffer,
+          outputBuffer: &right_outputBuffer,
+          icuInputBuffer: &right_icuInputBuffer,
+          icuOutputBuffer: &right_icuOutputBuffer
+        )
+        _internalInvariant(result.nextReadPosition != rightNormalizationIndex)
+        rightBufferCount = result.amountFilled
+        rightBufferIndex = 0
+        rightNormalizationIndex = result.nextReadPosition
+        if result.reallocatedBuffers {
+          _internalInvariant(!hasRightBufferOwnership)
+          hasRightBufferOwnership = true
+        }
+      }
+      while leftBufferIndex < leftBufferCount && rightBufferIndex < rightBufferCount {
+        let leftCU = left_outputBuffer[leftBufferIndex]
+        let rightCU = right_outputBuffer[rightBufferIndex]
+        if leftCU == rightCU {
+          leftBufferIndex += 1
+          rightBufferIndex += 1
+          continue
+        } else if leftCU < rightCU {
+          return expecting == .less
+        } else {
+          return false
+        }
+      }
+    } while (leftNormalizationIndex < leftCachedEndIndex
+    || leftBufferIndex < leftBufferCount)
+    && (rightNormalizationIndex < rightCachedEndIndex
+    || rightBufferIndex < rightBufferCount)
+    
+  
+    //At least one of them ran out of code units, whichever it was is the "smaller" string
+    if leftNormalizationIndex < leftCachedEndIndex 
+    || leftBufferIndex < leftBufferCount {
+      return false
+    } else if rightNormalizationIndex < rightCachedEndIndex
+    || rightBufferIndex < rightBufferCount {
+      return expecting == .less
+    } else {
+      //They both ran out
+      return expecting == .equal
     }
   }
 }
