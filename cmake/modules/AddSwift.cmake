@@ -1273,7 +1273,7 @@ function(_add_swift_library_single target name)
   # doing so will result in incorrect symbol resolution and linkage.  We created
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
     foreach(library_list LINK_LIBRARIES INTERFACE_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
@@ -1283,7 +1283,7 @@ function(_add_swift_library_single target name)
         # libraries are only associated with shared libraries, so add an
         # additional check for that as well.
         set(import_library ${library})
-        if(TARGET ${library} AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+        if(TARGET ${library})
           get_target_property(type ${library} TYPE)
           if(${type} STREQUAL "SHARED_LIBRARY")
             set(import_library ${library}_IMPLIB)
