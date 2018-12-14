@@ -83,7 +83,38 @@ public let SetTests = [
     runFunction: { n in run_SetIsSubsetInt(setP, setQ, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
-
+  
+  BenchmarkInfo(
+    name: "SetIsDisjointInt0",
+    runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointBox0",
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt25",
+    runFunction: { n in run_SetIsDisjointInt(setB, setAB, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointBox25",
+    runFunction: { n in run_SetIsDisjointBox(setOB, setOAB, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt50",
+    runFunction: { n in run_SetIsDisjointInt(setY, setXY, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setY, setXY]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt100",
+    runFunction: { n in run_SetIsDisjointInt(setP, setQ, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setP, setQ]) }),
+  
   BenchmarkInfo(
     name: "SetSymmetricDifferenceInt0",
     runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
@@ -296,6 +327,18 @@ public func run_SetSubtractingInt(
   }
 }
 
+@inline(never)
+public func run_SetIsDisjointInt(
+    _ a: Set<Int>,
+    _ b: Set<Int>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
+}
+
 class Box<T : Hashable> : Hashable {
   var value: T
 
@@ -370,4 +413,16 @@ func run_SetSubtractingBox(
     let and = a.subtracting(b)
     CheckResults(and.count == r)
   }
+}
+
+@inline(never)
+func run_SetIsDisjointBox(
+    _ a: Set<Box<Int>>,
+    _ b: Set<Box<Int>>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
 }
