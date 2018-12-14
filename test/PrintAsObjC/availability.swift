@@ -124,7 +124,17 @@
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'__makeUnavailableOnMacOSAvailability' has been renamed to 'unavailableAvailabilityWithValue:': use something else");
 
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
+// CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)x OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
+// CHECK-NEXT: - (nonnull instancetype)initWithFirst:(NSInteger)first second:(NSInteger)second OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedFirst:(NSInteger)first second:(NSInteger)second OBJC_DESIGNATED_INITIALIZER
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "initWithFirst:second:");
+// CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedOnMacOSFirst:(NSInteger)first second:(NSInteger)second OBJC_DESIGNATED_INITIALIZER
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'init' has been renamed to 'initWithFirst:second:'");
+// CHECK-NEXT: - (nonnull instancetype)initWithUnavailableFirst:(NSInteger)first second:(NSInteger)second OBJC_DESIGNATED_INITIALIZER
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'init' has been renamed to 'initWithFirst:second:'");
+// CHECK-NEXT: - (nonnull instancetype)initWithUnavailableOnMacOSFirst:(NSInteger)first second:(NSInteger)second OBJC_DESIGNATED_INITIALIZER
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'init' has been renamed to 'initWithFirst:second:'");
+
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger simpleProperty;
 // CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
@@ -163,9 +173,12 @@
 // CHECK-LABEL: @interface AvailabilitySub
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
 // CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
-// CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)x SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedZ:(NSInteger)deprecatedZ OBJC_DESIGNATED_INITIALIZER SWIFT_DEPRECATED_MSG("init(deprecatedZ:) was deprecated. Use the new one instead", "initWithNewZ:")
 // CHECK-NEXT: - (nonnull instancetype)initWithNewZ:(NSInteger)z OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedOnMacOSFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailability' has been renamed to 'SWTReplacementAvailable'")
@@ -431,8 +444,23 @@
 
     @objc init() {}
     @available(macOS 10.10, *)
-    @objc init(x _: Int) {}
-
+    @objc init(x: Int) {}
+    
+    @objc init(first: Int, second: Int) {}
+    init(first: Double, second: Double) {}
+    
+    @available(*, deprecated, renamed: "init(first:second:)")
+    @objc init(deprecatedFirst first: Int, second: Int) {}
+    
+    @available(macOS, deprecated, renamed: "init(first:second:)")
+    @objc init(deprecatedOnMacOSFirst first: Int, second: Int) {}
+    
+    @available(*, unavailable, renamed: "init(first:second:)")
+    @objc init(unavailableFirst first: Int, second: Int) {}
+    
+    @available(macOS, unavailable, renamed: "init(first:second:)")
+    @objc init(unavailableOnMacOSFirst first: Int, second: Int) {}
+    
     @objc var simpleProperty: Int {
         get {
             return 100
@@ -536,7 +564,6 @@
 extension Availability {
     @objc func extensionAvailability(_: WholeClassAvailability) {}
     
-    
     @available(macOS, deprecated: 10.10)
     @objc var propertyDeprecatedInsideExtension: Int {
         get {
@@ -548,7 +575,7 @@ extension Availability {
 @objc class AvailabilitySub: Availability {
     private override init() { super.init() }
     @available(macOS 10.10, *)
-    private override init(x _: Int) { super.init() }
+    private override init(x: Int) { super.init() }
     @available(*, deprecated, message: "init(deprecatedZ:) was deprecated. Use the new one instead", renamed: "init(z:)")
     @objc init(deprecatedZ: Int) { super.init() }
     @objc(initWithNewZ:) init(z: Int) { super.init() }
