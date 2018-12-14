@@ -202,6 +202,7 @@ extension _NativeDictionary { // ensureUnique
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func copyAndResize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
     let newStorage = _DictionaryStorage<Key, Value>.resize(
@@ -220,6 +221,7 @@ extension _NativeDictionary { // ensureUnique
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func copy() {
     let newStorage = _DictionaryStorage<Key, Value>.copy(original: _storage)
     _internalInvariant(newStorage._scale == _storage._scale)
@@ -241,7 +243,7 @@ extension _NativeDictionary { // ensureUnique
   /// Ensure storage of self is uniquely held and can hold at least `capacity`
   /// elements. Returns true iff contents were rehashed.
   @inlinable
-  @inline(__always)
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func ensureUnique(isUnique: Bool, capacity: Int) -> Bool {
     if _fastPath(capacity <= self.capacity && isUnique) {
       return false
@@ -490,7 +492,6 @@ extension _NativeDictionary { // Insertions
   /// held, and with enough capacity for a single insertion (if the key isn't
   /// already in the dictionary.)
   @inlinable
-  @inline(__always)
   internal mutating func mutatingFind(
     _ key: Key,
     isUnique: Bool
@@ -629,6 +630,7 @@ extension _NativeDictionary: _HashTableDelegate {
 extension _NativeDictionary { // Deletion
   @inlinable
   @_effects(releasenone)
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
@@ -637,7 +639,7 @@ extension _NativeDictionary { // Deletion
   }
 
   @inlinable
-  @inline(__always)
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
     isUnique: Bool
