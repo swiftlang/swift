@@ -22,6 +22,11 @@ import Foundation
 /// accepted connections will represent multiplexed streams on a new or existing transport
 /// binding.
 
+// NOTE: older overlays had Network.NWListener as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network11_NWListener is the
+// mangled name for Network._NWListener.
+@_objcRuntimeName(_TtC7Network11_NWListener)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public final class NWListener: CustomDebugStringConvertible {
 	public var debugDescription: String {
