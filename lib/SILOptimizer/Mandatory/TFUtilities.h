@@ -129,7 +129,7 @@ bool isStatefulOp(const GraphOperationInst* inst);
 /// the operation.
 GraphOperationInst *createConstTensor(Type elementType, SymbolicValue scalars,
                                       SymbolicValue shape, SILType resultType,
-                                      SILLocation loc, DeviceType targetDevice,
+                                      SILLocation loc, DeviceId targetDevice,
                                       SILBuilder &B);
 
 /// Create a tf_tensor_to_i1 instruction with the given value as argument.

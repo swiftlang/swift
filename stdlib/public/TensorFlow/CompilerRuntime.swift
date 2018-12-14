@@ -125,6 +125,9 @@ public enum _RuntimeConfig {
   /// needed. Otherwise, The entire GPU memory region is pre-allocated.
   static public var gpuMemoryAllowGrowth = true
 
+  /// The number of CPU devices.
+  static public var numCPUDevices: UInt32 = 1
+
   /// When non-nil, run metadata (with full trace) of each session execution
   /// will be dumped to the give path.
   static public var runMetadataOutputPath: String? = nil
@@ -234,10 +237,13 @@ public final class _ExecutionContext {
   /// Global context storing all available devices, loaded functions, etc.
   public static let global: _ExecutionContext = _ExecutionContext()
 
-  public let cpuDeviceName: String
+  // TODO: When we use remote session, we need to set cpu device to a local
+  // device.  There is no C API yet to find the local device. So, we are
+  // hard-coding the value for now.
+  public let cpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:CPU:"
 
-  /// Only set when there is a usable GPU.
-  public let gpuDeviceName: String?
+  /// Only set when there is some usable GPU.
+  public let gpuDeviceNamePrefix: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -296,7 +302,8 @@ public final class _ExecutionContext {
     }
     self.tensorFlowConfig = TF_CreateConfig(
       _RuntimeConfig.executionMode == .xla ? 1 : 0,
-      _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0)
+      _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
+      _RuntimeConfig.numCPUDevices)
     TFE_ContextOptionsSetConfig(opts,
                                 tensorFlowConfig.pointee.data,
                                 tensorFlowConfig.pointee.length,
@@ -323,19 +330,17 @@ public final class _ExecutionContext {
     // Initialize GPU device.
     // While the code here is only needed when _RuntimeConfig.executionMode is
     // set to .gpu, running it in all code paths helps keep things simple
-    // (e.g. so that the cpuDeviceName property is always set.)
+    // (e.g. so that the cpuDeviceNamePrefix property is always set.)
     let devices = TFE_ContextListDevices(eagerContext, status)
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
 
+    // Sanity check and gather/log device info. When `numGPUs` > 0, set
+    // `self.gpuDeviceNamePrefix`.
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
-    var deviceNames: [String : String] = [:]
-    // TODO: When we use remote session, we need to set cpu device to a local
-    // device.  There is no C API yet to find the local device. So, we are
-    // hard-coding the value for now.
-    let localCPUDeviceName = "/job:localhost/replica:0/task:0/device:CPU:0"
     var foundCPU = false
+    var numGPUs = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -346,17 +351,24 @@ public final class _ExecutionContext {
       debugLog(
         "Device \(deviceId) has type \(deviceType) and name \(deviceName)."
       )
-      if deviceType == "CPU", deviceName == localCPUDeviceName {
+      if deviceType == "CPU", deviceName.starts(with: self.cpuDeviceNamePrefix) {
         foundCPU = true
       }
-      deviceNames[deviceType] = deviceName
+      if deviceType == "GPU" {
+        numGPUs += 1
+      }
     }
     guard foundCPU else {
       fatalError("CPU should always be an available device.")
     }
-    self.cpuDeviceName = localCPUDeviceName
-    // This can be nil when no GPU is available.
-    self.gpuDeviceName = deviceNames["GPU"]
+    // We ignore the number of GPUs for now. It might be useful to cross check
+    // that against the number of GPUs that user intends to use (e.g. via the
+    // `withDevice` syntax).
+    if numGPUs > 0 {
+      self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
+    } else {
+      self.gpuDeviceNamePrefix = nil
+    }
 
     // Initialize the mutex.
     pthread_mutex_init(&mutex, nil)
@@ -549,6 +561,19 @@ internal func dumpCTensorHandleContent(
   }
 }
 
+/// Given an input like "foo.tf_13" (prefix if a SIL graph function like
+/// "foo.tf_13_CPU.device_partition"), extract and return `13` as the device
+/// index.
+internal func decodeDeviceIndexStr(_ opTypePrefix: Substring) -> Substring {
+  let underscorePos = opTypePrefix.lastIndex(of: "_")
+  internalConsistencyCheck(
+    underscorePos != nil,
+    "Malformed op type prefix \(opTypePrefix)")
+  let startPos = opTypePrefix.index(after: underscorePos!)
+  let deviceIndexStr = opTypePrefix.suffix(from: startPos)
+  return deviceIndexStr
+}
+
 private class TFEState {
   let status: CTFStatus = TF_NewStatus()
   /// The set of graph functions to be concurrently executed (as TFE ops).
@@ -588,16 +613,25 @@ private class TFEState {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
+      var deviceName: String
       if opType.hasSuffix("_CPU.device_partition") {
-        TFE_OpSetDevice(op, context.cpuDeviceName, status)
-        debugLog("Placing the op on device \(context.cpuDeviceName).")
+        // The op type can be: tmp3_main.tf_17_CPU.device_partition. We want to
+        // extract the device index "17" out of the above name, and use it to
+        // form a TF device string like
+        // "/job:localhost/replica:0/task:0/device:CPU:17".
+        let opTypePrefix = opType.dropLast("_CPU.device_partition".count)
+        let deviceIndexStr = decodeDeviceIndexStr(opTypePrefix)
+        deviceName = context.cpuDeviceNamePrefix + deviceIndexStr
       } else {
         // TODO: support TPU as well.
         internalConsistencyCheck(opType.hasSuffix("_GPU.device_partition"))
-        internalConsistencyCheck(context.gpuDeviceName != nil)
-        TFE_OpSetDevice(op, context.gpuDeviceName!, status)
-        debugLog("Placing the op on device \(context.gpuDeviceName!).")
+        internalConsistencyCheck(context.gpuDeviceNamePrefix != nil)
+        let opTypePrefix = opType.dropLast("_GPU.device_partition".count)
+        let deviceIndexStr = decodeDeviceIndexStr(opTypePrefix)
+        deviceName = context.gpuDeviceNamePrefix! + deviceIndexStr
       }
+      debugLog("Placing the op on device \(deviceName).")
+      TFE_OpSetDevice(op, deviceName, status)
       checkOk(status)
       ops.append(op!)
     }
@@ -1566,8 +1600,9 @@ func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
   let context = _ExecutionContext.global
   let device = context.currentDeviceKind
   switch device {
-  case .cpu: TFE_OpSetDevice(op, context.cpuDeviceName, status)
-  case .gpu: TFE_OpSetDevice(op, context.gpuDeviceName!, status)
+  // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
+  case .cpu: TFE_OpSetDevice(op, "\(context.cpuDeviceNamePrefix)0", status)
+  case .gpu: TFE_OpSetDevice(op, "\(context.gpuDeviceNamePrefix!)0", status)
   default: break
   }
 }

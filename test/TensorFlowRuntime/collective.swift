@@ -24,4 +24,44 @@ CollectiveTests.testAllBackends("SingletonGroup") {
   expectEqualWithScalarTensor(1, t)
 }
 
+// Run 2 collective ops concurrently in graph mode.
+//
+// TODO: To enable this test in eager mode, need to put each collective op (or
+// the enclosing graph function) in a separate swift thread.
+#if !TF_DYNAMIC_COMPILATION
+CollectiveTests.testAllBackends("GroupWithSize2") {
+  // Need 2 or more CPU devices for this test.
+  let x = Tensor<Float>(1.0)
+
+  // Cannot use raw op due to the use of `__device`.
+  // TODO: replace with user facing syntax like `withDevice`.
+  let handle: TensorHandle<Float> =
+    #tfop("CollectiveReduce", x,
+          T$dtype: Float.tensorFlowDataType,
+          merge_op: "Add",
+          final_op: "Id",
+          subdiv_offsets: [Int64(0)],
+          group_key: Int64(2),
+          group_size: Int64(2),
+          instance_key: Int64(2),
+          __device: "/job:localhost/replica:0/task:0/device:CPU:0")
+
+  let _: TensorHandle<Float> =
+    #tfop("CollectiveReduce", x,
+          T$dtype: Float.tensorFlowDataType,
+          merge_op: "Add",
+          final_op: "Id",
+          subdiv_offsets: [Int64(0)],
+          group_key: Int64(2),
+          group_size: Int64(2),
+          instance_key: Int64(2),
+          __device: "/job:localhost/replica:0/task:0/device:CPU:1")
+
+  let t = Tensor(handle: handle)
+  _hostOp(t)
+  expectEqualWithScalarTensor(2, t)
+}
+#endif // TF_DYNAMIC_COMPILATION
+
+_RuntimeConfig.numCPUDevices = 3
 runAllTests()

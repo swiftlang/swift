@@ -410,10 +410,6 @@ public:
   unsigned NumAnonVars = 0;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// If we run across a graph_op, we compute the function's
-  /// GraphFunctionDeviceInfo and store it here.
-  llvm::Optional<GraphFunctionDeviceInfo> deviceInfo;
-
   AttributeTypeClassifier attributeTypeClassifier;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -2051,12 +2047,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     setLoweredExplosion(i->getResults()[0], e);
     return;
   }
-
-  // If the deviceInfo is not computed yet, compute it here.
-  if (!deviceInfo)
-    deviceInfo = Optional<GraphFunctionDeviceInfo>(
-        GraphFunctionDeviceInfo::getForFunction(*CurSILFn,
-                                                /*removeConfigInst*/false));
 
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");

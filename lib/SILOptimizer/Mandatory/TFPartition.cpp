@@ -2057,7 +2057,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
 
-      auto opDevice = getDeviceType(GraphOperationInfo(graphOp));
+      auto opDevice = getDeviceId(GraphOperationInfo(graphOp));
       deviceInfo.markDeviceUsed(opDevice);
     }
   }
@@ -2576,10 +2576,10 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // consumed only on some devices, the promoted scalars on those other devices
   // should get pruned away in the later graph lowering pass.
   FP.deviceInfo.handleDevicePlacement(
-      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL),
+      opInfo.first, /*opDevice*/ getDeviceString({DeviceType::ALL, 0}),
       B.getModule().getASTContext(), &opBuilder);
 
-  if (FP.deviceInfo.primaryDeviceType == DeviceType::TPU)
+  if (FP.deviceInfo.primaryDeviceId.type == DeviceType::TPU)
     addScalarShapeArrayAttr(ctx, &opBuilder);
 
   auto *result = opBuilder.build(B, ctx, loc, {remapType(resultType)});
@@ -2685,7 +2685,7 @@ static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
   //
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
   // extending `deviceInfo` with a bool indicating if we are targeting XLA.
-  if (deviceInfo.primaryDeviceType == DeviceType::TPU && isScalar)
+  if (deviceInfo.primaryDeviceId.type == DeviceType::TPU && isScalar)
     addScalarShapeArrayAttr(ctx, &opBuilder);
   return getSingleValueResult(opBuilder.build(B, ctx, loc, {valueTy}));
 }
@@ -3068,7 +3068,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
       createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
                                     int32SILType, ctx, &constOpBuilder);
       FP.deviceInfo.handleDevicePlacement(
-          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          "Const", /*opDevice*/ getDeviceString(AllDeviceId),
           BA.getModule().getASTContext(), &constOpBuilder);
       auto tensorHandleInt32Ty =
           convertElementTypeToTensorValueType(int32SILType);
@@ -3092,7 +3092,7 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
           convertElementTypeToTensorValueType(boolFieldSILType);
 
       FP.deviceInfo.handleDevicePlacement(
-          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
+          "Equal", /*opDevice*/ getDeviceString(AllDeviceId),
           BA.getModule().getASTContext(), &equalOpBuilder);
 
       auto *equalComparisonInst = equalOpBuilder.build(BA, ctx, loc,
@@ -4251,7 +4251,7 @@ bool TFFunctionPartition::partition(bool isTest) {
   if (!isAcceleratorOnly(hostFn)) {
     // TODO(b/111123797): Lift this restriction.
     if (resultValues.empty() &&
-        deviceInfo.primaryDeviceType == DeviceType::TPU) {
+        deviceInfo.primaryDeviceId.type == DeviceType::TPU) {
       diagnose(hostFn.getASTContext(), hostFn.getLocation().getSourceLoc(),
                diag::tfop_incorrect_definition,
                "TPU execution cannot yet handle a graph that produces no "
@@ -4351,7 +4351,7 @@ bool TFFunctionPartition::partition(bool isTest) {
 bool TFFunctionPartition::lowerGraph(bool isTest) {
   assert(acceleratorFn);
   if (isAcceleratorOnly(hostFn)) {
-    assert(deviceInfo.numUsedDeviceTypes == 1 &&
+    assert(deviceInfo.getUsedDeviceIds().size() == 1 &&
            "An accelerator-only SIL function must be lowered to a single TF "
            "device.");
     if (graphLowering->lowerTFFunction(hostFn.getName(), acceleratorFn,
@@ -4393,7 +4393,7 @@ void TFFunctionPartition::finalizeHostFunction(const std::vector<char> &bytes,
   auto helperFunctionCount = B.createIntegerLiteral(
       hostFn.getLocation(),
       tensorProgram.helperFunctionCountPlaceholder->getType(),
-      deviceInfo.numUsedDeviceTypes - 1);
+      deviceInfo.getUsedDeviceIds().size() - 1);
   tensorProgram.programPlaceholder->replaceAllUsesWith(data);
   tensorProgram.programPlaceholder->eraseFromParent();
   tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);

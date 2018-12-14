@@ -359,7 +359,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
   var b = atariSim(a_host).toAccelerator()
   // This is the correct location
-  // expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
+  // expected-error @+1 {{did you specify shape?}}
   b += a_tpu
   _hostOp(b)
 }
@@ -423,7 +423,7 @@ public func resourceHandlesCanBeSentOrReceived() {
 public func resourceHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
   _hostOp(iterator)
 }
 
@@ -447,7 +447,7 @@ public func variantHandlesCanBeSentOrReceived() {
 public func variantHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
   let nextIterator: VariantHandle =
     #tfop("IteratorGetNextAsOptional", iterator,
     output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
