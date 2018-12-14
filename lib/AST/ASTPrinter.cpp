@@ -104,6 +104,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.OmitNameOfInaccessibleProperties = true;
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
+  result.VarInitializers = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -2099,20 +2100,19 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     }
 
     if (Options.VarInitializers) {
-      // FIXME: Implement once we can pretty-print expressions.
+      auto vd = entry.getAnchoringVarDecl();
+      if (entry.hasInitStringRepresentation() &&
+          vd->isInitExposedToClients()) {
+        SmallString<128> scratch;
+        Printer << " = " << entry.getInitStringRepresentation(scratch);
+      }
     }
 
-    auto vd = entry.getAnchoringVarDecl();
-    if (entry.hasInitStringRepresentation() &&
-        vd->isInitExposedToClients()) {
-      SmallString<128> scratch;
-      Printer << " = " << entry.getInitStringRepresentation(scratch);
-    }
-
-    // HACK: If we're just printing a single pattern and it has accessors,
-    //       print the accessors here.
-    if (decl->getNumPatternEntries() == 1) {
-      printAccessors(vd);
+    // If we're just printing a single pattern and it has accessors,
+    // print the accessors here. It is an error to add accessors to a
+    // pattern binding with multiple entries.
+    if (auto var = decl->getSingleVar()) {
+      printAccessors(var);
     }
   }
 }
@@ -3230,7 +3230,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
-      if (!VD->hasClangNode() && VD->getImplInfo().isSimpleStored())
+      if (!VD->hasClangNode() && VD->hasStorage())
         return false;
     }
 
@@ -3241,7 +3241,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         auto pattern =
           pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
-          if (!named->getDecl()->getImplInfo().isSimpleStored())
+          if (!named->getDecl()->hasStorage())
             return false;
         }
       }
