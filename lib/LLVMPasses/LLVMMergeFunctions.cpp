@@ -515,6 +515,17 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
   return true;
 }
 
+/// Returns true if functions containing calls to \p F may be merged together.
+static bool mayMergeCallsToFunction(Function &F) {
+  StringRef Name = F.getName();
+
+  // Calls to dtrace probes must generate unique patchpoints.
+  if (Name.startswith("__dtrace"))
+    return false;
+
+  return true;
+}
+
 /// Returns true if function \p F is eligible for merging.
 static bool isEligibleFunction(Function *F) {
   if (F->isDeclaration())
@@ -535,6 +546,8 @@ static bool isEligibleFunction(Function *F) {
     for (Instruction &I : BB) {
       if (CallSite CS = CallSite(&I)) {
         Function *Callee = CS.getCalledFunction();
+        if (Callee && !mayMergeCallsToFunction(*Callee))
+          return false;
         if (!Callee || !Callee->isIntrinsic()) {
           Benefit += 5;
           continue;
