@@ -3,16 +3,26 @@
 
 import Swift
 
-func evaldiff<T: Differentiable, U: Differentiable>(_ f: @escaping @autodiff (T) -> U, _ x: T) {
-  let jvp: (T) -> (U, (T.TangentVector) -> U.TangentVector) = Builtin.autodiffGetJVP(f)
-  let vjp: (T) -> (U, (U.CotangentVector) -> T.CotangentVector) = Builtin.autodiffGetVJP(f)
-  _ = jvp(x)
-  _ = vjp(x)
+func evaldiff<T: Differentiable, U: Differentiable>(_ f: @autodiff (T) -> U, _ x: T) -> (U, (T.TangentVector) -> U.TangentVector)
+  where T == T.TangentVector {
+  return Builtin.autodiffApplyJVP(f, x)
 }
 
 // CHECK-SIL-LABEL: @{{.*}}evaldiff{{.*}}
-// CHECK-SIL: bb0([[DIFFED:%.*]] : @guaranteed $@autodiff @callee_guaranteed (@in_guaranteed T) -> @out U, [[X:%.*]] : @trivial $*T):
-// CHECK-SIL:   [[DIFFED_COPY_1:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (@in_guaranteed T) -> @out U
-// CHECK-SIL:   [[JVP:%.*]] = autodiff_function_extract [jvp] [order 1] [[DIFFED_COPY_1]] : $@autodiff @callee_guaranteed (@in_guaranteed T) -> @out U
-// CHECK-SIL:   [[DIFFED_COPY_2:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (@in_guaranteed T) -> @out U
-// CHECK-SIL:   [[VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[DIFFED_COPY_2]] : $@autodiff @callee_guaranteed (@in_guaranteed T) -> @out U
+// CHECK-SIL: bb0([[ORIG_RES_BUF:%.*]] : @trivial $*U, [[ORIG_FN:%.*]] : @trivial $@autodiff @noescape @callee_guaranteed (@in_guaranteed T) -> @out U, [[ORIG_FN_ARG:%.*]] : @trivial $*T):
+// CHECK-SIL:   [[ORIG_FN_ARG_COPY:%.*]] = alloc_stack $T
+// CHECK-SIL:   copy_addr [[ORIG_FN_ARG]] to [initialization] [[ORIG_FN_ARG_COPY]] : $*T
+// CHECK-SIL:   [[JVP_FN:%.*]] = autodiff_function_extract [jvp] [order 1] [[ORIG_FN]] : $@autodiff @noescape @callee_guaranteed (@in_guaranteed T) -> @out U
+// CHECK-SIL:   [[JVP_RES_BUF:%.*]] = alloc_stack $(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector)
+// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 0
+// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = apply [[JVP_FN]]([[JVP_RES_BUF_0]], [[ORIG_FN_ARG_COPY]]) : $@noescape @callee_guaranteed (@in_guaranteed T) -> (@out U, @owned @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector)
+// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 1
+// CHECK-SIL:   store [[DIFFERENTIAL]] to [init] [[JVP_RES_BUF_1]] : $*@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
+// CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 0
+// CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 1
+// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = load [take] [[JVP_RES_BUF_1]] : $*@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
+// CHECK-SIL:   copy_addr [take] [[JVP_RES_BUF_0]] to [initialization] [[ORIG_RES_BUF]] : $*U
+// CHECK-SIL:   dealloc_stack [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector)
+// CHECK-SIL:   destroy_addr [[ORIG_FN_ARG_COPY]] : $*T
+// CHECK-SIL:   dealloc_stack [[ORIG_FN_ARG_COPY]] : $*T
+// CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector

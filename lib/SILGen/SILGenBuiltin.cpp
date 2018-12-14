@@ -1042,28 +1042,63 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static ManagedValue emitBuiltinAutoDiffGetJVP(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              SubstitutionMap substitutions,
-                                              Expr *argument,
-                                              SGFContext C) {
-  auto argVal = SGF.emitRValue(argument);
-  auto jvp = SGF.getBuilder().createAutoDiffFunctionExtract(
-      loc, AutoDiffFunctionExtractee::JVP, /*differentiationOrder*/ 1,
-      std::move(argVal).forwardAsSingleValue(SGF, loc));
-  return ManagedValue::forUnmanaged(jvp);
+static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
+    AutoDiffAssociatedFunctionKind kind, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, Expr *argument, SGFContext C) {
+  auto *argTuple = cast<TupleExpr>(argument);
+  assert(argTuple->getNumElements() == 2);
+  auto origFnVal =
+      SGF.emitRValueAsSingleValue(argTuple->getElement(0))
+          .borrow(SGF, loc).forward(SGF);
+  auto origFnArgVal =
+      SGF.emitRValueAsSingleValue(argTuple->getElement(1))
+          .borrow(SGF, loc).forward(SGF);
+  auto assocFn = SGF.B.createAutoDiffFunctionExtract(
+      loc, kind, /*differentiationOrder*/ 1, origFnVal);
+  auto assocFnType = assocFn->getType().getAs<SILFunctionType>();
+  assert(assocFnType->getNumResults() == 2);
+  // Emit an l-value when the function has indirect results.
+  if (assocFnType->hasIndirectFormalResults()) {
+    assert(origFnArgVal->getType().isAddress());
+    auto indResBuffer =
+        SGF.getBufferForExprResult(loc, assocFnType->getAllResultsType(), C);
+    SILValue applyArgs[2] {
+      SGF.B.createTupleElementAddr(loc, indResBuffer, 0),
+      origFnArgVal
+    };
+    auto differential = SGF.B.createApply(loc, assocFn, applyArgs,
+                                          /*isNonThrowing*/ false);
+    SGF.B.createStore(loc, differential,
+                      SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
+                      StoreOwnershipQualifier::Init);
+    return SGF.manageBufferForExprResult(
+        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
+  }
+  // Emit an r-value tuple otherwise.
+  assert(origFnArgVal->getType().isObject());
+  auto resultTuple =
+      SGF.B.createApply(loc, assocFn, {origFnArgVal}, /*isNonThrowing*/ false);
+  return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
-static ManagedValue emitBuiltinAutoDiffGetVJP(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              SubstitutionMap substitutions,
-                                              Expr *argument,
-                                              SGFContext C) {
-  auto argVal = SGF.emitRValue(argument);
-  auto vjp = SGF.getBuilder().createAutoDiffFunctionExtract(
-      loc, AutoDiffFunctionExtractee::VJP, /*differentiationOrder*/ 1,
-      std::move(argVal).forwardAsSingleValue(SGF, loc));
-  return ManagedValue::forUnmanaged(vjp);
+static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SubstitutionMap substitutions,
+                                                Expr *argument,
+                                                SGFContext C) {
+  return emitBuiltinAutoDiffApplyAssociatedFunction(
+      AutoDiffAssociatedFunctionKind::JVP, SGF, loc, substitutions,
+      argument, C);
+}
+
+static ManagedValue emitBuiltinAutoDiffApplyVJP(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                SubstitutionMap substitutions,
+                                                Expr *argument,
+                                                SGFContext C) {
+  return emitBuiltinAutoDiffApplyAssociatedFunction(
+      AutoDiffAssociatedFunctionKind::VJP, SGF, loc, substitutions,
+      argument, C);
 }
 
 Optional<SpecializedEmitter>

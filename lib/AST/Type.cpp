@@ -4222,7 +4222,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   };
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod, selfUncurried);
+  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod,
+                                   selfUncurried);
 
   // If this is a method, unwrap the function type so that we can see the
   // non-self parameters and the final result.
