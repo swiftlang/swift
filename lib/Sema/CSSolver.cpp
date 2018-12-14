@@ -1723,6 +1723,10 @@ void ConstraintSystem::partitionForDesignatedTypes(
     auto *parentDC = funcDecl->getParent();
     auto *parentDecl = parentDC->getSelfNominalTypeDecl();
 
+    // Skip anything not defined in a nominal type.
+    if (!parentDecl)
+      return false;
+
     for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
       auto *designatedNominal =
         designatedNominalTypes[designatedTypeIndex];
@@ -1807,7 +1811,6 @@ void ConstraintSystem::partitionDisjunction(
 
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
-  SmallVector<unsigned, 4> globalScope;
 
   // First collect disabled constraints.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
@@ -1831,20 +1834,6 @@ void ConstraintSystem::partitionDisjunction(
     });
   }
 
-  // Collect everything at the global scope.
-  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    auto *decl = constraint->getOverloadChoice().getDecl();
-    auto *funcDecl = cast<FuncDecl>(decl);
-
-    // Skip anything defined within a type.
-    auto *parentDecl = funcDecl->getParent()->getAsDecl();
-    if (parentDecl)
-      return false;
-
-    globalScope.push_back(index);
-    return true;
-  });
-
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -1856,9 +1845,6 @@ void ConstraintSystem::partitionDisjunction(
       };
 
   partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
-
-  // Add all the things defined at global scope.
-  appendPartition(globalScope);
 
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.
