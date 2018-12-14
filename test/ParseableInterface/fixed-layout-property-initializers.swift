@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s
-// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix CHECK < %t.swiftinterface
 
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-resilience %s
-// RUN: %FileCheck %s < %t-resilient.swiftinterface
+// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix CHECK < %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK
 
 // RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix CHECK
 
 // CHECK: @_fixed_layout public struct MyStruct {
 @_fixed_layout
@@ -34,7 +34,8 @@ public struct MyStruct {
   // CHECK: @_hasInitialValue public static var staticVar: [[BOOL]]
   public static var staticVar: Bool = Bool(true && false)
 
-  // CHECK: @inlinable internal init() {}
+  // FROMSOURCE: @inlinable internal init() {}
+  // FROMMODULE: @inlinable internal init(){{$}}
   @inlinable init() {}
 }
 
@@ -57,7 +58,8 @@ public class MyClass {
   // CHECK: @_hasInitialValue public static var staticVar: [[BOOL]]
   public static var staticVar: Bool = Bool(true && false)
 
-  // CHECK: @inlinable internal init() {}
+  // FROMSOURCE: @inlinable internal init() {}
+  // FROMMODULE: @inlinable internal init(){{$}}
   @inlinable init() {}
 }
 

@@ -1345,9 +1345,15 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
 void Serializer::writeInlinableBodyTextIfNeeded(
   const AbstractFunctionDecl *AFD) {
   using namespace decls_block;
+  // Only serialize the text for an inlinable function body if we're emitting
+  // a partial module. It's not needed in the final module file, but it's
+  // needed in partial modules so you can emit a parseable interface after
+  // merging them.
+  if (!SF) return;
 
   if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
     return;
+
   if (!AFD->hasInlinableBodyText()) return;
   SmallString<128> scratch;
   auto body = AFD->getInlinableBodyText(scratch);
