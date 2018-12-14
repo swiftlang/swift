@@ -11,4 +11,4 @@
 // order into the ABI. rdar://problem/46617463
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
-// XFAIL: swift_evolve
+// UNSUPPORTED: swift_evolve

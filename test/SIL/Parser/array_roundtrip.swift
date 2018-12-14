@@ -2,6 +2,6 @@
 
 // Fails if the positions of the two Collection subscript requirements are
 // reversed. rdar://problem/46650834
-// XFAIL: swift_evolve
+// UNSUPPORTED: swift_evolve
 
 var W = [UInt32](repeating: 0, count: 16)
