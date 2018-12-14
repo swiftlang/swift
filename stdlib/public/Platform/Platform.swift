@@ -13,6 +13,10 @@
 import SwiftShims
 import SwiftOverlayShims
 
+#if os(Windows)
+import ucrt
+#endif
+
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
 // MacTypes.h
@@ -132,6 +136,14 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
     return vsnprintf(ptr, len, format, va_args)
   }
 }
+#elseif os(Windows)
+public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
+public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
+public var stderr: UnsafeMutablePointer<FILE> { return __acrt_iob_func(2) }
+
+public var STDIN_FILENO: Int32 { return _fileno(stdin) }
+public var STDOUT_FILENO: Int32 { return _fileno(stdout) }
+public var STDERR_FILENO: Int32 { return _fileno(stderr) }
 #endif
 
 

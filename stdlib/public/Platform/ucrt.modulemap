@@ -111,6 +111,7 @@ module ucrt [system] {
 
   module corecrt {
     header "corecrt.h"
+    header "corecrt_stdio_config.h"
     export *
 
     module io {
@@ -120,6 +121,11 @@ module ucrt [system] {
 
     module math {
       header "corecrt_math.h"
+      export *
+    }
+
+    module stdio {
+      header "corecrt_wstdio.h"
       export *
     }
   }
