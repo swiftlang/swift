@@ -243,7 +243,7 @@ public func test_not_hoist_weakly_linked4() {
 // CHECK:; <label>:[[BB3]]:
 // CHECK:  [[WEAK_CASE:%.*]] = load i32, i32* @"$s25weak_import_native_helper1EO0A0yA2CmFWC"
 // CHECK:  [[IS_WEAK:%.*]] = icmp eq i32 [[TAG]], [[WEAK_CASE]]
-// CHECK:  br label %21
+// CHECK:  br label %[[BB2]]
 //
 // CHECK:; <label>:[[BB2]]:
 // CHECK:  = phi i1 [ false, %[[BB1]] ], [ [[IS_WEAK]], %[[BB3]] ]
