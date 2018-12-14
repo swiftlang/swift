@@ -355,7 +355,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                                 getExtInfo(),
                                 getCoroutineKind(), getCalleeConvention(),
                                 getParameters(), getYields(), jvpResults,
-                                getOptionalErrorResult(), ctx);
+                                getOptionalErrorResult(), ctx,
+                                getWitnessMethodConformanceOrNone());
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> cotangentParams;
@@ -387,7 +388,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                                 getExtInfo(),
                                 getCoroutineKind(), getCalleeConvention(),
                                 getParameters(), getYields(), vjpResults,
-                                getOptionalErrorResult(), ctx);
+                                getOptionalErrorResult(), ctx,
+                                getWitnessMethodConformanceOrNone());
   }
   }
 }
