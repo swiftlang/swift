@@ -1670,11 +1670,18 @@ void ConstraintSystem::sortDesignatedTypes(
   size_t nextType = 0;
   for (auto argType : argInfo.getTypes()) {
     auto *nominal = argType->getAnyNominal();
-    for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
+    for (size_t i = nextType; i < nominalTypes.size(); ++i) {
       if (nominal == nominalTypes[i]) {
         std::swap(nominalTypes[nextType], nominalTypes[i]);
         ++nextType;
         break;
+      } else if (auto *protoDecl = dyn_cast<ProtocolDecl>(nominalTypes[i])) {
+        if (TC.conformsToProtocol(argType, protoDecl, DC,
+                                  ConformanceCheckFlags::InExpression)) {
+          std::swap(nominalTypes[nextType], nominalTypes[i]);
+          ++nextType;
+          break;
+        }
       }
     }
   }
