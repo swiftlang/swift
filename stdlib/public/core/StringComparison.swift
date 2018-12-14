@@ -357,8 +357,8 @@ extension _StringGutsSlice {
     var right_icuOutput = _FixedArray16<UInt16>(allZeros: ())
     if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
       return self.withFastUTF8 { leftUTF8 in
-        return other.withFastUTF8 { rightUTF8 in
-          return _fastNormalizedCompareImpl(
+        other.withFastUTF8 { rightUTF8 in
+          _fastNormalizedCompareImpl(
             left_sourceBuffer: leftUTF8,
             left_outputBuffer: _castOutputBuffer(&left_output),
             left_icuInputBuffer: _castOutputBuffer(&left_icuInput),

@@ -2217,8 +2217,8 @@ StringTests.test("Comparison.Substrings/Opaque")
 .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
 .code {
 #if _runtime(_ObjC)
-  let str = "abcdefg"
-  let expectedStr = "bcdef"
+  let str = NSSlowString(string: "abcdefg") as String
+  let expectedStr = NSSlowString(string: "bcdef") as String
   let substring = str.dropFirst().dropLast()
   
   expectEqual(expectedStr, substring)

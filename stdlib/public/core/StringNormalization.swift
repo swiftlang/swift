@@ -422,7 +422,7 @@ private func foreignFill(
   let outputCount = outputBuffer.count
   let cachedEndIndex = endIndex
   while index != cachedEndIndex {
-    let (scalar, length) = guts.foreignErrorCorrectedScalar(startingAt: index)
+    let (scalar, length) = guts.errorCorrectedScalar(startingAt: index.encodedOffset)
     if scalar._hasNormalizationBoundaryBefore && index != readIndex {
       break
     }
