@@ -2071,6 +2071,22 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// getDifferentiableFunctionStorageType - Obtain the storage type for a
+/// differentiable thick function.
+llvm::StructType *
+IRGenModule::getDifferentiableThickFunctionStorageType(
+    unsigned differentiationOrder) {
+  assert(differentiationOrder > 0 && "Differentiation order must be positive");
+  SmallVector<llvm::Type *, 4> eltTypes;
+  auto numFns = 1 +
+    autodiff::getNumAutoDiffAssociatedFunctions(differentiationOrder);
+  for (unsigned i = 0; i < numFns; ++i)
+    eltTypes.append(FunctionPairTy->element_begin(),
+                    FunctionPairTy->element_end());
+  return llvm::StructType::get(getLLVMContext(), eltTypes);
+}
+
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
   if (it != SpareBitsForTypes.end())
