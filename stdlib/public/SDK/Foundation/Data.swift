@@ -314,8 +314,8 @@ internal final class _DataStorage {
     func append(_ otherData: Data) {
         guard otherData.count > 0 else { return }
         otherData.withUnsafeBytes {
-        append($0.baseAddress!, length: $0.count)
-    }
+            append($0.baseAddress!, length: $0.count)
+        }
     }
     
     @inlinable
@@ -759,10 +759,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable
         var count: Int {
             get {
-                return numericCast(length)
+                return Int(length)
             }
             set(newValue) {
-                precondition(newValue <= MemoryLayout<Buffer>.size)
+                assert(newValue <= MemoryLayout<Buffer>.size)
                 length = UInt8(newValue)
             }
         }
@@ -775,7 +775,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable
         func withUnsafeBytes<Result>(_ apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
-            let count: Int = numericCast(length)
+            let count = Int(length)
             return try Swift.withUnsafeBytes(of: bytes) { (rawBuffer) throws -> Result in
                 return try apply(UnsafeRawBufferPointer(start: rawBuffer.baseAddress, count: count))
             }
@@ -783,7 +783,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable
         mutating func withUnsafeMutableBytes<Result>(_ apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
-            let count: Int = numericCast(length)
+            let count = Int(length)
             return try Swift.withUnsafeMutableBytes(of: &bytes) { (rawBuffer) throws -> Result in
                 return try apply(UnsafeMutableRawBufferPointer(start: rawBuffer.baseAddress, count: count))
             }
@@ -827,8 +827,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             if count < range.upperBound {
                 count = range.upperBound
             }
-            Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
-                bzero(rawBuffer.baseAddress?.advanced(by: range.lowerBound), range.upperBound - range.lowerBound)
+            let _ = Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
+                memset(rawBuffer.baseAddress?.advanced(by: range.lowerBound), 0, range.upperBound - range.lowerBound)
             }
         }
 
@@ -838,7 +838,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(subrange.upperBound <= MemoryLayout<Buffer>.size)
             assert(count - (subrange.upperBound - subrange.lowerBound) + replacementLength <= MemoryLayout<Buffer>.size)
             precondition(subrange.lowerBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
-            precondition(subrange.upperBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
+            precondition(subrange.upperBound <= length, "index \(subrange.upperBound) is out of bounds of 0..<\(length)")
             let currentLength = count
             let resultingLength = currentLength - (subrange.upperBound - subrange.lowerBound) + replacementLength
             let shift = resultingLength - currentLength
@@ -872,7 +872,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable
         var hashValue: Int {
-            let count: Int = numericCast(length)
+            let count = Int(length)
             return Swift.withUnsafeBytes(of: bytes) { (rawBuffer) -> Int in
                 return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self)), count))
             }
@@ -972,9 +972,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
 
         @inlinable
-        var startIndex: Int { return numericCast(slice.lowerBound) }
+        var startIndex: Int { return Int(slice.lowerBound) }
         @inlinable
-        var endIndex: Int { return numericCast(slice.upperBound) }
+        var endIndex: Int { return Int(slice.upperBound) }
 
         @inlinable
         var capacity: Int {
@@ -991,7 +991,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable
         var count: Int {
             get {
-                return numericCast(slice.upperBound - slice.lowerBound)
+                return Int(slice.upperBound - slice.lowerBound)
             }
             set(newValue) {
                 assert(newValue < HalfInt.max)
@@ -1004,7 +1004,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable
         var range: Range<Int> {
             get {
-                return numericCast(slice.lowerBound)..<numericCast(slice.upperBound)
+                return Int(slice.lowerBound)..<Int(slice.upperBound)
             }
             set(newValue) {
                 assert(newValue.lowerBound < HalfInt.max)
@@ -1029,7 +1029,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(endIndex + buffer.count < HalfInt.max)
             ensureUniqueReference()
             storage.replaceBytes(in: NSRange(location: range.upperBound, length: storage.length - (range.upperBound - storage._offset)), with: buffer.baseAddress, length: buffer.count)
-            slice = slice.lowerBound..<HalfInt(numericCast(slice.upperBound) + buffer.count)
+            slice = slice.lowerBound..<HalfInt(Int(slice.upperBound) + buffer.count)
         }
 
         @inlinable
@@ -2212,7 +2212,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @inlinable
     internal func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
-        if range.upperBound - range.lowerBound == 0 { return }
+        if range.isEmpty { return }
         _representation.copyBytes(to: pointer, from: range)
     }
     
@@ -2453,7 +2453,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter newElements: The replacement bytes.
     @inlinable
     public mutating func replaceSubrange<ByteCollection : Collection>(_ subrange: Range<Index>, with newElements: ByteCollection) where ByteCollection.Iterator.Element == Data.Iterator.Element {
-        let totalCount: Int = numericCast(newElements.count)
+        let totalCount = Int(newElements.count)
         _withStackOrHeapBuffer(totalCount) { conditionalBuffer in
             let buffer = UnsafeMutableBufferPointer(start: conditionalBuffer.pointee.memory.assumingMemoryBound(to: UInt8.self), count: totalCount)
             var (iterator, index) = newElements._copyContents(initializing: buffer)
@@ -2561,8 +2561,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             let lower = R.Bound(startIndex)
             let upper = R.Bound(endIndex)
             let range = rangeExpression.relative(to: lower..<upper)
-            let start: Int = numericCast(range.lowerBound)
-            let end: Int = numericCast(range.upperBound)
+            let start = Int(range.lowerBound)
+            let end = Int(range.upperBound)
             let r: Range<Int> = start..<end
             return _representation[r]
         }
@@ -2570,12 +2570,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             let lower = R.Bound(startIndex)
             let upper = R.Bound(endIndex)
             let range = rangeExpression.relative(to: lower..<upper)
-            let start: Int = numericCast(range.lowerBound)
-            let end: Int = numericCast(range.upperBound)
+            let start = Int(range.lowerBound)
+            let end = Int(range.upperBound)
             let r: Range<Int> = start..<end
             replaceSubrange(r, with: newValue)
         }
-        
     }
     
     /// The start `Index` in the data.
