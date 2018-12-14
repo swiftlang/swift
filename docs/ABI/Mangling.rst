@@ -90,9 +90,9 @@ The following symbolic reference kinds are currently implemented:
    dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor (NOT IMPLEMENTED)
    dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor (NOT IMPLEMENTED)
 
-   associated-conformance-acceess-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
-   associated-conformance-acceess-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
-   keypath-metadata-access-function ::= '\x09' {.4}  // Reference points directly to keypath type metadata access function
+   associated-conformance-access-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
+   associated-conformance-access-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
+   keypath-metadata-access-function ::= '\x09' {.4}  // Reference points directly to keypath conformance access function
 
 Globals
 ~~~~~~~
@@ -133,6 +133,8 @@ Globals
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
+  global ::= protocol 'MS'               // protocol self-conformance descriptor
+  global ::= protocol 'WS'               // protocol self-conformance witness table
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= protocol-conformance 'WP'   // protocol witness table
   global ::= protocol-conformance 'Wa'   // protocol witness table accessor (HISTORICAL)
@@ -144,7 +146,8 @@ Globals
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
-  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc-type-list protocol 'WT' // associated type witness table accessor
+  global ::= protocol-conformance protocol 'Wb' // base protocol witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
@@ -181,6 +184,7 @@ types where the metadata itself has unknown layout.)
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
+  global ::= entity 'TS'                 // protocol self-conformance witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
   global ::= global specialization       // function specialization
@@ -197,6 +201,7 @@ types where the metadata itself has unknown layout.)
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
   global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
   global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
+  global ::= type protocol 'Tb'          // base conformance descriptor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk

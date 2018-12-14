@@ -41,7 +41,7 @@ entry(%0 : @guaranteed $C):
 }
 
 sil hidden @$s13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
-entry(%0 : @trivial $@objc_metatype C.Type):
+entry(%0 : $@objc_metatype C.Type):
   unreachable
 }
 

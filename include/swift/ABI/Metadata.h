@@ -295,10 +295,9 @@ public:
   // Handle the data witnesses explicitly so we can use more specific
   // types for the flags enums.
   typedef size_t size;
-  typedef ValueWitnessFlags flags;
   typedef size_t stride;
-  typedef ExtraInhabitantFlags extraInhabitantFlags;
-
+  typedef ValueWitnessFlags flags;
+  typedef uint32_t extraInhabitantCount;
 };
 
 struct TypeLayout;
@@ -376,16 +375,9 @@ template <typename Runtime> struct TargetValueWitnessTable {
   
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
-  unsigned getNumExtraInhabitants() const;
-
-  /// Assert that this value witness table is an extra-inhabitants
-  /// value witness table and return it as such.
-  ///
-  /// This has an awful name because it's supposed to be internal to
-  /// this file.  Code outside this file should use LLVM's cast/dyn_cast.
-  /// We don't want to use those here because we need to avoid accidentally
-  /// introducing ABI dependencies on LLVM structures.
-  const struct ExtraInhabitantsValueWitnessTable *_asXIVWT() const;
+  unsigned getNumExtraInhabitants() const {
+    return extraInhabitantCount;
+  }
 
   /// Assert that this value witness table is an enum value witness table
   /// and return it as such.
@@ -608,13 +600,6 @@ public:
   #define DATA_VALUE_WITNESS(LOWER, UPPER, TYPE)
   #include "swift/ABI/ValueWitness.def"
 
-  int vw_getExtraInhabitantIndex(const OpaqueValue *value) const  {
-    return getValueWitnesses()->_asXIVWT()->getExtraInhabitantIndex(value, this);
-  }
-  void vw_storeExtraInhabitant(OpaqueValue *value, int index) const {
-    getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
-  }
-
   unsigned vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
@@ -635,6 +620,10 @@ public:
 
   size_t vw_stride() const {
     return getValueWitnesses()->getStride();
+  }
+
+  unsigned vw_getNumExtraInhabitants() const {
+    return getValueWitnesses()->getNumExtraInhabitants();
   }
 
   /// Allocate an out-of-line buffer if values of this type don't fit in the
@@ -845,13 +834,15 @@ public:
 template <typename Runtime>
 struct TargetMethodOverrideDescriptor {
   /// The class containing the base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>> Class;
+  TargetRelativeIndirectablePointer<Runtime, TargetClassDescriptor<Runtime>,
+                                    /*nullable*/ true> Class;
 
   /// The base method.
-  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>> Method;
+  TargetRelativeIndirectablePointer<Runtime, TargetMethodDescriptor<Runtime>,
+                                    /*nullable*/ true> Method;
 
   /// The implementation of the override.
-  TargetRelativeDirectPointer<Runtime, void, /*Nullable=*/true> Impl;
+  TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> Impl;
 };
 
 /// Header for a class vtable override descriptor. This is a variable-sized
@@ -1059,8 +1050,9 @@ private:
   ConstTargetMetadataPointer<Runtime, TargetClassDescriptor> Description;
 
 public:
-  /// A function for destroying instance variables, used to clean up
-  /// after an early return from a constructor.
+  /// A function for destroying instance variables, used to clean up after an
+  /// early return from a constructor. If null, no clean up will be performed
+  /// and all ivars must be trivial.
   TargetPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
 
   // After this come the class members, laid out as follows:
@@ -1743,7 +1735,8 @@ struct TargetExistentialTypeMetadata
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
-  using MetadataPointer = ConstTargetMetadataPointer<Runtime, TargetMetadata>;
+  using MetadataPointer =
+      ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
   using TrailingObjects =
           swift::ABI::TrailingObjects<
           TargetExistentialTypeMetadata<Runtime>,
@@ -1954,7 +1947,7 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
 };
 using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance witness.
 ///
 /// Resilient conformances must use a pattern where new requirements
@@ -2005,7 +1998,7 @@ struct TargetResilientWitnessTable final
 };
 using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
 
-/// \brief The control structure of a generic or resilient protocol
+/// The control structure of a generic or resilient protocol
 /// conformance, which is embedded in the protocol conformance descriptor.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:
@@ -2083,10 +2076,10 @@ public:
   const TargetTypeContextDescriptor<Runtime> *
   getTypeContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
+    case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
+    case TypeReferenceKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
 
     // These types (and any others we might add to TypeReferenceKind
@@ -2172,14 +2165,14 @@ public:
 template <typename Runtime>
 struct TargetTypeReference {
   union {
-    /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetTypeContextDescriptor<Runtime>>
-      DirectNominalTypeDescriptor;
+    /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
+    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
+      DirectTypeDescriptor;
 
-    /// An indirect reference to a nominal type descriptor.
+    /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
     RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>>
-      IndirectNominalTypeDescriptor;
+        ConstTargetMetadataPointer<Runtime, TargetContextDescriptor>>
+      IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
     RelativeDirectPointer<
@@ -2191,14 +2184,14 @@ struct TargetTypeReference {
       DirectObjCClassName;
   };
 
-  const TargetTypeContextDescriptor<Runtime> *
-  getTypeContextDescriptor(TypeReferenceKind kind) const {
+  const TargetContextDescriptor<Runtime> *
+  getTypeDescriptor(TypeReferenceKind kind) const {
     switch (kind) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor;
+    case TypeReferenceKind::DirectTypeDescriptor:
+      return DirectTypeDescriptor;
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor;
+    case TypeReferenceKind::IndirectTypeDescriptor:
+      return *IndirectTypeDescriptor;
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
@@ -2305,8 +2298,8 @@ public:
     return TypeRef.getIndirectObjCClass(getTypeKind());
   }
   
-  const TargetTypeContextDescriptor<Runtime> *getTypeContextDescriptor() const {
-    return TypeRef.getTypeContextDescriptor(getTypeKind());
+  const TargetContextDescriptor<Runtime> *getTypeDescriptor() const {
+    return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
   /// Retrieve the context of a retroactive conformance.
@@ -2610,6 +2603,57 @@ public:
 };
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
+
+template<typename Runtime>
+class TargetGenericEnvironment
+    : public swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+               uint16_t, GenericParamDescriptor,
+               TargetGenericRequirementDescriptor<Runtime>> {
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<Runtime>;
+  using TrailingObjects =
+     swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+       uint16_t, GenericParamDescriptor, GenericRequirementDescriptor>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<uint16_t>) const {
+    return Flags.getNumGenericParameterLevels();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
+    return getGenericParameterCounts().back();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+    return Flags.getNumGenericRequirements();
+  }
+
+  GenericEnvironmentFlags Flags;
+
+public:
+  /// Retrieve the cumulative generic parameter counts at each level of genericity.
+  ArrayRef<uint16_t> getGenericParameterCounts() const {
+    return ArrayRef<uint16_t>(this->template getTrailingObjects<uint16_t>(),
+                              Flags.getNumGenericParameterLevels());
+  }
+
+  /// Retrieve the generic parameters descriptors.
+  ArrayRef<GenericParamDescriptor> getGenericParameters() const {
+    return ArrayRef<GenericParamDescriptor>(
+             this->template getTrailingObjects<GenericParamDescriptor>(),
+             getGenericParameterCounts().back());
+  }
+
+  /// Retrieve the generic requirements.
+  ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
+    return ArrayRef<GenericRequirementDescriptor>(
+             this->template getTrailingObjects<GenericRequirementDescriptor>(),
+             Flags.getNumGenericRequirements());
+  }
+};
 
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
@@ -3059,7 +3103,8 @@ struct TargetGenericClassMetadataPattern final :
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
@@ -3296,13 +3341,18 @@ using MetadataRelocator =
 template <typename Runtime>
 struct TargetResilientClassMetadataPattern {
   /// A function that allocates metadata with the correct size at runtime.
-  TargetRelativeDirectPointer<Runtime, MetadataRelocator> RelocationFunction;
+  ///
+  /// If this is null, the runtime instead calls swift_relocateClassMetadata(),
+  /// passing in the class descriptor and this pattern.
+  TargetRelativeDirectPointer<Runtime, MetadataRelocator, /*nullable*/ true>
+    RelocationFunction;
 
   /// The heap-destructor function.
   TargetRelativeDirectPointer<Runtime, HeapObjectDestroyer> Destroy;
 
   /// The ivar-destructor function.
-  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer> IVarDestroyer;
+  TargetRelativeDirectPointer<Runtime, ClassIVarDestroyer, /*nullable*/ true>
+    IVarDestroyer;
 
   /// The class flags.
   ClassFlags Flags;
@@ -3356,14 +3406,10 @@ struct TargetSingletonMetadataInitialization {
             classDescription->hasResilientSuperclass());
   }
 
+  /// This method can only be called from the runtime itself. It is defined
+  /// in MetadataCache.h.
   TargetMetadata<Runtime> *allocate(
-      const TargetTypeContextDescriptor<Runtime> *description) const {
-    if (hasResilientClassPattern(description)) {
-      return ResilientPattern->RelocationFunction(description,
-                                                  ResilientPattern.get());
-    }
-    return IncompleteMetadata.get();
-  }
+      const TargetTypeContextDescriptor<Runtime> *description) const;
 };
 
 template <typename Runtime>

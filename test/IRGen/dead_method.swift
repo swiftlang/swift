@@ -12,7 +12,7 @@ public class Class {
   private func dead() {}
 }
 
-// CHECK-LABEL: @"$s11dead_method5ClassCMn" ={{( protected)?}} constant <{{.*}}> <{
+// CHECK-LABEL: @"$s11dead_method5ClassCMn" ={{( dllexport)?}}{{( protected)?}} constant <{{.*}}> <{
 
 // -- metadata accessor
 // CHECK-SAME: "$s11dead_method5ClassCMa"

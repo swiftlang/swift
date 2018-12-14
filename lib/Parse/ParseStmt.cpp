@@ -266,8 +266,12 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConditionalBlockKind) {
+  bool isRootCtx = SyntaxContext->isRoot();
   SyntaxParsingContext ItemListContext(SyntaxContext,
                                        SyntaxKind::CodeBlockItemList);
+  if (isRootCtx) {
+    ItemListContext.setTransparent();
+  }
 
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);

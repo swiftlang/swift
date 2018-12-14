@@ -6,7 +6,7 @@ import Builtin
 class C {}
 
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {
-bb0(%0 : @trivial $*Optional<U>):
+bb0(%0 : $*Optional<U>):
   %1 = load [copy] %0 : $*Optional<U>
   %2 = ref_to_unmanaged %1 : $Optional<U> to $@sil_unmanaged Optional<U>
   %3 = unmanaged_to_ref %2 : $@sil_unmanaged Optional<U> to $Optional<U>

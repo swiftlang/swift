@@ -60,7 +60,7 @@ bb0:
   %0 = function_ref @error_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
   try_apply %0() : $@convention(thin) () -> (Builtin.Int32, @error Error), normal bb1, error bb2
 
-bb1(%2 : @trivial $Builtin.Int32):
+bb1(%2 : $Builtin.Int32):
   %9999 = tuple()
   return %9999 : $()
 

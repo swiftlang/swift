@@ -60,8 +60,8 @@ public struct Selector : ExpressibleByStringLiteral {
     self = sel_registerName(value)
   }
 
-  public var hashValue: Int {
-    return ptr.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ptr)
   }
 }
 
@@ -88,12 +88,16 @@ public func ~=(x: NSObject, y: NSObject) -> Bool {
 }
 
 extension NSObject : Equatable, Hashable {
-  @objc open var hashValue: Int {
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
+  public var hashValue: Int {
     return hash
   }
 
-  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
-    return lhs.isEqual(rhs)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(hash)
   }
 }
 

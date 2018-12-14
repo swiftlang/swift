@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // Some fake predicates for pattern guards.
 func runced() -> Bool { return true }
@@ -152,7 +152,7 @@ func test5() {
     // CHECK:   debug_value [[SECOND_N:%.*]] : $Int, let, name "n"
     // CHECK:   br [[CASE2]]([[SECOND_N]] : $Int)
     
-    // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : @trivial $Int):
+    // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : $Int):
     // CHECK:   [[Z:%.*]] = function_ref @$s18switch_fallthrough1zyySiF
     // CHECK    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
     // CHECK:   br [[CONT:bb[0-9]+]]

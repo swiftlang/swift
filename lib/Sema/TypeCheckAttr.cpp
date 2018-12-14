@@ -85,6 +85,7 @@ public:
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
+  IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -285,7 +286,6 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
-  void visitHasStorageAttr(HasStorageAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
@@ -426,16 +426,6 @@ void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
                                  attr->getAttrName());
-}
-
-void AttributeEarlyChecker::visitHasStorageAttr(HasStorageAttr *attr) {
-  auto *VD = cast<VarDecl>(D);
-  if (VD->getDeclContext()->getSelfClassDecl())
-    return;
-  auto nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl();
-  if (nominalDecl && isa<StructDecl>(nominalDecl))
-    return;
-  diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
 
 static Optional<Diag<bool,Type>>
@@ -2451,6 +2441,9 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
+  if (!D->getModuleContext()->isImplicitDynamicEnabled())
+    return;
+
   // Add the attribute if the decl kind allows it and it is not an accessor
   // decl. Accessor decls should always infer the var/subscript's attribute.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D) ||
@@ -2464,6 +2457,10 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     return;
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Don't turn stored into computed properties. This could conflict with
+    // exclusivity checking.
+    if (VD->hasStorage())
+      return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())
       return;

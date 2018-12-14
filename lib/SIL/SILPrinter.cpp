@@ -462,7 +462,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     if (!i.Type)
       return *this;
     *this << " : ";
-    if (i.OwnershipKind) {
+    if (i.OwnershipKind && *i.OwnershipKind != ValueOwnershipKind::Any) {
       *this << "@" << i.OwnershipKind.getValue() << " ";
     }
     return *this << i.Type;
@@ -1301,16 +1301,7 @@ public:
     
     *this << getIDAndType(MU->getOperand());
   }
-  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
-    *this << Ctx.getID(MU->getInitStorageFunc());
-    printSubstitutions(MU->getInitStorageSubstitutions());
-    *this << '(' << Ctx.getID(MU->getStorage())
-          << ") : " << MU->getInitStorageFunc()->getType() << ", "
-          << Ctx.getID(MU->getSetterFunc());
-    printSubstitutions(MU->getSetterSubstitutions());
-    *this << '(' << Ctx.getID(MU->getSelf())
-          << ") : " << MU->getSetterFunc()->getType();
-  }
+
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
     interleave(MFE->getElements(),
                [&](SILValue Var) { *this << getIDAndType(Var); },

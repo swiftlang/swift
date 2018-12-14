@@ -94,6 +94,8 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
+  /// A Clang module imported from DWARF.
+  DWARFModule
 };
 
 enum class SourceFileKind {
@@ -385,6 +387,17 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(Type type, ProtocolDecl *protocol);
 
+  /// Look for the conformance of the given existential type to the given
+  /// protocol.
+  Optional<ProtocolConformanceRef>
+  lookupExistentialConformance(Type type, ProtocolDecl *protocol);
+
+  /// Exposes TypeChecker functionality for querying protocol conformance.
+  /// Returns a valid ProtocolConformanceRef only if all conditional
+  /// requirements are successfully resolved.
+  Optional<ProtocolConformanceRef>
+  conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol);
+
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///
@@ -509,7 +522,7 @@ public:
   /// Source locations are ignored here.
   static bool isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs);
 
-  /// \brief Get the path for the file that this module came from, or an empty
+  /// Get the path for the file that this module came from, or an empty
   /// string if this is not applicable.
   StringRef getModuleFilename() const;
 
@@ -918,7 +931,7 @@ private:
   /// We only collect interface hash for primary input files.
   llvm::Optional<llvm::MD5> InterfaceHash;
 
-  /// \brief The ID for the memory buffer containing this file's source.
+  /// The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
@@ -1093,7 +1106,7 @@ public:
 
   void createReferencedNameTracker();
 
-  /// \brief The buffer ID for the file that was imported, or None if there
+  /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
   Optional<unsigned> getBufferID() const {
     if (BufferID == -1)
@@ -1111,7 +1124,7 @@ public:
   void dump() const;
   void dump(raw_ostream &os) const;
 
-  /// \brief Pretty-print the contents of this source file.
+  /// Pretty-print the contents of this source file.
   ///
   /// \param Printer The AST printer used for printing the contents.
   /// \param PO Options controlling the printing process.
@@ -1207,6 +1220,8 @@ public:
   bool shouldCollectToken() const;
 
   bool shouldBuildSyntaxTree() const;
+
+  bool canBeParsedInFull() const;
 
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
@@ -1308,6 +1323,9 @@ public:
     return nullptr;
   }
 
+  /// Returns the Swift module that overlays a Clang module.
+  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+
   virtual bool isSystemModule() const { return false; }
 
   /// Retrieve the set of generic signatures stored within this module.
@@ -1321,7 +1339,8 @@ public:
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
-           file->getKind() == FileUnitKind::ClangModule;
+           file->getKind() == FileUnitKind::ClangModule ||
+           file->getKind() == FileUnitKind::DWARFModule;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));

@@ -217,6 +217,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   ConstantInitBuilder B(*this);
   auto S = B.beginStruct();
   S.setPacked(true);
+  S.add(llvm::ConstantInt::get(Int8Ty, 255));
   S.add(llvm::ConstantInt::get(Int8Ty, kind));
   S.addRelativeAddress(accessor);
 
@@ -960,7 +961,11 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
 }
 
 void IRGenModule::
-emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
+emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
+  auto normalConf = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normalConf)
+    return;
+
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
@@ -976,14 +981,14 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
     return false;
   };
 
-  Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.
   if (AssociatedTypes.empty())
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Conformance, AssociatedTypes);
+  AssociatedTypeMetadataBuilder builder(*this, normalConf, AssociatedTypes);
   builder.emit();
 }
 

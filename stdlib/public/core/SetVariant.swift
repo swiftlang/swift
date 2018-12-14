@@ -92,8 +92,12 @@ extension Set._Variant {
     _modify {
       var native = _NativeSet<Element>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
+      defer {
+        // This is in a defer block because yield might throw, and we need to
+        // preserve Set's storage invariants when that happens.
+        object = .init(native: native._storage)
+      }
       yield &native
-      object = .init(native: native._storage)
     }
   }
 

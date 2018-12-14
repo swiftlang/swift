@@ -1127,7 +1127,7 @@ public:
 ProjectionTree::ProjectionTree(
     SILModule &Mod, SILType BaseTy,
     llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
-    : Mod(Mod), Allocator(Allocator) {
+    : Mod(&Mod), Allocator(&Allocator) {
   LLVM_DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
                           << "\n");
 

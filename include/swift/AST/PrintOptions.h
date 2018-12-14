@@ -123,16 +123,16 @@ struct ShouldPrintChecker {
 /// A default-constructed PrintOptions is suitable for printing to users;
 /// there are also factory methods for specific use cases.
 struct PrintOptions {
-  /// \brief The indentation width.
+  /// The indentation width.
   unsigned Indent = 2;
 
-  /// \brief Whether to print function definitions.
+  /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
-  /// \brief Whether to print '{ get set }' on readwrite computed properties.
+  /// Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
-  /// \brief Whether to print *any* accessors on properties.
+  /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
 
   /// Whether to print the accessors of a property abstractly,
@@ -161,16 +161,16 @@ struct PrintOptions {
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
 
-  /// \brief Whether to print type definitions.
+  /// Whether to print type definitions.
   bool TypeDefinitions = false;
 
-  /// \brief Whether to print variable initializers.
+  /// Whether to print variable initializers.
   bool VarInitializers = false;
 
-  /// \brief Whether to print enum raw value expressions.
+  /// Whether to print enum raw value expressions.
   bool EnumRawValues = false;
 
-  /// \brief Whether to prefer printing TypeReprs instead of Types,
+  /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.
   ///
@@ -178,22 +178,22 @@ struct PrintOptions {
   /// it to the user.
   bool PreferTypeRepr = true;
 
-  /// \brief Whether to print fully qualified Types.
+  /// Whether to print fully qualified Types.
   bool FullyQualifiedTypes = false;
 
-  /// \brief Print fully qualified types if our heuristics say that a certain
+  /// Print fully qualified types if our heuristics say that a certain
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
 
-  /// \brief Print Swift.Array and Swift.Optional with sugared syntax
+  /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
 
-  /// \brief If true, null types in the AST will be printed as "<null>". If
+  /// If true, null types in the AST will be printed as "<null>". If
   /// false, the compiler will trap.
   bool AllowNullTypes = true;
 
-  /// \brief If true, the printer will explode a pattern like this:
+  /// If true, the printer will explode a pattern like this:
   /// \code
   ///   var (a, b) = f()
   /// \endcode
@@ -210,10 +210,10 @@ struct PrintOptions {
   /// into multiple case declarations.
   bool ExplodeEnumCaseDecls = false;
 
-  /// \brief Whether to print implicit parts of the AST.
+  /// Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
-  /// \brief Whether to print unavailable parts of the AST.
+  /// Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
   /// Whether to skip internal stdlib declarations.
@@ -238,7 +238,7 @@ struct PrintOptions {
   /// Whether to skip printing 'import' declarations.
   bool SkipImports = false;
 
-  /// \brief Whether to skip printing overrides and witnesses for
+  /// Whether to skip printing overrides and witnesses for
   /// protocol requirements.
   bool SkipOverrides = false;
 
@@ -322,12 +322,12 @@ struct PrintOptions {
   ArgAndParamPrintingMode ArgAndParamPrinting =
       ArgAndParamPrintingMode::MatchSource;
 
-  /// \brief Whether to print documentation comments attached to declarations.
+  /// Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
   /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
 
-  /// \brief Whether to print regular comments from clang module headers.
+  /// Whether to print regular comments from clang module headers.
   bool PrintRegularClangComments = false;
 
   /// When true, printing interface from a source file will print the original
@@ -349,17 +349,17 @@ struct PrintOptions {
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
 
-  /// \brief Print dependent types as references into this generic environment.
+  /// Print dependent types as references into this generic environment.
   GenericEnvironment *GenericEnv = nullptr;
 
-  /// \brief Print types with alternative names from their canonical names.
+  /// Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
 
-  /// \brief The module in which the printer is used. Determines if the module
+  /// The module in which the printer is used. Determines if the module
   /// name should be printed when printing a type.
   ModuleDecl *CurrentModule = nullptr;
 
-  /// \brief The information for converting archetypes to specialized types.
+  /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
   bool PrintAsMember = false;
@@ -380,7 +380,7 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
-  /// \brief If this is not \c nullptr then function bodies (including accessors
+  /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
@@ -512,7 +512,7 @@ struct PrintOptions {
     return result;
   }
 
-  /// \brief Retrieve the set of options that prints everything.
+  /// Retrieve the set of options that prints everything.
   ///
   /// This is only intended for debug output.
   static PrintOptions printEverything() {

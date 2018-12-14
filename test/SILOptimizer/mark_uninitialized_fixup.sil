@@ -69,7 +69,7 @@ struct Bool {
 // CHECK: load [trivial] [[MUI]]
 // CHECK: destroy_value [[BOX]]
 sil @test_rauw_uses_of_project_box : $@convention(thin) (Builtin.Int1, @thin Bool.Type) -> Bool {
-bb0(%0 : @trivial $Builtin.Int1, %1 : @trivial $@thin Bool.Type):
+bb0(%0 : $Builtin.Int1, %1 : $@thin Bool.Type):
   %2 = alloc_box ${ var Bool }, var, name "self"
   %3 = mark_uninitialized [rootself] %2 : ${ var Bool }
   %4 = project_box %3 : ${ var Bool }, 0
@@ -85,7 +85,7 @@ bb0(%0 : @trivial $Builtin.Int1, %1 : @trivial $@thin Bool.Type):
 sil @capture_promotion_generated_callee : $@convention(thin) (@in Bool) -> ()
 
 // CHECK-LABEL: sil @test_copyvalue_use_of_projectbox : $@convention(thin) (Builtin.Int1) -> () {
-// CHECK: bb0([[ARG:%.*]] : @trivial $Builtin.Int1):
+// CHECK: bb0([[ARG:%.*]] : $Builtin.Int1):
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var Bool }, var, name "self"
 // CHECK:   [[PB:%.*]] = project_box [[BOX]]
 // CHECK:   [[MUI:%.*]] = mark_uninitialized [rootself] [[PB]]
@@ -94,7 +94,7 @@ sil @capture_promotion_generated_callee : $@convention(thin) (@in Bool) -> ()
 // CHECK:   destroy_value [[BOX_COPY]]
 // CHECK:   destroy_value [[BOX]]
 sil @test_copyvalue_use_of_projectbox : $@convention(thin) (Builtin.Int1) -> () {
-bb0(%0 : @trivial $Builtin.Int1):
+bb0(%0 : $Builtin.Int1):
   // Initial initialization.
   %1 = alloc_box ${ var Bool }, var, name "self"
   %2 = mark_uninitialized [rootself] %1 : ${ var Bool }

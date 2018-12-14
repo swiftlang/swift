@@ -19,26 +19,22 @@
 class Base {
   // CHECK: define hidden swiftcc void @"$s14method_linkage4Base{{.*}}3foo0
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage4Base{{.*}}3foo0
-  @inline(never)
   fileprivate func foo() {
   }
 
   // CHECK: define internal swiftcc void @"$s14method_linkage4Base{{.*}}3bar0
   // RESILIENT: define internal swiftcc void @"$s14method_linkage4Base{{.*}}3bar0
-  @inline(never)
   fileprivate final func bar() {
   }
 
   // CHECK: define hidden swiftcc void @"$s14method_linkage4Base{{.*}}5other0
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage4Base{{.*}}5other0
-  @inline(never)
   fileprivate func other() {
   }
 }
 class Derived : Base {
   // CHECK: define internal swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
   // RESILIENT: define internal swiftcc void @"$s14method_linkage7Derived{{.*}}3foo0
-  @inline(never)
   fileprivate final override func foo() {
   }
 }
@@ -46,7 +42,6 @@ class Derived : Base {
 extension Base {
   // CHECK: define internal swiftcc void @"$s14method_linkage4Base{{.*}}7extfunc0
   // RESILIENT: define internal swiftcc void @"$s14method_linkage4Base{{.*}}7extfunc0
-  @inline(never)
   fileprivate func extfunc() {
   }
 }
@@ -56,14 +51,22 @@ public class PublicClass {
 
   // CHECK: define hidden swiftcc void @"$s14method_linkage11PublicClass{{.*}}4pfoo0
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage11PublicClass{{.*}}4pfoo0
-  @inline(never)
   fileprivate func pfoo() {
   }
 
   // CHECK: define hidden swiftcc void @"$s14method_linkage11PublicClassC4pbaryyF
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage11PublicClassC4pbaryyF
-  @inline(never)
   internal func pbar() {
+  }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage11PublicClassC4pbazyyF"
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage11PublicClassC4pbazyyF"
+  public func pbaz() {
+  }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage11PublicClassC5pquuxyyF"
+  // RESILIENT: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage11PublicClassC5pquuxyyF"
+  public final func pquux() {
   }
 }
 
@@ -72,24 +75,29 @@ open class OpenClass {
 
   // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC4pfoo0
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage9OpenClassC4pfoo0
-  @inline(never)
   fileprivate func pfoo() {
   }
 
   // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC4pbaryyF
   // RESILIENT: define hidden swiftcc void @"$s14method_linkage9OpenClassC4pbaryyF
-  @inline(never)
   internal func pbar() {
+  }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC4pbazyyF"
+  // RESILIENT: define hidden swiftcc void @"$s14method_linkage9OpenClassC4pbazyyF"
+  public func pbaz() {
+  }
+
+  // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC5pquuxyyF"
+  // RESILIENT: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s14method_linkage9OpenClassC5pquuxyyF"
+  public final func pquux() {
   }
 }
 
 // Just in case anyone wants to delete unused methods...
-func callit(b: Base, p: PublicClass) {
+func callit(b: Base) {
   b.foo()
   b.bar()
   b.other()
   b.extfunc()
-  p.pfoo()
-  p.pbar()
 }
-

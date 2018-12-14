@@ -642,11 +642,13 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 CanSILFunctionType substType,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
+  if (param.isFormalIndirect())
+    return false;
+
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
-  auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+  auto &ti = IGF.getTypeInfoForLowered(argType.getASTType());
   // Empty values don't matter.
-  return ti.getSchema().empty() && !param.isFormalIndirect();
+  return ti.getSchema().empty();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially
@@ -1434,7 +1436,9 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
-    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    // We might get a struct containing a pointer e.g type <{ %AClass* }>
+    if (ctx->getType() != IGF.IGM.RefCountedPtrTy)
+      ctx = IGF.coerceValue(ctx, IGF.IGM.RefCountedPtrTy, IGF.IGM.DataLayout);
     out.add(ctx);
     return;
   }

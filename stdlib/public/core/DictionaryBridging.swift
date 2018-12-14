@@ -62,11 +62,11 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   @objc
   internal override required init() {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: __owned _NativeDictionary<Key, Value>) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = base
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
@@ -75,7 +75,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSDictionary<Key, Value>) {
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket
@@ -83,7 +83,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(bucket))
+    _internalInvariant(base.hashTable.isOccupied(bucket))
     if let bridgedKeys = self.bridgedKeys {
       return bridgedKeys[bucket]
     }
@@ -157,8 +157,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   internal var native: _NativeDictionary<Key, Value>
 
   internal init(_ native: __owned _NativeDictionary<Key, Value>) {
-    _sanityCheck(native.count > 0)
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self) ||
+    _internalInvariant(native.count > 0)
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self) ||
       !_isBridgedVerbatimToObjectiveC(Value.self))
     self.native = native
     super.init()
@@ -170,7 +170,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @nonobjc
@@ -498,7 +498,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
         return Index(Index.Storage(self, allKeys), offset: i)
       }
     }
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "An NSDictionary key wassn't listed amongst its enumerated contents")
   }
 

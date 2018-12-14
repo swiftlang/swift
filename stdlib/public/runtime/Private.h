@@ -218,35 +218,47 @@ public:
   _contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                     Demangle::NodePointer node);
   
-  const TypeContextDescriptor *
+  const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
 
-  /// Callback used to provide the substitution for a generic parameter
-  /// referenced by a "flat" index (where all depths have been collapsed)
-  /// to its metadata.
-  using SubstFlatGenericParameterFn =
-    llvm::function_ref<const Metadata *(unsigned flatIndex)>;
-
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   using SubstGenericParameterFn =
-    llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
+    std::function<const Metadata *(unsigned depth, unsigned index)>;
+
+  /// Callback used to provide the substitution of a witness table based on
+  /// its index into the enclosing generic environment.
+  using SubstDependentWitnessTableFn =
+    std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the generic arguments from
   /// the given metadata.
   ///
-  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  /// Use with \c _getTypeByMangledName to decode potentially-generic
+  /// types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
-    const Metadata *base;
+    /// Whether the source is metadata (vs. a generic environment);
+    const bool sourceIsMetadata;
+
+    union {
+      const TargetContextDescriptor<InProcess> *baseContext;
+      const TargetGenericEnvironment<InProcess> *environment;
+    };
+
+    /// The generic arguments.
+    const void * const *genericArgs;
 
     /// An element in the descriptor path.
     struct PathElement {
-      /// The context described by this path element.
-      const ContextDescriptor *context;
+      /// The generic parameters local to this element.
+      ArrayRef<GenericParamDescriptor> localGenericParams;
+
+      /// The total number of generic parameters.
+      unsigned numTotalGenericParams;
 
       /// The number of key parameters in the parent.
       unsigned numKeyGenericParamsInParent;
@@ -262,11 +274,18 @@ public:
     /// descriptor, from the outermost to the innermost.
     mutable std::vector<PathElement> descriptorPath;
 
+    /// The number of key generic parameters.
+    mutable unsigned numKeyGenericParameters = 0;
+
     /// Builds the descriptor path.
     ///
     /// \returns a pair containing the number of key generic parameters in
     /// the path up to this point.
     unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    /// Builds a path from the generic environment.
+    unsigned buildEnvironmentPath(
+               const TargetGenericEnvironment<InProcess> *environment) const;
 
     // Set up the state we need to compute substitutions.
     void setup() const;
@@ -274,18 +293,51 @@ public:
   public:
     /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
-      : base(base) { }
+      : sourceIsMetadata(true), baseContext(base->getTypeContextDescriptor()),
+        genericArgs(base ? (const void * const *)base->getGenericArgs()
+                         : nullptr) { }
+    
+    /// Produce substitutions from the given instantiation arguments for the
+    /// given context.
+    explicit SubstGenericParametersFromMetadata(const ContextDescriptor *base,
+                                                const void * const *args)
+      : sourceIsMetadata(true), baseContext(base), genericArgs(args)
+    {}
 
-    const Metadata *operator()(unsigned flatIndex) const;
+    /// Produce substitutions from the given instantiation arguments for the
+    /// given generic environment.
+    explicit SubstGenericParametersFromMetadata(
+               const TargetGenericEnvironment<InProcess> *environment,
+               const void * const *arguments)
+      : sourceIsMetadata(false), environment(environment),
+        genericArgs(arguments) { }
+
     const Metadata *operator()(unsigned depth, unsigned index) const;
+    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
   };
+
+  /// Retrieve the type metadata described by the given demangled type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  TypeInfo swift_getTypeByMangledNode(
+                               Demangler &demangler,
+                               Demangle::NodePointer node,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
   /// given a particular generic parameter specified by depth/index.
-  TypeInfo _getTypeByMangledName(StringRef typeName,
-                                 SubstGenericParameterFn substGenericParam);
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  TypeInfo swift_getTypeByMangledName(
+                               StringRef typeName,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the complete set of generic
@@ -316,8 +368,8 @@ public:
       : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
     }
 
-    const Metadata *operator()(unsigned flatIndex) const;
     const Metadata *operator()(unsigned depth, unsigned index) const;
+    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
   };
 
   /// Gather generic parameter counts from a context descriptor.
@@ -345,8 +397,8 @@ public:
   bool _checkGenericRequirements(
                     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                     std::vector<const void *> &extraArguments,
-                    SubstFlatGenericParameterFn substFlatGenericParam,
-                    SubstGenericParameterFn substGenericParam);
+                    SubstGenericParameterFn substGenericParam,
+                    SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -452,11 +504,22 @@ public:
                            ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
 
+  /// Construct type metadata for the given protocol.
+  const Metadata *
+  _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
+
   /// Given a type that we know can be used with the given conformance, find
   /// the superclass that introduced the conformance.
   const Metadata *findConformingSuperclass(
                              const Metadata *type,
                              const ProtocolConformanceDescriptor *conformance);
+
+  /// Determine whether the given type conforms to the given Swift protocol,
+  /// returning the appropriate protocol conformance descriptor when it does.
+  const ProtocolConformanceDescriptor *
+  swift_conformsToSwiftProtocol(const Metadata * const type,
+                                const ProtocolDescriptor *protocol,
+                                StringRef module);
 
   /// Retrieve an associated type witness from the given witness table.
   ///

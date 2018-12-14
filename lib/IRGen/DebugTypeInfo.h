@@ -88,14 +88,6 @@ public:
     return Type->getWithoutSpecifierType()->is<ArchetypeType>();
   }
 
-  /// LValues, inout args, and Archetypes are implicitly indirect by
-  /// virtue of their DWARF type.
-  //
-  // FIXME: There exists an inverse workaround in LLDB. Both should be removed.
-  bool isImplicitlyIndirect() const {
-    return isArchetype();
-  }
-
   bool isNull() const { return Type == nullptr; }
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;

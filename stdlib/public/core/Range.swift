@@ -772,7 +772,7 @@ public enum UnboundedRange_ {
   /// The unbounded range operator (`...`) is valid only within a collection's
   /// subscript.
   public static postfix func ... (_: UnboundedRange_) -> () {
-    fatalError("uncallable")
+    // This function is uncallable
   }
 }
 

@@ -110,7 +110,7 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
     GenericEnvironment *env = nullptr;
     loweredType.findIf([&env](Type t) -> bool {
         if (auto arch = t->getAs<ArchetypeType>()) {
-          env = arch->getGenericEnvironment();
+          env = arch->getPrimary()->getGenericEnvironment();
           return true;
         }
         return false;

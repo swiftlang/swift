@@ -119,6 +119,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
         subscript.withPathElement(PathEltKind::SubscriptMember));
+  } else if (isa<MemberRefExpr>(anchor)) {
+    ConstraintLocatorBuilder memberRef(locator);
+    locator =
+        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
@@ -576,10 +580,22 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr)
     return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-
-  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-  return true;
+  
+  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
+  auto subExprType = getType(tryExpr->getSubExpr());
+  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+  
+  
+  if (isSwift5OrGreater && subExpressionIsOptional) {
+    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
+    // under Swift 5+, so just report that a missing unwrap can't be handled here.
+    return false;
+  }
+  else {
+    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+    return true;
+  }
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
@@ -1193,4 +1209,69 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
   }
 
   return false;
+}
+
+bool AutoClosureForwardingFailure::diagnoseAsError() {
+  auto path = getLocator()->getPath();
+  assert(!path.empty());
+
+  auto &last = path.back();
+  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+
+  // We need a raw anchor here because `getAnchor()` is simplified
+  // to the argument expression.
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
+      .highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
+  return true;
+}
+
+bool MissingCallFailure::diagnoseAsError() {
+  auto *baseExpr = getAnchor();
+  SourceLoc insertLoc = baseExpr->getEndLoc();
+
+  if (auto *FVE = dyn_cast<ForceValueExpr>(baseExpr))
+    baseExpr = FVE->getSubExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
+    emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function,
+                   DRE->getDecl()->getBaseName().getIdentifier())
+        .fixItInsertAfter(insertLoc, "()");
+    return true;
+  }
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(baseExpr)) {
+    emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
+                   UDE->getName().getBaseIdentifier())
+        .fixItInsertAfter(insertLoc, "()");
+    return true;
+  }
+
+  if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(baseExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+      emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_method,
+                     DRE->getDecl()->getBaseName().getIdentifier())
+          .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  emitDiagnostic(baseExpr->getLoc(), diag::did_not_call_function_value)
+      .fixItInsertAfter(insertLoc, "()");
+  return true;
 }

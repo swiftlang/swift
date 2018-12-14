@@ -848,18 +848,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
     assert(anchor);
 
-    auto *call = dyn_cast<ApplyExpr>(anchor);
-    if (!call)
-      return false;
-
-    Expr *argExpr = nullptr;
-    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
-      assert(argsWithLabels.size() == 1);
-      argExpr = PE->getSubExpr();
-    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
-      argExpr = TE->getElement(argIdx);
-    }
-
+    auto *argExpr = getArgumentExpr(anchor, argIdx);
     if (!argExpr)
       return false;
 
@@ -895,11 +884,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // is itself `@autoclosure` function type in Swift < 5,
       // let's fix that up by making it look like argument is
       // called implicitly.
-      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
-        if (param.isAutoClosure() &&
-            isAutoClosureArg(locator.getAnchor(), argIdx)) {
-          argTy = argTy->castTo<FunctionType>()->getResult();
-          cs.increaseScore(SK_FunctionConversion);
+      if (param.isAutoClosure() &&
+          isAutoClosureArg(locator.getAnchor(), argIdx)) {
+        argTy = argTy->castTo<FunctionType>()->getResult();
+        cs.increaseScore(SK_FunctionConversion);
+
+        if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+          auto *fixLoc = cs.getConstraintLocator(loc);
+          if (cs.recordFix(AutoClosureForwarding::create(cs, fixLoc)))
+            return cs.getTypeMatchFailure(loc);
         }
       }
 
@@ -1903,7 +1896,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return formUnsolvedResult();
 
     case TypeKind::TypeVariable:
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
       // Nothing to do here; handle type variables and archetypes below.
       break;
 
@@ -1969,21 +1964,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto meta1 = cast<AnyMetatypeType>(desugar1);
       auto meta2 = cast<AnyMetatypeType>(desugar2);
 
-      ConstraintKind subKind = ConstraintKind::Equal;
       // A.Type < B.Type if A < B and both A and B are classes.
-      if (isa<MetatypeType>(meta1) &&
-          meta1->getInstanceType()->mayHaveSuperclass() &&
-          meta2->getInstanceType()->getClassOrBoundGenericClass())
-        subKind = std::min(kind, ConstraintKind::Subtype);
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
-      // and Q.Type are both existential metatypes.
-      else if (isa<ExistentialMetatypeType>(meta1))
-        subKind = std::min(kind, ConstraintKind::Subtype);
-      
-      return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
-                        subKind, subflags,
-                        locator.withPathElement(
-                          ConstraintLocator::InstanceType));
+      // and Q.Type are both existential metatypes
+      auto subKind = std::min(kind, ConstraintKind::Subtype);
+      // If instance types can't have a subtype relationship
+      // it means that such types can be simply equated.
+      auto instanceType1 = meta1->getInstanceType();
+      auto instanceType2 = meta2->getInstanceType();
+      if (isa<MetatypeType>(meta1) &&
+          !(instanceType1->mayHaveSuperclass() &&
+            instanceType2->getClassOrBoundGenericClass())) {
+        subKind = ConstraintKind::Equal;
+      }
+
+      return matchTypes(
+          instanceType1, instanceType2, subKind, subflags,
+          locator.withPathElement(ConstraintLocator::InstanceType));
     }
 
     case TypeKind::Function: {
@@ -2401,6 +2398,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           forceUnwrapPossible = false;
         }
       }
+      
+      if (auto optTryExpr =
+          dyn_cast_or_null<OptionalTryExpr>(locator.trySimplifyToExpr())) {
+        auto subExprType = getType(optTryExpr->getSubExpr());
+        bool isSwift5OrGreater = TC.getLangOpts().isSwiftVersionAtLeast(5);
+        if (isSwift5OrGreater && (bool)subExprType->getOptionalObjectType()) {
+          // For 'try?' expressions, a ForceOptional fix converts 'try?'
+          // to 'try!'. If the sub-expression is optional, then a force-unwrap
+          // won't change anything in Swift 5+ because 'try?' already avoids
+          // adding an additional layer of Optional there.
+          forceUnwrapPossible = false;
+        }
+      }
+      
 
       if (forceUnwrapPossible) {
         conversionsOrFixes.push_back(
@@ -2473,6 +2484,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (conversionsOrFixes.size() > 1) {
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
+
     for (auto potential : conversionsOrFixes) {
       auto constraintKind = kind;
 
@@ -2485,6 +2497,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         constraints.push_back(
           Constraint::createRestricted(*this, constraintKind, *restriction,
                                        type1, type2, fixedLocator));
+
+        if (constraints.back()->getKind() == ConstraintKind::Equal)
+          constraints.back()->setFavored();
+
         continue;
       }
 
@@ -2493,6 +2509,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
                                 fixedLocator));
     }
+
+    // Sort favored constraints first.
+    std::sort(constraints.begin(), constraints.end(),
+              [&](Constraint *lhs, Constraint *rhs) -> bool {
+                if (lhs->isFavored() == rhs->isFavored())
+                  return false;
+
+                return lhs->isFavored();
+              });
+
     addDisjunctionConstraint(constraints, fixedLocator);
     return getTypeMatchSuccess();
   }
@@ -2584,7 +2610,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
@@ -2955,10 +2983,27 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
     return SolutionKind::Unsolved;
   }
   
-  // If the base type is not optional, the constraint fails.
+
   Type objectTy = optTy->getOptionalObjectType();
-  if (!objectTy)
-    return SolutionKind::Error;
+  // If the base type is not optional, let's attempt a fix (if possible)
+  // and assume that `!` is just not there.
+  if (!objectTy) {
+    // Let's see if we can apply a specific fix here.
+    if (shouldAttemptFixes()) {
+      auto *fix =
+          RemoveUnwrap::create(*this, optTy, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      // If the fix was successful let's record
+      // "fixed" object type and continue.
+      objectTy = optTy;
+    } else {
+      // If fixes are not allowed, no choice but to fail.
+      return SolutionKind::Error;
+    }
+  }
   
   // The object type is an lvalue if the optional was.
   if (optLValueTy->is<LValueType>())
@@ -2969,7 +3014,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
   return SolutionKind::Solved;
 }
 
-/// \brief Attempt to simplify a function input or result constraint.
+/// Attempt to simplify a function input or result constraint.
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyFunctionComponentConstraint(
                                         ConstraintKind kind,
@@ -3693,49 +3738,72 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
-  if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
-    // If the base type was an optional, look through it.
+  if (shouldAttemptFixes()) {
+    if (baseObjTy->getOptionalObjectType()) {
+      // If the base type was an optional, look through it.
 
-    // If the base type is optional because we haven't chosen to force an
-    // implicit optional, don't try to fix it. The IUO will be forced instead.
-    if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
-      auto baseExpr = dotExpr->getBase();
-      auto resolvedOverload = getResolvedOverloadSets();
-      while (resolvedOverload) {
-        if (resolvedOverload->Locator->getAnchor() == baseExpr) {
-          if (resolvedOverload->Choice.isImplicitlyUnwrappedValueOrReturnValue())
-            return SolutionKind::Error;
-          break;
+      // If the base type is optional because we haven't chosen to force an
+      // implicit optional, don't try to fix it. The IUO will be forced instead.
+      if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
+        auto baseExpr = dotExpr->getBase();
+        auto resolvedOverload = getResolvedOverloadSets();
+        while (resolvedOverload) {
+          if (resolvedOverload->Locator->getAnchor() == baseExpr) {
+            if (resolvedOverload->Choice
+                    .isImplicitlyUnwrappedValueOrReturnValue())
+              return SolutionKind::Error;
+            break;
+          }
+          resolvedOverload = resolvedOverload->Previous;
         }
-        resolvedOverload = resolvedOverload->Previous;
       }
+
+      // The result of the member access can either be the expected member type
+      // (for '!' or optional members with '?'), or the original member type
+      // with one extra level of optionality ('?' with non-optional members).
+      auto innerTV = createTypeVariable(locator, TVO_CanBindToLValue);
+      Type optTy = getTypeChecker().getOptionalType(
+          locator->getAnchor()->getSourceRange().Start, innerTV);
+      SmallVector<Constraint *, 2> optionalities;
+      auto nonoptionalResult = Constraint::createFixed(
+          *this, ConstraintKind::Bind,
+          UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
+          locator);
+      auto optionalResult = Constraint::createFixed(
+          *this, ConstraintKind::Bind,
+          UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
+          optTy, memberTy, locator);
+      optionalities.push_back(nonoptionalResult);
+      optionalities.push_back(optionalResult);
+      addDisjunctionConstraint(optionalities, locator);
+
+      // Look through one level of optional.
+      addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
+                               innerTV, useDC, functionRefKind,
+                               outerAlternatives, locator);
+      return SolutionKind::Solved;
     }
 
-    // The result of the member access can either be the expected member type
-    // (for '!' or optional members with '?'), or the original member type with
-    // one extra level of optionality ('?' with non-optional members).
-    auto innerTV =
-        createTypeVariable(locator, TVO_CanBindToLValue);
-    Type optTy = getTypeChecker().getOptionalType(
-        locator->getAnchor()->getSourceRange().Start, innerTV);
-    SmallVector<Constraint *, 2> optionalities;
-    auto nonoptionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind,
-        UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
-        locator);
-    auto optionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind,
-        UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
-        optTy, memberTy, locator);
-    optionalities.push_back(nonoptionalResult);
-    optionalities.push_back(optionalResult);
-    addDisjunctionConstraint(optionalities, locator);
+    if (auto *funcType = baseTy->getAs<FunctionType>()) {
+      // We can't really suggest anything useful unless
+      // function takes no arguments, otherwise it
+      // would make sense to report this a missing member.
+      if (funcType->getNumParams() == 0) {
+        auto *fix = InsertExplicitCall::create(*this, locator);
+        if (recordFix(fix))
+          return SolutionKind::Error;
 
-    // Look through one level of optional.
-    addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
-                             innerTV, useDC, functionRefKind, outerAlternatives,
-                             locator);
-    return SolutionKind::Solved;
+        auto result = simplifyMemberConstraint(
+            kind, funcType->getResult(), member, memberTy, useDC,
+            functionRefKind, outerAlternatives, flags, locatorB);
+
+        // If there is indeed a member with given name in result type
+        // let's return, otherwise let's fall-through and report
+        // this problem as a missing member.
+        if (result == SolutionKind::Solved)
+          return result;
+      }
+    }
   }
   return SolutionKind::Error;
 }
@@ -4094,7 +4162,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
       instanceTy = metaTy->getInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = ArchetypeType::getOpened(instanceTy);
+    Type openedTy = OpenedArchetypeType::get(instanceTy);
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, TC.Context);
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
@@ -5398,10 +5466,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
+  case FixKind::InsertCall:
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
+  case FixKind::AutoClosureForwarding:
+  case FixKind::RemoveUnwrap:
     llvm_unreachable("handled elsewhere");
   }
 

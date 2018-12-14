@@ -116,6 +116,7 @@ set(SWIFTLIB_ESSENTIAL
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
+  Result.swift
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
@@ -175,6 +176,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
+  CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -205,6 +207,8 @@ set(SWIFTLIB_SOURCES
   PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
+  SIMDVector.swift
+  SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift

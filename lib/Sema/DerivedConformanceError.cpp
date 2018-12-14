@@ -26,7 +26,7 @@
 using namespace swift;
 
 static void deriveBodyBridgedNSError_enum_nsErrorDomain(
-              AbstractFunctionDecl *domainDecl) {
+              AbstractFunctionDecl *domainDecl, void *) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {

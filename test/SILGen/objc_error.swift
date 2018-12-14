@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_error -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_error %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -138,7 +138,7 @@ func eraseFictionalServerError() -> Error {
 // SR-1562
 extension Error {
   // CHECK-LABEL: sil hidden @$ss5ErrorP10objc_errorE16convertToNSErrorSo0F0CyF
-  // CHECK: bb0([[SELF:%[0-9]+]] : @trivial $*Self)
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
 	func convertToNSError() -> NSError {
     // CHECK: [[COPY:%.*]] = alloc_stack $Self
     // CHECK: copy_addr [[SELF]] to [initialization] [[COPY]]

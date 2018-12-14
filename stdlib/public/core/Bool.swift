@@ -187,11 +187,6 @@ extension Bool : CustomStringConvertible {
   }
 }
 
-// This is a magic entry point known to the compiler.
-@_transparent
-public // COMPILER_INTRINSIC
-func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
-
 extension Bool: Equatable {
   @_transparent
   public static func == (lhs: Bool, rhs: Bool) -> Bool {

@@ -1,0 +1,3 @@
+struct IndirectlyImportedStruct {
+  int value;
+};

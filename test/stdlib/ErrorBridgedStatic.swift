@@ -7,7 +7,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: static_stdlib
-// REQUIRES: rdar42789939
 
 import StdlibUnittest
 

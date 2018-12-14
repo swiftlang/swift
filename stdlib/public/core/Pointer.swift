@@ -165,7 +165,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer advanced from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func successor() -> Self {
     return advanced(by: 1)
   }
@@ -177,7 +177,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer shifted backward from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func predecessor() -> Self {
     return advanced(by: -1)
   }
@@ -199,7 +199,7 @@ extension _Pointer /*: Strideable*/ {
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  @inlinable
+  @_transparent
   public func distance(to end: Self) -> Int {
     return
       Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
@@ -222,7 +222,7 @@ extension _Pointer /*: Strideable*/ {
   ///   zero.
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> Self {
     return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
@@ -264,7 +264,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -282,7 +282,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))

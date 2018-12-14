@@ -26,7 +26,7 @@
 
 namespace swift {
 
-/// \brief An implementation of WritableBinaryStream which can write at its end
+/// An implementation of WritableBinaryStream which can write at its end
 /// causing the underlying data to grow.  This class owns the underlying data.
 class ExponentialGrowthAppendingBinaryByteStream
     : public llvm::WritableBinaryStream {

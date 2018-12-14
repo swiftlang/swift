@@ -37,7 +37,7 @@
 #include <objc/message.h>
 #include <objc/objc.h>
 #include <Foundation/Foundation.h>
-#include "../SDK/Foundation/NSError.h"
+#include "../Darwin/Foundation/NSError.h"
 
 using namespace swift;
 using namespace swift::hashable_support;

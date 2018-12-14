@@ -33,7 +33,7 @@ bb0(%0 : @owned $GenericInheritsObjC<T>):
 }
 
 sil @$s20generic_classes_objc19GenericInheritsObjCC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
-bb0(%0 : @trivial $Int, %1 : @owned $GenericInheritsObjC<T>):
+bb0(%0 : $Int, %1 : @owned $GenericInheritsObjC<T>):
   unreachable
 }
 
@@ -61,7 +61,7 @@ bb0(%0 : @owned $GenericInheritsObjC2<T>):
 }
 
 sil @$s20generic_classes_objc20GenericInheritsObjC2C7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
-bb0(%0 : @trivial $Int, %1 : @owned $GenericInheritsObjC<T>):
+bb0(%0 : $Int, %1 : @owned $GenericInheritsObjC<T>):
   unreachable
 }
 

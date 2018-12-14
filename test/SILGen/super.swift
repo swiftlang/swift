@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
 // RUN: %target-swift-emit-silgen -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 public class Parent {
   public final var finalProperty: String {
@@ -102,7 +110,7 @@ public class ChildToResilientParent : ResilientOutsideParent {
 
   // CHECK-LABEL: sil @$s5super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
   public override class func classMethod() {
-    // CHECK: bb0([[METASELF:%.*]] : @trivial $@thick ChildToResilientParent.Type):
+    // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[UPCAST_METASELF:%.*]] = upcast [[METASELF]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_METASELF]])
@@ -112,7 +120,7 @@ public class ChildToResilientParent : ResilientOutsideParent {
 
   // CHECK-LABEL: sil @$s5super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
   public class func returnsSelf() -> Self {
-    // CHECK: bb0([[METASELF:%.*]] : @trivial $@thick ChildToResilientParent.Type):
+    // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[CAST_METASELF:%.*]] = unchecked_trivial_bit_cast [[METASELF]] : $@thick ChildToResilientParent.Type to $@thick @dynamic_self ChildToResilientParent.Type
     // CHECK:   [[UPCAST_CAST_METASELF:%.*]] = upcast [[CAST_METASELF]] : $@thick @dynamic_self ChildToResilientParent.Type to $@thick ResilientOutsideParent.Type
     // CHECK:   [[FUNC:%.*]] = super_method [[METASELF]] : $@thick ChildToResilientParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> ()
@@ -140,7 +148,7 @@ public class ChildToFixedParent : OutsideParent {
 
   // CHECK-LABEL: sil @$s5super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
   public override class func classMethod() {
-    // CHECK: bb0([[SELF:%.*]] : @trivial $@thick ChildToFixedParent.Type):
+    // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[UPCAST_SELF:%.*]] = upcast [[SELF]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
     // CHECK:   apply [[FUNC]]([[UPCAST_SELF]])
@@ -150,7 +158,7 @@ public class ChildToFixedParent : OutsideParent {
 
   // CHECK-LABEL: sil @$s5super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
   public class func returnsSelf() -> Self {
-    // CHECK: bb0([[SELF:%.*]] : @trivial $@thick ChildToFixedParent.Type):
+    // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[FIRST_CAST:%.*]] = unchecked_trivial_bit_cast [[SELF]]
     // CHECK:   [[SECOND_CAST:%.*]] = upcast [[FIRST_CAST]]
     // CHECK:   [[FUNC:%.*]] = super_method [[SELF]] : $@thick ChildToFixedParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> ()

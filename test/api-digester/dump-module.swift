@@ -13,3 +13,8 @@
 // RUN: diff -u %S/Outputs/cake.json %t.dump.json
 // RUN: %api-digester -deserialize-sdk --input-paths %S/Outputs/cake-abi.json -o %t.dump.json
 // RUN: diff -u %S/Outputs/cake-abi.json %t.dump.json
+
+// The input JSON files need to be modified when standard library declarations
+// are reordered. This is expected behavior and we simply shouldn't run the test
+// when automatically evolving the standard library.
+// UNSUPPORTED: swift_evolve

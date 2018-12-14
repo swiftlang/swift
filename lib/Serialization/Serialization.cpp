@@ -906,6 +906,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::SELF_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
@@ -1635,6 +1637,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     break;
   }
 
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[SelfProtocolConformanceLayout::Code];
+    auto protocolID = addDeclRef(self->getProtocol());
+    SelfProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              protocolID);
+    break;
+  }
+
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
@@ -1877,10 +1888,12 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       discriminator = containingFile->getDiscriminatorForPrivateValue(generic);
     }
 
+    bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
+
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(generic->getName()),
                                         addDeclBaseNameRef(discriminator),
-                                        /*inProtocolExtension*/false,
+                                        isProtocolExt,
                                         generic->hasClangNode());
     break;
   }
@@ -3778,18 +3791,11 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Archetype: {
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
 
-    // Opened existential types use a separate layout.
-    if (auto existentialTy = archetypeTy->getOpenedExistentialType()) {
-      unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
-      OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                              addTypeRef(existentialTy));
-      break;
-    }
-
-    auto env = archetypeTy->getGenericEnvironment();
+    auto env = archetypeTy->getPrimary()->getGenericEnvironment();
     assert(env && "Primary archetype without generic environment?");
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
@@ -3798,6 +3804,14 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     envID, addTypeRef(interfaceType));
+    break;
+  }
+
+  case TypeKind::OpenedArchetype: {
+    auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
+    OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                           addTypeRef(archetypeTy->getOpenedExistentialType()));
     break;
   }
 
@@ -4126,6 +4140,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
+  registerDeclTypeAbbr<SelfProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();

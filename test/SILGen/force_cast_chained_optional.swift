@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name force_cast_chained_optional -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name force_cast_chained_optional %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!

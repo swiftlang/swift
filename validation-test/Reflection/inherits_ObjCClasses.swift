@@ -30,7 +30,7 @@ reflect(object: firstClassA)
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=32 alignment=16 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=xx offset=16
-// CHECK-64:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-64:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -39,7 +39,7 @@ reflect(object: firstClassA)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=32 alignment=16 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=xx offset=16
-// CHECK-32-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-32-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // Variant B: word size alignment
 class FirstClassB : FirstClass {
@@ -86,7 +86,7 @@ reflect(object: secondClassA)
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=48 alignment=16 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=xx offset=32
-// CHECK-64:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-64:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -95,7 +95,7 @@ reflect(object: secondClassA)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=32 alignment=16 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=xx offset=16
-// CHECK-32-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-32-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // Variant B: word size alignment
 class SecondClassB : SecondClass {
@@ -142,7 +142,7 @@ reflect(object: thirdClassA)
 // CHECK-64: Type info:
 // CHECK-64: (class_instance size=48 alignment=16 stride=48 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=xx offset=32
-// CHECK-64:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-64:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -151,7 +151,7 @@ reflect(object: thirdClassA)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=32 alignment=16 stride=32 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=xx offset=16
-// CHECK-32-NEXT:     (builtin size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1)))
+// CHECK-32-NEXT:     (struct size=16 alignment=16 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 
 // Variant B: word size alignment
 class ThirdClassB : ThirdClass {

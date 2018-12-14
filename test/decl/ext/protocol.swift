@@ -177,6 +177,23 @@ extension S1 {
 }
 
 // ----------------------------------------------------------------------------
+// Protocol extensions with redundant requirements
+// ----------------------------------------------------------------------------
+
+protocol FooProtocol {}
+extension FooProtocol where Self: FooProtocol {} // expected-warning {{requirement of 'Self' to 'FooProtocol' is redundant in an extension of 'FooProtocol'}}
+
+protocol AnotherFooProtocol {}
+protocol BazProtocol {}
+extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {} // expected-warning {{requirement of 'Self' to 'AnotherFooProtocol' is redundant in an extension of 'AnotherFooProtocol'}}
+
+protocol AnotherBazProtocol {
+  associatedtype BazValue
+}
+
+extension AnotherBazProtocol where BazValue: AnotherBazProtocol {} // ok, does not warn because BazValue is not Self
+
+// ----------------------------------------------------------------------------
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {

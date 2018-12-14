@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This is the entry point to the swift -frontend functionality, which
+/// This is the entry point to the swift -frontend functionality, which
 /// implements the core compiler functionality along with a number of additional
 /// tools for demonstration and testing purposes.
 ///
@@ -515,17 +515,6 @@ static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
   C.NumSILGenGlobalVariables += Module.getSILGlobalList().size();
 }
 
-static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
-                                 const SILModule& Module) {
-  auto &C = Stats.getFrontendCounters();
-  // FIXME: calculate these in constant time, via the dense maps.
-  C.NumSILOptFunctions += Module.getFunctionList().size();
-  C.NumSILOptVtables += Module.getVTableList().size();
-  C.NumSILOptWitnessTables += Module.getWitnessTableList().size();
-  C.NumSILOptDefaultWitnessTables += Module.getDefaultWitnessTableList().size();
-  C.NumSILOptGlobalVariables += Module.getSILGlobalList().size();
-}
-
 static std::unique_ptr<llvm::raw_fd_ostream>
 createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
   if (Filename.empty())
@@ -568,6 +557,17 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getFilenameOfFirstInput(),
       Invocation.getFrontendOptions()
           .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  const auto &InputsAndOutputs =
+      Invocation.getFrontendOptions().InputsAndOutputs;
+  assert(InputsAndOutputs.hasSingleInput());
+  StringRef InputPath = InputsAndOutputs.getFilenameOfFirstInput();
+  return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename());
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
@@ -934,6 +934,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
 
+  if (Action == FrontendOptions::ActionType::BuildModuleFromParseableInterface)
+    return buildModuleFromParseableInterface(Invocation, Instance);
+
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Invocation, Instance, Stats);
 
@@ -959,9 +962,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
-
-  if (observer)
-    observer->performedSemanticAnalysis(Instance);
 
   if (Stats)
     countStatsPostSema(*Stats, Instance);
@@ -1041,54 +1041,6 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
-/// Perform "stable" optimizations that are invariant across compiler versions.
-static bool performMandatorySILPasses(CompilerInvocation &Invocation,
-                                      SILModule *SM,
-                                      FrontendObserver *observer) {
-  if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::MergeModules) {
-    // Don't run diagnostic passes at all.
-  } else if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
-    if (runSILDiagnosticPasses(*SM))
-      return true;
-
-    if (observer) {
-      observer->performedSILDiagnostics(*SM);
-    }
-  } else {
-    // Even if we are not supposed to run the diagnostic passes, we still need
-    // to run the ownership evaluator.
-    if (runSILOwnershipEliminatorPass(*SM))
-      return true;
-  }
-
-  if (Invocation.getSILOptions().MergePartialModules)
-    SM->linkAllFromCurrentModule();
-  return false;
-}
-
-/// Perform SIL optimization passes if optimizations haven't been disabled.
-/// These may change across compiler versions.
-static void performSILOptimizations(CompilerInvocation &Invocation,
-                                    SILModule *SM) {
-  SharedTimer timer("SIL optimization");
-  if (Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::MergeModules ||
-      !Invocation.getSILOptions().shouldOptimize()) {
-    runSILPassesForOnone(*SM);
-    return;
-  }
-  runSILOptPreparePasses(*SM);
-
-  StringRef CustomPipelinePath =
-      Invocation.getSILOptions().ExternalPassPipelineFilename;
-  if (!CustomPipelinePath.empty()) {
-    runSILOptimizationPassesWithFileSpecification(*SM, CustomPipelinePath);
-  } else {
-    runSILOptimizationPasses(*SM);
-  }
-}
-
 /// Get the main source file's private discriminator and attach it to
 /// the compile unit's flags.
 static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
@@ -1153,9 +1105,6 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
-
-  if (observer)
-    observer->aboutToRunImmediately(Instance);
 
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
@@ -1243,9 +1192,6 @@ static bool performCompileStepsPostSILGen(
   SILOptions &SILOpts = Invocation.getSILOptions();
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
-  if (observer)
-    observer->performedSILGeneration(*SM);
-
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1261,21 +1207,12 @@ static bool performCompileStepsPostSILGen(
 
   std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile =
       createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
-  if (OptRecordFile)
-    SM->setOptRecordStream(llvm::make_unique<llvm::yaml::Output>(
-                               *OptRecordFile, &Instance.getSourceMgr()),
-                           std::move(OptRecordFile));
-
-  if (performMandatorySILPasses(Invocation, SM.get(), observer))
-    return true;
-
-  {
-    SharedTimer timer("SIL verification, pre-optimization");
-    SM->verify();
+  if (OptRecordFile) {
+    auto Output =
+        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+                                              &Instance.getSourceMgr());
+    SM->setOptRecordStream(std::move(Output), std::move(OptRecordFile));
   }
-
-  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
-                                                      moduleIsPublic);
 
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
@@ -1297,20 +1234,12 @@ static bool performCompileStepsPostSILGen(
   // can be serialized at any moment, e.g. during the optimization pipeline.
   SM->setSerializeSILAction(SerializeSILModuleAction);
 
-  performSILOptimizations(Invocation, SM.get());
+  // Perform optimizations and mandatory/diagnostic passes.
+  if (Instance.performSILProcessing(SM.get(), Stats))
+    return true;
 
-  if (observer)
-    observer->performedSILOptimization(*SM);
-
-  if (Stats)
-    countStatsPostSILOpt(*Stats, *SM);
-
-  {
-    SharedTimer timer("SIL verification, post-optimization");
-    SM->verify();
-  }
-
-  performSILInstCountIfNeeded(&*SM);
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
+                                                      moduleIsPublic);
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
@@ -1871,8 +1800,3 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
 void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
-void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
-void FrontendObserver::performedSILGeneration(SILModule &module) {}
-void FrontendObserver::performedSILDiagnostics(SILModule &module) {}
-void FrontendObserver::performedSILOptimization(SILModule &module) {}
-void FrontendObserver::aboutToRunImmediately(CompilerInstance &instance) {}

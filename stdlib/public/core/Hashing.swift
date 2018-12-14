@@ -138,7 +138,7 @@ internal final class _BridgingHashBuffer
 
   internal subscript(bucket: _HashTable.Bucket) -> AnyObject {
     @inline(__always) get {
-      _sanityCheck(header.hashTable.isOccupied(bucket))
+      _internalInvariant(header.hashTable.isOccupied(bucket))
       defer { _fixLifetime(self) }
       return firstElementAddress[bucket.offset]
     }
@@ -146,7 +146,7 @@ internal final class _BridgingHashBuffer
 
   @inline(__always)
   internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
-    _sanityCheck(header.hashTable.isOccupied(bucket))
+    _internalInvariant(header.hashTable.isOccupied(bucket))
     (firstElementAddress + bucket.offset).initialize(to: object)
     _fixLifetime(self)
   }

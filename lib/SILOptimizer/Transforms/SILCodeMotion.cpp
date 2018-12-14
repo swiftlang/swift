@@ -861,7 +861,7 @@ bool BBEnumTagDataflowState::init(EnumCaseDataflowContext &NewContext,
 //                            Generic Sinking Code
 //===----------------------------------------------------------------------===//
 
-/// \brief Hoist release on a SILArgument to its predecessors.
+/// Hoist release on a SILArgument to its predecessors.
 static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
   // There is no block to hoist releases to.
   if (BB->pred_empty())
@@ -906,12 +906,12 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
 static const int SinkSearchWindow = 6;
 
-/// \brief Returns True if we can sink this instruction to another basic block.
+/// Returns True if we can sink this instruction to another basic block.
 static bool canSinkInstruction(SILInstruction *Inst) {
   return !Inst->hasUsesOfAnyResult() && !isa<TermInst>(Inst);
 }
 
-/// \brief Returns true if this instruction is a skip barrier, which means that
+/// Returns true if this instruction is a skip barrier, which means that
 /// we can't sink other instructions past it.
 static bool isSinkBarrier(SILInstruction *Inst) {
   if (isa<TermInst>(Inst))
@@ -938,7 +938,7 @@ enum OperandRelation {
   EqualAfterMove
 };
 
-/// \brief Find a root value for operand \p In. This function inspects a sil
+/// Find a root value for operand \p In. This function inspects a sil
 /// value and strips trivial conversions such as values that are passed
 /// as arguments to basic blocks with a single predecessor or type casts.
 /// This is a shallow one-step search and not a deep recursive search.
@@ -991,7 +991,7 @@ static SILValue findValueShallowRoot(const SILValue &In) {
   return In;
 }
 
-/// \brief Search for an instruction that is identical to \p Iden by scanning
+/// Search for an instruction that is identical to \p Iden by scanning
 /// \p BB starting at the end of the block, stopping on sink barriers.
 /// The \p opRelation must be consistent for all operand comparisons.
 SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
@@ -1329,7 +1329,7 @@ static bool sinkArgumentsFromPredecessors(EnumCaseDataflowContext &Context,
   return Changed;
 }
 
-/// \brief canonicalize retain/release instructions and make them amenable to
+/// canonicalize retain/release instructions and make them amenable to
 /// sinking by selecting canonical pointers. We reduce the number of possible
 /// inputs by replacing values that are unlikely to be a canonical values.
 /// Reducing the search space increases the chances of matching ref count

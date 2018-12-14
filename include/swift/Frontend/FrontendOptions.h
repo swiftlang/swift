@@ -59,7 +59,7 @@ public:
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
-  /// \brief A list of arguments to forward to LLVM's option processing; this
+  /// A list of arguments to forward to LLVM's option processing; this
   /// should only be used for debugging and experimental features.
   std::vector<std::string> LLVMArgs;
 
@@ -125,6 +125,9 @@ public:
 
     EmitModuleOnly, ///< Emit module only
     MergeModules,   ///< Merge modules only
+
+    /// Build from a swiftinterface, as close to `import` as possible
+    BuildModuleFromParseableInterface,
 
     EmitSIBGen, ///< Emit serialized AST + raw SIL
     EmitSIB,    ///< Emit serialized AST + canonical SIL

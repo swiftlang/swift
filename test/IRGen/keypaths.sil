@@ -7,35 +7,35 @@
 sil_stage canonical
 import Swift
 
-struct S: Hashable {
-  var x: Int
-  let y: String
-  var z: C
-  var reabstracted: () -> ()
+public struct S: Hashable {
+  public var x: Int
+  public let y: String
+  public var z: C
+  public var reabstracted: () -> ()
 
-  var hashValue: Int { get }
-  static func ==(_: S, _: S) -> Bool
+  public func hash(into hasher: inout Hasher)
+  public static func ==(_: S, _: S) -> Bool
 }
-class C: Hashable {
-  final var x: Int
-  final let y: String
-  final var z: S
-  var w: Int { get set }
+public class C: Hashable {
+  public final var x: Int
+  public final let y: String
+  public final var z: S
+  public var w: Int { get set }
 
-  init()
+  public init()
 
-  var hashValue: Int { get }
-  static func ==(_: C, _: C) -> Bool
-}
-
-struct G<T> {
-  var x: T { get set }
-  subscript<U: Hashable>(x: U) -> T { get set }
+  public func hash(into hasher: inout Hasher)
+  public static func ==(_: C, _: C) -> Bool
 }
 
-class C1: C { }
-class C2: C1 {
-  var reabstracted: () -> ()
+public struct G<T> {
+  public var x: T { get set }
+  public subscript<U: Hashable>(x: U) -> T { get set }
+}
+
+public class C1: C { }
+public class C2: C1 {
+  public var reabstracted: () -> ()
 }
 
 sil_vtable C {}
@@ -183,8 +183,9 @@ sil_vtable C2 {}
 // -- %i: Gen<A>.x
 // CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"generic environment l"
+// CHECK-SAME: @"symbolic 8keypaths3GenVyxxG"
+// CHECK-SAME: @"symbolic x"
 //             -- size 8
 // CHECK-SAME: i32 8,
 //             -- struct with runtime-resolved offset, mutable
@@ -195,8 +196,9 @@ sil_vtable C2 {}
 // -- %j: Gen<A>.y
 // CHECK: [[KP_J:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"generic environment l"
+// CHECK-SAME: @"symbolic 8keypaths3GenVyxxG"
+// CHECK-SAME: @"symbolic x"
 //             -- size 8
 // CHECK-SAME: i32 8,
 //             -- struct with runtime-resolved offset
@@ -204,19 +206,8 @@ sil_vtable C2 {}
 // CHECK-32-SAME: i32 20 }>
 // CHECK-64-SAME: i32 36 }>
 
-// -- %t
-// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"got.$s8keypaths1GV1xxvpMV"
-// CHECK-SAME:   @"keypath_get_type
-//            -- computed get-only property, identified by indirect pointer
-// CHECK-SAME:   <i32 0x0208_0002>
-
-// -- %u
-// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"got.$s8keypaths1GVyxqd__cSHRd__luipMV"
-// CHECK-SAME:   @"keypath_get_type
-// CHECK-SAME:   @"keypath_get_type
-// CHECK-SAME:   @"keypath_get_witness_table
-//            -- computed get-only property, identified by indirect pointer
-// CHECK-SAME:   <i32 0x0208_0002>
+// CHECK-LABEL: @"generic environment SHRzSHR_r0_l" = linkonce_odr hidden constant
+// CHECK-SAME: i32 8193, i16 2, i8 -128, i8 -128, i32 128
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
@@ -250,27 +241,27 @@ entry:
 
 sil @k_id : $@convention(thin) () -> ()
 sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*S):
+bb0(%0 : $*Int, %1 : $*S):
   unreachable
 }
 
 sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> () {
-bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+bb0(%0 : $*Int, %1 : $*C):
   unreachable
 }
 
 sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
 sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> () {
-bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+bb0(%0 : $*@callee_guaranteed () -> @out (), %1 : $*S):
   unreachable
 }
 
@@ -372,7 +363,7 @@ sil @r_get : $@convention(thin) (@in_guaranteed C, UnsafeRawPointer) -> @out S
 sil @r_set : $@convention(thin) (@in_guaranteed S, @in_guaranteed C, UnsafeRawPointer) -> ()
 
 sil @generic_computed_property_indices : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
+entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
   %s = keypath $WritableKeyPath<A, B>, <X: Hashable, Y: Hashable> (
     root $X;
     settable_property $Y,
@@ -414,30 +405,6 @@ entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B
   return undef : $()
 }
 
-sil @generic_external : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
-  %t = keypath $KeyPath<G<B>, B>, <Z> (
-    root $G<Z>;
-    gettable_property $Z,
-      id @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
-      getter @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
-      external #G.x<Z>
-  ) <B>
-
-  %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
-    root $G<Y>;
-    gettable_property $Y,
-      id @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
-      getter @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
-      indices [%$0 : $X : $*X],
-      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int,
-      external #G.subscript<Y, X>
-  ) <B, A> (%1)
-
-  return undef : $()
-}
-
 sil @identity : $@convention(thin) <T> () -> () {
 entry:
   %v = keypath $WritableKeyPath<T, T>, <A> (root $A; objc "self") <T>
@@ -453,6 +420,3 @@ sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -
 
 sil @v_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, UnsafeRawPointer) -> @out A
 sil @v_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, UnsafeRawPointer) -> ()
-
-sil @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z
-sil @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B

@@ -69,16 +69,6 @@
 #  endif
 #endif
 
-OVERRIDE_METADATALOOKUP(getTypeByMangledName, const Metadata *,
-                        SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, ,
-                        (const char *typeNameStart, size_t typeNameLength,
-                         size_t numberOfLevels,
-                         size_t *parametersPerLevel,
-                         const Metadata * const *flatSubstitutions),
-                        (typeNameStart, typeNameLength, numberOfLevels,
-                         parametersPerLevel, flatSubstitutions))
-
-
 OVERRIDE_CASTING(dynamicCast, bool, , swift::,
                  (OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,
@@ -95,8 +85,9 @@ OVERRIDE_CASTING(dynamicCastClass, const void *, , swift::,
 
 OVERRIDE_CASTING(dynamicCastClassUnconditional, const void *, , swift::,
                  (const void *object,
-                  const ClassMetadata *targetType),
-                 (object, targetType))
+                  const ClassMetadata *targetType,
+                  const char *file, unsigned line, unsigned column),
+                 (object, targetType, file, line, column))
 
 
 
@@ -106,8 +97,9 @@ OVERRIDE_CASTING(dynamicCastUnknownClass, const void *, , swift::,
 
 
 OVERRIDE_CASTING(dynamicCastUnknownClassUnconditional, const void *, , swift::,
-                 (const void *object, const Metadata *targetType),
-                 (object, targetType))
+                 (const void *object, const Metadata *targetType,
+                  const char *file, unsigned line, unsigned column),
+                 (object, targetType, file, line, column))
 
 
 OVERRIDE_CASTING(dynamicCastMetatype, const Metadata *, , swift::,
@@ -118,8 +110,9 @@ OVERRIDE_CASTING(dynamicCastMetatype, const Metadata *, , swift::,
 
 OVERRIDE_CASTING(dynamicCastMetatypeUnconditional, const Metadata *, , swift::,
                  (const Metadata *sourceType,
-                  const Metadata *targetType),
-                 (sourceType, targetType))
+                  const Metadata *targetType,
+                  const char *file, unsigned line, unsigned column),
+                 (sourceType, targetType, file, line, column))
 
 
 OVERRIDE_FOREIGN(dynamicCastForeignClassMetatype, const ClassMetadata *, , swift::,
@@ -131,8 +124,9 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassMetatype, const ClassMetadata *, , swift
 OVERRIDE_FOREIGN(dynamicCastForeignClassMetatypeUnconditional,
                  const ClassMetadata *, , swift::,
                  (const ClassMetadata *sourceType,
-                  const ClassMetadata *targetType),
-                 (sourceType, targetType))
+                  const ClassMetadata *targetType,
+                  const char *file, unsigned line, unsigned column),
+                 (sourceType, targetType, file, line, column))
 
 
 OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , swift::,
@@ -140,9 +134,28 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , swift::
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToSwiftProtocol,
+                             const ProtocolConformanceDescriptor *, , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol,
+                              StringRef moduleName),
+                             (type, protocol, moduleName))
+
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))
+
+OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , swift::,
+                        (Demangler &demangler,
+                         Demangle::NodePointer node,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (demangler, node, substGenericParam, substWitnessTable))
+OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , swift::,
+                        (StringRef typeName,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (typeName, substGenericParam, substWitnessTable))
 
 OVERRIDE_WITNESSTABLE(getAssociatedTypeWitnessSlow, MetadataResponse,
                       SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, swift::,
@@ -170,8 +183,9 @@ OVERRIDE_OBJC(dynamicCastObjCClass, const void *, , swift::,
 
 OVERRIDE_OBJC(dynamicCastObjCClassUnconditional, const void *, , swift::,
               (const void *object,
-               const ClassMetadata *targetType),
-              (object, targetType))
+               const ClassMetadata *targetType,
+               const char *file, unsigned line, unsigned column),
+              (object, targetType, file, line, column))
 
 OVERRIDE_OBJC(dynamicCastObjCClassMetatype, const ClassMetadata *, , swift::,
               (const ClassMetadata *sourceType,
@@ -180,8 +194,9 @@ OVERRIDE_OBJC(dynamicCastObjCClassMetatype, const ClassMetadata *, , swift::,
 
 
 OVERRIDE_OBJC(dynamicCastObjCClassMetatypeUnconditional, const ClassMetadata *, , swift::,
-              (const ClassMetadata *sourceType, const ClassMetadata *targetType),
-              (sourceType, targetType))
+              (const ClassMetadata *sourceType, const ClassMetadata *targetType,
+               const char *file, unsigned line, unsigned column),
+              (sourceType, targetType, file, line, column))
 
 
 OVERRIDE_FOREIGN(dynamicCastForeignClass, const void *, , swift::,
@@ -191,8 +206,9 @@ OVERRIDE_FOREIGN(dynamicCastForeignClass, const void *, , swift::,
 
 
 OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , swift::,
-                 (const void *object, const ForeignClassMetadata *targetType),
-                 (object, targetType))
+                 (const void *object, const ForeignClassMetadata *targetType,
+                  const char *file, unsigned line, unsigned column),
+                 (object, targetType, file, line, column))
 
 #endif
 

@@ -125,6 +125,22 @@ SWIFT_RUNTIME_STDLIB_API
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length);
+
+SWIFT_RUNTIME_STDLIB_API
+const __swift_uint8_t * _Nullable
+_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
+                                                     unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_uint8_t
+_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
+                                           _swift_shims_UInt8 *_Nonnull buffer,
+                                           _swift_shims_CFIndex maxLength,
+                                           unsigned long encoding);
+
+SWIFT_RUNTIME_STDLIB_API
+__swift_uintptr_t
+_swift_stdlib_unsafeAddressOfClass(id _Nonnull obj);
   
 #endif // __OBJC2__
 

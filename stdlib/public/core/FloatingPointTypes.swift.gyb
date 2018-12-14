@@ -1851,8 +1851,8 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal func _isEqual(to box: _AnyHashableBox) -> Bool? {
-    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
-    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(Int64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(UInt64(exactly: _value) == nil, "self isn't canonical")
     if let box = box as? _${Self}AnyHashableBox {
       return _value == box._value
     }
@@ -1864,8 +1864,8 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal func _hash(into hasher: inout Hasher) {
-    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
-    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(Int64(exactly: _value) == nil, "self isn't canonical")
+    _internalInvariant(UInt64(exactly: _value) == nil, "self isn't canonical")
     hasher.combine(_value)
   }
 

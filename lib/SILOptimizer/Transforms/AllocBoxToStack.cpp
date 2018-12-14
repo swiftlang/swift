@@ -42,7 +42,7 @@ static SILValue stripOffCopyValue(SILValue V) {
   return V;
 }
 
-/// \brief Returns True if the operand or one of its users is captured.
+/// Returns True if the operand or one of its users is captured.
 static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
 
@@ -497,7 +497,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
 namespace {
 
-/// \brief A SILCloner subclass which clones a closure function while
+/// A SILCloner subclass which clones a closure function while
 /// promoting some of its box parameters to stack addresses.
 class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   friend class SILInstructionVisitor<PromotedParamCloner>;
@@ -558,7 +558,7 @@ static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
   return Mangler.mangle();
 }
 
-/// \brief Create the function corresponding to the clone of the
+/// Create the function corresponding to the clone of the
 /// original closure with the signature modified to reflect promoted
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *PromotedParamCloner::
@@ -621,7 +621,7 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
   return Fn;
 }
 
-/// \brief Populate the body of the cloned closure, modifying instructions as
+/// Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the removed parameters.
 void
 PromotedParamCloner::populateCloned() {
@@ -669,7 +669,7 @@ PromotedParamCloner::populateCloned() {
   cloneFunctionBody(Orig, ClonedEntryBB, entryArgs);
 }
 
-/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
@@ -682,7 +682,7 @@ PromotedParamCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILCloner<PromotedParamCloner>::visitStrongReleaseInst(Inst);
 }
 
-/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.

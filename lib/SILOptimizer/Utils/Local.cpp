@@ -89,7 +89,7 @@ swift::createDecrementBefore(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr, B.getDefaultAtomicity());
 }
 
-/// \brief Perform a fast local check to see if the instruction is dead.
+/// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
 bool
@@ -121,8 +121,6 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
     return false;
-  if (isa<MarkUninitializedBehaviorInst>(I))
-    return false;
 
   if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
     return false;
@@ -138,7 +136,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   return false;
 }
 
-/// \brief Return true if this is a release instruction and the released value
+/// Return true if this is a release instruction and the released value
 /// is a part of a guaranteed parameter.
 bool swift::isIntermediateRelease(SILInstruction *I,
                                   EpilogueARCFunctionInfo *EAFI) {
@@ -240,7 +238,7 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   }
 }
 
-/// \brief If the given instruction is dead, delete it along with its dead
+/// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
 /// \param I The instruction to be deleted.
@@ -396,7 +394,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
     FuncRef->moveBefore(&*DomBB->begin());
 }
 
-/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
 TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
@@ -651,6 +649,51 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index){
 
   SILBuilder B(NextInst);
   return B.createProjectBox(ABI->getLoc(), ABI, Index);
+}
+
+// Peek through trivial Enum initialization, typically for pointless
+// Optionals.
+//
+// Given an UncheckedTakeEnumDataAddrInst, check that there are no
+// other uses of the Enum value and return the address used to initialized the
+// enum's payload:
+//
+//   %stack_adr = alloc_stack
+//   %data_adr  = init_enum_data_addr %stk_adr
+//   %enum_adr  = inject_enum_addr %stack_adr
+//   %copy_src  = unchecked_take_enum_data_addr %enum_adr
+//   dealloc_stack %stack_adr
+//   (No other uses of %stack_adr.)
+InitEnumDataAddrInst *
+swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI) {
+  auto *ASI = dyn_cast<AllocStackInst>(UTEDAI->getOperand());
+  if (!ASI)
+    return nullptr;
+
+  SILInstruction *singleUser = nullptr;
+  for (auto use : ASI->getUses()) {
+    auto *user = use->getUser();
+    if (user == UTEDAI)
+      continue;
+
+    // As long as there's only one UncheckedTakeEnumDataAddrInst and one
+    // InitEnumDataAddrInst, we don't care how many InjectEnumAddr and
+    // DeallocStack users there are.
+    if (isa<InjectEnumAddrInst>(user) || isa<DeallocStackInst>(user))
+      continue;
+
+    if (singleUser)
+      return nullptr;
+
+    singleUser = user;
+  }
+  if (!singleUser)
+    return nullptr;
+
+  // Assume, without checking, that the returned InitEnumDataAddr dominates the
+  // given UncheckedTakeEnumDataAddrInst, because that's how SIL is defined. I
+  // don't know where this is actually verified.
+  return dyn_cast<InitEnumDataAddrInst>(singleUser);
 }
 
 //===----------------------------------------------------------------------===//

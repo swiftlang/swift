@@ -36,21 +36,27 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     }
   }
 
+  // Get the linkage for SILGlobalVariable.
+  FormalLinkage formalLinkage;
+  if (gDecl->isResilient())
+    formalLinkage = FormalLinkage::Private;
+  else
+    formalLinkage = getDeclLinkage(gDecl);
+  auto silLinkage = getSILLinkage(formalLinkage, forDef);
+
   // Check if it is already created, and update linkage if necessary.
   if (auto gv = M.lookUpGlobalVariable(mangledName)) {
     // Update the SILLinkage here if this is a definition.
     if (forDef == ForDefinition) {
-      gv->setLinkage(getSILLinkage(getDeclLinkage(gDecl), ForDefinition));
+      gv->setLinkage(silLinkage);
       gv->setDeclaration(false);
     }
     return gv;
   }
 
-  // Get the linkage for SILGlobalVariable.
-  SILLinkage link = getSILLinkage(getDeclLinkage(gDecl), forDef);
   SILType silTy = M.Types.getLoweredTypeOfGlobal(gDecl);
 
-  auto *silGlobal = SILGlobalVariable::create(M, link, IsNotSerialized,
+  auto *silGlobal = SILGlobalVariable::create(M, silLinkage, IsNotSerialized,
                                               mangledName, silTy,
                                               None, gDecl);
   silGlobal->setDeclaration(!forDef);

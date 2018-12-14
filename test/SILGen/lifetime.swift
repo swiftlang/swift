@@ -201,7 +201,7 @@ func reftype_call_with_arg(_ a: Ref) {
 // CHECK-LABEL: sil hidden @$s8lifetime16reftype_reassign{{[_0-9a-zA-Z]*}}F
 func reftype_reassign(_ a: inout Ref, b: Ref) {
     var b = b
-    // CHECK: bb0([[AADDR:%[0-9]+]] : @trivial $*Ref, [[B1:%[0-9]+]] : @guaranteed $Ref):
+    // CHECK: bb0([[AADDR:%[0-9]+]] : $*Ref, [[B1:%[0-9]+]] : @guaranteed $Ref):
     // CHECK: [[BADDR:%[0-9]+]] = alloc_box ${ var Ref }
     // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
     a = b
@@ -229,7 +229,7 @@ struct Aleph {
 
   // -- loadable value constructor:
   // CHECK-LABEL: sil hidden @$s8lifetime5AlephV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
-  // CHECK: bb0([[A:%.*]] : @owned $Ref, [[B:%.*]] : @trivial $Val, {{%.*}} : @trivial $@thin Aleph.Type):
+  // CHECK: bb0([[A:%.*]] : @owned $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
   // CHECK-NEXT:   [[RET:%.*]] = struct $Aleph ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
 }
@@ -251,7 +251,7 @@ struct Daleth {
 
   // -- address-only value constructor:
   // CHECK-LABEL: sil hidden @$s8lifetime6DalethV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Aleph, @owned Beth, @in Unloadable, @thin Daleth.Type) -> @out Daleth {
-  // CHECK: bb0([[THIS:%.*]] : @trivial $*Daleth, [[A:%.*]] : @owned $Aleph, [[B:%.*]] : @owned $Beth, [[C:%.*]] : @trivial $*Unloadable, {{%.*}} : @trivial $@thin Daleth.Type):
+  // CHECK: bb0([[THIS:%.*]] : $*Daleth, [[A:%.*]] : @owned $Aleph, [[B:%.*]] : @owned $Beth, [[C:%.*]] : $*Unloadable, {{%.*}} : $@thin Daleth.Type):
   // CHECK-NEXT:   [[A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.a
   // CHECK-NEXT:   store [[A]] to [init] [[A_ADDR]]
   // CHECK-NEXT:   [[B_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Daleth, #Daleth.b
@@ -266,7 +266,7 @@ class He {
   
   // -- default allocator:
   // CHECK-LABEL: sil hidden @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
-  // CHECK: bb0({{%.*}} : @trivial $@thick He.Type):
+  // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
   // CHECK-NEXT:   [[INIT:%.*]] = function_ref @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned He) -> @owned He
@@ -293,7 +293,7 @@ struct Waw {
 
   // -- loadable value initializer with tuple destructuring:
   // CHECK-LABEL: sil hidden @$s8lifetime3WawV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
-  // CHECK: bb0([[A0:%.*]] : @owned $Ref, [[A1:%.*]] : @trivial $Val, [[B:%.*]] : @trivial $Val, {{%.*}} : @trivial $@thin Waw.Type):
+  // CHECK: bb0([[A0:%.*]] : @owned $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
@@ -305,7 +305,7 @@ struct Zayin {
 
   // -- address-only value initializer with tuple destructuring:
   // CHECK-LABEL: sil hidden @$s8lifetime5ZayinV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> @out Zayin
-  // CHECK: bb0([[THIS:%.*]] : @trivial $*Zayin, [[A0:%.*]] : @trivial $*Unloadable, [[A1:%.*]] : @trivial $Val, [[B:%.*]] : @trivial $*Unloadable, {{%.*}} : @trivial $@thin Zayin.Type):
+  // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
   // CHECK-NEXT:   [[THIS_A1_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 1
@@ -386,7 +386,7 @@ class Foo<T> {
   init() {
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
-    // CHECK: bb0([[METATYPE:%[0-9]+]] : @trivial $@thick Foo<T>.Type):
+    // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
     // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[THIS]])
@@ -448,7 +448,7 @@ class Foo<T> {
 
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
-    // CHECK: bb0([[CHI:%[0-9]+]] : @trivial $Int, [[METATYPE:%[0-9]+]] : @trivial $@thick Foo<T>.Type):
+    // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
     // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[CHI]], [[THIS]])
@@ -456,7 +456,7 @@ class Foo<T> {
 
   // -- initializing entry point
   // CHECK-LABEL: sil hidden @$s8lifetime3FooC3chiACyxGSi_tcfc : $@convention(method) <T> (Int, @owned Foo<T>) -> @owned Foo<T> {
-    // CHECK: bb0([[CHI:%[0-9]+]] : @trivial $Int, [[THISIN:%[0-9]+]] : @owned $Foo<T>):
+    // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : @owned $Foo<T>):
     // CHECK:   [[THIS:%[0-9]+]] = mark_uninitialized [rootself] [[THISIN]]
 
     // -- First we initialize #Foo.y.
@@ -641,7 +641,7 @@ struct Bar {
   // Loadable struct initializer
   // CHECK-LABEL: sil hidden @$s8lifetime3BarV{{[_0-9a-zA-Z]*}}fC
   init() {
-    // CHECK: bb0([[METATYPE:%[0-9]+]] : @trivial $@thin Bar.Type):
+    // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thin Bar.Type):
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Bar }
     // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -669,7 +669,7 @@ struct Bas<T> {
   // Address-only struct initializer
   // CHECK-LABEL: sil hidden @$s8lifetime3BasV{{[_0-9a-zA-Z]*}}fC
   init(yy:T) {
-    // CHECK: bb0([[THISADDRPTR:%[0-9]+]] : @trivial $*Bas<T>, [[YYADDR:%[0-9]+]] : @trivial $*T, [[META:%[0-9]+]] : @trivial $@thin Bas<T>.Type):
+    // CHECK: bb0([[THISADDRPTR:%[0-9]+]] : $*Bas<T>, [[YYADDR:%[0-9]+]] : $*T, [[META:%[0-9]+]] : $@thin Bas<T>.Type):
     // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Bas<τ_0_0> } <T>
     // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
@@ -698,7 +698,7 @@ struct Bas<T> {
 class B { init(y:Int) {} }
 class D : B {
   // CHECK-LABEL: sil hidden @$s8lifetime1DC1x1yACSi_Sitcfc
-  // CHECK: bb0([[X:%[0-9]+]] : @trivial $Int, [[Y:%[0-9]+]] : @trivial $Int, [[SELF:%[0-9]+]] : @owned $D):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : @owned $D):
   init(x: Int, y: Int) {
     var x = x
     var y = y

@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -enable-experimental-static-assert -assume-parsing-unqualified-ownership-sil %s -dataflow-diagnostics -verify
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Static assertion that "1 + 1 == 2".
+sil @test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = builtin "add_Int32"(%0 : $Builtin.Int32, %0 : $Builtin.Int32) : $(Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 2
+  %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $(Builtin.Int1)
+  %4 = string_literal utf8 ""
+  %5 = builtin "poundAssert"(%3 : $Builtin.Int1, %4 : $Builtin.RawPointer) : $()
+  return undef : $()
+}
+
+// Static assertion that "2 + 2 == 5".
+sil @test2 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = builtin "add_Int32"(%0 : $Builtin.Int32, %0 : $Builtin.Int32) : $(Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 5
+  %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $(Builtin.Int1)
+  %4 = string_literal utf8 ""
+  // expected-error @+1 {{assertion failed}}
+  %5 = builtin "poundAssert"(%3 : $Builtin.Int1, %4 : $Builtin.RawPointer) : $()
+  return undef : $()
+}

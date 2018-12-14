@@ -635,7 +635,7 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
-/// \brief Determines if the given string is a valid operator identifier,
+/// Determines if the given string is a valid operator identifier,
 /// without escaping characters.
 bool Lexer::isOperator(StringRef string) {
   if (string.empty()) return false;
@@ -2386,6 +2386,8 @@ void Lexer::lexImpl() {
   case 0:
     switch (getNulCharacterKind(CurPtr - 1)) {
     case NulCharacterKind::CodeCompletion:
+      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        ;
       return formToken(tok::code_complete, TokStart);
 
     case NulCharacterKind::BufferEnd:

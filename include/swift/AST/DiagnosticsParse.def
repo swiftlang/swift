@@ -302,9 +302,6 @@ ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
-ERROR(behavior_multiple_vars,none,
-      "applying property behavior with parameter to multiple variables is "
-      "not supported", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -862,10 +859,6 @@ ERROR(parameter_let_var_as_attr,none,
       (StringRef))
 
 
-ERROR(expected_behavior_name,none,
-      "expected behavior name after '[' in property declaration", ())
-
-
 WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
@@ -1327,6 +1320,9 @@ ERROR(alignment_must_be_positive_integer,none,
 ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
       "@_swift_native_objc_runtime_base class name must be an identifier", ())
 
+ERROR(objc_runtime_name_must_be_identifier,none,
+      "@_objcRuntimeName name must be an identifier", ())
+
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
@@ -1349,6 +1345,8 @@ ERROR(attr_availability_unavailable_deprecated,none,
       "'%0' attribute cannot be both unconditionally 'unavailable' and "
       "'deprecated'", (StringRef))
 
+WARNING(attr_availability_invalid_duplicate,none,
+        "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 ERROR(attr_availability_invalid_renamed,none,

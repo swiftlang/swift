@@ -723,7 +723,7 @@ extension Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
   public func reduce<Result>(
-    into initialResult: Result,
+    into initialResult: __owned Result,
     _ updateAccumulatingResult:
       (_ partialResult: inout Result, Element) throws -> ()
   ) rethrows -> Result {

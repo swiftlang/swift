@@ -400,7 +400,7 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
            "All loadable values in an RValue must be an object");
 
     ValueOwnershipKind kind = v.getOwnershipKind();
-    if (kind == ValueOwnershipKind::Trivial)
+    if (kind == ValueOwnershipKind::Any)
       continue;
 
     // Merge together whether or not the RValue has cleanups.

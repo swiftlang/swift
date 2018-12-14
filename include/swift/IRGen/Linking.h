@@ -230,6 +230,13 @@ class LinkEntity {
     /// is stored in the data.
     DefaultAssociatedConformanceAccessor,
 
+    /// An descriptor for an base conformance within a protocol, which
+    /// will alias the TargetProtocolRequirement descripting this
+    /// particular base conformance.
+    /// The pointer is a ProtocolDecl*; the index of the base conformance
+    /// is stored in the data.
+    BaseConformanceDescriptor,
+
     /// A global function pointer for dynamically replaceable functions.
     /// The pointer is a AbstractStorageDecl*.
     DynamicallyReplaceableFunctionVariableAST,
@@ -262,8 +269,8 @@ class LinkEntity {
     // These next few are protocol-conformance kinds.
 
     /// A direct protocol witness table. The secondary pointer is a
-    /// ProtocolConformance*.
-    DirectProtocolWitnessTable,
+    /// RootProtocolConformance*.
+    ProtocolWitnessTable,
 
     /// A protocol witness table pattern. The secondary pointer is a
     /// ProtocolConformance*.
@@ -284,7 +291,7 @@ class LinkEntity {
     ReflectionAssociatedTypeDescriptor,
 
     /// The protocol conformance descriptor for a conformance.
-    /// The pointer is a NormalProtocolConformance*.
+    /// The pointer is a RootProtocolConformance*.
     ProtocolConformanceDescriptor,
 
     // These are both type kinds and protocol-conformance kinds.
@@ -350,8 +357,13 @@ class LinkEntity {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
 
+  static bool isRootProtocolConformanceKind(Kind k) {
+    return (k == Kind::ProtocolConformanceDescriptor ||
+            k == Kind::ProtocolWitnessTable);
+  }
+
   static bool isProtocolConformanceKind(Kind k) {
-    return (k >= Kind::DirectProtocolWitnessTable &&
+    return (k >= Kind::ProtocolWitnessTable &&
             k <= Kind::ProtocolWitnessTableLazyCacheVariable);
   }
 
@@ -671,6 +683,7 @@ public:
   }
 
   static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
+    assert(decl->exportsPropertyDescriptor());
     LinkEntity entity;
     entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
@@ -746,10 +759,9 @@ public:
     return entity;
   }
 
-  static LinkEntity
-  forDirectProtocolWitnessTable(const ProtocolConformance *C) {
+  static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
     LinkEntity entity;
-    entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable, C);
+    entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
     return entity;
   }
 
@@ -806,6 +818,18 @@ public:
   }
 
   static LinkEntity
+  forBaseConformanceDescriptor(BaseConformance conformance) {
+    LinkEntity entity;
+    entity.setForProtocolAndAssociatedConformance(
+        Kind::BaseConformanceDescriptor,
+        conformance.getSourceProtocol(),
+        conformance.getSourceProtocol()->getSelfInterfaceType()
+          ->getCanonicalType(),
+        conformance.getBaseRequirement());
+    return entity;
+  }
+
+  static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
                                      const AssociatedConformance &association) {
     LinkEntity entity;
@@ -848,10 +872,9 @@ public:
   }
 
   static LinkEntity
-  forProtocolConformanceDescriptor(const NormalProtocolConformance *C) {
+  forProtocolConformanceDescriptor(const RootProtocolConformance *C) {
     LinkEntity entity;
-    entity.setForProtocolConformance(
-        Kind::ProtocolConformanceDescriptor, C);
+    entity.setForProtocolConformance(Kind::ProtocolConformanceDescriptor, C);
     return entity;
   }
 
@@ -936,6 +959,11 @@ public:
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
+
+  const RootProtocolConformance *getRootProtocolConformance() const {
+    assert(isRootProtocolConformanceKind(getKind()));
+    return cast<RootProtocolConformance>(getProtocolConformance());
+  }
   
   const ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
@@ -954,7 +982,8 @@ public:
     }
 
     assert(getKind() == Kind::AssociatedConformanceDescriptor ||
-           getKind() == Kind::DefaultAssociatedConformanceAccessor);
+           getKind() == Kind::DefaultAssociatedConformanceAccessor ||
+           getKind() == Kind::BaseConformanceDescriptor);
     return getAssociatedConformanceByIndex(
              cast<ProtocolDecl>(getDecl()),
              LINKENTITY_GET_FIELD(Data, AssociatedConformanceIndex));

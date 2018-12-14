@@ -150,7 +150,7 @@ struct TestKeyPath {
 }
 //   Key-path getter for TestKeyPath.readable
 // CHECK-LABEL: sil shared [thunk] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
-// CHECK:       bb0(%0 : @trivial $*String, %1 : @trivial $*TestKeyPath):
+// CHECK:       bb0(%0 : $*String, %1 : $*TestKeyPath):
 // CHECK-NEXT:    [[SELF:%.*]] = load [trivial] %1
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[READ:%.*]] = function_ref @$s13read_accessor11TestKeyPathV8readableSSvr

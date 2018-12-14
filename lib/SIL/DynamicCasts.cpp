@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -93,27 +94,19 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  auto conformance = M->lookupConformance(source, TargetProtocol);
-  if (conformance) {
-    // A conditional conformance can have things that need to be evaluated
-    // dynamically.
-    if (conformance->getConditionalRequirements().empty())
-      return DynamicCastFeasibility::WillSucceed;
-
-    return DynamicCastFeasibility::MaySucceed;
-  }
+  // If conformsToProtocol returns a valid conformance, then all requirements
+  // were proven by the type checker.
+  if (M->conformsToProtocol(source, TargetProtocol))
+    return DynamicCastFeasibility::WillSucceed;
 
   auto *SourceNominalTy = source.getAnyNominal();
   if (!SourceNominalTy)
     return DynamicCastFeasibility::MaySucceed;
 
-  // If we are casting a protocol, then the cast will fail
-  // as we have not found any conformances and protocols cannot
-  // be extended currently.
-  // NOTE: If we allow protocol extensions in the future, this
-  // conditional statement should be removed.
-  if (isa<ProtocolType>(source)) {
-    return DynamicCastFeasibility::WillFail;
+  // Protocol types may conform to their own protocols (or other protocols)
+  // in the future.
+  if (source->isAnyExistentialType()) {
+    return DynamicCastFeasibility::MaySucceed;
   }
 
   // If it is a class and it can be proven that this class and its
@@ -130,6 +123,22 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
       // protocol, then we can still return WillFail.
       return DynamicCastFeasibility::MaySucceed;
     }
+  }
+
+  // The WillFail conditions below assume any possible conformance on the
+  // nominal source type has been ruled out. The prior conformsToProtocol query
+  // identified any definite conformance. Now check if there is already a known
+  // conditional conformance on the nominal type with requirements that were
+  // not proven.
+  //
+  // TODO: The TypeChecker can easily prove that some requirements cannot be
+  // met. Returning WillFail in those cases would be more optimal. To do that,
+  // the conformsToProtocol interface needs to be reformulated as a query, and
+  // the implementation, including checkGenericArguments, needs to be taught to
+  // recognize that types with archetypes may potentially succeed.
+  if (auto conformance = M->lookupConformance(source, TargetProtocol)) {
+    assert(!conformance->getConditionalRequirements().empty());
+    return DynamicCastFeasibility::MaySucceed;
   }
 
   // If the source type is file-private or target protocol is file-private,
@@ -491,7 +500,9 @@ swift::classifyDynamicCast(ModuleDecl *M,
           sourceFunction.getResult() == targetFunction.getResult())
         return DynamicCastFeasibility::WillSucceed;
 
-      return DynamicCastFeasibility::WillFail;
+      // Be conservative about function type relationships we may add in
+      // the future.
+      return DynamicCastFeasibility::MaySucceed;
     }
   }
 

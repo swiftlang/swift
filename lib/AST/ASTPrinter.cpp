@@ -418,7 +418,7 @@ static bool willUseTypeReprPrinting(TypeLoc tyLoc,
 }
 
 namespace {
-/// \brief AST pretty-printer.
+/// AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
   ASTPrinter &Printer;
   PrintOptions Options;
@@ -428,7 +428,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   friend DeclVisitor<PrintAST>;
 
-  /// \brief RAII object that increases the indentation level.
+  /// RAII object that increases the indentation level.
   class IndentRAII {
     PrintAST &Self;
     bool DoIndent;
@@ -446,12 +446,12 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   };
 
-  /// \brief Indent the current number of indentation spaces.
+  /// Indent the current number of indentation spaces.
   void indent() {
     Printer.setIndent(IndentLevel);
   }
 
-  /// \brief Record the location of this declaration, which is about to
+  /// Record the location of this declaration, which is about to
   /// be printed, marking the name and signature end locations.
   template<typename FnTy>
   void recordDeclLoc(Decl *decl, const FnTy &NameFn,
@@ -591,11 +591,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
 
     printAccess(D->getFormalAccess());
+    bool shouldSkipSetterAccess =
+      llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess);
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
         AccessLevel setterAccess = setter->getFormalAccess();
-        if (setterAccess != D->getFormalAccess())
+        if (setterAccess != D->getFormalAccess() && !shouldSkipSetterAccess)
           printAccess(setterAccess, "(set)");
       }
     }
@@ -756,7 +758,7 @@ private:
                           ArrayRef<AnyFunctionType::Param> params,
                           bool isAPINameByDefault);
 
-  /// \brief Print the function parameters in curried or selector style,
+  /// Print the function parameters in curried or selector style,
   /// to match the original function declaration.
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 
@@ -865,6 +867,10 @@ static bool hasNonMutatingSetter(const AbstractStorageDecl *ASD) {
   return setter && setter->isExplicitNonMutating();
 }
 
+static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
+  return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -880,11 +886,20 @@ void PrintAST::printAttributes(const Decl *D) {
       Options.ExcludeAttrList.push_back(DAK_Final);
     }
 
-    // Don't print @_hasInitialValue if we're printing an initializer
-    // expression.
     if (auto vd = dyn_cast<VarDecl>(D)) {
+      // Don't print @_hasInitialValue if we're printing an initializer
+      // expression.
       if (vd->isInitExposedToClients())
         Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+
+      if (!Options.PrintForSIL) {
+        // Don't print @_hasStorage if the value is simply stored, or the
+        // decl is resilient.
+        if (vd->isResilient() ||
+            (vd->getImplInfo().isSimpleStored() &&
+             !hasLessAccessibleSetter(vd)))
+          Options.ExcludeAttrList.push_back(DAK_HasStorage);
+      }
     }
 
     // Don't print any contextual decl modifiers.
@@ -1391,13 +1406,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
         }
       } else {
         Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
-        if (second) {
-          Requirement substReq(req.getKind(), first, second);
-          printRequirement(substReq);
-        } else {
-          Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
-          printRequirement(substReq);
-        }
+
+        // We don't substitute type for the printed requirement so that the
+        // printed requirement agrees with separately reported generic parameters.
+        printRequirement(req);
         Printer.printStructurePost(PrintStructureKind::GenericRequirement);
       }
     }
@@ -1613,18 +1625,27 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
 
-  // Never print anything for stored properties.
-  if (ASD->getAllAccessors().empty())
-    return;
-
   auto impl = ASD->getImplInfo();
 
-  // Treat StoredWithTrivialAccessors the same as Stored unless
-  // we're printing for SIL, in which case we want to distinguish it
-  // from a pure stored property.
+  // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
+    // ...unless we're printing for SIL, which expects a { get set? } on
+    //    trivial properties
     if (Options.PrintForSIL) {
       Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");
+    }
+    // ...or you're private/internal(set), at which point we'll print
+    //    @_hasStorage var x: T { get }
+    else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+      Printer << " {";
+      {
+        IndentRAII indentMore(*this);
+        indent();
+        Printer.printNewline();
+        Printer << "get";
+        Printer.printNewline();
+      }
+      Printer << "}";
     }
     return;
   }
@@ -1762,12 +1783,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
     case WriteImplKind::InheritedWithObservers: {
-      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
-      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
-      if (skippedDidSet && skippedWillSet) {
-        PrintAccessor(ASD->getGetter());
-        PrintAccessor(ASD->getSetter());
-      }
+      PrintAccessor(ASD->getGetter());
+      PrintAccessor(ASD->getSetter());
       break;
     }
     case WriteImplKind::Set:
@@ -2091,6 +2108,12 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       SmallString<128> scratch;
       Printer << " = " << entry.getInitStringRepresentation(scratch);
     }
+
+    // HACK: If we're just printing a single pattern and it has accessors,
+    //       print the accessors here.
+    if (decl->getNumPatternEntries() == 1) {
+      printAccessors(vd);
+    }
   }
 }
 
@@ -2322,7 +2345,6 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                        Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
-
 static bool isStructOrClassContext(DeclContext *dc) {
   auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
@@ -3329,7 +3351,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for imported types.
     for (auto File : M->getFiles()) {
-      if (File->getKind() == FileUnitKind::ClangModule)
+      if (File->getKind() == FileUnitKind::ClangModule ||
+          File->getKind() == FileUnitKind::DWARFModule)
         return false;
     }
 
@@ -3982,35 +4005,40 @@ public:
     visit(T->getObjectType());
   }
 
-  void visitArchetypeType(ArchetypeType *T) {
-    if (auto existentialTy = T->getOpenedExistentialType()) {
-      if (Options.PrintForSIL)
-        Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-      visit(existentialTy);
-    } else {
-      if (auto parent = T->getParent()) {
-        visit(parent);
-        Printer << ".";
-      }
-
-      if (Options.AlternativeTypeNames) {
-        auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
-        if (found != Options.AlternativeTypeNames->end()) {
-          Printer << found->second.str();
-          return;
-        }
-      }
-
-      auto Name = T->getName();
-      if (Name.empty())
-        Printer << "<anonymous>";
-      else {
-        PrintNameContext context = PrintNameContext::Normal;
-        if (Name == T->getASTContext().Id_Self)
-          context = PrintNameContext::GenericParameter;
-        Printer.printName(Name, context);
+  void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (Options.PrintForSIL)
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
+    visit(T->getOpenedExistentialType());
+  }
+  
+  void printArchetypeCommon(ArchetypeType *T) {
+    if (Options.AlternativeTypeNames) {
+      auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
+      if (found != Options.AlternativeTypeNames->end()) {
+        Printer << found->second.str();
+        return;
       }
     }
+
+    auto Name = T->getName();
+    if (Name.empty())
+      Printer << "<anonymous>";
+    else {
+      PrintNameContext context = PrintNameContext::Normal;
+      if (Name == T->getASTContext().Id_Self)
+        context = PrintNameContext::GenericParameter;
+      Printer.printName(Name, context);
+    }
+  }
+  
+  void visitNestedArchetypeType(NestedArchetypeType *T) {
+    visit(T->getParent());
+    Printer << ".";
+    printArchetypeCommon(T);
+  }
+  
+  void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
+    printArchetypeCommon(T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
@@ -4135,11 +4163,15 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
 
 void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
   StreamPrinter Printer(OS);
-  PrintAST(Printer, Opts)
-      .printGenericSignature(this,
-                             PrintAST::PrintParams |
-                             PrintAST::PrintRequirements);
+  print(Printer, Opts);
 }
+
+void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
+  PrintAST(Printer, Opts).printGenericSignature(this,
+                                                PrintAST::PrintParams |
+                                                PrintAST::PrintRequirements);
+}
+
 void GenericSignature::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
@@ -4353,6 +4385,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
        << " module " << normal->getDeclContext()->getParentModule()->getName();
+    break;
+  }
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(this);
+    os << self->getProtocol()->getName()
+       << " module " << self->getDeclContext()->getParentModule()->getName();
     break;
   }
   case ProtocolConformanceKind::Specialized: {

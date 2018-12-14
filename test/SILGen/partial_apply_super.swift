@@ -1,10 +1,18 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name partial_apply_super -enable-resilience -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule %S/../Inputs/resilient_class.swift
+
+// Note: we build fixed_layout_class without -enable-resilience, since with
+// -enable-resilience even @_fixed_layout classes have resilient metadata, and
+// we want to test the fragile access pattern here.
+
+// RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
+
+// RUN: %target-swift-emit-silgen -module-name partial_apply_super -enable-resilience -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
+import fixed_layout_class
 
 func doFoo(_ f: () -> ()) {
   f()
@@ -71,7 +79,7 @@ class Child : Parent {
   }
 
   // CHECK-LABEL: sil hidden @$s19partial_apply_super5ChildC25callFinalSuperClassMethodyyFZ : $@convention(method) (@thick Child.Type) -> ()
-  // CHECK: bb0([[ARG:%.*]] : @trivial $@thick Child.Type):
+  // CHECK: bb0([[ARG:%.*]] : $@thick Child.Type):
   // CHECK:   [[CASTED_SELF:%.*]] = upcast [[ARG]] : $@thick Child.Type to $@thick Parent.Type
   // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @$s19partial_apply_super6ParentC16finalClassMethodyyFZTc : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()
   // CHECK:   [[APPLIED_SELF:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF]]) : $@convention(thin) (@thick Parent.Type) -> @owned @callee_guaranteed () -> ()

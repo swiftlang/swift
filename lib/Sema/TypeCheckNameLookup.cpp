@@ -637,15 +637,6 @@ static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
   return true;
 }
 
-static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
-  auto binding = var->getParentPatternBinding();
-  if (!binding || binding->isImplicit())
-    return false;
-
-  auto initRange = binding->getSourceRange();
-  return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
-}
-
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
                                         NameLookupOptions lookupOptions,
@@ -669,12 +660,6 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     // not a plausible typo.
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
-
-    // Don't suggest a variable within its own initializer.
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (isLocInVarInit(*this, var, corrections.Loc.getBaseNameLoc()))
-        return;
-    }
 
     auto candidateName = decl->getFullName();
 

@@ -278,7 +278,8 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
-def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, ParseableInterfaceOption]>,
+def module_name : Separate<["-"], "module-name">,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -464,17 +465,20 @@ def Xlinker : Separate<["-"], "Xlinker">,
 
 def O_Group : OptionGroup<"<optimization level options>">;
 
-def Onone : Flag<["-"], "Onone">, Group<O_Group>, Flags<[FrontendOption]>,
+def Onone : Flag<["-"], "Onone">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile without any optimization">;
-def O : Flag<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>,
+def O : Flag<["-"], "O">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations">;
-def Osize : Flag<["-"], "Osize">, Group<O_Group>, Flags<[FrontendOption]>,
+def Osize : Flag<["-"], "Osize">, Group<O_Group>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations and target small code size">;
 def Ounchecked : Flag<["-"], "Ounchecked">, Group<O_Group>,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations and remove runtime safety checks">;
 def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
-  Flags<[HelpHidden, FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
@@ -747,6 +751,9 @@ def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
 def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
+
+def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-swift3-objc-inference -swift-version 4 -enable-sil-ownership -enable-objc-interop | %FileCheck -check-prefix CHECK-SWIFT4 %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-swift3-objc-inference -swift-version 4 -enable-objc-interop | %FileCheck -check-prefix CHECK-SWIFT4 %s
 
 import Foundation
 
@@ -43,7 +43,7 @@ class ObjCSubclass : NSObject {
   var bar: NSObject? = nil
 
   // CHECK-SWIFT4-LABEL: sil hidden [thunk] @$s016objc_deprecated_A7_thunks12ObjCSubclassCyyXlSicigTo : $@convention(objc_method) (Int, ObjCSubclass) -> @autoreleased AnyObject
-  // CHECK-SWIFT4: bb0(%0 : @trivial $Int, %1 : @unowned $ObjCSubclass):
+  // CHECK-SWIFT4: bb0(%0 : $Int, %1 : @unowned $ObjCSubclass):
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal
   // CHECK-SWIFT4-NEXT: [[IS_ASCII:%.*]] = integer_literal
@@ -52,7 +52,7 @@ class ObjCSubclass : NSObject {
   // CHECK-SWIFT4-NEXT: builtin "swift3ImplicitObjCEntrypoint"([[FILENAME]] : $Builtin.RawPointer, [[LENGTH]] : $Builtin.Word, [[LINE]] : $Builtin.Word, [[COLUMN]] : $Builtin.Word) : $() 
 
   // CHECK-SWIFT4-LABEL: sil hidden [thunk] @$s016objc_deprecated_A7_thunks12ObjCSubclassCyyXlSicisTo : $@convention(objc_method) (AnyObject, Int, ObjCSubclass) ->
-  // CHECK-SWIFT4: bb0(%0 : @unowned $AnyObject, %1 : @trivial $Int, %2 : @unowned $ObjCSubclass):
+  // CHECK-SWIFT4: bb0(%0 : @unowned $AnyObject, %1 : $Int, %2 : @unowned $ObjCSubclass):
   // CHECK-SWIFT4-NEXT: [[FILENAME:%.*]] = [[FILENAME_LITERAL]]
   // CHECK-SWIFT4-NEXT: [[LENGTH:%.*]] = integer_literal
   // CHECK-SWIFT4-NEXT: [[IS_ASCII:%.*]] = integer_literal

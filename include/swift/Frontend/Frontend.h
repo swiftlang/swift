@@ -80,7 +80,7 @@ class CompilerInvocation {
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
-  /// \brief Code completion offset in bytes from the beginning of the main
+  /// Code completion offset in bytes from the beginning of the main
   /// source file.  Valid only if \c isCodeCompletion() == true.
   unsigned CodeCompletionOffset = ~0U;
 
@@ -512,7 +512,7 @@ public:
     }
   }
 
-  /// \brief Returns true if there was an error during setup.
+  /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
 private:
@@ -573,6 +573,13 @@ public:
   /// Like a parse-only invocation, a single file is required. Unlike a
   /// parse-only invocation, module imports will be processed.
   void performParseAndResolveImportsOnly();
+
+  /// Performs mandatory, diagnostic, and optimization passes over the SIL.
+  /// \param silModule The SIL module that was generated during SILGen.
+  /// \param stats A stats reporter that will report optimization statistics.
+  /// \returns true if any errors occurred.
+  bool performSILProcessing(SILModule *silModule,
+                            UnifiedStatsReporter *stats = nullptr);
 
 private:
   SourceFile *

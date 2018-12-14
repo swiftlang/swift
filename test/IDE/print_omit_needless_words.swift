@@ -4,9 +4,9 @@
 // FIXME: this is failing on simulators
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/ObjectiveC.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules-without-ns/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ObjectiveC -function-definitions=false -prefer-type-repr=true  > %t.ObjectiveC.txt
 // RUN: %FileCheck %s -check-prefix=CHECK-OBJECTIVEC -strict-whitespace < %t.ObjectiveC.txt
@@ -86,8 +86,9 @@
 // CHECK-FOUNDATION-NEXT: case decimal
 // CHECK-FOUNDATION-NEXT: case binary
 
-// Note: Make sure NSURL works in various places
-// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
+// Note: Make sure initialisms work in various places
+// CHECK-FOUNDATION: open(_: URL!, completionHandler: ((Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: NSGUID!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
@@ -113,16 +114,18 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Noun phrase puts preposition inside.
-// CHECK-FOUNDATION: func url(withAddedString: String) -> NSURL?
+// CHECK-FOUNDATION: func url(withAddedString: String) -> URL?
+// CHECK-FOUNDATION: func guid(withAddedString: String) -> NSGUID?
 
 // Note: NSCalendarUnits is not a set of "Options".
 // CHECK-FOUNDATION: func forCalendarUnits(_: NSCalendar.Unit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
-// CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
-
 // Note: <property type><preposition> --> <preposition>.
-// CHECK-FOUNDATION: var withHTTPS: NSURL { get }
+// CHECK-FOUNDATION: var deletingLastPathComponent: URL? { get }
+// CHECK-FOUNDATION: var withHTTPS: URL { get }
+// CHECK-FOUNDATION: var canonicalizing: NSGUID? { get }
+// CHECK-FOUNDATION: var withContext: NSGUID { get }
 
 // Note: lowercasing option set values
 // CHECK-FOUNDATION: struct NSEnumerationOptions
@@ -184,7 +187,8 @@
 // CHECK-FOUNDATION: let NSHTTPRequestKey: String
 
 // Lowercasing initialisms with plurals.
-// CHECK-FOUNDATION: var urlsInText: [NSURL] { get }
+// CHECK-FOUNDATION: var urlsInText: [URL] { get }
+// CHECK-FOUNDATION: var guidsInText: [NSGUID] { get }
 
 // Don't strip prefixes from macro names.
 // CHECK-FOUNDATION: var NSTimeIntervalSince1970: Double { get }
@@ -201,14 +205,17 @@
 // CHECK-OMIT-NEEDLESS-WORDS:   static var backAndForth: OMWWobbleOptions
 // CHECK-OMIT-NEEDLESS-WORDS:   static var toXMLHex: OMWWobbleOptions
 
-// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: NSURL)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: URL)
+// CHECK-OMIT-NEEDLESS-WORDS: func jump(to: NSGUID)
+// CHECK-OMIT-NEEDLESS-WORDS: func jumpAgain(to: NSGUID)
 // CHECK-OMIT-NEEDLESS-WORDS: func objectIs(compatibleWith: Any) -> Bool
 // CHECK-OMIT-NEEDLESS-WORDS: func insetBy(x: Int, y: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func setIndirectlyToValue(_: Any)
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: Any)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: Any)
-// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [NSURL])
-// CHECK-OMIT-NEEDLESS-WORDS: func save(to: NSURL, forSaveOperation: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [URL])
+// CHECK-OMIT-NEEDLESS-WORDS: func save(to: URL, forSaveOperation: Int)
+// CHECK-OMIT-NEEDLESS-WORDS: func save(to: NSGUID, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<NSError?>!)
 

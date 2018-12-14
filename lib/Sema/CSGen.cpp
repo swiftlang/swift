@@ -32,7 +32,7 @@
 using namespace swift;
 using namespace swift::constraints;
 
-/// \brief Find the declaration directly referenced by this expression.
+/// Find the declaration directly referenced by this expression.
 static std::pair<ValueDecl *, FunctionRefKind>
 findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
   do {
@@ -127,14 +127,20 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
+    ConstraintSystem &CS;
 
   public:
-    
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
-        LinkedExprs(linkedExprs) {}
-    
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
+                        ConstraintSystem &cs)
+        : LinkedExprs(linkedExprs), CS(cs) {}
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
           
@@ -164,20 +170,20 @@ namespace {
       return expr;
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
-    /// \brief Ignore patterns.
+    /// Ignore patterns.
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
       return { false, pat };
     }
 
-    /// \brief Ignore types.
+    /// Ignore types.
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
@@ -195,6 +201,11 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
@@ -327,20 +338,20 @@ namespace {
       return { true, expr };
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
-    /// \brief Ignore patterns.
+    /// Ignore patterns.
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *pat) override {
       return { false, pat };
     }
 
-    /// \brief Ignore types.
+    /// Ignore types.
     bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
@@ -934,6 +945,11 @@ namespace {
       CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
@@ -965,12 +981,12 @@ namespace {
       return expr;
     }
     
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
     
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 } // end anonymous namespace
@@ -992,7 +1008,7 @@ namespace {
       = { nullptr, nullptr };
     unsigned currentEditorPlaceholderVariable = 0;
 
-    /// \brief Add constraints for a reference to a named member of the given
+    /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
                                  FunctionRefKind functionRefKind,
@@ -1014,7 +1030,7 @@ namespace {
       return tv;
     }
 
-    /// \brief Add constraints for a reference to a specific member of the given
+    /// Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl,
                                  FunctionRefKind functionRefKind) {
@@ -1038,7 +1054,7 @@ namespace {
       return tv;
     }
 
-    /// \brief Add constraints for a subscript operation.
+    /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(Expr *anchor, Type baseTy, Expr *index,
                                  ValueDecl *declOrNull,
                                  ConstraintLocator *locator = nullptr) {
@@ -1709,9 +1725,18 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       optTy, CS.getType(expr->getSubExpr()),
-                       CS.getConstraintLocator(expr));
+      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
+      // even if the sub-expression was already optional.
+      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         CS.getType(expr->getSubExpr()), optTy,
+                         CS.getConstraintLocator(expr));
+      }
+      else {
+        CS.addConstraint(ConstraintKind::OptionalObject,
+                         optTy, CS.getType(expr->getSubExpr()),
+                         CS.getConstraintLocator(expr));
+      }
       return optTy;
     }
 
@@ -2048,7 +2073,7 @@ namespace {
       });
     }
 
-    /// \brief Produces a type for the given pattern, filling in any missing
+    /// Produces a type for the given pattern, filling in any missing
     /// type information with fresh type variables.
     ///
     /// \param pattern The pattern.
@@ -2159,7 +2184,7 @@ namespace {
       return CS.getType(expr->getClosureBody());
     }
 
-    /// \brief Walk a closure body to determine if it's possible for
+    /// Walk a closure body to determine if it's possible for
     /// it to return with a non-void result.
     static bool closureHasNoResult(ClosureExpr *expr) {
       // A walker that looks for 'return' statements that aren't
@@ -2208,7 +2233,7 @@ namespace {
       return finder.hasNoResult();
     }
     
-    /// \brief Walk a closure AST to determine if it can throw.
+    /// Walk a closure AST to determine if it can throw.
     bool closureCanThrow(ClosureExpr *expr) {
       // A walker that looks for 'try' or 'throw' expressions
       // that aren't nested within closures, nested declarations,
@@ -3212,7 +3237,7 @@ namespace {
     }
   };
 
-  /// \brief AST walker that "sanitizes" an expression for the
+  /// AST walker that "sanitizes" an expression for the
   /// constraint-based type checker.
   ///
   /// This is necessary because Sema fills in too much type information before
@@ -3231,6 +3256,12 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       while (true) {
+
+        // If we should reuse pre-checked types, don't sanitize the expression
+        // if it's already type-checked.
+        if (CS.shouldReusePrecheckedType() && expr->getType())
+          return { false, expr };
+
         // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
         if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
           auto archetypeVal = OOE->getOpaqueValue();
@@ -3319,10 +3350,8 @@ namespace {
         Type type = CS.getType(expr);
         if (type->hasOpenedExistential()) {
           type = type.transform([&](Type type) -> Type {
-            if (auto archetype = type->getAs<ArchetypeType>())
-              if (auto existentialType = archetype->getOpenedExistentialType())
-                return existentialType;
-
+            if (auto archetype = type->getAs<OpenedArchetypeType>())
+              return archetype->getOpenedExistentialType();
             return type;
           });
           CS.setType(expr, type);
@@ -3383,7 +3412,7 @@ namespace {
       return expr;
     }
 
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
 
     // Don't walk into statements.  This handles the BraceStmt in
@@ -3400,6 +3429,15 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
+        if (expr->getType()) {
+          assert(!expr->getType()->hasTypeVariable());
+          CG.getConstraintSystem().cacheType(expr);
+          return { false, expr };
+        }
+      }
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -3450,7 +3488,7 @@ namespace {
       return { true, expr };
     }
 
-    /// \brief Once we've visited the children of the given expression,
+    /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
 
@@ -3525,12 +3563,12 @@ namespace {
       return nullptr;
     }
 
-    /// \brief Ignore statements.
+    /// Ignore statements.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       return { false, stmt };
     }
 
-    /// \brief Ignore declarations.
+    /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
@@ -3620,7 +3658,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs);
+  LinkedExprCollector collector(linkedExprs, *this);
   e->walk(collector);
   
   // Favor types, as appropriate.

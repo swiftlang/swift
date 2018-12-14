@@ -21,14 +21,8 @@ do {
   let _: UIntMax = 0 // expected-error {{'UIntMax' has been renamed to 'UInt64'}}
 }
 
-func integer<T : Integer>(x: T) {} // expected-error {{'Integer' has been renamed to 'BinaryInteger'}}
-func integerArithmetic<T : IntegerArithmetic>(x: T) {} // expected-error {{'IntegerArithmetic' has been renamed to 'BinaryInteger'}}
-func signedNumber<T : SignedNumber>(x: T) {} // expected-error {{Please use 'SignedNumeric & Comparable' instead.}}
-func absoluteValuable<T : AbsoluteValuable>(x: T) {} // expected-error {{Please use 'SignedNumeric & Comparable' instead.}}
-func _signedInteger<T : _SignedInteger>(x: T) {} // expected-error {{'_SignedInteger' has been renamed to 'SignedInteger'}}
-
 func absolutaValuable<T : SignedNumeric & Comparable>(x: T) {
-  _ = T.abs(x) // expected-error {{use the 'abs(_:)' free function}}
+  _ = T.abs(x) // expected-error {{type 'T' has no member 'abs'}}
 }
 
 func signedIntegerMaskingArithmetics<T : SignedInteger>(x: T) {

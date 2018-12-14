@@ -65,11 +65,11 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @objc
   internal override required init() {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: __owned _NativeSet<Element>) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
     self.bridgedElements = nil
     self.nextBucket = base.hashTable.startBucket
@@ -78,7 +78,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSSet<Element>) {
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
     self.nextBucket = base.hashTable.startBucket
@@ -86,7 +86,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(bucket))
+    _internalInvariant(base.hashTable.isOccupied(bucket))
     if let bridgedElements = self.bridgedElements {
       return bridgedElements[bucket]
     }
@@ -156,8 +156,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   internal var native: _NativeSet<Element>
 
   internal init(_ native: __owned _NativeSet<Element>) {
-    _sanityCheck(native.count > 0)
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
+    _internalInvariant(native.count > 0)
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.native = native
     super.init()
   }
@@ -208,7 +208,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -379,7 +379,7 @@ extension _CocoaSet: _SetBuffer {
         return Index(Index.Storage(self, allKeys), offset: i)
       }
     }
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "An NSSet member wasn't listed amongst its enumerated contents")
   }
 
@@ -399,7 +399,7 @@ extension _CocoaSet: _SetBuffer {
   @_effects(releasenone)
   internal func element(at i: Index) -> AnyObject {
     let element: AnyObject? = i.element
-    _sanityCheck(element != nil, "Item not found in underlying NSSet")
+    _internalInvariant(element != nil, "Item not found in underlying NSSet")
     return element!
   }
 }

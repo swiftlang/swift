@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$s22enum_generic_raw_value1EO
 enum E<T>: Int {

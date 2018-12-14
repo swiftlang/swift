@@ -25,12 +25,12 @@ def run_command(cmd):
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
-def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args, 
+def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
               current_reparse_start):
     pre_edit_line = ""
     post_edit_line = ""
 
-    # We parse one tag at a time in the line while eating away a prefix of the 
+    # We parse one tag at a time in the line while eating away a prefix of the
     # line
     while line:
         # The regular expression to match the template markers
@@ -56,7 +56,7 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
                 # Compute the -incremental-edit argument for swift-syntax-test
                 column = len(pre_edit_line) + len(prefix) + 1
                 edit_arg = '%d:%d-%d:%d=%s' % \
-                    (line_no, column, line_no, column + len(pre_edit), 
+                    (line_no, column, line_no, column + len(pre_edit),
                      post_edit)
                 incremental_edit_args.append('-incremental-edit')
                 incremental_edit_args.append(edit_arg)
@@ -82,8 +82,8 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
                                               'in line %d' % line_no)
                     reparse_args.append('-reparse-region')
                     reparse_args.append(
-                        '%d:%d-%d:%d' % (current_reparse_start[0], 
-                                         current_reparse_start[1], 
+                        '%d:%d-%d:%d' % (current_reparse_start[0],
+                                         current_reparse_start[1],
                                          line_no, column))
                     current_reparse_start = None
                 else:
@@ -105,9 +105,9 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
     return (pre_edit_line, post_edit_line, current_reparse_start)
 
 
-def serializeIncrParseMarkupFile(test_file, test_case, mode, 
-                                 serialization_mode, serialization_format, 
-                                 omit_node_ids, output_file, temp_dir, 
+def serializeIncrParseMarkupFile(test_file, test_case, mode,
+                                 serialization_mode, serialization_format,
+                                 omit_node_ids, output_file, temp_dir,
                                  swift_syntax_test, print_visual_reuse_info):
     test_file_name = os.path.basename(test_file)
     pre_edit_file = temp_dir + '/' + test_file_name + '.' + test_case + \
@@ -120,7 +120,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
 
     # =========================================================================
     # First generate the pre-edit and post-edit Swift file and gather the edits
-    # and expected reparse regions. This is the parser for the special edit 
+    # and expected reparse regions. This is the parser for the special edit
     # markup for testing incremental parsing
     # =========================================================================
 
@@ -128,7 +128,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
             open(pre_edit_file, mode='w+') as pre_edit_file_handle, \
             open(post_edit_file, mode='w+') as post_edit_file_handle:
 
-        # Gather command line arguments for swift-syntax-test specifiying the 
+        # Gather command line arguments for swift-syntax-test specifiying the
         # performed edits in this list
         incremental_edit_args = []
         reparse_args = []
@@ -136,7 +136,7 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
 
         line_no = 1
         for line in test_file_handle.readlines():
-            parseLineRes = parseLine(line, line_no, test_case, 
+            parseLineRes = parseLine(line, line_no, test_case,
                                      incremental_edit_args,
                                      reparse_args, current_reparse_start)
             (pre_edit_line, post_edit_line, current_reparse_start) = \
@@ -155,12 +155,12 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
     # Now generate the requested serialized file
     # =========================================================================
 
-    # Build the command to serialize the tree depending on the command line 
+    # Build the command to serialize the tree depending on the command line
     # arguments
 
     try:
         command = [
-            swift_syntax_test, 
+            swift_syntax_test,
             '-serialize-raw-tree',
             '-output-filename', output_file
         ]
@@ -170,20 +170,20 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
 
         if serialization_mode == 'full':
             # Nothing to do. This is the default behaviour of swift-syntax-test
-            pass 
+            pass
         elif serialization_mode == 'incremental':
             command.extend(['-incremental-serialization'])
         else:
-            raise ValueError('Unknown serialization mode "%s"' % 
+            raise ValueError('Unknown serialization mode "%s"' %
                              serialization_mode)
 
         if serialization_format == 'json':
             # Nothing to do. This is the default behaviour of swift-syntax-test
-            pass 
+            pass
         elif serialization_format == 'byteTree':
             command.extend(['-serialize-byte-tree'])
         else:
-            raise ValueError('Unknown serialization format "%s"' % 
+            raise ValueError('Unknown serialization format "%s"' %
                              serialization_format)
 
         if mode == 'pre-edit':
@@ -191,27 +191,27 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
         elif mode == 'post-edit':
             command.extend(['-input-source-filename', post_edit_file])
         elif mode == 'incremental':
-            # We need to build the syntax tree of the pre-edit file first so 
-            # that we can pass it to swift-syntax-test to perform incremental 
+            # We need to build the syntax tree of the pre-edit file first so
+            # that we can pass it to swift-syntax-test to perform incremental
             # parsing
             pre_edit_tree_file = pre_edit_file + '.serialized.json'
 
-            run_command([swift_syntax_test] + 
+            run_command([swift_syntax_test] +
                         ['-serialize-raw-tree'] +
                         ['-input-source-filename', pre_edit_file] +
                         ['-output-filename', pre_edit_tree_file])
 
-            # Then perform incremental parsing with the old syntax tree on the 
+            # Then perform incremental parsing with the old syntax tree on the
             # post-edit file
             command.extend(['-input-source-filename', post_edit_file])
-            command.extend(['-old-syntax-tree-filename', 
+            command.extend(['-old-syntax-tree-filename',
                             pre_edit_tree_file])
             command.extend(['--old-source-filename', pre_edit_file])
             command.extend(incremental_edit_args)
             command.extend(reparse_args)
             if print_visual_reuse_info:
                 command.extend([
-                    '-print-visual-reuse-info', 
+                    '-print-visual-reuse-info',
                     '-force-colored-output'
                 ])
         else:
@@ -229,13 +229,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description='Utility for testing incremental syntax parsing',
         epilog='''
-    This utility can parse a special markup to dedicate a pre-edit and a 
+    This utility can parse a special markup to dedicate a pre-edit and a
     post-edit version of a file simulateously and generate a serialized version
-    of the libSyntax tree by parsing either the pre-edit file, the post-edit 
+    of the libSyntax tree by parsing either the pre-edit file, the post-edit
     file or the edits that are required to retrieve the post-edit file from the
     pre-edit file incrementally.
 
-    To generate the pre-edit and the post-edit file from the template, it 
+    To generate the pre-edit and the post-edit file from the template, it
     operates on markers of the form:
 
         <<test_case<pre|||post>>>
@@ -252,7 +252,7 @@ def main():
         help='The test case to execute. If no test case is specified all \
               unnamed substitutions are applied')
     parser.add_argument(
-        '--mode', choices=['pre-edit', 'incremental', 'post-edit'], 
+        '--mode', choices=['pre-edit', 'incremental', 'post-edit'],
         required=True, help='''
     The type of parsing to perform:
     - pre-edit: Serialize the syntax tree when parsing the pre-edit file \
@@ -263,13 +263,13 @@ def main():
     post-edit file from scratch
     ''')
     parser.add_argument(
-        '--serialization-mode', choices=['full', 'incremental'], 
+        '--serialization-mode', choices=['full', 'incremental'],
         default='full', help='''
-    Only applicable if `--mode` is `incremental`. Whether to serialize the 
+    Only applicable if `--mode` is `incremental`. Whether to serialize the
     entire tree or use the incremental transfer mode. Default is `full`.
     ''')
     parser.add_argument(
-        '--serialization-format', choices=['json', 'byteTree'], 
+        '--serialization-format', choices=['json', 'byteTree'],
         default='json', help='''
     The format in which the syntax tree shall be serialized.
     ''')
@@ -307,15 +307,15 @@ def main():
     visual_reuse_info = args.print_visual_reuse_info
 
     try:
-        serializeIncrParseMarkupFile(test_file=test_file, 
-                                     test_case=test_case, 
-                                     mode=mode, 
+        serializeIncrParseMarkupFile(test_file=test_file,
+                                     test_case=test_case,
+                                     mode=mode,
                                      serialization_mode=serialization_mode,
                                      serialization_format=serialization_format,
                                      omit_node_ids=omit_node_ids,
-                                     output_file=output_file, 
-                                     temp_dir=temp_dir, 
-                                     swift_syntax_test=swift_syntax_test, 
+                                     output_file=output_file,
+                                     temp_dir=temp_dir,
+                                     swift_syntax_test=swift_syntax_test,
                                      print_visual_reuse_info=visual_reuse_info)
     except TestFailedError as e:
         print(e.message, file=sys.stderr)

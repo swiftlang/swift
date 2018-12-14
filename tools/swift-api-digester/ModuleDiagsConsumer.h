@@ -30,7 +30,7 @@ namespace swift {
 namespace ide {
 namespace api {
 
-/// \brief Diagnostic consumer that displays diagnostics to standard output.
+/// Diagnostic consumer that displays diagnostics to standard output.
 class ModuleDifferDiagsConsumer: public PrintingDiagnosticConsumer {
   llvm::raw_ostream &OS;
   bool DiagnoseModuleDiff;

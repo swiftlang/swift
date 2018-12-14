@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 4 -module-name generic_casts -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 4 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // The below tests are to ensure we maintain compatibility with Swift 4.1's
 // behaviour when casting to an archetype – the compiler assumes a non-optional
@@ -8,7 +8,7 @@
 // CHECK-LABEL: sil hidden @$s13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_opaque_archetype<T>(_ x: Any?) -> T {
   return x as! T
-  // CHECK: bb0([[RET:%.*]] : @trivial $*T, {{%.*}} : @trivial $*Optional<Any>):
+  // CHECK: bb0([[RET:%.*]] : $*T, {{%.*}} : $*Optional<Any>):
   // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in [[RET]] : $*T
 }
 

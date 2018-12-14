@@ -1821,6 +1821,13 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
       candidate = covariantExpr->getSubExpr();
       continue;
     }
+    
+    // Look through inject into optional expressions
+    if (auto injectIntoOptionalExpr
+        = dyn_cast<InjectIntoOptionalExpr>(candidate)) {
+      candidate = injectIntoOptionalExpr->getSubExpr();
+      continue;
+    }
     break;
   }
 
@@ -2091,11 +2098,11 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
-  return type->castTo<ArchetypeType>();
+  return type->castTo<OpenedArchetypeType>();
 }
 
 KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,

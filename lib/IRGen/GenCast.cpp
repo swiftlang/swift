@@ -133,6 +133,34 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   return {cond, from};
 }
 
+/// Returns an ArrayRef with the set of arguments to pass to a dynamic cast call.
+///
+/// `argsBuf` should be passed in as a reference to an array with three nullptr
+/// values at the end. These will be dropped from the return ArrayRef for a
+/// conditional cast, or filled in with source location arguments for an
+/// unconditional cast.
+template<unsigned n>
+static ArrayRef<llvm::Value*>
+getDynamicCastArguments(IRGenFunction &IGF,
+                        llvm::Value *(&argsBuf)[n], CheckedCastMode mode
+                        /*TODO , SILLocation location*/)
+{
+  switch (mode) {
+  case CheckedCastMode::Unconditional:
+    // TODO: Pass along location info if available for unconditional casts, so
+    // that the runtime error for a failed cast can report the source of the
+    // error from user code.
+    argsBuf[n-3] = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    argsBuf[n-2] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    argsBuf[n-1] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    return argsBuf;
+      
+  case CheckedCastMode::Conditional:
+    return llvm::makeArrayRef(argsBuf, n-3);
+    break;
+  }
+}
+
 /// Emit a checked unconditional downcast of a class value.
 llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
                                       SILType toType, CheckedCastMode mode) {
@@ -206,9 +234,17 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
 
+  llvm::Value *argsBuf[] = {
+    from,
+    metadataRef,
+    nullptr,
+    nullptr,
+    nullptr,
+  };
+
   auto call
-    = IGF.Builder.CreateCall(castFn, {from, metadataRef});
-  // FIXME: Eventually, we may want to throw.
+    = IGF.Builder.CreateCall(castFn,
+                             getDynamicCastArguments(IGF, argsBuf, mode));
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 
@@ -267,8 +303,17 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
   auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
+  
+  llvm::Value *argsBuf[] = {
+    metatype,
+    toMetadata,
+    nullptr,
+    nullptr,
+    nullptr,
+  };
 
-  auto call = IGF.Builder.CreateCall(castFn, {metatype, toMetadata});
+  auto call = IGF.Builder.CreateCall(castFn,
+                                   getDynamicCastArguments(IGF, argsBuf, mode));
   call->setCallingConv(cc);
   call->setDoesNotThrow();
   ex.add(call);
@@ -486,8 +531,16 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
     auto cc = IGF.IGM.DefaultCC;
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
+    
+    llvm::Value *argsBuf[] = {
+      metatypeValue,
+      nullptr,
+      nullptr,
+      nullptr,
+    };
 
-    auto call = IGF.Builder.CreateCall(castFn, metatypeValue);
+    auto call = IGF.Builder.CreateCall(castFn,
+                                   getDynamicCastArguments(IGF, argsBuf, mode));
     call->setCallingConv(cc);
     return call;
   }
@@ -672,11 +725,18 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
 
+    llvm::Value *argsBuf[] = {
+      objcCastObject,
+      IGF.IGM.getSize(Size(objcProtos.size())),
+      protoRefsBuf.getAddress(),
+      nullptr,
+      nullptr,
+      nullptr,
+    };
 
     auto call = IGF.Builder.CreateCall(
-        castFn,
-        {objcCastObject, IGF.IGM.getSize(Size(objcProtos.size())),
-         protoRefsBuf.getAddress()});
+      castFn,
+      getDynamicCastArguments(IGF, argsBuf, mode));
     call->setCallingConv(cc);
     objcCast = call;
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);

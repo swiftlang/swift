@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 // SR-8398
 func fibonacci(_ n: Int) -> Int {
   var cache: [Int: Int] = [:]

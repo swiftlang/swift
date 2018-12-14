@@ -220,6 +220,7 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     StringRef symbolName,
+    unsigned alignment,
     bool shouldSetLowBit,
     llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
   // Call this to form the return value.
@@ -251,7 +252,8 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     llvm::GlobalValue::HiddenVisibility,
     llvm::GlobalValue::DefaultStorageClass})
   .to(var);
-  var->setAlignment(2);
+  if (alignment)
+    var->setAlignment(alignment);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
 

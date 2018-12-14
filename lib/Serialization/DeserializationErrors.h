@@ -282,6 +282,26 @@ public:
   }
 };
 
+class XRefNonLoadedModuleError :
+    public llvm::ErrorInfo<XRefNonLoadedModuleError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  explicit XRefNonLoadedModuleError(Identifier name) {
+    this->name = name;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "module '" << name << "' was not loaded";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 class OverrideError : public llvm::ErrorInfo<OverrideError,
                                              DeclDeserializationError> {
 private:

@@ -185,6 +185,8 @@ extension LazyMapCollection : BidirectionalCollection
   }
 }
 
+extension LazyMapCollection: LazyCollectionProtocol { }
+
 extension LazyMapCollection : RandomAccessCollection
   where Base : RandomAccessCollection { }
 

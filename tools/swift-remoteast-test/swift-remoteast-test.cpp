@@ -178,7 +178,7 @@ printDynamicTypeAndAddressForExistential(void *object,
 namespace {
 
 struct Observer : public FrontendObserver {
-  void aboutToRunImmediately(CompilerInstance &instance) override {
+  void configuredCompiler(CompilerInstance &instance) override {
     Context = &instance.getASTContext();
   }
 };

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_extensions -enable-sil-ownership -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_extensions -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

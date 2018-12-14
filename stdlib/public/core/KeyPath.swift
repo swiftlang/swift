@@ -26,7 +26,12 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
-/// A type-erased key path, from any root type to any resulting value type.
+/// A type-erased key path, from any root type to any resulting value
+/// type. NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
+/// The two must coexist, so it was renamed. The old name must not be
+/// used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
+/// Swift._AnyKeyPath.
+@_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable
@@ -125,7 +130,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
   internal init() {
-    _sanityCheckFailure("use _create(...)")
+    _internalInvariantFailure("use _create(...)")
   }
 
   @usableFromInline
@@ -137,7 +142,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
-    _sanityCheck(bytes > 0 && bytes % 4 == 0,
+    _internalInvariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
@@ -245,7 +250,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
               to: NewValue.self, endingWith: Value.self) {
             case .continue(let newBase):
               if isLast {
-                _sanityCheck(NewValue.self == Value.self,
+                _internalInvariant(NewValue.self == Value.self,
                              "key path does not terminate in correct type")
                 return unsafeBitCast(newBase, to: Value.self)
               } else {
@@ -290,7 +295,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     return withBuffer {
       var buffer = $0
       
-      _sanityCheck(!buffer.hasReferencePrefix,
+      _internalInvariant(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
       if buffer.data.isEmpty {
@@ -356,7 +361,7 @@ public class ReferenceWritableKeyPath<
       var base: Any = origBase
       while buffer.hasReferencePrefix {
         let (rawComponent, optNextType) = buffer.next()
-        _sanityCheck(optNextType != nil,
+        _internalInvariant(optNextType != nil,
                      "reference prefix should not go to end of buffer")
         let nextType = optNextType.unsafelyUnwrapped
         
@@ -723,9 +728,9 @@ internal final class NonmutatingWritebackBuffer<CurValue, NewValue> {
 }
 
 internal typealias KeyPathComputedArgumentLayoutFn = @convention(thin)
-  (_ patternArguments: UnsafeRawPointer) -> (size: Int, alignmentMask: Int)
+  (_ patternArguments: UnsafeRawPointer?) -> (size: Int, alignmentMask: Int)
 internal typealias KeyPathComputedArgumentInitializerFn = @convention(thin)
-  (_ patternArguments: UnsafeRawPointer,
+  (_ patternArguments: UnsafeRawPointer?,
    _ instanceArguments: UnsafeMutableRawPointer) -> ()
 
 internal enum KeyPathComputedIDKind {
@@ -801,7 +806,7 @@ internal struct RawKeyPathComponent {
     }
 
     internal var isStoredMutable: Bool {
-      _sanityCheck(kind == .struct || kind == .class)
+      _internalInvariant(kind == .struct || kind == .class)
       return _value & Header.storedMutableFlag != 0
     }
 
@@ -809,7 +814,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedMutatingFlag
     }
     internal var isComputedMutating: Bool {
-      _sanityCheck(kind == .computed)
+      _internalInvariant(kind == .computed)
       return _value & Header.computedMutatingFlag != 0
     }
 
@@ -817,7 +822,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedSettableFlag
     }
     internal var isComputedSettable: Bool {
-      _sanityCheck(kind == .computed)
+      _internalInvariant(kind == .computed)
       return _value & Header.computedSettableFlag != 0
     }
 
@@ -833,7 +838,7 @@ internal struct RawKeyPathComponent {
 
       switch (storedProperty, vtableOffset) {
       case (true, true):
-        _sanityCheckFailure("not allowed")
+        _internalInvariantFailure("not allowed")
       case (true, false):
         return .storedPropertyIndex
       case (false, true):
@@ -847,7 +852,7 @@ internal struct RawKeyPathComponent {
       return _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
     }
     internal var hasComputedArguments: Bool {
-      _sanityCheck(kind == .computed)
+      _internalInvariant(kind == .computed)
       return _value & Header.computedHasArgumentsFlag != 0
     }
 
@@ -860,12 +865,12 @@ internal struct RawKeyPathComponent {
     }
     internal var isComputedInstantiatedFromExternalWithArguments: Bool {
       get {
-        _sanityCheck(kind == .computed)
+        _internalInvariant(kind == .computed)
         return
           _value & Header.computedInstantiatedFromExternalWithArgumentsFlag != 0
       }
       set {
-        _sanityCheck(kind == .computed)
+        _internalInvariant(kind == .computed)
         _value =
             _value & ~Header.computedInstantiatedFromExternalWithArgumentsFlag
           | (newValue ? Header.computedInstantiatedFromExternalWithArgumentsFlag
@@ -898,7 +903,7 @@ internal struct RawKeyPathComponent {
       }
       set {
         let shifted = newValue << Header.discriminatorShift
-        _sanityCheck(shifted & Header.discriminatorMask == shifted,
+        _internalInvariant(shifted & Header.discriminatorMask == shifted,
                      "discriminator doesn't fit")
         _value = _value & ~Header.discriminatorMask | shifted
       }
@@ -908,21 +913,21 @@ internal struct RawKeyPathComponent {
         return _value & Header.payloadMask
       }
       set {
-        _sanityCheck(newValue & Header.payloadMask == newValue,
+        _internalInvariant(newValue & Header.payloadMask == newValue,
                      "payload too big")
         _value = _value & ~Header.payloadMask | newValue
       }
     }
     internal var storedOffsetPayload: UInt32 {
       get {
-        _sanityCheck(kind == .struct || kind == .class,
+        _internalInvariant(kind == .struct || kind == .class,
                      "not a stored component")
         return _value & Header.storedOffsetPayloadMask
       }
       set {
-        _sanityCheck(kind == .struct || kind == .class,
+        _internalInvariant(kind == .struct || kind == .class,
                      "not a stored component")
-        _sanityCheck(newValue & Header.storedOffsetPayloadMask == newValue,
+        _internalInvariant(newValue & Header.storedOffsetPayloadMask == newValue,
                      "payload too big")
         _value = _value & ~Header.storedOffsetPayloadMask | newValue
       }
@@ -957,7 +962,7 @@ internal struct RawKeyPathComponent {
       case (Header.optionalTag, Header.optionalForcePayload):
         return .optionalForce
       default:
-        _sanityCheckFailure("invalid header")
+        _internalInvariantFailure("invalid header")
       }
     }
 
@@ -1055,7 +1060,7 @@ internal struct RawKeyPathComponent {
       case .class: discriminator = Header.classTag
       }
 
-      _sanityCheck(inlineOffset <= Header.maximumOffsetPayload)
+      _internalInvariant(inlineOffset <= Header.maximumOffsetPayload)
       let payload = inlineOffset
         | (mutable ? Header.storedMutableFlag : 0)
       self.init(discriminator: discriminator,
@@ -1111,7 +1116,7 @@ internal struct RawKeyPathComponent {
       }
       return 0
     case .external:
-      _sanityCheckFailure("should be instantiated away")
+      _internalInvariantFailure("should be instantiated away")
     case .optionalChain, .optionalForce, .optionalWrap:
       return 0
     case .computed:
@@ -1136,13 +1141,13 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _structOrClassOffset: Int {
-    _sanityCheck(header.kind == .struct || header.kind == .class,
+    _internalInvariant(header.kind == .struct || header.kind == .class,
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
     if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
-      _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
+      _internalInvariant(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
@@ -1150,14 +1155,14 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedIDValue: Int {
-    _sanityCheck(header.kind == .computed,
+    _internalInvariant(header.kind == .computed,
                  "not a computed property")
     return body.load(fromByteOffset: Header.pointerAlignmentSkew,
                      as: Int.self)
   }
 
   internal var _computedID: ComputedPropertyID {
-    _sanityCheck(header.kind == .computed,
+    _internalInvariant(header.kind == .computed,
                  "not a computed property")
 
     return ComputedPropertyID(
@@ -1166,7 +1171,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedGetter: UnsafeRawPointer {
-    _sanityCheck(header.kind == .computed,
+    _internalInvariant(header.kind == .computed,
                  "not a computed property")
 
     return body.load(
@@ -1175,7 +1180,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedSetter: UnsafeRawPointer {
-    _sanityCheck(header.isComputedSettable,
+    _internalInvariant(header.isComputedSettable,
                  "not a settable property")
 
     return body.load(
@@ -1184,7 +1189,7 @@ internal struct RawKeyPathComponent {
   }
 
   internal var _computedArgumentHeaderPointer: UnsafeRawPointer {
-    _sanityCheck(header.hasComputedArguments, "no arguments")
+    _internalInvariant(header.hasComputedArguments, "no arguments")
 
     return body.baseAddress.unsafelyUnwrapped
       + Header.pointerAlignmentSkew
@@ -1269,10 +1274,10 @@ internal struct RawKeyPathComponent {
                                set: _computedSetter,
                                argument: argument)
       case (false, true):
-        _sanityCheckFailure("impossible")
+        _internalInvariantFailure("impossible")
       }
     case .external:
-      _sanityCheckFailure("should have been instantiated away")
+      _internalInvariantFailure("should have been instantiated away")
     }
   }
 
@@ -1293,7 +1298,7 @@ internal struct RawKeyPathComponent {
                  _computedArgumentSize - _computedArgumentWitnessSizeAdjustment)
       }
     case .external:
-      _sanityCheckFailure("should have been instantiated away")
+      _internalInvariantFailure("should have been instantiated away")
     }
   }
 
@@ -1376,7 +1381,7 @@ internal struct RawKeyPathComponent {
       }
 
     case .external:
-      _sanityCheckFailure("should have been instantiated away")
+      _internalInvariantFailure("should have been instantiated away")
     }
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
@@ -1395,7 +1400,7 @@ internal struct RawKeyPathComponent {
       case .continue(let x):
         return x
       case .break:
-        _sanityCheckFailure("should not have stopped key path projection")
+        _internalInvariantFailure("should not have stopped key path projection")
       }
     }
   }
@@ -1416,7 +1421,7 @@ internal struct RawKeyPathComponent {
       })
 
     case .class(let offset):
-      _sanityCheck(CurValue.self is AnyObject.Type,
+      _internalInvariant(CurValue.self is AnyObject.Type,
                    "base is not a class")
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
@@ -1444,9 +1449,9 @@ internal struct RawKeyPathComponent {
                            argument?.data.count ?? 0))
 
     case .optionalChain:
-      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+      _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
-      _sanityCheck(_isOptional(LeafValue.self),
+      _internalInvariant(_isOptional(LeafValue.self),
                    "leaf result should be optional")
       if let baseValue = unsafeBitCast(base, to: Optional<NewValue>.self) {
         return .continue(baseValue)
@@ -1457,12 +1462,12 @@ internal struct RawKeyPathComponent {
       }
 
     case .optionalForce:
-      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+      _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping optional value")
       return .continue(unsafeBitCast(base, to: Optional<NewValue>.self)!)
 
     case .optionalWrap:
-      _sanityCheck(NewValue.self == Optional<CurValue>.self,
+      _internalInvariant(NewValue.self == Optional<CurValue>.self,
                    "should be wrapping optional value")
       return .continue(
         unsafeBitCast(base as Optional<CurValue>, to: NewValue.self))
@@ -1482,7 +1487,7 @@ internal struct RawKeyPathComponent {
     case .class(let offset):
       // A class dereference should only occur at the root of a mutation,
       // since otherwise it would be part of the reference prefix.
-      _sanityCheck(isRoot,
+      _internalInvariant(isRoot,
                  "class component should not appear in the middle of mutation")
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
@@ -1527,7 +1532,7 @@ internal struct RawKeyPathComponent {
                             argument: let argument):
       // A nonmutating property should only occur at the root of a mutation,
       // since otherwise it would be part of the reference prefix.
-      _sanityCheck(isRoot,
+      _internalInvariant(isRoot,
            "nonmutating component should not appear in the middle of mutation")
 
       typealias Getter
@@ -1553,7 +1558,7 @@ internal struct RawKeyPathComponent {
       return UnsafeRawPointer(Builtin.addressof(&writeback.value))
 
     case .optionalForce:
-      _sanityCheck(CurValue.self == Optional<NewValue>.self,
+      _internalInvariant(CurValue.self == Optional<NewValue>.self,
                    "should be unwrapping an optional value")
       // Optional's layout happens to always put the payload at the start
       // address of the Optional value itself, if a value is present at all.
@@ -1564,7 +1569,7 @@ internal struct RawKeyPathComponent {
       return base
     
     case .optionalChain, .optionalWrap, .get:
-      _sanityCheckFailure("not a mutable key path component")
+      _internalInvariantFailure("not a mutable key path component")
     }
   }
 }
@@ -1577,7 +1582,7 @@ internal func _pop<T>(from: inout UnsafeRawBufferPointer,
 internal func _pop<T>(from: inout UnsafeRawBufferPointer,
                       as: T.Type,
                       count: Int) -> UnsafeBufferPointer<T> {
-  _sanityCheck(_isPOD(T.self), "should be POD")
+  _internalInvariant(_isPOD(T.self), "should be POD")
   from = MemoryLayout<T>._roundingUpBaseToAlignment(from)
   let byteCount = MemoryLayout<T>.stride * count
   let result = UnsafeBufferPointer(
@@ -1616,7 +1621,7 @@ internal struct KeyPathBuffer {
     }
 
     internal init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
-      _sanityCheck(size <= Int(Header.sizeMask), "key path too big")
+      _internalInvariant(size <= Int(Header.sizeMask), "key path too big")
       _value = UInt32(size)
         | (trivial ? Header.trivialFlag : 0)
         | (hasReferencePrefix ? Header.hasReferencePrefixFlag : 0)
@@ -1682,7 +1687,7 @@ internal struct KeyPathBuffer {
     let header = _pop(from: &data, as: RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
     if header.endOfReferencePrefix {
-      _sanityCheck(self.hasReferencePrefix,
+      _internalInvariant(self.hasReferencePrefix,
                    "beginMutation marker in non-reference-writable key path?")
       self.hasReferencePrefix = false
     }
@@ -2099,7 +2104,7 @@ internal func _appendingKeyPaths<
         rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
         leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
-        appendedKVCLength = rootKVCLength + 1 + leafKVCLength
+        appendedKVCLength = rootKVCLength + 1 + leafKVCLength + 1
       } else {
         rootKVCLength = 0
         leafKVCLength = 0
@@ -2210,7 +2215,7 @@ internal func _appendingKeyPaths<
           }
         }
         
-        _sanityCheck(destBuffer.count == 0,
+        _internalInvariant(destBuffer.count == 0,
                      "did not fill entire result buffer")
       }
 
@@ -2245,7 +2250,7 @@ internal var keyPathObjectHeaderSize: Int {
 }
 
 internal var keyPathPatternHeaderSize: Int {
-  return 12
+  return 16
 }
 
 // Runtime entry point to instantiate a key path object.
@@ -2323,7 +2328,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   }
 
   // Adopt the KVC string from the pattern.
-  let kvcStringBase = patternPtr.advanced(by: 8)
+  let kvcStringBase = patternPtr.advanced(by: 12)
   let kvcStringOffset = kvcStringBase.load(as: Int32.self)
 
   if kvcStringOffset == 0 {
@@ -2396,9 +2401,34 @@ internal func _getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
   return end - base
 }
 
+// Resolve a mangled name in a generic environment, described by either a
+// flat GenericEnvironment * (if the bottom tag bit is 0) or possibly-nested
+// ContextDescriptor * (if the bottom tag bit is 1)
+internal func _getTypeByMangledNameInEnvironmentOrContext(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericEnvironmentOrContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type? {
+
+  let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
+  if taggedPointer & 1 == 0 {
+    return _getTypeByMangledNameInEnvironment(name, nameLength,
+                      genericEnvironment: genericEnvironmentOrContext,
+                      genericArguments: genericArguments)
+  } else {
+    let context = UnsafeRawPointer(bitPattern: taggedPointer & ~1)
+    return _getTypeByMangledNameInContext(name, nameLength,
+                      genericContext: context,
+                      genericArguments: genericArguments)
+  }
+}
+
 // Resolve the given generic argument reference to a generic argument.
-internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
-                                                 arguments: UnsafeRawPointer)
+internal func _resolveKeyPathGenericArgReference(
+    _ reference: UnsafeRawPointer,
+    genericEnvironment: UnsafeRawPointer?,
+    arguments: UnsafeRawPointer?)
     -> UnsafeRawPointer {
   // If the low bit is clear, it's a direct reference to the argument.
   if (UInt(bitPattern: reference) & 0x01 == 0) {
@@ -2410,15 +2440,16 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
 
   // If we have a symbolic reference to an accessor, call it.
   let first = referenceStart.load(as: UInt8.self)
-  if first == 9 {
+  if first == 255 && reference.load(as: UInt8.self) == 9 {
     typealias MetadataAccessor =
-      @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
+      @convention(c) (UnsafeRawPointer?) -> UnsafeRawPointer
 
     // Unaligned load of the offset.
+    let pointerReference = reference + 1
     var offset: Int32 = 0
-    _memcpy(dest: &offset, src: reference, size: 4)
+    _memcpy(dest: &offset, src: pointerReference, size: 4)
 
-    let accessorPtr = _resolveRelativeAddress(reference, offset)
+    let accessorPtr = _resolveRelativeAddress(pointerReference, offset)
     let accessor = unsafeBitCast(accessorPtr, to: MetadataAccessor.self)
     return accessor(arguments)
   }
@@ -2427,10 +2458,10 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
   let namePtr = referenceStart.bindMemory(to: UInt8.self,
                                           capacity: nameLength + 1)
   // FIXME: Could extract this information from the mangled name.
-  let parametersPerLevel: [UInt] = []
-  let substitutions: [Any.Type] = []
-  guard let result = _getTypeByMangledName(namePtr, UInt(nameLength), 0,
-                                           parametersPerLevel, substitutions)
+  guard let result =
+    _getTypeByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
+                         genericEnvironmentOrContext: genericEnvironment,
+                         genericArguments: arguments)
     else {
       let nameStr = String._fromUTF8Repairing(
         UnsafeBufferPointer(start: namePtr, count: nameLength)
@@ -2443,11 +2474,16 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
 }
 
 // Resolve the given metadata reference to (type) metadata.
-internal func _resolveKeyPathMetadataReference(_ reference: UnsafeRawPointer,
-                                               arguments: UnsafeRawPointer)
+internal func _resolveKeyPathMetadataReference(
+    _ reference: UnsafeRawPointer,
+    genericEnvironment: UnsafeRawPointer?,
+    arguments: UnsafeRawPointer?)
     -> Any.Type {
   return unsafeBitCast(
-           _resolveKeyPathGenericArgReference(reference, arguments: arguments),
+           _resolveKeyPathGenericArgReference(
+             reference,
+             genericEnvironment: genericEnvironment,
+             arguments: arguments),
            to: Any.Type.self)
 }
 
@@ -2467,9 +2503,10 @@ internal struct KeyPathPatternComputedArguments {
 }
 
 internal protocol KeyPathPatternVisitor {
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer)
+                            kvcCompatibilityString: UnsafeRawPointer?)
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
                                      mutable: Bool,
                                      offset: KeyPathPatternStoredOffset)
@@ -2519,14 +2556,17 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                                   _ pattern: UnsafeRawPointer,
                                   walker: inout W) {
   // Visit the header.
-  let rootMetadataRef = _loadRelativeAddress(at: pattern,
+  let genericEnvironment = _loadRelativeAddress(at: pattern,
+                                                as: UnsafeRawPointer.self)
+  let rootMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
                                              as: MetadataReference.self)
-  let leafMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
+  let leafMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 8,
                                              as: MetadataReference.self)
-  let kvcString = _loadRelativeAddress(at: pattern, fromByteOffset: 8,
+  let kvcString = _loadRelativeAddress(at: pattern, fromByteOffset: 12,
                                        as: UnsafeRawPointer.self)
 
-  walker.visitHeader(rootMetadataRef: rootMetadataRef,
+  walker.visitHeader(genericEnvironment: genericEnvironment,
+                     rootMetadataRef: rootMetadataRef,
                      leafMetadataRef: leafMetadataRef,
                      kvcCompatibilityString: kvcString)
 
@@ -2634,7 +2674,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     var bufferSizeBefore = 0
     var expectedPop = 0
 
-    _sanityCheck({
+    _internalInvariant({
       bufferSizeBefore = buffer.count
       expectedPop = header.patternComponentBodySize
       return true
@@ -2695,7 +2735,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
       let localCandidateHeader = _pop(from: &buffer,
                                       as: RawKeyPathComponent.Header.self)
       let localCandidateSize = localCandidateHeader.patternComponentBodySize
-      _sanityCheck({
+      _internalInvariant({
         expectedPop += localCandidateSize + 4
         return true
       }())
@@ -2753,12 +2793,12 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
           arguments: arguments,
           externalArgs: genericParamCount > 0 ? externalArgs : nil)
       case .optionalChain, .optionalWrap, .optionalForce, .external:
-        _sanityCheckFailure("not possible for property descriptor")
+        _internalInvariantFailure("not possible for property descriptor")
       }
     }
 
     // Check that we consumed the expected amount of data from the pattern.
-    _sanityCheck(
+    _internalInvariant(
       {
         // Round the amount of data we read up to alignment.
         let popped = MemoryLayout<Int32>._roundingUpToAlignment(
@@ -2780,11 +2820,11 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     let componentTypeRef = _resolveRelativeAddress(componentTypeBase,
                                                    componentTypeOffset)
     walker.visitIntermediateComponentType(metadataRef: componentTypeRef)
-    _sanityCheck(!buffer.isEmpty)
+    _internalInvariant(!buffer.isEmpty)
   }
 
   // We should have walked the entire pattern.
-  _sanityCheck(buffer.isEmpty, "did not walk entire pattern buffer")
+  _internalInvariant(buffer.isEmpty, "did not walk entire pattern buffer")
   walker.finish()
 }
 
@@ -2795,9 +2835,10 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
   var didChain: Bool = false
   var root: Any.Type!
   var leaf: Any.Type!
-  let patternArgs: UnsafeRawPointer
+  var genericEnvironment: UnsafeRawPointer?
+  let patternArgs: UnsafeRawPointer?
 
-  init(patternArgs: UnsafeRawPointer) {
+  init(patternArgs: UnsafeRawPointer?) {
     self.patternArgs = patternArgs
   }
 
@@ -2805,15 +2846,21 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     size = MemoryLayout<Int>._roundingUpToAlignment(size)
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
+                            kvcCompatibilityString: UnsafeRawPointer?) {
+    self.genericEnvironment = genericEnvironment
     // Get the root and leaf type metadata so we can form the class type
     // for the entire key path.
-    root = _resolveKeyPathMetadataReference(rootMetadataRef,
-                                            arguments: patternArgs)
-    leaf = _resolveKeyPathMetadataReference(leafMetadataRef,
-                                            arguments: patternArgs)
+    root = _resolveKeyPathMetadataReference(
+              rootMetadataRef,
+              genericEnvironment: genericEnvironment,
+              arguments: patternArgs)
+    leaf = _resolveKeyPathMetadataReference(
+              leafMetadataRef,
+              genericEnvironment: genericEnvironment,
+              arguments: patternArgs)
   }
 
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
@@ -2866,7 +2913,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
       // Writable if the base is. No effect.
       break
     case (false, true):
-      _sanityCheckFailure("unpossible")
+      _internalInvariantFailure("unpossible")
     }
 
     // Save space for the header...
@@ -2889,7 +2936,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
       // the layout function.
       let (addedSize, addedAlignmentMask) = arguments.getLayout(patternArgs)
       // TODO: Handle over-aligned values
-      _sanityCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+      _internalInvariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
                    "overaligned computed property element not supported")
       size += addedSize
     
@@ -2901,7 +2948,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
       size += argumentHeaderSize
       let (addedSize, addedAlignmentMask) = arguments.getLayout(patternArgs)
       // TODO: Handle over-aligned values
-      _sanityCheck(addedAlignmentMask < MemoryLayout<Int>.alignment,
+      _internalInvariant(addedAlignmentMask < MemoryLayout<Int>.alignment,
                    "overaligned computed property element not supported")
       size += addedSize
       // We also need to store the size of the local arguments so we can
@@ -2994,11 +3041,12 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
 
 internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
   var destData: UnsafeMutableRawBufferPointer
-  let patternArgs: UnsafeRawPointer
+  var genericEnvironment: UnsafeRawPointer?
+  let patternArgs: UnsafeRawPointer?
   var base: Any.Type
 
   init(destData: UnsafeMutableRawBufferPointer,
-       patternArgs: UnsafeRawPointer,
+       patternArgs: UnsafeRawPointer?,
        root: Any.Type) {
     self.destData = destData
     self.patternArgs = patternArgs
@@ -3013,7 +3061,7 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
   var previousComponentAddr: UnsafeMutableRawPointer? = nil
 
   mutating func pushDest<T>(_ value: T) {
-    _sanityCheck(_isPOD(T.self))
+    _internalInvariant(_isPOD(T.self))
     let size = MemoryLayout<T>.size
     let alignment = MemoryLayout<T>.alignment
     var baseAddress = destData.baseAddress.unsafelyUnwrapped
@@ -3037,9 +3085,11 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
     return oldValue
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
+                            kvcCompatibilityString: UnsafeRawPointer?) {
+    self.genericEnvironment = genericEnvironment
   }
 
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
@@ -3118,7 +3168,7 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
 
     switch idKind {
     case .storedPropertyIndex, .vtableOffset:
-      _sanityCheck(idResolved)
+      _internalInvariant(idResolved)
       // Zero-extend the integer value to get the instantiated id.
       let value = UInt(UInt32(bitPattern: idValue))
       resolvedID = UnsafeRawPointer(bitPattern: value)
@@ -3153,7 +3203,7 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
     if let arguments = arguments {
       // Instantiate the arguments.
       let (baseSize, alignmentMask) = arguments.getLayout(patternArgs)
-      _sanityCheck(alignmentMask < MemoryLayout<Int>.alignment,
+      _internalInvariant(alignmentMask < MemoryLayout<Int>.alignment,
                    "overaligned computed arguments not implemented yet")
 
       // The real buffer stride will be rounded up to alignment.
@@ -3183,7 +3233,7 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
       }
 
       // Initialize the local candidate arguments here.
-      _sanityCheck(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
+      _internalInvariant(Int(bitPattern: destData.baseAddress) & alignmentMask == 0,
                    "argument destination not aligned")
       arguments.initializer(patternArgs,
                             destData.baseAddress.unsafelyUnwrapped)
@@ -3209,8 +3259,10 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
         let metadataRef = UnsafeRawPointer(base) + Int(offset)
-        let result = _resolveKeyPathGenericArgReference(metadataRef,
-                                                       arguments: patternArgs)
+        let result = _resolveKeyPathGenericArgReference(
+                       metadataRef,
+                       genericEnvironment: genericEnvironment,
+                       arguments: patternArgs)
         pushDest(result)
       }
     }
@@ -3234,8 +3286,10 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
 
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
     // Get the metadata for the intermediate type.
-    let metadata = _resolveKeyPathMetadataReference(metadataRef,
-                                                    arguments: patternArgs)
+    let metadata = _resolveKeyPathMetadataReference(
+                     metadataRef,
+                     genericEnvironment: genericEnvironment,
+                     arguments: patternArgs)
     pushDest(metadata)
     base = metadata
   }
@@ -3243,7 +3297,7 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
   mutating func finish() {
     // Should have filled the entire buffer by the time we reach the end of the
     // pattern.
-    _sanityCheck(destData.isEmpty,
+    _internalInvariant(destData.isEmpty,
                  "should have filled entire destination buffer")
   }
 }
@@ -3263,13 +3317,16 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     origDest = self.instantiateVisitor.destData.baseAddress.unsafelyUnwrapped
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
-    sizeVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+                            kvcCompatibilityString: UnsafeRawPointer?) {
+    sizeVisitor.visitHeader(genericEnvironment: genericEnvironment,
+                            rootMetadataRef: rootMetadataRef,
                             leafMetadataRef: leafMetadataRef,
                             kvcCompatibilityString: kvcCompatibilityString)
-    instantiateVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+    instantiateVisitor.visitHeader(genericEnvironment: genericEnvironment,
+                                 rootMetadataRef: rootMetadataRef,
                                  leafMetadataRef: leafMetadataRef,
                                  kvcCompatibilityString: kvcCompatibilityString)
   }
@@ -3342,7 +3399,7 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     let nextDest = instantiateVisitor.destData.baseAddress.unsafelyUnwrapped
     let curSize = nextDest - origDest + MemoryLayout<Int>.size
 
-    _sanityCheck(curSize == sizeVisitor.size,
+    _internalInvariant(curSize == sizeVisitor.size,
                  "size and instantiation visitors out of sync")
   }
 }

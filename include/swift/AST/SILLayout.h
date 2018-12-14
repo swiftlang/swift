@@ -139,7 +139,7 @@ public:
                       CanGenericSignature Generics,
                       ArrayRef<SILField> Fields);
   
-  /// \brief Produce a profile of this locator, for use in a folding set.
+  /// Produce a profile of this locator, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getGenericSignature(), getFields());
   }

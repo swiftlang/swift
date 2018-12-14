@@ -30,7 +30,7 @@
 
 namespace swift {
 
-/// \brief A utility class for cloning code while remapping types.
+/// A utility class for cloning code while remapping types.
 ///
 /// \tparam FunctionBuilderTy Function builder type injected by
 /// subclasses. Used to break a circular dependency from SIL <=>

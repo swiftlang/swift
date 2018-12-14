@@ -1,6 +1,4 @@
 // RUN: %target-typecheck-verify-swift -typecheck -swift-version 4 %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -swift-version 4 -debug-generic-signatures %s > %t.dump 2>&1
-// RUN: %FileCheck %s < %t.dump
 
 protocol P0 { }
 protocol Q0: P0 { }
@@ -37,22 +35,16 @@ func acceptP3<T: P3>(_: T) { }
 
 
 func testPaths1<T: P2 & P4>(_ t: T) {
-	// CHECK: Conformance access path for T.AssocP2.AssocP1: P0 is τ_0_0: P2 -> τ_0_0.AssocP2: P1 -> τ_0_0.AssocP1: Q0 -> τ_0_0: P0
 	acceptP0(t.getAssocP2().getAssocP1())
-	// CHECK: Conformance access path for T.AssocP3: P0 is τ_0_0: P4 -> τ_0_0: P3 -> τ_0_0.AssocP3: P0
 	acceptP0(t.getAssocP3())
 }
 
 func testPaths2<U: P2 & P4>(_ t: U) where U.AssocP3 == U.AssocP2.AssocP1 {
-	// CHECK: Conformance access path for U.AssocP3: P0 is τ_0_0: P4 -> τ_0_0: P3 -> τ_0_0.AssocP3: P0
 	acceptP0(t.getAssocP2().getAssocP1())
 }
 
 func testPaths3<V: P5>(_ v: V) {
-	// CHECK: Conformance access path for V.AssocP3: P0 is τ_0_0: P5 -> τ_0_0.AssocP3: Q0 -> τ_0_0: P0
 	acceptP0(v.getAssocP3())
-
-	// CHECK: Conformance access path for V.AssocP3: Q0 is τ_0_0: P5 -> τ_0_0.AssocP3: Q0
 	acceptQ0(v.getAssocP3())
 }
 
@@ -68,6 +60,5 @@ protocol P5Unordered {
 }
 
 func testUnorderedP5_P6<W: P6Unordered>(_ w: W) {
-	// CHECK: Conformance access path for W.A: P0 is τ_0_0: P6Unordered -> τ_0_0: P5Unordered -> τ_0_0.A: P0
 	acceptP0(w.getA())
 }

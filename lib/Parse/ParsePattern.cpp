@@ -31,7 +31,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-/// \brief Determine the kind of a default argument given a parsed
+/// Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
 static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   if (!init)

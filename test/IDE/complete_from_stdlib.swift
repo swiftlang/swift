@@ -282,7 +282,7 @@ func testInfixOperator4(_ x: String) {
 }
 // INFIX_EXT_STRING: Begin completions
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#String#}[#String#]
-// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
+// INFIX_EXT_STRING-NOT: ==
 // INFIX_EXT_STRING: End completions

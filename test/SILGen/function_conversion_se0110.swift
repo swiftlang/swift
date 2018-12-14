@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name function_conversion -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name function_conversion -primary-file %s | %FileCheck %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 
@@ -50,7 +50,7 @@ func givesTwoAnyObjectOwned(_ fn: (__owned AnyObject, __owned AnyObject) -> ()) 
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$syXlyXlIgxx_yXlyXlIeggg_TR : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, @noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()) -> () {
-// CHECK: bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject, %2 : @trivial $@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()):
+// CHECK: bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject, %2 : $@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()):
 // CHECK-NEXT: [[FIRST:%.*]] = copy_value %0
 // CHECK-NEXT: [[SECOND:%.*]] = copy_value %1
 // CHECK-NEXT: apply %2([[FIRST]], [[SECOND]]) : $@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()

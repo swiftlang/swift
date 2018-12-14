@@ -47,6 +47,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
+#include "ConformanceDescription.h"
 #include "GenEnum.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -167,6 +168,18 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
+
+  // For the relative address type, we want to use the int32 bit type
+  // on most architectures, e.g. x86_64, because it produces valid
+  // fixups/relocations. The exception is 16-bit architectures,
+  // so we shorten the relative address type there.
+  if (SizeTy->getBitWidth()<32) {
+    RelativeAddressTy = SizeTy;
+  } else {
+    RelativeAddressTy = Int32Ty;
+  }
+
+  RelativeAddressPtrTy = RelativeAddressTy->getPointerTo();
 
   FloatTy = llvm::Type::getFloatTy(getLLVMContext());
   DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
@@ -739,7 +752,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
     return true;
 
   NominalTypeDecl *ConformingTy =
-    wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
+    wt->getConformingType()->getNominalOrBoundGenericNominal();
 
   switch (ConformingTy->getEffectiveAccess()) {
     case AccessLevel::Private:
@@ -845,6 +858,10 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
   constructInitialFnAttributes(b);
   return llvm::AttributeList::get(LLVMContext,
                                   llvm::AttributeList::FunctionIndex, b);
+}
+
+llvm::Constant *IRGenModule::getInt32(uint32_t value) {
+  return llvm::ConstantInt::get(Int32Ty, value);
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {

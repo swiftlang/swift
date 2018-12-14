@@ -22,6 +22,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -201,4 +202,36 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
+}
+
+bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
+  auto failure =
+      AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
+                                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}
+
+bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
+                                          getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveUnwrap *RemoveUnwrap::create(ConstraintSystem &cs, Type baseType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveUnwrap(cs, baseType, locator);
+}
+
+bool InsertExplicitCall::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingCallFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }

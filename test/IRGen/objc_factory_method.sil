@@ -18,7 +18,7 @@ bb0:
 
 // CHECK-LABEL: define {{.*}} @_TFCSo4HiveCfMS_FT5queenGSQCSo3Bee__S_
 sil @_TFCSo4HiveCfMS_FT5queenGSQCSo3Bee__S_ : $@convention(thin) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive> {
-bb0(%0 : @owned $Optional<Bee>, %1 : @trivial $@thick Hive.Type):
+bb0(%0 : @owned $Optional<Bee>, %1 : $@thick Hive.Type):
   %2 = thick_to_objc_metatype %1 : $@thick Hive.Type to $@objc_metatype Hive.Type // users: %3, %4
   // CHECK: load i8*, i8** @"\01L_selector(hiveWithQueen:)"
   %3 = objc_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive> // user: %4

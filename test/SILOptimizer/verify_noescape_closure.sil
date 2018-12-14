@@ -17,13 +17,13 @@ import Swift
 sil @takesEscapingClosure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 
 sil hidden @closureWithArgument : $@convention(thin) (@inout_aliasable Int) -> () {
-bb0(%1 : @trivial $*Int):
+bb0(%1 : $*Int):
   %3 = tuple ()
   return %3 : $()
 }
 
 sil @missingNoescape : $@convention(thin) (Int) ->() {
-bb0(%0 : @trivial $Int):
+bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int

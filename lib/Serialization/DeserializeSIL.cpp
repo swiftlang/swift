@@ -2437,8 +2437,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
-    llvm_unreachable("todo");
   }
 
   for (auto result : ResultVal->getResults()) {
@@ -2944,13 +2942,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
-  auto theConformance = cast<NormalProtocolConformance>(
+  auto theConformance = cast<RootProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
 
-  PrettyStackTraceType trace(SILMod.getASTContext(),
-                             "deserializing SIL witness table for",
-                             theConformance->getType());
-  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
+  PrettyStackTraceConformance trace(SILMod.getASTContext(),
+                                    "deserializing SIL witness table for",
+                                    theConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);

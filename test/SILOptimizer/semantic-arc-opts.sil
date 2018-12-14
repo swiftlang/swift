@@ -9,6 +9,7 @@ import Builtin
 //////////////////
 
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
@@ -185,6 +186,56 @@ bb0(%0 : @unowned $Builtin.NativeObject):
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @dead_live_range_multiple_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: bb3:
+// CHECK:     destroy_value
+// CHECK: } // end sil function 'dead_live_range_multiple_destroy_value'
+sil @dead_live_range_multiple_destroy_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject) :
+  %1 = copy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @dead_live_range_multiple_destroy_value_consuming_user : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: destroy_value
+// CHECK: destroy_value
+// CHECK: } // end sil function 'dead_live_range_multiple_destroy_value_consuming_user'
+sil @dead_live_range_multiple_destroy_value_consuming_user : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject) :
+  %1 = copy_value %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  %2 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

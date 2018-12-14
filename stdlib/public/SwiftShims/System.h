@@ -66,6 +66,9 @@
 #define SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_32 0U
 #define SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64 0x8000000000000000ULL
 
+// Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
+#define SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK 0xFF00000000000007ULL
+
 /*********************************** i386 *************************************/
 
 // Heap objects are pointer-aligned, so the low two bits are unused.
@@ -104,7 +107,10 @@
 #define SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER 0x100000000ULL
 
 // Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
-#define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
+// This is conservative: in practice architectual limitations and other
+// compatiblity concerns likely constrain the address space to 52 bits.
+#define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK                                 \
+  SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK
 
 // Objective-C reserves the low bit for tagged pointers on macOS, but
 // reserves the high bit on simulators.
@@ -138,7 +144,8 @@
 
 // TBI guarantees the top byte of pointers is unused.
 // Heap objects are eight-byte aligned.
-#define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
+#define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK                                  \
+  SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK
 
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
@@ -159,14 +166,15 @@
 /*********************************** powerpc64 ********************************/
 
 // Heap objects are pointer-aligned, so the low three bits are unused.
-#define SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL
+#define SWIFT_ABI_POWERPC64_SWIFT_SPARE_BITS_MASK                              \
+  SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK
 
 /*********************************** s390x ************************************/
 
 // Top byte of pointers is unused, and heap objects are eight-byte aligned.
 // On s390x it is theoretically possible to have high bit set but in practice
 // it is unlikely.
-#define SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
+#define SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK
 
 // Objective-C reserves just the high bit for tagged pointers.
 #define SWIFT_ABI_S390X_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL

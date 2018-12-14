@@ -34,6 +34,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -2119,9 +2120,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     ProtocolDecl *proto = conforms.first;
 
     // Look for an associated type and/or concrete type with this name.
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto member : proto->lookupDirect(name, flags)) {
+    for (auto member : proto->lookupDirect(name)) {
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2406,16 +2405,16 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   if (parentArchetype) {
     // Create a nested archetype.
     auto *depMemTy = anchor->castTo<DependentMemberType>();
-    archetype = ArchetypeType::getNew(ctx, parentArchetype, depMemTy, protos,
-                                      superclass, layout);
+    archetype = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
+                                            protos, superclass, layout);
 
     // Register this archetype with its parent.
     parentArchetype->registerNestedType(assocType->getName(), archetype);
   } else {
     // Create a top-level archetype.
     auto genericParam = anchor->castTo<GenericTypeParamType>();
-    archetype = ArchetypeType::getNew(ctx, genericEnv, genericParam, protos,
-                                      superclass, layout);
+    archetype = PrimaryArchetypeType::getNew(ctx, genericEnv, genericParam,
+                                             protos, superclass, layout);
 
     // Register the archetype with the generic environment.
     genericEnv->addMapping(genericParam, archetype);
@@ -2990,7 +2989,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getGenericEnvironment();
+  auto genericEnv = getPrimary()->getGenericEnvironment();
   auto &builder = *genericEnv->getGenericSignatureBuilder();
 
   Type interfaceType = getInterfaceType();
@@ -3543,11 +3542,11 @@ GenericSignatureBuilder::Implementation::getRewriteTreeRootIfPresent(
 RewriteTreeNode *
 GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
                                           CanType anchor) {
-  auto known = RewriteTreeRoots.find(anchor);
-  if (known != RewriteTreeRoots.end()) return known->second.get();
+  if (auto *root = getRewriteTreeRootIfPresent(anchor))
+    return root;
 
   auto &root = RewriteTreeRoots[anchor];
-  root = std::unique_ptr<RewriteTreeNode>(new RewriteTreeNode(nullptr));
+  root = llvm::make_unique<RewriteTreeNode>(nullptr);
   return root.get();
 }
 
@@ -4889,12 +4888,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
-  // Decide which potential archetype is to be considered the representative.
-  // We prefer potential archetypes with lower nesting depths, because it
-  // prevents us from unnecessarily building deeply nested potential archetypes.
-  unsigned nestingDepth1 = T1->getNestingDepth();
-  unsigned nestingDepth2 = T2->getNestingDepth();
-  if (nestingDepth2 < nestingDepth1) {
+  // Pick representative based on the canonical ordering of the type parameters.
+  if (compareDependentTypes(depType2, depType1) < 0) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
     std::swap(equivClass, equivClass2);
@@ -4906,6 +4901,8 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
     equivClass = T1->getOrCreateEquivalenceClass(*this);
 
   // Record this same-type constraint.
+  // Let's keep type order in the new constraint the same as it's written
+  // in source, which makes it much easier to diagnose later.
   equivClass->sameTypeConstraints.push_back({depType1, depType2, source});
 
   // Determine the anchor types of the two equivalence classes.
@@ -4929,14 +4926,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   };
 
   // Consider the second equivalence class to be modified.
-  if (equivClass2)
-    equivClass->modified(*this);
-
-  // Same-type requirements, delayed requirements.
+  // Transfer Same-type requirements and delayed requirements.
   if (equivClass2) {
-    Impl->DelayedRequirements.append(equivClass2->delayedRequirements.begin(),
-                                     equivClass2->delayedRequirements.end());
-
+    // Mark as modified and transfer deplayed requirements to the primary queue.
+    equivClass2->modified(*this);
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
@@ -4944,20 +4937,14 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   }
 
   // Combine the rewrite rules.
-  if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2)) {
-    if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1)) {
-      // Merge the second rewrite tree into the first.
-      if (rewriteRoot2->mergeInto(rewriteRoot1))
-        ++Impl->RewriteGeneration;
-      Impl->RewriteTreeRoots.erase(anchor2);
-    } else {
-      // Take the second rewrite tree and make it the first.
-      auto root2Entry = Impl->RewriteTreeRoots.find(anchor2);
-      auto root2Ptr = std::move(root2Entry->second);
-      Impl->RewriteTreeRoots.erase(root2Entry);
-      (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
-    }
-  }
+  auto *rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1);
+  auto *rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2);
+  assert(rewriteRoot1 && rewriteRoot2 &&
+         "Couldn't create/retrieve rewrite tree root");
+  // Merge the second rewrite tree into the first.
+  if (rewriteRoot2->mergeInto(rewriteRoot1))
+    ++Impl->RewriteGeneration;
+  Impl->RewriteTreeRoots.erase(anchor2);
 
   // Add a rewrite rule to map the anchor of T2 down to the anchor of T1.
   if (addSameTypeRewriteRule(anchor2, anchor1))
@@ -5468,11 +5455,7 @@ void GenericSignatureBuilder::inferRequirements(
 
 void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
-                                          ParameterList *params,
-                                          GenericParamList *genericParams) {
-  if (genericParams == nullptr)
-    return;
-
+                                          ParameterList *params) {
   for (auto P : *params) {
     inferRequirements(module, P->getTypeLoc().getType(),
                       P->getTypeLoc().getTypeRepr(),
@@ -6922,34 +6905,118 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // connect all of the components, or else we wouldn't have an equivalence
   // class.
   if (intercomponentEdges.size() > numComponents - 1) {
-    std::vector<bool> connected(numComponents, false);
-    const auto &firstEdge = intercomponentEdges.front();
-    for (const auto &edge : intercomponentEdges) {
-      // If both the source and target are already connected, this edge is
-      // not part of the spanning tree.
-      if (connected[edge.source] && connected[edge.target]) {
-        if (edge.constraint.source->shouldDiagnoseRedundancy(true) &&
-            firstEdge.constraint.source->shouldDiagnoseRedundancy(false)) {
-          Diags.diagnose(edge.constraint.source->getLoc(),
-                         diag::redundant_same_type_constraint,
-                         edge.constraint.getSubjectDependentType(
-                                                          genericParams),
-                         edge.constraint.value);
+    // First let's order all of the intercomponent edges
+    // as written in source, this helps us to diagnose
+    // all of the duplicate constraints in correct order.
+    std::vector<IntercomponentEdge *> sourceOrderedEdges;
+    for (auto &edge : intercomponentEdges)
+      sourceOrderedEdges.push_back(&edge);
 
-          Diags.diagnose(firstEdge.constraint.source->getLoc(),
-                         diag::previous_same_type_constraint,
-                         firstEdge.constraint.source->classifyDiagKind(),
-                         firstEdge.constraint.getSubjectDependentType(
-                                                          genericParams),
-                         firstEdge.constraint.value);
+    llvm::array_pod_sort(
+        sourceOrderedEdges.begin(), sourceOrderedEdges.end(),
+        [](IntercomponentEdge *const *a, IntercomponentEdge *const *b) -> int {
+          auto &sourceMgr = (*a)->constraint.value->getASTContext().SourceMgr;
+
+          auto locA = (*a)->constraint.source->getLoc();
+          auto locB = (*b)->constraint.source->getLoc();
+
+          auto bufferA = sourceMgr.findBufferContainingLoc(locA);
+          auto bufferB = sourceMgr.findBufferContainingLoc(locB);
+
+          if (bufferA != bufferB)
+            return bufferA < bufferB ? -1 : 1;
+
+          auto offsetA = sourceMgr.getLocOffsetInBuffer(locA, bufferA);
+          auto offsetB = sourceMgr.getLocOffsetInBuffer(locB, bufferB);
+
+          return offsetA < offsetB ? -1 : (offsetA == offsetB ? 0 : 1);
+        });
+
+    auto isDiagnosable = [](const IntercomponentEdge &edge, bool isPrimary) {
+      return edge.constraint.source->shouldDiagnoseRedundancy(isPrimary);
+    };
+
+    using EquivClass = llvm::DenseMap<Type, unsigned>;
+    llvm::DenseMap<Type, EquivClass> equivalences;
+    // The idea here is to form an equivalence class per representative
+    // (picked from each edge constraint in type parameter order) and
+    // propagate all new equivalent types up the chain until duplicate
+    // entry is found, that entry is going to point to previous
+    // declaration and is going to mark current edge as a duplicate of
+    // such entry.
+    for (auto edgeIdx : indices(sourceOrderedEdges)) {
+      const auto &edge = *sourceOrderedEdges[edgeIdx];
+
+      Type lhs = edge.constraint.getSubjectDependentType(genericParams);
+      Type rhs = edge.constraint.value;
+
+      // Make sure that representative for equivalence class is picked
+      // in canonical type parameter order.
+      if (compareDependentTypes(rhs, lhs) < 0)
+        std::swap(lhs, rhs);
+
+      // Index of the previous declaration of the same-type constraint
+      // which current edge might be a duplicate of.
+      Optional<unsigned> previousIndex;
+
+      bool isDuplicate = false;
+      auto &representative = equivalences[lhs];
+      if (representative.insert({rhs, edgeIdx}).second) {
+        // Since this is a new equivalence, and right-hand side might
+        // be a representative of some other equivalence class,
+        // its existing members have to be merged up.
+        auto RHSEquivClass = equivalences.find(rhs);
+        if (RHSEquivClass != equivalences.end()) {
+          auto &equivClass = RHSEquivClass->getSecond();
+          representative.insert(equivClass.begin(), equivClass.end());
         }
 
-        continue;
+        // If left-hand side is involved in any other equivalences
+        // let's propagate new information up the chain.
+        for (auto &e : equivalences) {
+          auto &repr = e.first;
+          auto &equivClass = e.second;
+
+          if (repr->isEqual(lhs) || !equivClass.count(lhs))
+            continue;
+
+          if (!equivClass.insert({rhs, edgeIdx}).second) {
+            // Even if "previous" edge is not diagnosable we
+            // still need to produce diagnostic about main duplicate.
+            isDuplicate = true;
+
+            auto prevIdx = equivClass[rhs];
+            if (!isDiagnosable(intercomponentEdges[prevIdx],
+                               /*isPrimary=*/false))
+              continue;
+
+            // If there is a diagnosable duplicate equivalence,
+            // it means that we've found our previous declaration.
+            previousIndex = prevIdx;
+            break;
+          }
+        }
+      } else {
+        // Looks like this is a situation like T.A == T.B, ..., T.B == T.A
+        previousIndex = representative[rhs];
+        isDuplicate = true;
       }
 
-      // Put the source and target into the spanning tree.
-      connected[edge.source] = true;
-      connected[edge.target] = true;
+      if (!isDuplicate || !isDiagnosable(edge, /*isPrimary=*/true))
+        continue;
+
+      Diags.diagnose(edge.constraint.source->getLoc(),
+                     diag::redundant_same_type_constraint,
+                     edge.constraint.getSubjectDependentType(genericParams),
+                     edge.constraint.value);
+
+      if (previousIndex) {
+        auto &prevEquiv = sourceOrderedEdges[*previousIndex]->constraint;
+        Diags.diagnose(
+            prevEquiv.source->getLoc(), diag::previous_same_type_constraint,
+            prevEquiv.source->classifyDiagKind(),
+            prevEquiv.getSubjectDependentType(genericParams), prevEquiv.value);
+      }
     }
   }
 
@@ -7423,29 +7490,14 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
-/// Add all of the generic parameters from the given parameter list (and it's
-/// outer generic parameter lists) to the given generic signature builder.
-static void addAllGenericParams(GenericSignatureBuilder &builder,
-                                GenericParamList *genericParams) {
-  if (!genericParams) return;
-
-  addAllGenericParams(builder, genericParams->getOuterParameters());
-  for (auto gp : *genericParams)
-    builder.addGenericParameter(gp);
-}
-
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
 
-  if (!proto->hasInterfaceType()) {
-    // FIXME: Overkill.
-    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
-      lazyResolver->resolveDeclSignature(proto);
-  }
-
   // Add all of the generic parameters.
-  addAllGenericParams(builder, proto->getGenericParams());
+  proto->createGenericParamsIfMissing();
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
 
   // Add the conformance of 'self' to the protocol.
   auto selfType =

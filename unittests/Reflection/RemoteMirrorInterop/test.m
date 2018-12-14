@@ -57,34 +57,28 @@ uint64_t GetStringLength(void *context, swift_addr_t address) {
 }
 
 swift_addr_t GetSymbolAddress(void *context, const char *name, uint64_t name_length) {
+  (void)name_length;
   assert(context == (void *)0xdeadbeef);
   return (swift_addr_t)dlsym(RTLD_DEFAULT, name);
 }
 
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    fprintf(stderr, "usage: %s <libtestswift.dylib> <libswiftRemoteMirror4.dylib> "
-                    "<libswiftRemoteMirror5.dylib>\n",
+  if (argc < 2) {
+    fprintf(stderr, "usage: %s <libtestswift.dylib> <libswiftRemoteMirror.dylib ...>\n",
                     argv[0]);
     exit(1);
   }
   
   char *TestLibPath = argv[1];
-  char *Mirror4Path = argv[2];
-  char *Mirror5Path = argv[3];
   
   void *TestHandle = Load(TestLibPath);
   intptr_t (*Test)(void) = dlsym(TestHandle, "test");
   
   uintptr_t Obj = Test();
   
-  void *Mirror4Handle = Mirror4Path[0] == '-' ? NULL : Load(Mirror4Path);
-  void *Mirror5Handle = Mirror5Path[0] == '-' ? NULL : Load(Mirror5Path);
   SwiftReflectionInteropContextRef Context =
     swift_reflection_interop_createReflectionContext(
       (void *)0xdeadbeef,
-      Mirror5Handle,
-      Mirror4Handle,
       sizeof(void *),
       Free,
       ReadBytes,
@@ -93,6 +87,28 @@ int main(int argc, char **argv) {
   if (Context == NULL) {
     fprintf(stderr, "Unable to create a reflection context!\n");
     exit(1);
+  }
+  
+  for (int i = 2; i < argc; i++) {
+    void *Handle = Load(argv[i]);
+    int Success = swift_reflection_interop_addLibrary(Context, Handle);
+    if (!Success) {
+      fprintf(stderr, "Failed to add library at %s\n", argv[i]);
+      exit(1);
+    }
+  }
+  
+  int hasLegacy = 0;
+  int hasNonLegacy = 0;
+  for (int i = 0; i < Context->LibraryCount; i++) {
+    if (Context->Libraries[i].IsLegacy)
+      hasLegacy = 1;
+    else
+      hasNonLegacy = 1;
+  }
+  if (hasLegacy && !hasNonLegacy) {
+    printf("We can't run tests with only a legacy library. Giving up.\n");
+    exit(0);
   }
   
   uint32_t ImageCount = _dyld_image_count();

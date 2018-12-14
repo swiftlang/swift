@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name collection_subtype_downcast -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name collection_subtype_downcast -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 
@@ -17,8 +17,9 @@ func array_downcast(array: [Any]) -> [S]? {
 }
 
 extension S : Hashable {
-  var hashValue : Int {
-    return x + y
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+    hasher.combine(y)
   }
 }
 func ==(lhs: S, rhs: S) -> Bool {

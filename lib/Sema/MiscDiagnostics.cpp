@@ -886,7 +886,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     
     void checkForSuspiciousBitCasts(DeclRefExpr *DRE,
                                     Expr *Parent = nullptr) {
-      if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
+      if (DRE->getDecl() != TC.Context.getUnsafeBitCast())
         return;
       
       if (DRE->getDeclRef().getSubstitutions().empty())
@@ -3078,7 +3078,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   const_cast<Expr *>(E)->walk(Walker);
 }
 
-/// \brief Diagnose trailing closure in statement-conditions.
+/// Diagnose trailing closure in statement-conditions.
 ///
 /// Conditional statements, including 'for' or `switch` doesn't allow ambiguous
 /// trailing closures in these conditions part. Even if the parser can recover
@@ -3969,7 +3969,7 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
 // High-level entry points.
 //===----------------------------------------------------------------------===//
 
-/// \brief Emit diagnostics for syntactic restrictions on a given expression.
+/// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt) {

@@ -1355,12 +1355,12 @@ void TypeChecker::diagnosePotentialUnavailability(
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
-    AccessorDecl *Accessor, SourceRange ReferenceRange,
+    const AccessorDecl *Accessor, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
     bool ForInout) {
   assert(Accessor->isGetterOrSetter());
 
-  AbstractStorageDecl *ASD = Accessor->getStorage();
+  const AbstractStorageDecl *ASD = Accessor->getStorage();
   DeclName Name = ASD->getFullName();
 
   auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
@@ -2355,7 +2355,8 @@ public:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
                         const ApplyExpr *call = nullptr,
                         bool AllowPotentiallyUnavailableProtocol = false,
-                        bool SignalOnPotentialUnavailability = true);
+                        bool SignalOnPotentialUnavailability = true,
+                        bool ForInout = false);
 
 private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
@@ -2511,32 +2512,13 @@ private:
   void diagAccessorAvailability(AccessorDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
                                 bool ForInout) const {
-    if (!D) {
+    if (diagnoseDeclAvailability(D, TC,
+                                 const_cast<DeclContext*>(ReferenceDC),
+                                 ReferenceRange,
+                                 /*AllowPotentiallyUnavailableProtocol*/false,
+                                 /*SignalOnPotentialUnavailability*/false,
+                                 ForInout))
       return;
-    }
-
-    // If the property/subscript is unconditionally unavailable, don't bother
-    // with any of the rest of this.
-    if (AvailableAttr::isUnavailable(D->getStorage()))
-      return;
-
-    if (diagnoseExplicitUnavailability(D, ReferenceRange, ReferenceDC,
-                                       /*call*/nullptr)) {
-      return;
-    }
-
-    // Make sure not to diagnose an accessor's deprecation if we already
-    // complained about the property/subscript.
-    if (!TypeChecker::getDeprecated(D->getStorage()))
-      TC.diagnoseIfDeprecated(ReferenceRange, ReferenceDC, D, /*call*/nullptr);
-
-    auto MaybeUnavail = TC.checkDeclarationAvailability(D, ReferenceRange.Start,
-                                                        DC);
-    if (MaybeUnavail.hasValue()) {
-      TC.diagnosePotentialAccessorUnavailability(D, ReferenceRange, ReferenceDC,
-                                                 MaybeUnavail.getValue(),
-                                                 ForInout);
-    }
   }
 };
 } // end anonymous namespace
@@ -2546,7 +2528,8 @@ private:
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
                                           const ApplyExpr *call,
                                           bool AllowPotentiallyUnavailableProtocol,
-                                          bool SignalOnPotentialUnavailability) {
+                                          bool SignalOnPotentialUnavailability,
+                                          bool ForInout) {
   if (!D)
     return false;
 
@@ -2555,6 +2538,16 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
       return true;
     if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
       return true;
+  }
+
+  // Keep track if this is an accessor.
+  auto accessor = dyn_cast<AccessorDecl>(D);
+
+  if (accessor) {
+    // If the property/subscript is unconditionally unavailable, don't bother
+    // with any of the rest of this.
+    if (AvailableAttr::isUnavailable(accessor->getStorage()))
+      return false;
   }
 
   if (FragileKind)
@@ -2566,8 +2559,14 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   if (diagnoseExplicitUnavailability(D, R, DC, call))
     return true;
 
+  // Make sure not to diagnose an accessor's deprecation if we already
+  // complained about the property/subscript.
+  bool isAccessorWithDeprecatedStorage =
+    accessor && TypeChecker::getDeprecated(accessor->getStorage());
+
   // Diagnose for deprecation
-  TC.diagnoseIfDeprecated(R, DC, D, call);
+  if (!isAccessorWithDeprecatedStorage)
+    TC.diagnoseIfDeprecated(R, DC, D, call);
 
   if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
     return false;
@@ -2575,7 +2574,13 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
-    TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
+    if (accessor) {
+      TC.diagnosePotentialAccessorUnavailability(accessor, R, DC,
+                                                 maybeUnavail.getValue(),
+                                                 ForInout);
+    } else {
+      TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
+    }
     if (SignalOnPotentialUnavailability)
       return true;
   }
@@ -2751,10 +2756,12 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
                                      DeclContext *DC,
                                      SourceRange R,
                                      bool AllowPotentiallyUnavailableProtocol,
-                                     bool SignalOnPotentialUnavailability)
+                                     bool SignalOnPotentialUnavailability,
+                                     bool ForInout)
 {
   AvailabilityWalker AW(TC, DC);
   return AW.diagAvailability(Decl, R, nullptr,
                              AllowPotentiallyUnavailableProtocol,
-                             SignalOnPotentialUnavailability);
+                             SignalOnPotentialUnavailability,
+                             ForInout);
 }

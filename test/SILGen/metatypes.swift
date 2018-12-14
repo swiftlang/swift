@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
 import Swift
 
@@ -53,7 +53,7 @@ func class_metatypes(c: SomeClass, s: SomeSubclass)
 }
 
 // CHECK-LABEL: sil hidden @$s9metatypes010archetype_A0{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0(%0 : @trivial $*T):
+// CHECK: bb0(%0 : $*T):
 func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
   // CHECK: [[STATIC_T:%[0-9]+]] = metatype $@thick T.Type
   // CHECK: [[DYN_T:%[0-9]+]] = value_metatype $@thick T.Type, %0

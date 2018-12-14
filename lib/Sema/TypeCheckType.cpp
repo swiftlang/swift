@@ -476,19 +476,18 @@ Type TypeChecker::resolveTypeInContext(
       genericParam->getDeclaredInterfaceType());
   }
 
-  // If we are referring to a type within its own context, and we have either
-  // a generic type with no generic arguments or a non-generic type, use the
-  // type within the context.
-  if (auto nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
-    if (!isa<ProtocolDecl>(nominalType) &&
-        (!nominalType->getGenericParams() || !isSpecialized)) {
-      for (auto parentDC = fromDC;
+  if (!isSpecialized) {
+    // If we are referring to a type within its own context, and we have either
+    // a generic type with no generic arguments or a non-generic type, use the
+    // type within the context.
+    if (auto *nominalType = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      for (auto *parentDC = fromDC;
            !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParent()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
           return resolution.mapTypeIntoContext(
-            parentDC->getSelfInterfaceType());
+            parentDC->getDeclaredInterfaceType());
         if (isa<ExtensionDecl>(parentDC)) {
           auto *extendedType = parentNominal;
           while (extendedType != nullptr) {
@@ -496,6 +495,27 @@ Type TypeChecker::resolveTypeInContext(
               return resolution.mapTypeIntoContext(
                 extendedType->getDeclaredInterfaceType());
             extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
+          }
+        }
+      }
+    }
+
+    // If we're inside an extension of a type alias, allow the type alias to be
+    // referenced without generic arguments as well.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      for (auto *parentDC = fromDC;
+            !parentDC->isModuleScopeContext();
+            parentDC = parentDC->getParent()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
+          auto extendedType = ext->getExtendedType();
+          if (auto *aliasType = dyn_cast<NameAliasType>(extendedType.getPointer())) {
+            if (aliasType->getDecl() == aliasDecl) {
+              return resolution.mapTypeIntoContext(
+                  aliasDecl->getDeclaredInterfaceType());
+            }
+
+            extendedType = aliasType->getParent();
+            continue;
           }
         }
       }
@@ -700,7 +720,7 @@ Type TypeChecker::applyGenericArguments(Type type,
 
   // FIXME: More principled handling of circularity.
   if (!genericDecl->hasValidSignature()) {
-    diags.diagnose(loc, diag::recursive_type_reference,
+    diags.diagnose(loc, diag::recursive_decl_reference,
              genericDecl->getDescriptiveKind(), genericDecl->getName());
     genericDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return ErrorType::get(ctx);
@@ -844,7 +864,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   return resultType;
 }
 
-/// \brief Diagnose a use of an unbound generic type.
+/// Diagnose a use of an unbound generic type.
 static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
   auto unbound = ty->castTo<UnboundGenericType>();
   {
@@ -900,7 +920,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
 }
 
-/// \brief Returns a valid type or ErrorType in case of an error.
+/// Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC,
                             TypeResolution resolution,
@@ -922,7 +942,7 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
 
     // If we were not able to validate recursively, bail out.
     if (!typeDecl->hasInterfaceType()) {
-      diags.diagnose(loc, diag::recursive_type_reference,
+      diags.diagnose(loc, diag::recursive_decl_reference,
                   typeDecl->getDescriptiveKind(), typeDecl->getName());
       typeDecl->diagnose(diag::kind_declared_here,
                          DescriptiveDeclKind::Type);
@@ -1515,7 +1535,8 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
       TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
       if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(),
                                    AllowPotentiallyUnavailableProtocol,
-                                   /*SignalOnPotentialUnavailability*/false)) {
+                                   /*SignalOnPotentialUnavailability*/false,
+                                   /*ForInout*/false)) {
         return true;
       }
     }
@@ -1551,7 +1572,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
   return ty;
 }
 
-/// \brief Returns a valid type or ErrorType in case of an error.
+/// Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(
        TypeResolution resolution,
        IdentTypeRepr *IdType,
@@ -2173,7 +2194,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (!ty->isExistentialType()) {
       diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
     } else {
-      ty = ArchetypeType::getOpened(ty, attrs.OpenedID);
+      ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
     attrs.clearAttribute(TAK_opened);
   }
@@ -3283,6 +3304,17 @@ public:
       });
     }
   }
+
+  void visitRequirements(ArrayRef<RequirementRepr> reqts) {
+    for (auto reqt : reqts) {
+      if (reqt.getKind() == RequirementReprKind::SameType) {
+        if (auto *repr = reqt.getFirstTypeLoc().getTypeRepr())
+          repr->walk(*this);
+        if (auto *repr = reqt.getSecondTypeLoc().getTypeRepr())
+          repr->walk(*this);
+      }
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -3291,12 +3323,22 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
   if (!decl || decl->isInvalid())
     return;
 
-  // Type declarations are okay.
-  if (isa<TypeDecl>(decl))
-    return;
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(decl))
+    checkUnsupportedProtocolType(protocolDecl->getTrailingWhereClause());
+  else if (auto *genericDecl = dyn_cast<GenericTypeDecl>(decl))
+    checkUnsupportedProtocolType(genericDecl->getGenericParams());
+  else if (auto *assocType = dyn_cast<AssociatedTypeDecl>(decl))
+    checkUnsupportedProtocolType(assocType->getTrailingWhereClause());
+  else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))
+    checkUnsupportedProtocolType(extDecl->getTrailingWhereClause());
+  else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl))
+    checkUnsupportedProtocolType(subscriptDecl->getGenericParams());
+  else if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!isa<AccessorDecl>(funcDecl))
+      checkUnsupportedProtocolType(funcDecl->getGenericParams());
+  }
 
-  // Extensions are okay.
-  if (isa<ExtensionDecl>(decl))
+  if (isa<TypeDecl>(decl) || isa<ExtensionDecl>(decl))
     return;
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
@@ -3309,4 +3351,20 @@ void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/true);
   stmt->walk(visitor);
+}
+
+void TypeChecker::checkUnsupportedProtocolType(TrailingWhereClause *whereClause) {
+  if (whereClause == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(whereClause->getRequirements());
+}
+
+void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) {
+  if (genericParams  == nullptr)
+    return;
+
+  UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
+  visitor.visitRequirements(genericParams->getRequirements());
 }

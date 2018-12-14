@@ -72,7 +72,7 @@ extension UnsafeBufferPointer.Iterator: IteratorProtocol {
     guard let start = _position else {
       return nil
     }
-    _sanityCheck(_end != nil, "inconsistent _position, _end pointers")
+    _internalInvariant(_end != nil, "inconsistent _position, _end pointers")
 
     if start == _end._unsafelyUnwrappedUnchecked { return nil }
 
@@ -281,6 +281,23 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 %end
   }
 
+  // Skip all debug and runtime checks
+  @inlinable // unsafe-performance
+  internal subscript(_unchecked i: Int) -> Element {
+    get {
+      _internalInvariant(i >= 0)
+      _internalInvariant(i < endIndex)
+      return _position._unsafelyUnwrappedUnchecked[i]
+    }
+%if Mutable:
+    nonmutating _modify {
+      _internalInvariant(i >= 0)
+      _internalInvariant(i < endIndex)
+      yield &_position._unsafelyUnwrappedUnchecked[i]
+    }
+%end
+  }
+
   /// Accesses a contiguous subrange of the buffer's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -415,6 +432,25 @@ extension Unsafe${Mutable}BufferPointer {
     return try body(&self)
   }
 
+  @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    let (oldBase, oldCount) = (self.baseAddress, self.count)
+    defer { 
+      _debugPrecondition((oldBase, oldCount) == (self.baseAddress, self.count),
+      "UnsafeMutableBufferPointer.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+    } 
+    return try body(&self)
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try body(UnsafeBufferPointer(self))
+  }
+
 %  else:
 
   /// Creates an immutable typed buffer pointer referencing the same memory as the 
@@ -425,6 +461,13 @@ extension Unsafe${Mutable}BufferPointer {
   public init(_ other: UnsafeMutableBufferPointer<Element>) {
     _position = UnsafePointer<Element>(other._position)
     count = other.count
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try body(self)
   }
 
 %  end

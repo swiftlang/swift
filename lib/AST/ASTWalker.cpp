@@ -75,7 +75,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   ASTWalker &Walker;
   
-  /// \brief RAII object that sets the parent of the walk context 
+  /// RAII object that sets the parent of the walk context 
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;

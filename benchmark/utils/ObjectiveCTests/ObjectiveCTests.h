@@ -38,6 +38,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)testIsEqualToString2;
 - (void)testIsEqualToStringAllSwift;
 - (void)testUTF8String;
+- (void)testCStringUsingEncoding;
 - (void)testGetUTF8Contents;
 - (void)testGetASCIIContents;
 - (void)testRangeOfString;

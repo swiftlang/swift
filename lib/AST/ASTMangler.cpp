@@ -183,19 +183,28 @@ std::string ASTMangler::mangleConstructorVTableThunk(
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
+std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
   beginMangling();
-  appendProtocolConformance(C);
-  appendOperator("WP");
+  if (isa<NormalProtocolConformance>(C)) {
+    appendProtocolConformance(C);
+    appendOperator("WP");
+  } else {
+    appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
+    appendOperator("WS");
+  }
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
+std::string ASTMangler::mangleWitnessThunk(
+                                     const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
   // Concrete witness thunks get a special mangling.
-  if (Conformance)
-    appendProtocolConformance(Conformance);
+  if (Conformance) {
+    if (!isa<SelfProtocolConformance>(Conformance)) {
+      appendProtocolConformance(Conformance);
+    }
+  }
 
   if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
     appendConstructorEntity(ctor, /*isAllocating=*/true);
@@ -204,8 +213,9 @@ std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformanc
     appendEntity(cast<FuncDecl>(Requirement));
   }
 
-  if (Conformance)
-    appendOperator("TW");
+  if (Conformance) {
+    appendOperator(isa<SelfProtocolConformance>(Conformance) ? "TS" : "TW");
+  }
   return finalize();
 }
 
@@ -216,23 +226,6 @@ std::string ASTMangler::mangleClosureWitnessThunk(
   appendProtocolConformance(Conformance);
   appendClosureEntity(Closure);
   appendOperator("TW");
-  return finalize();
-}
-
-std::string ASTMangler::mangleBehaviorInitThunk(const VarDecl *decl) {
-  auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-  auto fileUnit = cast<FileUnit>(topLevelContext);
-  Identifier discriminator = fileUnit->getDiscriminatorForPrivateValue(decl);
-  assert(!discriminator.empty());
-  assert(!isNonAscii(discriminator.str()) &&
-         "discriminator contains non-ASCII characters");
-  assert(!clang::isDigit(discriminator.str().front()) &&
-         "not a valid identifier");
-
-  appendContextOf(decl);
-  appendIdentifier(decl->getName().str());
-  appendIdentifier(discriminator.str());
-  appendOperator("TB");
   return finalize();
 }
 
@@ -257,7 +250,8 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
                                             const AbstractStorageDecl *property,
                                             GenericSignature *signature,
                                             CanType baseType,
-                                            ArrayRef<CanType> subs) {
+                                            SubstitutionMap subs,
+                                            ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
@@ -266,11 +260,13 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
   if (isa<SubscriptDecl>(property)) {
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
-    for (auto &sub : subs) {
-      appendType(sub);
+    for (auto sub : subs.getReplacementTypes()) {
+      appendType(sub->mapTypeOutOfContext()->getCanonicalType());
     }
   }
   appendOperator("TK");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
@@ -278,7 +274,8 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
                                           const AbstractStorageDecl *property,
                                           GenericSignature *signature,
                                           CanType baseType,
-                                          ArrayRef<CanType> subs) {
+                                          SubstitutionMap subs,
+                                          ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
@@ -287,33 +284,41 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
   if (isa<SubscriptDecl>(property)) {
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
-    for (auto &sub : subs) {
-      appendType(sub);
+    for (auto sub : subs.getReplacementTypes()) {
+      appendType(sub->mapTypeOutOfContext()->getCanonicalType());
     }
   }
   appendOperator("Tk");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
 std::string ASTMangler::mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                                  GenericSignature *signature) {
+                                                  GenericSignature *signature,
+                                                  ResilienceExpansion expansion) {
   beginMangling();
   for (auto &index : indices)
     appendType(index);
   if (signature)
     appendGenericSignature(signature);
   appendOperator("TH");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
 std::string ASTMangler::mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                                GenericSignature *signature) {
+                                                GenericSignature *signature,
+                                                ResilienceExpansion expansion) {
   beginMangling();
   for (auto &index : indices)
     appendType(index);
   if (signature)
     appendGenericSignature(signature);
   appendOperator("Th");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
@@ -861,7 +866,9 @@ void ASTMangler::appendType(Type type) {
       return appendImplFunctionType(cast<SILFunctionType>(tybase));
 
       // type ::= archetype
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
     case TypeKind::DynamicSelf: {
@@ -924,23 +931,27 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::SILBox: {
       auto box = cast<SILBoxType>(tybase);
       auto layout = box->getLayout();
-      SmallVector<TupleTypeElt, 4> fieldsList;
+      bool firstField = true;
       for (auto &field : layout->getFields()) {
-        auto fieldTy = field.getLoweredType();
-        // Use the `inout` mangling to represent a mutable field.
-        auto fieldFlag = ParameterTypeFlags().withInOut(field.isMutable());
-        fieldsList.push_back(TupleTypeElt(fieldTy, Identifier(), fieldFlag));
+        appendType(field.getLoweredType());
+        if (field.isMutable()) {
+          // Use the `inout` mangling to represent a mutable field.
+          appendOperator("z");
+        }
+        appendListSeparator(firstField);
       }
-      appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
-                       ->getCanonicalType());
+      if (firstField)
+        appendOperator("y");
 
       if (auto sig = layout->getGenericSignature()) {
-        fieldsList.clear();
+        bool firstType = true;
         for (Type type : box->getSubstitutions().getReplacementTypes()) {
-          fieldsList.push_back(TupleTypeElt(type));
+          appendType(type);
+          appendListSeparator(firstType);
         }
-        appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
-                         ->getCanonicalType());
+        if (firstType)
+          appendOperator("y");
+
         appendGenericSignature(sig);
         appendOperator("XX");
       } else {
@@ -1044,8 +1055,6 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
     if (genericContext->isGeneric()) {
       auto genericParams = subs.getGenericSignature()->getGenericParams();
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
-      assert(genericContext->getGenericParams()->getDepth() == depth &&
-             "Depth mismatch mangling substitution map");
       auto replacements = subs.getReplacementTypes();
       for (unsigned lastGenericParamIdx = genericParams.size();
            (currentGenericParamIdx != lastGenericParamIdx &&
@@ -1099,8 +1108,13 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 /// Determine whether the given protocol conformance is itself retroactive,
 /// meaning that there might be multiple conflicting conformances of the
 /// same type to the same protocol.
-static bool isRetroactiveConformance(
-                               const NormalProtocolConformance *conformance) {
+static bool isRetroactiveConformance(const RootProtocolConformance *root) {
+  auto conformance = dyn_cast<NormalProtocolConformance>(root);
+  if (!conformance) {
+    assert(isa<SelfProtocolConformance>(root));
+    return false; // self-conformances are never retroactive.
+  }
+
   /// Non-retroactive conformances are... never retroactive.
   if (!conformance->isRetroactive())
     return false;
@@ -1123,7 +1137,7 @@ static bool containsRetroactiveConformance(
                                       const ProtocolConformance *conformance,
                                       ModuleDecl *module) {
   // If the root conformance is retroactive, it's retroactive.
-  if (isRetroactiveConformance(conformance->getRootNormalConformance()))
+  if (isRetroactiveConformance(conformance->getRootConformance()))
     return true;
 
   // If any of the substitutions used to form this conformance are retroactive,
@@ -1282,7 +1296,8 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl) {
   // Clang decls. Check getKind() directly to avoid a layering dependency.
   //   known-context ::= 'SC'
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
-    if (file->getKind() == FileUnitKind::ClangModule) {
+    if (file->getKind() == FileUnitKind::ClangModule ||
+        file->getKind() == FileUnitKind::DWARFModule) {
       if (decl->getClangDecl())
         return ASTMangler::ObjCContext;
       return ASTMangler::ClangImporterContext;
@@ -1748,9 +1763,8 @@ void ASTMangler::appendFunctionInputType(
     const auto &param = params.front();
     auto type = param.getPlainType();
 
-    // If this is just a single parenthesized type,
-    // to save space in the mangled name, let's encode
-    // it as a single type dropping sugar.
+    // If the sole unlabeled parameter has a non-tuple type, encode
+    // the parameter list as a single type.
     if (!param.hasLabel() && !param.isVariadic() &&
         !isa<TupleType>(type.getPointer())) {
       appendTypeListElement(Identifier(), type, param.getParameterFlags());
@@ -2084,7 +2098,9 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
 
-  CanType type = decl->getInterfaceType()->getCanonicalType();
+  CanType type = decl->getInterfaceType()
+                      ->getReferenceStorageReferent()
+                      ->getCanonicalType();
   if (auto gft = dyn_cast<GenericFunctionType>(type)) {
     genericSig = gft.getGenericSignature();
     CurGenericSignature = gft.getGenericSignature();
@@ -2229,50 +2245,42 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       conformance->getDeclContext()->getModuleScopeContext();
   Mod = topLevelContext->getParentModule();
 
-  if (auto behaviorStorage = conformance->getBehaviorDecl()) {
-    appendContextOf(behaviorStorage);
-    FileUnit *fileUnit = cast<FileUnit>(topLevelContext);
-    appendIdentifier(
-              fileUnit->getDiscriminatorForPrivateValue(behaviorStorage).str());
-    appendProtocolName(conformance->getProtocol());
-    appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
-  } else {
-    auto conformingType = conformance->getType();
-    appendType(conformingType->getCanonicalType());
-    
-    appendProtocolName(conformance->getProtocol());
+  auto conformingType = conformance->getType();
+  appendType(conformingType->getCanonicalType());
+  
+  appendProtocolName(conformance->getProtocol());
 
-    bool needsModule = true;
-    if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
-      if (file->getKind() == FileUnitKind::ClangModule) {
-        if (conformance->getProtocol()->hasClangNode())
-          appendOperator("So");
-        else
-          appendOperator("SC");
-        needsModule = false;
-      }
+  bool needsModule = true;
+  if (auto *file = dyn_cast<FileUnit>(topLevelContext)) {
+    if (file->getKind() == FileUnitKind::ClangModule ||
+        file->getKind() == FileUnitKind::DWARFModule) {
+      if (conformance->getProtocol()->hasClangNode())
+        appendOperator("So");
+      else
+        appendOperator("SC");
+      needsModule = false;
     }
-    if (needsModule)
-      appendModule(Mod);
-
-    contextSig =
-      conformingType->getAnyNominal()->getGenericSignatureOfContext();
   }
+  if (needsModule)
+    appendModule(Mod);
+
+  contextSig =
+    conformingType->getAnyNominal()->getGenericSignatureOfContext();
+
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig, contextSig);
   }
 }
 
 void ASTMangler::appendProtocolConformanceRef(
-                                const NormalProtocolConformance *conformance) {
+                                const RootProtocolConformance *conformance) {
   // FIXME: Symbolic reference to the protocol conformance descriptor.
   appendProtocolName(conformance->getProtocol());
 
   // For retroactive conformances, add a reference to the module in which the
   // conformance resides. For @objc protocols, there is no point: conformances
   // are global anyway.
-  if (conformance->isRetroactive() && !conformance->isSynthesizedNonUnique() &&
-      !conformance->getProtocol()->isObjC())
+  if (isRetroactiveConformance(conformance))
     appendModule(conformance->getDeclContext()->getParentModule());
 }
 
@@ -2356,7 +2364,7 @@ void ASTMangler::appendConcreteProtocolConformance(
   appendType(conformingType->getCanonicalType());
 
   // Protocol conformance reference.
-  appendProtocolConformanceRef(conformance->getRootNormalConformance());
+  appendProtocolConformanceRef(conformance->getRootConformance());
 
   // Conditional conformance requirements.
   bool firstRequirement = true;

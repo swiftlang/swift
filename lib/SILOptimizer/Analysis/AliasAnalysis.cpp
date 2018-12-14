@@ -407,7 +407,7 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   return false;
 }
 
-/// \brief return True if the types \p LTy and \p RTy may alias.
+/// return True if the types \p LTy and \p RTy may alias.
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
 /// in the SIL reference manual.

@@ -10,12 +10,12 @@
 // CHECK: is-module: 0
 // CHECK: module-name: some_module_test
 // CHECK: has-main: 1
-// CHECK: main-path: {{.*}}/unit-from-compile.swift
-// CHECK: out-file: {{.*}}/file1.o
+// CHECK: main-path: {{.*}}{{/|\\}}unit-from-compile.swift
+// CHECK: out-file: {{.*}}{{/|\\}}file1.o
 // CHECK: is-debug: 1
 
 // CHECK: DEPEND START
-// CHECK: Unit | system | {{.*}}/Swift.swiftmodule
+// CHECK: Unit | system | {{.*}}{{/|\\}}Swift.swiftmodule
 // CHECK: DEPEND END (1)
 
 // OPT: is-debug: 1

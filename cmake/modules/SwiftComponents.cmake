@@ -119,9 +119,11 @@ function(swift_install_in_component component)
   precondition(component MESSAGE "Component name is required")
 
   swift_is_installing_component("${component}" is_installing)
-  if(is_installing)
-    install(${ARGN})
+  if(NOT is_installing)
+    return()
   endif()
+
+  install(${ARGN})
 endfunction()
 
 function(swift_install_symlink_component component)

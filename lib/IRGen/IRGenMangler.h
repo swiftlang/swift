@@ -197,10 +197,24 @@ public:
       const ProtocolDecl *requirement) {
     beginMangling();
     appendAnyGenericType(proto);
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    if (isa<GenericTypeParamType>(subject)) {
+      appendType(subject);
+    } else {
+      bool isFirstAssociatedTypeIdentifier = true;
+      appendAssociatedTypePath(subject, isFirstAssociatedTypeIdentifier);
+    }
     appendProtocolName(requirement);
     appendOperator("Tn");
+    return finalize();
+  }
+
+  std::string mangleBaseConformanceDescriptor(
+      const ProtocolDecl *proto,
+      const ProtocolDecl *requirement) {
+    beginMangling();
+    appendAnyGenericType(proto);
+    appendProtocolName(requirement);
+    appendOperator("Tb");
     return finalize();
   }
 
@@ -218,12 +232,7 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                 const ProtocolConformance *Conformance) {
-    beginMangling();
-    appendProtocolConformance(Conformance);
-    appendOperator("Mc");
-    return finalize();
-  }
+                                   const RootProtocolConformance *conformance);
   
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
@@ -244,10 +253,6 @@ public:
     appendEntity(Decl);
     appendOperator("WC");
     return finalize();
-  }
-
-  std::string mangleDirectProtocolWitnessTable(const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "WP");
   }
 
   std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {
@@ -279,6 +284,16 @@ public:
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
     appendOperator("WT");
+    return finalize();
+  }
+
+  std::string mangleBaseWitnessTableAccessFunction(
+                                      const ProtocolConformance *Conformance,
+                                      const ProtocolDecl *BaseProto) {
+    beginMangling();
+    appendProtocolConformance(Conformance);
+    appendAnyGenericType(BaseProto);
+    appendOperator("Wb");
     return finalize();
   }
 
@@ -425,6 +440,8 @@ public:
                                            CanType type,
                                            ProtocolConformanceRef conformance);
 
+  std::string mangleSymbolNameForGenericEnvironment(
+                                                CanGenericSignature genericSig);
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

@@ -94,7 +94,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
       endIndex += 1
     }
     let illegalRange = Range(buf.startIndex...endIndex)
-    _sanityCheck(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
+    _internalInvariant(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
                  "illegal range out of full range")
     // FIXME: Remove the call to `_legacyNarrowIllegalRange` and return `illegalRange` directly
     return _legacyNarrowIllegalRange(buf: buf[illegalRange])
@@ -154,8 +154,8 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
 }
 
 internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRange: Range<Int>) -> String {
-  _sanityCheck(input.count > 0, "empty input doesn't need to be repaired")
-  _sanityCheck(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)
+  _internalInvariant(input.count > 0, "empty input doesn't need to be repaired")
+  _internalInvariant(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)
   // During this process, `remainingInput` contains the remaining bytes to process. It's split into three
   // non-overlapping sub-regions:
   //
@@ -176,8 +176,8 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
   var brokenRange: Range<Int> = firstKnownBrokenRange
   var remainingInput = input
   repeat {
-    _sanityCheck(brokenRange.count > 0, "broken range empty")
-    _sanityCheck(remainingInput.count > 0, "empty remaining input doesn't need to be repaired")
+    _internalInvariant(brokenRange.count > 0, "broken range empty")
+    _internalInvariant(remainingInput.count > 0, "empty remaining input doesn't need to be repaired")
     let goodChunk = remainingInput[..<brokenRange.startIndex]
 
     // very likely this capacity reservation does not actually do anything because we reserved space for the entire

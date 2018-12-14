@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
 
 @_semantics("typechecker.type(of:)")
 public func type<T, Metatype>(of value: T) -> Metatype {}
@@ -20,7 +20,7 @@ struct S: P {
 }
 
 // CHECK-LABEL: sil hidden @$s21existential_metatypes0A8MetatypeyyAA1P_pF
-// CHECK: bb0([[X:%.*]] : @trivial $*P):
+// CHECK: bb0([[X:%.*]] : $*P):
 func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
   let type1 = type(of: x)

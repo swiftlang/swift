@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 

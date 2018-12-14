@@ -659,7 +659,7 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 struct UnaryOp {}
 
 _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
-// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double)}}
+// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Double), (Float), (Float80)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
@@ -708,9 +708,10 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  _ = a + b // expected-error {{unavailable}}
-  a += a + // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist}}
+  _ = a + b // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt32, UInt32)}}
+  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
     b
+  a += b  // expected-error {{binary operator '+=' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+=' exist with these partially matching parameter lists: (inout Int, Int), (inout UInt32, UInt32)}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
@@ -1004,15 +1005,15 @@ func SR_6272_d() {
   let x: Float = 1.0
 
   // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
-  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (Float, Float), (SR_6272_D, Int)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + x
 
   // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Double'}} {{none}}
-  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Double, Double)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (SR_6272_D, Int)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + 42.0
 
   // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
-  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (Float, Float), (SR_6272_D, Int)}}
   let _: Float = SR_6272_D(integerLiteral: 42) + x + 1.0
 }
 
@@ -1183,6 +1184,14 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{cannot force unwrap value of non-optional type 'Bool'}} {{18-19=}}
+    // expected-error@-2 {{cannot force unwrap value of non-optional type 'Bool'}} {{24-25=}}
+    // expected-error@-3 {{cannot force unwrap value of non-optional type 'Bool'}} {{36-37=}}
+    // expected-error@-4 {{cannot force unwrap value of non-optional type 'Bool'}} {{48-49=}}
+  }
+
+  let _ = [i, j, k].reduce(0 as Int?) {
+    $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }

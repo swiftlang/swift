@@ -38,14 +38,17 @@ let StringBreadcrumbsTests = TestSuite("StringBreadcrumbsTests")
 
 func validateBreadcrumbs(_ str: String) {
   var utf16CodeUnits = Array(str.utf16)
-  var utf16Indices = Array(str.utf16.indices)
   var outputBuffer = Array<UInt16>(repeating: 0, count: utf16CodeUnits.count)
 
-  for i in 0..<(utf16CodeUnits.count-1) {
-    for j in (i+1)..<utf16CodeUnits.count {
+  // Include the endIndex, so we can test end conversions
+  var utf16Indices = Array(str.utf16.indices) + [str.utf16.endIndex]
+
+  for i in 0...utf16CodeUnits.count {
+    for j in i...utf16CodeUnits.count {
       let range = Range(uncheckedBounds: (i, j))
 
       let indexRange = str._toUTF16Indices(range)
+
       // Range<String.Index> <=> Range<Int>
       expectEqual(utf16Indices[i], indexRange.lowerBound)
       expectEqual(utf16Indices[j], indexRange.upperBound)
@@ -67,6 +70,13 @@ func validateBreadcrumbs(_ str: String) {
       expectEqualSequence(utf16CodeUnits[i..<j], outputBuffer[..<range.count])
     }
   }
+}
+
+StringBreadcrumbsTests.test("uniform strings") {
+  validateBreadcrumbs(smallASCII)
+  validateBreadcrumbs(largeASCII)
+  validateBreadcrumbs(smallUnicode)
+  validateBreadcrumbs(largeUnicode)
 }
 
 StringBreadcrumbsTests.test("largeString") {

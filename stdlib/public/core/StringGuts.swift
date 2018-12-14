@@ -90,6 +90,10 @@ extension _StringGuts {
     @inline(__always) get { return _object.isSmall }
   }
 
+  internal var isSmallASCII: Bool {
+    @inline(__always) get { return _object.isSmall && _object.smallIsASCII }
+  }
+
   @inlinable
   internal var asSmall: _SmallString {
     @inline(__always) get { return _SmallString(_object) }
@@ -143,7 +147,7 @@ extension _StringGuts {
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    _sanityCheck(isFastUTF8)
+    _internalInvariant(isFastUTF8)
 
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
 
@@ -153,18 +157,11 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal func withFastUTF8<R>(
-    range: Range<Int>?,
+    range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { wholeUTF8 in
-      let slicedUTF8: UnsafeBufferPointer<UInt8>
-      if let r = range {
-        slicedUTF8 = UnsafeBufferPointer(rebasing: wholeUTF8[r])
-      } else {
-        slicedUTF8 = wholeUTF8
-      }
-
-      return try f(slicedUTF8)
+      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
@@ -187,12 +184,12 @@ extension _StringGuts {
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     #if arch(i386) || arch(arm)
-    _sanityCheck(MemoryLayout<String>.size == 12, """
+    _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
     #else
-    _sanityCheck(MemoryLayout<String>.size == 16, """
+    _internalInvariant(MemoryLayout<String>.size == 16, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
@@ -223,7 +220,7 @@ extension _StringGuts {
   internal func _slowWithCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    _sanityCheck(!_object.isFastZeroTerminated)
+    _internalInvariant(!_object.isFastZeroTerminated)
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = $0.baseAddress._unsafelyUnwrappedUnchecked
       return try body(ptr)

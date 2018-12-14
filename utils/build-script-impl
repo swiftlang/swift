@@ -235,11 +235,13 @@ KNOWN_SETTINGS=(
     android-ndk                        ""        "An absolute path to the NDK that will be used as a libc implementation for Android builds"
     android-api-level                  ""        "The Android API level to target when building for Android. Currently only 21 or above is supported"
     android-ndk-gcc-version            ""        "The GCC version to use when building for Android. Currently only 4.9 is supported"
-    android-icu-uc                     ""        "Path to a directory containing libicuuc.so"
+    android-icu-uc                     ""        "Path to libicuuc.so"
     android-icu-uc-include             ""        "Path to a directory containing headers for libicuuc"
-    android-icu-i18n                   ""        "Path to a directory containing libicui18n.so"
+    android-icu-i18n                   ""        "Path to libicui18n.so"
     android-icu-i18n-include           ""        "Path to a directory containing headers libicui18n"
+    android-icu-data                   ""        "Path to libicudata.so"
     android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
+    android-arch                       "armv7"   "The Android target architecture when building for Android"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
     cmark-cmake-options                ""        "CMake options used for all cmark targets"
@@ -1178,7 +1180,9 @@ SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SKSTRESSTESTER_SOURCE_DIR="${WORKSPACE}/swift-stress-tester/SourceKitStressTester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
@@ -1221,9 +1225,15 @@ fi
 # products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
+     if [[ -z "${SKIP_BUILD_SWIFT_STATIC_LIBDISPATCH}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" libdispatch_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+     if [[ -z "${SKIP_BUILD_STATIC_FOUNDATION}" ]] ; then
+       PRODUCTS=("${PRODUCTS[@]}" foundation_static)
+     fi
 fi
 if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" llbuild)
@@ -1565,10 +1575,10 @@ function build_directory_bin() {
             xctest)
                 echo "${root}/${XCTEST_BUILD_TYPE}/bin"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
@@ -1637,6 +1647,9 @@ function common_cross_c_flags() {
             ;;
         android-armv7)
             echo -n " -arch armv7"
+            ;;
+        android-arm64)
+            echo -n " -arch aarch64"
             ;;
     esac
 }
@@ -1707,10 +1720,10 @@ function cmake_config_opt() {
             xctest)
                 echo "--config ${XCTEST_BUILD_TYPE}"
                 ;;
-            foundation)
+            foundation|foundation_static)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
@@ -2144,12 +2157,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
-                        -DSWIFT_ANDROID_armv7_ICU_UC:STRING="${ANDROID_ICU_UC}"
-                        -DSWIFT_ANDROID_armv7_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
-                        -DSWIFT_ANDROID_armv7_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
-                        -DSWIFT_ANDROID_armv7_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
-                        -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="armv7"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC:STRING="${ANDROID_ICU_UC}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_I18N_INCLUDE:STRING="${ANDROID_ICU_I18N_INCLUDE}"
+                        -DSWIFT_ANDROID_${ANDROID_ARCH}_ICU_DATA:STRING="${ANDROID_ICU_DATA}"
                         -DSWIFT_ANDROID_DEPLOY_DEVICE_PATH:STRING="${ANDROID_DEPLOY_DEVICE_PATH}"
+                        -DSWIFT_SDK_ANDROID_ARCHITECTURES:STRING="${ANDROID_ARCH}"
                     )
                 fi
 
@@ -2280,7 +2294,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
@@ -2595,7 +2608,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # The configuration script requires knowing about XCTest's
                 # location for building and running the tests. Note that XCTest
                 # is not yet built at this point.
@@ -2616,8 +2629,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -2653,10 +2670,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
                   -DENABLE_TESTING:BOOL=NO
+
+                  -DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
                 )
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -2720,6 +2739,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
                     -DENABLE_TESTING=YES
+                    -DBUILD_SHARED_LIBS=$([[ ${product} == libdispatch_static ]] && echo "NO" || echo "YES")
                   )
                 ;;
                 esac
@@ -3215,8 +3235,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
                         -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
                         -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                         -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_DEBUG:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY_RELEASE:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
                     )
                 else
                     LIBICU_BUILD_ARGS=()
@@ -3256,6 +3280,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 results_targets=( "test" )
                 executable_target=("TestFoundation")
                 ;;
+            foundation_static)
+              continue
+            ;;
             libdispatch)
                 if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
                     continue
@@ -3276,6 +3303,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
+            libdispatch_static)
+              # FIXME: merge with libdispatch once the unit tests work with
+              # libdispatch_static
+              continue
+            ;;
             libicu)
                 if [[ "${SKIP_TEST_LIBICU}" ]]; then
                     continue
@@ -3503,7 +3535,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 esac
 
                 ;;
-            foundation)
+            foundation|foundation_static)
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
                     echo "Skipping Foundation on OS X -- use the Xcode project instead"
@@ -3520,7 +3552,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 ;;
-            libdispatch)
+            libdispatch|libdispatch_static)
                 if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
                     continue
                 fi

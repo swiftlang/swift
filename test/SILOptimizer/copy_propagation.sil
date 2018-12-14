@@ -74,7 +74,7 @@ bb0(%0 : @guaranteed $T):
 }
 
 // CHECK-LABEL: sil @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
-// CHECK: bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : @trivial $Bool):
+// CHECK: bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
 // CHECK-NEXT: %3 = struct_extract %2 : $Bool, #Bool._value
 // CHECK-NEXT: cond_br %3, bb1, bb2
 //
@@ -90,7 +90,7 @@ bb0(%0 : @guaranteed $T):
 // CHECK-NEXT: return %9 : $T
 // CHECK-LABEL: } // end sil function 'testPhi'
 sil @testPhi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Bool) -> @out T {
-bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : @trivial $Bool):
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Bool):
   %3 = copy_value %0 : $T
   %4 = copy_value %1 : $T
   %5 = struct_extract %2 : $Bool, #Bool._value
@@ -111,7 +111,7 @@ bb3(%11 : @owned $T):
 }
 
 // CHECK-LABEL: sil @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
-// CHECK: bb0(%0 : @owned $T, %1 : @trivial $*T):
+// CHECK: bb0(%0 : @owned $T, %1 : $*T):
 //
 // The original copy_value is deleted.
 // CHECK-NEXT:   debug_value %0 : $T
@@ -132,7 +132,7 @@ bb3(%11 : @owned $T):
 // CHECK-NEXT:   return %8 : $()
 // CHECK-LABEL: // end sil function 'testConsume'
 sil @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
-bb0(%arg : @owned $T, %addr : @trivial $*T):
+bb0(%arg : @owned $T, %addr : $*T):
   %copy = copy_value %arg : $T
   debug_value %copy : $T
   store %copy to [init] %addr : $*T
@@ -144,7 +144,7 @@ bb0(%arg : @owned $T, %addr : @trivial $*T):
 }
 
 // CHECK-LABEL: sil @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-// CHECK: bb0(%0 : @owned $T, %1 : @trivial $*T, %2 : @trivial $Builtin.Int1):
+// CHECK: bb0(%0 : @owned $T, %1 : $*T, %2 : $Builtin.Int1):
 // CHECK-NEXT:   cond_br %2, bb2, bb1
 //
 // CHECK: bb1:
@@ -165,7 +165,7 @@ bb0(%arg : @owned $T, %addr : @trivial $*T):
 // CHECK-NEXT:   return %9 : $()
 // CHECK-LABEL: } // end sil function 'testDestroyEdge'
 sil @testDestroyEdge : $@convention(thin) <T> (@in T, @inout T, Builtin.Int1) -> () {
-bb0(%arg : @owned $T, %addr : @trivial $*T, %z : @trivial $Builtin.Int1):
+bb0(%arg : @owned $T, %addr : $*T, %z : $Builtin.Int1):
   cond_br %z, bb1, bb2
 
 bb1:

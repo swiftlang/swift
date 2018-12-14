@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -249,7 +249,7 @@ extension InformallyFunging: NSFunging { }
 
 // CHECK-LABEL: sil hidden @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
-  // CHECK: bb0([[META:%[0-9]+]] : @trivial $@thick Initializable.Type, [[I:%[0-9]+]] : @trivial $Int):
+  // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
   // CHECK:   [[PB:%.*]] = project_box [[I2_BOX]]
   // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type

@@ -38,6 +38,10 @@ public class Concrete : Derived<Int> {
 //// Type metadata for 'Base' has a static vtable.
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMf" = internal global
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
+// -- value witness table
+// CHECK-SAME: i8** @"$sBoWV"
 // -- vtable entry for 'm1()'
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'
@@ -110,6 +114,10 @@ public class Concrete : Derived<Int> {
 //// Type metadata for 'Concrete' has a static vtable.
 
 // CHECK-LABEL: @"$s14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteCfD",
+// -- value witness table is filled in at runtime
+// CHECK-SAME: i8** null,
 // -- nominal type descriptor
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCMn",
 // -- vtable entry for 'm1()'

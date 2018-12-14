@@ -10,7 +10,7 @@ sil_stage canonical
 import Builtin
 
 sil @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
-bb0(%0 : @trivial $Builtin.Int32):
+bb0(%0 : $Builtin.Int32):
   %1 = unconditional_checked_cast_value %0 : $Builtin.Int32 to $T
   return %1 : $T
 }
@@ -61,7 +61,7 @@ bb0(%0 : @guaranteed $T):
 typealias AnyObject = Builtin.AnyObject
 
 sil @takeType : $@convention(thin) (@thick AnyObject.Type) -> () {
-bb0(%0 : @trivial $@thick AnyObject.Type):
+bb0(%0 : $@thick AnyObject.Type):
   %18 = tuple ()
   return %18 : $()
 }
@@ -81,7 +81,7 @@ bb0(%0 : @owned $AnyObject):
 }
 
 sil @passTrivialAsOpaqueValue : $@convention(thin) (Builtin.Int64) -> () {
-bb0(%0 : @trivial $Builtin.Int64):
+bb0(%0 : $Builtin.Int64):
   %1 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
   %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> @out T
   %3 = function_ref @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T

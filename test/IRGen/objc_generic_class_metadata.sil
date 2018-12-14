@@ -39,7 +39,7 @@ entry:
   %b = metatype $@thick GenericClass<NSObject>.Type
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
-  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
+  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
   // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
   // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
@@ -79,7 +79,7 @@ entry(%0: @owned $Subclass, %1: @owned $NSDictionary):
 }
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"(
-// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
+// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
 // CHECK:         call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSaySo12GenericClassC_SitGMa"

@@ -935,9 +935,6 @@ public:
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
   }
-  void visitMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *i) {
-    llvm_unreachable("mark_uninitialized_behavior is not valid in canonical SIL");
-  }
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
@@ -3727,8 +3724,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
       emitShadowCopyIfNeeded(Addr, i->getDebugScope(), Name, VarInfo->ArgNo,
                              IsAnonymous),
       DbgTy, SILType(), i->getDebugScope(), Decl, Name, VarInfo->ArgNo,
-      (IsLoadablyByAddress || DbgTy.isImplicitlyIndirect()) ? DirectValue
-                                                            : IndirectValue);
+      (IsLoadablyByAddress) ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
@@ -3995,10 +3991,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
       RealType, type);
-
-  // FIXME: This is working around the inverse special case in LLDB.
-  if (DbgTy.isImplicitlyIndirect())
-    Indirection = DirectValue;
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
@@ -4705,6 +4697,8 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
 void IRGenSILFunction::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i){
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *swiftMeta = from.claimNext();
+  // Claim any conformances.
+  (void)from.claimAll();
   CanType instanceType(i->getType().castTo<AnyMetatypeType>().getInstanceType());
   Explosion to;
   llvm::Value *classPtr =
@@ -5465,12 +5459,12 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   // its offset since methods can be re-ordered resiliently. Instead, we call
   // the class method lookup function, passing in a reference to the
   // method descriptor.
-  if (IGM.isResilient(classDecl, ResilienceExpansion::Maximal)) {
+  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal)) {
     // Load the superclass of the static type of the 'self' value.
     llvm::Value *superMetadata;
     auto instanceTy = CanType(baseType.getASTType()->getMetatypeInstanceType());
-    if (!IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                         ResilienceExpansion::Maximal)) {
+    if (!IGM.hasResilientMetadata(instanceTy.getClassOrBoundGenericClass(),
+                                  ResilienceExpansion::Maximal)) {
       // It's still possible that the static type of 'self' is not resilient, in
       // which case we can assume its superclass.
       //
@@ -5549,8 +5543,8 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
-  if (IGM.isResilient(classDecl,
-                      ResilienceExpansion::Maximal)) {
+  if (IGM.hasResilientMetadata(classDecl,
+                               ResilienceExpansion::Maximal)) {
     auto *fnPtr = IGM.getAddrOfDispatchThunk(method, NotForDefinition);
     auto sig = IGM.getSignature(methodType);
     FunctionPointer fn(fnPtr, sig);

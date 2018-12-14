@@ -107,12 +107,16 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
-bool swift::parseIntoSourceFile(SourceFile &SF,
+static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB) {
+                                DelayedParsingCallbacks *DelayedParseCB,
+                                bool FullParse) {
+  assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
+         "cannot parse in full with the given parameters!");
+
   SharedTimer timer("Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
   PrettyStackTraceParser StackTrace(P);
@@ -122,10 +126,34 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
-  bool FoundSideEffects = P.parseTopLevel();
-  *Done = P.Tok.is(tok::eof);
+  bool FoundSideEffects = false;
+  do {
+    bool hasSideEffects = P.parseTopLevel();
+    FoundSideEffects = FoundSideEffects || hasSideEffects;
+    *Done = P.Tok.is(tok::eof);
+  } while (FullParse && !*Done);
 
   return FoundSideEffects;
+}
+
+bool swift::parseIntoSourceFile(SourceFile &SF,
+                                unsigned BufferID,
+                                bool *Done,
+                                SILParserState *SIL,
+                                PersistentParserState *PersistentState,
+                                DelayedParsingCallbacks *DelayedParseCB) {
+  return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
+                                 PersistentState, DelayedParseCB,
+                                 /*FullParse=*/SF.shouldBuildSyntaxTree());
+}
+
+bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+                                    PersistentParserState *PersistentState,
+                                    DelayedParsingCallbacks *DelayedParseCB) {
+  bool Done = false;
+  return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
+                                 PersistentState, DelayedParseCB,
+                                 /*FullParse=*/true);
 }
 
 
@@ -143,6 +171,16 @@ namespace {
     ArrayRef<RequirementRepr> requirements;
     bool exported;
     SILSpecializeAttr::SpecializationKind kind;
+  };
+
+  enum class ConformanceContext {
+    /// A normal conformance parse.
+    Ordinary,
+
+    /// We're parsing this for a SIL witness table.
+    /// Leave any generic parameter clauses in scope, and use an explicit
+    /// self-conformance instead of an abstract one.
+    WitnessTable,
   };
 
   class SILParser {
@@ -178,10 +216,10 @@ namespace {
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
 
-    ProtocolConformance *
+    Optional<ProtocolConformanceRef>
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
                                    GenericEnvironment *GenericEnv,
-                                   bool localScope,
+                                   ConformanceContext context,
                                    ProtocolDecl *defaultForProto);
   public:
     SILParser(Parser &P)
@@ -319,11 +357,12 @@ namespace {
     bool parseSILOwnership(ValueOwnershipKind &OwnershipKind) {
       // We parse here @ <identifier>.
       if (!P.consumeIf(tok::at_sign)) {
-        // Add error here.
-        return true;
+        // If we fail, we must have @any ownership.
+        OwnershipKind = ValueOwnershipKind::Any;
+        return false;
       }
 
-      StringRef AllOwnershipKinds[4] = {"trivial", "unowned", "owned",
+      StringRef AllOwnershipKinds[3] = {"unowned", "owned",
                                         "guaranteed"};
       return parseSILIdentifierSwitch(OwnershipKind, AllOwnershipKinds,
                                       diag::expected_sil_value_ownership_kind);
@@ -384,7 +423,7 @@ namespace {
                         StringRef &OpcodeName);
     bool parseSILDebugVar(SILDebugVariable &Var);
 
-    /// \brief Parses the basic block arguments as part of branch instruction.
+    /// Parses the basic block arguments as part of branch instruction.
     bool parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args, SILBuilder &B);
 
     bool parseSILLocation(SILLocation &L);
@@ -410,15 +449,17 @@ namespace {
                             GenericEnvironment *GenericEnv=nullptr,
                             ProtocolDecl *defaultForProto = nullptr);
 
-    ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
+    Optional<ProtocolConformanceRef>
+    parseProtocolConformance(ProtocolDecl *&proto,
                              GenericEnvironment *&genericEnv,
-                             bool localScope,
+                             ConformanceContext context,
                              ProtocolDecl *defaultForProto);
-    ProtocolConformance *parseProtocolConformance(
-                                              ProtocolDecl *defaultForProto) {
+    Optional<ProtocolConformanceRef>
+    parseProtocolConformance(ProtocolDecl *defaultForProto,
+                             ConformanceContext context) {
       ProtocolDecl *dummy;
       GenericEnvironment *env;
-      return parseProtocolConformance(dummy, env, true, defaultForProto);
+      return parseProtocolConformance(dummy, env, context, defaultForProto);
     }
 
     Optional<llvm::coverage::Counter>
@@ -3355,86 +3396,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   
-  case SILInstructionKind::MarkUninitializedBehaviorInst: {
-    UnresolvedValueName InitStorageFuncName, StorageName,
-                        SetterFuncName, SelfName;
-    SmallVector<ParsedSubstitution, 4> ParsedInitStorageSubs,
-                                       ParsedSetterSubs;
-    GenericEnvironment *InitStorageEnv, *SetterEnv;
-    SILType InitStorageTy, SetterTy;
-    
-    // mark_uninitialized_behavior %init<Subs>(%storage) : $T -> U,
-    //                             %set<Subs>(%self) : $V -> W
-    if (parseValueName(InitStorageFuncName)
-        || parseSubstitutions(ParsedInitStorageSubs)
-        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
-        || parseValueName(StorageName)
-        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
-        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(InitStorageTy, InitStorageEnv)
-        || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseValueName(SetterFuncName)
-        || parseSubstitutions(ParsedSetterSubs)
-        || P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
-        || parseValueName(SelfName)
-        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")
-        || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || parseSILType(SetterTy, SetterEnv)
-        || parseSILDebugLocation(InstLoc, B))
-      return true;
-    
-    // Resolve the types of the operands.
-    SILValue InitStorageFunc = getLocalValue(InitStorageFuncName,
-                                             InitStorageTy, InstLoc, B);
-    SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
-
-    SubstitutionMap InitStorageSubs, SetterSubs;
-    {
-      if (InitStorageEnv) {
-        InitStorageSubs =
-          getApplySubstitutionsFromParsed(*this, InitStorageEnv,
-                                          ParsedInitStorageSubs);
-        if (!InitStorageSubs)
-          return true;
-      }
-
-      if (SetterEnv) {
-        SetterSubs = getApplySubstitutionsFromParsed(*this, SetterEnv,
-                                                     ParsedSetterSubs);
-        if (!SetterSubs)
-          return true;
-      }
-    }
-
-    auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), InitStorageSubs);
-    auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()
-      ->substGenericArgs(B.getModule(), SetterSubs);
-    
-    // Derive the storage type from the initStorage method.
-    auto StorageTy = SILType::getPrimitiveAddressType(
-                               SubstInitStorageTy->getSingleResult().getType());
-    auto Storage = getLocalValue(StorageName, StorageTy, InstLoc, B);
-
-    SILFunctionConventions substConv(SubstSetterTy, B.getModule());
-    auto SelfTy = substConv.getSILType(SubstSetterTy->getSelfParameter());
-    auto Self = getLocalValue(SelfName, SelfTy, InstLoc, B);
-
-    auto PropTy = SubstInitStorageTy->getParameters()[0]
-                      .getSILStorageType()
-                      .getAddressType();
-
-    ResultVal = B.createMarkUninitializedBehavior(InstLoc,
-                                                  InitStorageFunc,
-                                                  InitStorageSubs,
-                                                  Storage,
-                                                  SetterFunc,
-                                                  SetterSubs,
-                                                  Self,
-                                                  PropTy);
-    break;
-  }
-  
   case SILInstructionKind::MarkFunctionEscapeInst: {
     SmallVector<SILValue, 4> OpList;
     do {
@@ -4715,7 +4676,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     
     // Lower the type at the abstraction level of the existential.
     auto archetype
-      = ArchetypeType::getOpened(Val->getType().getASTType())
+      = OpenedArchetypeType::get(Val->getType().getASTType())
         ->getCanonicalType();
     
     SILType LoweredTy = SILMod.Types.getLoweredType(
@@ -5803,29 +5764,31 @@ static CanType parseAssociatedTypePath(Parser &P, SILParser &SP,
   return CanType();
 }
 
-static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
-           SILParser &SP, Type ConformingTy, ProtocolDecl *&proto) {
+static bool isSelfConformance(Type conformingType, ProtocolDecl *protocol) {
+  if (auto protoTy = conformingType->getAs<ProtocolType>())
+    return protoTy->getDecl() == protocol;
+  return false;
+}
+
+static Optional<ProtocolConformanceRef> parseRootProtocolConformance(Parser &P,
+           SILParser &SP, Type ConformingTy, ProtocolDecl *&proto,
+           ConformanceContext context) {
   Identifier ModuleKeyword, ModuleName;
   SourceLoc Loc, KeywordLoc;
   proto = parseProtocolDecl(P, SP);
   if (!proto)
-    return nullptr;
+    return None;
       
   if (P.parseIdentifier(ModuleKeyword, KeywordLoc,
                         diag::expected_tok_in_sil_instr, "module") ||
       SP.parseSILIdentifier(ModuleName, Loc,
                             diag::expected_sil_value_name))
-    return nullptr;
+    return None;
 
   if (ModuleKeyword.str() != "module") {
     P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
-    return nullptr;
+    return None;
   }
-
-  // FIXME: we currently emit _CocoaArrayType: _CocoaArrayType.
-  if (ConformingTy->is<ProtocolType>() &&
-      ConformingTy->getAs<ProtocolType>()->getDecl() == proto)
-    return nullptr;
 
   // Calling lookupConformance on a BoundGenericType will return a specialized
   // conformance. We use UnboundGenericType to find the normal conformance.
@@ -5835,13 +5798,17 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
   auto lookup = P.SF.getParentModule()->lookupConformance(lookupTy, proto);
   if (!lookup) {
     P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
-    return nullptr;
+    return None;
   }
-  if (!lookup->isConcrete()) {
-    P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
-    return nullptr;
+
+  // Use a concrete self-conformance if we're parsing this for a witness table.
+  if (context == ConformanceContext::WitnessTable &&
+      !lookup->isConcrete() &&
+      isSelfConformance(ConformingTy, proto)) {
+    lookup = ProtocolConformanceRef(P.Context.getSelfConformance(proto));
   }
-  return lookup->getConcrete()->getRootNormalConformance();
+
+  return lookup;
 }
 
 ///  protocol-conformance ::= normal-protocol-conformance
@@ -5853,15 +5820,15 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
 ///  normal-protocol-conformance ::=
 ///    generic-parameter-list? type: protocolName module ModuleName
 /// Note that generic-parameter-list is already parsed before calling this.
-ProtocolConformance *SILParser::parseProtocolConformance(
+Optional<ProtocolConformanceRef> SILParser::parseProtocolConformance(
            ProtocolDecl *&proto,
            GenericEnvironment *&genericEnv,
-           bool localScope,
+           ConformanceContext context,
            ProtocolDecl *defaultForProto) {
   // Parse generic params for the protocol conformance. We need to make sure
   // they have the right scope.
   Optional<Scope> GenericsScope;
-  if (localScope)
+  if (context == ConformanceContext::Ordinary)
     GenericsScope.emplace(&P, ScopeKind::Generics);
 
   // Make sure we don't leave it uninitialized in the caller
@@ -5872,25 +5839,24 @@ ProtocolConformance *SILParser::parseProtocolConformance(
     genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }
 
-  ProtocolConformance *retVal =
-      parseProtocolConformanceHelper(proto, genericEnv, localScope,
-                                     defaultForProto);
+  auto retVal = parseProtocolConformanceHelper(proto, genericEnv, context,
+                                               defaultForProto);
 
-  if (localScope) {
+  if (GenericsScope) {
     GenericsScope.reset();
   }
   return retVal;
 }
 
-ProtocolConformance *SILParser::parseProtocolConformanceHelper(
+Optional<ProtocolConformanceRef> SILParser::parseProtocolConformanceHelper(
                                     ProtocolDecl *&proto,
                                     GenericEnvironment *witnessEnv,
-                                    bool localScope,
+                                    ConformanceContext context,
                                     ProtocolDecl *defaultForProto) {
   // Parse AST type.
   ParserResult<TypeRepr> TyR = P.parseType();
   if (TyR.isNull())
-    return nullptr;
+    return None;
   TypeLoc Ty = TyR.get();
   if (defaultForProto) {
     bindProtocolSelfInTypeRepr(Ty, defaultForProto);
@@ -5898,11 +5864,11 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
 
   if (performTypeLocChecking(Ty, /*IsSILType=*/ false, witnessEnv,
                              defaultForProto))
-    return nullptr;
+    return None;
   auto ConformingTy = Ty.getType();
 
   if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
-    return nullptr;
+    return None;
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "specialize") {
     P.consumeToken();
@@ -5910,45 +5876,50 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     // Parse substitutions for specialized conformance.
     SmallVector<ParsedSubstitution, 4> parsedSubs;
     if (parseSubstitutions(parsedSubs, witnessEnv, defaultForProto))
-      return nullptr;
+      return None;
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
-      return nullptr;
+      return None;
     ProtocolDecl *dummy;
     GenericEnvironment *specializedEnv;
     auto genericConform =
-        parseProtocolConformance(dummy, specializedEnv, localScope,
+        parseProtocolConformance(dummy, specializedEnv,
+                                 ConformanceContext::Ordinary,
                                  defaultForProto);
-    if (!genericConform)
-      return nullptr;
+    if (!genericConform || !genericConform->isConcrete())
+      return None;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
-      return nullptr;
+      return None;
 
     SubstitutionMap subMap =
       getApplySubstitutionsFromParsed(*this, specializedEnv, parsedSubs);
     if (!subMap)
-      return nullptr;
+      return None;
 
     auto result = P.Context.getSpecializedConformance(
-      ConformingTy, genericConform, subMap);
-    return result;
+      ConformingTy, genericConform->getConcrete(), subMap);
+    return ProtocolConformanceRef(result);
   }
 
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit") {
     P.consumeToken();
 
     if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
-      return nullptr;
-    auto baseConform = parseProtocolConformance(defaultForProto);
-    if (!baseConform)
-      return nullptr;
+      return None;
+    auto baseConform = parseProtocolConformance(defaultForProto,
+                                                ConformanceContext::Ordinary);
+    if (!baseConform || !baseConform->isConcrete())
+      return None;
     if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
-      return nullptr;
+      return None;
 
-    return P.Context.getInheritedConformance(ConformingTy, baseConform);
+    auto result = P.Context.getInheritedConformance(ConformingTy,
+                                                    baseConform->getConcrete());
+    return ProtocolConformanceRef(result);
   }
 
-  auto retVal = parseNormalProtocolConformance(P, *this, ConformingTy, proto);
+  auto retVal =
+    parseRootProtocolConformance(P, *this, ConformingTy, proto, context);
   return retVal;
 }
 
@@ -5984,13 +5955,14 @@ static bool parseSILVTableEntry(
       return true;
     if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
-    ProtocolConformance *conform =
-      witnessState.parseProtocolConformance(defaultForProto);
-    if (!conform) // Ignore this witness entry for now.
+    auto conform =
+      witnessState.parseProtocolConformance(defaultForProto,
+                                            ConformanceContext::Ordinary);
+    if (!conform || !conform->isConcrete()) // Ignore this witness entry for now.
       return false;
 
     witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-      proto, conform
+      proto, conform->getConcrete()
     });
     return false;
   }
@@ -6032,10 +6004,12 @@ static bool parseSILVTableEntry(
 
     ProtocolConformanceRef conformance(proto);
     if (P.Tok.getText() != "dependent") {
-      auto concrete = witnessState.parseProtocolConformance(defaultForProto);
-      if (!concrete) // Ignore this witness entry for now.
+      auto concrete =
+        witnessState.parseProtocolConformance(defaultForProto,
+                                              ConformanceContext::Ordinary);
+      if (!concrete && !concrete->isConcrete()) // Ignore this for now.
         return false;
-      conformance = ProtocolConformanceRef(concrete);
+      conformance = *concrete;
     } else {
       P.consumeToken();
     }
@@ -6153,12 +6127,15 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   GenericEnvironment *witnessEnv;
   auto conf = WitnessState.parseProtocolConformance(proto,
                                                     witnessEnv,
-                                                    false/*localScope*/,
+                                              ConformanceContext::WitnessTable,
                                                     nullptr);
   WitnessState.ContextGenericEnv = witnessEnv;
 
-  NormalProtocolConformance *theConformance = conf ?
-      dyn_cast<NormalProtocolConformance>(conf) : nullptr;
+  // FIXME: should we really allow a specialized or inherited conformance here?
+  auto theConformance =
+    (conf && conf->isConcrete())
+      ? conf->getConcrete()->getRootConformance()
+      : nullptr;
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {

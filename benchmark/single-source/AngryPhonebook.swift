@@ -18,22 +18,15 @@ import Foundation
 public let AngryPhonebook = BenchmarkInfo(
   name: "AngryPhonebook",
   runFunction: run_AngryPhonebook,
-  tags: [.validation, .api, .String])
+  tags: [.validation, .api, .String],
+  legacyFactor: 7)
 
 var words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
   "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
   "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
-  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank", "Jonathan", "Scott",
-  "Justin", "Raymond", "Brandon", "Gregory", "Samuel", "Patrick", "Benjamin",
-  "Jack", "Dennis", "Jerry", "Alexander", "Tyler", "Douglas", "Henry", "Peter",
-  "Walter", "Aaron", "Jose", "Adam", "Harold", "Zachary", "Nathan", "Carl",
-  "Kyle", "Arthur", "Gerald", "Lawrence", "Roger", "Albert", "Keith", "Jeremy",
-  "Terry", "Joe", "Sean", "Willie", "Jesse", "Ralph", "Billy", "Austin", "Bruce",
-  "Christian", "Roy", "Bryan", "Eugene", "Louis", "Harry", "Wayne", "Ethan",
-  "Jordan", "Russell", "Alan", "Philip", "Randy", "Juan", "Howard", "Vincent",
-  "Bobby", "Dylan", "Johnny", "Phillip", "Craig"]
+  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
 @inline(never)
 public func run_AngryPhonebook(_ N: Int) {

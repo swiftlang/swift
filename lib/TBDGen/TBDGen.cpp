@@ -105,6 +105,12 @@ void TBDGenVisitor::addAssociatedConformanceDescriptor(
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addBaseConformanceDescriptor(
+                                           BaseConformance conformance) {
+  auto entity = LinkEntity::forBaseConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -113,31 +119,34 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!needsWTable)
       continue;
 
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-    if (!normalConformance)
+    // Only root conformances get symbols; the others get any public symbols
+    // from their parent conformances.
+    auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+    if (!rootConformance) {
       continue;
+    }
 
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
+    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance);
+        rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
-          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+          (isa<SelfProtocolConformance>(rootConformance) ||
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
-            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
+            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(
+
+    rootConformance->forEachValueWitness(
         nullptr, [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
@@ -205,8 +214,7 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Add the property descriptor if the decl needs it.
-  if (SwiftModule->getASTContext().LangOpts.EnableKeyPathResilience
-      && ASD->exportsPropertyDescriptor()) {
+  if (ASD->exportsPropertyDescriptor()) {
     addSymbol(LinkEntity::forPropertyDescriptor(ASD));
   }
 
@@ -217,27 +225,30 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  // Non-global variables might have an explicit initializer symbol, in
-  // non-resilient modules.
-  if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
-      SwiftModule->getResilienceStrategy() == ResilienceStrategy::Default &&
-      !isGlobalOrStaticVar(VD)) {
-    auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
-    // Stored property initializers for public properties are currently
-    // public.
-    addSymbol(declRef);
-  }
-
-  // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
-      // The actual variable has a symbol.
-      Mangle::ASTMangler mangler;
-      addSymbol(mangler.mangleEntity(VD, false));
+  // Variables inside non-resilient modules have some additional symbols.
+  if (!VD->isResilient()) {
+    // Non-global variables might have an explicit initializer symbol, in
+    // non-resilient modules.
+    if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+        !isGlobalOrStaticVar(VD)) {
+      auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
     }
 
-    if (VD->isLazilyInitializedGlobal())
-      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // statically/globally stored variables have some special handling.
+    if (VD->hasStorage() &&
+        isGlobalOrStaticVar(VD)) {
+      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        // The actual variable has a symbol.
+        Mangle::ASTMangler mangler;
+        addSymbol(mangler.mangleEntity(VD, false));
+      }
+
+      if (VD->isLazilyInitializedGlobal())
+        addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
   }
 
   visitAbstractStorageDecl(VD);
@@ -308,11 +319,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   auto hasResilientAncestor =
-      CD->isResilient(SwiftModule, ResilienceExpansion::Minimal);
+      CD->hasResilientMetadata(SwiftModule, ResilienceExpansion::Minimal);
   auto ancestor = CD->getSuperclassDecl();
   while (ancestor && !hasResilientAncestor) {
     hasResilientAncestor |=
-        ancestor->isResilient(SwiftModule, ResilienceExpansion::Maximal);
+        ancestor->hasResilientMetadata(SwiftModule, ResilienceExpansion::Maximal);
     ancestor = ancestor->getSuperclassDecl();
   }
 
@@ -333,7 +344,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     void addMethod(SILDeclRef method) {
       assert(method.getDecl()->getDeclContext() == CD);
 
-      if (CD->isResilient()) {
+      if (CD->hasResilientMetadata()) {
         if (FirstTime) {
           FirstTime = false;
 
@@ -426,15 +437,18 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
 
-      // Skip inherited requirements.
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType()))
-        continue;
-
-      AssociatedConformance conformance(
-        PD,
-        req.getFirstType()->getCanonicalType(),
-        req.getSecondType()->castTo<ProtocolType>()->getDecl());
-      addAssociatedConformanceDescriptor(conformance);
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
+        BaseConformance conformance(
+          PD,
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addBaseConformanceDescriptor(conformance);
+      } else {
+        AssociatedConformance conformance(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addAssociatedConformanceDescriptor(conformance);
+      }
     }
 
     for (auto *member : PD->getMembers()) {
@@ -454,6 +468,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           addAssociatedTypeDescriptor(assocType);
       }
     }
+
+    // Include the self-conformance.
+    addConformances(PD);
   }
 
 #ifndef NDEBUG

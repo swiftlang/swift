@@ -30,7 +30,7 @@ namespace swift {
 
 class SILOptFunctionBuilder;
 
-/// \brief This is a helper class used to optimize casts.
+/// This is a helper class used to optimize casts.
 class CastOptimizer {
   SILOptFunctionBuilder &FunctionBuilder;
 

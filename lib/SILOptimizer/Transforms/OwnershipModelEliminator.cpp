@@ -28,8 +28,14 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+// Utility command line argument to dump the module before we eliminate
+// ownership from it.
+static llvm::cl::opt<std::string>
+DumpBefore("sil-dump-before-ome-to-path", llvm::cl::Hidden);
 
 //===----------------------------------------------------------------------===//
 //                               Implementation
@@ -282,6 +288,10 @@ namespace {
 
 struct OwnershipModelEliminator : SILModuleTransform {
   void run() override {
+    if (DumpBefore.size()) {
+      getModule()->dump(DumpBefore.c_str());
+    }
+
     for (auto &F : *getModule()) {
       // Don't rerun early lowering on deserialized functions.
       if (F.wasDeserializedCanonical())

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,7 +8,7 @@ func trap() -> Never {
 
 
 // CHECK-LABEL: sil @main
-// CHECK: bb0({{%.*}} : @trivial $Int32, {{%.*}} : @trivial $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
 // CHECK: alloc_global @$s8toplevel1xSiv

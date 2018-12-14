@@ -32,7 +32,7 @@ extension String {
   internal static func _fromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
-    _sanityCheck(_allASCII(input), "not actually ASCII")
+    _internalInvariant(_allASCII(input), "not actually ASCII")
 
     if let smol = _SmallString(input) {
       return String(_StringGuts(smol))
@@ -119,7 +119,7 @@ extension String {
       to: UTF8.self,
       stoppingOnError: false,
       into: { contents.append($0) })
-    _sanityCheck(!repaired, "Error present")
+    _internalInvariant(!repaired, "Error present")
 
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
@@ -168,6 +168,17 @@ extension String {
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
     return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
+  }
+
+  @usableFromInline
+  internal static func _fromSubstring(
+    _ substring: __shared Substring
+  ) -> String {
+    if substring._offsetRange == substring._wholeString._offsetRange {
+      return substring._wholeString
+    }
+
+    return substring._withUTF8 { return String._uncheckedFromUTF8($0) }
   }
 }
 

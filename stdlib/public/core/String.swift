@@ -443,7 +443,7 @@ extension String {
     if targetEncoding == UTF8.self {
       return try self.withCString {
         (cPtr: UnsafePointer<CChar>) -> Result  in
-        _sanityCheck(UInt8.self == TargetEncoding.CodeUnit.self)
+        _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
         let ptr = UnsafeRawPointer(cPtr).assumingMemoryBound(
           to: TargetEncoding.CodeUnit.self)
         return try body(ptr)
@@ -468,7 +468,7 @@ extension String {
         stoppingOnError: false,
         into: { arg.append($0) })
       arg.append(TargetEncoding.CodeUnit(0))
-      _sanityCheck(!repaired)
+      _internalInvariant(!repaired)
       return try body(arg)
     }
   }

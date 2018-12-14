@@ -30,6 +30,7 @@ import ArraySubscript
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
+import Breadcrumbs
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -43,6 +44,7 @@ import CharacterLiteralsSmall
 import CharacterProperties
 import Chars
 import ClassArrayGetter
+import Codable
 import Combos
 import CountAlgo
 import DataBenchmarks
@@ -195,6 +197,7 @@ registerBenchmark(BinaryFloatingPointPropertiesBinade)
 registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
+registerBenchmark(Breadcrumbs)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
@@ -252,6 +255,7 @@ registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
+registerBenchmark(Codable)
 registerBenchmark(Join)
 registerBenchmark(LazyFilter)
 registerBenchmark(LinkedList)

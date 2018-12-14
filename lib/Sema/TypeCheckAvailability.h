@@ -41,7 +41,8 @@ bool diagnoseDeclAvailability(const ValueDecl *Decl,
                               DeclContext *DC,
                               SourceRange R,
                               bool AllowPotentiallyUnavailableProtocol,
-                              bool SignalOnPotentialUnavailability);
+                              bool SignalOnPotentialUnavailability,
+                              bool ForInout);
 
 void diagnoseUnavailableOverride(ValueDecl *override,
                                  const ValueDecl *base,

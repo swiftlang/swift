@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief A simple module loader that loads .swift source files.
+/// A simple module loader that loads .swift source files.
 ///
 //===----------------------------------------------------------------------===//
 

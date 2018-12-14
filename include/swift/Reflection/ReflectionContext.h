@@ -139,26 +139,60 @@ public:
     if (!Command)
       return false;
 
-    // Read everything including the __TEXT segment.
-    Buf = this->getReader().readBytes(ImageStart, Command->vmsize);
-    auto Start = reinterpret_cast<const char *>(Buf.get());
+   // Find the load command offset.
+    auto loadCmdOffset = ImageStart.getAddressData() + Offset + sizeof(typename T::Header);
+
+    // Read the load command.
+    auto LoadCmdAddress = reinterpret_cast<const char *>(loadCmdOffset);
+    auto LoadCmdBuf = this->getReader().readBytes(
+        RemoteAddress(LoadCmdAddress), sizeof(typename T::SegmentCmd));
+    auto LoadCmd = reinterpret_cast<typename T::SegmentCmd *>(LoadCmdBuf.get());
+
+    // The sections start immediately after the load command.
+    unsigned NumSect = LoadCmd->nsects;
+    auto SectAddress = reinterpret_cast<const char *>(loadCmdOffset) +
+                       sizeof(typename T::SegmentCmd);
+    auto Sections = this->getReader().readBytes(
+        RemoteAddress(SectAddress), NumSect * sizeof(typename T::Section));
+
+    auto Slide = ImageStart.getAddressData() - Command->vmaddr;
+    std::string Prefix = "__swift5";
+    uint64_t RangeStart = UINT64_MAX;
+    uint64_t RangeEnd = UINT64_MAX;
+    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
+    for (unsigned I = 0; I < NumSect; ++I) {
+      auto S = reinterpret_cast<typename T::Section *>(
+          SectionsBuf + (I * sizeof(typename T::Section)));
+      if (strncmp(S->sectname, Prefix.c_str(), strlen(Prefix.c_str())) != 0)
+        continue;
+      if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX) {
+        RangeStart = S->addr + Slide;
+        RangeEnd = S->addr + S->size + Slide;
+        continue;
+      }
+      RangeStart = std::min(RangeStart, (uint64_t)S->addr + Slide);
+      RangeEnd = std::max(RangeEnd, (uint64_t)(S->addr + S->size + Slide));
+    }
+ 
+    if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX)
+      return false;
+
+    auto SectBuf = this->getReader().readBytes(RemoteAddress(RangeStart),
+                                               RangeEnd - RangeStart);
 
     auto findMachOSectionByName = [&](std::string Name)
         -> std::pair<std::pair<const char *, const char *>, uint32_t> {
-      auto cmdOffset = Start + Offset + sizeof(typename T::Header);
-      auto SegCmd = reinterpret_cast<typename T::SegmentCmd *>(cmdOffset);
-      auto SectAddress = reinterpret_cast<const char *>(cmdOffset) +
-                         sizeof(typename T::SegmentCmd);
-      for (unsigned I = 0; I < SegCmd->nsects; ++I) {
+      for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
-            SectAddress + (I * sizeof(typename T::Section)));
+            SectionsBuf + (I * sizeof(typename T::Section)));
         if (strncmp(S->sectname, Name.c_str(), strlen(Name.c_str())) != 0)
           continue;
-        auto Slide = ImageStart.getAddressData() - Command->vmaddr;
         auto RemoteSecStart = S->addr + Slide;
-        auto LocalSecStart = RemoteSecStart - ImageStart.getAddressData() + Start;
-        auto SecSize = S->size;
-        return {{LocalSecStart, LocalSecStart + SecSize}, 0};
+        auto SectBufData = reinterpret_cast<const char *>(SectBuf.get());
+        auto LocalSectStart =
+            reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
+        auto LocalSectEnd = reinterpret_cast<const char *>(LocalSectStart + S->size);
+        return {{LocalSectStart, LocalSectEnd}, 0};
       }
       return {{nullptr, nullptr}, 0};
     };
@@ -178,8 +212,8 @@ public:
         ReflStrMdSec.first.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
-    auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(SectBuf.get());
+    auto RemoteStartAddress = static_cast<uintptr_t>(RangeStart);
 
     ReflectionInfo info = {
         {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
@@ -212,6 +246,8 @@ public:
     }
 
     savedBuffers.push_back(std::move(Buf));
+    savedBuffers.push_back(std::move(SectBuf));
+    savedBuffers.push_back(std::move(Sections));
     return true;
   }
 

@@ -19,7 +19,8 @@ public let CountAlgo = [
   BenchmarkInfo(
     name: "CountAlgoString",
     runFunction: run_CountAlgoString,
-    tags: [.validation, .api]),
+    tags: [.validation, .api],
+    legacyFactor: 5),
 ]
 
 @inline(never)
@@ -32,7 +33,7 @@ public func run_CountAlgoArray(_ N: Int) {
 @inline(never)
 public func run_CountAlgoString(_ N: Int) {
   let vowels = Set("aeiou")
-  for _ in 1...5*N {
+  for _ in 1...N {
     CheckResults(text.count(where: vowels.contains) == 2014)
   }
 }

@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(_ x: Error) { }
 // CHECK-LABEL: sil hidden @$s18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
@@ -192,7 +192,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
 }
 
 // CHECK-LABEL: sil hidden @$s18boxed_existentials14erasure_to_anyyyps5Error_p_sAC_ptF
-// CHECK:       bb0([[OUT:%.*]] : @trivial $*Any, [[GUAR:%.*]] : @guaranteed $Error,
+// CHECK:       bb0([[OUT:%.*]] : $*Any, [[GUAR:%.*]] : @guaranteed $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box ${ var Error }
@@ -222,4 +222,22 @@ func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
 
     return plusOneError()
   }
+}
+
+extension Error {
+  var myError: Error {
+    return self
+  }
+}
+
+// Make sure we don't assert on this.
+// CHECK-LABEL: sil hidden @$s18boxed_existentials4testyyF
+// CHECK:  [[ERROR_ADDR:%.*]] = alloc_stack $Error
+// CHECK:  [[ARRAY_GET:%.*]] = function_ref @$sSayxSicig
+// CHECK:  apply [[ARRAY_GET]]<Error>([[ERROR_ADDR]]
+// CHECK:  [[ERROR:%.*]] = load [take] [[ERROR_ADDR]] : $*Error
+// CHECK:  open_existential_box [[ERROR]]
+func test() {
+  var errors: [Error] = []
+  test_property(errors[0].myError)
 }

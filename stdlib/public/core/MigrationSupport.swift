@@ -157,150 +157,6 @@ public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable,
 @available(*, unavailable, renamed: "Optional")
 public typealias ImplicitlyUnwrappedOptional<Wrapped> = Optional<Wrapped>
 
-@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
-public typealias BitwiseOperations = _BitwiseOperations
-
-public protocol _BitwiseOperations {
-  static func & (lhs: Self, rhs: Self) -> Self
-  static func | (lhs: Self, rhs: Self) -> Self
-  static func ^ (lhs: Self, rhs: Self) -> Self
-  static prefix func ~ (x: Self) -> Self
-  static var allZeros: Self { get }
-}
-
-extension _BitwiseOperations {  
-    @available(swift, obsoleted: 4.1)
-    public static func |= (lhs: inout Self, rhs: Self) {
-      lhs = lhs | rhs
-    }
-
-    @available(swift, obsoleted: 4.1)
-    public static func &= (lhs: inout Self, rhs: Self) {
-      lhs = lhs & rhs
-    }
-
-    @available(swift, obsoleted: 4.1)
-    public static func ^= (lhs: inout Self, rhs: Self) {
-      lhs = lhs ^ rhs
-    }
-}
-
-extension FloatingPoint {
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func negated() -> Self {
-    return -self
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func adding(_ other: Self) -> Self {
-    return self + other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func add(_ other: Self) {
-    self += other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func subtracting(_ other: Self) -> Self {
-    return self - other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func subtract(_ other: Self) {
-    self -= other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func multiplied(by other: Self) -> Self {
-    return self * other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func multiply(by other: Self) {
-    self *= other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func divided(by other: Self) -> Self {
-    return self / other
-  }
-
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func divide(by other: Self) {
-    self /= other
-  }
-}
-
-extension FloatingPoint {
-  @available(*, unavailable, message: "Use bitPattern property instead")
-  public func _toBitPattern() -> UInt {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "Use init(bitPattern:) instead")
-  public static func _fromBitPattern(_ bits: UInt) -> Self {
-    fatalError("unavailable")
-  }
-}
-
-extension BinaryFloatingPoint {
-  @available(*, unavailable, renamed: "isSignalingNaN")
-  public var isSignaling: Bool {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, renamed: "nan")
-  public var NaN: Bool {
-    fatalError("unavailable")
-  }
-  @available(*, unavailable, renamed: "nan")
-  public var quietNaN: Bool {
-    fatalError("unavailable")
-  }
-}
-
-@available(*, unavailable, renamed: "FloatingPoint")
-public typealias FloatingPointType = FloatingPoint
-
-// Swift 3 compatibility APIs
-@available(swift, obsoleted: 4, renamed: "BinaryInteger")
-public typealias Integer = BinaryInteger
-
-@available(swift, obsoleted: 4, renamed: "BinaryInteger")
-public typealias IntegerArithmetic = BinaryInteger
-
-@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
-public typealias SignedNumber = SignedNumeric & Comparable
-
-@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
-public typealias AbsoluteValuable = SignedNumeric & Comparable
-
-@available(swift, obsoleted: 4, renamed: "SignedInteger")
-public typealias _SignedInteger = SignedInteger
-
-extension SignedNumeric where Self : Comparable {
-  @available(swift, obsoleted: 4, message: "Please use the 'abs(_:)' free function.")
-  @_transparent
-  public static func abs(_ x: Self) -> Self {
-    return Swift.abs(x)
-  }
-}
-
-extension BinaryInteger {
-  @available(swift, obsoleted: 4)
-  public func toIntMax() -> Int64 {
-    return Int64(self)
-  }
-}
-
-extension UnsignedInteger {
-  @available(swift, obsoleted: 4)
-  public func toUIntMax() -> UInt64 {
-    return UInt64(self)
-  }
-}
-
 extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
@@ -319,13 +175,6 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   public init(_ other: ClosedRange<Bound>) {
     self = other
   }  
-}
-
-extension _ExpressibleByColorLiteral {
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, message: "This initializer is only meant to be used by color literals")
-  public init(colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) {
-    self.init(_colorLiteralRed: red, green: green, blue: blue, alpha: alpha)
-  }
 }
 
 @available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
@@ -354,43 +203,6 @@ extension LazySequenceProtocol {
   }
 }
 
-extension FloatingPoint {
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
-  public static func abs(_ x: Self) -> Self {
-    return x.magnitude
-  }
-}
-
-extension FixedWidthInteger {
-  /// The empty bitset.
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
-  public static var allZeros: Self { return 0 }
-  
-  @available(*, unavailable, message:
-    "Use operators or addingReportingOverflow instead.")
-  public func unsafeAdding(_ other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or subtractingReportingOverflow instead.")
-  public func unsafeSubtracting(_ other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or multipliedReportingOverflow(by:) instead.")
-  public func unsafeMultiplied(by other: Self) -> Self {
-    fatalError("unavailable")
-  }
-  
-  @available(*, unavailable, message:
-    "Use operators or dividedReportingOverflow(by:) instead.")
-  public func unsafeDivided(by other: Self) -> Self {
-    fatalError("unavailable")
-  }
-}
-
 extension String {
   /// A view of a string's contents as a collection of characters.
   ///
@@ -407,12 +219,8 @@ extension String {
   /// characters, so this type is now just an alias for String.
   @available(swift, deprecated: 3.2, obsoleted: 5.0, message: "Please use String directly")
   public var characters: String {
-    get {
-      return self
-    }
-    set {
-      self = newValue
-    }
+    get { return self }
+    set { self = newValue }
   }
 
   /// Applies the given closure to a mutable view of the string's characters.
@@ -426,128 +234,12 @@ extension String {
   ) -> R {
     return body(&self)
   }
-
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public init?(_ utf16: UTF16View) {
-    Builtin.unreachable()
-  }
-
-  @available(swift, deprecated: 3.2, message: "Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)")
-  @available(swift, obsoleted: 4.0, message: "Please use non-failable String.init(_:UTF8View) instead")
-  public init?(_ utf8: UTF8View) {
-    Builtin.unreachable()
-  }
 }
-
-extension String { // RangeReplaceableCollection
-  // The defaulted argument prevents this initializer from satisfies the
-  // LosslessStringConvertible conformance.  You can satisfy a protocol
-  // requirement with something that's not yet available, but not with
-  // something that has become unavailable. Without this, the code won't
-  // compile as Swift 4.
-  @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
-  public init?(_ other: String, obsoletedInSwift4: () = ()) {
-    Builtin.unreachable()
-  }
-}
-
-@available(*, unavailable, renamed: "TextOutputStream")
-public typealias OutputStreamType = TextOutputStream
-
-extension TextOutputStreamable {
-  @available(*, unavailable, renamed: "write(to:)")
-  public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
-    Builtin.unreachable()
-  }
-}
-
 
 extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
-  }
-}
-
-// backward compatibility for index interchange.
-extension String.UnicodeScalarView {
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?,  offsetBy n: Int) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.Scalar {
-    Builtin.unreachable()
-  }
-}
-
-// backward compatibility for index interchange.
-extension String.UTF16View {
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?, offsetBy n: Int) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
-    Builtin.unreachable()
-  }
-}
-
-// backward compatibility for index interchange.
-extension String.UTF8View {
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?, offsetBy n: Int) -> Index {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> Int {
-    Builtin.unreachable()
-  }
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.UTF8.CodeUnit {
-    Builtin.unreachable()
-  }
-}
-
-//===--- String/Substring Slicing Support ---------------------------------===//
-/// In Swift 3.2, in the absence of type context,
-///
-///     someString[someString.startIndex..<someString.endIndex]
-///
-/// was deduced to be of type `String`.  Therefore have a more-specific
-/// Swift-3-only `subscript` overload on `String` (and `Substring`) that
-/// continues to produce `String`.
-extension String {
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(self[bounds])
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(self[bounds])
   }
 }
 
@@ -573,47 +265,6 @@ extension String.UnicodeScalarView {
   }
 }
 
-//===--- Slicing Support --------------------------------------------------===//
-// In Swift 3.2, in the absence of type context,
-//
-//   someString.utf16[someString.utf16.startIndex..<someString.utf16.endIndex]
-//
-// was deduced to be of type `String.UTF16View`.  Provide a more-specific
-// Swift-3-only `subscript` overload that continues to produce
-// `String.UTF16View`.
-extension String.UTF16View {
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String.UTF16View {
-    Builtin.unreachable()
-  }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
-    Builtin.unreachable()
-  }
-}
-
-//===--- Slicing Support --------------------------------------------------===//
-/// In Swift 3.2, in the absence of type context,
-///
-///   someString.utf8[someString.utf8.startIndex..<someString.utf8.endIndex]
-///
-/// was deduced to be of type `String.UTF8View`.  Provide a more-specific
-/// Swift-3-only `subscript` overload that continues to produce
-/// `String.UTF8View`.
-extension String.UTF8View {
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String.UTF8View {
-    Builtin.unreachable()
-  }
-
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
-    Builtin.unreachable()
-  }
-}
-
 // @available(swift,deprecated: 5.0, renamed: "Unicode.UTF8")
 public typealias UTF8 = Unicode.UTF8
 // @available(swift, deprecated: 5.0, renamed: "Unicode.UTF16")
@@ -623,22 +274,6 @@ public typealias UTF32 = Unicode.UTF32
 // @available(swift, deprecated: 5.0, renamed: "Unicode.Scalar")
 public typealias UnicodeScalar = Unicode.Scalar
 
-
-// popFirst() is only present when a collection is its own subsequence. This was
-// dropped in Swift 4.
-extension String {
-  @available(swift, deprecated: 3.2, obsoleted: 4, message: "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
-  public mutating func popFirst() -> String.Element? {
-    Builtin.unreachable()
-  }
-}
-
-extension String.UnicodeScalarView {
-  @available(swift, deprecated: 3.2, obsoleted: 4, message: "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
-  public mutating func popFirst() -> String.UnicodeScalarView.Element? {
-    Builtin.unreachable()
-  }
-}
 
 extension String.UTF16View : _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
@@ -652,15 +287,6 @@ extension String.UTF8View : _CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
-}
-
-extension StringProtocol {
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF8View.Index")
-  public typealias UTF8Index = UTF8View.Index
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF16View.Index")
-  public typealias UTF16Index = UTF16View.Index
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UnicodeScalarView.Index")
-  public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
 extension Substring {
@@ -784,38 +410,6 @@ extension UnsafeMutablePointer {
     // ensure that exactly rhs.count elements were written
     _precondition(remainders.next() == nil, "rhs underreported its count")
     _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
-  }
-}
-
-extension Strideable {
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func + (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: rhs)
-  }
-
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func + (lhs: Self.Stride, rhs: Self) -> Self {
-    return rhs.advanced(by: lhs)
-  }
-
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func - (lhs: Self, rhs: Self.Stride) -> Self {
-    return lhs.advanced(by: -rhs)
-  }
-
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func - (lhs: Self, rhs: Self) -> Self.Stride {
-    return rhs.distance(to: lhs)
-  }
-
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func += (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: rhs)
-  }
-
-  @available(swift, deprecated: 3, obsoleted: 4, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")
-  public static func -= (lhs: inout Self, rhs: Self.Stride) {
-    lhs = lhs.advanced(by: -rhs)
   }
 }
 
@@ -1013,45 +607,6 @@ extension Collection where Element: Equatable {
   }
 }
 
-extension String.Index {
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public init(_position: Int) {
-    self.init(encodedOffset: _position)
-  }
-
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public init(_codeUnitOffset: Int) {
-    self.init(encodedOffset: _codeUnitOffset)
-  }
-
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public var _utf16Index: Int {
-    return self.encodedOffset
-  }
-
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public var _offset: Int {
-    return self.encodedOffset
-  }
-}
-
-// backward compatibility for index interchange.
-extension Optional where Wrapped == String.Index {
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public static func ..<(
-    lhs: String.Index?, rhs: String.Index?
-  ) -> Range<String.Index> {
-    return lhs! ..< rhs!
-  }
-
-  @available(swift, obsoleted: 4.0, message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public static func ...(
-    lhs: String.Index?, rhs: String.Index?
-  ) -> ClosedRange<String.Index> {
-    return lhs! ... rhs!
-  }
-}
-
 extension Zip2Sequence {
   @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Sequence1.Iterator")
   public typealias Stream1 = Sequence1.Iterator
@@ -1104,78 +659,6 @@ public enum _PlaygroundQuickLook {
   case sprite(Any)
   case url(String)
   case _raw([UInt8], String)
-}
-
-// Maintain old `keys` and `values` types in Swift 3 mode.
-extension Dictionary {
-  /// A collection containing just the keys of the dictionary.
-  ///
-  /// When iterated over, keys appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs. Each key in the keys
-  /// collection has a unique value.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for k in countryCodes.keys {
-  ///         print(k)
-  ///     }
-  ///     // Prints "BR"
-  ///     // Prints "JP"
-  ///     // Prints "GH"
-  @available(swift, obsoleted: 4.0)
-  public var keys: LazyMapCollection<[Key: Value], Key> {
-    return self.lazy.map { $0.key }
-  }
-
-  /// A collection containing just the values of the dictionary.
-  ///
-  /// When iterated over, values appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for v in countryCodes.values {
-  ///         print(v)
-  ///     }
-  ///     // Prints "Brazil"
-  ///     // Prints "Japan"
-  ///     // Prints "Ghana"
-  @available(swift, obsoleted: 4.0)
-  public var values: LazyMapCollection<[Key: Value], Value> {
-    return self.lazy.map { $0.value }
-  }
-
-  @available(swift, obsoleted: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
-  }
-}
-
-extension Set {
-  @available(swift, obsoleted: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
-  }  
 }
 
 extension _PlaygroundQuickLook {

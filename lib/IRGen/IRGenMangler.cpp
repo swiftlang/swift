@@ -49,16 +49,14 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithTake) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
-    GET_MANGLING(StoreExtraInhabitant) \
-    GET_MANGLING(GetExtraInhabitantIndex) \
     GET_MANGLING(GetEnumTag) \
     GET_MANGLING(DestructiveProjectEnumData) \
     GET_MANGLING(DestructiveInjectEnumTag)
 #undef GET_MANGLING
     case ValueWitness::Size:
     case ValueWitness::Flags:
+    case ValueWitness::ExtraInhabitantCount:
     case ValueWitness::Stride:
-    case ValueWitness::ExtraInhabitantFlags:
       llvm_unreachable("not a function witness");
   }
   appendOperator("w", Code);
@@ -133,6 +131,20 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   return withSymbolicReferences(IGM, [&]{
     appendType(Ty);
   });
+}
+
+std::string IRGenMangler::mangleProtocolConformanceDescriptor(
+                                 const RootProtocolConformance *conformance) {
+  beginMangling();
+  if (isa<NormalProtocolConformance>(conformance)) {
+    appendProtocolConformance(conformance);
+    appendOperator("Mc");
+  } else {
+    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+    appendProtocolName(protocol);
+    appendOperator("MS");
+  }
+  return finalize();
 }
 
 SymbolicMangling
@@ -278,5 +290,13 @@ std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
     appendProtocolName(conformance.getAbstract());
   else
     assert(conformance.isInvalid() && "Unknown protocol conformance");
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
+                                              CanGenericSignature genericSig) {
+  beginManglingWithoutPrefix();
+  Buffer << "generic environment ";
+  appendGenericSignature(genericSig);
   return finalize();
 }

@@ -790,7 +790,7 @@ public:
                    const MetadataFn &metadataFn,
                    const ClassNameFn &classNameFn) {
     switch (refKind) {
-    case TypeReferenceKind::IndirectNominalTypeDescriptor: {
+    case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
       if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress))
         return None;
@@ -799,7 +799,7 @@ public:
       LLVM_FALLTHROUGH;
     }
 
-    case TypeReferenceKind::DirectNominalTypeDescriptor: {
+    case TypeReferenceKind::DirectTypeDescriptor: {
       auto descriptor = readContextDescriptor(ref);
       if (!descriptor)
         return None;

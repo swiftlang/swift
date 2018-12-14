@@ -18,6 +18,7 @@ import os
 import time
 import unittest
 
+from StringIO import StringIO
 from imp import load_source
 
 from compare_perf_tests import PerformanceTestResult
@@ -33,6 +34,7 @@ parse_args = Benchmark_Driver.parse_args
 BenchmarkDriver = Benchmark_Driver.BenchmarkDriver
 BenchmarkDoctor = Benchmark_Driver.BenchmarkDoctor
 LoggingReportFormatter = Benchmark_Driver.LoggingReportFormatter
+MarkdownReportHandler = Benchmark_Driver.MarkdownReportHandler
 
 
 class Test_parse_args(unittest.TestCase):
@@ -421,6 +423,58 @@ class TestLoggingReportFormatter(unittest.TestCase):
         self.assertEquals(f.format(lr), 'INFO Hi!')
 
 
+class TestMarkdownReportHandler(unittest.TestCase):
+    def setUp(self):
+        super(TestMarkdownReportHandler, self).setUp()
+        self.stream = StringIO()
+        self.handler = MarkdownReportHandler(self.stream)
+
+    def assert_contains(self, texts):
+        assert not isinstance(texts, str)
+        for text in texts:
+            self.assertIn(text, self.stream.getvalue())
+
+    def record(self, level, category, msg):
+        return logging.makeLogRecord({
+            'name': 'BenchmarkDoctor.' + category,
+            'levelno': level, 'msg': msg})
+
+    def test_init_writes_table_header(self):
+        self.assertEquals(self.handler.level, logging.INFO)
+        self.assert_contains(['Benchmark Check Report\n', '---|---'])
+
+    def test_close_writes_final_newlines(self):
+        self.handler.close()
+        self.assert_contains(['---|---\n\n'])
+
+    def test_errors_and_warnings_start_new_rows_with_icons(self):
+        self.handler.emit(self.record(logging.ERROR, '', 'Blunder'))
+        self.handler.emit(self.record(logging.WARNING, '', 'Boo-boo'))
+        self.assert_contains(['\n⛔️ | Blunder',
+                              '\n⚠️ | Boo-boo'])
+
+    def test_category_icons(self):
+        self.handler.emit(self.record(logging.WARNING, 'naming', 'naming'))
+        self.handler.emit(self.record(logging.WARNING, 'runtime', 'runtime'))
+        self.handler.emit(self.record(logging.WARNING, 'memory', 'memory'))
+        self.assert_contains(['🔤 | naming',
+                              '⏱ | runtime',
+                              'Ⓜ️ | memory'])
+
+    def test_info_stays_in_table_cell_breaking_line_row_to_subscript(self):
+        """Assuming Infos only follow after Errors and Warnings.
+
+        Infos don't emit category icons.
+        """
+        self.handler.emit(self.record(logging.ERROR, 'naming', 'Blunder'))
+        self.handler.emit(self.record(logging.INFO, 'naming', 'Fixit'))
+        self.assert_contains(['Blunder <br><sub> Fixit'])
+
+    def test_names_in_code_format(self):
+        self.handler.emit(self.record(logging.WARNING, '', "'QuotedName'"))
+        self.assert_contains(['| `QuotedName`'])
+
+
 def _PTR(min=700, mem_pages=1000, setup=None):
     """Create PerformanceTestResult Stub."""
     return Stub(samples=Stub(min=min), mem_pages=mem_pages, setup=setup)
@@ -479,7 +533,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         Num-samples for Benchmark Driver are calibrated to be powers of two,
         take measurements for approximately 1s
-        based on short initial runtime sampling. Capped at 2k samples.
+        based on short initial runtime sampling. Capped at 200 samples.
         """
         driver = BenchmarkDriverMock(tests=['B1'], responses=([
             # calibration run, returns a stand-in for PerformanceTestResult
@@ -487,10 +541,10 @@ class TestBenchmarkDoctor(unittest.TestCase):
                   verbose=True), _PTR(min=300))] +
             # 5x i1 series, with 300 μs runtime its possible to take 4098
             # samples/s, but it should be capped at 2k
-            ([(_run('B1', num_samples=2048, num_iters=1,
+            ([(_run('B1', num_samples=200, num_iters=1,
                     verbose=True, measure_memory=True), _PTR(min=300))] * 5) +
             # 5x i2 series
-            ([(_run('B1', num_samples=2048, num_iters=2,
+            ([(_run('B1', num_samples=200, num_iters=2,
                     verbose=True, measure_memory=True), _PTR(min=300))] * 5)
         ))
         doctor = BenchmarkDoctor(self.args, driver)
@@ -507,13 +561,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assert_contains(
             ['Calibrating num-samples for B1:',
              'Runtime 300 μs yields 4096 adjusted samples per second.',
-             'Measuring B1, 5 x i1 (2048 samples), 5 x i2 (2048 samples)'],
+             'Measuring B1, 5 x i1 (200 samples), 5 x i2 (200 samples)'],
             self.logs['debug'])
 
-    def test_benchmark_name_matches_capital_words_conventions(self):
+    def test_benchmark_name_matches_naming_conventions(self):
         driver = BenchmarkDriverMock(tests=[
             'BenchmarkName', 'CapitalWordsConvention', 'ABBRName',
-            'wrongCase', 'Wrong_convention'])
+            'TooManyCamelCaseHumps',
+            'Existential.Array.method.1x.Val4',
+            'Flatten.Array.Array.Str.for-in.reserved',
+            'Flatten.Array.String?.as!.NSArray',
+            'wrongCase', 'Wrong_convention', 'Illegal._$%[]<>{}@^()'])
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, driver)
             doctor.check()
@@ -523,12 +581,22 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertNotIn('BenchmarkName', output)
         self.assertNotIn('CapitalWordsConvention', output)
         self.assertNotIn('ABBRName', output)
+        self.assertNotIn('Existential.Array.method.1x.Val4', output)
+        self.assertNotIn('Flatten.Array.Array.Str.for-in.reserved', output)
+        self.assertNotIn('Flatten.Array.String?.as!.NSArray', output)
+        err_msg = " name doesn't conform to benchmark naming convention."
         self.assert_contains(
-            ["'wrongCase' name doesn't conform to UpperCamelCase convention.",
-             "'Wrong_convention' name doesn't conform to UpperCamelCase "
-             "convention."], self.logs['error'])
+            ["'wrongCase'" + err_msg, "'Wrong_convention'" + err_msg,
+             "'Illegal._$%[]<>{}@^()'" + err_msg], self.logs['error'])
         self.assert_contains(
-            ['See http://bit.ly/UpperCamelCase'], self.logs['info'])
+            ["'TooManyCamelCaseHumps' name is composed of 5 words."],
+            self.logs['warning'])
+        self.assert_contains(
+            ['See http://bit.ly/BenchmarkNaming'], self.logs['info'])
+        self.assert_contains(
+            ["Split 'TooManyCamelCaseHumps' name into dot-separated groups "
+             "and variants. See http://bit.ly/BenchmarkNaming"],
+            self.logs['info'])
 
     def test_benchmark_name_is_at_most_40_chars_long(self):
         driver = BenchmarkDriverMock(tests=[
@@ -682,9 +750,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
              "workload depending on the `num-iters`."],
             self.logs['error'])
         self.assert_contains(
+            ["'VariableMemory' "
+             "mem_pages [i1, i2]: min=[1460, 1750] 𝚫=290 R=[12, 2]"],
+            self.logs['info'])
+        self.assert_contains(
             ["'HighVariance' has very wide range of memory used between "
              "independent, repeated measurements."],
             self.logs['warning'])
+        self.assert_contains(
+            ["'HighVariance' "
+             "mem_pages [i1, i2]: min=[4818, 4674] 𝚫=144 R=[1382, 1570]"],
+            self.logs['info'])
 
 
 if __name__ == '__main__':

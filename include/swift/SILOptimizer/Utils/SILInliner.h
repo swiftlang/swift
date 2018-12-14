@@ -80,18 +80,32 @@ public:
   /// iterator to the first inlined instruction (or first instruction after the
   /// call for an empty function).
   ///
-  /// This may split basic blocks and delete instructions.
-  ///
   /// This only performs one step of inlining: it does not recursively
   /// inline functions called by the callee.
+  ///
+  /// This may split basic blocks and delete instructions anywhere.
+  ///
+  /// All inlined instructions must be either inside the original call block or
+  /// inside new basic blocks laid out after the original call block.
+  ///
+  /// Any instructions in the original call block after the inlined call must be
+  /// in a new basic block laid out after all inlined blocks.
+  ///
+  /// The above guarantees ensure that inlining is liner in the number of
+  /// instructions and that inlined instructions are revisited exactly once.
   ///
   /// *NOTE*: This attempts to perform inlining unconditionally and thus asserts
   /// if inlining will fail. All users /must/ check that a function is allowed
   /// to be inlined using SILInliner::canInlineApplySite before calling this
   /// function.
-  SILBasicBlock::iterator inlineFunction(SILFunction *calleeFunction,
-                                         FullApplySite apply,
-                                         ArrayRef<SILValue> appliedArgs);
+  ///
+  /// Returns an iterator to the first inlined instruction (or the end of the
+  /// caller block for empty functions) and the last block in function order
+  /// containing inlined instructions (the original caller block for
+  /// single-block functions).
+  std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
+                 ArrayRef<SILValue> appliedArgs);
 };
 
 } // end namespace swift

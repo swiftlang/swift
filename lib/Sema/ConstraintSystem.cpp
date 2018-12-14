@@ -1020,7 +1020,7 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
+  auto bindPrimaryArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
 
@@ -1044,7 +1044,7 @@ static void bindArchetypesFromContext(
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
-        bindContextArchetype(selfTy, contextTy);
+        bindPrimaryArchetype(selfTy, contextTy);
       }
       continue;
     }
@@ -1056,7 +1056,7 @@ static void bindArchetypesFromContext(
 
     for (auto *paramTy : genericSig->getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
-      bindContextArchetype(paramTy, contextTy);
+      bindPrimaryArchetype(paramTy, contextTy);
     }
 
     break;
@@ -1189,6 +1189,7 @@ ConstraintSystem::getTypeOfMemberReference(
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1321,7 +1322,7 @@ ConstraintSystem::getTypeOfMemberReference(
   Type baseOpenedTy = baseObjTy;
 
   if (baseObjTy->isExistentialType()) {
-    ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
+    auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
                                        openedArchetype });
     baseOpenedTy = openedArchetype;
@@ -1442,6 +1443,40 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
   }
 }
 
+/// If there are any SIMD operators in the overload set, partition the set so
+/// that the SIMD operators come at the end.
+static ArrayRef<OverloadChoice> partitionSIMDOperators(
+                                  ArrayRef<OverloadChoice> choices,
+                                  SmallVectorImpl<OverloadChoice> &scratch) {
+  // If the first element isn't an operator, none of them are.
+  if (!choices[0].isDecl() ||
+      !isa<FuncDecl>(choices[0].getDecl()) ||
+      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
+      choices[0].getDecl()->getASTContext().LangOpts
+        .SolverEnableOperatorDesignatedTypes)
+    return choices;
+
+  // Check whether we have any SIMD operators.
+  bool foundSIMDOperator = false;
+  for (const auto &choice : choices) {
+    if (isSIMDOperator(choice.getDecl())) {
+      foundSIMDOperator = true;
+      break;
+    }
+  }
+
+  if (!foundSIMDOperator)
+    return choices;
+
+  scratch.assign(choices.begin(), choices.end());
+  std::stable_partition(scratch.begin(), scratch.end(),
+                        [](const OverloadChoice &choice) {
+                          return !isSIMDOperator(choice.getDecl());
+                        });
+
+  return scratch;
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1457,6 +1492,9 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+
+  SmallVector<OverloadChoice, 4> scratchChoices;
+  choices = partitionSIMDOperators(choices, scratchChoices);
 
   SmallVector<Constraint *, 4> overloads;
   
@@ -2189,7 +2227,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   return diagnosed;
 }
 
-/// \brief Determine the number of distinct overload choices in the
+/// Determine the number of distinct overload choices in the
 /// provided set.
 static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   llvm::SmallPtrSet<void *, 4> uniqueChoices;
@@ -2201,7 +2239,7 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
   return result;
 }
 
-/// \brief Determine the name of the overload in a set of overload choices.
+/// Determine the name of the overload in a set of overload choices.
 static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   DeclName name;
   for (auto choice : choices) {
@@ -2355,4 +2393,24 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
     return nullptr;
 
   return locator->getAnchor();
+}
+
+Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
+  Expr *argExpr = nullptr;
+  if (auto *AE = dyn_cast<ApplyExpr>(expr))
+    argExpr = AE->getArg();
+  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
+    argExpr = UME->getArgument();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
+    argExpr = SE->getIndex();
+  else
+    return nullptr;
+
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    assert(index == 0);
+    return PE->getSubExpr();
+  }
+
+  assert(isa<TupleExpr>(argExpr));
+  return cast<TupleExpr>(argExpr)->getElement(index);
 }

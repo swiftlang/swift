@@ -1,6 +1,7 @@
 /// a ==> depends-on-a-ext, depends-on-a-foo | a-ext ==> depends-on-a-ext
 
-// RUN: rm -rf %t && cp -r %S/Inputs/nominal-members/ %t
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/nominal-members/* %t
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./a-ext.swift ./depends-on-a-foo.swift ./depends-on-a-ext.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-INITIAL %s

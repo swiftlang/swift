@@ -179,7 +179,7 @@ static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
 
 #define FUNC_DECL(NAME, ID)                             \
   FuncDecl *SILGenModule::get##NAME(SILLocation loc) {  \
-    if (auto fn = getASTContext().get##NAME(nullptr))   \
+    if (auto fn = getASTContext().get##NAME())   \
       return fn;                                        \
     return diagnoseMissingIntrinsic(*this, loc, ID);    \
   }
@@ -675,10 +675,10 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 /// Emit a function now, if it's externally usable or has been referenced in
 /// the current TU, or remember how to emit it later if not.
 template<typename /*void (SILFunction*)*/ Fn>
-void emitOrDelayFunction(SILGenModule &SGM,
-                         SILDeclRef constant,
-                         Fn &&emitter,
-                         bool forceEmission = false) {
+static void emitOrDelayFunction(SILGenModule &SGM,
+                                SILDeclRef constant,
+                                Fn &&emitter,
+                                bool forceEmission = false) {
   auto emitAfter = SGM.lastEmittedFunction;
 
   SILFunction *f = nullptr;
@@ -1286,9 +1286,6 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  if (vd->hasBehavior())
-    emitPropertyBehavior(vd);
-
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -1312,7 +1309,8 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
       case AccessorKind::Read:
         return impl.getReadImpl() != ReadImplKind::Read;
       case AccessorKind::Set:
-        return impl.getWriteImpl() != WriteImplKind::Set;
+        return impl.getWriteImpl() != WriteImplKind::Set &&
+               impl.getWriteImpl() != WriteImplKind::StoredWithObservers;
       case AccessorKind::Modify:
         return impl.getReadWriteImpl() != ReadWriteImplKind::Modify;
 #define ACCESSOR(ID) \
@@ -1331,12 +1329,19 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 }
 
 bool
-TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
+SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                                  ResilienceExpansion expansion) {
+  // If the declaration is resilient, we have to treat the component as
+  // computed.
+  if (decl->isResilient(M.getSwiftModule(), expansion))
+    return false;
+
   auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
                                           decl->supportsMutation()
                                             ? AccessKind::ReadWrite
                                             : AccessKind::Read,
-                                          M.getSwiftModule());
+                                          M.getSwiftModule(),
+                                          expansion);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     // Keypaths rely on accessors to handle the special behavior of weak or
@@ -1349,9 +1354,9 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = getSubstitutedStorageType(decl, componentObjTy);
+    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
     
     return storageTy.getAddressType() == opaqueTy.getAddressType();
   }
@@ -1359,13 +1364,11 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   case AccessStrategy::DispatchToAccessor:
   case AccessStrategy::MaterializeToTemporary:
     return false;
-  case AccessStrategy::BehaviorStorage:
-    llvm_unreachable("should not occur");
   }
   llvm_unreachable("unhandled strategy");
 }
 
-static bool canStorageUseTrivialDescriptor(SILModule &M,
+static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
                                            AbstractStorageDecl *decl) {
   // A property can use a trivial property descriptor if the key path component
   // that an external module would form given publicly-exported information
@@ -1373,10 +1376,11 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
   // key path.
   // This means that the property isn't stored (without promising to be always
   // stored) and doesn't have a setter with less-than-public visibility.
-  
-  switch (M.getSwiftModule()->getResilienceStrategy()) {
+  auto expansion = ResilienceExpansion::Maximal;
+
+  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Default: {
-    if (M.Types.canStorageUseStoredKeyPathComponent(decl)) {
+    if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
@@ -1404,7 +1408,7 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
     // or a fixed-layout type may not have been.
     // Without availability information, only get-only computed properties
     // can resiliently use trivial descriptors.
-    return !M.Types.canStorageUseStoredKeyPathComponent(decl)
+    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
       && decl->getSetter() == nullptr;
   }
   }
@@ -1412,9 +1416,6 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
-    return;
-  
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
@@ -1444,7 +1445,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
   
-  if (canStorageUseTrivialDescriptor(M, decl)) {
+  if (canStorageUseTrivialDescriptor(*this, decl)) {
     (void)SILProperty::create(M, /*serialized*/ false, decl, None);
     return;
   }
@@ -1455,18 +1456,13 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
+                                               ResilienceExpansion::Maximal,
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),
                                                /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);
-}
-
-void SILGenModule::emitPropertyBehavior(VarDecl *vd) {
-  assert(vd->hasBehavior());
-  // Emit the protocol conformance to the behavior.
-  getWitnessTable(*vd->getBehavior()->Conformance);
 }
 
 void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {

@@ -96,7 +96,7 @@ private:
 public:
   PatternKind getKind() const { return PatternKind(Bits.Pattern.Kind); }
 
-  /// \brief Retrieve the name of the given pattern kind.
+  /// Retrieve the name of the given pattern kind.
   ///
   /// This name should only be used for debugging dumps and other
   /// developer aids, and should never be part of a diagnostic or exposed
@@ -161,14 +161,14 @@ public:
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceLoc getLoc() const;
 
-  /// \brief Collect the set of variables referenced in the given pattern.
+  /// Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
-  /// \brief apply the specified function to all variables referenced in this
+  /// apply the specified function to all variables referenced in this
   /// pattern.
   void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
-  /// \brief apply the specified function to all pattern nodes recursively in
+  /// apply the specified function to all pattern nodes recursively in
   /// this pattern.  This is a pre-order traversal.
   void forEachNode(llvm::function_ref<void(Pattern *)> f);
 
@@ -182,7 +182,7 @@ public:
 
   bool isNeverDefaultInitializable() const;
 
-  /// \brief Mark all vardecls in this pattern as having non-pattern initial
+  /// Mark all vardecls in this pattern as having non-pattern initial
   /// values bound into them.
   void markHasNonPatternBindingInit() {
     forEachVariable([&](VarDecl *VD) {
@@ -190,7 +190,7 @@ public:
     });
   }
   
-  /// \brief Mark all vardecls in this pattern as having an owning statement for
+  /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {
     forEachVariable([&](VarDecl *VD) {
@@ -305,7 +305,7 @@ public:
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
                               Optional<bool> implicit = None);
 
-  /// \brief Create either a tuple pattern or a paren pattern, depending
+  /// Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements, SourceLoc rp,

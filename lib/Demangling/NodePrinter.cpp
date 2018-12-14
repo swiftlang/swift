@@ -319,6 +319,8 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
+    case Node::Kind::BaseConformanceDescriptor:
+    case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ClassMetadataBaseOffset:
     case Node::Kind::CFunctionPointer:
     case Node::Kind::Constructor:
@@ -418,6 +420,9 @@ private:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
+    case Node::Kind::ProtocolSelfConformanceDescriptor:
+    case Node::Kind::ProtocolSelfConformanceWitness:
+    case Node::Kind::ProtocolSelfConformanceWitnessTable:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -432,7 +437,7 @@ private:
     case Node::Kind::SILBoxLayout:
     case Node::Kind::SILBoxMutableField:
     case Node::Kind::SILBoxImmutableField:
-    case Node::Kind::SpecializationIsFragile:
+    case Node::Kind::IsSerialized:
     case Node::Kind::SpecializationPassID:
     case Node::Kind::Static:
     case Node::Kind::Subscript:
@@ -891,7 +896,7 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
         // information that is useful to our users.
         break;
 
-      case Node::Kind::SpecializationIsFragile:
+      case Node::Kind::IsSerialized:
         Printer << Separator;
         Separator = ", ";
         print(node->getChild(i));
@@ -1235,8 +1240,8 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::InlinedGenericFunction:
     printSpecializationPrefix(Node, "inlined generic function");
     return nullptr;
-  case Node::Kind::SpecializationIsFragile:
-    Printer << "preserving fragile attribute";
+  case Node::Kind::IsSerialized:
+    Printer << "serialized";
     return nullptr;
   case Node::Kind::GenericSpecializationParam:
     print(Node->getChild(0));
@@ -1375,6 +1380,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " and conformance ";
     print(Node->getChild(1));
     return nullptr;
+  case Node::Kind::ProtocolSelfConformanceWitnessTable:
+    Printer << "protocol self-conformance witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::ProtocolWitnessTableAccessor:
     Printer << "protocol witness table accessor for ";
     print(Node->getFirstChild());
@@ -1403,6 +1412,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "vtable thunk for ";
     print(Node->getChild(1));
     Printer << " dispatching to ";
+    print(Node->getChild(0));
+    return nullptr;
+  }
+  case Node::Kind::ProtocolSelfConformanceWitness: {
+    Printer << "protocol self-conformance witness for ";
     print(Node->getChild(0));
     return nullptr;
   }
@@ -1436,25 +1450,19 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     }
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
-    Printer << "key path getter for ";
-    print(Node->getChild(0));
-    Printer << " : ";
-    if (Node->getNumChildren() == 2) {
-      print(Node->getChild(1));
-    } else {
-      print(Node->getChild(1));
-      print(Node->getChild(2));
-    }
-    return nullptr;
   case Node::Kind::KeyPathSetterThunkHelper:
-    Printer << "key path setter for ";
+    if (Node->getKind() == Node::Kind::KeyPathGetterThunkHelper)
+      Printer << "key path getter for ";
+    else
+      Printer << "key path setter for ";
+
     print(Node->getChild(0));
     Printer << " : ";
-    if (Node->getNumChildren() == 2) {
-      print(Node->getChild(1));
-    } else {
-      print(Node->getChild(1));
-      print(Node->getChild(2));
+    for (unsigned index = 1; index < Node->getNumChildren(); ++index) {
+      auto Child = Node->getChild(index);
+      if (Child->getKind() == Node::Kind::IsSerialized)
+        Printer << ", ";
+      print(Child);
     }
     return nullptr;
   case Node::Kind::KeyPathEqualsThunkHelper:
@@ -1463,16 +1471,23 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
          << (Node->getKind() == Node::Kind::KeyPathEqualsThunkHelper
                ? "equality" : "hash")
          << " operator for ";
-   
-    auto lastChild = Node->getChild(Node->getNumChildren() - 1);
-    auto lastType = Node->getNumChildren();
+
+    unsigned lastChildIndex = Node->getNumChildren();
+    auto lastChild = Node->getChild(lastChildIndex - 1);
+    bool isSerialized = false;
+    if (lastChild->getKind() == Node::Kind::IsSerialized) {
+      isSerialized = true;
+      lastChildIndex--;
+      lastChild = Node->getChild(lastChildIndex - 1);
+    }
+
     if (lastChild->getKind() == Node::Kind::DependentGenericSignature) {
       print(lastChild);
-      lastType--;
+      lastChildIndex--;
     }
-    
+
     Printer << "(";
-    for (unsigned i = 0; i < lastType; ++i) {
+    for (unsigned i = 0; i < lastChildIndex; ++i) {
       if (i != 0)
         Printer << ", ";
       print(Node->getChild(i));
@@ -1551,6 +1566,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "metaclass for ";
     print(Node->getFirstChild());
     return nullptr;
+  case Node::Kind::ProtocolSelfConformanceDescriptor:
+    Printer << "protocol self-conformance descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::ProtocolConformanceDescriptor:
     Printer << "protocol conformance descriptor for ";
     print(Node->getChild(0));
@@ -1621,6 +1640,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::BaseConformanceDescriptor:
+    Printer << "base conformance descriptor for ";
+    print(Node->getChild(0));
+    Printer << ": ";
+    print(Node->getChild(1));
+    return nullptr;
   case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
@@ -1630,6 +1655,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(1));
     Printer << " : ";
     print(Node->getChild(2));
+    Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::BaseWitnessTableAccessor:
+    Printer << "base witness table accessor for ";
+    print(Node->getChild(1));
     Printer << " in ";
     print(Node->getChild(0));
     return nullptr;

@@ -31,6 +31,7 @@ namespace clang {
 
 namespace swift {
   class AnyFunctionRef;
+  enum class Bridgeability : unsigned;
   class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
@@ -217,13 +218,13 @@ public:
 
   virtual ~TypeLowering() {}
 
-  /// \brief Are r-values of this type passed as arguments indirectly by formal
+  /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
   ///
   /// This is independent of whether the SIL argument is address type.
   bool isFormallyPassedIndirectly() const { return isAddressOnly(); }
 
-  /// \brief Are r-values of this type returned indirectly by formal convention?
+  /// Are r-values of this type returned indirectly by formal convention?
   ///
   /// This is independent of whether the SIL result is address type.
   bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
@@ -851,6 +852,7 @@ public:
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(AbstractionPattern pattern, Type t,
+                             Bridgeability bridging,
                              SILFunctionTypeRepresentation rep,
                              BridgedTypePurpose purpose);
 
@@ -871,7 +873,8 @@ public:
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
-                                            AnyFunctionType::ExtInfo extInfo);
+                                            AnyFunctionType::ExtInfo extInfo,
+                                            Bridgeability bridging);
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -931,7 +934,7 @@ public:
     NeedsThunk
   };
   
-  /// \brief Test if type1 is ABI compatible with type2, and can be converted
+  /// Test if type1 is ABI compatible with type2, and can be converted
   /// with a trivial bitcast.
   ///
   /// Note that type1 and type2 must be lowered types, and type1 must be a
@@ -943,7 +946,7 @@ public:
   ABIDifference checkForABIDifferences(SILType type1, SILType type2,
                                        bool thunkOptionals = true);
 
-  /// \brief Same as above but for SIL function types.
+  /// Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
                                                SILFunctionType *fnTy2);
 
@@ -971,28 +974,30 @@ public:
   CanSILBoxType getBoxTypeForEnumElement(SILType enumType,
                                          EnumElementDecl *elt);
 
-  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl);
-  
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
-                              bool canBridgeBool,
-                              bool bridgedCollectionsAreOptional);
+                              Bridgeability bridging,
+                              SILFunctionTypeRepresentation rep,
+                              BridgedTypePurpose purpose);
 
   AnyFunctionType::Param
   getBridgedParam(SILFunctionTypeRepresentation rep,
                   AbstractionPattern pattern,
-                  AnyFunctionType::Param param);
+                  AnyFunctionType::Param param,
+                  Bridgeability bridging);
 
   void getBridgedParams(SILFunctionTypeRepresentation rep,
                         AbstractionPattern pattern,
                         ArrayRef<AnyFunctionType::Param> params,
-                        SmallVectorImpl<AnyFunctionType::Param> &bridged);
+                        SmallVectorImpl<AnyFunctionType::Param> &bridged,
+                        Bridgeability bridging);
 
   CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,
                                CanType result,
+                               Bridgeability bridging,
                                bool suppressOptional);
 };
 

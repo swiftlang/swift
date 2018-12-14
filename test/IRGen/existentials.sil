@@ -8,8 +8,8 @@ import Swift
 protocol P {}
 
 // NonBitwiseTakableBit = 0x00100000. This struct is bitwise takable because
-// 0x70007 = 458759
-// CHECK: @"$s12existentials14BitwiseTakableVWV" = internal constant [14 x i8*] {{.*}} i8* inttoptr (i64 458759 to i8*)
+// 0x30007 = 196615
+// CHECK: @"$s12existentials14BitwiseTakableVWV" = internal constant %swift.vwtable {{.*}} i32 196615
 struct BitwiseTakable {
   var p: P
 }

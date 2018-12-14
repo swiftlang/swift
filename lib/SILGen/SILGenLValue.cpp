@@ -843,8 +843,11 @@ namespace {
                          ManagedValue base) && override {
       assert(base.getType().isExistentialType() &&
              "base for open existential component must be an existential");
-      assert(base.getType().isAddress() &&
-             "base value of open-existential component was not an address?");
+      assert((base.getType().isAddress() ||
+              base.getType().getPreferredExistentialRepresentation(SGF.SGM.M) ==
+                  ExistentialRepresentation::Boxed) &&
+             "base value of open-existential component was not an address or a "
+             "boxed existential?");
       SILValue addr;
 
       auto rep = base.getType().getPreferredExistentialRepresentation(SGF.SGM.M);
@@ -1754,13 +1757,13 @@ namespace {
       SmallVector<Type, 2> typeArgs;
       typeArgs.push_back(BaseFormalType);
       if (TypeKind == KPTK_AnyKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtAnyKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtAnyKeyPath();
       } else if (TypeKind == KPTK_PartialKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtPartialKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtPartialKeyPath();
       } else if (TypeKind == KPTK_KeyPath ||
                  TypeKind == KPTK_WritableKeyPath ||
                  TypeKind == KPTK_ReferenceWritableKeyPath) {
-        projectFn = SGF.getASTContext().getGetAtKeyPath(nullptr);
+        projectFn = SGF.getASTContext().getGetAtKeyPath();
 
         auto keyPathTy = keyPathValue.getType().castTo<BoundGenericType>();
         assert(keyPathTy->getGenericArgs().size() == 2);
@@ -1790,10 +1793,10 @@ namespace {
       auto keyPathValue = KeyPath;
       FuncDecl *setFn;
       if (TypeKind == KPTK_WritableKeyPath) {
-        setFn = SGF.getASTContext().getSetAtWritableKeyPath(nullptr);
+        setFn = SGF.getASTContext().getSetAtWritableKeyPath();
         assert(base.isLValue());
       } else if (TypeKind == KPTK_ReferenceWritableKeyPath) {
-        setFn = SGF.getASTContext().getSetAtReferenceWritableKeyPath(nullptr);
+        setFn = SGF.getASTContext().getSetAtReferenceWritableKeyPath();
         base = makeBaseConsumableMaterializedRValue(SGF, loc, base);
       } else {
         llvm_unreachable("bad writable type kind");
@@ -2337,9 +2340,6 @@ namespace {
         return asImpl().emitUsingStorage(typeData);
       }
 
-      case AccessStrategy::BehaviorStorage:
-        return asImpl().emitUsingBehaviorStorage();
-
       case AccessStrategy::DirectToAccessor:
         return asImpl().emitUsingAccessor(strategy.getAccessor(), true);
 
@@ -2411,7 +2411,9 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
   LValue lv;
 
   auto access = getFormalAccessKind(accessKind);
-  auto strategy = var->getAccessStrategy(semantics, access, SGF.FunctionDC);
+  auto strategy = var->getAccessStrategy(semantics, access,
+                                         SGF.SGM.M.getSwiftModule(),
+                                         SGF.F.getResilienceExpansion());
 
   lv.addNonMemberVarComponent(SGF, loc, var, /*be lazy*/ None,
                               options, accessKind, strategy, formalRValueType);
@@ -2517,11 +2519,6 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
 
       if (address.getType().is<ReferenceStorageType>())
         LV.add<OwnershipComponent>(typeData);
-    }
-  
-    void emitUsingBehaviorStorage() {
-      // TODO: Behaviors aren't supported for non-instance properties yet.
-      llvm_unreachable("not implemented");
     }
   } emitter(SGF, loc, var, subs, accessKind, formalRValueType, options, *this);
 
@@ -2805,10 +2802,6 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
     
-  case AccessStrategy::BehaviorStorage:
-    // We should only access the behavior storage for initialization purposes.
-    assert(accessKind == SGFAccessKind::Write);
-    return SGFAccessKind::ReadWrite;
   }
   llvm_unreachable("bad access strategy");
 }
@@ -2845,7 +2838,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   auto accessSemantics = e->getAccessSemantics();
   AccessStrategy strategy =
     var->getAccessStrategy(accessSemantics,
-                           getFormalAccessKind(accessKind), SGF.FunctionDC);
+                           getFormalAccessKind(accessKind),
+                           SGF.SGM.M.getSwiftModule(),
+                           SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
@@ -2864,7 +2859,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = var->getAccessStrategy(
-          accessSemantics, getFormalAccessKind(accessKind), SGF.FunctionDC);
+          accessSemantics,
+          getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(),
+          SGF.F.getResilienceExpansion());
     }
   }
 
@@ -2994,17 +2992,6 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         LV.add<OwnershipComponent>(typeData);
       }
     }
-
-    // For behavior initializations, we should have set up a marking proxy that
-    // replaces the access path.
-    void emitUsingBehaviorStorage() {
-      auto addr = SGF.maybeEmitValueOfLocalVarDecl(Storage);
-      assert(addr && addr.isLValue());
-      LV = LValue();
-      auto typeData = getPhysicalStorageTypeData(SGF.SGM, AccessKind, Storage,
-                                                 FormalRValueType);
-      LV.add<ValueComponent>(addr, None, typeData);
-    }
   } emitter(SGF, loc, var, subs, isSuper, accessKind,
             formalRValueType, options, *this,
             /*indices for diags*/ nullptr, /*indices*/ PreparedArguments(),
@@ -3023,7 +3010,9 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto accessSemantics = e->getAccessSemantics();
   auto strategy =
     decl->getAccessStrategy(accessSemantics,
-                            getFormalAccessKind(accessKind), SGF.FunctionDC);
+                            getFormalAccessKind(accessKind),
+                            SGF.SGM.M.getSwiftModule(),
+                            SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
   bool isContextRead = isCurrentFunctionReadAccess(SGF);
@@ -3041,7 +3030,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = decl->getAccessStrategy(
-          accessSemantics, getFormalAccessKind(accessKind), SGF.FunctionDC);
+          accessSemantics,
+          getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(),
+          SGF.F.getResilienceExpansion());
     }
   }
 
@@ -3167,10 +3159,6 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
 
     void emitUsingStorage(LValueTypeData typeData) {
       llvm_unreachable("subscripts never have storage");
-    }
-
-    void emitUsingBehaviorStorage() {
-      llvm_unreachable("subscripts never have behaviors");
     }
   } emitter(SGF, loc, decl, subs, isSuper, accessKind, formalRValueType,
             options, *this, indexExprForDiagnostics, std::move(indices),
@@ -3325,7 +3313,9 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy =
     ivar->getAccessStrategy(semantics,
-                            getFormalAccessKind(accessKind), FunctionDC);
+                            getFormalAccessKind(accessKind),
+                            SGM.M.getSwiftModule(),
+                            F.getResilienceExpansion());
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType);
@@ -3906,7 +3896,9 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
   AccessStrategy strategy =
-    storage->getAccessStrategy(semantics, AccessKind::Read, FunctionDC);
+    storage->getAccessStrategy(semantics, AccessKind::Read,
+                               SGM.M.getSwiftModule(),
+                               F.getResilienceExpansion());
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {

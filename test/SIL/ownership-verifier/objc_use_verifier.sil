@@ -23,7 +23,7 @@ class Hoozit : Gizmo {
 }
 
 sil hidden @test_objc_super_method : $@convention(method) (@thick Hoozit.Type) -> () {
-bb0(%0 : @trivial $@thick Hoozit.Type):
+bb0(%0 : $@thick Hoozit.Type):
   %2 = upcast %0 : $@thick Hoozit.Type to $@thick Gizmo.Type
   %3 = objc_super_method %0 : $@thick Hoozit.Type, #Gizmo.runce!1.foreign : (Gizmo.Type) -> () -> (), $@convention(objc_method) (@objc_metatype Gizmo.Type) -> ()
   %4 = tuple()

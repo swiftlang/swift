@@ -326,10 +326,6 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
-def enable_experimental_property_behaviors :
-  Flag<["-"], "enable-experimental-property-behaviors">,
-  HelpText<"Enable experimental property behaviors">;
-  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -517,6 +513,11 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def build_module_from_parseable_interface :
+  Flag<["-"], "build-module-from-parseable-interface">,
+  HelpText<"Treat the (single) input as a swiftinterface and produce a module">,
+  ModeOpt;
+
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
@@ -546,9 +547,6 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
-
-def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
-  HelpText<"Enable key path resilience.">;
 
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,

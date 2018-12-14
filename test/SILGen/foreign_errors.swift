@@ -68,7 +68,7 @@ extension NSObject {
 // CHECK:   br bb6([[BOOL]] : $ObjCBool)
 // CHECK: bb2([[ERR:%.*]] : @owned $Error):
 // CHECK:   switch_enum %0 : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb4
-// CHECK: bb3([[UNWRAPPED_OUT:%.+]] : @trivial $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
+// CHECK: bb3([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
 // CHECK:   [[T0:%.*]] = function_ref @$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF : $@convention(thin) (@guaranteed Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
@@ -86,14 +86,14 @@ extension NSObject {
 // CHECK:   [[VALUE:%.*]] = struct ${{Bool|UInt8}} ([[BITS]] : $Builtin.Int{{[18]}})
 // CHECK:   [[BOOL:%.*]] = struct $ObjCBool ([[VALUE]] : ${{Bool|UInt8}})
 // CHECK:   br bb6([[BOOL]] : $ObjCBool)
-// CHECK: bb6([[BOOL:%.*]] : @trivial $ObjCBool):
+// CHECK: bb6([[BOOL:%.*]] : $ObjCBool):
 // CHECK:   return [[BOOL]] : $ObjCBool
 
   @objc func badDescription() throws -> String {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }
 // CHECK-LABEL: sil hidden [thunk] @$sSo8NSObjectC14foreign_errorsE14badDescriptionSSyKFTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSObject) -> @autoreleased Optional<NSString> {
-// CHECK: bb0([[UNOWNED_ARG0:%.*]] : @trivial $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[UNOWNED_ARG1:%.*]] : @unowned $NSObject):
+// CHECK: bb0([[UNOWNED_ARG0:%.*]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[UNOWNED_ARG1:%.*]] : @unowned $NSObject):
 // CHECK: [[ARG1:%.*]] = copy_value [[UNOWNED_ARG1]]
 // CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
 // CHECK: [[T0:%.*]] = function_ref @$sSo8NSObjectC14foreign_errorsE14badDescriptionSSyKF : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error Error)
@@ -111,7 +111,7 @@ extension NSObject {
 // CHECK: [[ERROR_BB]]([[ERR:%.*]] : @owned $Error):
 // CHECK:   switch_enum [[UNOWNED_ARG0]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9][0-9]*]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9][0-9]*]]
 //
-// CHECK: [[SOME_BB]]([[UNWRAPPED_OUT:%.+]] : @trivial $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
+// CHECK: [[SOME_BB]]([[UNWRAPPED_OUT:%.+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>):
 // CHECK:   [[T0:%.*]] = function_ref @$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF : $@convention(thin) (@guaranteed Error) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.some!enumelt.1, [[T1]] : $NSError
@@ -136,11 +136,11 @@ extension NSObject {
 // CHECK:   return [[T0]] : $Optional<NSString>
 
 // CHECK-LABEL: sil hidden [thunk] @$sSo8NSObjectC14foreign_errorsE7takeIntyySiKFTo : $@convention(objc_method) (Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSObject) -> ObjCBool
-// CHECK: bb0([[I:%[0-9]+]] : @trivial $Int, [[ERROR:%[0-9]+]] : @trivial $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[SELF:%[0-9]+]] : @unowned $NSObject)
+// CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[SELF:%[0-9]+]] : @unowned $NSObject)
   @objc func takeInt(_ i: Int) throws { }
 
 // CHECK-LABEL: sil hidden [thunk] @$sSo8NSObjectC14foreign_errorsE10takeDouble_3int7closureySd_S3iXEtKFTo : $@convention(objc_method) (Double, Int, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @convention(block) @noescape (Int) -> Int, NSObject) -> ObjCBool
-// CHECK: bb0([[D:%[0-9]+]] : @trivial $Double, [[INT:%[0-9]+]] : @trivial $Int, [[ERROR:%[0-9]+]] : @trivial $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[CLOSURE:%[0-9]+]] : @unowned $@convention(block) @noescape (Int) -> Int, [[SELF:%[0-9]+]] : @unowned $NSObject):
+// CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, [[CLOSURE:%[0-9]+]] : @unowned $@convention(block) @noescape (Int) -> Int, [[SELF:%[0-9]+]] : @unowned $NSObject):
   @objc func takeDouble(_ d: Double, int: Int, closure: (Int) -> Int) throws {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }

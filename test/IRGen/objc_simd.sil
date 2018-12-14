@@ -25,7 +25,7 @@ func forceStuff(x: float4, y: float3) -> (Float, Float, Float, Float) {
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float>)
 sil @simd_c_args : $@convention(c) (float4) -> float4 {
-entry(%x : @trivial $float4):
+entry(%x : $float4):
   return %x : $float4
 }
 
@@ -41,7 +41,7 @@ entry(%x : @trivial $float4):
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float>)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float>)
 sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
-entry(%x : @trivial $float3):
+entry(%x : $float3):
 // x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
 // x86_64: store <3 x float> %0, <3 x float>* [[COERCE]]
 // x86_64: [[COERCED:%.*]] = bitcast <3 x float>* [[COERCE]] to %T4simd6float3V*
@@ -60,7 +60,7 @@ entry(%x : @trivial $float3):
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}))
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
-entry(%x : @trivial $float4):
+entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4
   %y = apply %f(%x) : $@convention(c) (float4) -> float4
   return %y : $float4
@@ -78,7 +78,7 @@ entry(%x : @trivial $float4):
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float, float, float)
 sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
-entry(%x : @trivial $float3):
+entry(%x : $float3):
   %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3
   %y = apply %f(%x) : $@convention(c) (float3) -> float3
   return %y : $float3

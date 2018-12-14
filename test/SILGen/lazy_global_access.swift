@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s -check-prefix=MAIN
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s -check-prefix=LIBRARY
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s -check-prefix=MAIN
+// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s -check-prefix=LIBRARY
 
 // The following code is valid as a library or as a main source file. Script
 // variables should be accessed directly, whereas library global variables
@@ -22,3 +22,16 @@ func useProps() -> (Int, Int) {
   return (globalProp, Fooo.staticProp)
 }
 
+// rdar://46472759
+// We used to crash tying to double-emit the setter.
+struct Bar {
+  mutating func mutate() {}
+}
+func useGlobalBar() -> Bar {
+  globalBar = Bar()
+  globalBar.mutate()
+  return globalBar
+}
+private var globalBar = Bar() {
+  willSet {}
+}
