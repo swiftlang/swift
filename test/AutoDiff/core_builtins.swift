@@ -20,16 +20,9 @@ func evaldiff<T: Differentiable, U: Differentiable>(_ f: @autodiff (T) -> U, _ x
 // CHECK-SIL:   store [[DIFFERENTIAL]] to [init] [[JVP_RES_BUF_1]] : $*@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
 // CHECK-SIL:   [[JVP_RES_BUF_0:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 0
 // CHECK-SIL:   [[JVP_RES_BUF_1:%.*]] = tuple_element_addr [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector), 1
-// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = load_borrow [[JVP_RES_BUF_1]] : $*@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
-// CHECK-SIL:   [[ORIG_RES_BUF_NEW:%.*]] = alloc_stack $U
-// CHECK-SIL:   copy_addr [[JVP_RES_BUF_0]] to [initialization] [[ORIG_RES_BUF_NEW]] : $*U
-// CHECK-SIL:   [[DIFFERENTIAL_COPY:%.*]] = copy_value [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
-// CHECK-SIL:   copy_addr [take] [[ORIG_RES_BUF_NEW]] to [initialization] [[ORIG_RES_BUF]] : $*U
-// CHECK-SIL:   dealloc_stack [[ORIG_RES_BUF_NEW]] : $*U
-// CHECK-SIL:   end_borrow [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
+// CHECK-SIL:   [[DIFFERENTIAL:%.*]] = load [take] [[JVP_RES_BUF_1]] : $*@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
+// CHECK-SIL:   copy_addr [take] [[JVP_RES_BUF_0]] to [initialization] [[ORIG_RES_BUF]] : $*U
 // CHECK-SIL:   dealloc_stack [[JVP_RES_BUF]] : $*(U, @callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector)
+// CHECK-SIL:   destroy_addr [[ORIG_FN_ARG_COPY]] : $*T
 // CHECK-SIL:   dealloc_stack [[ORIG_FN_ARG_COPY]] : $*T
-// CHECK-SIL:   return [[DIFFERENTIAL_COPY]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
-
-
-
+// CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector

@@ -1048,11 +1048,13 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   auto *argTuple = cast<TupleExpr>(argument);
   assert(argTuple->getNumElements() == 2);
   auto origFnVal =
-      SGF.emitRValueAsSingleValue(argTuple->getElement(0)).getUnmanagedValue();
+      SGF.emitRValueAsSingleValue(argTuple->getElement(0))
+          .borrow(SGF, loc).forward(SGF);
   auto origFnArgVal =
-      SGF.emitRValueAsSingleValue(argTuple->getElement(1)).forward(SGF);
+      SGF.emitRValueAsSingleValue(argTuple->getElement(1))
+          .borrow(SGF, loc).forward(SGF);
   auto assocFn = SGF.B.createAutoDiffFunctionExtract(
-          loc, kind, /*differentiationOrder*/ 1, origFnVal);
+      loc, kind, /*differentiationOrder*/ 1, origFnVal);
   auto assocFnType = assocFn->getType().getAs<SILFunctionType>();
   assert(assocFnType->getNumResults() == 2);
   // Emit an l-value when the function has indirect results.
@@ -1069,13 +1071,14 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
                       StoreOwnershipQualifier::Init);
-    return ManagedValue::forLValue(indResBuffer);
+    return SGF.manageBufferForExprResult(
+        indResBuffer, SGF.getTypeLowering(indResBuffer->getType()), C);
   }
   // Emit an r-value tuple otherwise.
   assert(origFnArgVal->getType().isObject());
   auto resultTuple =
       SGF.B.createApply(loc, assocFn, {origFnArgVal}, /*isNonThrowing*/ false);
-  return ManagedValue::forUnmanaged(resultTuple);
+  return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
 static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
