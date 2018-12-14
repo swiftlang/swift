@@ -64,8 +64,11 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 
 // Underlying storage representation for medium and large data.
 // Inlinability strategy: methods from here should not inline into InlineSlice or LargeSlice unless trivial.
+// NOTE: older overlays called this class _DataStorage. The two must
+// coexist without a conflicting ObjC class name, so it was renamed.
+// The old name must not be used in the new runtime.
 @usableFromInline
-internal final class _DataStorage {
+internal final class __DataStorage {
     @usableFromInline static let maxSize = Int.max >> 1
     @usableFromInline static let vmOpsThreshold = NSPageSize() * 4
     
@@ -83,7 +86,7 @@ internal final class _DataStorage {
         var dest = dest_
         var source = source_
         var num = num_
-        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | Int(bitPattern: dest)) & (NSPageSize() - 1)) == 0 {
+        if __DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | Int(bitPattern: dest)) & (NSPageSize() - 1)) == 0 {
             let pages = NSRoundDownToMultipleOfPageSize(num)
             NSCopyMemoryPages(source!, dest, pages)
             source = source!.advanced(by: pages)
@@ -146,7 +149,7 @@ internal final class _DataStorage {
     
     @inlinable // This is inlinable as trivially computable.
     var isExternallyOwned: Bool {
-        // all _DataStorages will have some sort of capacity, because empty cases hit the .empty enum _Representation
+        // all __DataStorages will have some sort of capacity, because empty cases hit the .empty enum _Representation
         // anything with 0 capacity means that we have not allocated this pointer and concequently mutation is not ours to make.
         return _capacity == 0
     }
@@ -158,8 +161,8 @@ internal final class _DataStorage {
         if newLength == 0 {
             if isExternallyOwned {
                 let newCapacity = malloc_good_size(_length)
-                let newBytes = _DataStorage.allocate(newCapacity, false)
-                _DataStorage.move(newBytes!, _bytes!, _length)
+                let newBytes = __DataStorage.allocate(newCapacity, false)
+                __DataStorage.move(newBytes!, _bytes!, _length)
                 _freeBytes()
                 _bytes = newBytes
                 _capacity = newCapacity
@@ -167,9 +170,9 @@ internal final class _DataStorage {
             }
         } else if isExternallyOwned {
             let newCapacity = malloc_good_size(newLength)
-            let newBytes = _DataStorage.allocate(newCapacity, clear)
+            let newBytes = __DataStorage.allocate(newCapacity, clear)
             if let bytes = _bytes {
-                _DataStorage.move(newBytes!, bytes, _length)
+                __DataStorage.move(newBytes!, bytes, _length)
             }
             _freeBytes()
             _bytes = newBytes
@@ -178,27 +181,27 @@ internal final class _DataStorage {
             _needToZero = true
         } else {
             let cap = _capacity
-            var additionalCapacity = (newLength >> (_DataStorage.vmOpsThreshold <= newLength ? 2 : 1))
+            var additionalCapacity = (newLength >> (__DataStorage.vmOpsThreshold <= newLength ? 2 : 1))
             if Int.max - additionalCapacity < newLength {
                 additionalCapacity = 0
             }
             var newCapacity = malloc_good_size(Swift.max(cap, newLength + additionalCapacity))
             let origLength = _length
-            var allocateCleared = clear && _DataStorage.shouldAllocateCleared(newCapacity)
+            var allocateCleared = clear && __DataStorage.shouldAllocateCleared(newCapacity)
             var newBytes: UnsafeMutableRawPointer? = nil
             if _bytes == nil {
-                newBytes = _DataStorage.allocate(newCapacity, allocateCleared)
+                newBytes = __DataStorage.allocate(newCapacity, allocateCleared)
                 if newBytes == nil {
                     /* Try again with minimum length */
-                    allocateCleared = clear && _DataStorage.shouldAllocateCleared(newLength)
-                    newBytes = _DataStorage.allocate(newLength, allocateCleared)
+                    allocateCleared = clear && __DataStorage.shouldAllocateCleared(newLength)
+                    newBytes = __DataStorage.allocate(newLength, allocateCleared)
                 }
             } else {
                 let tryCalloc = (origLength == 0 || (newLength / origLength) >= 4)
                 if allocateCleared && tryCalloc {
-                    newBytes = _DataStorage.allocate(newCapacity, true)
+                    newBytes = __DataStorage.allocate(newCapacity, true)
                     if let newBytes = newBytes {
-                        _DataStorage.move(newBytes, _bytes!, origLength)
+                        __DataStorage.move(newBytes, _bytes!, origLength)
                         _freeBytes()
                     }
                 }
@@ -206,9 +209,9 @@ internal final class _DataStorage {
                 if newBytes == nil {
                     allocateCleared = false
                     if _deallocator != nil {
-                        newBytes = _DataStorage.allocate(newCapacity, true)
+                        newBytes = __DataStorage.allocate(newCapacity, true)
                         if let newBytes = newBytes {
-                            _DataStorage.move(newBytes, _bytes!, origLength)
+                            __DataStorage.move(newBytes, _bytes!, origLength)
                             _freeBytes()
                         }
                     } else {
@@ -218,11 +221,11 @@ internal final class _DataStorage {
                 /* Try again with minimum length */
                 if newBytes == nil {
                     newCapacity = malloc_good_size(newLength)
-                    allocateCleared = clear && _DataStorage.shouldAllocateCleared(newCapacity)
+                    allocateCleared = clear && __DataStorage.shouldAllocateCleared(newCapacity)
                     if allocateCleared && tryCalloc {
-                        newBytes = _DataStorage.allocate(newCapacity, true)
+                        newBytes = __DataStorage.allocate(newCapacity, true)
                         if let newBytes = newBytes {
-                            _DataStorage.move(newBytes, _bytes!, origLength)
+                            __DataStorage.move(newBytes, _bytes!, origLength)
                             _freeBytes()
                         }
                     }
@@ -293,10 +296,46 @@ internal final class _DataStorage {
             ensureUniqueBufferReference(growingTo: newLength, clear: false)
         }
         _length = newLength
-        _DataStorage.move(_bytes!.advanced(by: origLength), bytes, length)
+        __DataStorage.move(_bytes!.advanced(by: origLength), bytes, length)
     }
     
+<<<<<<< HEAD
     @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is trivially computed.
+=======
+    // fast-path for appending directly from another data storage
+    @inlinable
+    func append(_ otherData: __DataStorage, startingAt start: Int, endingAt end: Int) {
+        let otherLength = otherData.length
+        if otherLength == 0 { return }
+        if let bytes = otherData.bytes {
+            append(bytes.advanced(by: start), length: end - start)
+        }
+    }
+    
+    @inlinable
+    func append(_ otherData: Data) {
+        guard otherData.count > 0 else { return }
+        otherData.withUnsafeBytes {
+        append($0.baseAddress!, length: $0.count)
+    }
+    }
+    
+    @inlinable
+    func increaseLength(by extraLength: Int) {
+        if extraLength == 0 { return }
+        
+        let origLength = _length
+        let newLength = origLength + extraLength
+        if _capacity < newLength || _bytes == nil {
+            ensureUniqueBufferReference(growingTo: newLength, clear: true)
+        } else if _needToZero {
+            memset(_bytes!.advanced(by: origLength), 0, extraLength)
+        }
+        _length = newLength
+    }
+
+    @inlinable
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
     func get(_ index: Int) -> UInt8 {
         return _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
     }
@@ -313,7 +352,27 @@ internal final class _DataStorage {
         UnsafeMutableRawBufferPointer(start: pointer, count: range.upperBound - range.lowerBound).copyMemory(from: offsetPointer)
     }
 
+<<<<<<< HEAD
     @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
+=======
+    @inlinable
+    func replaceBytes(in range: NSRange, with bytes: UnsafeRawPointer?) {
+        if range.length == 0 { return }
+        if _length < range.location + range.length {
+            let newLength = range.location + range.length
+            if _capacity < newLength {
+                ensureUniqueBufferReference(growingTo: newLength, clear: false)
+            }
+            _length = newLength
+        } else {
+            ensureUniqueBufferReference()
+        }
+        __DataStorage.move(_bytes!.advanced(by: range.location - _offset), bytes!, range.length)
+
+    }
+    
+    @inlinable
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
     func replaceBytes(in range_: NSRange, with replacementBytes: UnsafeRawPointer?, length replacementLength: Int) {
         let range = NSRange(location: range_.location - _offset, length: range_.length)
         let currentLength = _length
@@ -364,14 +423,14 @@ internal final class _DataStorage {
 
     @usableFromInline // This is not @inlinable as a non-trivial, non-convenience initializer.
     init(length: Int) {
-        precondition(length < _DataStorage.maxSize)
+        precondition(length < __DataStorage.maxSize)
         var capacity = (length < 1024 * 1024 * 1024) ? length + (length >> 2) : length
-        if _DataStorage.vmOpsThreshold <= capacity {
+        if __DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         
-        let clear = _DataStorage.shouldAllocateCleared(length)
-        _bytes = _DataStorage.allocate(capacity, clear)!
+        let clear = __DataStorage.shouldAllocateCleared(length)
+        _bytes = __DataStorage.allocate(capacity, clear)!
         _capacity = capacity
         _needToZero = !clear
         _length = 0
@@ -382,12 +441,12 @@ internal final class _DataStorage {
     @usableFromInline // This is not @inlinable as a non-convience initializer.
     init(capacity capacity_: Int = 0) {
         var capacity = capacity_
-        precondition(capacity < _DataStorage.maxSize)
-        if _DataStorage.vmOpsThreshold <= capacity {
+        precondition(capacity < __DataStorage.maxSize)
+        if __DataStorage.vmOpsThreshold <= capacity {
             capacity = NSRoundUpToMultipleOfPageSize(capacity)
         }
         _length = 0
-        _bytes = _DataStorage.allocate(capacity, false)!
+        _bytes = __DataStorage.allocate(capacity, false)!
         _capacity = capacity
         _needToZero = true
         _offset = 0
@@ -395,35 +454,35 @@ internal final class _DataStorage {
     
     @usableFromInline // This is not @inlinable as a non-convience initializer.
     init(bytes: UnsafeRawPointer?, length: Int) {
-        precondition(length < _DataStorage.maxSize)
+        precondition(length < __DataStorage.maxSize)
         _offset = 0
         if length == 0 {
             _capacity = 0
             _length = 0
             _needToZero = false
             _bytes = nil
-        } else if _DataStorage.vmOpsThreshold <= length {
+        } else if __DataStorage.vmOpsThreshold <= length {
             _capacity = length
             _length = length
             _needToZero = true
-            _bytes = _DataStorage.allocate(length, false)!
-            _DataStorage.move(_bytes!, bytes, length)
+            _bytes = __DataStorage.allocate(length, false)!
+            __DataStorage.move(_bytes!, bytes, length)
         } else {
             var capacity = length
-            if _DataStorage.vmOpsThreshold <= capacity {
+            if __DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length
-            _bytes = _DataStorage.allocate(capacity, false)!
+            _bytes = __DataStorage.allocate(capacity, false)!
             _capacity = capacity
             _needToZero = true
-            _DataStorage.move(_bytes!, bytes, length)
+            __DataStorage.move(_bytes!, bytes, length)
         }
     }
     
     @usableFromInline // This is not @inlinable as a non-convience initializer.
     init(bytes: UnsafeMutableRawPointer?, length: Int, copy: Bool, deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?, offset: Int) {
-        precondition(length < _DataStorage.maxSize)
+        precondition(length < __DataStorage.maxSize)
         _offset = offset
         if length == 0 {
             _capacity = 0
@@ -440,25 +499,25 @@ internal final class _DataStorage {
             _needToZero = false
             _bytes = bytes
             _deallocator = deallocator
-        } else if _DataStorage.vmOpsThreshold <= length {
+        } else if __DataStorage.vmOpsThreshold <= length {
             _capacity = length
             _length = length
             _needToZero = true
-            _bytes = _DataStorage.allocate(length, false)!
-            _DataStorage.move(_bytes!, bytes, length)
+            _bytes = __DataStorage.allocate(length, false)!
+            __DataStorage.move(_bytes!, bytes, length)
             if let dealloc = deallocator {
                 dealloc(bytes!, length)
             }
         } else {
             var capacity = length
-            if _DataStorage.vmOpsThreshold <= capacity {
+            if __DataStorage.vmOpsThreshold <= capacity {
                 capacity = NSRoundUpToMultipleOfPageSize(capacity)
             }
             _length = length
-            _bytes = _DataStorage.allocate(capacity, false)!
+            _bytes = __DataStorage.allocate(capacity, false)!
             _capacity = capacity
             _needToZero = true
-            _DataStorage.move(_bytes!, bytes, length)
+            __DataStorage.move(_bytes!, bytes, length)
             if let dealloc = deallocator {
                 dealloc(bytes!, length)
             }
@@ -517,9 +576,15 @@ internal final class _DataStorage {
         _freeBytes()
     }
     
+<<<<<<< HEAD
     @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is trivially computed.
     func mutableCopy(_ range: Range<Int>) -> _DataStorage {
         return _DataStorage(bytes: _bytes?.advanced(by: range.lowerBound - _offset), length: range.upperBound - range.lowerBound, copy: true, deallocator: nil, offset: range.lowerBound)
+=======
+    @inlinable
+    func mutableCopy(_ range: Range<Int>) -> __DataStorage {
+        return __DataStorage(bytes: _bytes?.advanced(by: range.lowerBound - _offset), length: range.upperBound - range.lowerBound, copy: true, deallocator: nil, offset: range.lowerBound)
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
     }
 
     @inlinable // This is @inlinable despite escaping the _DataStorage boundary layer because it is generic and trivially computed.
@@ -541,14 +606,14 @@ internal final class _DataStorage {
     }
 }
 
-// NOTE: older runtimes called this _NSSwiftData. The two must
+// NOTE: older overlays called this _NSSwiftData. The two must
 // coexist, so it was renamed. The old name must not be used in the new
 // runtime.
 internal class __NSSwiftData : NSData {
-    var _backing: _DataStorage!
+    var _backing: __DataStorage!
     var _range: Range<Data.Index>!
 
-    convenience init(backing: _DataStorage, range: Range<Data.Index>) {
+    convenience init(backing: __DataStorage, range: Range<Data.Index>) {
         self.init()
         _backing = backing
         _range = range
@@ -840,8 +905,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     internal struct InlineSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
+<<<<<<< HEAD
         @usableFromInline var slice: Range<HalfInt>
         @usableFromInline var storage: _DataStorage
+=======
+        @usableFromInline
+        var slice: Range<HalfInt>
+        @usableFromInline
+        var storage: __DataStorage
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
 
         @inlinable // This is @inlinable as trivially computable.
         static func canStore(count: Int) -> Bool {
@@ -851,32 +923,32 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
             assert(buffer.count < HalfInt.max)
-            self.init(_DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
+            self.init(__DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(capacity: Int) {
             assert(capacity < HalfInt.max)
-            self.init(_DataStorage(capacity: capacity), count: 0)
+            self.init(__DataStorage(capacity: capacity), count: 0)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(count: Int) {
             assert(count < HalfInt.max)
-            self.init(_DataStorage(length: count), count: count)
+            self.init(__DataStorage(length: count), count: count)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData) {
             assert(inline.count < HalfInt.max)
-            self.init(inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
+            self.init(inline.withUnsafeBytes { return __DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData, range: Range<Int>) {
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
-            self.init(inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }, range: range)
+            self.init(inline.withUnsafeBytes { return __DataStorage(bytes: $0.baseAddress, length: $0.count) }, range: range)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
@@ -893,15 +965,25 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             self.init(large.storage, range: range)
         }
 
+<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
+=======
+        @inlinable
+        init(_ storage: __DataStorage, count: Int) {
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             assert(count < HalfInt.max)
             self.storage = storage
             slice = 0..<HalfInt(count)
         }
 
+<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, range: Range<Int>) {
+=======
+        @inlinable
+        init(_ storage: __DataStorage, range: Range<Int>) {
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
             self.storage = storage
@@ -1086,28 +1168,39 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     internal struct LargeSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
+<<<<<<< HEAD
         @usableFromInline var slice: RangeReference
         @usableFromInline var storage: _DataStorage
+=======
+        @usableFromInline
+        var slice: RangeReference
+        @usableFromInline
+        var storage: __DataStorage
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
-            self.init(_DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
+            self.init(__DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(capacity: Int) {
-            self.init(_DataStorage(capacity: capacity), count: 0)
+            self.init(__DataStorage(capacity: capacity), count: 0)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(count: Int) {
-            self.init(_DataStorage(length: count), count: count)
+            self.init(__DataStorage(length: count), count: count)
         }
 
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData) {
+<<<<<<< HEAD
             let storage = inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }
             self.init(storage, count: inline.count)
+=======
+            self.init(inline.withUnsafeBytes { return __DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
         }
 
         @inlinable // This is @inlinable as a trivial initializer.
@@ -1116,8 +1209,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             self.slice = RangeReference(slice.range)
         }
 
+<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
+=======
+        @inlinable
+        init(_ storage: __DataStorage, count: Int) {
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             self.storage = storage
             self.slice = RangeReference(0..<count)
         }
@@ -1286,7 +1384,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 self = .inline(InlineData(buffer))
             } else {
                 let count = buffer.count
-                let storage = _DataStorage(bytes: UnsafeMutableRawPointer(mutating: buffer.baseAddress), length: count, copy: false, deallocator: { _, _ in
+                let storage = __DataStorage(bytes: UnsafeMutableRawPointer(mutating: buffer.baseAddress), length: count, copy: false, deallocator: { _, _ in
                     _fixLifetime(owner)
                 }, offset: 0)
                 if InlineSlice.canStore(count: count) {
@@ -1323,8 +1421,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
+<<<<<<< HEAD
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
+=======
+        @inlinable
+        init(_ storage: __DataStorage, count: Int) {
+>>>>>>> [Stdlib][Overlays] Rename various classes to avoid conflicting ObjC names.
             if count == 0 {
                 self = .empty
             } else if InlineData.canStore(count: count) {
@@ -1974,7 +2077,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             deallocator._deallocator(bytes, count)
             _representation = .empty
         } else {
-            _representation = _Representation(_DataStorage(bytes: bytes, length: count, copy: false, deallocator: whichDeallocator, offset: 0), count: count)
+            _representation = _Representation(__DataStorage(bytes: bytes, length: count, copy: false, deallocator: whichDeallocator, offset: 0), count: count)
         }
     }
     
@@ -2037,9 +2140,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             let providesConcreteBacking = (reference as AnyObject)._providesConcreteBacking?() ?? false
 #endif
             if providesConcreteBacking {
-                _representation = _Representation(_DataStorage(immutableReference: reference.copy() as! NSData, offset: 0), count: length)
+                _representation = _Representation(__DataStorage(immutableReference: reference.copy() as! NSData, offset: 0), count: length)
             } else {
-                _representation = _Representation(_DataStorage(customReference: reference.copy() as! NSData, offset: 0), count: length)
+                _representation = _Representation(__DataStorage(customReference: reference.copy() as! NSData, offset: 0), count: length)
             }
         }
         

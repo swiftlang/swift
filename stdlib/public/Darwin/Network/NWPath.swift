@@ -225,6 +225,11 @@ public struct NWPath : Equatable, CustomDebugStringConvertible {
 /// The paths will watch the state of multiple interfaces, and allows the
 /// application to enumerate the available interfaces for use in creating connections
 /// or listeners bound to specific interfaces.
+// NOTE: older overlays had Network.NWPathMonitor as the ObjC name.
+// The two must coexist, so it was renamed. The old name must not be
+// used in the new runtime. _TtC7Network14_NWPathMonitor is the
+// mangled name for Network._NWPathMonitor.
+@_objcRuntimeName(_TtC7Network14_NWPathMonitor)
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
 public final class NWPathMonitor {
 

@@ -10,27 +10,27 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper around _RawSetStorage that provides most of the
+/// A wrapper around __RawSetStorage that provides most of the
 /// implementation of Set.
 @usableFromInline
 @_fixed_layout
 internal struct _NativeSet<Element: Hashable> {
-  /// See the comments on _RawSetStorage and its subclasses to understand why we
+  /// See the comments on __RawSetStorage and its subclasses to understand why we
   /// store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawSetStorage
+  internal var _storage: __RawSetStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   @inline(__always)
   internal init() {
-    self._storage = _RawSetStorage.empty
+    self._storage = __RawSetStorage.empty
   }
 
   /// Constructs a native set adopting the given storage.
   @inlinable
   @inline(__always)
-  internal init(_ storage: __owned _RawSetStorage) {
+  internal init(_ storage: __owned __RawSetStorage) {
     self._storage = storage
   }
 
@@ -41,12 +41,12 @@ internal struct _NativeSet<Element: Hashable> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet) {
+  internal init(_ cocoa: __owned __CocoaSet) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
+  internal init(_ cocoa: __owned __CocoaSet, capacity: Int) {
     _internalInvariant(cocoa.count <= capacity)
     self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
     for element in cocoa {
@@ -439,7 +439,7 @@ extension _NativeSet {
 
 #if _runtime(_ObjC)
   @inlinable
-  func isEqual(to other: _CocoaSet) -> Bool {
+  func isEqual(to other: __CocoaSet) -> Bool {
     if self.count != other.count { return false }
 
     defer { _fixLifetime(self) }

@@ -838,13 +838,13 @@ extension _StringObject {
     }
   }
 
-  internal var nativeStorage: _StringStorage {
+  internal var nativeStorage: __StringStorage {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
       guard case .native(let storage) = _variant else {
         _internalInvariantFailure()
       }
-      return _unsafeUncheckedDowncast(storage, to: _StringStorage.self)
+      return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
 #else
       _internalInvariant(hasNativeStorage)
       return Builtin.reinterpretCast(largeAddressBits)
@@ -852,13 +852,13 @@ extension _StringObject {
     }
   }
 
-  internal var sharedStorage: _SharedStringStorage {
+  internal var sharedStorage: __SharedStringStorage {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
       guard case .native(let storage) = _variant else {
         _internalInvariantFailure()
       }
-      return _unsafeUncheckedDowncast(storage, to: _SharedStringStorage.self)
+      return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
 #else
       _internalInvariant(largeFastIsShared && !largeIsCocoa)
       _internalInvariant(hasSharedStorage)
@@ -982,7 +982,7 @@ extension _StringObject {
   }
 
   @inline(__always)
-  internal init(_ storage: _StringStorage) {
+  internal init(_ storage: __StringStorage) {
 #if arch(i386) || arch(arm)
     self.init(
       variant: .native(storage),
@@ -996,7 +996,7 @@ extension _StringObject {
 #endif
   }
 
-  internal init(_ storage: _SharedStringStorage) {
+  internal init(_ storage: __SharedStringStorage) {
 #if arch(i386) || arch(arm)
     self.init(
       variant: .native(storage),
@@ -1100,7 +1100,7 @@ extension _StringObject {
       }
       if _countAndFlags.isNativelyStored {
         let anyObj = Builtin.reinterpretCast(largeAddressBits) as AnyObject
-        _internalInvariant(anyObj is _StringStorage)
+        _internalInvariant(anyObj is __StringStorage)
       }
     }
 
