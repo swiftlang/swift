@@ -27,6 +27,7 @@
 
 // SWIFT_ENABLE_TENSORFLOW
 #include "../lib/SILOptimizer/Mandatory/TFDeabstraction.h"
+#include "../lib/SILOptimizer/Mandatory/TFUtilities.h"
 
 using namespace swift;
 
@@ -66,6 +67,9 @@ class SILPerformanceInliner {
   ColdBlockInfo CBI;
 
   OptRemark::Emitter &ORE;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  tf::TensorFunctionClassifier TFC;
 
   /// The following constants define the cost model for inlining. Some constants
   /// are also defined in ShortestPathAnalysis.
@@ -851,6 +855,37 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (AppliesToInline.empty())
     return false;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // We should disable inlining for special functions if the any of following
+  // conditions hold:
+  //  - Is this a function in a TensorFlow module?
+  //  - Does this operate on Tensor values?
+  //
+  // Helper that returns true if function belongs to TensorFlow module.
+  auto isTensorFlowFunction = [](SILFunction *func) {
+    return func->getName().startswith("$s10TensorFlow") ||
+           func->getName().startswith("$sSf10TensorFlow");
+  };
+  bool hasTensorOps = isTensorFlowFunction(Caller);
+  if (!hasTensorOps) {
+    for (SILBasicBlock &bb : *Caller) {
+      for (SILInstruction &inst : bb) {
+        if (auto graphInst = dyn_cast<GraphOperationInst>(&inst)) {
+          hasTensorOps = true;
+          break;
+        }
+        if (auto funcRef = dyn_cast<FunctionRefInst>(&inst)) {
+          SILFunction *func = funcRef->getReferencedFunction();
+          if (TFC.containsTensorFlowValue(func->getLoweredFunctionType()) ||
+              isTensorFlowFunction(func)) {
+            hasTensorOps = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // Second step: do the actual inlining.
   for (auto AI : AppliesToInline) {
     SILFunction *Callee = AI.getReferencedFunction();
@@ -859,7 +894,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     if (!Callee->shouldOptimize()) {
       continue;
     }
-    
+
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
@@ -880,7 +915,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
                        AI.getSubstitutionMap(), OpenedArchetypesTracker);
 
     // SWIFT_ENABLE_TENSORFLOW
-    if (swift::tf::TFDeabstractionHelper::isSpecialNoInlineCallee(AI, *Callee))
+    if (hasTensorOps &&
+        swift::tf::TFDeabstractionHelper::isSpecialNoInlineCallee(AI, *Callee))
       continue;
 
     // We've already determined we should be able to inline this, so
