@@ -3469,6 +3469,150 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.StringEqualityMismatch") {
   expectTrue(v == 42 || v == 23)
 }
 
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.OptionalDowncastFailure") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectNotNil(nsd as? [NSString: NSNumber])
+  expectNotNil(nsd as? [NSString: NSObject])
+  expectNotNil(nsd as? [NSObject: NSNumber])
+  expectNil(nsd as? [NSNumber: NSObject])
+  expectNil(nsd as? [NSObject: NSString])
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Keys") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  let bridged = nsd as! [NSNumber: NSObject]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Values") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+
+  let bridged = nsd as! [NSObject: NSString]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Both") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  let bridged = nsd as! [NSNumber: NSString]
+  expectCrashLater()
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  _ = bridged.first
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Verbatim.ForcedDowncastFailure.Partial")
+  .code {
+  let nsd = NSMutableDictionary(
+    objects: (0..<10).map { "\($0)" as NSString },
+    forKeys: (0..<10).map { $0 as NSNumber })
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  let bridged = nsd as! [NSNumber: NSString]
+  // The forced downcast succeeds unconditionally; the cast is instead verified
+  // when we access individual elements.
+  for i in 0 ..< 10 {
+    expectEqual("\(i)" as NSString, bridged[i as NSNumber])
+  }
+  // The item with the unexpected key is only accessible when we iterate over
+  // the elements. There should be a trap when we get to it.
+  expectCrashLater()
+  for (key, value) in bridged {
+    _ = key
+    _ = value
+  }
+}
+
+DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DowncastFailure.LeakTest") {
+  let nsd = NSMutableDictionary(
+    objects: (0..<100).map { TestObjCEquatableValueTy($0) },
+    forKeys: (0..<100).map { TestObjCKeyTy($0) })
+  expectNotNil(nsd as? [TestObjCKeyTy: TestObjCEquatableValueTy])
+  expectNotNil(nsd as? [TestObjCKeyTy: NSObject])
+  expectNotNil(nsd as? [NSObject: TestObjCEquatableValueTy])
+
+  // Inserting a single key-value pair of a different type should make all these
+  // downcasts fail.
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  expectNil(nsd as? [TestObjCKeyTy: TestObjCEquatableValueTy])
+  expectNil(nsd as? [TestObjCKeyTy: NSObject])
+  expectNil(nsd as? [NSObject: TestObjCEquatableValueTy])
+  // No crash test here -- we're relying on the leak tests in tearDown.
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.OptionalDowncastFailure") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectNotNil(nsd as? [String: Int])
+  expectNotNil(nsd as? [String: NSObject])
+  expectNotNil(nsd as? [NSObject: Int])
+  expectNil(nsd as? [Int: NSObject])
+  expectNil(nsd as? [NSObject: String])
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Keys") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [Int: NSObject]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Values") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [NSObject: String]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.ForcedDowncastFailure.Both") {
+  let nsd = NSDictionary(
+    objects: [1 as NSNumber, 2 as NSNumber, 3 as NSNumber],
+    forKeys: ["One" as NSString, "Two" as NSString, "Three" as NSString])
+  expectCrashLater()
+  _ = nsd as! [Int: String]
+}
+
+DictionaryTestSuite
+  .test("BridgedFromObjC.Nonverbatim.DowncastFailure.LeakTest") {
+  let nsd = NSMutableDictionary(
+    objects: (0..<100).map { TestObjCEquatableValueTy($0) },
+    forKeys: (0..<100).map { TestObjCKeyTy($0) })
+  expectNotNil(nsd as? [TestBridgedKeyTy: TestBridgedEquatableValueTy])
+  expectNotNil(nsd as? [TestBridgedKeyTy: NSObject])
+  expectNotNil(nsd as? [NSObject: TestBridgedEquatableValueTy])
+
+  // Inserting a single key-value pair of a different type should make all these
+  // downcasts fail.
+  nsd.setObject("cuckoo" as NSString, forKey: "cuckoo" as NSString)
+  expectNil(nsd as? [TestBridgedKeyTy: TestBridgedEquatableValueTy])
+  expectNil(nsd as? [TestBridgedKeyTy: NSObject])
+  expectNil(nsd as? [NSObject: TestBridgedEquatableValueTy])
+  // No crash test here -- we're relying on the leak tests in tearDown.
+}
+
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
