@@ -3366,6 +3366,20 @@ namespace {
       assert(!isa<ImplicitConversionExpr>(expr) &&
              "ImplicitConversionExpr should be eliminated in walkToExprPre");
 
+      auto buildMemberRef = [&](Type memberType, Expr *base, SourceLoc dotLoc,
+                                ConcreteDeclRef member, DeclNameLoc memberLoc,
+                                bool implicit) -> Expr * {
+        auto *memberRef = new (TC.Context)
+            MemberRefExpr(base, dotLoc, member, memberLoc, implicit);
+
+        if (memberType) {
+          memberRef->setType(memberType);
+          return CS.cacheType(memberRef);
+        }
+
+        return memberRef;
+      };
+
       // A DotSyntaxCallExpr is a member reference that has already been
       // type-checked down to a call; turn it back into an overloaded
       // member reference expression.
@@ -3375,21 +3389,23 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotCall->getBase()));
-          return new (TC.Context) MemberRefExpr(dotCall->getBase(),
-                                                dotCall->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotCall->getType(),
+                                dotCall->getBase(),
+                                dotCall->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
 
       if (auto *dynamicMember = dyn_cast<DynamicMemberRefExpr>(expr)) {
         if (auto memberRef = dynamicMember->getMember()) {
           assert(!isa<ImplicitConversionExpr>(dynamicMember->getBase()));
-          return new (TC.Context) MemberRefExpr(dynamicMember->getBase(),
-                                                dynamicMember->getDotLoc(),
-                                                memberRef,
-                                                dynamicMember->getNameLoc(),
-                                                expr->isImplicit());
+          return buildMemberRef(dynamicMember->getType(),
+                                dynamicMember->getBase(),
+                                dynamicMember->getDotLoc(),
+                                memberRef,
+                                dynamicMember->getNameLoc(),
+                                expr->isImplicit());
         }
       }
 
@@ -3403,10 +3419,11 @@ namespace {
                                                        memberLoc);
         if (memberAndFunctionRef.first) {
           assert(!isa<ImplicitConversionExpr>(dotIgnored->getLHS()));
-          return new (TC.Context) MemberRefExpr(dotIgnored->getLHS(),
-                                                dotIgnored->getDotLoc(),
-                                                memberAndFunctionRef.first,
-                                                memberLoc, expr->isImplicit());
+          return buildMemberRef(dotIgnored->getType(),
+                                dotIgnored->getLHS(),
+                                dotIgnored->getDotLoc(),
+                                memberAndFunctionRef.first,
+                                memberLoc, expr->isImplicit());
         }
       }
       return expr;
