@@ -685,14 +685,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                             UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) //len  //enum
         @usableFromInline
         var bytes: Buffer
-#elseif arch(i386) || arch(arm) || arch(arm64_32)
+#elseif arch(i386) || arch(arm)
         @usableFromInline
         typealias Buffer = (UInt8, UInt8, UInt8, UInt8,
                             UInt8, UInt8) //len  //enum
         @usableFromInline
         var bytes: Buffer
-#else
-    #error ("Unsupported architecture: a definition of Buffer needs to be made with N = (MemoryLayout<(Int, Int)>.size - 2) UInt8 members to a tuple")
 #endif
         @usableFromInline
         var length: UInt8
@@ -722,11 +720,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(count <= MemoryLayout<Buffer>.size)
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
             bytes = (UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0))
-#elseif arch(i386) || arch(arm) || arch(arm64_32)
+#elseif arch(i386) || arch(arm)
             bytes = (UInt8(0), UInt8(0), UInt8(0), UInt8(0),
                      UInt8(0), UInt8(0))
-#else
-    #error ("Unsupported architecture: initialization for Buffer is required for this architecture")
 #endif
             length = UInt8(count)
         }
@@ -882,11 +878,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
     @usableFromInline
     internal typealias HalfInt = Int32
-#elseif arch(i386) || arch(arm) || arch(arm64_32)
+#elseif arch(i386) || arch(arm)
     @usableFromInline
     internal typealias HalfInt = Int16
-#else
-    #error ("Unsupported architecture: a definition of half of the pointer sized Int needs to be defined for this architecture")
 #endif
 
     @usableFromInline
