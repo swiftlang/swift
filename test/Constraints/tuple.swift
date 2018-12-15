@@ -56,7 +56,7 @@ f5((1,1))
 // Tuples with existentials
 var any : Any = ()
 any = (1, 2)
-any = (label: 4)
+any = (label: 4) // expected-error {{cannot create a single-element tuple with an element label}}
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
@@ -251,4 +251,12 @@ func f(b: Bool) -> (a: Int, b: String)? {
   let x = 3
   let y = ""
   return b ? (x, y) : nil
+}
+
+// Single element tuple expressions
+func singleElementTuple() {
+  let _ = (label: 123) // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = (label: 123).label // expected-error {{cannot create a single-element tuple with an element label}} {{12-19=}}
+  let _ = ((label: 123)) // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
+  let _ = ((label: 123)).label // expected-error {{cannot create a single-element tuple with an element label}} {{13-20=}}
 }
