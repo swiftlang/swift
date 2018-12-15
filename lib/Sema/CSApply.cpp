@@ -381,14 +381,15 @@ static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
   Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+  (void)cs.TC.typeCheckExpression(nameExpr, dc);
+  cs.cacheExprTypes(nameExpr);
 
   // Build a tuple so that the argument has a label.
   Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember,
                                   loc, loc, /*hasTrailingClosure*/false,
                                   /*implicit*/true);
-  (void)cs.TC.typeCheckExpression(tuple, dc, TypeLoc::withoutLoc(ty),
-                                  CTP_CallArgument);
-  cs.cacheExprTypes(tuple);
+  cs.setType(tuple, ty);
+  tuple->setType(ty);
   return tuple;
 }
 
@@ -4419,13 +4420,17 @@ namespace {
             auto loc = origComponent.getLoc();
             auto fieldName =
                 foundDecl->choice.getName().getBaseIdentifier().str();
-            auto index = buildDynamicMemberLookupIndexExpr(fieldName, indexType,
-                                                           loc, dc, cs);
-            
+
+            Expr *nameExpr = new (ctx) StringLiteralExpr(fieldName, loc,
+                                                         /*implicit*/true);
+            (void)cs.TC.typeCheckExpression(nameExpr, dc);
+            cs.cacheExprTypes(nameExpr);
+
             origComponent = KeyPathExpr::Component::
-              forUnresolvedSubscript(ctx, loc, index, {}, loc, loc,
-                                     /*trailingClosure*/nullptr);
-            cs.setType(origComponent.getIndexExpr(), index->getType());
+              forUnresolvedSubscript(ctx, loc,
+                                     {nameExpr}, {ctx.Id_dynamicMember}, {loc},
+                                     loc, /*trailingClosure*/nullptr);
+            cs.setType(origComponent.getIndexExpr(), indexType);
           }
 
           auto subscriptType =
