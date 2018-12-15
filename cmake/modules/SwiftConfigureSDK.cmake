@@ -12,9 +12,9 @@ include(SwiftAndroidSupport)
 function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
   if("${prefix}" STREQUAL "WINDOWS")
-    message(STATUS "  UCRT Version: $ENV{UCRTVersion}")
-    message(STATUS "  UCRT SDK Dir: $ENV{UniversalCRTSdkDir}")
-    message(STATUS "  VC Dir: $ENV{VCToolsInstallDir}")
+    message(STATUS "  UCRT Version: ${UCRTVersion}")
+    message(STATUS "  UCRT SDK Dir: ${UniversalCRTSdkDir}")
+    message(STATUS "  VC Dir: ${VCToolsInstallDir}")
     if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       message(STATUS "  ${CMAKE_BUILD_TYPE} VC++ CRT: MDd")
     else()
@@ -250,6 +250,8 @@ macro(configure_sdk_windows name environment architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
+  swift_windows_cache_VCVARS()
+
   string(TOUPPER ${name} prefix)
   string(TOLOWER ${name} platform)
 
@@ -274,10 +276,10 @@ macro(configure_sdk_windows name environment architectures)
     # NOTE(compnerd) workaround incorrectly extensioned import libraries from
     # the Windows SDK on case sensitive file systems.
     swift_windows_arch_spelling(${arch} WinSDKArchitecture)
-    set(WinSDK${arch}UMDir "$ENV{UniversalCRTSdkDir}/Lib/$ENV{UCRTVersion}/um/${WinSDKArchitecture}")
+    set(WinSDK${arch}UMDir "${UniversalCRTSdkDir}/Lib/${UCRTVersion}/um/${WinSDKArchitecture}")
     set(OverlayDirectory "${CMAKE_BINARY_DIR}/winsdk_lib_${arch}_symlinks")
 
-    if(NOT EXISTS "$ENV{UniversalCRTSdkDir}/Include/$ENV{UCRTVersion}/um/WINDOWS.H")
+    if(NOT EXISTS "${UniversalCRTSdkDir}/Include/${UCRTVersion}/um/WINDOWS.H")
       file(MAKE_DIRECTORY ${OverlayDirectory})
 
       file(GLOB libraries RELATIVE "${WinSDK${arch}UMDir}" "${WinSDK${arch}UMDir}/*")
