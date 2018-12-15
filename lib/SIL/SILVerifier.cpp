@@ -385,7 +385,14 @@ void verifyKeyPathComponent(SILModule &M,
     break;
   }
   case KeyPathPatternComponent::Kind::TupleElement: {
-    //llvm_unreachable("[technicated]");
+    require(loweredBaseTy.is<TupleType>(),
+            "invalid baseTy, should have been a TupleType");
+      
+    auto tupleTy = loweredBaseTy.getAs<TupleType>();
+
+    require(component.getTupleIndex() < tupleTy->getNumElements(),
+            "invalid element index, greater than # of tuple elements");
+
     break;
   }
   }
