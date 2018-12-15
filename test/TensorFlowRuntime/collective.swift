@@ -63,5 +63,5 @@ CollectiveTests.testAllBackends("GroupWithSize2") {
 }
 #endif // TF_DYNAMIC_COMPILATION
 
-_RuntimeConfig.numCPUDevices = 3
+_RuntimeConfig.cpuDeviceCount = 3
 runAllTests()

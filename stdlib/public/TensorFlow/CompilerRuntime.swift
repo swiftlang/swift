@@ -126,7 +126,7 @@ public enum _RuntimeConfig {
   static public var gpuMemoryAllowGrowth = true
 
   /// The number of CPU devices.
-  static public var numCPUDevices: UInt32 = 1
+  static public var cpuDeviceCount: UInt32 = 1
 
   /// When non-nil, run metadata (with full trace) of each session execution
   /// will be dumped to the give path.
@@ -240,10 +240,10 @@ public final class _ExecutionContext {
   // TODO: When we use remote session, we need to set cpu device to a local
   // device.  There is no C API yet to find the local device. So, we are
   // hard-coding the value for now.
-  public let cpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:CPU:"
+  fileprivate let cpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:CPU:"
 
   /// Only set when there is some usable GPU.
-  public let gpuDeviceNamePrefix: String?
+  fileprivate let gpuDeviceNamePrefix: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
   public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
@@ -303,7 +303,7 @@ public final class _ExecutionContext {
     self.tensorFlowConfig = TF_CreateConfig(
       _RuntimeConfig.executionMode == .xla ? 1 : 0,
       _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
-      _RuntimeConfig.numCPUDevices)
+      _RuntimeConfig.cpuDeviceCount)
     TFE_ContextOptionsSetConfig(opts,
                                 tensorFlowConfig.pointee.data,
                                 tensorFlowConfig.pointee.length,
@@ -335,12 +335,12 @@ public final class _ExecutionContext {
     checkOk(status)
     defer { TF_DeleteDeviceList(devices!) }
 
-    // Sanity check and gather/log device info. When `numGPUs` > 0, set
+    // Sanity check and gather/log device info. When `gpuCount` > 0, set
     // `self.gpuDeviceNamePrefix`.
     let deviceCount = TF_DeviceListCount(devices!)
     debugLog("There are \(deviceCount) devices.")
     var foundCPU = false
-    var numGPUs = 0
+    var gpuCount = 0
     for deviceId in 0..<deviceCount {
       let cDeviceName = TF_DeviceListName(devices, deviceId, status)
       checkOk(status)
@@ -351,11 +351,11 @@ public final class _ExecutionContext {
       debugLog(
         "Device \(deviceId) has type \(deviceType) and name \(deviceName)."
       )
-      if deviceType == "CPU", deviceName.starts(with: self.cpuDeviceNamePrefix) {
+      if deviceType == "CPU", deviceName.starts(with: cpuDeviceNamePrefix) {
         foundCPU = true
       }
       if deviceType == "GPU" {
-        numGPUs += 1
+        gpuCount += 1
       }
     }
     guard foundCPU else {
@@ -364,7 +364,7 @@ public final class _ExecutionContext {
     // We ignore the number of GPUs for now. It might be useful to cross check
     // that against the number of GPUs that user intends to use (e.g. via the
     // `withDevice` syntax).
-    if numGPUs > 0 {
+    if gpuCount > 0 {
       self.gpuDeviceNamePrefix = "/job:localhost/replica:0/task:0/device:GPU:"
     } else {
       self.gpuDeviceNamePrefix = nil
@@ -561,19 +561,6 @@ internal func dumpCTensorHandleContent(
   }
 }
 
-/// Given an input like "foo.tf_13" (prefix if a SIL graph function like
-/// "foo.tf_13_CPU.device_partition"), extract and return `13` as the device
-/// index.
-internal func decodeDeviceIndexStr(_ opTypePrefix: Substring) -> Substring {
-  let underscorePos = opTypePrefix.lastIndex(of: "_")
-  internalConsistencyCheck(
-    underscorePos != nil,
-    "Malformed op type prefix \(opTypePrefix)")
-  let startPos = opTypePrefix.index(after: underscorePos!)
-  let deviceIndexStr = opTypePrefix.suffix(from: startPos)
-  return deviceIndexStr
-}
-
 private class TFEState {
   let status: CTFStatus = TF_NewStatus()
   /// The set of graph functions to be concurrently executed (as TFE ops).
@@ -587,6 +574,20 @@ private class TFEState {
        programByteCount: Int,
        helperFunctionCount: Int,
        entryFunctionBaseNameAddress: UnsafePointer<Int8>) {
+
+    // Given an input like "foo.tf_13" (prefix if a SIL graph function like
+    // "foo.tf_13_CPU.device_partition"), extract and return "13" as the device
+    // index.
+    func decodeDeviceIndexStr(_ opTypePrefix: Substring) -> Substring {
+      let underscorePos = opTypePrefix.lastIndex(of: "_")
+      internalConsistencyCheck(
+        underscorePos != nil,
+        "Malformed op type prefix \(opTypePrefix)")
+      let startPos = opTypePrefix.index(after: underscorePos!)
+      let deviceIndexStr = opTypePrefix.suffix(from: startPos)
+      return deviceIndexStr
+    }
+
     let context = _ExecutionContext.global
     // Make sure the program is loaded into the context.
     let graph = context.loadProgramInBytes(programByteAddress,
@@ -613,7 +614,7 @@ private class TFEState {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
-      var deviceName: String
+      let deviceName: String
       if opType.hasSuffix("_CPU.device_partition") {
         // The op type can be: tmp3_main.tf_17_CPU.device_partition. We want to
         // extract the device index "17" out of the above name, and use it to
