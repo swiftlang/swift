@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify -Xllvm -debug -Xllvm -debug-only -Xllvm ConstExpr
+// RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 
 // REQUIRES: asserts
 
@@ -25,8 +25,23 @@ func test_nonConstant() {
   #assert(isOne(Int(readLine()!)!), "input is not 1") // expected-error{{#assert condition not constant}}
 }
 
-// We don't support mutation, so the only loop we can make is infinite.
-// TODO: As soon as we support mutation, add tests with finite loops.
+func loops1(a: Int) -> Int {
+  var x = 42
+  while x <= 42 {
+    x += a
+  } // expected-note {{control flow loop found}}
+  return x
+}
+
+func loops2(a: Int) -> Int {
+  var x = 42
+  // expected-note @+1 {{could not fold operation}}
+  for i in 0 ... a {
+    x += i
+  }
+  return x
+}
+
 func infiniteLoop() -> Int {
   // expected-note @+2 {{condition always evaluates to true}}
   // expected-note @+1 {{control flow loop found}}
@@ -35,7 +50,15 @@ func infiniteLoop() -> Int {
   return 1
 }
 
-func test_infiniteLoop() {
+func test_loops() {
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{when called from here}}
+  #assert(loops1(a: 20000) > 42)
+
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{when called from here}}
+  #assert(loops2(a: 20000) > 42)
+
   // expected-error @+2 {{#assert condition not constant}}
   // expected-note @+1 {{when called from here}}
   #assert(infiniteLoop() == 1)
@@ -82,12 +105,12 @@ func test_topLevelEvaluation(topLevelArgument: Int) {
   var topLevelVar = 1 // expected-warning {{never mutated}}
   #assert(topLevelVar == 1)
 
+  // expected-note @+1 {{could not fold operation}}
   var topLevelVarConditionallyMutated = 1
   if topLevelVarConditionallyMutated < 0 {
     topLevelVarConditionallyMutated += 1
   }
-  // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{could not fold operation}}
+  // expected-error @+1 {{#assert condition not constant}}
   #assert(topLevelVarConditionallyMutated == 1)
 
   // expected-error @+1 {{#assert condition not constant}}
@@ -155,4 +178,48 @@ func test_CustomStruct() {
   #assert(cs.x.0 == 1)
   #assert(cs.x.1 == 2)
   #assert(cs.y == 3)
+}
+
+//===----------------------------------------------------------------------===//
+// Mutation
+//===----------------------------------------------------------------------===//
+
+struct InnerStruct {
+  var a, b: Int
+}
+
+struct MutableStruct {
+  var x: InnerStruct
+  var y: Int
+}
+
+func addOne(to target: inout Int) {
+  target += 1
+}
+
+func callInout() -> Bool {
+  var myMs = MutableStruct(x: InnerStruct(a: 1, b: 2), y: 3)
+  addOne(to: &myMs.x.a)
+  addOne(to: &myMs.y)
+  return (myMs.x.a + myMs.x.b + myMs.y) == 8
+}
+
+func replaceAggregate() -> Bool {
+  var myMs = MutableStruct(x: InnerStruct(a: 1, b: 2), y: 3)
+  myMs.x = InnerStruct(a: 10, b: 20)
+  return myMs.x.a == 10 && myMs.x.b == 20 && myMs.y == 3
+}
+
+func shouldNotAlias() -> Bool {
+  var x = 1
+  var y = x
+  x += 1
+  y += 2
+  return x == 2 && y == 3
+}
+
+func invokeMutationTests() {
+  #assert(callInout())
+  #assert(replaceAggregate())
+  #assert(shouldNotAlias())
 }

@@ -69,7 +69,8 @@ class ConstExprFunctionState {
   unsigned &numInstEvaluated;
 
   /// This is a state of previously analyzed values, maintained and filled in
-  /// by getConstantValue.  This does not hold SIL address values.
+  /// by getConstantValue.  This does not hold the memory referred to by SIL
+  /// addresses.
   llvm::DenseMap<SILValue, SymbolicValue> calculatedValues;
 
 public:
@@ -80,11 +81,19 @@ public:
         numInstEvaluated(numInstEvaluated) {}
 
   void setValue(SILValue value, SymbolicValue symVal) {
-    // TODO(constexpr patch): Uncomment this assertion once Address kinds have
-    // been added.
-    // assert(symVal.getKind() != SymbolicValue::Address &&
-    //        "calculatedValues does not hold addresses");
     calculatedValues.insert({value, symVal});
+  }
+
+  /// Invariant: Before the call, `calculatedValues` must not contain `addr`
+  /// as a key.
+  SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
+    assert(!calculatedValues.count(addr));
+    auto type = substituteGenericParamsAndSimpify(addr->getType().getASTType());
+    auto *memObject = SymbolicValueMemoryObject::create(
+        type, initialValue, evaluator.getASTContext());
+    auto result = SymbolicValue::getAddress(memObject);
+    setValue(addr, result);
+    return result;
   }
 
   /// Return the SymbolicValue for the specified SIL value, lazily computing
@@ -96,9 +105,9 @@ public:
   /// statements.
   llvm::Optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
 
-  Type simplifyType(Type ty);
-  CanType simplifyType(CanType ty) {
-    return simplifyType(Type(ty))->getCanonicalType();
+  Type substituteGenericParamsAndSimpify(Type ty);
+  CanType substituteGenericParamsAndSimpify(CanType ty) {
+    return substituteGenericParamsAndSimpify(Type(ty))->getCanonicalType();
   }
   SymbolicValue computeConstantValue(SILValue value);
   SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
@@ -108,12 +117,16 @@ public:
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
                                                         SILFunction *callee);
 
+  SymbolicValue getConstAddrAndLoadResult(SILValue addr);
+  SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
+  llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
+                                               SILValue dest);
 };
 } // end anonymous namespace
 
 /// Simplify the specified type based on knowledge of substitutions if we have
 /// any.
-Type ConstExprFunctionState::simplifyType(Type ty) {
+Type ConstExprFunctionState::substituteGenericParamsAndSimpify(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
@@ -133,7 +146,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // types.
   if (auto *mti = dyn_cast<MetatypeInst>(value)) {
     auto metatype = mti->getType().castTo<MetatypeType>();
-    auto type = simplifyType(metatype->getInstanceType())->getCanonicalType();
+    auto type = substituteGenericParamsAndSimpify(metatype->getInstanceType())
+        ->getCanonicalType();
     return SymbolicValue::getMetatype(type);
   }
 
@@ -174,6 +188,39 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getAggregate(elts, evaluator.getASTContext());
   }
 
+  // If this is a struct or tuple element addressor, compute a more derived
+  // address.
+  if (isa<StructElementAddrInst>(value) || isa<TupleElementAddrInst>(value)) {
+    auto inst = cast<SingleValueInstruction>(value);
+    auto baseAddr = getConstantValue(inst->getOperand(0));
+    if (!baseAddr.isConstant())
+      return baseAddr;
+
+    SmallVector<unsigned, 4> accessPath;
+    auto *memObject = baseAddr.getAddressValue(accessPath);
+
+    // Add our index onto the next of the list.
+    unsigned index;
+    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
+      index = sea->getFieldNo();
+    else
+      index = cast<TupleElementAddrInst>(inst)->getFieldNo();
+    accessPath.push_back(index);
+    return SymbolicValue::getAddress(memObject, accessPath,
+                                     evaluator.getASTContext());
+  }
+
+  // If this is a load, then we either have computed the value of the memory
+  // already (when analyzing the body of a function in a flow-sensitive
+  // fashion), or this is the indirect result of a call.  Either way, we ask for
+  // the value of the pointer.  In the former case, this will be the latest
+  // value of the memory.  In the latter case, the call must be the only
+  // store to the address so that the memory object can be computed by
+  // recursively processing the allocation and call instructions in a
+  // demand-driven fashion.
+  if (auto li = dyn_cast<LoadInst>(value))
+    return getConstAddrAndLoadResult(li->getOperand());
+
   if (auto *builtin = dyn_cast<BuiltinInst>(value))
     return computeConstantValueBuiltin(builtin);
 
@@ -187,6 +234,10 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     assert(calculatedValues.count(apply));
     return calculatedValues[apply];
   }
+
+  // This instruction is a marker that returns its first operand.
+  if (auto *bai = dyn_cast<BeginAccessInst>(value))
+    return getConstantValue(bai->getOperand());
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -521,6 +572,143 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   return result;
 }
 
+/// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
+/// a new element like 4, return the aggregate value with the indexed element
+/// replaced with the new element, producing {{1, 4}, 3} in this case.
+/// If `writeOnlyOnce` is true, and the target aggregate element to update
+/// already has a constant value, fail on the update.
+///
+/// This returns true on failure and false on success.
+///
+static bool updateIndexedElement(SymbolicValue &aggregate,
+                                 ArrayRef<unsigned> indices,
+                                 SymbolicValue newElement, Type type,
+                                 bool writeOnlyOnce,
+                                 ASTContext &astContext) {
+  // We're done if we've run out of indices.
+  if (indices.empty()) {
+    aggregate = newElement;
+    return false;
+  }
+
+  // If we have an uninit memory, then scalarize it into an aggregate to
+  // continue.  This happens when memory objects are initialized piecewise.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory) {
+    unsigned numMembers;
+    // We need to have either a struct or a tuple type.
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      numMembers = std::distance(decl->getStoredProperties().begin(),
+                                 decl->getStoredProperties().end());
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      numMembers = tuple->getNumElements();
+    } else {
+      return true;
+    }
+
+    SmallVector<SymbolicValue, 4> newElts(numMembers,
+                                          SymbolicValue::getUninitMemory());
+    aggregate = SymbolicValue::getAggregate(newElts, astContext);
+  }
+
+  unsigned elementNo = indices.front();
+
+  // If we have a non-aggregate then fail.
+  if (aggregate.getKind() != SymbolicValue::Aggregate)
+    return true;
+
+  ArrayRef<SymbolicValue> oldElts;
+  Type eltType;
+
+  // We need to have a struct or a tuple type.
+  oldElts = aggregate.getAggregateValue();
+
+  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    auto it = decl->getStoredProperties().begin();
+    std::advance(it, elementNo);
+    eltType = (*it)->getType();
+  } else if (auto tuple = type->getAs<TupleType>()) {
+    assert(elementNo < tuple->getNumElements() && "invalid index");
+    eltType = tuple->getElement(elementNo).getType();
+  } else {
+    return true;
+  }
+
+  if (writeOnlyOnce &&
+      oldElts[elementNo].getKind() != SymbolicValue::UninitMemory) {
+    // Cannot overwrite an existing constant.
+    return true;
+  }
+
+  // Update the indexed element of the aggregate.
+  SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
+  if (updateIndexedElement(newElts[elementNo], indices.drop_front(), newElement,
+                           eltType, writeOnlyOnce, astContext))
+    return true;
+
+  aggregate = SymbolicValue::getAggregate(newElts, astContext);
+  return false;
+}
+
+/// Given the operand to a load, resolve it to a constant if possible.
+SymbolicValue ConstExprFunctionState::getConstAddrAndLoadResult(SILValue addr) {
+  auto addrVal = getConstantValue(addr);
+  if (!addrVal.isConstant())
+    return addrVal;
+
+  return loadAddrValue(addr, addrVal);
+}
+
+/// Load and return the underlying (const) object whose address is given by
+/// `addrVal`. On error, return a message based on `addr`.
+SymbolicValue ConstExprFunctionState::loadAddrValue(SILValue addr,
+                                                    SymbolicValue addrVal) {
+  SmallVector<unsigned, 4> accessPath;
+  auto *memoryObject = addrVal.getAddressValue(accessPath);
+
+  // If this is a derived address, then we are digging into an aggregate
+  // value.
+  auto objectVal = memoryObject->getValue();
+
+  // Try digging through the aggregate to get to our value.
+  unsigned idx = 0, end = accessPath.size();
+  while (idx != end && objectVal.getKind() == SymbolicValue::Aggregate) {
+    objectVal = objectVal.getAggregateValue()[accessPath[idx]];
+    ++idx;
+  }
+
+  // If we successfully indexed down to our value, then we're done.
+  if (idx == end)
+    return objectVal;
+
+  // If the memory object had a reason, return it.
+  if (objectVal.isUnknown())
+    return objectVal;
+
+  // Otherwise, return a generic failure.
+  return evaluator.getUnknown(addr, UnknownReason::Default);
+}
+
+/// Evaluate a flow sensitive store to the specified pointer address.
+llvm::Optional<SymbolicValue>
+ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
+  // Only update existing memory locations that we're tracking.
+  auto it = calculatedValues.find(dest);
+  if (it == calculatedValues.end() || !it->second.isConstant())
+    return evaluator.getUnknown(dest, UnknownReason::Default);
+
+  SmallVector<unsigned, 4> accessPath;
+  auto *memoryObject = it->second.getAddressValue(accessPath);
+  auto objectVal = memoryObject->getValue();
+  auto objectType = memoryObject->getType();
+
+  if (updateIndexedElement(objectVal, accessPath, storedCst, objectType,
+                           /*writeOnlyOnce*/ false, evaluator.getASTContext()))
+    return evaluator.getUnknown(dest, UnknownReason::Default);
+
+  memoryObject->setValue(objectVal);
+  return None;
+}
+
 /// Evaluate the specified instruction in a flow sensitive way, for use by
 /// the constexpr function evaluator.  This does not handle control flow
 /// statements.  This returns None on success, and an Unknown SymbolicValue with
@@ -537,6 +725,19 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<StrongReleaseInst>(inst))
     return None;
 
+  // If this is a special flow-sensitive instruction like a stack allocation,
+  // store, copy_addr, etc, we handle it specially here.
+  if (auto asi = dyn_cast<AllocStackInst>(inst)) {
+    createMemoryObject(asi, SymbolicValue::getUninitMemory());
+    return None;
+  }
+
+  // If this is a deallocation of a memory object that we are tracking, then
+  // don't do anything.  The memory is allocated in a BumpPtrAllocator so there
+  // is no useful way to free it.
+  if (isa<DeallocStackInst>(inst))
+    return None;
+
   if (isa<CondFailInst>(inst)) {
     auto failed = getConstantValue(inst->getOperand(0));
     if (failed.getKind() == SymbolicValue::Integer) {
@@ -550,6 +751,23 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this is a call, evaluate it.
   if (auto apply = dyn_cast<ApplyInst>(inst))
     return computeCallResult(apply);
+
+  if (isa<StoreInst>(inst)) {
+    auto stored = getConstantValue(inst->getOperand(0));
+    if (!stored.isConstant())
+      return stored;
+
+    return computeFSStore(stored, inst->getOperand(1));
+  }
+
+  // Copy addr is a load + store combination.
+  if (auto *copy = dyn_cast<CopyAddrInst>(inst)) {
+    auto value = getConstAddrAndLoadResult(copy->getOperand(0));
+    if (!value.isConstant())
+      return value;
+
+    return computeFSStore(value, copy->getOperand(1));
+  }
 
   // If the instruction produces normal results, try constant folding it.
   // If this fails, then we fail.

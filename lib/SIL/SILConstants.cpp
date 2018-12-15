@@ -37,6 +37,9 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   os.indent(indent);
   switch (representationKind) {
+  case RK_UninitMemory:
+    os << "uninit\n";
+    return;
   case RK_Unknown: {
     os << "unknown(" << (int)getUnknownReason() << "): ";
     getUnknownNode()->dump();
@@ -76,6 +79,16 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
       return;
     }
   }
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
+    SmallVector<unsigned, 4> accessPath;
+    SymbolicValueMemoryObject *memObject = getAddressValue(accessPath);
+    os << "Address[" << memObject->getType() << "] ";
+    interleave(accessPath.begin(), accessPath.end(),
+               [&](unsigned idx) { os << idx; }, [&]() { os << ", "; });
+    os << "\n";
+    break;
+  }
   }
 }
 
@@ -85,6 +98,8 @@ void SymbolicValue::dump() const { print(llvm::errs()); }
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
+  case RK_UninitMemory:
+    return UninitMemory;
   case RK_Unknown:
     return Unknown;
   case RK_Metatype:
@@ -96,6 +111,9 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Integer:
   case RK_IntegerInline:
     return Integer;
+  case RK_DirectAddress:
+  case RK_DerivedAddress:
+    return Address;
   }
 }
 
@@ -105,6 +123,7 @@ SymbolicValue
 SymbolicValue::cloneInto(ASTContext &astContext) const {
   auto thisRK = representationKind;
   switch (thisRK) {
+  case RK_UninitMemory:
   case RK_Unknown:
   case RK_Metatype:
   case RK_Function:
@@ -120,7 +139,28 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
       results.push_back(elt.cloneInto(astContext));
     return getAggregate(results, astContext);
   }
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
+    SmallVector<unsigned, 4> accessPath;
+    auto *memObject = getAddressValue(accessPath);
+    auto *newMemObject = SymbolicValueMemoryObject::create(
+        memObject->getType(), memObject->getValue(), astContext);
+    return getAddress(newMemObject, accessPath, astContext);
   }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// SymbolicValueMemoryObject implementation
+//===----------------------------------------------------------------------===//
+
+SymbolicValueMemoryObject *
+SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
+                                  ASTContext &astContext) {
+  auto *result = astContext.Allocate(sizeof(SymbolicValueMemoryObject),
+                                     alignof(SymbolicValueMemoryObject));
+  new (result) SymbolicValueMemoryObject(type, value);
+  return (SymbolicValueMemoryObject *)result;
 }
 
 //===----------------------------------------------------------------------===//
@@ -225,7 +265,7 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
                                       ASTContext &astContext) {
     auto byteSize =
         UnknownSymbolicValue::totalSizeToAlloc<SourceLoc>(elements.size());
-    auto rawMem = astContext.Allocate(byteSize, alignof(UnknownSymbolicValue));
+    auto *rawMem = astContext.Allocate(byteSize, alignof(UnknownSymbolicValue));
 
     // Placement-new the value inside the memory we just allocated.
     auto value = ::new (rawMem) UnknownSymbolicValue(
@@ -277,6 +317,91 @@ SILNode *SymbolicValue::getUnknownNode() const {
 UnknownReason SymbolicValue::getUnknownReason() const {
   assert(getKind() == Unknown);
   return value.unknown->reason;
+}
+
+//===----------------------------------------------------------------------===//
+// Addresses
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// This is the representation of a derived address.  A derived address refers
+/// to a memory object along with an access path that drills into it.
+struct DerivedAddressValue final
+    : private llvm::TrailingObjects<DerivedAddressValue, unsigned> {
+  friend class llvm::TrailingObjects<DerivedAddressValue, unsigned>;
+
+  SymbolicValueMemoryObject *memoryObject;
+
+  /// This is the number of indices in the derived address.
+  const unsigned numElements;
+
+  static DerivedAddressValue *create(SymbolicValueMemoryObject *memoryObject,
+                                     ArrayRef<unsigned> elements,
+                                     ASTContext &astContext) {
+    auto byteSize =
+        DerivedAddressValue::totalSizeToAlloc<unsigned>(elements.size());
+    auto *rawMem = astContext.Allocate(byteSize, alignof(DerivedAddressValue));
+
+    //  Placement initialize the object.
+    auto dav =
+        ::new (rawMem) DerivedAddressValue(memoryObject, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            dav->getTrailingObjects<unsigned>());
+    return dav;
+  }
+
+  /// Return the access path for this derived address, which is an array of
+  /// indices drilling into the memory object.
+  ArrayRef<unsigned> getElements() const {
+    return {getTrailingObjects<unsigned>(), numElements};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return numElements;
+  }
+
+private:
+  DerivedAddressValue() = delete;
+  DerivedAddressValue(const DerivedAddressValue &) = delete;
+  DerivedAddressValue(SymbolicValueMemoryObject *memoryObject,
+                      unsigned numElements)
+      : memoryObject(memoryObject), numElements(numElements) {}
+};
+} // end namespace swift
+
+/// Return a symbolic value that represents the address of a memory object
+/// indexed by a path.
+SymbolicValue SymbolicValue::getAddress(SymbolicValueMemoryObject *memoryObject,
+                                        ArrayRef<unsigned> indices,
+                                        ASTContext &astContext) {
+  if (indices.empty())
+    return getAddress(memoryObject);
+
+  auto dav = DerivedAddressValue::create(memoryObject, indices, astContext);
+  SymbolicValue result;
+  result.representationKind = RK_DerivedAddress;
+  result.value.derivedAddress = dav;
+  return result;
+}
+
+/// Return the memory object of this reference along with any access path
+/// indices involved.
+SymbolicValueMemoryObject *
+SymbolicValue::getAddressValue(SmallVectorImpl<unsigned> &accessPath) const {
+  assert(getKind() == Address);
+
+  accessPath.clear();
+  if (representationKind == RK_DirectAddress)
+    return value.directAddress;
+  assert(representationKind == RK_DerivedAddress);
+
+  auto *dav = value.derivedAddress;
+
+  // The first entry is the object ID, the rest are indices in the accessPath.
+  accessPath.assign(dav->getElements().begin(), dav->getElements().end());
+  return dav->memoryObject;
 }
 
 //===----------------------------------------------------------------------===//
