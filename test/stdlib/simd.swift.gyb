@@ -313,5 +313,10 @@ simdTestSuite.test("matrix elements") {
 % end # for type
 }
 
+simdTestSuite.test("debug description") {
+  expectEqual("SIMD2<Float>(1.0, 2.5)",
+    SIMD2<Float>(1.0, 2.5).debugDescription)
+}
+
 runAllTests()
 

@@ -109,6 +109,14 @@ public extension SIMD${n} where Scalar : FixedWidthInteger {
   }
 }
 
+extension SIMD${n} : CustomDebugStringConvertible {
+  /// Debug string representation
+  public var debugDescription: String {
+    return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
+                       '\\(self['+ str(c) + '])',
+                       xrange(n)))})"
+  }
+}
 
 public extension SIMD${n} where Scalar : BinaryFloatingPoint {
   @inlinable
