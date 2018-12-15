@@ -1273,7 +1273,7 @@ function(_add_swift_library_single target name)
   # doing so will result in incorrect symbol resolution and linkage.  We created
   # import library targets when the library was added.  Use that to adjust the
   # link libraries.
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
+  if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS AND NOT CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
     foreach(library_list LINK_LIBRARIES INTERFACE_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES)
       set(import_libraries)
       foreach(library ${SWIFTLIB_SINGLE_${library_list}})
@@ -1283,7 +1283,7 @@ function(_add_swift_library_single target name)
         # libraries are only associated with shared libraries, so add an
         # additional check for that as well.
         set(import_library ${library})
-        if(TARGET ${library} AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+        if(TARGET ${library})
           get_target_property(type ${library} TYPE)
           if(${type} STREQUAL "SHARED_LIBRARY")
             set(import_library ${library}_IMPLIB)
@@ -2322,26 +2322,26 @@ function(add_swift_host_tool executable)
       "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
 
+  precondition(ADDSWIFTHOSTTOOL_SWIFT_COMPONENT
+               MESSAGE "Swift Component is required to add a host tool")
+
   # Create the executable rule.
   add_swift_executable(
     ${executable} 
     ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
   )
 
-  # And then create the install rule if we are asked to.
-  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      TARGETS ${executable}
-      RUNTIME DESTINATION bin)
+  swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    TARGETS ${executable}
+    RUNTIME DESTINATION bin)
 
-    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      is_installing)
-  
-    if(NOT is_installing)
-      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
-    else()
-      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
-    endif()
+  swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    is_installing)
+
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
   endif()
 endfunction()
 
