@@ -3863,6 +3863,9 @@ void Serializer::writeType(Type ty) {
     break;
   }
       
+  case TypeKind::OpaqueTypeArchetype:
+    llvm_unreachable("todo");
+
   case TypeKind::PrimaryArchetype: {
     auto archetypeTy = cast<PrimaryArchetypeType>(ty.getPointer());
     auto env = archetypeTy->getGenericEnvironment();

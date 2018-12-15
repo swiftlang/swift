@@ -183,6 +183,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
     return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
     return cast<ProtocolType>(type)->requiresClass();
@@ -2413,6 +2414,22 @@ NestedArchetypeType::NestedArchetypeType(const ASTContext &Ctx,
 {
 }
 
+OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
+                                   SubstitutionMap Substitutions,
+                                   RecursiveTypeProperties Props,
+                                   GenericSignature *BoundSignature,
+                                   Type InterfaceType,
+                                   ArrayRef<ProtocolDecl*> ConformsTo,
+                                   Type Superclass, LayoutConstraint Layout)
+  : ArchetypeType(TypeKind::OpaqueTypeArchetype, OpaqueDecl->getASTContext(),
+                  Props,
+                  InterfaceType, ConformsTo, Superclass, Layout),
+    OpaqueDecl(OpaqueDecl),
+    Substitutions(Substitutions),
+    BoundSignature(BoundSignature)
+{
+}
+
 CanNestedArchetypeType NestedArchetypeType::getNew(
                                    const ASTContext &Ctx,
                                    ArchetypeType *Parent,
@@ -2431,7 +2448,7 @@ CanNestedArchetypeType NestedArchetypeType::getNew(
           ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
       alignof(NestedArchetypeType), arena);
 
-  return CanNestedArchetypeType(new (mem) NestedArchetypeType(
+  return CanNestedArchetypeType(::new (mem) NestedArchetypeType(
       Ctx, Parent, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -2454,7 +2471,7 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
           ConformsTo.size(), Superclass ? 1 : 0, Layout ? 1 : 0),
       alignof(PrimaryArchetypeType), arena);
 
-  return CanPrimaryArchetypeType(new (mem) PrimaryArchetypeType(
+  return CanPrimaryArchetypeType(::new (mem) PrimaryArchetypeType(
       Ctx, GenericEnv, InterfaceType, ConformsTo, Superclass, Layout));
 }
 
@@ -2614,6 +2631,14 @@ std::string ArchetypeType::getFullName() const {
   llvm::SmallString<64> Result;
   collectFullName(this, Result);
   return Result.str().str();
+}
+
+void
+OpaqueTypeArchetypeType::Profile(llvm::FoldingSetNodeID &id,
+                                 OpaqueTypeDecl *decl,
+                                 SubstitutionMap subs) {
+  id.AddPointer(decl);
+  subs.profile(id);
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3005,6 +3030,17 @@ static Type substType(Type derivedType,
     // error.
     if (isa<OpenedArchetypeType>(substOrig))
       return Type(type);
+    // Opaque types also can't be directly substituted, but we can substitute
+    // the generic arguments.
+    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(substOrig)) {
+      if (!opaque->hasArchetype()
+          && !opaque->hasTypeParameter())
+        return Type(type);
+      
+      auto newSubs = opaque->getSubstitutions().subst(substitutions, lookupConformances);
+      auto newTy = OpaqueTypeArchetypeType::get(opaque->getOpaqueDecl(), newSubs);
+      return Type(newTy);
+    }
 
     // For nested archetypes, we can substitute the parent.
     auto nestedArchetype = cast<NestedArchetypeType>(substOrig);
@@ -3388,15 +3424,19 @@ Type Type::transformRec(
   // Recur into children of this type.
   TypeBase *base = getPointer();
   switch (base->getKind()) {
-#define ALWAYS_CANONICAL_TYPE(Id, Parent) \
+#define BUILTIN_TYPE(Id, Parent) \
 case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
   case TypeKind::Error:
   case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::GenericTypeParam:
   case TypeKind::SILToken:
+  case TypeKind::Module:
     return *this;
 
   case TypeKind::Enum:
@@ -3550,6 +3590,39 @@ case TypeKind::Id:
       return *this;
 
     return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
+  }
+      
+  case TypeKind::OpaqueTypeArchetype: {
+    auto opaque = cast<OpaqueTypeArchetypeType>(base);
+    if (opaque->getSubstitutions().empty())
+      return *this;
+    
+    SmallVector<Type, 4> newSubs;
+    bool anyChanged = false;
+    for (auto replacement : opaque->getSubstitutions().getReplacementTypes()) {
+      Type newReplacement = replacement.transformRec(fn);
+      if (!newReplacement)
+        return Type();
+      newSubs.push_back(newReplacement);
+      if (replacement.getPointer() != newReplacement.getPointer())
+        anyChanged = true;
+    }
+    
+    if (!anyChanged)
+      return *this;
+    
+    // FIXME: This re-looks-up conformances instead of transforming them in
+    // a systematic way.
+    auto sig = opaque->getOpaqueDecl()->getGenericSignature();
+    auto newSubMap =
+      SubstitutionMap::get(sig,
+       [&](SubstitutableType *t) -> Type {
+         auto index = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(t));
+         return newSubs[index];
+       },
+       LookUpConformanceInModule(opaque->getOpaqueDecl()->getModuleContext()));
+    return OpaqueTypeArchetypeType::get(opaque->getOpaqueDecl(),
+                                        newSubMap);
   }
 
   case TypeKind::ExistentialMetatype: {
@@ -3998,7 +4071,8 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
-  case TypeKind::NestedArchetype: {
+  case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype: {
     auto archetype = cast<ArchetypeType>(type);
     auto layout = archetype->getLayoutConstraint();
     (void)layout;
