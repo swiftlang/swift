@@ -6,5 +6,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not %target-swift-frontend %s -emit-ir
+
+// XFAIL: *
+
 extension CountableRange{{}{}protocol P{typealias a:A{}func 丏
 protocol A:CountableRange
