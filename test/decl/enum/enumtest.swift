@@ -164,9 +164,9 @@ func test5(_ myorigin: CGPoint) {
   // Dot syntax.
   _ = x2.origin.x
   _ = x1.size.area()
-  _ = (r : x1.size).r.area()
+  _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
   _ = x1.size.area()
-  _ = (r : x1.size).r.area()
+  _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
   
   _ = x1.area
 

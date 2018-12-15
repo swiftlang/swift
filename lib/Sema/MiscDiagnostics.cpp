@@ -203,10 +203,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
 
-      // Record call arguments.
-      if (auto Call = dyn_cast<CallExpr>(Base))
-        CallArgs.insert(Call->getArg());
-
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
         if (isa<TypeDecl>(DRE->getDecl())) {
@@ -235,7 +231,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
+      if (auto *TSE = dyn_cast<TupleShuffleExpr>(E)) {
+        if (CallArgs.count(TSE))
+          CallArgs.insert(TSE->getSubExpr());
+      }
+
       if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+        CallArgs.insert(SE->getIndex());
+
         // Implicit InOutExpr's are allowed in the base of a subscript expr.
         if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
           if (IOE->isImplicit())
@@ -246,6 +249,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, SE, OperandKind::Argument);
         });
+      }
+
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (auto Comp : KPE->getComponents()) {
+          if (auto *Arg = Comp.getIndexExpr())
+            CallArgs.insert(Arg);
+        }
       }
 
       if (auto *AE = dyn_cast<CollectionExpr>(E)) {
@@ -266,6 +276,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
+        // Record call arguments.
+        CallArgs.insert(Call->getArg());
+
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
         
@@ -378,6 +391,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
                       isChainToSuper, !IsExprStmt);
+        }
+      }
+
+      // Diagnose single-element tuple expressions.
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        if (!CallArgs.count(tupleExpr)) {
+          if (tupleExpr->getNumElements() == 1) {
+            TC.diagnose(tupleExpr->getElementNameLoc(0),
+                        diag::tuple_single_element)
+              .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
+                                tupleExpr->getElement(0)->getStartLoc());
+          }
         }
       }
 
