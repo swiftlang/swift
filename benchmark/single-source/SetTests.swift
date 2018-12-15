@@ -58,7 +58,7 @@ let setQ: Set<Int> = {
 public let SetTests = [
   // Mnemonic: number after name is percentage of common elements in input sets.
   BenchmarkInfo(
-    name: "SetIsSubsetEmptyInt0",
+    name: "Set.Empty.IsSubsetInt0",
     runFunction: { n in run_SetIsSubsetInt(setE, setAB, true, 5000 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
@@ -94,23 +94,23 @@ public let SetTests = [
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
-    name: "SetIsDisjointEmptyInt0",
+    name: "Set.Empty.IsDisjointInt0",
     runFunction: { n in run_SetIsDisjointInt(setE, setAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
   BenchmarkInfo(
-    name: "SetIsDisjointEmptyBox0",
+    name: "Set.Empty.IsDisjointBox0",
     runFunction: { n in run_SetIsDisjointBox(setOE, setOAB, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOE, setOAB]) }),
   BenchmarkInfo(
     name: "SetIsDisjointInt0",
-    runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 5000 * n) },
+    runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setAB, setCD]) }),
   BenchmarkInfo(
     name: "SetIsDisjointBox0",
-    runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 5000 * n) },
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 50 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOAB, setOCD]) }),
   BenchmarkInfo(
@@ -228,12 +228,12 @@ public let SetTests = [
     setUpFunction: { blackHole([setP, setQ]) }),
 
   BenchmarkInfo(
-    name: "SetSubtractingEmptyInt0",
+    name: "Set.Empty.SubtractingInt0",
     runFunction: { n in run_SetSubtractingInt(setE, setAB, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setE, setAB]) }),
   BenchmarkInfo(
-    name: "SetSubtractingEmptyBox0",
+    name: "Set.Empty.SubtractingBox0",
     runFunction: { n in run_SetSubtractingBox(setOE, setOAB, 0, 10 * n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setOE, setOAB]) }),
