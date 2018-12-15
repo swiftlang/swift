@@ -2914,6 +2914,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::EnumElementDecl:
   case TypeResolverContext::EnumPatternPayload:
   case TypeResolverContext::TypeAliasDecl:
+  case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
   case TypeResolverContext::ImmediateOptionalTypeArgument:
   case TypeResolverContext::InExpression:
