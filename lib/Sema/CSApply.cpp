@@ -2831,7 +2831,23 @@ namespace {
     }
 
     Expr *visitTupleExpr(TupleExpr *expr) {
-      return simplifyExprType(expr);
+      auto toType = simplifyType(cs.getType(expr))->castTo<TupleType>();
+      cs.setType(expr, toType);
+
+      ConstraintLocatorBuilder locator(cs.getConstraintLocator(expr));
+      for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        auto *element = expr->getElement(i);
+
+        auto eltType = cs.getType(element);
+        if (eltType->isEqual(toType->getElementType(i)))
+          continue;
+
+        auto eltLoc =
+            locator.withPathElement(LocatorPathElt::getTupleElement(i));
+        expr->setElement(
+            i, coerceToType(element, toType->getElementType(i), eltLoc));
+      }
+      return expr;
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
