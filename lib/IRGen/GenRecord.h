@@ -486,6 +486,12 @@ public:
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
+
+    // Unwrap one-element tuples; they show up here when emitting enum metadata.
+    if (auto tupleTy = T.getAs<TupleType>())
+      if (tupleTy->getNumElements() == 1)
+        return;
+
     collector.collectTypeMetadataForLayout(T);
   }
 };

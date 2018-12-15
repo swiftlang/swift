@@ -623,9 +623,8 @@ namespace {
       assert(ElementsWithPayload.size() == 1 &&
              "empty singleton enum should not be dynamic!");
 
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
-      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
+      auto payloadLayout = emitEnumPayloadLayoutRef(
+          IGF, T, ElementsWithPayload[0].decl, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumMetadataSingleCaseFn(),
@@ -2960,9 +2959,8 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            IGM.getSILModule());
-      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
+      auto payloadLayout = emitEnumPayloadLayoutRef(
+          IGF, T, ElementsWithPayload[0].decl, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
       auto flags = emitEnumLayoutFlags(IGM, isVWTMutable);
@@ -5009,11 +5007,9 @@ namespace {
                                                   IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
         
-        auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
-        
-        auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
-        
-        IGF.Builder.CreateStore(metadata, eltAddr);
+        auto payloadLayout = emitEnumPayloadLayoutRef(IGF, T, elt.decl,
+                                                      collector);
+        IGF.Builder.CreateStore(payloadLayout, eltAddr);
       }
       assert(firstAddr && "Expected firstAddr to be assigned to");
 
@@ -6176,6 +6172,22 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
   }
   TI = mutableTI;
   return mutableTI;
+}
+
+llvm::Value *
+EnumImplStrategy::emitEnumPayloadLayoutRef(IRGenFunction &IGF,
+                                           SILType T,
+                                           EnumElementDecl *elt,
+                                MetadataDependencyCollector *collector) const {
+  auto payloadTy = T.getEnumElementType(elt, IGM.getSILModule());
+
+  // We normally ban one-element tuples, but they can come up in enum cases.
+  // Unwrap the type since we can't represent one-element tuple metadata.
+  if (auto tupleTy = payloadTy.getAs<TupleType>())
+    if (tupleTy->getNumElements() == 1)
+    payloadTy = payloadTy.getTupleElementType(0);
+
+  return emitTypeLayoutRef(IGF, payloadTy, collector);
 }
 
 TypeInfo *

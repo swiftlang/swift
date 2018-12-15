@@ -160,6 +160,11 @@ protected:
                                  Alignment A, IsPOD_t isPOD,
                                  IsBitwiseTakable_t isBT);
   
+  llvm::Value *emitEnumPayloadLayoutRef(IRGenFunction &IGF,
+                                        SILType T,
+                                        EnumElementDecl *elt,
+                                        MetadataDependencyCollector *collector) const;
+
 public:
   virtual ~EnumImplStrategy() { }
   
