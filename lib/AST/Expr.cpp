@@ -2200,9 +2200,9 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
     ? nullptr : indexHashables.data();
 
   if (subscriptLabels.empty()) {
-    technicated.TupleIndex = fieldNumber;
+    TupleIndex = fieldNumber;
   } else {
-    technicated.SubscriptSize = subscriptLabels.size();
+    SubscriptSize = subscriptLabels.size();
   }
 }
 
@@ -2220,7 +2220,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
     ArrayRef<ProtocolConformanceRef> hashables) {
   switch (getKind()) {
   case Kind::Subscript:
-    assert(hashables.size() == technicated.SubscriptSize);
+    assert(hashables.size() == SubscriptSize);
     SubscriptHashableConformancesData = getComponentType()->getASTContext()
       .AllocateCopy(hashables)
       .data();
