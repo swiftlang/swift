@@ -2322,26 +2322,26 @@ function(add_swift_host_tool executable)
       "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
 
+  precondition(ADDSWIFTHOSTTOOL_SWIFT_COMPONENT
+               MESSAGE "Swift Component is required to add a host tool")
+
   # Create the executable rule.
   add_swift_executable(
     ${executable} 
     ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
   )
 
-  # And then create the install rule if we are asked to.
-  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      TARGETS ${executable}
-      RUNTIME DESTINATION bin)
+  swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    TARGETS ${executable}
+    RUNTIME DESTINATION bin)
 
-    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      is_installing)
-  
-    if(NOT is_installing)
-      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
-    else()
-      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
-    endif()
+  swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    is_installing)
+
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
   endif()
 endfunction()
 
