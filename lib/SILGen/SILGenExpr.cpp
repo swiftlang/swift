@@ -3577,9 +3577,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 KeyPathPatternComponent
 SILGenModule::emitKeyPathComponentForTupleElement(unsigned tupleIndex,
                                                   CanType baseTy) {
-  if (!baseTy->is<TupleType>()) {
-    llvm_unreachable("baseTy is expected to be a TupleType");
-  }
+  assert(baseTy->is<TupleType>() && "baseTy is expected to be a TupleType");
 
   auto elementTy = baseTy->getAs<TupleType>()
     ->getElementType(tupleIndex)
