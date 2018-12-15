@@ -1107,10 +1107,8 @@ emitKeyPathComponent(IRGenModule &IGM,
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
   case KeyPathPatternComponent::Kind::TupleElement:
-    if (!baseTy->is<TupleType>()) {
-      llvm_unreachable("not a tuple");
-    }
-
+    assert(baseTy->is<TupleType>() && "not a tuple");
+          
     SILType loweredTy = IGM.getSILTypes().getLoweredType(baseTy);
 
     if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
