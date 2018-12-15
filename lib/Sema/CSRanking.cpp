@@ -1133,17 +1133,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The systems are not considered equivalent.
     identical = false;
 
-    // If one type is convertible to of the other, but not vice-versa.
-    type1Better = tc.isConvertibleTo(type1, type2, cs.DC);
-    type2Better = tc.isConvertibleTo(type2, type1, cs.DC);
-    if (type1Better || type2Better) {
-      if (type1Better)
-        ++score1;
-      if (type2Better)
-        ++score2;
-      continue;
-    }
-
     // A concrete type is better than an archetype.
     // FIXME: Total hack.
     if (type1->is<ArchetypeType>() != type2->is<ArchetypeType>()) {
