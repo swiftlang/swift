@@ -893,6 +893,9 @@ static bool isObjCForUnownedReference(void *value) {
 
 UnownedReference *swift::swift_unknownObjectUnownedInit(UnownedReference *dest,
                                                         void *value) {
+  // Note that LLDB also needs to know about the memory layout of unowned
+  // references. The implementation here needs to be kept in sync with
+  // lldb_private::SwiftLanguagueRuntime.
   if (!value) {
     dest->Value = nullptr;
   } else if (isObjCForUnownedReference(value)) {
