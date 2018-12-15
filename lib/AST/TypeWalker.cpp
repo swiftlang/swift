@@ -169,6 +169,14 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
     return false;
   }
+  
+  bool visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *ty) {
+    for (auto arg : ty->getSubstitutions().getReplacementTypes()) {
+      if (doIt(arg))
+        return true;
+    }
+    return false;
+  }
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
   

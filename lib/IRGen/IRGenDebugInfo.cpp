@@ -1344,6 +1344,9 @@ private:
     case TypeKind::InOut:
       break;
 
+    case TypeKind::OpaqueTypeArchetype:
+      // TODO: opaque type resilience
+      llvm_unreachable("should be lowered to underlying type; resilience not implemented");
     case TypeKind::PrimaryArchetype:
     case TypeKind::OpenedArchetype:
     case TypeKind::NestedArchetype: {
