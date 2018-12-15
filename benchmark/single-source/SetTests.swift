@@ -16,6 +16,10 @@ let size = 400
 let half = size / 2
 let quarter = size / 4
 
+// Construction of empty sets.
+let setE: Set<Int> = []
+let setOE: Set<Box<Int>> = []
+
 // Construction kit for sets with 25% overlap
 let setAB = Set(0 ..< size)                              //   0 ..< 400
 let setCD = Set(size ..< 2 * size)                       // 400 ..< 800
@@ -54,6 +58,11 @@ let setQ: Set<Int> = {
 public let SetTests = [
   // Mnemonic: number after name is percentage of common elements in input sets.
   BenchmarkInfo(
+    name: "Set.Empty.IsSubsetInt0",
+    runFunction: { n in run_SetIsSubsetInt(setE, setAB, true, 5000 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
     name: "SetIsSubsetInt0",
     runFunction: { n in run_SetIsSubsetInt(setAB, setCD, false, 5000 * n) },
     tags: [.validation, .api, .Set],
@@ -84,6 +93,47 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
+  BenchmarkInfo(
+    name: "Set.Empty.IsDisjointInt0",
+    runFunction: { n in run_SetIsDisjointInt(setE, setAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.Empty.IsDisjointBox0",
+    runFunction: { n in run_SetIsDisjointBox(setOE, setOAB, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, setOAB]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt0",
+    runFunction: { n in run_SetIsDisjointInt(setAB, setCD, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setAB, setCD]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointBox0",
+    runFunction: { n in run_SetIsDisjointBox(setOAB, setOCD, true, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOAB, setOCD]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt25",
+    runFunction: { n in run_SetIsDisjointInt(setB, setAB, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setB, setAB]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointBox25",
+    runFunction: { n in run_SetIsDisjointBox(setOB, setOAB, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOB, setOAB]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt50",
+    runFunction: { n in run_SetIsDisjointInt(setY, setXY, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setY, setXY]) }),
+  BenchmarkInfo(
+    name: "SetIsDisjointInt100",
+    runFunction: { n in run_SetIsDisjointInt(setP, setQ, false, 50 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setP, setQ]) }),
+  
   BenchmarkInfo(
     name: "SetSymmetricDifferenceInt0",
     runFunction: { n in run_SetSymmetricDifferenceInt(setAB, setCD, countABCD, 10 * n) },
@@ -177,6 +227,16 @@ public let SetTests = [
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole([setP, setQ]) }),
 
+  BenchmarkInfo(
+    name: "Set.Empty.SubtractingInt0",
+    runFunction: { n in run_SetSubtractingInt(setE, setAB, 0, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, setAB]) }),
+  BenchmarkInfo(
+    name: "Set.Empty.SubtractingBox0",
+    runFunction: { n in run_SetSubtractingBox(setOE, setOAB, 0, 10 * n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, setOAB]) }),
   BenchmarkInfo(
     name: "SetSubtractingInt0",
     runFunction: { n in run_SetSubtractingInt(setAB, setCD, countAB, 10 * n) },
@@ -296,6 +356,18 @@ public func run_SetSubtractingInt(
   }
 }
 
+@inline(never)
+public func run_SetIsDisjointInt(
+    _ a: Set<Int>,
+    _ b: Set<Int>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
+}
+
 class Box<T : Hashable> : Hashable {
   var value: T
 
@@ -370,4 +442,16 @@ func run_SetSubtractingBox(
     let and = a.subtracting(b)
     CheckResults(and.count == r)
   }
+}
+
+@inline(never)
+func run_SetIsDisjointBox(
+    _ a: Set<Box<Int>>,
+    _ b: Set<Box<Int>>,
+    _ r: Bool,
+    _ n: Int) {
+    for _ in 0 ..< n {
+        let isDisjoint = a.isDisjoint(with: identity(b))
+        CheckResults(isDisjoint == r)
+    }
 }

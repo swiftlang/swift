@@ -712,7 +712,8 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSubset<S: Sequence>(of possibleSuperset: S) -> Bool
   where S.Element == Element {
-    // FIXME(performance): isEmpty fast path, here and elsewhere.
+    guard !isEmpty else { return true }
+    
     let other = Set(possibleSuperset)
     return isSubset(of: other)
   }
@@ -763,10 +764,12 @@ extension Set: SetAlgebra {
   @inlinable
   public func isSuperset<S: Sequence>(of possibleSubset: __owned S) -> Bool
     where S.Element == Element {
-    // FIXME(performance): Don't build a set; just ask if every element is in
-    // `self`.
-    let other = Set(possibleSubset)
-    return other.isSubset(of: self)
+    for member in possibleSubset {
+      if !contains(member) {
+        return false
+      }
+    }
+    return true
   }
 
   /// Returns a Boolean value that indicates whether the set is a strict
@@ -811,9 +814,7 @@ extension Set: SetAlgebra {
   @inlinable
   public func isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
-    // FIXME(performance): Don't need to build a set.
-    let otherSet = Set(other)
-    return isDisjoint(with: otherSet)
+    return _isDisjoint(with: other)
   }
 
   /// Returns a new set with the elements of both this set and the given
@@ -920,6 +921,10 @@ extension Set: SetAlgebra {
   @inlinable
   internal mutating func _subtract<S: Sequence>(_ other: S)
   where S.Element == Element {
+    // If self is empty we don't need to iterate over `other` because there's
+    // nothing to remove on self.
+    guard !isEmpty else { return }
+
     for item in other {
       remove(item)
     }
@@ -1121,8 +1126,16 @@ extension Set {
   ///   otherwise, `false`.
   @inlinable
   public func isDisjoint(with other: Set<Element>) -> Bool {
-    for member in self {
-      if other.contains(member) {
+    return _isDisjoint(with: other)
+  }
+    
+  @inlinable
+  internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
+  where S.Element == Element {
+    guard !isEmpty else { return true }
+
+    for member in other {
+      if contains(member) {
         return false
       }
     }
