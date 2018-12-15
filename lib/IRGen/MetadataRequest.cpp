@@ -800,9 +800,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                         emitEmptyTupleTypeMetadataRef(IGF.IGM));
 
   case 1:
-    // For metadata purposes, we consider a singleton tuple to be
-    // isomorphic to its element type. ???
-    return getMetadataRecursive(type.getElementType(0), request);
+    llvm_unreachable("One-element tuples do not exist");
 
   case 2: {
     auto elt0Metadata = getElementMetadata(type.getElementType(0));
