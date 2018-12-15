@@ -41,16 +41,17 @@ using namespace swift::driver;
 
 using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
 
-LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path) {
+LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
+                                     DiagnosticEngine &diags) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
   // For debugging, emit dot files before and after.
   // TODO: add flag to control dot file creation
-  emitDotFileForJob(None, Cmd);
+  emitDotFileForJob(diags, Cmd);
   verify();
   auto r = loadFromBuffer(Cmd, *buffer.get());
-  emitDotFileForJob(None, Cmd);
+  emitDotFileForJob(diags, Cmd);
   verify();
   return r;
 }
@@ -338,9 +339,8 @@ void DriverGraph::checkTransitiveClosureForCascading(
 
 // Emitting Dot file for DriverGraph ===========================================
 
-void DriverGraph::emitDotFileForJob(Optional<DiagnosticEngine *> DiagsMaybe,
-                                    const Job *job) {
-  emitDotFile(DiagsMaybe, dotFilenameForJob(job));
+void DriverGraph::emitDotFileForJob(DiagnosticEngine &diags, const Job *job) {
+  emitDotFile(diags, dotFilenameForJob(job));
 }
 
 std::string DriverGraph::dotFilenameForJob(const Job *job) {
@@ -349,20 +349,11 @@ std::string DriverGraph::dotFilenameForJob(const Job *job) {
   return dependenciesFile.str() + "." + std::to_string(seqNo) + ".dot";
 }
 
-void DriverGraph::emitDotFile(Optional<DiagnosticEngine *> DiagsMaybe,
-                              StringRef outputPath) {
-  if (DiagsMaybe)
-    withOutputFile(*(DiagsMaybe.getValue()), outputPath,
-                   [&](llvm::raw_ostream &out) {
-                     emitDotFile(out);
-                     return false;
-                   });
-  else {
-    std::error_code EC;
-    llvm::raw_fd_ostream out(outputPath, EC);
-    if (!EC)
-      emitDotFile(out);
-  }
+void DriverGraph::emitDotFile(DiagnosticEngine &diags, StringRef outputPath) {
+  withOutputFile(diags, outputPath, [&](llvm::raw_ostream &out) {
+    emitDotFile(out);
+    return false;
+  });
 }
 
 void DriverGraph::emitDotFile(llvm::raw_ostream &out) {

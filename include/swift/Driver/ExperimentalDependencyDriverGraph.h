@@ -182,7 +182,8 @@ public:
 
   DriverGraph() = default;
 
-  DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef);
+  DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
+                                               DiagnosticEngine &);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -297,11 +298,11 @@ private:
 
   /// For debugging, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
-  void emitDotFileForJob(Optional<DiagnosticEngine *>, const driver::Job *);
+  void emitDotFileForJob(DiagnosticEngine &, const driver::Job *);
 
   std::string dotFilenameForJob(const driver::Job *);
 
-  void emitDotFile(Optional<DiagnosticEngine *>, StringRef outputPath);
+  void emitDotFile(DiagnosticEngine &, StringRef outputPath);
   void emitDotFile() { emitDotFile(llvm::errs()); }
   void emitDotFile(llvm::raw_ostream &);
 
