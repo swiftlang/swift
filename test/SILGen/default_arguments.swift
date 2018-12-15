@@ -367,3 +367,13 @@ func callThem() throws {
    defaultEscaping()
    autoclosureDefaultEscaping()
 }
+
+func tupleDefaultArg(x: (Int, Int) = (1, 2)) {}
+
+// CHECK-LABEL: sil hidden @$s17default_arguments19callTupleDefaultArgyyF : $@convention(thin) () -> ()
+// CHECK: function_ref @$s17default_arguments15tupleDefaultArg1xySi_Sit_tFfA_ : $@convention(thin) () -> (Int, Int)
+// CHECK: function_ref @$s17default_arguments15tupleDefaultArg1xySi_Sit_tF : $@convention(thin) (Int, Int) -> ()
+// CHECK: return
+func callTupleDefaultArg() {
+  tupleDefaultArg()
+}
