@@ -2815,11 +2815,7 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
-      auto &ctx = cs.getASTContext();
-      auto pty = cs.getType(expr->getSubExpr());
-      cs.setType(expr, ParenType::get(ctx, pty->getInOutObjectType(),
-                                      ParameterTypeFlags().withInOut(pty->is<InOutType>())));
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitTupleExpr(TupleExpr *expr) {
