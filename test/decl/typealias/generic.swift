@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct MyType<TyA, TyB> {
+struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
   var a : TyA, b : TyB
 }
 
@@ -105,6 +105,9 @@ _ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
 _ = G(a: "foo", b: 42)
 _ = G<Int, String>(a: "foo", b: 42)
 
+// Generic typealias cannot have unbound generic type.
+typealias VeryBad1<T> = MyType // expected-error {{reference to generic type 'MyType' requires arguments in <...>}}
+typealias VeryBad2<T> = Swift.Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}}
 
 struct MyTypeWithHashable<TyA, TyB : Hashable> {
 }
