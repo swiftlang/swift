@@ -13,7 +13,13 @@
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
+#endif
+#if defined(_WIN32)
+#include <io.h>
+#include <process.h>
+#endif
 
 #include "swift/Runtime/Config.h"
 
@@ -21,15 +27,21 @@ static void CrashCatcher(int Sig) {
   const char *Msg;
   switch (Sig) {
     case SIGILL:  Msg = "CRASHED: SIGILL\n";  break;
-    case SIGTRAP: Msg = "CRASHED: SIGTRAP\n"; break;
     case SIGABRT: Msg = "CRASHED: SIGABRT\n"; break;
     case SIGFPE:  Msg = "CRASHED: SIGFPE\n";  break;
-    case SIGBUS:  Msg = "CRASHED: SIGBUS\n";  break;
     case SIGSEGV: Msg = "CRASHED: SIGSEGV\n"; break;
+#if !defined(_WIN32)
+    case SIGTRAP: Msg = "CRASHED: SIGTRAP\n"; break;
+    case SIGBUS:  Msg = "CRASHED: SIGBUS\n";  break;
     case SIGSYS:  Msg = "CRASHED: SIGSYS\n";  break;
+#endif
     default:      Msg = "CRASHED: SIG????\n"; break;
   }
+#if defined(_WIN32)
+  _write(_fileno(stderr), Msg, strlen(Msg));
+#else
   write(STDERR_FILENO, Msg, strlen(Msg));
+#endif
   _exit(0);
 }
 
@@ -39,11 +51,13 @@ void installTrapInterceptor() {
   setbuf(stdout, 0);
 
   signal(SIGILL,  CrashCatcher);
-  signal(SIGTRAP, CrashCatcher);
   signal(SIGABRT, CrashCatcher);
   signal(SIGFPE,  CrashCatcher);
-  signal(SIGBUS,  CrashCatcher);
   signal(SIGSEGV, CrashCatcher);
+#if !defined(_WIN32)
+  signal(SIGTRAP, CrashCatcher);
+  signal(SIGBUS,  CrashCatcher);
   signal(SIGSYS,  CrashCatcher);
+#endif
 }
 
