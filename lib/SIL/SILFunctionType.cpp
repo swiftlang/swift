@@ -2713,7 +2713,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   // Build the curried function type.
   auto inner =
     CanFunctionType::get(llvm::makeArrayRef(bridgedParams),
-                         bridgedResultType);
+                         bridgedResultType, innerExtInfo);
 
   auto curried =
     CanAnyFunctionType::get(genericSig, {selfParam}, inner, extInfo);
