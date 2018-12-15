@@ -1099,29 +1099,7 @@ void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() ||
-         !LazyFieldTypes.empty() ||
          !LazyWitnessTables.empty()) {
-
-    while (!LazyFieldTypes.empty()) {
-      auto info = LazyFieldTypes.pop_back_val();
-      auto &IGM = *info.IGM;
-
-      for (auto fieldType : info.fieldTypes) {
-        if (fieldType->hasArchetype())
-          continue;
-
-        // All of the required attributes are going to be preserved
-        // by field reflection metadata in the mangled name, so
-        // there is no need to worry about ownership semantics here.
-        if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldType))
-          fieldType = refStorTy.getReferentType();
-
-        // Make sure that all of the field type metadata is forced,
-        // otherwise there might be a problem when fields are accessed
-        // through reflection.
-        (void)irgen::getOrCreateTypeMetadataAccessFunction(IGM, fieldType);
-      }
-    }
 
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
