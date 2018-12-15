@@ -360,7 +360,7 @@ public:
                               bool forPropertyDescriptor);
 
   KeyPathPatternComponent
-  emitKeyPathComponentForTupleElement();
+  emitKeyPathComponentForTupleElement(unsigned tupleIndex, CanType baseTy);
     
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();

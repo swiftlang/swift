@@ -24,6 +24,7 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenStruct.h"
+#include "GenTuple.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
@@ -1106,8 +1107,22 @@ emitKeyPathComponent(IRGenModule &IGM,
     fields.addInt32(KeyPathComponentHeader::forOptionalWrap().getData());
     break;
   case KeyPathPatternComponent::Kind::TupleElement:
-    llvm_unreachable("[technicated]");
-    break;
+    if (!baseTy->is<TupleType>()) {
+      llvm_unreachable("not a tuple");
+    }
+
+    SILType loweredTy = IGM.getSILTypes().getLoweredType(baseTy);
+
+    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
+      auto header = KeyPathComponentHeader
+                      ::forStructComponentWithInlineOffset(/*isLet*/ false,
+                                                           offset->getValue());
+        
+      fields.addInt32(header.getData());
+      break;
+    }
+          
+    llvm_unreachable("could not get element offset");
   }
 }
 

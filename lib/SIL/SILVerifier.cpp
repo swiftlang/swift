@@ -385,7 +385,7 @@ void verifyKeyPathComponent(SILModule &M,
     break;
   }
   case KeyPathPatternComponent::Kind::TupleElement: {
-    llvm_unreachable("[technicated]");
+    //llvm_unreachable("[technicated]");
     break;
   }
   }

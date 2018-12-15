@@ -2397,10 +2397,10 @@ public:
     StoredProperty,
     GettableProperty,
     SettableProperty,
+    TupleElement,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
-    TupleElement,
   };
   
   // Description of a captured index value and its Hashable conformance for a
@@ -2439,7 +2439,10 @@ private:
   // Value is the VarDecl* for StoredProperty, the SILFunction* of the
   // Getter for computed properties, or the Kind for other kinds
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
-  llvm::PointerIntPair<SILFunction *, 2,
+  
+  // Setter is the SILFunction* of the Setter for computed properties, or the
+  // tuple index for tuple elements
+  llvm::PointerIntPair<void *, 2,
                        ComputedPropertyId::KindType> SetterAndIdKind;
   ComputedPropertyId::ValueType IdValue;
   ArrayRef<Index> Indices;
@@ -2486,6 +2489,15 @@ private:
            && "not an optional component");
   }
 
+  /// Constructor for tuple element.
+  KeyPathPatternComponent(unsigned tupleIndex, CanType componentType)
+    : ValueAndKind((void*)((uintptr_t)Kind::TupleElement << KindPackingBits), PackedStored),
+    SetterAndIdKind((void*)((uintptr_t)tupleIndex << 2), (ComputedPropertyId::KindType)0),
+    ComponentType(componentType)
+  {
+    // fixme: [technicated] magic << 2 shift
+  }
+
 public:
   KeyPathPatternComponent() : ValueAndKind(nullptr, 0) {}
 
@@ -2497,7 +2509,8 @@ public:
     auto packedKind = ValueAndKind.getInt();
     switch ((PackedKind)packedKind) {
     case PackedStored:
-      return Kind::StoredProperty;
+      return SetterAndIdKind.getPointer()
+        ? Kind::TupleElement : Kind::StoredProperty;
     case PackedComputed:
       return SetterAndIdKind.getPointer()
         ? Kind::SettableProperty : Kind::GettableProperty;
@@ -2567,7 +2580,7 @@ public:
     case Kind::TupleElement:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return SetterAndIdKind.getPointer();
+      return static_cast<SILFunction*>(SetterAndIdKind.getPointer());
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2663,7 +2676,8 @@ public:
     case Kind::SettableProperty:
       llvm_unreachable("not a tuple element");
     case Kind::TupleElement:
-      llvm_unreachable("[technicated]");
+      // fixme: [technicated] magic >> 2 shift
+      return (uintptr_t)SetterAndIdKind.getPointer() >> 2;
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2718,6 +2732,11 @@ public:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);
+  }
+    
+  static KeyPathPatternComponent forTupleElement(unsigned tupleIndex,
+                                                 CanType ty) {
+    return KeyPathPatternComponent(tupleIndex, ty);
   }
   
   void incrementRefCounts() const;

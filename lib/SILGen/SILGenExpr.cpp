@@ -3575,8 +3575,17 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 }
 
 KeyPathPatternComponent
-SILGenModule::emitKeyPathComponentForTupleElement() {
-    llvm_unreachable("technicated");
+SILGenModule::emitKeyPathComponentForTupleElement(unsigned tupleIndex,
+                                                  CanType baseTy) {
+  if (!baseTy->is<TupleType>()) {
+    llvm_unreachable("baseTy is expected to be a TupleType");
+  }
+
+  auto elementTy = baseTy->getAs<TupleType>()
+    ->getElementType(tupleIndex)
+    ->getCanonicalType();
+
+  return KeyPathPatternComponent::forTupleElement(tupleIndex, elementTy);
 }
 
 RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
@@ -3650,8 +3659,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     }
 
     case KeyPathExpr::Component::Kind::TupleElement: {
+      auto tupleIndex = component.getTupleIndex();
       loweredComponents.push_back(
-        SGF.SGM.emitKeyPathComponentForTupleElement());
+        SGF.SGM.emitKeyPathComponentForTupleElement(tupleIndex,
+                                                    baseTy));
 
       baseTy = loweredComponents.back().getComponentType();
 
