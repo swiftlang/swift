@@ -177,6 +177,11 @@ static Type getOpaqueResultType(TypeChecker &tc,
                                 TypeResolution resolution,
                                 ValueDecl *originatingDecl,
                                 OpaqueReturnTypeRepr *repr) {
+  // If the decl already has an opaque type decl for its return type, use it.
+  if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
+    return existingDecl->getDeclaredInterfaceType();
+  }
+  
   // Try to resolve the constraint repr. It should be some kind of existential
   // type.
   TypeResolutionOptions options(TypeResolverContext::FunctionResult);
@@ -203,8 +208,8 @@ static Type getOpaqueResultType(TypeChecker &tc,
   SmallVector<Requirement, 4> interfaceRequirements;
 
   auto originatingDC = originatingDecl->getInnermostDeclContext();
-  if (auto outerGenericSignature =
-      originatingDC->getGenericSignatureOfContext()) {
+  auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
+  if (outerGenericSignature) {
     std::copy(outerGenericSignature->getGenericParams().begin(),
               outerGenericSignature->getGenericParams().end(),
               std::back_inserter(interfaceGenericParams));
@@ -262,12 +267,15 @@ static Type getOpaqueResultType(TypeChecker &tc,
 
   originatingDecl->setOpaqueResultTypeDecl(opaqueDecl);
   
-  // TODO: The declared interface type should be an opaque ArchetypeType,
-  // when that's supported.
-  auto errorType = ErrorType::get(constraintTypeLoc.getType());
-  auto errorMetatype = MetatypeType::get(errorType);
-  opaqueDecl->setInterfaceType(errorMetatype);
-  return errorType;
+  // The declared interface type is an opaque ArchetypeType.
+  SubstitutionMap subs;
+  if (outerGenericSignature) {
+    subs = outerGenericSignature->getIdentitySubstitutionMap();
+  }
+  auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
+  auto metatype = MetatypeType::get(opaqueTy);
+  opaqueDecl->setInterfaceType(metatype);
+  return opaqueTy;
 }
 
 /// Check the signature of a generic function.
