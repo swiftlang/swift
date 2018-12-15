@@ -871,6 +871,10 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
+    case TypeKind::OpaqueTypeArchetype:
+#warning "todo"
+      llvm_unreachable("TODO");
+      
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);
       if (dynamicSelf->getSelfType()->getAnyNominal()) {

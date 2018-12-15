@@ -53,8 +53,10 @@ namespace swift {
   class GenericTypeParamType;
   class GenericParamList;
   class GenericSignature;
+  class GenericSignatureBuilder;
   class Identifier;
   class InOutType;
+  class OpaqueTypeDecl;
   class OpenedArchetypeType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
@@ -4757,6 +4759,65 @@ private:
 BEGIN_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(PrimaryArchetypeType, ArchetypeType)
 
+/// An archetype that represents an opaque type.
+class OpaqueTypeArchetypeType final : public ArchetypeType,
+    public llvm::FoldingSetNode,
+    private ArchetypeTrailingObjects<OpaqueTypeArchetypeType>
+{
+  friend TrailingObjects;
+  friend ArchetypeType;
+  friend GenericSignatureBuilder;
+
+  /// The declaration that defines the opaque type.
+  OpaqueTypeDecl *OpaqueDecl;
+  /// The substitutions into the interface signature of the opaque type.
+  SubstitutionMap Substitutions;
+  
+  /// The generic signature used to build out this archetype, and its
+  /// nested archetypes.
+  GenericSignature *BoundSignature;
+  
+public:
+  /// Get an opaque archetype representing the underlying type of the given
+  /// opaque type decl.
+  static OpaqueTypeArchetypeType *
+  get(OpaqueTypeDecl *Decl,
+      SubstitutionMap Substitutions);
+  
+  OpaqueTypeDecl *getOpaqueDecl() const {
+    return OpaqueDecl;
+  }
+  SubstitutionMap getSubstitutions() const {
+    return Substitutions;
+  }
+  
+  /// Get the underlying type of the opaque type, if it's known.
+  Type getUnderlyingType() const;
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::OpaqueTypeArchetype;
+  }
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      OpaqueTypeDecl *OpaqueDecl,
+                      SubstitutionMap Substitutions);
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getOpaqueDecl(), getSubstitutions());
+  };
+  
+private:
+  OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
+                          SubstitutionMap Substitutions,
+                          RecursiveTypeProperties Props,
+                          GenericSignature *BoundSignature,
+                          Type InterfaceType,
+                          ArrayRef<ProtocolDecl*> ConformsTo,
+                          Type Superclass, LayoutConstraint Layout);
+};
+BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+  
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,
     private ArchetypeTrailingObjects<OpenedArchetypeType>
@@ -4852,6 +4913,9 @@ template<typename Type>
 const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto contextTy = dyn_cast<PrimaryArchetypeType>(this)) {
     return contextTy->getTrailingObjects<Type>();
+  }
+  if (auto opaqueTy = dyn_cast<OpaqueTypeArchetypeType>(this)) {
+    return opaqueTy->getTrailingObjects<Type>();
   }
   if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
     return openedTy->getTrailingObjects<Type>();

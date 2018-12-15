@@ -4044,6 +4044,20 @@ public:
   void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
     printArchetypeCommon(T);
   }
+  
+  void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
+#warning "todo"
+    Printer << "(__opaque " << T->getOpaqueDecl()->getNamingDecl()->printRef();
+    if (!T->getSubstitutions().empty()) {
+      Printer << '<';
+      auto replacements = T->getSubstitutions().getReplacementTypes();
+      interleave(replacements.begin(), replacements.end(),
+                 [&](Type t) { visit(t); },
+                 [&] { Printer << ", "; });
+      Printer << '>';
+    }
+    Printer << ')';
+  }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     if (T->getDecl() == nullptr) {

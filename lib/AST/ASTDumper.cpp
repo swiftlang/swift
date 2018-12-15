@@ -3411,6 +3411,20 @@ namespace {
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+    void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
+                                      StringRef label) {
+      printArchetypeCommon(T, "opaque_type", label);
+      printField("decl", T->getOpaqueDecl()->getNamingDecl()->printRef());
+      if (!T->getSubstitutions().empty()) {
+        OS << '\n';
+        SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+        dumpSubstitutionMapRec(T->getSubstitutions(), OS,
+                               SubstitutionMap::DumpStyle::Full,
+                               Indent + 2, Dumped);
+      }
+      printArchetypeNestedTypes(T);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitGenericTypeParamType(GenericTypeParamType *T, StringRef label) {
       printCommon(label, "generic_type_param_type");
