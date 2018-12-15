@@ -1317,11 +1317,42 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   return getTypeMatchFailure(locator);
 }
 
+static ConstraintSystem::TypeMatchResult
+matchDeepTypeArguments(ConstraintSystem &cs,
+                       ConstraintSystem::TypeMatchOptions subflags,
+                       ArrayRef<Type> args1,
+                       ArrayRef<Type> args2,
+                       ConstraintLocatorBuilder locator) {
+  if (args1.size() != args2.size()) {
+    return cs.getTypeMatchFailure(locator);
+  }
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    auto result = cs.matchTypes(args1[i], args2[i], ConstraintKind::Bind,
+                                subflags, locator.withPathElement(
+                                        LocatorPathElt::getGenericArgument(i)));
+
+    if (result.isFailure())
+      return result;
+  }
+
+  return cs.getTypeMatchSuccess();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = TMF_GenerateConstraints;
 
+  // Handle opaque archetypes.
+  if (auto opaque1 = type1->getAs<OpaqueTypeArchetypeType>()) {
+    auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
+    
+    auto args1 = opaque1->getSubstitutions().getReplacementTypes();
+    auto args2 = opaque2->getSubstitutions().getReplacementTypes();
+    // Match up the replacement types of the respective substitution maps.
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+  }
+  
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -1356,19 +1387,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  if (args1.size() != args2.size()) {
-    return getTypeMatchFailure(locator);
-  }
-  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = matchTypes(args1[i], args2[i], ConstraintKind::Equal,
-                             subflags, locator.withPathElement(
-                                        LocatorPathElt::getGenericArgument(i)));
-
-    if (result.isFailure())
-      return result;
-  }
-
-  return getTypeMatchSuccess();
+  return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2047,6 +2066,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
       break;
     }
+
+    case TypeKind::OpaqueTypeArchetype: {
+      auto opaque1 = cast<OpaqueTypeArchetypeType>(desugar1);
+      auto opaque2 = cast<OpaqueTypeArchetypeType>(desugar2);
+      
+      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
+      if (!type1->is<LValueType>()
+          && opaque1->getOpaqueDecl() == opaque2->getOpaqueDecl()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+        
     }
   }
 
@@ -2629,6 +2661,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::PrimaryArchetype:
   case TypeKind::OpenedArchetype:
   case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:

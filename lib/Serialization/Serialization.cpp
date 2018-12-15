@@ -3802,6 +3802,9 @@ void Serializer::writeType(Type ty) {
                                       addTypeRef(dynamicSelfTy->getSelfType()));
     break;
   }
+      
+  case TypeKind::OpaqueTypeArchetype:
+    llvm_unreachable("todo");
 
   case TypeKind::PrimaryArchetype:
   case TypeKind::NestedArchetype: {
