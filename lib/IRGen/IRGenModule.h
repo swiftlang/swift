@@ -241,14 +241,6 @@ private:
 
   llvm::SetVector<SILFunction*> DynamicReplacements;
 
-  struct FieldTypeMetadata {
-    IRGenModule *IGM;
-    std::vector<CanType> fieldTypes;
-  };
-
-  /// Field types we need to verify are present.
-  llvm::SmallVector<FieldTypeMetadata, 4> LazyFieldTypes;
-
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
 
@@ -367,6 +359,13 @@ public:
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
 
+  void noteUseOfTypeMetadata(Type type) {
+    type.visit([&](Type t) {
+      if (auto *nominal = t->getAnyNominal())
+        noteUseOfTypeMetadata(nominal);
+    });
+  }
+
   void noteUseOfTypeContextDescriptor(NominalTypeDecl *type,
                                       RequireMetadata_t requireMetadata) {
     noteUseOfTypeGlobals(type, false, requireMetadata);
@@ -386,9 +385,6 @@ public:
   /// Adds \p Conf to LazyWitnessTables if it has not been added yet.
   void addLazyWitnessTable(const ProtocolConformance *Conf);
 
-  void addFieldTypes(ArrayRef<CanType> fieldTypes, IRGenModule *IGM) {
-    LazyFieldTypes.push_back({IGM, {fieldTypes.begin(), fieldTypes.end()}});
-  }
 
   void addClassForEagerInitialization(ClassDecl *ClassDecl);
 
@@ -846,7 +842,6 @@ public:
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
-  void addFieldTypes(ArrayRef<CanType> fieldTypes);
   void addProtocolConformance(ConformanceDescription &&conformance);
 
   llvm::Constant *emitSwiftProtocols();
