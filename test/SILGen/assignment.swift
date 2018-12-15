@@ -49,3 +49,12 @@ func copyRightToLeft(p: inout P) {
   // CHECK:   end_access [[WRITE]] : $*P
   p.left = p.right
 }
+
+// SR-5919
+func stupidGames() -> ((), ()) {
+  return ((), ())
+}
+
+func assignToNestedVoid() {
+  let _: ((), ()) = stupidGames()
+}
