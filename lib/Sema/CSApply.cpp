@@ -431,16 +431,12 @@ namespace {
     /// \param sources The sources of each of the elements to be used in the
     /// resulting tuple, as provided by \c computeTupleShuffle.
     ///
-    /// \param variadicArgs The source indices that are mapped to the variadic
-    /// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
-    ///
     /// \param typeFromPattern Optionally, the caller can specify the pattern
     /// from where the toType is derived, so that we can deliver better fixit.
     Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                              TupleType *toTuple,
                              ConstraintLocatorBuilder locator,
-                             SmallVectorImpl<int> &sources,
-                             SmallVectorImpl<unsigned> &variadicArgs,
+                             SmallVectorImpl<unsigned> &sources,
                              Optional<Pattern*> typeFromPattern = None);
 
     /// Coerce a subclass, class-constrained archetype, class-constrained
@@ -5057,8 +5053,7 @@ static Type rebuildIdentityExprs(ConstraintSystem &cs, Expr *expr, Type type) {
 Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
-                                       SmallVectorImpl<int> &sources,
-                                       SmallVectorImpl<unsigned> &variadicArgs,
+                                       SmallVectorImpl<unsigned> &sources,
                                        Optional<Pattern*> typeFromPattern){
   auto &tc = cs.getTypeChecker();
 
@@ -5073,14 +5068,11 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                  fromTuple->getElements().size());
 
   for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
-    assert(sources[i] != TupleShuffleExpr::DefaultInitialize &&
-           sources[i] != TupleShuffleExpr::Variadic);
-
     const auto &toElt = toTuple->getElement(i);
     auto toEltType = toElt.getType();
 
     // If the source and destination index are different, we'll be shuffling.
-    if ((unsigned)sources[i] != i) {
+    if (sources[i] != i) {
       anythingShuffled = true;
     }
 
@@ -5157,11 +5149,22 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     return expr;
   }
-  
+
+  // computeTupleShuffle() produces an array of unsigned (since it can only
+  // contain tuple element indices). However TupleShuffleExpr is also used
+  // for call argument lists which can contain special things like default
+  // arguments and variadics; those are presented by negative integers.
+  //
+  // FIXME: Design and implement a new AST where argument lists are
+  // separate from rvalue tuple conversions.
+  ArrayRef<unsigned> sourcesRef = sources;
+  ArrayRef<int> sourcesCast((const int *) sourcesRef.data(),
+                            sourcesRef.size());
+
   // Create the tuple shuffle.
   return
     cs.cacheType(TupleShuffleExpr::create(tc.Context,
-                                          expr, sources,
+                                          expr, sourcesCast,
                                           TupleShuffleExpr::TupleToTuple,
                                           ConcreteDeclRef(), {}, Type(), {},
                                           toSugarType));
@@ -5302,15 +5305,12 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   if (auto tupleType = fromType->getAs<TupleType>()) {
     if (tupleType->hasLValueType()) {
       auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      bool failed = computeTupleShuffle(tupleType, toTuple,
-                                        sources, variadicArgs);
+      SmallVector<unsigned, 4> sources;
+      bool failed = computeTupleShuffle(tupleType, toTuple, sources);
       assert(!failed && "Couldn't convert tuple to tuple?");
       (void)failed;
 
-      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources,
-                         variadicArgs);
+      coerceTupleToTuple(expr, tupleType, toTuple, locator, sources);
     }
   }
 
@@ -6539,11 +6539,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (auto toTuple = toType->getAs<TupleType>()) {
     // Coerce from a tuple to a tuple.
     if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
+      SmallVector<unsigned, 4> sources;
+      if (!computeTupleShuffle(fromTuple, toTuple, sources)) {
         return coerceTupleToTuple(expr, fromTuple, toTuple,
-                                  locator, sources, variadicArgs);
+                                  locator, sources);
       }
     }
   }
