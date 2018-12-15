@@ -377,3 +377,9 @@ func tupleDefaultArg(x: (Int, Int) = (1, 2)) {}
 func callTupleDefaultArg() {
   tupleDefaultArg()
 }
+
+// FIXME: Should this be banned?
+func stupidGames(x: Int = 3) -> Int {
+  return x
+}
+stupidGames(x:)()
