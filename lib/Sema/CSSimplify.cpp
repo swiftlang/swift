@@ -1141,6 +1141,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             !params[0].isVariadic());
   };
 
+  auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
+    if (params.size() == 1)
+      return false;
+
+    for (auto param : params)
+      if (param.isVariadic() || param.isInOut())
+        return false;
+
+    return true;
+  };
+
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
     auto input = AnyFunctionType::composeInput(getASTContext(), params,
                                                /*canonicalVararg=*/false);
@@ -1161,21 +1172,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleParam(func2Params)) {
-          if (!isSingleParam(func1Params)) {
-            implodeParams(func1Params);
-          }
-        } else if (getASTContext().isSwiftVersionAtLeast(4)
-                   && !getASTContext().isSwiftVersionAtLeast(5)
-                   && !isSingleParam(func2Params)) {
+        if (isSingleParam(func2Params) &&
+            canImplodeParams(func1Params)) {
+          implodeParams(func1Params);
+        } else if (!getASTContext().isSwiftVersionAtLeast(5) &&
+                   isSingleParam(func1Params) &&
+                   canImplodeParams(func2Params)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
           if (simplified && isa<DeclRefExpr>(simplified)) {
-            if (isSingleParam(func1Params)) {
-              implodeParams(func2Params);
-            }
+            implodeParams(func2Params);
           }
         }
       }
