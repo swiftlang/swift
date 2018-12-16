@@ -664,8 +664,8 @@ ClosureSpecCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  if (!ClosureUser->hasQualifiedOwnership()) {
-    Fn->setUnqualifiedOwnership();
+  if (!ClosureUser->hasOwnership()) {
+    Fn->setOwnershipEliminated();
   }
   for (auto &Attr : ClosureUser->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);

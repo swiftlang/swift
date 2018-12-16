@@ -615,8 +615,8 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
-  if (!Orig->hasQualifiedOwnership()) {
-    Fn->setUnqualifiedOwnership();
+  if (!Orig->hasOwnership()) {
+    Fn->setOwnershipEliminated();
   }
   return Fn;
 }

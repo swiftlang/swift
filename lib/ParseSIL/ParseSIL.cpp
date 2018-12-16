@@ -5182,10 +5182,10 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   bool AssumeUnqualifiedOwnershipWhenParsing =
     F->getModule().getOptions().AssumeUnqualifiedOwnershipWhenParsing;
   if (AssumeUnqualifiedOwnershipWhenParsing) {
-    F->setUnqualifiedOwnership();
+    F->setOwnershipEliminated();
   }
   B.setInsertionPoint(BB);
-  B.setHasOwnership(F->hasQualifiedOwnership());
+  B.setHasOwnership(F->hasOwnership());
   do {
     if (parseSILInstruction(B))
       return true;

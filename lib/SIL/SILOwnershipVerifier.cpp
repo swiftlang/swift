@@ -637,7 +637,7 @@ void SILInstruction::verifyOperandOwnership() const {
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
-  if (!getFunction()->hasQualifiedOwnership() ||
+  if (!getFunction()->hasOwnership() ||
       !getFunction()->shouldVerifyOwnership())
     return;
 
@@ -701,7 +701,7 @@ void SILValue::verifyOwnership(SILModule &mod,
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
-  if (!f->hasQualifiedOwnership() || !f->shouldVerifyOwnership())
+  if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
   ErrorBehaviorKind errorBehavior;
@@ -737,7 +737,7 @@ bool OwnershipChecker::checkValue(SILValue value) {
 
   // If the given function has unqualified ownership, there is nothing further
   // to verify.
-  if (!f->hasQualifiedOwnership())
+  if (!f->hasOwnership())
     return false;
 
   ErrorBehaviorKind errorBehavior(ErrorBehaviorKind::ReturnFalse);

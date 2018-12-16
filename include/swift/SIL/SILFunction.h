@@ -232,12 +232,13 @@ private:
   /// *) It is a function referenced by the specialization information.
   bool Zombie = false;
 
-  /// True if SILOwnership is enabled for this function.
+  /// True if this function is in Ownership SSA form and thus must pass
+  /// ownership verification.
   ///
   /// This enables the verifier to easily prove that before the Ownership Model
   /// Eliminator runs on a function, we only see a non-semantic-arc world and
   /// after the pass runs, we only see a semantic-arc world.
-  bool HasQualifiedOwnership = true;
+  bool HasOwnership = true;
 
   /// Set if the function body was deserialized from canonical SIL. This implies
   /// that the function's home module performed SIL diagnostics prior to
@@ -423,12 +424,12 @@ public:
   bool isZombie() const { return Zombie; }
 
   /// Returns true if this function has qualified ownership instructions in it.
-  bool hasQualifiedOwnership() const { return HasQualifiedOwnership; }
+  bool hasOwnership() const { return HasOwnership; }
 
-  /// Sets the HasQualifiedOwnership flag to false. This signals to SIL that no
+  /// Sets the HasOwnership flag to false. This signals to SIL that no
   /// ownership instructions should be in this function any more.
-  void setUnqualifiedOwnership() {
-    HasQualifiedOwnership = false;
+  void setOwnershipEliminated() {
+    HasOwnership = false;
   }
 
   /// Returns true if this function was deserialized from canonical
