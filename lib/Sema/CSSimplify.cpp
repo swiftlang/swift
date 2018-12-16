@@ -997,29 +997,12 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   }
 
   // Compute the element shuffles for conversions.
-  SmallVector<int, 16> sources;
-  SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments))
+  SmallVector<unsigned, 16> sources;
+  if (computeTupleShuffle(tuple1, tuple2, sources))
     return getTypeMatchFailure(locator);
 
   // Check each of the elements.
-  bool hasVariadic = false;
-  unsigned variadicIdx = sources.size();
   for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
-    // Default-initialization always allowed for conversions.
-    if (sources[idx2] == TupleShuffleExpr::DefaultInitialize) {
-      continue;
-    }
-
-    // Variadic arguments handled below.
-    if (sources[idx2] == TupleShuffleExpr::Variadic) {
-      assert(!hasVariadic && "Multiple variadic parameters");
-      hasVariadic = true;
-      variadicIdx = idx2;
-      continue;
-    }
-
-    assert(sources[idx2] >= 0);
     unsigned idx1 = sources[idx2];
 
     // Match up the types.
@@ -1030,21 +1013,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                         LocatorPathElt::getTupleElement(idx1)));
     if (result.isFailure())
       return result;
-  }
-
-  // If we have variadic arguments to check, do so now.
-  if (hasVariadic) {
-    const auto &elt2 = tuple2->getElements()[variadicIdx];
-    auto eltType2 = elt2.getVarargBaseTy();
-
-    for (unsigned idx1 : variadicArguments) {
-      auto result = matchTypes(tuple1->getElementType(idx1), eltType2, subKind,
-                         subflags,
-                         locator.withPathElement(
-                                        LocatorPathElt::getTupleElement(idx1)));
-      if (result.isFailure())
-        return result;
-    }
   }
 
   return getTypeMatchSuccess();
@@ -1173,6 +1141,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             !params[0].isVariadic());
   };
 
+  auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
+    if (params.size() == 1)
+      return false;
+
+    for (auto param : params)
+      if (param.isVariadic() || param.isInOut())
+        return false;
+
+    return true;
+  };
+
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
     auto input = AnyFunctionType::composeInput(getASTContext(), params,
                                                /*canonicalVararg=*/false);
@@ -1193,21 +1172,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleParam(func2Params)) {
-          if (!isSingleParam(func1Params)) {
-            implodeParams(func1Params);
-          }
-        } else if (getASTContext().isSwiftVersionAtLeast(4)
-                   && !getASTContext().isSwiftVersionAtLeast(5)
-                   && !isSingleParam(func2Params)) {
+        if (isSingleParam(func2Params) &&
+            canImplodeParams(func1Params)) {
+          implodeParams(func1Params);
+        } else if (!getASTContext().isSwiftVersionAtLeast(5) &&
+                   isSingleParam(func1Params) &&
+                   canImplodeParams(func2Params)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
           if (simplified && isa<DeclRefExpr>(simplified)) {
-            if (isSingleParam(func1Params)) {
-              implodeParams(func2Params);
-            }
+            implodeParams(func2Params);
           }
         }
       }
