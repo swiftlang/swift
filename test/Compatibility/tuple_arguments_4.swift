@@ -1677,3 +1677,9 @@ class Mappable<T> {
 
 let x = Mappable(())
 _ = x.map { (_: Void) in return () }
+
+// https://bugs.swift.org/browse/SR-9470
+do {
+  func f(_: Int...) {}
+  let _ = [(1, 2, 3)].map(f) // expected-error {{cannot invoke 'map' with an argument list of type '((Int...) -> ())'}}
+}
