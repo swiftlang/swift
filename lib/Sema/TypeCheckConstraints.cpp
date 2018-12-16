@@ -100,13 +100,11 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 
 bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
                                       ArrayRef<TupleTypeElt> toTuple,
-                                      SmallVectorImpl<int> &sources,
-                                      SmallVectorImpl<unsigned> &variadicArgs) {
-  const int unassigned = -3;
+                                      SmallVectorImpl<unsigned> &sources) {
+  const unsigned unassigned = -1;
   
   SmallVector<bool, 4> consumed(fromTuple.size(), false);
   sources.clear();
-  variadicArgs.clear();
   sources.assign(toTuple.size(), unassigned);
 
   // Match up any named elements.
@@ -150,35 +148,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     if (sources[i] != unassigned)
       continue;
 
-    const auto &elt2 = toTuple[i];
-
-    // Variadic tuple elements match the rest of the input elements.
-    if (elt2.isVararg()) {
-      // Collect the remaining (unnamed) inputs.
-      while (fromNext != fromLast) {
-        // Labeled elements can't be adopted into varargs even if
-        // they're non-mandatory.  There isn't a really strong reason
-        // for this, though.
-        if (fromTuple[fromNext].hasName())
-          return true;
-
-        variadicArgs.push_back(fromNext);
-        consumed[fromNext] = true;
-        skipToNextAvailableInput();
-      }
-      sources[i] = TupleShuffleExpr::Variadic;
-      
-      // Keep looking at subsequent arguments.  Non-variadic arguments may
-      // follow the variadic one.
-      continue;
-    }
-
     // If there aren't any more inputs, we are done.
     if (fromNext == fromLast) {
       return true;
     }
 
     // Otherwise, assign this input to the next output element.
+    const auto &elt2 = toTuple[i];
+    assert(!elt2.isVararg());
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.

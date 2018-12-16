@@ -1528,13 +1528,12 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         FromElts.push_back({ voidTy, fromTT->getElement(i).getName() });
       auto TEType = TupleType::get(FromElts, CS.getASTContext());
 
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
+      SmallVector<unsigned, 4> sources;
       
       // If the shuffle conversion is invalid (e.g. incorrect element labels),
       // then we have a type error.
       if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                              toTT->getElements(), sources, variadicArgs)) {
+                              toTT->getElements(), sources)) {
         diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
                  fromTT, toTT)
         .highlight(anchor->getSourceRange());
@@ -7610,27 +7609,18 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   if (!TEType->is<TupleType>())
     return visitExpr(TE);
 
-  SmallVector<int, 4> sources;
-  SmallVector<unsigned, 4> variadicArgs;
+  SmallVector<unsigned, 4> sources;
   
   // If the shuffle is invalid, then there is a type error.  We could diagnose
   // it specifically here, but the general logic does a fine job so we let it
   // do it.
   if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                          contextualTT->getElements(), sources, variadicArgs))
+                          contextualTT->getElements(), sources))
     return visitExpr(TE);
 
   // If we got a correct shuffle, we can perform the analysis of all of
   // the input elements, with their expected types.
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
-    // If the value is taken from a default argument, ignore it.
-    if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
-        sources[i] == TupleShuffleExpr::Variadic ||
-        sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
-      continue;
-    
-    assert(sources[i] >= 0 && "Unknown sources index");
-    
     // Otherwise, it must match the corresponding expected argument type.
     unsigned inArgNo = sources[i];
 
@@ -7656,27 +7646,6 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
             .fixItRemove(IOE->getStartLoc());
         return true;
       }
-    }
-  }
-  
-  if (!variadicArgs.empty()) {
-    Type varargsTy;
-    for (auto &elt : contextualTT->getElements()) {
-      if (elt.isVararg()) {
-        varargsTy = elt.getVarargBaseTy();
-        break;
-      }
-    }
-
-    assert(varargsTy);
-
-    for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
-      unsigned inArgNo = variadicArgs[i];
-
-      auto expr = typeCheckChildIndependently(
-          TE->getElement(inArgNo), varargsTy, CS.getContextualTypePurpose());
-      // If there was an error type checking this argument, then we're done.
-      if (!expr) return true;
     }
   }
   
