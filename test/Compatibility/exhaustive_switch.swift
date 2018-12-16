@@ -432,10 +432,6 @@ enum OverlyLargeSpaceEnum {
   case case9
   case case10
   case case11
-  case case12
-  case case13
-  case case14
-  case case15
 }
 
 enum ContainsOverlyLargeEnum {
@@ -445,8 +441,8 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 132 {{add missing case:}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -459,13 +455,10 @@ func quiteBigEnough() -> Bool {
   case (.case9, .case9): return true
   case (.case10, .case10): return true
   case (.case11, .case11): return true
-  case (.case12, .case12): return true
-  case (.case13, .case13): return true
-  case (.case14, .case14): return true
-  case (.case15, .case15): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -477,31 +470,22 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
-  case (.case11, _): return true
-  case (.case12, _): return true
-  case (.case13, _): return true
-  case (.case14, _): return true
-  case (.case15, _): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  case (.case0, .case0): return true
-  case (.case1, .case1): return true
-  case (.case2, .case2): return true
-  case (.case3, .case3): return true
-  case (.case4, .case4): return true
-  case (.case5, .case5): return true
-  case (.case6, .case6): return true
-  case (.case7, .case7): return true
-  case (.case8, .case8): return true
-  case (.case9, .case9): return true
-  case (.case10, .case10): return true
-  case (.case11, .case11): return true
-  case (.case12, .case12): return true
-  case (.case13, .case13): return true
-  case (.case14, .case14): return true
-  case (.case15, .case15): return true
-  @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-warning {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
+  case (.case0, _): return true
+  case (.case1, _): return true
+  case (.case2, _): return true
+  case (.case3, _): return true
+  case (.case4, _): return true
+  case (.case5, _): return true
+  case (.case6, _): return true
+  case (.case7, _): return true
+  case (.case8, _): return true
+  case (.case9, _): return true
+  case (.case10, _): return true
+  @unknown default: return false
   }
 
 
@@ -519,10 +503,6 @@ func quiteBigEnough() -> Bool {
   case (.case9, _): return true
   case (.case10, _): return true
   case (.case11, _): return true
-  case (.case12, _): return true
-  case (.case13, _): return true
-  case (.case14, _): return true
-  case (.case15, _): return true
   }
 
   // No diagnostic
@@ -539,10 +519,6 @@ func quiteBigEnough() -> Bool {
   case (_, .case9): return true
   case (_, .case10): return true
   case (_, .case11): return true
-  case (_, .case12): return true
-  case (_, .case13): return true
-  case (_, .case14): return true
-  case (_, .case15): return true
   }
 
   // No diagnostic 
@@ -567,7 +543,7 @@ func quiteBigEnough() -> Bool {
   }
 
   // Make sure we haven't just stopped emitting diagnostics.
-  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 16 {{add missing case}}
+  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 12 {{add missing case}}
   }
 }
 
