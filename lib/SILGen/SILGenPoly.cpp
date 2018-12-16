@@ -3241,7 +3241,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   // TODO: Use parameter indices specified in the function type.
   AutoDiffParameterIndicesBuilder parameterIndicesBuilder(
-      inputSubstType, /*isMethod*/ false, /*setAllParams*/ true);
+      inputSubstType, /*setAllParams*/ true);
   auto *parameterIndices =
       parameterIndicesBuilder.build(inputSubstType->getASTContext());
 
@@ -3250,8 +3250,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
           -> CanAnyFunctionType {
         auto assocTy = fnTy->getAutoDiffAssociatedFunctionType(
             parameterIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()),
-            /*isMethod*/ false);
+            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
   auto getAssocFnPattern =
@@ -3758,8 +3757,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto originalFn = SGF.emitGlobalFunctionRef(
           loc, witness.asAutoDiffOriginalFunction());
       auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>(),
-          /*isMethod*/ true);
+          witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
       auto autoDiffFn = SGF.B.createAutoDiffFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
       AutoDiffFunctionExtractInst::Extractee extractee;

@@ -610,13 +610,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   // SWIFT_ENABLE_TENSORFLOW
   if (autoDiffAssociatedFunctionIdentifier) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
-    bool isMethod = cast<AbstractFunctionDecl>(getDecl())->getImplicitSelfDecl()
-        ? true : false;
     auto *functionTy =
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>();
     auto silParameterIndices =
         autoDiffAssociatedFunctionIdentifier->getParameterIndices()->getLowered(
-            functionTy, isMethod);
+            functionTy);
     SILAutoDiffIndices indices(/*source*/ 0, silParameterIndices);
     std::string mangledKind;
     switch (autoDiffAssociatedFunctionIdentifier->getKind()) {

@@ -1771,8 +1771,7 @@ static SILValue emitVJPReference(
     // Check that the requirement indices are the same as the desired indices.
     auto *requirementParameterIndices = diffAttr->getCheckedParameterIndices();
     auto loweredRequirementIndices = requirementParameterIndices->getLowered(
-        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>(),
-        /*isMethod*/ true);
+        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices requirementIndices(/*source*/ 0, loweredRequirementIndices);
 
     // TODO:
@@ -2184,8 +2183,9 @@ public:
   bool run();
 
 protected:
-  /// Get the primal, and lazily schedule a task to synthesize its body.
-  SILFunction *lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task);
+  /// If the task needs primal synthesis, and if primal synthesis for the task
+  /// hasn't been scheduled yet, then schedule primal synthesis.
+  void schedulePrimalSynthesisIfNeeded(DifferentiationTask *task);
 
 private:
   /// Processes a synthesis item. Returns true if any error occurs.
@@ -2645,7 +2645,7 @@ public:
         context, builder, indices, getMappedValue(ai->getCallee()),
         /*invoker*/ {ai, synthesis.task},
         [&](DifferentiationTask *newTask) {
-           primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
+           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
     if (!vjp) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
@@ -2761,7 +2761,9 @@ public:
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
     // Get the primal function from the task. If the task was newly created,
     // then we need to schedule a synthesis item for the primal.
-    auto *primalFn = primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
+    primalGen.schedulePrimalSynthesisIfNeeded(newTask);
+    auto *primalFn = newTask->getPrimal();
+    assert(primalFn);
     // Now that we have the primal, get ready to call it.
     // But before calling it, we need to convert the primal function like how
     // the original function is converted.
@@ -2926,25 +2928,21 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   return cloner.run();
 }
 
-SILFunction *
-PrimalGen::lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task) {
-  auto *primal = task->getPrimal();
-  assert(primal && "requesting primal from task without primal");
-
+void PrimalGen::schedulePrimalSynthesisIfNeeded(DifferentiationTask *task) {
   if (task->getPrimalSynthesisState() == FunctionSynthesisState::Needed) {
+    auto *primal = task->getPrimal();
+    assert(primal);
     FunctionSynthesisItem synthesis{task->getOriginal(), primal,
                                     task->getIndices(), task};
     worklist.push_back(synthesis);
     task->setPrimalSynthesisState(FunctionSynthesisState::Pending);
   }
-
-  return primal;
 }
 
 bool PrimalGen::run() {
   // Push everything to the list of primal synthesis items.
   for (auto &task : context.getDifferentiationTasks())
-    lookUpPrimalAndMaybeScheduleSynthesis(task.get());
+    schedulePrimalSynthesisIfNeeded(task.get());
   // Process each item until empty.
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
@@ -4423,6 +4421,13 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
   if (attr->hasVJP())
     vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
 
+  if (vjp) {
+    // If we already have the vjp, then we don't need to synthesize anything.
+    primalSynthesisState = FunctionSynthesisState::NotNeeded;
+    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
+    return;
+  }
+
   if (adjoint) {
     // If we already have an adjoint, then we don't need to synthesize the
     // primal or the adjoint.
@@ -4433,17 +4438,13 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
            "[differentiable] attr without adjoint should not have primal");
 
     // We don't have the primal or adjoint, so we need to synthesize them.
-    // TODO: Once the AD pass uses VJP, we don't need to synthesize primal or
-    // adjoint if VJP exists.
     primalSynthesisState = FunctionSynthesisState::Needed;
     adjointSynthesisState = FunctionSynthesisState::Needed;
     createEmptyPrimal();
     createEmptyAdjoint();
   }
 
-  // If there is no VJP, synthesize it.
-  if (!vjp)
-    createVJP();
+  createVJP();
 }
 
 void DifferentiationTask::createEmptyPrimal() {

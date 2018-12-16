@@ -2307,12 +2307,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // We will put the checked wrt param indices here.
   AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
-      originalFnTy, isMethod);
+      originalFnTy);
 
   if (uncheckedWrtParams.empty()) {
     // If 'wrt:' is not specified, the wrt parameters are all the parameters in
     // the main parameter group. Self is intentionally excluded.
-    autoDiffParameterIndicesBuilder.setAllNonSelfParameters();
+    unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
+        (isMethod ? 1 : 0);
+    for (unsigned i : range(numNonSelfParameters))
+      autoDiffParameterIndicesBuilder.setParameter(i);
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
@@ -2332,7 +2335,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
-        autoDiffParameterIndicesBuilder.setNonSelfParameter(index);
+        autoDiffParameterIndicesBuilder.setParameter(index);
         lastIndex = index;
         break;
       }
@@ -2349,7 +2352,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
-        autoDiffParameterIndicesBuilder.setSelfParameter();
+        autoDiffParameterIndicesBuilder.setParameter(
+            autoDiffParameterIndicesBuilder.size() - 1);
         break;
       }
       }
@@ -2384,8 +2388,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Check that the user has only selected wrt params with allowed types.
   SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes,
-                                                  isMethod);
+  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
     SourceLoc loc;
@@ -2519,8 +2522,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()),
-            isMethod);
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -2547,8 +2549,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()),
-            isMethod);
+            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);

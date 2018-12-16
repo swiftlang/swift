@@ -763,8 +763,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         vjpName = getFunction(SILDeclRef(vjpFn), ForDefinition)->getName();
       // Get lowered argument indices.
       auto paramIndices = diffAttr->getCheckedParameterIndices()->getLowered(
-          AFD->getInterfaceType()->castTo<AnyFunctionType>(),
-          /*isMethod*/ AFD->getImplicitSelfDecl() ? true : false);
+          AFD->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addDifferentiableAttr(
           SILDifferentiableAttr::create(

@@ -203,13 +203,31 @@ CanSILFunctionType SILFunctionType::getGradientType(
 llvm::SmallBitVector
 SILFunctionType::getDifferentiationParameterIndices() const {
   assert(isDifferentiable());
-  SmallBitVector result(getNumParameters());
-  for (auto paramAndIndex : enumerate(getParameters())) {
-    auto &param = paramAndIndex.value();
-    unsigned index = paramAndIndex.index();
-    if (param.getDifferentiability() ==
-            SILParameterDifferentiability::DifferentiableOrNotApplicable)
-      result.set(index);
+
+  // Unwrap curry levels.
+  SmallVector<const SILFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  unsigned numParameters = 0;
+  while (currentLevel != nullptr) {
+    curryLevels.push_back(currentLevel);
+    numParameters += currentLevel->getNumParameters();
+    if (currentLevel->getNumResults() != 1)
+      break;
+    currentLevel =
+        currentLevel->getSingleResult().getType()->getAs<SILFunctionType>();
+  }
+
+  SmallBitVector result(numParameters);
+  unsigned currentOffset = 0;
+  for (auto *curryLevel : reversed(curryLevels)) {
+    for (auto paramAndIndex : enumerate(curryLevel->getParameters())) {
+      auto &param = paramAndIndex.value();
+      unsigned index = paramAndIndex.index();
+      if (param.getDifferentiability() ==
+              SILParameterDifferentiability::DifferentiableOrNotApplicable)
+        result.set(currentOffset + index);
+    }
+    currentOffset += curryLevel->getNumParameters();
   }
   return result;
 }
@@ -249,12 +267,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   auto &ctx = getASTContext();
 
-  unsigned numParamsWithoutSelf = hasSelfParam() ? getNumParameters() - 1
-                                                 : getNumParameters();
   auto testParamIndex = [&](unsigned index) -> bool {
     return index < parameterIndices.size()  && parameterIndices[index];
   };
 
+  // Define `getAssociatedType`, which returns Tangent/Cotangent types.
   auto *differentiableProtocol =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
   assert(differentiableProtocol && "could not find differentiable protocol");
@@ -309,6 +326,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     }
     return {type, conv};
   };
+
   // Given a type, returns its formal SIL result info.
   auto getResultInfoForOriginalParameter = [&](
       CanType type, ParameterConvention origParamConv) -> SILResultInfo {
@@ -331,88 +349,116 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     }
     return {type, conv};
   };
+
+  // Unwrap curry levels.
+  SmallVector<SILFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  while (currentLevel != nullptr) {
+    curryLevels.push_back(currentLevel);
+    if (currentLevel->getNumResults() != 1)
+      break;
+    currentLevel =
+        currentLevel->getSingleResult().getType()->getAs<SILFunctionType>();
+  }
+
+  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
+  unsigned currentOffset = 0;
+  for (unsigned curryLevelIndex : reversed(indices(curryLevels))) {
+    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
+    currentOffset += curryLevels[curryLevelIndex]->getNumParameters();
+  }
+
+  // Calculate WRT parameter infos, in the order that they appear in the
+  // AST-level parameter lists.
+  SmallVector<SILParameterInfo, 4> wrtParams;
+  for (unsigned curryLevelIndex : indices(curryLevels)) {
+    auto *curryLevel = curryLevels[curryLevelIndex];
+    unsigned parameterIndexOffset =
+        curryLevelParameterIndexOffsets[curryLevelIndex];
+    unsigned numParamsWithoutSelf = curryLevel->getNumParameters() -
+        (curryLevel->hasSelfParam() ? 1 : 0);
+    if (curryLevel->hasSelfParam() &&
+        testParamIndex(parameterIndexOffset + numParamsWithoutSelf))
+      wrtParams.push_back(curryLevel->getSelfParameter());
+    for (unsigned paramIndex : range(numParamsWithoutSelf)) {
+      if (testParamIndex(parameterIndexOffset + paramIndex)) {
+        wrtParams.push_back(curryLevel->getParameters()[paramIndex]);
+      }
+    }
+  }
+
+  auto withNewResults = [&](SILFunctionType *base,
+                            ArrayRef<SILResultInfo> newResults)
+      -> CanSILFunctionType {
+    return SILFunctionType::get(base->getGenericSignature(),
+                                base->getExtInfo(),
+                                base->getCoroutineKind(),
+                                base->getCalleeConvention(),
+                                base->getParameters(), base->getYields(),
+                                newResults, base->getOptionalErrorResult(), ctx,
+                                base->getWitnessMethodConformanceOrNone());
+  };
+
+  CanSILFunctionType closureType;
   switch (kind) {
   case AutoDiffAssociatedFunctionKind::JVP: {
     SmallVector<SILParameterInfo, 8> tangentParams;
-    if (hasSelfParam() && testParamIndex(numParamsWithoutSelf)) {
-      auto &param = getParameters()[numParamsWithoutSelf];
+    for (auto &param : wrtParams)
       tangentParams.push_back({
         getAssociatedType(param.getType(), tangentDependentType),
         param.getConvention()
       });
-    }
-    for (unsigned paramIndex : range(numParamsWithoutSelf)) {
-      if (!testParamIndex(paramIndex))
-        continue;
-      auto &param = getParameters()[paramIndex];
-      tangentParams.push_back({
-        getAssociatedType(param.getType(), tangentDependentType),
-        param.getConvention()
-      });
-    }
     SmallVector<SILResultInfo, 8> tangentResults;
-    auto &result = getResults()[resultIndex];
+    auto &result = curryLevels.back()->getResults()[resultIndex];
     tangentResults.push_back({
       getAssociatedType(result.getType(), tangentDependentType),
       result.getConvention()
     });
-    auto differentialType = SILFunctionType::get(
+    closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, tangentParams, {},
         tangentResults, None, ctx);
-    SmallVector<SILResultInfo, 8> jvpResults(getResults().begin(),
-                                             getResults().end());
-    jvpResults.push_back({differentialType, ResultConvention::Owned});
-    return SILFunctionType::get(getGenericSignature(),
-                                getExtInfo(),
-                                getCoroutineKind(), getCalleeConvention(),
-                                getParameters(), getYields(), jvpResults,
-                                getOptionalErrorResult(), ctx,
-                                getWitnessMethodConformanceOrNone());
+    SmallVector<SILResultInfo, 8> jvpResults(
+        curryLevels.back()->getResults().begin(),
+        curryLevels.back()->getResults().end());
+    break;
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> cotangentParams;
-    auto &origRes = getResults()[resultIndex];
+    auto &origRes = curryLevels.back()->getResults()[resultIndex];
     auto cotangentAssocTy = getAssociatedType(
         origRes.getType(), cotangentDependentType);
     cotangentParams.push_back(
         getParameterInfoForOriginalResult(cotangentAssocTy,
                                           origRes.getConvention()));
     SmallVector<SILResultInfo, 8> cotangentResults;
-    if (hasSelfParam() && testParamIndex(numParamsWithoutSelf)) {
-      auto &param = getParameters()[numParamsWithoutSelf];
+    for (auto &param : wrtParams) {
       auto paramCotangentTy = getAssociatedType(param.getType(),
                                                 cotangentDependentType);
       cotangentResults.push_back(
           getResultInfoForOriginalParameter(paramCotangentTy,
                                             param.getConvention()));
     }
-    for (unsigned paramIndex : range(numParamsWithoutSelf)) {
-      if (!testParamIndex(paramIndex))
-        continue;
-      auto &param = getParameters()[paramIndex];
-      auto paramCotangentTy = getAssociatedType(param.getType(),
-                                                cotangentDependentType);
-      cotangentResults.push_back(
-          getResultInfoForOriginalParameter(paramCotangentTy,
-                                            param.getConvention()));
-    }
-    auto pullbackType = SILFunctionType::get(
+    closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, cotangentParams, {},
         cotangentResults, {}, ctx);
-    SmallVector<SILResultInfo, 8> vjpResults(getResults().begin(),
-                                             getResults().end());
-    vjpResults.push_back({pullbackType, ResultConvention::Owned});
-    auto vjpTy = SILFunctionType::get(getGenericSignature(),
-                                      getExtInfo(),
-                                      getCoroutineKind(), getCalleeConvention(),
-                                      getParameters(), getYields(), vjpResults,
-                                      getOptionalErrorResult(), ctx,
-                                      getWitnessMethodConformanceOrNone());
-    return vjpTy;
+    break;
   }
   }
+
+  SmallVector<SILResultInfo, 8> results(
+      curryLevels.back()->getResults().begin(),
+      curryLevels.back()->getResults().end());
+  results.push_back({closureType, ResultConvention::Owned});
+  CanSILFunctionType associatedFunction = withNewResults(curryLevels.back(),
+                                                         results);
+  auto curryLevelsWithoutLast =
+      ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
+  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
+    associatedFunction = withNewResults(
+        curryLevel, {{associatedFunction, ResultConvention::Owned}});
+  return associatedFunction;
 }
 
 ProtocolDecl *
