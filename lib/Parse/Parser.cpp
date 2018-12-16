@@ -1098,6 +1098,16 @@ ParserUnit::~ParserUnit() {
   delete &Impl;
 }
 
+void ParserUnit::parse() {
+  auto &P = getParser();
+  bool Done = false;
+  while (!Done) {
+    P.parseTopLevel();
+    Done = P.Tok.is(tok::eof);
+  }
+  P.finalizeSyntaxTree();
+}
+
 Parser &ParserUnit::getParser() {
   return *Impl.TheParser;
 }
