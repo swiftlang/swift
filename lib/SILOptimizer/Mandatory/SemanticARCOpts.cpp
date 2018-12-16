@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -27,6 +29,8 @@
 using namespace swift;
 
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
+STATISTIC(NumLoadCopyConvertedToLoadBorrow,
+          "number of load_copy converted to load_borrow");
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -79,6 +83,7 @@ struct SemanticARCOptVisitor
   bool visitSILInstruction(SILInstruction *i) { return false; }
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
+  bool visitLoadInst(LoadInst *li);
 };
 
 } // end anonymous namespace
@@ -247,6 +252,116 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
     return true;
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                         load [copy] Optimizations
+//===----------------------------------------------------------------------===//
+
+/// A flow insensitive analysis that tells the load [copy] analysis if the
+/// storage has 0, 1, >1 writes to it.
+///
+/// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
+///
+/// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
+/// advantage of definite initialization implying that an alloc_stack must be
+/// written to once before any loads from the memory location. Thus if we are
+/// local and see 1 write, we can still change to load_borrow if all other uses
+/// check out.
+///
+/// If there is 2+ writes, we can not optimize = (.
+namespace {
+
+struct CanOptimizeLoadCopyFromAccessVisitor
+    : AccessedStorageVisitor<CanOptimizeLoadCopyFromAccessVisitor, bool> {
+  SILFunction &f;
+
+  CanOptimizeLoadCopyFromAccessVisitor(SILFunction &f) : f(f) {}
+
+  // Stubs
+  bool visitBox(const AccessedStorage &boxStorage) { return false; }
+  bool visitStack(const AccessedStorage &stackStorage) { return false; }
+  bool visitGlobal(const AccessedStorage &globalStorage) { return false; }
+  bool visitClass(const AccessedStorage &classStorage) { return false; }
+  bool visitYield(const AccessedStorage &yieldStorage) { return false; }
+  bool visitUnidentified(const AccessedStorage &unidentifiedStorage) {
+    return false;
+  }
+  bool visitNested(const AccessedStorage &nested) {
+    llvm_unreachable("Visitor should never see nested since we lookup our "
+                     "address storage using lookup non nested");
+  }
+
+  bool visitArgument(const AccessedStorage &argumentStorage);
+};
+
+} // namespace
+
+bool CanOptimizeLoadCopyFromAccessVisitor::visitArgument(
+    const AccessedStorage &storage) {
+  auto *arg = cast<SILFunctionArgument>(storage.getArgument(&f));
+
+  // Then check if we have an in_guaranteed argument. In this case, we can
+  // always optimize load [copy] from this.
+  if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
+    return true;
+
+  // For now just return false.
+  return false;
+}
+
+static bool isWrittenTo(SILFunction &f, SILValue value) {
+  // Then find our accessed storage. If we can not find anything, be
+  // conservative and assume that the value is written to.
+  const auto &storage = findAccessedStorageNonNested(value);
+  if (!storage)
+    return false;
+
+  // Then see if we ever write to this address in a flow insensitive
+  // way (ignoring stores that are obviously the only initializer to
+  // memory). We have to do this since load_borrow assumes that the
+  // underlying memory is never written to.
+  return !CanOptimizeLoadCopyFromAccessVisitor(f).visit(storage);
+}
+
+// Convert a load [copy] from unique storage [read] that has all uses that can
+// accept a guaranteed parameter to a load_borrow.
+bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
+  if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+    return false;
+
+  // Ok, we have our load [copy]. Make sure its value is never
+  // consumed. If it is consumed, we need to pass off a +1 value, so
+  // bail.
+  //
+  // FIXME: We should consider if it is worth promoting a load [copy]
+  // -> load_borrow if we can put a copy_value on a cold path and thus
+  // eliminate RR traffic on a hot path.
+  SmallVector<DestroyValueInst *, 32> destroyValues;
+  if (isConsumed(li, destroyValues))
+    return false;
+
+  // Then check if our address is ever written to. If it is, then we
+  // can not use the load_borrow.
+  if (isWrittenTo(*li->getFunction(), li->getOperand()))
+    return false;
+
+  // Ok, we can perform our optimization. Convert the load [copy] into a
+  // load_borrow.
+  auto *lbi =
+      SILBuilderWithScope(li).createLoadBorrow(li->getLoc(), li->getOperand());
+  while (!destroyValues.empty()) {
+    auto *dvi = destroyValues.pop_back_val();
+    SILBuilderWithScope(dvi).createEndBorrow(dvi->getLoc(), lbi);
+    dvi->eraseFromParent();
+    ++NumEliminatedInsts;
+  }
+
+  li->replaceAllUsesWith(lbi);
+  li->eraseFromParent();
+  ++NumEliminatedInsts;
+  ++NumLoadCopyConvertedToLoadBorrow;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
