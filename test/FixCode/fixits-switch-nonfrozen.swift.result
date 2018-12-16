@@ -324,8 +324,270 @@ func quiteBigEnough() -> Bool {
   case (.case9, .case9): return true
   case (.case10, .case10): return true
   case (.case11, .case11): return true
-  default:
-<#fatalError()#>
+  case (.case11, .case0):
+<#code#>
+case (.case11, .case1):
+<#code#>
+case (.case11, .case2):
+<#code#>
+case (.case11, .case3):
+<#code#>
+case (.case11, .case4):
+<#code#>
+case (.case11, .case5):
+<#code#>
+case (.case11, .case6):
+<#code#>
+case (.case11, .case7):
+<#code#>
+case (.case11, .case8):
+<#code#>
+case (.case11, .case9):
+<#code#>
+case (.case11, .case10):
+<#code#>
+case (.case10, .case0):
+<#code#>
+case (.case10, .case1):
+<#code#>
+case (.case10, .case2):
+<#code#>
+case (.case10, .case3):
+<#code#>
+case (.case10, .case4):
+<#code#>
+case (.case10, .case5):
+<#code#>
+case (.case10, .case6):
+<#code#>
+case (.case10, .case7):
+<#code#>
+case (.case10, .case8):
+<#code#>
+case (.case10, .case9):
+<#code#>
+case (.case10, .case11):
+<#code#>
+case (.case9, .case0):
+<#code#>
+case (.case9, .case1):
+<#code#>
+case (.case9, .case2):
+<#code#>
+case (.case9, .case3):
+<#code#>
+case (.case9, .case4):
+<#code#>
+case (.case9, .case5):
+<#code#>
+case (.case9, .case6):
+<#code#>
+case (.case9, .case7):
+<#code#>
+case (.case9, .case8):
+<#code#>
+case (.case9, .case10):
+<#code#>
+case (.case9, .case11):
+<#code#>
+case (.case8, .case0):
+<#code#>
+case (.case8, .case1):
+<#code#>
+case (.case8, .case2):
+<#code#>
+case (.case8, .case3):
+<#code#>
+case (.case8, .case4):
+<#code#>
+case (.case8, .case5):
+<#code#>
+case (.case8, .case6):
+<#code#>
+case (.case8, .case7):
+<#code#>
+case (.case8, .case9):
+<#code#>
+case (.case8, .case10):
+<#code#>
+case (.case8, .case11):
+<#code#>
+case (.case7, .case0):
+<#code#>
+case (.case7, .case1):
+<#code#>
+case (.case7, .case2):
+<#code#>
+case (.case7, .case3):
+<#code#>
+case (.case7, .case4):
+<#code#>
+case (.case7, .case5):
+<#code#>
+case (.case7, .case6):
+<#code#>
+case (.case7, .case8):
+<#code#>
+case (.case7, .case9):
+<#code#>
+case (.case7, .case10):
+<#code#>
+case (.case7, .case11):
+<#code#>
+case (.case6, .case0):
+<#code#>
+case (.case6, .case1):
+<#code#>
+case (.case6, .case2):
+<#code#>
+case (.case6, .case3):
+<#code#>
+case (.case6, .case4):
+<#code#>
+case (.case6, .case5):
+<#code#>
+case (.case6, .case7):
+<#code#>
+case (.case6, .case8):
+<#code#>
+case (.case6, .case9):
+<#code#>
+case (.case6, .case10):
+<#code#>
+case (.case6, .case11):
+<#code#>
+case (.case5, .case0):
+<#code#>
+case (.case5, .case1):
+<#code#>
+case (.case5, .case2):
+<#code#>
+case (.case5, .case3):
+<#code#>
+case (.case5, .case4):
+<#code#>
+case (.case5, .case6):
+<#code#>
+case (.case5, .case7):
+<#code#>
+case (.case5, .case8):
+<#code#>
+case (.case5, .case9):
+<#code#>
+case (.case5, .case10):
+<#code#>
+case (.case5, .case11):
+<#code#>
+case (.case4, .case0):
+<#code#>
+case (.case4, .case1):
+<#code#>
+case (.case4, .case2):
+<#code#>
+case (.case4, .case3):
+<#code#>
+case (.case4, .case5):
+<#code#>
+case (.case4, .case6):
+<#code#>
+case (.case4, .case7):
+<#code#>
+case (.case4, .case8):
+<#code#>
+case (.case4, .case9):
+<#code#>
+case (.case4, .case10):
+<#code#>
+case (.case4, .case11):
+<#code#>
+case (.case3, .case0):
+<#code#>
+case (.case3, .case1):
+<#code#>
+case (.case3, .case2):
+<#code#>
+case (.case3, .case4):
+<#code#>
+case (.case3, .case5):
+<#code#>
+case (.case3, .case6):
+<#code#>
+case (.case3, .case7):
+<#code#>
+case (.case3, .case8):
+<#code#>
+case (.case3, .case9):
+<#code#>
+case (.case3, .case10):
+<#code#>
+case (.case3, .case11):
+<#code#>
+case (.case2, .case0):
+<#code#>
+case (.case2, .case1):
+<#code#>
+case (.case2, .case3):
+<#code#>
+case (.case2, .case4):
+<#code#>
+case (.case2, .case5):
+<#code#>
+case (.case2, .case6):
+<#code#>
+case (.case2, .case7):
+<#code#>
+case (.case2, .case8):
+<#code#>
+case (.case2, .case9):
+<#code#>
+case (.case2, .case10):
+<#code#>
+case (.case2, .case11):
+<#code#>
+case (.case1, .case0):
+<#code#>
+case (.case1, .case2):
+<#code#>
+case (.case1, .case3):
+<#code#>
+case (.case1, .case4):
+<#code#>
+case (.case1, .case5):
+<#code#>
+case (.case1, .case6):
+<#code#>
+case (.case1, .case7):
+<#code#>
+case (.case1, .case8):
+<#code#>
+case (.case1, .case9):
+<#code#>
+case (.case1, .case10):
+<#code#>
+case (.case1, .case11):
+<#code#>
+case (.case0, .case1):
+<#code#>
+case (.case0, .case2):
+<#code#>
+case (.case0, .case3):
+<#code#>
+case (.case0, .case4):
+<#code#>
+case (.case0, .case5):
+<#code#>
+case (.case0, .case6):
+<#code#>
+case (.case0, .case7):
+<#code#>
+case (.case0, .case8):
+<#code#>
+case (.case0, .case9):
+<#code#>
+case (.case0, .case10):
+<#code#>
+case (.case0, .case11):
+<#code#>
 }
 
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
@@ -340,8 +602,8 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
-  default:
-<#fatalError()#>
+  case (.case11, _):
+<#code#>
 }
 }
 

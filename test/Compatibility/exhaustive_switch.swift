@@ -441,8 +441,8 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 132 {{add missing case:}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -457,8 +457,8 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -472,7 +472,8 @@ func quiteBigEnough() -> Bool {
   case (.case10, _): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-warning {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -484,7 +485,7 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
-  @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
+  @unknown default: return false
   }
 
 
