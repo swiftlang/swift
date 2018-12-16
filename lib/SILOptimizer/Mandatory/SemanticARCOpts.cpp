@@ -32,6 +32,10 @@ STATISTIC(NumEliminatedInsts, "number of removed instructions");
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+/// Return true if v only has invalidating uses that are destroy_value.
+///
+/// Semantically this implies that a value is never passed off as +1 to memory
+/// or another function implying it can be used everywhere at +0.
 static bool isConsumed(SILValue v,
                        SmallVectorImpl<DestroyValueInst *> &destroys) {
   assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
