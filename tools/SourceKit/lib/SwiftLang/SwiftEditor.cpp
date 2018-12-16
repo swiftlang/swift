@@ -698,13 +698,7 @@ public:
   }
 
   void parse() {
-    auto &P = Parser->getParser();
-    bool Done = false;
-    while (!Done) {
-      P.parseTopLevel();
-      Done = P.Tok.is(tok::eof);
-    }
-    P.finalizeSyntaxTree();
+    Parser->parse();
   }
 
   SourceFile &getSourceFile() {

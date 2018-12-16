@@ -342,6 +342,8 @@ namespace swift {
 
     ~ParserUnit();
 
+    void parse();
+
     Parser &getParser();
     SourceFile &getSourceFile();
     DiagnosticEngine &getDiagnosticEngine();
