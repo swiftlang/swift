@@ -92,7 +92,14 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
-  if (Options.EnableMandatorySemanticARCOpts) {
+  // Only run semantic arc opts if we are optimizing and if mandatory semantic
+  // arc opts is explicitly enabled.
+  //
+  // NOTE: Eventually this pass will be split into a mandatory/more aggressive
+  // pass. This will happen when OSSA is no longer eliminated before the
+  // optimizer pipeline is run implying we can put a pass that requires OSSA
+  // there.
+  if (Options.EnableMandatorySemanticARCOpts && Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
   P.addClosureLifetimeFixup();
