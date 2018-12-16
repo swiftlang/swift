@@ -314,6 +314,7 @@ namespace swift {
       } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
                  Target.isAndroid() || Target.isOSWindows() ||
                  Target.isPS4() || Target.isOSHaiku() ||
+                 Target.isOSUnknown() ||
                  Target.getTriple().empty()) {
         major = minor = revision = 0;
       } else {
