@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// See test/Compatibility/tuple_arguments_3.swift for the Swift 3 behavior.
-
 func concrete(_ x: Int) {}
 func concreteLabeled(x: Int) {}
 func concreteTwo(_ x: Int, _ y: Int) {} // expected-note 5 {{'concreteTwo' declared here}}
@@ -1670,7 +1668,6 @@ do {
   func h(_: ()) {} // expected-note {{'h' declared here}}
   h() // expected-error {{missing argument for parameter #1 in call}}
 }
-
 
 // https://bugs.swift.org/browse/SR-7191
 class Mappable<T> {
