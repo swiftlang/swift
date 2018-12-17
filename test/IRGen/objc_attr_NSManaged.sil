@@ -32,27 +32,27 @@ sil_vtable X {}
   @objc @NSManaged func kvc()
 }
 sil @$s19objc_attr_NSManaged1XCACycfcTo : $@convention(objc_method) (@owned X) -> @owned X {
-bb0(%0 : @owned $X):
+bb0(%0 : $X):
   return %0 : $X
 }
 
 sil @$s19objc_attr_NSManaged10SwiftGizmoCACycfcTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
-bb0(%0 : @owned $SwiftGizmo):
+bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
 sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
-bb0(%0 : $Int, %1 : @owned $SwiftGizmo):
+bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }
 
 sil @$s19objc_attr_NSManaged10SwiftGizmoCACycfc : $@convention(method) (@owned SwiftGizmo) -> @owned SwiftGizmo {
-bb0(%0 : @owned $SwiftGizmo):
+bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
 sil @$s19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSi_tcfc : $@convention(method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
-bb0(%0 : $Int, %1 : @owned $SwiftGizmo):
+bb0(%0 : $Int, %1 : $SwiftGizmo):
   return %1 : $SwiftGizmo
 }
 

@@ -6,7 +6,7 @@ enum MyError : Error {
 
 throw MyError.A
 
-// CHECK: sil @main
+// CHECK: sil [ossa] @main
 // CHECK: [[T0:%.*]] = enum $MyError, #MyError.A!enumelt
 // CHECK: [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK: [[ADDR:%.*]] = project_existential_box $MyError in [[ERR]] : $Error

@@ -20,7 +20,7 @@ extension Conformance: P1 where A: P2 {
 // This is defined below but is emitted before any witness tables.
 // Just make sure it does not have a generic signature.
 //
-// CHECK-LABEL: sil private [transparent] [thunk] @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW : $@convention(witness_method: P1) (@in_guaranteed SameTypeConcrete<Int>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW : $@convention(witness_method: P1) (@in_guaranteed SameTypeConcrete<Int>) -> ()
 
 
 // CHECK-LABEL: sil_witness_table hidden <A where A : P2> Conformance<A>: P1 module conditional_conformance {

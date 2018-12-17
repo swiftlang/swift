@@ -12,7 +12,7 @@ import AppKit
 @NSApplicationMain
 class MyDelegate: NSApplicationDelegate {}
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil [ossa] @main
 // CHECK:         function_ref @NSApplicationMain
 // IR-LABEL: define{{( protected)?}} i32 @main
 // IR:            call swiftcc i32 @NSApplicationMain

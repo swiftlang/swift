@@ -16,8 +16,8 @@ sil @takesInoutAndNoEscapeClosureWithGenericReturn : $@convention(thin) <T> (@in
 sil @takesInoutAndNoEscapeBlockClosure : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
 sil @takesInoutAndNoEscapeOptionalBlockClosure : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
 
-// CHECK-LABEL: sil hidden @twoLocalInoutsDisaliased
-sil hidden @twoLocalInoutsDisaliased : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoLocalInoutsDisaliased
+sil hidden [ossa] @twoLocalInoutsDisaliased : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -37,8 +37,8 @@ bb0(%0 : $Int):
   return %14 : $()
 }
 
-// CHECK-LABEL: sil hidden @twoLocalInoutsSimpleAliasing
-sil hidden @twoLocalInoutsSimpleAliasing : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoLocalInoutsSimpleAliasing
+sil hidden [ossa] @twoLocalInoutsSimpleAliasing : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -54,8 +54,8 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil hidden @conflictingPriorAccess
-sil hidden @conflictingPriorAccess : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @conflictingPriorAccess
+sil hidden [ossa] @conflictingPriorAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -73,8 +73,8 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil hidden @twoSequentialInouts
-sil hidden @twoSequentialInouts : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoSequentialInouts
+sil hidden [ossa] @twoSequentialInouts : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -92,8 +92,8 @@ bb0(%0 : $Int):
 }
 
 
-// CHECK-LABEL: sil hidden @unconditionalBranch
-sil hidden @unconditionalBranch : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @unconditionalBranch
+sil hidden [ossa] @unconditionalBranch : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -107,8 +107,8 @@ finish:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden @diamondMergeStacks
-sil hidden @diamondMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
+// CHECK-LABEL: sil hidden [ossa] @diamondMergeStacks
+sil hidden [ossa] @diamondMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -127,8 +127,8 @@ finish:
 }
 
 
-// CHECK-LABEL: sil hidden @loopMergeStacks
-sil hidden @loopMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
+// CHECK-LABEL: sil hidden [ossa] @loopMergeStacks
+sil hidden [ossa] @loopMergeStacks : $@convention(thin) (Int, Builtin.Int1) -> () {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -144,8 +144,8 @@ bb2:
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden @loopWithError
-sil hidden @loopWithError : $@convention(thin) (Int, Builtin.Int1) -> () {
+// CHECK-LABEL: sil hidden [ossa] @loopWithError
+sil hidden [ossa] @loopWithError : $@convention(thin) (Int, Builtin.Int1) -> () {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -164,8 +164,8 @@ bb2:
   return %6 : $()
 }
 
-// CHECK-LABEL: sil hidden @modifySubAccessesAreAllowed
-sil hidden @modifySubAccessesAreAllowed : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @modifySubAccessesAreAllowed
+sil hidden [ossa] @modifySubAccessesAreAllowed : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -183,8 +183,8 @@ bb0(%0 : $Int):
 
 // Multiple access kinds
 
-// CHECK-LABEL: sil hidden @twoLocalReadsSimpleAliasing
-sil hidden @twoLocalReadsSimpleAliasing : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoLocalReadsSimpleAliasing
+sil hidden [ossa] @twoLocalReadsSimpleAliasing : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
@@ -198,8 +198,8 @@ bb0(%0 : $Int):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil hidden @localReadFollowedByModify
-sil hidden @localReadFollowedByModify : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @localReadFollowedByModify
+sil hidden [ossa] @localReadFollowedByModify : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
@@ -213,8 +213,8 @@ bb0(%0 : $Int):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil hidden @localModifyFollowedByRead
-sil hidden @localModifyFollowedByRead : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @localModifyFollowedByRead
+sil hidden [ossa] @localModifyFollowedByRead : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
@@ -233,8 +233,8 @@ class ClassWithStoredProperty {
   @_hasStorage var f: Int
   init()
 }
-// CHECK-LABEL: sil hidden @classStoredProperty
-sil hidden @classStoredProperty : $@convention(thin) (ClassWithStoredProperty) -> () {
+// CHECK-LABEL: sil hidden [ossa] @classStoredProperty
+sil hidden [ossa] @classStoredProperty : $@convention(thin) (ClassWithStoredProperty) -> () {
 bb0(%0 : @unowned $ClassWithStoredProperty):
   %1 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
 
@@ -251,8 +251,8 @@ bb0(%0 : @unowned $ClassWithStoredProperty):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden @lookThroughBeginBorrow
-sil hidden @lookThroughBeginBorrow : $@convention(thin) (ClassWithStoredProperty) -> () {
+// CHECK-LABEL: sil hidden [ossa] @lookThroughBeginBorrow
+sil hidden [ossa] @lookThroughBeginBorrow : $@convention(thin) (ClassWithStoredProperty) -> () {
 bb0(%0 : @unowned $ClassWithStoredProperty):
   %1 = begin_borrow %0 : $ClassWithStoredProperty
   %2 = begin_borrow %0 : $ClassWithStoredProperty
@@ -277,8 +277,8 @@ bb0(%0 : @unowned $ClassWithStoredProperty):
 
 // Treat 'alloc_box' as identity for project_box
 
-// CHECK-LABEL: sil hidden @twoAllocBoxProjections
-sil hidden @twoAllocBoxProjections : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoAllocBoxProjections
+sil hidden [ossa] @twoAllocBoxProjections : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -295,8 +295,8 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil hidden @lookThroughMarkUninitialized
-sil hidden @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @lookThroughMarkUninitialized
+sil hidden [ossa] @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = mark_uninitialized [rootself] %1 : ${ var Int }
@@ -316,8 +316,8 @@ bb0(%0 : $Int):
 sil_global hidden @global1 : $Int
 sil_global hidden @global2 : $Int
 
-// CHECK-LABEL: sil hidden @modifySameGlobal
-sil hidden @modifySameGlobal : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @modifySameGlobal
+sil hidden [ossa] @modifySameGlobal : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = global_addr @global1 :$*Int
   %2 = global_addr @global1 :$*Int
@@ -329,8 +329,8 @@ bb0(%0 : $Int):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil hidden @modifyDifferentGlobal
-sil hidden @modifyDifferentGlobal : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @modifyDifferentGlobal
+sil hidden [ossa] @modifyDifferentGlobal : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = global_addr @global1 :$*Int
   %2 = global_addr @global2 :$*Int
@@ -346,8 +346,8 @@ bb0(%0 : $Int):
 
 // If we have a sequence of begin read - begin write - begin read accesses make
 // sure the second read doesn't report a confusing read-read conflict.
-// CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
-sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @readWriteReadConflictingThirdAccess
+sil hidden [ossa] @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -367,8 +367,8 @@ bb0(%0 : $Int):
 
 // If we have a sequence of begin write - begin write - begin write accesses make sure the
 // third write doesn't report a conflict.
-// CHECK-LABEL: sil hidden @writeWriteWriteConflictingThirdAccess
-sil hidden @writeWriteWriteConflictingThirdAccess : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @writeWriteWriteConflictingThirdAccess
+sil hidden [ossa] @writeWriteWriteConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -389,8 +389,8 @@ bb0(%0 : $Int):
 // If we have a sequence of begin write - end write - begin write - begin write
 // accesses make sure the it is the second begin write that gets the note
 // about the conflict and not the first
-// CHECK-LABEL: sil hidden @resetFirstAccessForNote
-sil hidden @resetFirstAccessForNote : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @resetFirstAccessForNote
+sil hidden [ossa] @resetFirstAccessForNote : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -415,7 +415,7 @@ bb0(%0 : $Int):
 //
 //  The unreachable block below must branch to bN where
 //    N = 3/4 * INITIAL_SIZE - 2
-sil @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
+sil [ossa] @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
  br bb1
 bb1:
@@ -471,8 +471,8 @@ bbUnreachable:
 
 // Check that a pointer_to_address access passes diagnostics.
 //
-// CHECK-LABEL: sil hidden  @pointerToAddr
-sil hidden  @pointerToAddr : $@convention(thin) (Builtin.RawPointer) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @pointerToAddr
+sil hidden [ossa] @pointerToAddr : $@convention(thin) (Builtin.RawPointer) -> Int {
 bb0(%0: $Builtin.RawPointer):
   %adr = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %access = begin_access [read] [dynamic] %adr : $*Int
@@ -490,8 +490,8 @@ struct S {
 // This only happens when mandatory passes are applied repeatedly.
 // e.g. importing from a debug standard library.
 //
-// CHECK-LABEL: sil hidden @inlinedStructElement
-sil hidden @inlinedStructElement : $@convention(thin) (@inout S) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @inlinedStructElement
+sil hidden [ossa] @inlinedStructElement : $@convention(thin) (@inout S) -> Int {
 bb0(%0 : $*S):
   %2 = begin_access [modify] [static] %0 : $*S
   %3 = struct_element_addr %2 : $*S, #S.x
@@ -505,8 +505,8 @@ bb0(%0 : $*S):
 // Check inlined tuple element access.
 // This only happens when mandatory passes are applied repeatedly.
 //
-// CHECK-LABEL: sil hidden @inlinedTupleElement
-sil hidden @inlinedTupleElement : $@convention(thin) (@inout (Int, Int)) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @inlinedTupleElement
+sil hidden [ossa] @inlinedTupleElement : $@convention(thin) (@inout (Int, Int)) -> Int {
 bb0(%0 : $*(Int, Int)):
   %2 = begin_access [modify] [static] %0 : $*(Int, Int)
   %3 = tuple_element_addr %2 : $*(Int, Int), 0
@@ -520,8 +520,8 @@ bb0(%0 : $*(Int, Int)):
 // Check inlined enum access.
 // This only happens when mandatory passes are applied repeatedly.
 //
-// CHECK-LABEL: sil hidden @inlinedEnumValue
-sil hidden @inlinedEnumValue : $@convention(thin) (Int) -> (@out Optional<Int>, Int) {
+// CHECK-LABEL: sil hidden [ossa] @inlinedEnumValue
+sil hidden [ossa] @inlinedEnumValue : $@convention(thin) (Int) -> (@out Optional<Int>, Int) {
 bb0(%0 : $*Optional<Int>, %1 : $Int):
   %6 = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
   %7 = begin_access [read] [static] %6 : $*Int
@@ -536,8 +536,8 @@ class Storage {}
 // Check inlined array access.
 // This only happens when mandatory passes are applied repeatedly.
 //
-// CHECK-LABEL: sil hidden @inlinedArrayProp
-sil hidden @inlinedArrayProp : $@convention(thin) (@guaranteed Storage, Builtin.Word) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @inlinedArrayProp
+sil hidden [ossa] @inlinedArrayProp : $@convention(thin) (@guaranteed Storage, Builtin.Word) -> Int {
 bb0(%0 : @guaranteed $Storage, %1 : $Builtin.Word):
   %2 = ref_tail_addr %0 : $Storage, $UInt
   %3 = begin_access [read] [static] %2 : $*UInt
@@ -554,7 +554,7 @@ bb0(%0 : @guaranteed $Storage, %1 : $Builtin.Word):
 
 // Conflicts involving noescape closures.
 
-sil hidden @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+sil hidden [ossa] @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -569,8 +569,8 @@ bb0(%0 : $*Int, %1 : $*Int):
 // function type to @conventio(thin), we insert access enforcement on the caller
 // side for captured variables.
 //
-// CHECK-LABEL: sil hidden @inProgressModifyModifyConflictWithCallToClosure
-sil hidden @inProgressModifyModifyConflictWithCallToClosure : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressModifyModifyConflictWithCallToClosure
+sil hidden [ossa] @inProgressModifyModifyConflictWithCallToClosure : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -584,7 +584,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil hidden [ossa] @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note 2 {{conflicting access is here}}
   end_access %2 : $*Int
@@ -592,8 +592,8 @@ bb0(%0 : $Int, %1 : $*Int):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureArgument
-sil hidden @inProgressConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressConflictWithNoEscapeClosureArgument
+sil hidden [ossa] @inProgressConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -610,8 +610,8 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeGuaranteedClosureArgument : $@convention(thin) (Int) -> () {
-sil hidden @inProgressConflictWithNoEscapeGuaranteedClosureArgument : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressConflictWithNoEscapeGuaranteedClosureArgument : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @inProgressConflictWithNoEscapeGuaranteedClosureArgument : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -630,7 +630,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> () {
+sil hidden [ossa] @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   end_access %1 : $*Int
@@ -638,8 +638,8 @@ bb0(%0 : $*Int):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil hidden @inProgressReadModifyConflictWithNoEscapeClosureArgument
-sil hidden @inProgressReadModifyConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressReadModifyConflictWithNoEscapeClosureArgument
+sil hidden [ossa] @inProgressReadModifyConflictWithNoEscapeClosureArgument : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -656,7 +656,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden @closureWithConcreteReturn : $@convention(thin) (Int, @inout_aliasable Int) -> (Int) {
+sil hidden [ossa] @closureWithConcreteReturn : $@convention(thin) (Int, @inout_aliasable Int) -> (Int) {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -665,8 +665,8 @@ bb0(%0 : $Int, %1 : $*Int):
 
 sil [reabstraction_thunk] @thunkForClosureWithConcreteReturn : $@convention(thin) (Int, @noescape @callee_owned (Int) -> Int) -> @out Int
 
-// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithReabstractionThunk
-sil hidden @inProgressConflictWithNoEscapeClosureWithReabstractionThunk : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithReabstractionThunk
+sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithReabstractionThunk : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -689,7 +689,7 @@ bb0(%0 : $Int):
 sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
 sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
-sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
+sil hidden [ossa] @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 3{{conflicting access is here}}
   end_access %1 : $*Int
@@ -697,8 +697,8 @@ bb0(%0 : $*Int):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage
-sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithBlockStorage
+sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithBlockStorage : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -727,8 +727,8 @@ bb0(%0 : $Int):
   return %ret : $()
 }
 
-// CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithOptionalBlockStorage
-sil hidden @inProgressConflictWithNoEscapeClosureWithOptionalBlockStorage : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithOptionalBlockStorage
+sil hidden [ossa] @inProgressConflictWithNoEscapeClosureWithOptionalBlockStorage : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -773,10 +773,10 @@ struct StructWithStoredProps {
   var n: NestedStructWithStoredProps
 }
 
-sil @takesInoutIntAndStructWithStoredProps : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
+sil [ossa] @takesInoutIntAndStructWithStoredProps : $@convention(thin) (@inout Int, @inout StructWithStoredProps) -> ()
 
-// CHECK-LABEL: sil hidden @twoSeparateStoredProperties
-sil hidden @twoSeparateStoredProperties : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoSeparateStoredProperties
+sil hidden [ossa] @twoSeparateStoredProperties : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var StructWithStoredProps }
   %3 = project_box %2 : ${ var StructWithStoredProps }, 0
@@ -793,8 +793,8 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil hidden @twoSeparateNestedStoredProperties
-sil hidden @twoSeparateNestedStoredProperties : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoSeparateNestedStoredProperties
+sil hidden [ossa] @twoSeparateNestedStoredProperties : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var StructWithStoredProps }
   %3 = project_box %2 : ${ var StructWithStoredProps }, 0
@@ -813,8 +813,8 @@ bb0(%0 : $Int):
   return %12 : $()
 }
 
-// CHECK-LABEL: sil hidden @theSameStoredProperty
-sil hidden @theSameStoredProperty : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @theSameStoredProperty
+sil hidden [ossa] @theSameStoredProperty : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var StructWithStoredProps }
   %3 = project_box %2 : ${ var StructWithStoredProps }, 0
@@ -831,8 +831,8 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil hidden @storedPropertyAndAggregate
-sil hidden @storedPropertyAndAggregate : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @storedPropertyAndAggregate
+sil hidden [ossa] @storedPropertyAndAggregate : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var StructWithStoredProps }
   %3 = project_box %2 : ${ var StructWithStoredProps }, 0
@@ -848,8 +848,8 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil hidden @nestedStoredPropertyAndAggregate
-sil hidden @nestedStoredPropertyAndAggregate : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @nestedStoredPropertyAndAggregate
+sil hidden [ossa] @nestedStoredPropertyAndAggregate : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var StructWithStoredProps }
   %3 = project_box %2 : ${ var StructWithStoredProps }, 0
@@ -866,8 +866,8 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil hidden @twoSeparateTupleElements
-sil hidden @twoSeparateTupleElements : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @twoSeparateTupleElements
+sil hidden [ossa] @twoSeparateTupleElements : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var (Int, Int) }
   %3 = project_box %2 : ${ var (Int, Int) }, 0
@@ -884,8 +884,8 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-// CHECK-LABEL: sil hidden @sameTupleElement
-sil hidden @sameTupleElement : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @sameTupleElement
+sil hidden [ossa] @sameTupleElement : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var (Int, Int) }
   %3 = project_box %2 : ${ var (Int, Int) }, 0
@@ -902,7 +902,7 @@ bb0(%0 : $Int):
   return %10 : $()
 }
 
-sil hidden @passNilToNoEscape : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @passNilToNoEscape : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -913,7 +913,7 @@ bb0(%0 : $Int):
   return %7 : $()
 }
 
-sil private @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+sil private [ossa] @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %access = begin_access [read] [unknown] %1 : $*Int // expected-note 3 {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -922,7 +922,7 @@ bb0(%0 : $*Int, %1 : $*Int):
   return %v : $()
 }
 
-sil hidden @directPartialApplyTakingInout : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @directPartialApplyTakingInout : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %box = alloc_box ${ var Int }, var, name "i"
   %boxadr = project_box %box : ${ var Int }, 0
@@ -938,7 +938,7 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
-sil private @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
+sil private [ossa] @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
   %access = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -947,7 +947,7 @@ bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
   return %v : $()
 }
 
-sil hidden @directPartialApplyChain : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @directPartialApplyChain : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %box = alloc_box ${ var Int }, var, name "i"
   %boxadr = project_box %box : ${ var Int }, 0
@@ -964,7 +964,7 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
-sil private @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil private [ossa] @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -973,7 +973,7 @@ bb0(%0 : $Int, %1 : $*Int):
   return %v : $()
 }
 
-sil hidden @partialApplyArgChain : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @partialApplyArgChain : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
@@ -999,7 +999,7 @@ class SomeClass {}
 //
 // Check that this doesn't trigger the DiagnoseStaticExclusivity
 // assert that all accesses have a valid AccessedStorage source.
-sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+sil [ossa] @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
 bb0(%0 : $UnsafeMutablePointer<Any>):
   %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
   %3 = integer_literal $Builtin.Int64, 8
@@ -1023,12 +1023,12 @@ bb0(%0 : $UnsafeMutablePointer<Any>):
   return %9999 : $()
 }
 
-sil @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+sil [ossa] @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
 
 // An addressor produces an unsafely accessed RawPointer. Pass the
 // address to an inout can result in an enforced (unknown) access on
 // the unsafe address. We need to handle this case without asserting.
-sil @addressorAccess : $@convention(thin) (@guaranteed ClassWithStoredProperty, Int32) -> () {
+sil [ossa] @addressorAccess : $@convention(thin) (@guaranteed ClassWithStoredProperty, Int32) -> () {
 bb0(%0 : @guaranteed $ClassWithStoredProperty, %1 : $Int32):
   %f = function_ref @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
   %up = apply %f() : $@convention(thin) () -> UnsafeMutablePointer<Int32>
@@ -1051,7 +1051,7 @@ bb0(%0 : @guaranteed $ClassWithStoredProperty, %1 : $Int32):
 // which may only be used as a nonescaping closure, can be passed to a reabstraction thunk
 // without the @noescape function-type argument convention.
 
-sil @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
+sil [ossa] @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
 bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
   %up = unchecked_enum_data %0 : $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1
   %p = struct_extract %up : $UnsafePointer<Int32>, #UnsafePointer._rawValue
@@ -1064,7 +1064,7 @@ bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
   return %v : $()
 }
 
-sil shared [transparent] [serializable] [reabstraction_thunk] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
+sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
 bb0(%0 : $UnsafePointer<Int32>, %1 : @guaranteed $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()):
   %e = enum $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1, %0 : $UnsafePointer<Int32>
   %c = apply %1(%e) : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()
@@ -1072,12 +1072,12 @@ bb0(%0 : $UnsafePointer<Int32>, %1 : @guaranteed $@callee_guaranteed (Optional<U
   return %v : $()
 }
 
-sil @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+sil [ossa] @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
 
 // A (mutating) closure taking an @inout_aliasable argument may be
 // passed to a reabstraction_thunk as an escaping function type. This
 // is valid as long as the thunk is only used as a @nosecape type.
-sil @mutatingNoescapeWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+sil [ossa] @mutatingNoescapeWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
 bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
   %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
   %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
@@ -1090,9 +1090,9 @@ bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
   return %v : $()
 }
 
-sil @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+sil [ossa] @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
 
-sil @mutatingNoescapeConflictWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+sil [ossa] @mutatingNoescapeConflictWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
 bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
   %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
   %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
@@ -1120,7 +1120,7 @@ sil @takeInoutInt : $@convention(thin) (@inout Int) -> ()
 // unidentified. Addressors that require enforcement must start a
 // dynamic access within the addressor itself, before returning an
 // UnsafePointer.
-sil @testNestedKeypathAccess : $@convention(thin) (@guaranteed (UnsafeMutablePointer<Int>, Optional<AnyObject>)) -> () {
+sil [ossa] @testNestedKeypathAccess : $@convention(thin) (@guaranteed (UnsafeMutablePointer<Int>, Optional<AnyObject>)) -> () {
 bb0(%0 : @guaranteed $(UnsafeMutablePointer<Int>, Optional<AnyObject>)):
   %up = tuple_extract %0 : $(UnsafeMutablePointer<Int>, Optional<AnyObject>), 0
   %o = tuple_extract %0 : $(UnsafeMutablePointer<Int>, Optional<AnyObject>), 1
@@ -1136,7 +1136,7 @@ bb0(%0 : @guaranteed $(UnsafeMutablePointer<Int>, Optional<AnyObject>)):
 }
 
 // Test a conflict on a noescape closure where multiple closures may be conditionally stored in an ObjC block.
-sil hidden @noEscapeClosureWithConditionalBlockStorage : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @noEscapeClosureWithConditionalBlockStorage : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %box = alloc_box ${ var Int }
   %boxadr = project_box %box : ${ var Int }, 0
@@ -1193,13 +1193,13 @@ bb3(%block : @owned $@convention(block) @noescape () -> ()):
 // Test that 'checkNoEscapePartialApply' does not assert on a noescape
 // closure passed through a block argument.
 
-sil hidden @closureWithNoCapture : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @closureWithNoCapture : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = tuple ()
   return %2 : $()
 }
 
-sil hidden @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil hidden [ossa] @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -1207,7 +1207,7 @@ bb0(%0 : $Int, %1 : $*Int):
   return %v : $()
 }
 
-sil shared [transparent] [serializable] [reabstraction_thunk] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error) {
+sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @partialApplyPhiThunk : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed (Int) -> (@error Error)) -> (@error Error) {
 bb0(%0 : $*Int, %1 : $@noescape @callee_guaranteed (Int) -> (@error Error)):
   %val = load [trivial] %0 : $*Int
   try_apply %1(%val) : $@noescape @callee_guaranteed (Int) -> (@error Error), normal bb1, error bb2
@@ -1219,10 +1219,10 @@ bb2(%5 : @owned $Error):
   throw %5 : $Error
 }
 
-sil @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
+sil [ossa] @takeGenericNoEscapeFunction : $@convention(method) <τ_0_0> (@inout τ_0_0, @noescape @callee_guaranteed (@in_guaranteed τ_0_0) -> (@error Error)) -> (@error Error)
 
-// CHECK-LABEL: sil @testPartialApplyPhi
-sil @testPartialApplyPhi : $@convention(thin) (Int, @inout Int) -> (@error Error) {
+// CHECK-LABEL: sil [ossa] @testPartialApplyPhi
+sil [ossa] @testPartialApplyPhi : $@convention(thin) (Int, @inout Int) -> (@error Error) {
 bb0(%0 : $Int, %1 : $*Int):
   cond_br undef, bb1, bb2
 
@@ -1261,8 +1261,8 @@ bb5(%e : @owned $Error):
   throw %e : $Error
 }
 
-// CHECK-LABEL: sil @testDirectPartialApplyPhi
-sil @testDirectPartialApplyPhi : $@convention(thin) (@inout Int) -> (@error Error) {
+// CHECK-LABEL: sil [ossa] @testDirectPartialApplyPhi
+sil [ossa] @testDirectPartialApplyPhi : $@convention(thin) (@inout Int) -> (@error Error) {
 bb0(%0 : $*Int):
   cond_br undef, bb1, bb2
 
@@ -1293,7 +1293,7 @@ bb3(%pa3 : @owned $@callee_guaranteed (@inout Int) -> ()):
 
 sil @takeEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
 
-sil private @nestedInWithoutActuallyEscapingVerify : $@convention(thin) (@inout_aliasable Int) -> () {
+sil private [ossa] @nestedInWithoutActuallyEscapingVerify : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %a = begin_access [modify] [unknown] %0 : $*Int
   end_access %a : $*Int
@@ -1301,8 +1301,8 @@ bb0(%0 : $*Int):
   return %v : $()
 }
 
-// CHECK-LABEL: sil hidden @testWithoutActuallyEscapingVerify : $@convention(thin) (@inout Int) -> () {
-sil hidden @testWithoutActuallyEscapingVerify : $@convention(thin) (@inout Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @testWithoutActuallyEscapingVerify : $@convention(thin) (@inout Int) -> () {
+sil hidden [ossa] @testWithoutActuallyEscapingVerify : $@convention(thin) (@inout Int) -> () {
 bb0(%0 : $*Int):
   %2 = function_ref @nestedInWithoutActuallyEscapingVerify : $@convention(thin) (@inout_aliasable Int) -> ()
   %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
@@ -1320,14 +1320,14 @@ bb0(%0 : $*Int):
   return %14 : $()
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
-sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @thunkForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
   %1 = apply %0() : $@callee_guaranteed () -> ()
   return %1 : $()
 }
 
-sil private @closureForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+sil private [ossa] @closureForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
   %2 = function_ref @takeEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
@@ -1340,9 +1340,9 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
 // <rdar://problem/43059088> Assertion in DiagnoseStaticExclusivity
 // Noescape closure verification should not assert.
 
-// CHECK-LABEL: sil hidden @testWithoutActuallyEscapingBlockVerify : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @testWithoutActuallyEscapingBlockVerify : $@convention(thin) (Int) -> () {
 // CHECK: convert_function %{{.*}} : $@convention(block) () -> () to [without_actually_escaping] $@convention(block) () -> ()
-sil hidden @testWithoutActuallyEscapingBlockVerify : $@convention(thin) (Int) -> () {
+sil hidden [ossa] @testWithoutActuallyEscapingBlockVerify : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %box = alloc_box ${ var Int }, var, name "localVal"
   %projbox = project_box %box : ${ var Int }, 0
@@ -1370,10 +1370,10 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
-sil @testWithoutActuallyEscapingBlockVerifyClosure : $@convention(thin) (@inout_aliasable Int) -> ()
+sil [ossa] @testWithoutActuallyEscapingBlockVerifyClosure : $@convention(thin) (@inout_aliasable Int) -> ()
 
 // thunk for @escaping @callee_guaranteed () -> ()
-sil shared [transparent] [serializable] [reabstraction_thunk] @$sIeg_IeyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> () {
+sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sIeg_IeyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> () {
 // %0
 bb0(%0 : $*@block_storage @callee_guaranteed () -> ()):
   %1 = project_block_storage %0 : $*@block_storage @callee_guaranteed () -> ()
@@ -1386,7 +1386,7 @@ bb0(%0 : $*@block_storage @callee_guaranteed () -> ()):
   return %6 : $()
 } // end sil function '$sIeg_IeyB_TR'
 
-sil private @testWithoutActuallyEscapingBlockVerifyClause : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> () {
+sil private [ossa] @testWithoutActuallyEscapingBlockVerifyClause : $@convention(thin) (@guaranteed @convention(block) () -> ()) -> () {
 bb0(%0 : @guaranteed $@convention(block) () -> ()):
   %1 = copy_block %0 : $@convention(block) () -> ()
   %3 = begin_borrow %1 : $@convention(block) () -> ()

@@ -97,7 +97,7 @@ struct AddrOnlyStructInitGeneric<T> {
 // Tests //
 ///////////
 
-// CHECK-LABEL: sil hidden @$ss021testLoadableClassInitB0yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss021testLoadableClassInitB0yyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[THUNK_REF:%.*]] = function_ref @$ss017LoadableClassInitA0CyABs5KlassCcfCTcTd : $@convention(thin) (@thick LoadableClassInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableClassInitLoadable
 // CHECK:   [[CANONICAL_THUNK:%.*]] = apply [[THUNK_REF]](
@@ -111,7 +111,7 @@ struct AddrOnlyStructInitGeneric<T> {
 
 // Curry thunk.
 //
-// CHECK-LABEL: sil shared [thunk] @$ss017LoadableClassInitA0CyABs5KlassCcfCTcTd : $@convention(thin) (@thick LoadableClassInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableClassInitLoadable {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$ss017LoadableClassInitA0CyABs5KlassCcfCTcTd : $@convention(thin) (@thick LoadableClassInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableClassInitLoadable {
 // CHECK:   [[ALLOCATING_INIT_FN:%.*]] = function_ref @$ss017LoadableClassInitA0CyABs5KlassCcfC :
 // CHECK:   [[METATYPE_PA_ALLOCATING_INIT_FN:%.*]] = partial_apply [callee_guaranteed] [[ALLOCATING_INIT_FN]](
 // CHECK:   [[THUNK_FN:%.*]] = function_ref @$ss5KlassCs017LoadableClassInitB0CIegxo_AbDIeggo_TR :
@@ -121,7 +121,7 @@ struct AddrOnlyStructInitGeneric<T> {
 
 // Canonical Thunk.
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$ss5KlassCs017LoadableClassInitB0CIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable) -> @owned LoadableClassInitLoadable {
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCs017LoadableClassInitB0CIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable) -> @owned LoadableClassInitLoadable {
 // CHECK: bb0([[CLASS:%.*]] : @guaranteed $Klass, [[PA:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @owned LoadableClassInitLoadable):
 // CHECK:   [[CLASS_COPY:%.*]] = copy_value [[CLASS]]
 // CHECK:   [[RESULT:%.*]] = apply [[PA]]([[CLASS_COPY]])
@@ -132,7 +132,7 @@ func testLoadableClassInitLoadable() {
   let y = x(Klass())
 }
 
-// CHECK-LABEL: sil hidden @$ss022testLoadableStructInitB0yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss022testLoadableStructInitB0yyF : $@convention(thin) () -> () {
 // CHECK:   [[THUNK_REF:%.*]] = function_ref @$ss018LoadableStructInitA0VyABs5KlassCcfCTc : $@convention(thin) (@thin LoadableStructInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableStructInitLoadable
 // CHECK:   [[CANONICAL_THUNK:%.*]] = apply [[THUNK_REF]](
 // CHECK:   [[BORROWED_CANONICAL_THUNK:%.*]] = begin_borrow [[CANONICAL_THUNK]]
@@ -145,7 +145,7 @@ func testLoadableClassInitLoadable() {
 
 // Curry thunk.
 //
-// CHECK-LABEL: sil shared [thunk] @$ss018LoadableStructInitA0VyABs5KlassCcfCTc : $@convention(thin) (@thin LoadableStructInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableStructInitLoadable {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$ss018LoadableStructInitA0VyABs5KlassCcfCTc : $@convention(thin) (@thin LoadableStructInitLoadable.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @owned LoadableStructInitLoadable {
 // CHECK:   [[ALLOCATING_INIT_FN:%.*]] = function_ref @$ss018LoadableStructInitA0VyABs5KlassCcfC :
 // CHECK:   [[METATYPE_PA_ALLOCATING_INIT_FN:%.*]] = partial_apply [callee_guaranteed] [[ALLOCATING_INIT_FN]](
 // CHECK:   [[THUNK_FN:%.*]] = function_ref @$ss5KlassCs018LoadableStructInitB0VIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable) -> @owned LoadableStructInitLoadable
@@ -155,7 +155,7 @@ func testLoadableClassInitLoadable() {
 
 // Canonical Thunk.
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$ss5KlassCs018LoadableStructInitB0VIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable) -> @owned LoadableStructInitLoadable {
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCs018LoadableStructInitB0VIegxo_AbDIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable) -> @owned LoadableStructInitLoadable {
 // CHECK: bb0([[CLASS:%.*]] : @guaranteed $Klass, [[PA:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @owned LoadableStructInitLoadable):
 // CHECK:   [[CLASS_COPY:%.*]] = copy_value [[CLASS]]
 // CHECK:   [[RESULT:%.*]] = apply [[PA]]([[CLASS_COPY]])
@@ -169,7 +169,7 @@ func testLoadableStructInitLoadable() {
 // In this case we have a generic type that due to type lowering introduces an
 // extra thunk.
 //
-// CHECK-LABEL: sil hidden @$ss37testAddrOnlyStructInitGenericConcreteyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss37testAddrOnlyStructInitGenericConcreteyyF : $@convention(thin) () -> () {
 // CHECK:   [[THUNK_REF:%.*]] = function_ref @$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc : $@convention(thin) <τ_0_0> (@thin AddrOnlyStructInitGeneric<τ_0_0>.Type) -> @owned @callee_guaranteed (@in_guaranteed τ_0_0) -> @out AddrOnlyStructInitGeneric<τ_0_0>
 // CHECK:   [[CURRY_THUNK:%.*]] = apply [[THUNK_REF]]<Klass>(
 // CHECK:   [[CANONICAL_THUNK_REF:%.*]] = function_ref @$ss5KlassCs25AddrOnlyStructInitGenericVyABGIegnr_AbEIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>) -> @owned AddrOnlyStructInitGeneric<Klass>
@@ -183,7 +183,7 @@ func testLoadableStructInitLoadable() {
 
 // Curry thunk
 //
-// CHECK-LABEL: sil shared [thunk] @$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc : $@convention(thin) <T> (@thin AddrOnlyStructInitGeneric<T>.Type) -> @owned @callee_guaranteed (@in_guaranteed T) -> @out AddrOnlyStructInitGeneric<T> {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc : $@convention(thin) <T> (@thin AddrOnlyStructInitGeneric<T>.Type) -> @owned @callee_guaranteed (@in_guaranteed T) -> @out AddrOnlyStructInitGeneric<T> {
 // CHECK:   [[ALLOCATING_INIT_REF:%.*]] = function_ref @$ss25AddrOnlyStructInitGenericVyAByxGxcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin AddrOnlyStructInitGeneric<τ_0_0>.Type) -> @out AddrOnlyStructInitGeneric<τ_0_0>
 // CHECK:   [[ALLOCATING_INIT:%.*]] = partial_apply [callee_guaranteed] [[ALLOCATING_INIT_REF]]<T>(
 // CHECK:   [[THUNK_REF:%.*]] = function_ref @$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out AddrOnlyStructInitGeneric<τ_0_0>) -> @out AddrOnlyStructInitGeneric<τ_0_0>
@@ -191,14 +191,14 @@ func testLoadableStructInitLoadable() {
 // CHECK:   return [[THUNK]]
 // CHECK: } // end sil function '$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc'
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>) -> @out AddrOnlyStructInitGeneric<T> {
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR : $@convention(thin) <T> (@in_guaranteed T, @guaranteed @callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>) -> @out AddrOnlyStructInitGeneric<T> {
 // CHECK: bb0([[ARG0:%.*]] : $*AddrOnlyStructInitGeneric<T>, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>):
 // CHECK:   [[STACK:%.*]] = alloc_stack $T
 // CHECK:   copy_addr [[ARG1]] to [initialization] [[STACK]] : $*T
 // CHECK:   apply [[ARG2]]([[ARG0]], [[STACK]]) : $@callee_guaranteed (@in T) -> @out AddrOnlyStructInitGeneric<T>
 // CHECK: } // end sil function '$sxs25AddrOnlyStructInitGenericVyxGIegir_xACIegnr_lTR'
 
-// CHECK_LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$ss5KlassCs25AddrOnlyStructInitGenericVyABGIegnr_AbEIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>) -> @owned AddrOnlyStructInitGeneric<Klass> {
+// CHECK_LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$ss5KlassCs25AddrOnlyStructInitGenericVyABGIegnr_AbEIeggo_TR : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>) -> @owned AddrOnlyStructInitGeneric<Klass> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Klass, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Klass) -> @out AddrOnlyStructInitGeneric<Klass>):
 // CHECK:   [[STACK:%.*]] = alloc_stack $Klass
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
@@ -214,7 +214,7 @@ func testAddrOnlyStructInitGenericConcrete() {
   let y = x(Klass())
 }
 
-// CHECK-LABEL: sil hidden @$ss029testAddrOnlyStructInitGenericbC01tyx_ts08Protocole7AddressC0RzlF : $@convention(thin) <T where T : ProtocolInitAddressOnly> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss029testAddrOnlyStructInitGenericbC01tyx_ts08Protocole7AddressC0RzlF : $@convention(thin) <T where T : ProtocolInitAddressOnly> (@in_guaranteed T) -> () {
 // CHECK:   [[CURRY_THUNK_REF:%.*]] = function_ref @$ss25AddrOnlyStructInitGenericVyAByxGxcfCTc : $@convention(thin) <τ_0_0> (@thin AddrOnlyStructInitGeneric<τ_0_0>.Type) -> @owned @callee_guaranteed (@in_guaranteed τ_0_0) -> @out AddrOnlyStructInitGeneric<τ_0_0>
 // CHECK:   [[CURRY_THUNK:%.*]] = apply [[CURRY_THUNK_REF]]<T.SubType>(
 // CHECK:   [[Y:%.*]] = alloc_stack $AddrOnlyStructInitGeneric<T.SubType>, let, name "y"
@@ -231,7 +231,7 @@ func testAddrOnlyStructInitGenericAddrOnly<T : ProtocolInitAddressOnly>(t: T) {
   let y = x(T.SubType())
 }
 
-// CHECK-LABEL: sil hidden @$ss20testGenericInitClass1tyx_ts08ProtocolC8LoadableRzlF : $@convention(thin) <T where T : ProtocolInitLoadable> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss20testGenericInitClass1tyx_ts08ProtocolC8LoadableRzlF : $@convention(thin) <T where T : ProtocolInitLoadable> (@in_guaranteed T) -> () {
 // CHECK:   [[CURRY_THUNK_REF:%.*]] = function_ref @$ss20ProtocolInitLoadableP1txs5KlassC_tcfCTc : $@convention(thin) <τ_0_0 where τ_0_0 : ProtocolInitLoadable> (@thick τ_0_0.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @out τ_0_0
 // CHECK:   [[CURRY_THUNK:%.*]] = apply [[CURRY_THUNK_REF]]<T>(
 // CHECK:   [[Y:%.*]] = alloc_stack $T, let, name "y"
@@ -245,7 +245,7 @@ func testAddrOnlyStructInitGenericAddrOnly<T : ProtocolInitAddressOnly>(t: T) {
 
 // Curry thunk.
 //
-// CHECK-LABEL: sil shared [thunk] @$ss20ProtocolInitLoadableP1txs5KlassC_tcfCTc : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@thick Self.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @out Self {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$ss20ProtocolInitLoadableP1txs5KlassC_tcfCTc : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@thick Self.Type) -> @owned @callee_guaranteed (@guaranteed Klass) -> @out Self {
 // CHECK:   [[WITNESS_METHOD_REF:%.*]] = witness_method $Self, #ProtocolInitLoadable.init!allocator.1 : <Self where Self : ProtocolInitLoadable> (Self.Type) -> (Klass) -> Self : $@convention(witness_method: ProtocolInitLoadable) <τ_0_0 where τ_0_0 : ProtocolInitLoadable> (@owned Klass, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   [[WITNESS_METHOD:%.*]] = partial_apply [callee_guaranteed] [[WITNESS_METHOD_REF]]<Self>(
 // CHECK:   [[CANONICAL_THUNK_REF:%.*]] = function_ref @$ss5KlassCxIegxr_ABxIeggr_s20ProtocolInitLoadableRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : ProtocolInitLoadable> (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @out τ_0_0) -> @out τ_0_0
@@ -255,7 +255,7 @@ func testAddrOnlyStructInitGenericAddrOnly<T : ProtocolInitAddressOnly>(t: T) {
 
 // Canonical thunk
 //
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$ss5KlassCxIegxr_ABxIeggr_s20ProtocolInitLoadableRzlTR : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @out Self) -> @out Self {
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$ss5KlassCxIegxr_ABxIeggr_s20ProtocolInitLoadableRzlTR : $@convention(thin) <Self where Self : ProtocolInitLoadable> (@guaranteed Klass, @guaranteed @callee_guaranteed (@owned Klass) -> @out Self) -> @out Self {
 // CHECK: bb0([[ARG0:%.*]] : $*Self, [[ARG1:%.*]] : @guaranteed $Klass, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@owned Klass) -> @out Self):
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   apply [[ARG2]]([[ARG0]], [[ARG1_COPY]])

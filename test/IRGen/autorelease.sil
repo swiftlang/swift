@@ -9,13 +9,13 @@ import Swift
 
 class C {}
 sil_vtable C {}
-sil @_TFC11autorelease1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
+sil [ossa] @_TFC11autorelease1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
-sil @foo : $@convention(thin) (@owned C?) -> @autoreleased C? {
+sil [ossa] @foo : $@convention(thin) (@owned C?) -> @autoreleased C? {
 bb0(%0 : @owned $C?):
   return %0 : $C?
 }
@@ -28,7 +28,7 @@ bb0(%0 : @owned $C?):
 // CHECK-64:        [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
 // CHECK-64-NEXT:   ret i64 [[T0]]
 
-sil @bar : $@convention(thin) (@owned C?) -> @owned C? {
+sil [ossa] @bar : $@convention(thin) (@owned C?) -> @owned C? {
 bb0(%0 : @owned $C?):
   %1 = function_ref @foo : $@convention(thin) (@owned C?) -> @autoreleased C?
   %2 = apply %1(%0) : $@convention(thin) (@owned C?) -> @autoreleased C?

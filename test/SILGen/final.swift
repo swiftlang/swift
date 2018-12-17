@@ -19,7 +19,7 @@ class TestDerived : TestClass {
 }
 
 
-// CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch{{.*}} : $@convention(thin) (@guaranteed TestClass) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testDirectDispatch{{.*}} : $@convention(thin) (@guaranteed TestClass) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $TestClass):
 // CHECK: [[FINALMETH:%[0-9]+]] = function_ref @$s5final9TestClassC0A6Method{{[_0-9a-zA-Z]*}}F
 // CHECK: apply [[FINALMETH]]([[ARG]])

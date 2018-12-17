@@ -4,7 +4,7 @@ struct X { }
 
 // Initializer delegation within a struct.
 struct S {
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S.Type) -> S {
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation1SV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S.Type) -> S {
   init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin S.Type):
     // CHECK-NEXT:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S }
@@ -31,7 +31,7 @@ enum E {
   // We don't want the enum to be uninhabited
   case Foo
 
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation1EO{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin E.Type) -> E
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation1EO{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin E.Type) -> E
   init() {
     // CHECK: bb0([[E_META:%[0-9]+]] : $@thin E.Type):
     // CHECK:   [[E_BOX:%[0-9]+]] = alloc_box ${ var E }
@@ -55,7 +55,7 @@ enum E {
 
 // Initializer delegation to a generic initializer
 struct S2 {
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation2S2V{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S2.Type) -> S2
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2S2V{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin S2.Type) -> S2
   init() {
     // CHECK: bb0([[S2_META:%[0-9]+]] : $@thin S2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var S2 }
@@ -85,7 +85,7 @@ struct S2 {
 class C1 {
   var ivar: X
 
- // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C1C{{[_0-9a-zA-Z]*}}fC
+ // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2C1C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C1.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C1 }
@@ -107,7 +107,7 @@ class C1 {
 @objc class C2 {
   var ivar: X
 
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC
   convenience init(x: X) {
     // CHECK: bb0([[X:%[0-9]+]] : $X, [[SELF_META:%[0-9]+]] : $@thick C2.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var C2 }
@@ -120,11 +120,11 @@ class C1 {
     // CHECK:   destroy_value [[MARKED_SELF_BOX]] : ${ var C2 }
     // CHECK:   return [[VAR_15]] : $C2
     self.init(x1: x, x2: x)
-    // CHECK-NOT: sil hidden @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, @owned C2) -> @owned C2 {
+    // CHECK-NOT: sil hidden [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, @owned C2) -> @owned C2 {
   }
 
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, X, @thick C2.Type) -> @owned C2 {
-  // CHECK-NOT:   sil @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, X, @owned C2) -> @owned C2 {
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fC : $@convention(method) (X, X, @thick C2.Type) -> @owned C2 {
+  // CHECK-NOT:   sil [ossa] @$s19init_ref_delegation2C2C{{[_0-9a-zA-Z]*}}fcTo : $@convention(objc_method) (X, X, @owned C2) -> @owned C2 {
   init(x1: X, x2: X) { ivar = x1 }
 }
 
@@ -133,7 +133,7 @@ var x: X = X()
 class C3 {
   var i: Int = 5
 
-  // CHECK-LABEL: sil hidden @$s19init_ref_delegation2C3C{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [ossa] @$s19init_ref_delegation2C3C{{[_0-9a-zA-Z]*}}fC
   convenience init() {
     // CHECK: mark_uninitialized [delegatingself]
     // CHECK-NOT: integer_literal
@@ -154,7 +154,7 @@ extension C4 {
   convenience init(x1: X) {
     self.init()
   }
-  // CHECK: sil hidden @$s19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fC
+  // CHECK: sil hidden [ossa] @$s19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fC
   // CHECK: [[PEER:%[0-9]+]] = function_ref @$s19init_ref_delegation2C4C{{[_0-9a-zA-Z]*}}fC
   // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[META:%[0-9]+]])
   convenience init(x2: X) {

@@ -3,7 +3,7 @@
 
 struct S { var x, y: Int }
 
-// CHECK-LABEL: sil hidden @$s25collection_subtype_upcast06array_C00D0SayypGSayAA1SVG_tF :
+// CHECK-LABEL: sil hidden [ossa] @$s25collection_subtype_upcast06array_C00D0SayypGSayAA1SVG_tF :
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Array<S>):
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -27,7 +27,7 @@ func ==(lhs: S, rhs: S) -> Bool {
 }
 
 // FIXME: This entrypoint name should not be bridging-specific
-// CHECK-LABEL:      sil hidden @$s25collection_subtype_upcast05dict_C00D0SDyAA1SVypGSDyAESiG_tF :
+// CHECK-LABEL:      sil hidden [ossa] @$s25collection_subtype_upcast05dict_C00D0SDyAA1SVypGSDyAESiG_tF :
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Dictionary<S, Int>):
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]

@@ -312,7 +312,7 @@ sil @n_get : $@convention(thin) <UU, TT> (@in_guaranteed TT) -> @out UU
 sil @n_set : $@convention(thin) <UU, TT> (@in_guaranteed UU, @in_guaranteed TT) -> ()
 
 sil @computed_property_indices : $@convention(thin) (C, S, C, S, C, S) -> () {
-entry(%0 : @unowned $C, %1 : @unowned $S, %2 : @unowned $C, %3 : @unowned $S, %4 : @unowned $C, %5 : @unowned $S):
+entry(%0 : $C, %1 : $S, %2 : $C, %3 : $S, %4 : $C, %5 : $S):
   %o = keypath $WritableKeyPath<S, C>, (
     root $S;
     settable_property $C,

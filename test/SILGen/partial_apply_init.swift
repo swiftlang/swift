@@ -20,7 +20,7 @@ extension P {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s18partial_apply_init06class_c1_a1_B0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s18partial_apply_init06class_c1_a1_B0{{[_0-9a-zA-Z]*}}F
 func class_init_partial_apply(c: C.Type) {
   // Partial applications at the static metatype use the direct (_TTd) thunk.
   // CHECK: function_ref @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
@@ -34,14 +34,14 @@ func class_init_partial_apply(c: C.Type) {
   let requiredM: (Double) -> C = c.init
 }
 
-// CHECK-LABEL: sil shared [thunk] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
 // CHECK:         function_ref @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
-// CHECK-LABEL: sil shared [thunk] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fCTcTd
 // CHECK:         function_ref @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
-// CHECK-LABEL: sil shared [thunk] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
-// CHECK-LABEL: sil hidden @$s18partial_apply_init010archetype_c1_a1_B0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s18partial_apply_init010archetype_c1_a1_B0{{[_0-9a-zA-Z]*}}F
 func archetype_init_partial_apply<T: C>(t: T.Type) where T: P {
   // Archetype initializations are always dynamic, whether applied to the type or a metatype.
   // CHECK: function_ref @$s18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
@@ -59,8 +59,8 @@ func archetype_init_partial_apply<T: C>(t: T.Type) where T: P {
   let protoExtM: (Float) -> T = t.init
 }
 
-// CHECK-LABEL: sil shared [thunk] @$s18partial_apply_init1PP{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18partial_apply_init1PP{{[_0-9a-zA-Z]*}}fC
 // CHECK:         witness_method $Self, #P.init!allocator.1
-// CHECK-LABEL: sil shared [thunk] @$s18partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
 // CHECK:         function_ref @$s18partial_apply_init1PPAAE{{[_0-9a-zA-Z]*}}fC
 

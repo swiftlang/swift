@@ -5,30 +5,30 @@ class X {
   }
 
   // Convenience inits must dynamically dispatch designated inits...
-  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation1XC0A0ACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC0A0ACyt_tcfC
   // CHECK:         class_method {{%.*}}, #X.init!allocator.1
   convenience init(convenience: ()) {
     self.init()
   }
 
   // ...but can statically invoke peer convenience inits
-  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation1XC17doubleConvenienceACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC17doubleConvenienceACyt_tcfC
   // CHECK:         function_ref @$s32convenience_init_peer_delegation1XC0A0ACyt_tcfC
   convenience init(doubleConvenience: ()) {
     self.init(convenience: ())
   }
 
-  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation1XC8requiredACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC8requiredACyt_tcfC
   required init(required: ()) {
   }
 
-  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC19requiredConvenienceACyt_tcfC
   required convenience init(requiredConvenience: ()) {
     self.init(required: ())
   }
 
   // Convenience inits must dynamically dispatch required peer convenience inits
-  // CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC25requiredDoubleConvenienceACyt_tcfC
   // CHECK:         class_method {{%.*}}, #X.init!allocator.1
   required convenience init(requiredDoubleConvenience: ()) {
     self.init(requiredDoubleConvenience: ())
@@ -54,7 +54,7 @@ class Y: X {
   required init(requiredDoubleConvenience: ()) { super.init() }
 }
 
-// CHECK-LABEL: sil hidden @$s32convenience_init_peer_delegation11invocations2xtyAA1XCm_tF
+// CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation11invocations2xtyAA1XCm_tF
 func invocations(xt: X.Type) {
   // CHECK: function_ref @$s32convenience_init_peer_delegation1XCACycfC
   _ = X()

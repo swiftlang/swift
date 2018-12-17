@@ -2,7 +2,7 @@
 
 func use<T>(_: T) {}
 
-// CHECK-LABEL: sil hidden @$s22generic_local_property3foo1x1yyx_SitlF
+// CHECK-LABEL: sil hidden [ossa] @$s22generic_local_property3foo1x1yyx_SitlF
 func foo<T>(x: T, y: Int) {
   var mutable: Int {
     get {

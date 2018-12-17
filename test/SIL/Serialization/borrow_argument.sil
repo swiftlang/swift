@@ -8,10 +8,10 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: sil [serialized] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [serialized] [ossa] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb1([[PHIBBARG:%.*]] : @guaranteed $Builtin.NativeObject):
 // CHECK: end_borrow [[PHIBBARG]] : $Builtin.NativeObject
-sil [serialized] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [serialized] [ossa] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 

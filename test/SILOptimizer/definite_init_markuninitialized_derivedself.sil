@@ -60,7 +60,7 @@ sil @getSomeOptionalClass : $@convention(thin) () -> Optional<SomeClass>
 //   }
 // }
 //
-sil @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+sil [ossa] @derived_test1 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
@@ -109,7 +109,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
 //   override init() {
 //   }
 // }
-sil @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
+sil [ossa] @derived_test2 :  $@convention(method) (@owned DerivedClassWithIVars) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0
@@ -152,7 +152,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 // come from when mandatory inlining ran very early. That being said, we should
 // still dot he right thing.
 //
-// CHECK-LABEL: sil @test_derived_release
+// CHECK-LABEL: sil [ossa] @test_derived_release
 // CHECK: bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
 // CHECK-NEXT: store
@@ -160,7 +160,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_stack [[SELFBOX]]
-sil @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_derived_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -178,7 +178,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // come from when mandatory inlining ran very early. That being said, we should
 // still dot he right thing.
 //
-// CHECK-LABEL: sil @test_derived_partial_release
+// CHECK-LABEL: sil [ossa] @test_derived_partial_release
 // CHECK: bb0([[ARG:%.*]] : @owned $DerivedClassWithNontrivialStoredProperties):
 //
 // Initialize the self box.
@@ -204,7 +204,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // CHECK: dealloc_partial_ref [[SELF]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
 // CHECK: dealloc_stack [[SELFBOX]]
 // CHECK: } // end sil function 'test_derived_partial_release'
-sil @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+sil [ossa] @test_derived_partial_release : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
   %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [derivedself] %1 : $*DerivedClassWithNontrivialStoredProperties
@@ -243,7 +243,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 //   }
 // }
 //
-sil @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
+sil [ossa] @super_init_out_of_order :  $@convention(method) (@owned DerivedClassWithIVars, Int) -> @owned DerivedClassWithIVars {
 bb0(%0 : @owned $DerivedClassWithIVars, %i : $Int):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>, 0

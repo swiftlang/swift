@@ -12,7 +12,7 @@ public struct S {
 
 sil_global [let] @my_global : $Int
 
-sil hidden [global_init] @private_function : $@convention(thin) () -> Builtin.RawPointer {
+sil hidden [global_init] [ossa] @private_function : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %4 = global_addr @my_global : $*Int
   %5 = address_to_pointer %4 : $*Int to $Builtin.RawPointer
@@ -21,7 +21,7 @@ bb0:
 
 // This function is transparent, but not serialized. We cannot inline it into
 // serialized_caller.
-sil [transparent] @transparent_callee : $@convention(thin) () -> Int {
+sil [transparent] [ossa] @transparent_callee : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @private_function : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
@@ -30,8 +30,8 @@ bb0:
   return %3 : $Int
 }
 
-// CHECK-LABEL: sil [serialized] @serialized_callee
-sil [serialized] @serialized_callee : $@convention(method) (@thin S.Type) -> S {
+// CHECK-LABEL: sil [serialized] [ossa] @serialized_callee
+sil [serialized] [ossa] @serialized_callee : $@convention(method) (@thin S.Type) -> S {
 bb0(%0 : $@thin S.Type):
   %1 = alloc_box ${ var S }, var, name "self"
   %2 = mark_uninitialized [rootself] %1 : ${ var S }

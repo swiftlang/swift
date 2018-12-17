@@ -18,7 +18,7 @@ struct Holder {
 }
 
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @$ss6HolderV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden [ossa] @$ss6HolderV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@owned C, @thin Holder.Type) -> Holder
 // CHECK: bb0([[T0:%.*]] : @owned $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   destroy_value [[T0]] : $C
@@ -29,7 +29,7 @@ func set(holder holder: inout Holder) {
   holder.value = C()
 }
 
-// CHECK-LABEL: sil hidden @$ss3set6holderys6HolderVz_tF : $@convention(thin) (@inout Holder) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss3set6holderys6HolderVz_tF : $@convention(thin) (@inout Holder) -> () {
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK:        [[T0:%.*]] = function_ref @$ss1CC{{[_0-9a-zA-Z]*}}fC
 // CHECK:        [[C:%.*]] = apply [[T0]](
@@ -44,7 +44,7 @@ func set(holder holder: inout Holder) {
 func get(holder holder: inout Holder) -> C {
   return holder.value
 }
-// CHECK-LABEL: sil hidden @$ss3get6holders1CCs6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C {
+// CHECK-LABEL: sil hidden [ossa] @$ss3get6holders1CCs6HolderVz_tF : $@convention(thin) (@inout Holder) -> @owned C {
 // CHECK: bb0([[ADDR:%.*]] : $*Holder):
 // CHECK-NEXT:   debug_value_addr %0 : $*Holder, var, name "holder", argno 1 
 // CHECK-NEXT:   [[READ:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*Holder
@@ -58,7 +58,7 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL: sil hidden @$ss7project2fns1CCs6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C {
+// CHECK-LABEL: sil hidden [ossa] @$ss7project2fns1CCs6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C {
 // CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()

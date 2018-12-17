@@ -8,7 +8,7 @@ enum Optionable<T> {
   case Nuttn
 }
 
-// CHECK-LABEL: sil hidden @$s18switch_abstraction18enum_reabstraction1x1ayAA10OptionableOyAA1AVAHcG_AHtF : $@convention(thin) (@guaranteed Optionable<(A) -> A>, A) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_abstraction18enum_reabstraction1x1ayAA10OptionableOyAA1AVAHcG_AHtF : $@convention(thin) (@guaranteed Optionable<(A) -> A>, A) -> ()
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optionable<(A) -> A>,
 // CHECK: switch_enum [[ARG]] : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
 //
@@ -30,7 +30,7 @@ enum Wacky<A, B> {
   case Bar((B) -> A)
 }
 
-// CHECK-LABEL: sil hidden @$s18switch_abstraction45enum_addr_only_to_loadable_with_reabstraction{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in_guaranteed Wacky<T, A>, A) -> @out T {
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_abstraction45enum_addr_only_to_loadable_with_reabstraction{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in_guaranteed Wacky<T, A>, A) -> @out T {
 // CHECK: switch_enum_addr [[ENUM:%.*]] : $*Wacky<T, A>, {{.*}} case #Wacky.Bar!enumelt.1: [[DEST:bb[0-9]+]]
 // CHECK: [[DEST]]:
 // CHECK:   [[ORIG_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM]] : $*Wacky<T, A>, #Wacky.Bar
@@ -51,7 +51,7 @@ func enum_addr_only_to_loadable_with_reabstraction<T>(x: Wacky<T, A>, a: A)
 func hello() {}
 func goodbye(_: Any) {}
 
-// CHECK-LABEL: sil hidden @$s18switch_abstraction34requires_address_and_reabstractionyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_abstraction34requires_address_and_reabstractionyyF : $@convention(thin) () -> () {
 // CHECK: [[FN:%.*]] = function_ref @$s18switch_abstraction5helloyyF : $@convention(thin) () -> ()
 // CHECK: [[THICK:%.*]] = thin_to_thick_function [[FN]]
 // CHECK: [[BOX:%.*]] = alloc_stack $@callee_guaranteed () -> @out ()

@@ -41,7 +41,7 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
 
 func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast17testArrayDowncast{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast17testArrayDowncast{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>):
 func testArrayDowncast(_ array: [AnyObject]) -> [BridgedObjC] {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -50,21 +50,21 @@ func testArrayDowncast(_ array: [AnyObject]) -> [BridgedObjC] {
   return array as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast27testArrayDowncastFromObject{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast27testArrayDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
 func testArrayDowncastFromObject(_ obj: AnyObject) -> [BridgedObjC] {
   // CHECK: unconditional_checked_cast_addr AnyObject in [[OBJECT_ALLOC:%[0-9]+]] : $*AnyObject to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Array<BridgedObjC>
   return obj as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast28testArrayDowncastFromNSArray{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast28testArrayDowncastFromNSArray{{.*}}F
 // CHECK: bb0([[NSARRAY_OBJ:%[0-9]+]] : @guaranteed $NSArray):
 func testArrayDowncastFromNSArray(_ obj: NSArray) -> [BridgedObjC] {
   // CHECK: unconditional_checked_cast_addr NSArray in [[OBJECT_ALLOC:%[0-9]+]] : $*NSArray to Array<BridgedObjC> in [[VALUE_ALLOC:%[0-9]+]] : $*Array<BridgedObjC>
   return obj as! [BridgedObjC]
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast28testArrayDowncastConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast28testArrayDowncastConditional{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>):
 func testArrayDowncastConditional(_ array: [AnyObject]) -> [BridgedObjC]? {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -74,7 +74,7 @@ func testArrayDowncastConditional(_ array: [AnyObject]) -> [BridgedObjC]? {
 }
 // CHECK: } // end sil function '$s19collection_downcast28testArrayDowncastConditional{{.*}}F'
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast12testArrayIsa{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast12testArrayIsa{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>)
 func testArrayIsa(_ array: [AnyObject]) -> Bool {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -84,7 +84,7 @@ func testArrayIsa(_ array: [AnyObject]) -> Bool {
   return array is [BridgedObjC] ? true : false
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast24testArrayDowncastBridged{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast24testArrayDowncastBridged{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>):
 func testArrayDowncastBridged(_ array: [AnyObject]) -> [BridgedSwift] {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -94,7 +94,7 @@ func testArrayDowncastBridged(_ array: [AnyObject]) -> [BridgedSwift] {
   return array as! [BridgedSwift]
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast35testArrayDowncastBridgedConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast35testArrayDowncastBridgedConditional{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>):
 func testArrayDowncastBridgedConditional(_ array: [AnyObject]) -> [BridgedSwift]?{
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -104,7 +104,7 @@ func testArrayDowncastBridgedConditional(_ array: [AnyObject]) -> [BridgedSwift]
   return array as? [BridgedSwift]
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast19testArrayIsaBridged{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast19testArrayIsaBridged{{.*}}F
 // CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<AnyObject>)
 func testArrayIsaBridged(_ array: [AnyObject]) -> Bool {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
@@ -114,7 +114,7 @@ func testArrayIsaBridged(_ array: [AnyObject]) -> Bool {
   return array is [BridgedSwift] ? true : false
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast32testDictionaryDowncastFromObject{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast32testDictionaryDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
 func testDictionaryDowncastFromObject(_ obj: AnyObject) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
@@ -122,7 +122,7 @@ func testDictionaryDowncastFromObject(_ obj: AnyObject)
   return obj as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast22testDictionaryDowncast{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast22testDictionaryDowncast{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncast(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
@@ -133,7 +133,7 @@ func testDictionaryDowncast(_ dict: Dictionary<NSObject, AnyObject>)
   return dict as! Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast33testDictionaryDowncastConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast33testDictionaryDowncastConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastConditional(_ dict: Dictionary<NSObject, AnyObject>) 
 -> Dictionary<BridgedObjC, BridgedObjC>? {
@@ -144,7 +144,7 @@ func testDictionaryDowncastConditional(_ dict: Dictionary<NSObject, AnyObject>)
   return dict as? Dictionary<BridgedObjC, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast41testDictionaryDowncastBridgedVConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast41testDictionaryDowncastBridgedVConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedSwift>? {
@@ -155,7 +155,7 @@ func testDictionaryDowncastBridgedVConditional(_ dict: Dictionary<NSObject, AnyO
   return dict as? Dictionary<BridgedObjC, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast41testDictionaryDowncastBridgedKConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast41testDictionaryDowncastBridgedKConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKConditional(_ dict: Dictionary<NSObject, AnyObject>) 
 -> Dictionary<BridgedSwift, BridgedObjC>? {
@@ -166,7 +166,7 @@ func testDictionaryDowncastBridgedKConditional(_ dict: Dictionary<NSObject, AnyO
   return dict as? Dictionary<BridgedSwift, BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast31testDictionaryDowncastBridgedKV{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast31testDictionaryDowncastBridgedKV{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKV(_ dict: Dictionary<NSObject, AnyObject>) 
 -> Dictionary<BridgedSwift, BridgedSwift> {
@@ -177,7 +177,7 @@ func testDictionaryDowncastBridgedKV(_ dict: Dictionary<NSObject, AnyObject>)
   return dict as! Dictionary<BridgedSwift, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast42testDictionaryDowncastBridgedKVConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast42testDictionaryDowncastBridgedKVConditional{{.*}}F
 // CHECK: bb0([[DICT:%[0-9]+]] : @guaranteed $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedSwift>? {
@@ -188,7 +188,7 @@ func testDictionaryDowncastBridgedKVConditional(_ dict: Dictionary<NSObject, Any
   return dict as? Dictionary<BridgedSwift, BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast25testSetDowncastFromObject{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast25testSetDowncastFromObject{{.*}}F
 // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
 func testSetDowncastFromObject(_ obj: AnyObject) 
        -> Set<BridgedObjC> {
@@ -196,7 +196,7 @@ func testSetDowncastFromObject(_ obj: AnyObject)
   return obj as! Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast15testSetDowncast{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast15testSetDowncast{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : @guaranteed $Set<NSObject>)
 func testSetDowncast(_ dict: Set<NSObject>) 
        -> Set<BridgedObjC> {
@@ -207,7 +207,7 @@ func testSetDowncast(_ dict: Set<NSObject>)
   return dict as! Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast26testSetDowncastConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast26testSetDowncastConditional{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : @guaranteed $Set<NSObject>)
 func testSetDowncastConditional(_ dict: Set<NSObject>) 
        -> Set<BridgedObjC>? {
@@ -218,7 +218,7 @@ func testSetDowncastConditional(_ dict: Set<NSObject>)
   return dict as? Set<BridgedObjC>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast22testSetDowncastBridged{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast22testSetDowncastBridged{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : @guaranteed $Set<NSObject>)
 func testSetDowncastBridged(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift> {
@@ -229,7 +229,7 @@ func testSetDowncastBridged(_ dict: Set<NSObject>)
   return dict as! Set<BridgedSwift>
 }
 
-// CHECK-LABEL: sil hidden @$s19collection_downcast33testSetDowncastBridgedConditional{{.*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s19collection_downcast33testSetDowncastBridgedConditional{{.*}}F
 // CHECK: bb0([[SET:%[0-9]+]] : @guaranteed $Set<NSObject>)
 func testSetDowncastBridgedConditional(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift>? {

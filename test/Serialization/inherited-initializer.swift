@@ -6,7 +6,7 @@ import InheritedInitializerBase
 
 class InheritsInit : Base {}
 
-// CHECK-LABEL: sil hidden @$s4main10testSimpleyyF
+// CHECK-LABEL: sil hidden [ossa] @$s4main10testSimpleyyF
 func testSimple() {
   // CHECK: [[DEFAULT:%.+]] = function_ref @$s24InheritedInitializerBase0C0CyACSicfcfA_
   // CHECK: [[ARG:%.+]] = apply [[DEFAULT]]()
@@ -29,7 +29,7 @@ class GenericSub<T: Initializable> : GenericBase<T> {}
 class ModifiedGenericSub<U> : GenericBase<Reinitializable<U>> {}
 class NonGenericSub : GenericBase<Reinitializable<Int>> {}
 
-// CHECK-LABEL: sil hidden @$s4main11testGenericyyF
+// CHECK-LABEL: sil hidden [ossa] @$s4main11testGenericyyF
 func testGeneric() {
   // CHECK: [[TYPE:%.+]] = metatype $@thick GenericSub<Reinitializable<Int8>>.Type
   // CHECK: [[DEFAULT:%.+]] = function_ref @$s24InheritedInitializerBase07GenericC0CyACyxGxcfcfA_

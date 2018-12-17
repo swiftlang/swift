@@ -129,7 +129,7 @@ protocol Frobable {
   var anse: Anse { get set }
 }
 
-// CHECK-LABEL: sil hidden @$s9writeback12test_generic{{[_0-9a-zA-Z]*}}F 
+// CHECK-LABEL: sil hidden [ossa] @$s9writeback12test_generic{{[_0-9a-zA-Z]*}}F 
 // CHECK:         witness_method $Runce, #Runcible.frob!modify.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.Anse) {
@@ -138,14 +138,14 @@ func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.An
 
 // We should *not* write back when referencing decls or members as rvalues.
 // <rdar://problem/16530235>
-// CHECK-LABEL: sil hidden @$s9writeback15loadAddressOnlyAA8Fungible_pyF : $@convention(thin) () -> @out Fungible {
+// CHECK-LABEL: sil hidden [ossa] @$s9writeback15loadAddressOnlyAA8Fungible_pyF : $@convention(thin) () -> @out Fungible {
 func loadAddressOnly() -> Fungible {
   // CHECK:       function_ref writeback.addressOnly.getter
   // CHECK-NOT:   function_ref writeback.addressOnly.setter
   return addressOnly
 }
 
-// CHECK-LABEL: sil hidden @$s9writeback10loadMember{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s9writeback10loadMember{{[_0-9a-zA-Z]*}}F
 // CHECK:         witness_method $Runce, #Runcible.frob!getter.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!getter.1
 // CHECK-NOT:     witness_method $Runce.Frob, #Frobable.anse!setter.1

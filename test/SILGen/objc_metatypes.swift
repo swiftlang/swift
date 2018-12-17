@@ -5,9 +5,9 @@ import gizmo
 @objc class ObjCClass {}
 
 class A {
-  // CHECK-LABEL: sil hidden @$s14objc_metatypes1AC3foo{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden [ossa] @$s14objc_metatypes1AC3foo{{[_0-9a-zA-Z]*}}F
 
-  // CHECK-LABEL: sil hidden [thunk] @$s14objc_metatypes1AC3fooyAA9ObjCClassCmAFmFTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_metatypes1AC3fooyAA9ObjCClassCmAFmFTo
   @objc dynamic func foo(_ m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : @unowned $A):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $A
@@ -23,9 +23,9 @@ class A {
     return m
   }
 
-  // CHECK-LABEL: sil hidden @$s14objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZ
+  // CHECK-LABEL: sil hidden [ossa] @$s14objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZ
 
-  // CHECK-LABEL: sil hidden [thunk] @$s14objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZTo
   // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
   // CHECK:   [[BAR:%[0-9]+]] = function_ref @$s14objc_metatypes1AC3bar{{[_0-9a-zA-Z]*}}FZ
@@ -35,7 +35,7 @@ class A {
 
   @objc dynamic func takeGizmo(_ g: Gizmo.Type) { }
 
-  // CHECK-LABEL: sil hidden @$s14objc_metatypes1AC7callFoo{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden [ossa] @$s14objc_metatypes1AC7callFoo{{[_0-9a-zA-Z]*}}F
   func callFoo() {
     // Make sure we peephole Type/thick_to_objc_metatype.
     // CHECK-NOT: thick_to_objc_metatype

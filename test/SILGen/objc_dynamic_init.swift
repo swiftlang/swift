@@ -35,7 +35,7 @@ final class Bobamathing: Thingamabob {
     }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s{{.*}}GadgetC{{.*}}CTW
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s{{.*}}GadgetC{{.*}}CTW
 // CHECK:         function_ref @{{.*}}Gadget{{.*}}fC :
 
 // CHECK-LABEL: sil_vtable Gadget {
