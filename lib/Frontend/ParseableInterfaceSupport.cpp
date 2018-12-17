@@ -562,7 +562,7 @@ llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
 }
 
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
-  return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ": (.*)$",
+  return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ":(.*)$",
                      llvm::Regex::Newline);
 }
 
