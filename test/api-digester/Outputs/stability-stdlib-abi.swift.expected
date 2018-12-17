@@ -7,8 +7,24 @@ Var _StringObject.CountAndFlags.countMask has declared type change from UInt to 
 Var _StringObject.CountAndFlags.countMask is now static
 Var _StringObject.CountAndFlags.flagsMask has declared type change from UInt to UInt64
 Var _StringObject.CountAndFlags.flagsMask is now static
-Var _StringObject.Nibbles.discriminatorMask has been removed
 Var _StringObject.Nibbles.discriminatorShift has been removed
 Var _StringObject.discriminator has been removed
 Var _StringObject.objectRawBits has been renamed to Var _StringObject.discriminatedObjectRawBits
 Var _StringObject.undiscriminatedObjectRawBits has been removed
+
+Constructor _StringObject.CountAndFlags.init(count:) has been removed
+Constructor _StringObject.CountAndFlags.init(count:isASCII:) has been removed
+Func _StringObject.Nibbles.largeSharedMortal() has been removed
+Var _StringGuts.hasNativeStorage has been removed
+Var _StringGuts.isNFC has been removed
+Var _StringGuts.isNFCFastUTF8 has been removed
+Var _StringObject.hasNativeStorage has been removed
+Var _StringObject.isNFC has been removed
+Var _StringObject.largeFastIsNative has been removed
+
+Var _StringObject.largeFastIsShared has been removed
+Var _StringObject.largeIsCocoa has been removed
+Var _StringObject.objCBridgeableObject has been removed
+
+Var _StringObject._countAndFlags is no longer a stored property
+Var _StringObject._countAndFlagsBits is added to a non-resilient type
