@@ -11,7 +11,7 @@
 
 // CHECK-DAG: ![[MODULE:[0-9]+]] = !DIModule({{.*}}, name: "NotTheStdlib", includePath: "{{.*}}test{{.*}}DebugInfo{{.*}}"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE:[0-9]+]], entity: ![[MODULE]]
-// CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "ImportsStdlib.swift", directory: "{{.*}}test/DebugInfo")
+// CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "ImportsStdlib.swift", directory: "{{.*}}test{{/|\\5C}}DebugInfo")
 
 // NEGATIVE-NOT: !DIFile(filename: "Swift.swiftmodule"
 // NEGATIVE-NOT: !DIModule({{.*}}, name: "Swift"
