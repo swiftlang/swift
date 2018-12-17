@@ -471,6 +471,8 @@ public:
       tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
                                               DC->getParentModule());
     }
+    while (auto ICE = dyn_cast<ImplicitConversionExpr>(E))
+      E = ICE->getSubExpr();
     if (auto DRE = dyn_cast<DeclRefExpr>(E))
       if (auto FD = dyn_cast<FuncDecl>(DRE->getDecl()))
         TC.addEscapingFunctionAsReturnValue(FD, RS);
