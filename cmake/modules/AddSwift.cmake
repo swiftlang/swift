@@ -1506,19 +1506,22 @@ function(add_swift_host_library name)
     INSTALL_IN_COMPONENT "dev"
     )
 
+  swift_is_installing_component(dev is_installing)
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  elseif(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    set(export_to_swiftexports EXPORT SwiftExports)
+    set_property(GLOBAL PROPERTY SWIFT_HAS_EXPORTS True)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
+
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
-    swift_install_in_component(TARGETS ${name}
+    swift_install_in_component(TARGETS ${name} ${export_to_swiftexports}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
       RUNTIME DESTINATION bin COMPONENT dev)
   endif()
 
-  swift_is_installing_component(dev is_installing)
-  if(NOT is_installing)
-    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
-  else()
-    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
-  endif()
 endfunction()
 
 # Add a new Swift target library.
@@ -2117,7 +2120,16 @@ function(add_swift_target_library name)
       endif()
 
       if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
-        swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
+        set(target_name ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
+        swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+        if(NOT is_installing)
+          set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${target_name})
+        else(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+          set(export_to_swiftexports EXPORT SwiftExports)
+          set_property(GLOBAL PROPERTY SWIFT_HAS_EXPORTS True)
+          set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${target_name})
+        endif()
+        swift_install_in_component(TARGETS ${target_name} ${export_to_swiftexports}
                                    RUNTIME
                                      DESTINATION "bin"
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
@@ -2159,6 +2171,7 @@ function(add_swift_target_library name)
         endif()
 
         if(is_installing)
+          set_property(GLOBAL PROPERTY SWIFT_HAS_EXPORTS True)
           set_property(GLOBAL APPEND
             PROPERTY SWIFT_EXPORTS ${_variant_name})
         else()
@@ -2406,18 +2419,22 @@ function(add_swift_host_tool executable)
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
 
-  swift_install_in_component(TARGETS ${executable}
-                             RUNTIME
-                               DESTINATION bin
-                               COMPONENT ${ASHT_SWIFT_COMPONENT})
-
   swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
   else()
+    set(export_to_swiftexports EXPORT SwiftExports)
+    set_property(GLOBAL PROPERTY SWIFT_HAS_EXPORTS True)
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
   endif()
+
+  swift_install_in_component(TARGETS ${executable} ${export_to_swiftexports}
+                             RUNTIME
+                               DESTINATION bin
+                               COMPONENT ${ASHT_SWIFT_COMPONENT})
+
+
 endfunction()
 
 # This declares a swift host tool that links with libfuzzer.
