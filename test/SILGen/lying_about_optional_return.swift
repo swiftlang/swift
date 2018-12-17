@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$s27lying_about_optional_return0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
 func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
