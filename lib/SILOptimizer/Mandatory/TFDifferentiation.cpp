@@ -4795,7 +4795,10 @@ void DifferentiationTask::createVJP() {
 
   // Add original parameters.
   for (auto arg : vjp->getArgumentsWithoutIndirectResults()) {
-    builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
+    if (arg->getType().isObject())
+      builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
+    else
+      builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
     partialAdjointArgs.push_back(arg);
   }
 

@@ -247,11 +247,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // VJP: (T...) -> ((R...),
   //                 (R.CotangentVector...) -> (T.CotangentVector...))
 
-  // RAII that pushes our generic context to `module.Types` so that the calls
-  // `module.Types.getTypeLowering()` below can understand our generic
-  // parameter types.
-  GenericContextScope genericContextScope(module.Types, getGenericSignature());
-
   auto &ctx = getASTContext();
 
   unsigned numParamsWithoutSelf = hasSelfParam() ? getNumParameters() - 1
@@ -410,11 +405,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
                                              getResults().end());
     vjpResults.push_back({pullbackType, ResultConvention::Owned});
     auto vjpTy = SILFunctionType::get(getGenericSignature(),
-                                getExtInfo(),
-                                getCoroutineKind(), getCalleeConvention(),
-                                getParameters(), getYields(), vjpResults,
-                                getOptionalErrorResult(), ctx,
-                                getWitnessMethodConformanceOrNone());
+                                      getExtInfo(),
+                                      getCoroutineKind(), getCalleeConvention(),
+                                      getParameters(), getYields(), vjpResults,
+                                      getOptionalErrorResult(), ctx,
+                                      getWitnessMethodConformanceOrNone());
     return vjpTy;
   }
   }
