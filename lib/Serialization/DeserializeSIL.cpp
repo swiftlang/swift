@@ -662,7 +662,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   if (!hasQualifiedOwnership)
-    fn->setUnqualifiedOwnership();
+    fn->setOwnershipEliminated();
 
   NumDeserializedFunc++;
 

@@ -593,7 +593,7 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
                                                  FullApplySite AI) {
-  if (!AI.getFunction()->hasQualifiedOwnership()
+  if (!AI.getFunction()->hasOwnership()
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
   }

@@ -298,7 +298,7 @@ struct OwnershipModelEliminator : SILModuleTransform {
         continue;
 
       // Set F to have unqualified ownership.
-      F.setUnqualifiedOwnership();
+      F.setOwnershipEliminated();
 
       bool MadeChange = false;
       SILBuilder B(F);
