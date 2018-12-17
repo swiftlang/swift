@@ -122,7 +122,7 @@ internal struct NormalizationResult {
 private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
-) -> (Int, Int) {
+) -> (Int, Int)? {
   let outputBufferThreshold = outputBuffer.count - 4
   
   // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
@@ -154,7 +154,7 @@ private func fastFill(
     _internalInvariant(inputCount == outputCount,
       "non-normalizing UTF-8 fast path should be 1-to-1 in code units")
   }
-  return (inputCount, outputCount)
+  return outputCount > 0 ? (inputCount, outputCount) : nil
 }
 
 // Transcodes a single segment from the source buffer to the outputBuffer as UTF16
@@ -190,7 +190,7 @@ private func transcodeSegmentToUTF16(
 }
 
 //transcodes the UTF16 segment stored in soureceBuffer into the outputBuffer as UTF8
-private func transcodeSegmentToUTF8(
+private func transcodeValidUTF16ToUTF8(
   _ sourceBuffer: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt8>
 ) -> (Int, Int)? {
@@ -241,16 +241,13 @@ internal func _fastNormalize(
 ) -> NormalizationResult {
   let start = readIndex.encodedOffset
   let rebasedSourceBuffer = UnsafeBufferPointer(rebasing: sourceBuffer[start...])
-  do {
-    let (read, filled) = fastFill(rebasedSourceBuffer, outputBuffer)
-      if filled > 0 {
-        let nextIndex = readIndex.encoded(offsetBy: read)
-        _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
-        
-        return NormalizationResult(
-          amountFilled: filled, nextReadPosition: nextIndex, reallocatedBuffers: false
-        )
-      }
+  if let (read, filled) = fastFill(rebasedSourceBuffer, outputBuffer) {
+    let nextIndex = readIndex.encoded(offsetBy: read)
+    _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
+    
+    return NormalizationResult(
+      amountFilled: filled, nextReadPosition: nextIndex, reallocatedBuffers: false
+    )
   }
   guard let (read, filled) = transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer)
   else {
@@ -277,7 +274,7 @@ internal func _fastNormalize(
     )
   }
   
-  guard let (_, transcoded) = transcodeSegmentToUTF8(
+  guard let (_, transcoded) = transcodeValidUTF16ToUTF8(
     UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
     into: outputBuffer
   ) else {
@@ -303,7 +300,7 @@ internal func _foreignNormalize(
   icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
 ) -> NormalizationResult {
   guard let (read, filled) = foreignFill(
-    readIndex: readIndex, endIndex: endIndex, guts, into: icuInputBuffer
+    readIndex: readIndex.encodedOffset, endIndex: endIndex.encodedOffset, guts, into: icuInputBuffer
   ) else {
     return _foreignReallocateBuffers(
       readIndex: readIndex,
@@ -330,7 +327,7 @@ internal func _foreignNormalize(
     )
   }
   
-  guard let (_, transcoded) = transcodeSegmentToUTF8(
+  guard let (_, transcoded) = transcodeValidUTF16ToUTF8(
     UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
     into: outputBuffer
   ) else {
@@ -402,31 +399,30 @@ internal func _fastReallocateBuffers(
 }
 
 private func foreignFill(
-  readIndex: String.Index,
-  endIndex: String.Index,
+  readIndex gutsReadIndex: Int,
+  endIndex gutsEndIndex: Int,
   _ guts: _StringGuts,
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
 ) -> (Int, Int)? {
-  var index = readIndex
-  var writeIndex = 0
+  var readIndex = gutsReadIndex
+  var outputWriteIndex = 0
   let outputCount = outputBuffer.count
-  let cachedEndIndex = endIndex
-  while index != cachedEndIndex {
-    let (scalar, length) = guts.errorCorrectedScalar(startingAt: index.encodedOffset)
-    if scalar._hasNormalizationBoundaryBefore && index != readIndex {
+  while readIndex != gutsEndIndex {
+    let (scalar, length) = guts.errorCorrectedScalar(startingAt: readIndex)
+    if scalar._hasNormalizationBoundaryBefore && readIndex != gutsReadIndex {
       break
     }
     
-    index = index.encoded(offsetBy: length)
+    readIndex += length
     
     for cu in scalar.utf16 {
-      if writeIndex < outputCount {
-        outputBuffer[writeIndex] = cu
-        writeIndex += 1
+      if outputWriteIndex < outputCount {
+        outputBuffer[outputWriteIndex] = cu
+        outputWriteIndex += 1
       } else {
         return nil
       }
     }
   }
-  return (index.encodedOffset - readIndex.encodedOffset, writeIndex)
+  return (readIndex - gutsReadIndex, outputWriteIndex)
 }

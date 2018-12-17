@@ -89,14 +89,19 @@ internal func _decodeScalar(
 ) -> (Unicode.Scalar, scalarLength: Int) {
   let high = utf16[i]
   if i + 1 >= utf16.count {
+    _internalInvariant(!_isLeadingSurrogate(high))
+    _internalInvariant(!_isTrailingSurrogate(high))
     return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
-  }
+  } 
   
   if !_isLeadingSurrogate(high) {
+    _internalInvariant(!_isTrailingSurrogate(high))
     return (Unicode.Scalar(_unchecked: UInt32(high)), 1)
   }
   
   let low = utf16[i+1]
+  _internalInvariant(_isLeadingSurrogate(high))
+  _internalInvariant(_isTrailingSurrogate(low))
   return (Unicode.Scalar(_unchecked: _decodeSurrogatePair(leading: high, trailing: low)), 2)
 }
 
