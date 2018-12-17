@@ -4782,6 +4782,8 @@ void DifferentiationTask::createVJP() {
       // This assumes that the primal direct results correspond exactly to the
       // adjoint's direct parameters, an assumption that we check in assertions
       // above.
+      builder.createRetainValue(loc, primalDirectResults[dirResIdx],
+                                builder.getDefaultAtomicity());
       partialAdjointArgs.push_back(primalDirectResults[dirResIdx++]);
     } else {
       // This assumes that the primal indirect results correspond exactly to the
@@ -4792,8 +4794,10 @@ void DifferentiationTask::createVJP() {
   }
 
   // Add original parameters.
-  for (auto arg : vjp->getArgumentsWithoutIndirectResults())
+  for (auto arg : vjp->getArgumentsWithoutIndirectResults()) {
+    builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
     partialAdjointArgs.push_back(arg);
+  }
 
   // Get and partially apply the adjoint.
   auto *adjointRef = builder.createFunctionRef(loc, adjoint);
