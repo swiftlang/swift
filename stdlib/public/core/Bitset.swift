@@ -503,8 +503,8 @@ extension _Bitset: Sequence {
         return wordIndex * Word.capacity + v
       }
       guard let storage = self.storage else { return nil }
-      while wordIndex < storage._wordCount {
-        word = storage._words[wordIndex]
+      while wordIndex < storage.wordCount {
+        word = storage[word: wordIndex]
         // Note that _wordIndex is offset by 1 due to word0;
         // this is why the index needs to be incremented at exactly this point.
         wordIndex += 1
@@ -520,18 +520,23 @@ extension _Bitset: Sequence {
 ////////////////////////////////////////////////////////////////////////////////
 
 extension _Bitset {
+  @_fixed_layout
+  @usableFromInline
+  internal struct StorageHeader {
+    @usableFromInline
+    internal var wordCount: Int
+
+    @inlinable
+    internal init(wordCount: Int) {
+      self.wordCount = wordCount
+    }
+  }
+
   /// A simple bitmap storage class with room for a specific number of
   /// tail-allocated bits.
   @_fixed_layout
   @usableFromInline
-  internal final class Storage {
-    @usableFromInline
-    internal fileprivate(set) var _wordCount: Int
-
-    internal init(_doNotCall: ()) {
-      _internalInvariantFailure("This class cannot be directly initialized")
-    }
-  }
+  internal final class Storage: ManagedBuffer<StorageHeader, Word> {}
 }
 
 extension _Bitset.Storage {
@@ -543,44 +548,63 @@ extension _Bitset.Storage {
   internal static func allocateUninitialized(
     wordCount: Int
   ) -> _Bitset.Storage {
-    let storage = Builtin.allocWithTailElems_1(
-      _Bitset.Storage.self,
-      wordCount._builtinWordValue, Word.self)
-    storage._wordCount = wordCount
-    return storage
+    let storage = create(
+      minimumCapacity: wordCount,
+      makingHeaderWith: { storage in
+        _Bitset.StorageHeader(wordCount: wordCount)
+      })
+    return unsafeDowncast(storage, to: _Bitset.Storage.self)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal var wordCount: Int {
+    return header.wordCount
   }
 
   @inlinable
   internal func clear() {
-    _words.assign(repeating: .empty, count: _wordCount)
+    firstElementAddress.assign(repeating: .empty, count: wordCount)
   }
 
   @inlinable
   internal func copy() -> _Bitset.Storage {
-    let storage = _Bitset.Storage.allocateUninitialized(wordCount: _wordCount)
+    let storage = _Bitset.Storage.allocateUninitialized(wordCount: wordCount)
     storage.copy(contentsOf: self.bitset)
     return storage
   }
 
   @inlinable
   func copy(contentsOf bitset: _UnsafeBitset) {
-    _internalInvariant(bitset.wordCount == self._wordCount)
-    self._words.assign(from: bitset.words, count: bitset.wordCount)
+    _internalInvariant(bitset.wordCount == self.wordCount)
+    firstElementAddress.assign(from: bitset.words, count: bitset.wordCount)
   }
 
   @inlinable
-  internal var _words: UnsafeMutablePointer<Word> {
+  internal subscript(word index: Int) -> Word {
     @inline(__always)
     get {
-      let addr = Builtin.projectTailElems(self, Word.self)
-      return UnsafeMutablePointer(addr)
+      _internalInvariant(index >= 0 && index < wordCount)
+      return firstElementAddress[index]
+    }
+    @inline(__always)
+    set {
+      _internalInvariant(index >= 0 && index < wordCount)
+      firstElementAddress[index] = newValue
+    }
+    @inline(__always)
+    _modify {
+      _internalInvariant(index >= 0 && index < wordCount)
+      yield &firstElementAddress[index]
     }
   }
 
   @inlinable
   internal var bitset: _UnsafeBitset {
     @inline(__always) get {
-      return _UnsafeBitset(words: _words, wordCount: _wordCount)
+      return _UnsafeBitset(
+        words: firstElementAddress,
+        wordCount: wordCount)
     }
   }
 }
