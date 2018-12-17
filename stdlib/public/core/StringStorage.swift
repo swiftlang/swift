@@ -396,7 +396,8 @@ extension _StringStorage {
     capacity: Int,
     isASCII: Bool
   ) -> _StringStorage {
-    let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
+    let countAndFlags = CountAndFlags(
+      mortalCount: bufPtr.count, isASCII: isASCII)
     _internalInvariant(capacity >= bufPtr.count)
     let storage = _StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
@@ -497,6 +498,8 @@ extension _StringStorage {
     if let crumbs = _breadcrumbsAddress.pointee {
       crumbs._invariantCheck(for: self.asString)
     }
+    _internalInvariant(_countAndFlags.isNativelyStored)
+    _internalInvariant(_countAndFlags.isTailAllocated)
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -507,7 +510,7 @@ extension _StringStorage {
   @_effects(releasenone)
   private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = CountAndFlags(
-      count: newCount, isASCII: newIsASCII)
+      mortalCount: newCount, isASCII: newIsASCII)
 #if arch(i386) || arch(arm)
     self._count = countAndFlags.count
     self._flags = countAndFlags.flags
@@ -794,6 +797,8 @@ extension _SharedStringStorage {
       crumbs._invariantCheck(for: self.asString)
     }
     _countAndFlags._invariantCheck()
+    _internalInvariant(!_countAndFlags.isNativelyStored)
+    _internalInvariant(!_countAndFlags.isTailAllocated)
   }
 #endif // INTERNAL_CHECKS_ENABLED
 }

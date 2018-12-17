@@ -281,9 +281,13 @@ extension String {
       }
     }
     if _guts._object.isImmortal {
+      // TODO: We'd rather emit a valid ObjC object statically than create a
+      // shared string class instance.
+      let gutsCountAndFlags = _guts._object._countAndFlags
       return _SharedStringStorage(
         immortal: _guts._object.fastUTF8.baseAddress!,
-        countAndFlags: _guts._object._countAndFlags)
+        countAndFlags: _StringObject.CountAndFlags(
+          sharedCount: _guts.count, isASCII: gutsCountAndFlags.isASCII))
     }
 
     _internalInvariant(_guts._object.hasObjCBridgeableObject,

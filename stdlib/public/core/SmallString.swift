@@ -105,13 +105,10 @@ extension _SmallString {
 
   // Give raw, nul-terminated code units. This is only for limited internal
   // usage: it always clears the discriminator and count (in case it's full)
-  @inlinable
+  @inlinable @inline(__always)
   internal var zeroTerminatedRawCodeUnits: RawBitPattern {
-    @inline(__always) get {
-      return (
-        self._storage.0,
-        self._storage.1 & _StringObject.Nibbles.largeAddressMask)
-    }
+    let smallStringCodeUnitMask: UInt64 = 0x00FF_FFFF_FFFF_FFFF
+    return (self._storage.0, self._storage.1 & smallStringCodeUnitMask)
   }
 
   internal func computeIsASCII() -> Bool {
@@ -239,6 +236,7 @@ extension _SmallString {
     _internalInvariant(trailing & countAndDiscriminator == 0)
 
     self.init(raw: (leading, trailing | countAndDiscriminator))
+    _internalInvariant(self.count == count)
   }
 
   // Direct from UTF-8
