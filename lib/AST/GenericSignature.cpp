@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -24,7 +25,6 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include <functional>
-#include "GenericSignatureBuilderImpl.h"
 
 using namespace swift;
 
