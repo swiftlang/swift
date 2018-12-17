@@ -1,9 +1,5 @@
 // RUN: %target-run-simple-parse-stdlib-swift
 // REQUIRES: executable_test
-// XFAIL: *
-
-// FIXME(rxwei): The proper fix here is to make `convert_escaping_to_noescape` work
-// on differentiable functions.
 
 import Swift
 import StdlibUnittest

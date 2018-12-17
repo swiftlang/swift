@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-parse-stdlib-swift
 // REQUIRES: executable_test
-// XFAIL: *
 
 import Swift
 import StdlibUnittest
@@ -14,9 +13,6 @@ func valueWithPullback<T, R>(
   where T : Differentiable, R : Differentiable {
   return Builtin.autodiffApplyVJP(f, x)
 }
-
-// FIXME(rxwei): It's crashing because the compiler does not know how to emit reabstraction
-// thunks for @autodiff functions yet.
 
 BuiltinDifferentialOperatorTests.test("Trivial") {
   let t = 1.0

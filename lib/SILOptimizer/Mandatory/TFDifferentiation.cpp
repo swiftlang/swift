@@ -196,6 +196,8 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
     return findReferenceToVisibleFunction(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
     return findReferenceToVisibleFunction(convertFn->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(inst))
+    return findReferenceToVisibleFunction(convertFn->getOperand());
   if (auto *partialApply = dyn_cast<PartialApplyInst>(inst))
     return findReferenceToVisibleFunction(partialApply->getCallee());
   return nullptr;
@@ -1668,6 +1670,17 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         loc, innerNewFunc, pai->getSubstitutionMap(), newArgs,
         ParameterConvention::Direct_Guaranteed);
   }
+  // convert_escape_to_noescape
+  if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
+    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
+                                                  cetn->getOperand(), builder,
+                                                  loc, substituteOperand);
+    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
+    auto noEscapeType = operandFnTy->getWithExtInfo(operandFnTy->getExtInfo().withNoEscape());
+    auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
+    return builder.createConvertEscapeToNoEscape(
+        loc, innerNewFunc, silTy, cetn->isEscapedByUser(), cetn->isLifetimeGuaranteed());
+  }
   llvm_unreachable("Unhandled function convertion instruction");
 }
 
@@ -1681,6 +1694,8 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
   if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
     return findWitnessMethod(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
+    return findWitnessMethod(convertFn->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return findWitnessMethod(convertFn->getOperand());
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
     return findWitnessMethod(partialApply->getCallee());
@@ -5133,6 +5148,13 @@ bool Differentiation::processGradientInst(GradientInst *gi,
 
 bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
                                                   ADContext &context) {
+  if (adfi->getNumAssociatedFunctions() ==
+      autodiff::getNumAutoDiffAssociatedFunctions(
+          adfi->getDifferentiationOrder()))
+    return false;
+  assert(adfi->getNumAssociatedFunctions() == 0 &&
+         "some functions are already filled in but not all of them");
+
   SILFunction *parent = adfi->getFunction();
   auto origFnOperand = adfi->getOriginalFunction();
   SILBuilder builder(adfi);
