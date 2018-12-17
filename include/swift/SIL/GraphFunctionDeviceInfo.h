@@ -18,6 +18,7 @@
 #define SWIFT_SIL_GRAPHFUNCTIONDEVICEINFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -51,23 +52,49 @@ struct DeviceId {
   DeviceType type;
   unsigned index;
 
-  /// Map between a DeviceId object and a 64-bit int. The latter is used when we
-  /// use DeviceId as the key type of a set/map container.
-  // We use 32 bits to encode `type`, which is wasteful.
-  uint64_t encode() const { return ((uint64_t)type << 32) | index; }
-
-  static DeviceId decode(uint64_t code) {
-    auto type = DeviceType(code >> 32);
-    auto index = (unsigned)(code & 0xffffffff);
-    return {type, index};
-  }
-
   bool operator==(const DeviceId &rhs) const {
     return type == rhs.type && index == rhs.index;
   }
 
   bool operator!=(const DeviceId &rhs) const { return !(*this == rhs); }
+
+  // Used for containers like SmallSet.
+  bool operator<(const DeviceId &rhs) const {
+    return (unsigned)type < (unsigned)rhs.type ||
+           (type == rhs.type && index == rhs.index);
+  }
 };
+
+} // end namespace tf
+} // namespace swift
+
+// Support for using DeviceId as a key type for DenseMap.
+namespace llvm {
+using swift::tf::DeviceId;
+using swift::tf::DeviceType;
+
+template <> struct DenseMapInfo<DeviceId> {
+  static DeviceId getEmptyKey() {
+    return {DeviceType::INVALID, (unsigned)-2};
+  }
+  static DeviceId getTombstoneKey() {
+    return {DeviceType::INVALID, (unsigned)-1};
+  }
+  static unsigned getHashValue(DeviceId Val) {
+    // Map between a DeviceId object and a 64-bit int. The latter is used when
+    // we use DeviceId as the key type of a set/map container. We use 32 bits to
+    // encode `type`, which is wasteful.
+    uint64_t code = ((uint64_t)Val.type << 32) | Val.index;
+    return DenseMapInfo<uint64_t>::getHashValue(code);
+  }
+  static bool isEqual(DeviceId LHS, DeviceId RHS) {
+    return LHS == RHS;
+  }
+};
+} // namespace llvm
+
+namespace swift {
+namespace tf {
 
 static const char TF_CPU_DEVICE_STRING_PREFIX[] =
     "/job:localhost/replica:0/task:0/device:CPU:";
@@ -106,6 +133,14 @@ static inline DeviceId getOpDeviceId(llvm::StringRef device) {
     return {DeviceType::CPU, deviceIndex};
   }
 
+  if (device.startswith(TF_GPU_DEVICE_STRING_PREFIX)) {
+    auto deviceIndexStr = device.substr(strlen(TF_GPU_DEVICE_STRING_PREFIX));
+    unsigned deviceIndex;
+    bool ret = llvm::to_integer(deviceIndexStr, deviceIndex);
+    assert(ret && "Invalid device string!");
+    return {DeviceType::GPU, deviceIndex};
+  }
+
   return {_getOpDeviceType(device), 0};
 }
 
@@ -132,7 +167,7 @@ struct GraphFunctionDeviceInfo {
   const DeviceId primaryDeviceId;
   const bool isTPUInfeedEnabled;
 
-  using UsedDeviceSet = llvm::SmallSet<uint64_t, 8>;
+  using UsedDeviceSet = llvm::SmallSet<DeviceId, 8>;
   const UsedDeviceSet &getUsedDeviceIds() const { return usedDeviceIds; }
 
   /// Return the deviceInfo for the specified function.
@@ -145,7 +180,7 @@ struct GraphFunctionDeviceInfo {
   void markDeviceUsed(DeviceId device) {
     assert(device.type != DeviceType::INVALID);
     if (device.type == DeviceType::ALL ||
-        !usedDeviceIds.insert(device.encode()).second)
+        !usedDeviceIds.insert(device).second)
       return;
   }
 
@@ -180,7 +215,7 @@ private:
       : primaryDeviceId(primaryDeviceId),
         isTPUInfeedEnabled(isTPUInfeedEnabled) {
     assert(primaryDeviceId.type != DeviceType::ALL);
-    usedDeviceIds.insert(primaryDeviceId.encode());
+    usedDeviceIds.insert(primaryDeviceId);
   }
 
   // `attributes` are used here to determine kernel availability (primarily
@@ -194,7 +229,7 @@ private:
   UsedDeviceSet usedDeviceIds;
 };
 
-} // end namespace tf
+} // namespace swift
 } // end namespace swift
 
 #endif

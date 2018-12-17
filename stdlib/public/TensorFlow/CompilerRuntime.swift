@@ -578,7 +578,7 @@ private class TFEState {
     // Given an input like "foo.tf_13" (prefix if a SIL graph function like
     // "foo.tf_13_CPU.device_partition"), extract and return "13" as the device
     // index.
-    func decodeDeviceIndexStr(_ opTypePrefix: Substring) -> Substring {
+    func deviceIndexSubstring(from opTypePrefix: Substring) -> Substring {
       let underscorePos = opTypePrefix.lastIndex(of: "_")
       internalConsistencyCheck(
         underscorePos != nil,
@@ -621,14 +621,14 @@ private class TFEState {
         // form a TF device string like
         // "/job:localhost/replica:0/task:0/device:CPU:17".
         let opTypePrefix = opType.dropLast("_CPU.device_partition".count)
-        let deviceIndexStr = decodeDeviceIndexStr(opTypePrefix)
+        let deviceIndexStr = deviceIndexSubstring(from: opTypePrefix)
         deviceName = context.cpuDeviceNamePrefix + deviceIndexStr
       } else {
         // TODO: support TPU as well.
         internalConsistencyCheck(opType.hasSuffix("_GPU.device_partition"))
         internalConsistencyCheck(context.gpuDeviceNamePrefix != nil)
         let opTypePrefix = opType.dropLast("_GPU.device_partition".count)
-        let deviceIndexStr = decodeDeviceIndexStr(opTypePrefix)
+        let deviceIndexStr = deviceIndexSubstring(from: opTypePrefix)
         deviceName = context.gpuDeviceNamePrefix! + deviceIndexStr
       }
       debugLog("Placing the op on device \(deviceName).")

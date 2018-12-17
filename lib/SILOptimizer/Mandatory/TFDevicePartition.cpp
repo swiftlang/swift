@@ -342,13 +342,13 @@ void DevicePartitionCloner::visitTensorTransferInst(
 
   // Insert a D2DSend for each dest device that's different from src.
   for (auto destDeviceForSend : deviceInfo.getUsedDeviceIds()) {
-    if (destDeviceForSend == srcDevice.encode()) {
+      if (destDeviceForSend == srcDevice) {
       // When dest is src, update the mapping, and do not send.
       ValueMap[getSingleValueResult(inst)] = getMappedValue(inst->getOperand(0));
       continue;
     }
     addD2DSend(graphOpInfo, tensorShapeAttrIdx, transferId,
-               DeviceId::decode(destDeviceForSend));
+               destDeviceForSend);
   }
 }
 
@@ -443,7 +443,7 @@ class DevicePartitionerImpl
   /// the upper bound for loop iteration, where the loop runs on all devices.
   class InstByDevice {
     using InstSet = SmallPtrSet<SILInstruction *, 8>;
-    using DeviceInstSetMap = llvm::DenseMap<uint64_t, InstSet *>;
+    using DeviceInstSetMap = llvm::DenseMap<DeviceId, InstSet *>;
     DeviceInstSetMap deviceToInsts;
 
   public:
@@ -455,13 +455,13 @@ class DevicePartitionerImpl
     /// `deviceId` must be present in this object.
     const InstSet &getInstsForDevice(DeviceId deviceId) const {
       /*auto*/ DeviceInstSetMap::const_iterator find_it =
-          deviceToInsts.find(deviceId.encode());
+            deviceToInsts.find(deviceId);
       assert(find_it != deviceToInsts.end() && "bad deviceId!");
       return *find_it->second;
     }
 
     void insertInstOnDevice(SILInstruction *inst, DeviceId deviceId) {
-      auto &ret = deviceToInsts[deviceId.encode()];
+      auto &ret = deviceToInsts[deviceId];
       if (!ret) {
         ret = new InstSet();
       }
@@ -469,7 +469,7 @@ class DevicePartitionerImpl
     }
 
     bool hasInstOnDevice(SILInstruction *inst, DeviceId deviceId) const {
-      auto find_it = deviceToInsts.find(deviceId.encode());
+      auto find_it = deviceToInsts.find(deviceId);
       if (find_it == deviceToInsts.end())
         return false;
       return find_it->second->count(inst);
@@ -489,7 +489,7 @@ class DevicePartitionerImpl
   class InstDeviceToSILValueMap {
     // To avoid setting up a map with a complex key type based on (i, D2),
     // here we implement this map via 2-level mapping: i -> D2 -> w.
-    using DeviceToSILValueMap = llvm::DenseMap<uint64_t, SILValue>;
+    using DeviceToSILValueMap = llvm::DenseMap<DeviceId, SILValue>;
     llvm::DenseMap<SILInstruction *, DeviceToSILValueMap *> instMaps;
 
   public:
@@ -505,8 +505,8 @@ class DevicePartitionerImpl
       if (!ret) {
         ret = new DeviceToSILValueMap();
       }
-      assert(!ret->count(deviceId.encode()));
-      (*ret)[deviceId.encode()] = v;
+      assert(!ret->count(deviceId));
+      (*ret)[deviceId] = v;
     }
 
     /// If the SIL value produced by `inst` has been transferred to `deviceId`,
@@ -519,7 +519,7 @@ class DevicePartitionerImpl
       if (find_it == instMaps.end())
         return SILValue();
       auto *deviceToSILValueMap = find_it->second;
-      auto find_it2 = deviceToSILValueMap->find(deviceId.encode());
+      auto find_it2 = deviceToSILValueMap->find(deviceId);
       if (find_it2 == deviceToSILValueMap->end())
         return SILValue();
       return find_it2->second;
@@ -857,7 +857,7 @@ public:
 
     Optional<DeviceId> operandDeviceId = None;
     for (auto encodedDeviceId : deviceInfo.getUsedDeviceIds()) {
-      auto deviceId = DeviceId::decode(encodedDeviceId);
+      auto deviceId = encodedDeviceId;
       if (instByDevice.hasInstOnDevice(inst, deviceId)) {
         operandDeviceId = deviceId;
         break;
@@ -880,7 +880,7 @@ public:
 
   void markInstForAllDevices(SILInstruction *inst) {
     for (auto deviceId : deviceInfo.getUsedDeviceIds()) {
-      instByDevice.insertInstOnDevice(inst, DeviceId::decode(deviceId));
+      instByDevice.insertInstOnDevice(inst, deviceId);
     }
     instByDevice.insertInstOnDevice(inst, AllDeviceId);
   }

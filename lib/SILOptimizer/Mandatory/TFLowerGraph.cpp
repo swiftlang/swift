@@ -2744,11 +2744,11 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   // To make sure we produced deterministic SIL code (e.g. produce graph
   // function for CPU, before GPU), which is useful at least for unit testing,
   // we sort the device IDs first.
-  SmallVector<uint64_t, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
+  SmallVector<DeviceId, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
                                      deviceInfo.getUsedDeviceIds().end());
   llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
   for (auto encodeDeviceId : deviceIds) {
-    auto deviceId = DeviceId::decode(encodeDeviceId);
+    auto deviceId = encodeDeviceId;
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceId);
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal
