@@ -5346,6 +5346,7 @@ inline CanType CanType::getNominalParent() const {
 
 inline bool CanType::isActuallyCanonicalOrNull() const {
   return getPointer() == nullptr ||
+         getPointer() == llvm::DenseMapInfo<TypeBase *>::getEmptyKey() ||
          getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
          getPointer()->isCanonical();
 }
