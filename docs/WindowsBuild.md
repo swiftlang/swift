@@ -72,7 +72,17 @@ set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 
 - Set up the `ucrt`, `visualc`, and `WinSDK` modules by copying  `ucrt.modulemap` located at
   `swift/stdlib/public/Platform/ucrt.modulemap` into
-  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/10.0.107663/um`
+  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um` and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
+
+```cmd
+cd %UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt
+mklink module.modulemap %swift_source_dir%\swift\stdlib\public\Platform\ucrt.modulemap
+cd %VCToolsInstallDir%\include
+mklink module.modulemap %swift_source_dir%\swift\stdlib\public\Platform\visualc.modulemap
+mklink visualc.apinotes %swift_source_dir%\swift\stdlib\public\Platform\visualc.apinotes
+cd %UniversalCRTSdkDir\Include\%UCRTVersion%\um
+mklink module.modulemap %swift_source_dir%\swift\stdlib\public\Platform\winsdk.modulemap
+```
 
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
@@ -178,7 +188,16 @@ popd
 cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
 ```
 
-### 9. Install Swift on Windows
+### 9. Running tests on Windows
+
+Running the testsuite on Windows has additional external dependencies.  You must have a subset of the GNUWin32 programs installed and available in your path.  The following packages are currently required:
+
+  1. coreutils
+  2. diffutils
+  3. grep
+  4. sed
+
+### 10. Install Swift on Windows
 
 - Run ninja install:
 ```cmd 
