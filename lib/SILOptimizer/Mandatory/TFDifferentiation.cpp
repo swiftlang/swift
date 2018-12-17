@@ -4797,8 +4797,9 @@ void DifferentiationTask::createVJP() {
   for (auto arg : vjp->getArgumentsWithoutIndirectResults()) {
     if (arg->getType().isObject())
       builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
-    else
-      builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
+    // TODO: We need to copy address arguments into a Box, and give the Box to
+    // the adjoint. We'll need to wrap the adjoint in a function that projects
+    // Boxes to acheive this.
     partialAdjointArgs.push_back(arg);
   }
 
