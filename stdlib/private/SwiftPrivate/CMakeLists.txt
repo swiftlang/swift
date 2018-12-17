@@ -11,6 +11,7 @@ add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   IO.swift
   ShardedAtomicCounter.swift
 
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
   SWIFT_COMPILE_FLAGS ${swift_swiftprivate_compile_flags}
   INSTALL_IN_COMPONENT stdlib-experimental)
 
