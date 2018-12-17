@@ -141,7 +141,7 @@ public:
 
   ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
     releaseMemory();
-    new (this)ParsedRawSyntaxNode(other);
+    new (this)ParsedRawSyntaxNode(std::move(other));
     return *this;
   }
 
