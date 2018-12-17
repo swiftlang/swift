@@ -510,8 +510,8 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     NewF->addSemanticsAttr(Attr);
 
   /// Set Unqualified ownership, if any.
-  if (!F->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!F->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
 
   /// Step 1a: Populate the body of NewF.

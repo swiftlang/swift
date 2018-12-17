@@ -703,7 +703,7 @@ public:
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
-    if (!F->hasQualifiedOwnership())
+    if (!F->hasOwnership())
       return;
     SILValue(V).verifyOwnership(F->getModule(), &DEBlocks);
   }
@@ -1515,12 +1515,12 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!F.hasQualifiedOwnership(),
+      require(!F.hasOwnership(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
     case LoadOwnershipQualifier::Take:
-      require(F.hasQualifiedOwnership(),
+      require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
       // TODO: Could probably make this a bit stricter.
       require(!LI->getType().isTrivial(LI->getModule()),
@@ -1528,7 +1528,7 @@ public:
               "types");
       break;
     case LoadOwnershipQualifier::Trivial:
-      require(F.hasQualifiedOwnership(),
+      require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
       require(LI->getType().isTrivial(LI->getModule()),
               "A load with trivial ownership must load a trivial type");
@@ -1538,7 +1538,7 @@ public:
 
   void checkLoadBorrowInst(LoadBorrowInst *LBI) {
     require(
-        F.hasQualifiedOwnership(),
+        F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
@@ -1552,7 +1552,7 @@ public:
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
     require(
-        F.hasQualifiedOwnership(),
+        F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
   }
 
@@ -1672,13 +1672,13 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!F.hasQualifiedOwnership(),
+      require(!F.hasOwnership(),
               "Qualified store in function with unqualified ownership?!");
       break;
     case StoreOwnershipQualifier::Init:
     case StoreOwnershipQualifier::Assign:
       require(
-          F.hasQualifiedOwnership(),
+          F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       // TODO: Could probably make this a bit stricter.
       require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
@@ -1687,7 +1687,7 @@ public:
       break;
     case StoreOwnershipQualifier::Trivial: {
       require(
-          F.hasQualifiedOwnership(),
+          F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(SI->getModule()) ||
@@ -1771,26 +1771,26 @@ public:
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of strong_retain_" #name); \
-    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
   } \
   void check##Name##RetainInst(Name##RetainInst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of " #name "_retain"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of " #name "_release"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
     requireObjectType(Name##StorageType, I->getOperand(), \
                       "Operand of " #name "_retain"); \
-    require(F.hasQualifiedOwnership(), \
+    require(F.hasOwnership(), \
             "copy_" #name "_value is only valid in functions with qualified " \
             "ownership"); \
   }
@@ -1802,7 +1802,7 @@ public:
                                 "Operand of strong_retain_" #name); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
           "strong_retain_" #name " requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
   } \
@@ -1811,7 +1811,7 @@ public:
                                 "Operand of " #name "_retain"); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             #name "_retain requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
@@ -1819,7 +1819,7 @@ public:
                                 "Operand of " #name "_release"); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             #name "_release requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
@@ -1891,21 +1891,21 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkRetainValueAddrInst(RetainValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1913,7 +1913,7 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1921,14 +1921,14 @@ public:
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
   void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
@@ -2215,12 +2215,12 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "strong_retain is only in functions with unqualified ownership");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "strong_release is only in functions with unqualified ownership");
   }
 
@@ -3322,7 +3322,7 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_br must match type of "
             "cast");
-    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_br in unqualified ownership sil must "
             "take no arguments");
 #if 0
@@ -3349,7 +3349,7 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_value_br must match "
             "type of cast");
-    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_value_br in unqualified ownership "
             "sil must take no arguments");
   }
@@ -3897,7 +3897,7 @@ public:
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->hasAssociatedValues()) {
-        if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+        if (isSILOwnershipEnabled() && F.hasOwnership()) {
           require(dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
@@ -3939,14 +3939,14 @@ public:
       // an @owned original version of the enum.
       //
       // When SIL ownership is disabled, we no longer support this.
-      if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+      if (isSILOwnershipEnabled() && F.hasOwnership()) {
         require(SOI->getDefaultBB()->getNumArguments() == 1,
                 "Switch enum default block should have one argument");
         require(SOI->getDefaultBB()->getArgument(0)->getType() ==
                     SOI->getOperand()->getType(),
                 "Switch enum default block should have one argument that is "
                 "the same as the input type");
-      } else if (!F.hasQualifiedOwnership()) {
+      } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
       }
@@ -4322,7 +4322,7 @@ public:
       }
 
       // If we do not have qualified ownership, do not check ownership.
-      if (!F.hasQualifiedOwnership()) {
+      if (!F.hasOwnership()) {
         return;
       }
 
@@ -4613,7 +4613,7 @@ public:
       // have non-trivial arguments.
       //
       // FIXME: it would be far simpler to ban all critical edges in general.
-      if (!F->hasQualifiedOwnership())
+      if (!F->hasOwnership())
         continue;
 
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {

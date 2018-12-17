@@ -506,8 +506,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
-  if (!F->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!F->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
 
   if (F->isSpecialization()) {

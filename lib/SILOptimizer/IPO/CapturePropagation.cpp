@@ -265,8 +265,8 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       OrigF->getEntryCount(), OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
-  if (!OrigF->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!OrigF->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
   LLVM_DEBUG(llvm::dbgs() << "  Specialize callee as ";
              NewF->printName(llvm::dbgs());

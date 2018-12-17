@@ -539,7 +539,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
   case OwnershipQualifiedKind::Unqualified: {
     // If we already know that the function has unqualified ownership, just
     // return early.
-    if (!F.get()->hasQualifiedOwnership())
+    if (!F.get()->hasOwnership())
       return true;
 
     // Ok, so we know at this point that we have qualified ownership. If we have
@@ -551,7 +551,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     // Otherwise, set the function to have unqualified ownership. This will
     // ensure that no more Qualified instructions can be added to the given
     // function.
-    F.get()->setUnqualifiedOwnership();
+    F.get()->setOwnershipEliminated();
     return true;
   }
   case OwnershipQualifiedKind::Qualified: {
@@ -559,7 +559,7 @@ bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
     // have unqualified ownership, then we know that we have already seen an
     // unqualified ownership instruction. This means the function has both
     // qualified and unqualified instructions. =><=.
-    if (!F.get()->hasQualifiedOwnership())
+    if (!F.get()->hasOwnership())
       return false;
 
     // Ok, at this point we know that we are still qualified. Since functions

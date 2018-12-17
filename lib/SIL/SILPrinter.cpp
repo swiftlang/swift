@@ -561,7 +561,7 @@ public:
 
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
-    if (BB->getParent()->hasQualifiedOwnership()) {
+    if (BB->getParent()->hasOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
