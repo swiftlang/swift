@@ -69,6 +69,11 @@ static const int NAMED_TENSOR_QUEUE_CAPACITY = 1;
 // FIXME: revisit whether using a fixed value is good enough.
 static const int DEVICE_INCARNATION_ID = 1;
 
+// For the synthesized fifo queue and queueing ops, used for host<-TF
+// sends/recvs.
+static const char TF_DEFAULT_CPU_DEVICE[] =
+    "/job:localhost/replica:0/task:0/device:CPU:0";
+
 /// When generating a TF TPU graph, call this function to place an eligible TF
 /// graph node onto TPU device. Some nodes such as Placeholder and
 /// Dataset/Iterator nodes are not eligible for TPU.
@@ -114,7 +119,7 @@ struct GraphFunctionInput {
 /// including its inputs, outputs, live-in values used by the loop and the
 /// ops created that make it up.
 struct GraphFunctionBody {
-  const DeviceType thisDeviceType;
+  const DeviceId thisDeviceId;
   const GraphFunctionDeviceInfo &deviceInfo;
 
   /// This is the temporary Graph we use to build up the body of this
@@ -162,9 +167,9 @@ struct GraphFunctionBody {
   bool shouldLowerEffectfulOps = true;
 
 public:
-  GraphFunctionBody(DeviceType thisDeviceType,
+  GraphFunctionBody(DeviceId thisDeviceId,
                     const GraphFunctionDeviceInfo &deviceInfo)
-      : thisDeviceType(thisDeviceType), deviceInfo(deviceInfo),
+      : thisDeviceId(thisDeviceId), deviceInfo(deviceInfo),
         graph(TF_NewGraph(), &TF_DeleteGraph) {}
 
   TF_Graph *getGraph() const { return graph.get(); }
@@ -181,7 +186,7 @@ public:
       TF_AddControlInput(desc, controlDependenceValue);
 
     // If this node should be put onto TPU, mark it with an attribute.
-    if (thisDeviceType == DeviceType::TPU && isEligibleForTPU) {
+    if (thisDeviceId.type == DeviceType::TPU && isEligibleForTPU) {
       markNodeAsTPUReplicated(desc);
     }
 
@@ -226,8 +231,8 @@ struct TFGraphFunctionLowering
     : public SILInstructionVisitor<TFGraphFunctionLowering, GLStatus> {
   SILFunction &SILFn;
   // The TF device to which the generated graph is targeting.
-  const DeviceType thisDeviceType;
-  const std::string thisDeviceTypeStr;
+  const DeviceId thisDeviceId;
+  const std::string thisDeviceIdStr;
   const GraphFunctionDeviceInfo &deviceInfo;
   const std::string &funcNodeBaseName;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
@@ -265,9 +270,9 @@ struct TFGraphFunctionLowering
 
 public:
   /// Generate one or more TF graph functions from `fn` targeting
-  /// `thisDeviceType`, and add them to `resultGraph`.
+  /// `thisDeviceId`, and add them to `resultGraph`.
   TFGraphFunctionLowering(
-      SILFunction &fn, DeviceType thisDeviceType,
+      SILFunction &fn, DeviceId thisDeviceId,
       const GraphFunctionDeviceInfo &deviceInfo,
       const std::string &funcNodeBaseName,
       llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
@@ -275,11 +280,11 @@ public:
       TF_Graph *resultGraph,
       SmallVectorImpl<std::pair<StringRef, SILLocation>> &pendingGraphFnNames,
       TF_Status *status)
-      : SILFn(fn), thisDeviceType(thisDeviceType),
-        thisDeviceTypeStr(getDeviceString(thisDeviceType)),
-        deviceInfo(deviceInfo), funcNodeBaseName(funcNodeBaseName),
-        graphFunctions(graphFunctions), resultGraph(resultGraph),
-        status(status), pendingGraphFnNames(pendingGraphFnNames) {}
+      : SILFn(fn), thisDeviceId(thisDeviceId),
+        thisDeviceIdStr(getDeviceString(thisDeviceId)), deviceInfo(deviceInfo),
+        funcNodeBaseName(funcNodeBaseName), graphFunctions(graphFunctions),
+        resultGraph(resultGraph), status(status),
+        pendingGraphFnNames(pendingGraphFnNames) {}
 
   /// Return the current graph function that is being set up.
   GraphFunctionBody &getCurrentGraphFunction() { return functionStack.back(); }
@@ -643,7 +648,7 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
 
   // Append device type to ensure the name is unique across all devices.
   name += ':';
-  name += thisDeviceTypeStr;
+  name += thisDeviceIdStr;
 
   // Append module name to ensure the name is unique across all modules.
   // (Duplicate names happen across execution units in the lldb repl).
@@ -788,16 +793,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SymbolicValue> elts,
 //===----------------------------------------------------------------------===//
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
-
-/// If `type` is Tensor<T> or TensorHandle<T>, return the TF_DataType
-/// corresponding to element type T. Otherwise, return 0.
-static unsigned getTFDataTypeFromTensorGenericType(Type type) {
-  auto *genTy = type->getAs<BoundGenericType>();
-  if (!genTy || genTy->getGenericArgs().size() != 1) {
-    return 0;
-  }
-  return convertSwiftTypeToTF(genTy->getGenericArgs()[0]);
-}
 
 /// Decode the shape array attribute at attr `attrIdx` in the graph_op
 /// instruction, into `dims`, `numDims` and `dimPtrs`.
@@ -1036,7 +1031,7 @@ GLStatus TFGraphFunctionLowering::addTFRecvOp(const SILInstruction *inst,
   auto opName = "tf_recv_" + llvm::itostr(transferId);
   auto &graphFn = getCurrentGraphFunction();
   auto *desc = TF_NewOperation(graphFn.getGraph(), "_Recv", opName.c_str());
-  TF_SetDevice(desc, thisDeviceTypeStr.c_str());
+  TF_SetDevice(desc, thisDeviceIdStr.c_str());
 
   auto outputFromRecvVal = inst->getResults()[0];
   auto tfType =
@@ -1048,8 +1043,8 @@ GLStatus TFGraphFunctionLowering::addTFRecvOp(const SILInstruction *inst,
   TF_SetAttrString(desc, "tensor_name", tensorName.data(), tensorName.size());
   TF_SetAttrString(desc, "send_device", srcDevice.data(), srcDevice.size());
   TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
-  TF_SetAttrString(desc, "recv_device", thisDeviceTypeStr.data(),
-                   thisDeviceTypeStr.size());
+  TF_SetAttrString(desc, "recv_device", thisDeviceIdStr.data(),
+                   thisDeviceIdStr.size());
   auto *recvOp = graphFn.finishOp(desc, /*opHasSideEffects*/ true,
                                   /*isEligibleForTPU*/ false, status);
   if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
@@ -1079,9 +1074,9 @@ GLStatus TFGraphFunctionLowering::addTPUDequeueOp(const SILInstruction *inst,
     return GLStatus::Error;
   }
   if (isInfeed) {
-    assert(thisDeviceType == DeviceType::TPU);
+    assert(thisDeviceId.type == DeviceType::TPU);
   } else {
-    if (thisDeviceType != DeviceType::CPU) {
+    if (thisDeviceId.type != DeviceType::CPU) {
       internalError(getUserSourceLocation(inst->getDebugLocation()),
                     "TPU outfeed dequeue cannot run on this device",
                     diag::tfop_invalid_tfop);
@@ -1097,7 +1092,7 @@ GLStatus TFGraphFunctionLowering::addTPUDequeueOp(const SILInstruction *inst,
   if (isInfeed) {
     markNodeAsTPUReplicated(desc);
   } else {
-    TF_SetDevice(desc, thisDeviceTypeStr.c_str());
+    TF_SetDevice(desc, thisDeviceIdStr.c_str());
     TF_SetAttrInt(desc, "device_ordinal", 0);
   }
 
@@ -1132,12 +1127,12 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceIdStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto srcDeviceStr = graphOpInfo.getStringAttr(1, "srcDevice");
-  auto srcDevice = getOpDeviceType(srcDeviceStr);
-  assert(thisDeviceType != srcDevice);
+  auto srcDevice = getOpDeviceId(srcDeviceStr);
+  assert(thisDeviceId != srcDevice);
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
@@ -1148,10 +1143,10 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
                            TF_SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
                            dimPtrs);
   }
-  if (thisDeviceType == DeviceType::TPU) {
+  if (thisDeviceId.type == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
                            dimPtrs);
-  } else if (srcDevice == DeviceType::TPU) {
+  } else if (srcDevice.type == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ false, transferId, dims,
                            numDims, dimPtrs);
   } else {
@@ -1165,7 +1160,7 @@ GLStatus TFGraphFunctionLowering::addTFSendOp(const SILInstruction *inst,
   auto opName = "tf_send_" + llvm::itostr(transferId);
   auto &graphFn = getCurrentGraphFunction();
   auto *desc = TF_NewOperation(graphFn.getGraph(), "_Send", opName.c_str());
-  TF_SetDevice(desc, thisDeviceTypeStr.c_str());
+  TF_SetDevice(desc, thisDeviceIdStr.c_str());
 
   auto inputToSendVal = inst->getOperand(0);
   auto inputToSendOp = getOperandValue(inputToSendVal);
@@ -1178,8 +1173,8 @@ GLStatus TFGraphFunctionLowering::addTFSendOp(const SILInstruction *inst,
   TF_SetAttrType(desc, "T", (TF_DataType)tfType);
   auto tensorName = "tensor_transfer_" + llvm::itostr(transferId);
   TF_SetAttrString(desc, "tensor_name", tensorName.data(), tensorName.size());
-  TF_SetAttrString(desc, "send_device", thisDeviceTypeStr.data(),
-                   thisDeviceTypeStr.size());
+  TF_SetAttrString(desc, "send_device", thisDeviceIdStr.data(),
+                   thisDeviceIdStr.size());
   TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
   TF_SetAttrString(desc, "recv_device", destDevice.data(), destDevice.size());
   /* sendOp = */ graphFn.finishOp(desc, /*opHasSideEffects*/ true,
@@ -1196,7 +1191,7 @@ GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(const SILInstruction *inst,
                                                   ArrayRef<int64_t *> dimPtrs) {
   // Infeed enqueue runs on CPU, while outfeed enqueue runs on TPU.
   if (isInfeed) {
-    if (thisDeviceType != DeviceType::CPU) {
+    if (thisDeviceId.type != DeviceType::CPU) {
       internalError(getUserSourceLocation(inst->getDebugLocation()),
                     "TPU infeed enqueue cannot run on this device",
                     diag::tfop_invalid_tfop);
@@ -1214,7 +1209,7 @@ GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(const SILInstruction *inst,
       return GLStatus::Error;
     }
   } else {
-    assert(thisDeviceType == DeviceType::TPU);
+    assert(thisDeviceId.type == DeviceType::TPU);
   }
   std::string opName = isInfeed ? "tf_infeed_enqueue_" : "tf_outfeed_enqueue_";
   opName += llvm::itostr(transferId);
@@ -1223,7 +1218,7 @@ GLStatus TFGraphFunctionLowering::addTPUEnqueueOp(const SILInstruction *inst,
       graphFn.getGraph(),
       isInfeed ? "InfeedEnqueueTuple" : "OutfeedEnqueueTuple", opName.c_str());
   if (isInfeed) {
-    TF_SetDevice(desc, thisDeviceTypeStr.c_str());
+    TF_SetDevice(desc, thisDeviceIdStr.c_str());
     TF_SetAttrInt(desc, "device_ordinal", 0);
   } else {
     markNodeAsTPUReplicated(desc);
@@ -1260,12 +1255,12 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   assert(inst->getNumResults() == 0);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceIdStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto destDeviceStr = graphOpInfo.getStringAttr(1, "destDevice");
-  auto destDevice = getOpDeviceType(destDeviceStr);
-  assert(thisDeviceType != destDevice);
+  auto destDevice = getOpDeviceId(destDeviceStr);
+  assert(thisDeviceId != destDevice);
 
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
@@ -1275,10 +1270,10 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
     decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
                            TF_SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
                            dimPtrs);
-  if (thisDeviceType == DeviceType::TPU) {
+  if (thisDeviceId.type == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims,
                            numDims, dimPtrs);
-  } else if (destDevice == DeviceType::TPU) {
+  } else if (destDevice.type == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
                            dimPtrs);
   } else {
@@ -1440,7 +1435,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
           TF_SetAttrString(op, name.c_str(), value.data(), value.size());
         } else {
           if (value == TF_ALL_DEVICES)
-            value = thisDeviceTypeStr;
+            value = thisDeviceIdStr;
 
           if (value.str() != TF_DEFAULT_TPU_DEVICE) {
             TF_SetDevice(op, value.str().c_str());
@@ -1998,7 +1993,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 
     // For non TPU/XLA case, cast the boolean value to int32, a workaround as
     // needed to get while loop to run on GPU (b/65752372).
-    if (thisDeviceType != DeviceType::TPU) {
+    if (thisDeviceId.type != DeviceType::TPU) {
       // FIXME: this added cast may not work for XlaWhile. Revisit whether/how
       // to support loops in XLA GPU.
       condValue =
@@ -2371,7 +2366,7 @@ TFGraphFunctionLowering::lowerToFunction(const std::function<void()> &body) {
   ValueMappingScopedHashTable::ScopeTy scope(valueMapping);
 
   /// Start a new graph function.
-  functionStack.push_back(GraphFunctionBody(thisDeviceType, deviceInfo));
+  functionStack.push_back(GraphFunctionBody(thisDeviceId, deviceInfo));
 
   // Lower the code in the body however the caller wants to do it.
   body();
@@ -2421,7 +2416,8 @@ bool TFGraphFunctionLowering::addTopLevelTPUConfigLogic(
 bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
     StringRef funcOpType, bool isPrimaryFn, ArrayRef<TF_DataType> inputTypes,
     ArrayRef<TF_DataType> outputTypes, TF_Operation *&metadataNodeForTPU) {
-  if (isPrimaryFn && thisDeviceType == DeviceType::TPU && !metadataNodeForTPU) {
+  if (isPrimaryFn && thisDeviceId.type == DeviceType::TPU &&
+      !metadataNodeForTPU) {
     if (addTopLevelTPUConfigLogic(&metadataNodeForTPU)) {
       // An error has occurred. Abort graph generation.
       return true;
@@ -2457,10 +2453,10 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
   TF_OperationDescription *funcDesc =
       TF_NewOperation(resultGraph, /*op_type*/ funcOpTypeStr.c_str(),
                       /*op_name*/ funcNodeName.c_str());
-  if (thisDeviceType == DeviceType::TPU) {
+  if (thisDeviceId.type == DeviceType::TPU) {
     markNodeAsTPUReplicated(funcDesc);
   } else {
-    TF_SetDevice(funcDesc, thisDeviceTypeStr.c_str());
+    TF_SetDevice(funcDesc, thisDeviceIdStr.c_str());
   }
 
   // Handle inputs.
@@ -2474,7 +2470,7 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
     if (checkStatus(SILFn.getLocation()))
       return true;
     TF_Output inputNode{placeholder, 0};
-    if (thisDeviceType != DeviceType::TPU) {
+    if (thisDeviceId.type != DeviceType::TPU) {
       // Feed I directly into F.
       TF_AddInput(funcDesc, inputNode);
     } else {
@@ -2521,7 +2517,7 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
     TF_OperationDescription *outputDesc =
         TF_NewOperation(resultGraph, "Identity", outputNodeName.c_str());
     TF_Output funcOutputNode{funcNode, static_cast<int>(i)};
-    if (thisDeviceType != DeviceType::TPU) {
+    if (thisDeviceId.type != DeviceType::TPU) {
       // Feed F directly into O.
       TF_AddInput(outputDesc, funcOutputNode);
     } else {
@@ -2742,15 +2738,25 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   auto entryFnBaseName = graphFnNameForCaller;
   unsigned helperFuncId = 0;
   SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
-  for (auto deviceType : deviceInfo.getUsedDeviceTypes()) {
-    auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
+  // SIL functions can be processed in non-deterministic ordering, so the
+  // ordering of device ids being inserted into `deviceInfo` is not
+  // deterministic either.
+  // To make sure we produced deterministic SIL code (e.g. produce graph
+  // function for CPU, before GPU), which is useful at least for unit testing,
+  // we sort the device IDs first.
+  SmallVector<DeviceId, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
+                                     deviceInfo.getUsedDeviceIds().end());
+  llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
+  for (auto encodeDeviceId : deviceIds) {
+    auto deviceId = encodeDeviceId;
+    auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceId);
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal
       // compiler flow.
       parentTransform.getPassManager()->notifyWillDeleteFunction(perDeviceFn);
       perDeviceFn->getModule().eraseFunction(perDeviceFn);
     };
-    bool isPrimaryFn = deviceType == deviceInfo.primaryDeviceType;
+    bool isPrimaryFn = deviceId == deviceInfo.primaryDeviceId;
 
     // The func op type is `graphFnName`, with the caller node name being
     // based on `funcNodeBaseName`.
@@ -2760,7 +2766,7 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
       ++helperFuncId;
     }
     TFGraphFunctionLowering graphFuncGen(
-        *perDeviceFn, deviceType, deviceInfo, funcNodeBaseName, graphFunctions,
+        *perDeviceFn, deviceId, deviceInfo, funcNodeBaseName, graphFunctions,
         graph.get(), pendingGraphFnNames, status);
     GLStatus S = GLStatus::Success;
     auto graphFnBody =

@@ -159,7 +159,7 @@ GraphFunctionDeviceInfo::getForFunction(SILFunction &fn,
       recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
     }
   }
-  return GraphFunctionDeviceInfo(deviceType, isTPUInfeedEnabled);
+  return GraphFunctionDeviceInfo({deviceType, 0}, isTPUInfeedEnabled);
 }
 
 /// Whether this is an op that configures the function's device.
@@ -172,9 +172,9 @@ bool GraphFunctionDeviceInfo::isConfigOp(const GraphOperationInfo &opInfo) {
 std::string GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice,
     llvm::ArrayRef<GraphOperationAttribute> attributes) {
-  DeviceType chosenDevice;
+  DeviceId chosenDevice;
   if (!opDevice.empty())
-    chosenDevice = getOpDeviceType(opDevice);
+    chosenDevice = getOpDeviceId(opDevice);
   else
     chosenDevice = chooseDevice(opType, attributes);
 
@@ -198,18 +198,18 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 
-DeviceType GraphFunctionDeviceInfo::chooseDevice(
+DeviceId GraphFunctionDeviceInfo::chooseDevice(
     llvm::StringRef opType,
     llvm::ArrayRef<GraphOperationAttribute> attributes) const {
   if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
-    return DeviceType::CPU;
+    return {DeviceType::CPU, 0};
 
   // TODO: A similar statement might be necessary for TPU.
-  if (primaryDeviceType == DeviceType::GPU) {
+  if (primaryDeviceId.type == DeviceType::GPU) {
     if (CanRunOnDevice(opType, attributes, "GPU")) {
-      return DeviceType::GPU;
+      return primaryDeviceId;
     }
-    return DeviceType::CPU;
+    return {DeviceType::CPU, 0};
   }
-  return primaryDeviceType;
+  return primaryDeviceId;
 }

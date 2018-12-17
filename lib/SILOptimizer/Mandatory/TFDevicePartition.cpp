@@ -27,6 +27,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 
 using namespace swift;
@@ -44,8 +45,8 @@ StringRef swift::tf::getDeviceString(const GraphOperationInfo &graphOpInfo) {
   return attr.getValue().getStringValue();
 }
 
-DeviceType swift::tf::getDeviceType(const GraphOperationInfo &graphOpInfo) {
-  return getOpDeviceType(getDeviceString(graphOpInfo));
+DeviceId swift::tf::getDeviceId(const GraphOperationInfo &graphOpInfo) {
+  return getOpDeviceId(getDeviceString(graphOpInfo));
 }
 
 //===----------------------------------------------------------------------===//
@@ -64,20 +65,20 @@ class DevicePartitionCloner
   const GraphFunctionDeviceInfo &deviceInfo;
 
   /// The device for us to extract the SIL computation in.
-  const DeviceType thisDeviceType;
+  const DeviceId thisDeviceId;
 
-  /// The set of ops in `srcFn` to run on `thisDeviceType`.
+  /// The set of ops in `srcFn` to run on `thisDeviceId`.
   const SmallPtrSetImpl<SILInstruction *> &targetOps;
 
  public:
    DevicePartitionCloner(SILFunction &srcFn,
                          const GraphFunctionDeviceInfo &deviceInfo,
-                         DeviceType thisDeviceType,
+                         DeviceId thisDeviceId,
                          const SmallPtrSetImpl<SILInstruction *> &targetOps,
                          SILFunction &NewFn)
        : SILClonerWithScopes(NewFn), srcFn(srcFn), deviceInfo(deviceInfo),
-         thisDeviceType(thisDeviceType), targetOps(targetOps) {
-     assert(thisDeviceType != DeviceType::ALL);
+         thisDeviceId(thisDeviceId), targetOps(targetOps) {
+     assert(thisDeviceId.type != DeviceType::ALL);
    }
 
   /// Extracts the device-specific computation into `NewFn` above.
@@ -130,7 +131,7 @@ class DevicePartitionCloner
 
  private:
   bool isPrimaryFn() const {
-    return deviceInfo.primaryDeviceType == thisDeviceType;
+    return deviceInfo.primaryDeviceId == thisDeviceId;
   }
 
   /// Check to see if the argument was marked in a way that indicates we should
@@ -164,9 +165,9 @@ class DevicePartitionCloner
   /// (i.e., infeed/outfeed).
   void visitTensorTransferInst(GraphOperationInfo &graphOpInfo);
   void addD2DSend(GraphOperationInfo &graphOpInfo, unsigned tensorShapeAttrIdx,
-                  int transferId, DeviceType destDevice);
+                  int transferId, DeviceId destDevice);
   void addD2DRecv(GraphOperationInfo &graphOpInfo, unsigned tensorShapeAttrIdx,
-                  int transferId, DeviceType srcDevice);
+                  int transferId, DeviceId srcDevice);
 
   void initBlock(SILBasicBlock *BB);
 
@@ -205,10 +206,10 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     return;
   }
 
-  auto deviceType = getDeviceType(decoder);
+  auto deviceId = getDeviceId(decoder);
 
   // Skip this instruction if it isn't for the current device.
-  if (deviceType != DeviceType::ALL && deviceType != thisDeviceType)
+  if (deviceId.type != DeviceType::ALL && deviceId != thisDeviceId)
     return;
 
   auto &B = getBuilder();
@@ -237,10 +238,10 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
 
 void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
                                        unsigned tensorShapeAttrIdx,
-                                       int transferId, DeviceType destDevice) {
-  auto srcDevice = thisDeviceType;
-  assert(srcDevice != DeviceType::ALL);
-  assert(destDevice != DeviceType::ALL);
+                                       int transferId, DeviceId destDevice) {
+  auto srcDevice = thisDeviceId;
+  assert(srcDevice.type != DeviceType::ALL);
+  assert(destDevice.type != DeviceType::ALL);
   assert(srcDevice != destDevice);
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
@@ -258,7 +259,7 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
        SymbolicValue::getString(getDeviceString(destDevice), allocator)});
   newInstBuilder.addAttribute(
       {ctx.getIdentifier(TF_DEVICE_ATTR),
-       SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
+       SymbolicValue::getString(getDeviceString(thisDeviceId), allocator)});
 
   auto valueToSend = getMappedValue(inst->getOperand(0));
   newInstBuilder.addArgument(valueToSend);
@@ -270,10 +271,10 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
 
 void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
                                        unsigned tensorShapeAttrIdx,
-                                       int transferId, DeviceType srcDevice) {
-  auto destDevice = thisDeviceType;
-  assert(srcDevice != DeviceType::ALL);
-  assert(destDevice != DeviceType::ALL);
+                                       int transferId, DeviceId srcDevice) {
+  auto destDevice = thisDeviceId;
+  assert(srcDevice.type != DeviceType::ALL);
+  assert(destDevice.type != DeviceType::ALL);
   assert(srcDevice != destDevice);
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
@@ -292,7 +293,7 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
        SymbolicValue::getString(getDeviceString(srcDevice), allocator)});
   newInstBuilder.addAttribute(
       {ctx.getIdentifier(TF_DEVICE_ATTR),
-       SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
+       SymbolicValue::getString(getDeviceString(thisDeviceId), allocator)});
 
   auto valueTy = inst->getResults()[0]->getType();
   if (inst->getNumAttributes() > tensorShapeAttrIdx)
@@ -313,15 +314,15 @@ void DevicePartitionCloner::visitTensorTransferInst(
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto srcDeviceStr = graphOpInfo.getStringAttr(1, "srcDevice");
-  auto srcDevice = getOpDeviceType(srcDeviceStr);
+  auto srcDevice = getOpDeviceId(srcDeviceStr);
   auto destDeviceStr = graphOpInfo.getStringAttr(2, "destDevice");
-  auto destDevice = getOpDeviceType(destDeviceStr);
+  auto destDevice = getOpDeviceId(destDeviceStr);
   assert(srcDevice != destDevice);
   // This graph_op cannot have src device set to ALL, but dest device can be ALL.
-  assert(srcDevice != DeviceType::ALL);
-  bool shouldRunTransferAsSrcDevice = srcDevice == thisDeviceType;
+  assert(srcDevice.type != DeviceType::ALL);
+  bool shouldRunTransferAsSrcDevice = srcDevice == thisDeviceId;
   bool shouldRunTransferAsDestDevice =
-      destDevice == DeviceType::ALL || destDevice == thisDeviceType;
+      destDevice.type == DeviceType::ALL || destDevice == thisDeviceId;
   if (!shouldRunTransferAsSrcDevice && !shouldRunTransferAsDestDevice)
     return;
 
@@ -334,19 +335,20 @@ void DevicePartitionCloner::visitTensorTransferInst(
   }
 
   // Run transfer as src device, and send to a single dest.
-  if (destDevice != DeviceType::ALL) {
+  if (destDevice.type != DeviceType::ALL) {
     addD2DSend(graphOpInfo, tensorShapeAttrIdx, transferId, destDevice);
     return;
   }
 
   // Insert a D2DSend for each dest device that's different from src.
-  for (auto destDeviceForSend : deviceInfo.getUsedDeviceTypes()) {
-    if (destDeviceForSend == srcDevice) {
+  for (auto destDeviceForSend : deviceInfo.getUsedDeviceIds()) {
+      if (destDeviceForSend == srcDevice) {
       // When dest is src, update the mapping, and do not send.
       ValueMap[getSingleValueResult(inst)] = getMappedValue(inst->getOperand(0));
       continue;
     }
-    addD2DSend(graphOpInfo, tensorShapeAttrIdx, transferId, destDeviceForSend);
+    addD2DSend(graphOpInfo, tensorShapeAttrIdx, transferId,
+               destDeviceForSend);
   }
 }
 
@@ -439,18 +441,91 @@ class DevicePartitionerImpl
   /// instructions.  For example, we create an int interal on ALL devices, use
   /// it to create a Const tfop on ALL devices, and in turn use that const as
   /// the upper bound for loop iteration, where the loop runs on all devices.
-  SmallPtrSet<SILInstruction *, 8> instByDevice[TF_NUM_DEVICE_TYPES];
+  class InstByDevice {
+    using InstSet = SmallPtrSet<SILInstruction *, 8>;
+    using DeviceInstSetMap = llvm::DenseMap<DeviceId, InstSet *>;
+    DeviceInstSetMap deviceToInsts;
 
-  /// When a SIL value v on some device D1 is to be consumed by an instruction
-  /// on another device D2, prepare() below inserts a TensorTransfer instruction
-  /// w to transfer v to device D2.
+  public:
+    ~InstByDevice() {
+      for (auto &instSet : deviceToInsts)
+        delete instSet.second;
+    }
+
+    /// `deviceId` must be present in this object.
+    const InstSet &getInstsForDevice(DeviceId deviceId) const {
+      /*auto*/ DeviceInstSetMap::const_iterator find_it =
+            deviceToInsts.find(deviceId);
+      assert(find_it != deviceToInsts.end() && "bad deviceId!");
+      return *find_it->second;
+    }
+
+    void insertInstOnDevice(SILInstruction *inst, DeviceId deviceId) {
+      auto &ret = deviceToInsts[deviceId];
+      if (!ret) {
+        ret = new InstSet();
+      }
+      ret->insert(inst);
+    }
+
+    bool hasInstOnDevice(SILInstruction *inst, DeviceId deviceId) const {
+      auto find_it = deviceToInsts.find(deviceId);
+      if (find_it == deviceToInsts.end())
+        return false;
+      return find_it->second->count(inst);
+    }
+  };
+  InstByDevice instByDevice;
+
+  /// When a SIL value v (produced by some SIL instruction i) on some device D1
+  /// is to be consumed by an instruction on another device D2, we insert a
+  /// TensorTransfer instruction w to transfer v to device D2.
   ///
-  /// A map entry is added accordingly for: (v, D2) -> w. This way if another
-  /// instruction on device D2 also wants to consume v, we need not do another
-  /// tensor transfer.
-  using KeyByInstDestDevice =
-      llvm::PointerIntPair<SILInstruction *, 3, unsigned>;
-  llvm::DenseMap<KeyByInstDestDevice, SILValue> transferInstsByDestDevice;
+  /// We track this with a map entry: (i, D2) -> w, so that if another
+  /// instruction on device D2 also wants to consume v, we can let it consume w,
+  /// and avoid another D1->D2 tensor transfer. Note we need not track the
+  /// source device D1 or SIL value v, since such information is encoded in i (i
+  /// produces v, runs on D1).
+  class InstDeviceToSILValueMap {
+    // To avoid setting up a map with a complex key type based on (i, D2),
+    // here we implement this map via 2-level mapping: i -> D2 -> w.
+    using DeviceToSILValueMap = llvm::DenseMap<DeviceId, SILValue>;
+    llvm::DenseMap<SILInstruction *, DeviceToSILValueMap *> instMaps;
+
+  public:
+    ~InstDeviceToSILValueMap() {
+      for (auto &instMap : instMaps)
+        delete instMap.second;
+    }
+
+    /// Insert (inst, deviceId) -> v into this map.
+    void insertInstOnDevice(SILInstruction *inst, DeviceId deviceId,
+                            SILValue v) {
+      auto &ret = instMaps[inst];
+      if (!ret) {
+        ret = new DeviceToSILValueMap();
+      }
+      assert(!ret->count(deviceId));
+      (*ret)[deviceId] = v;
+    }
+
+    /// If the SIL value produced by `inst` has been transferred to `deviceId`,
+    /// return the SIL value representing that SIL value on `deviceId`.
+    // TODO: assess whether we need to handle the case where `inst` produces
+    // multiple SIL values.
+    SILValue getSILValueOfInstOnDevice(SILInstruction *inst,
+                                       DeviceId deviceId) const {
+      auto find_it = instMaps.find(inst);
+      if (find_it == instMaps.end())
+        return SILValue();
+      auto *deviceToSILValueMap = find_it->second;
+      auto find_it2 = deviceToSILValueMap->find(deviceId);
+      if (find_it2 == deviceToSILValueMap->end())
+        return SILValue();
+      return find_it2->second;
+    }
+  };
+  InstDeviceToSILValueMap transferInstsByDestDevice;
 
   /// This is a counter we use to give each cross-device send/receive operation
   /// a unique ID.
@@ -468,13 +543,10 @@ public:
                         int &nextTensorTransferId)
       : parentTransform(parentTransform), srcFn(srcFn), deviceInfo(deviceInfo),
         nextTensorTransferId(nextTensorTransferId) {
-    static_assert(
-        TF_NUM_DEVICE_TYPES <= 8,
-        "3 bits are allocated in KeyByInstDestDevice to encode device types");
     markFunctionAndInsertTensorTransfers();
   }
 
-  /// Returns a function extracted from `srcFn`, specialized on `deviceType`.
+  /// Returns a function extracted from `srcFn`, specialized on `deviceId`.
   ///
   /// For example, say `fn` returns a+b, where a and b and constant tensors,
   /// and a is placed on GPU.
@@ -482,8 +554,8 @@ public:
   ///   a _Send() node to CPU.
   /// - The extracted function for CPU device has _Recv node from GPU to read
   ///   a, and adds its output with const tensor b to produce the sum result.
-  SILFunction *extractFunctionForDevice(DeviceType deviceType) {
-    bool isPrimaryFn = deviceType == deviceInfo.primaryDeviceType;
+  SILFunction *extractFunctionForDevice(DeviceId deviceId) {
+    bool isPrimaryFn = deviceId == deviceInfo.primaryDeviceId;
     auto newFnType =
         isPrimaryFn ? srcFn.getLoweredFunctionType()
                     : SILFunctionType::get(
@@ -495,15 +567,16 @@ public:
                           srcFn.getModule().getASTContext());
 
     std::string resultFnName = srcFn.getName().str() + "_" +
-                               getDeviceShortName(deviceType) +
+                               getDeviceShortName(deviceId) +
                                ".device_partition";
     SILOptFunctionBuilder FB(parentTransform);
     auto resultFn = FB.getOrCreateFunction(
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
         /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 
-    DevicePartitionCloner PC(srcFn, deviceInfo, deviceType,
-                             instByDevice[(unsigned)deviceType], *resultFn);
+    DevicePartitionCloner PC(srcFn, deviceInfo, deviceId,
+                             instByDevice.getInstsForDevice(deviceId),
+                             *resultFn);
 
     // Fill in the cloned function body.
     PC.cloneFunction();
@@ -513,13 +586,13 @@ public:
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
-    auto deviceType = getDeviceType(GraphOperationInfo(inst));
-    markInstForDevice(deviceType, inst);
+    auto deviceId = getDeviceId(GraphOperationInfo(inst));
+    markInstForDevice(deviceId, inst);
 
     // If any operand of `inst` is produced on another device, insert a
     // TensorTransfer inst if that has not been done yet.
     for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-      makeOperandLocal(deviceType, inst, i);
+      makeOperandLocal(deviceId, inst, i);
     }
   }
 
@@ -528,32 +601,32 @@ public:
     // could be empty).  These become the results of the graph.
     if (auto *ti = dyn_cast<TupleInst>(inst->getOperand())) {
       for (unsigned i = 0, e = ti->getNumOperands(); i != e; ++i) {
-        makeOperandLocal(deviceInfo.primaryDeviceType, ti, i);
+        makeOperandLocal(deviceInfo.primaryDeviceId, ti, i);
       }
     } else {
-      makeOperandLocal(deviceInfo.primaryDeviceType, inst,
+      makeOperandLocal(deviceInfo.primaryDeviceId, inst,
                        /*operandIdx*/ 0);
     }
   }
 
   void visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
     auto opValue = inst->getOperand();
-    DeviceType operandDeviceType;
+    DeviceId operandDeviceId;
     if (isa<SILArgument>(opValue)) {
       // Func args only live on the primary device, while other BB args are
       // replicated on all devices.
-      operandDeviceType = inst->getParent() == srcFn.getEntryBlock()
-                              ? deviceInfo.primaryDeviceType
-                              : DeviceType::ALL;
+      operandDeviceId = inst->getParent() == srcFn.getEntryBlock()
+                            ? deviceInfo.primaryDeviceId
+                            : AllDeviceId;
     } else {
       // Find an arbitrary device which hosts `opValue`, and do a tensor
       // transfer if needed.
       assert(opValue->getDefiningInstruction());
-      operandDeviceType =
+      operandDeviceId =
           getSomeDevicePlacement(opValue->getDefiningInstruction());
     }
 
-    markInstForDevice(operandDeviceType, inst);
+    markInstForDevice(operandDeviceId, inst);
   }
 
   // Replicate these instructions on all devices, and graph lowering will make
@@ -580,7 +653,7 @@ public:
   void visitBranchInst(BranchInst *inst) {
     // Each BB arg of the branch needs to be replicated on ALL devices.
     for (unsigned i = 0, e = inst->getNumArgs(); i != e; ++i) {
-      makeOperandLocal(DeviceType::ALL, inst, i);
+      makeOperandLocal(AllDeviceId, inst, i);
     }
   }
 
@@ -638,7 +711,7 @@ public:
   }
 
   /// If the operand is produced on device, denoted by S, and S is different
-  /// from `deviceType`, denoted by D, insert tensor transfer from S to D if
+  /// from `deviceId`, denoted by D, insert tensor transfer from S to D if
   /// that has not been done, and rewrite the operand to read from the
   /// transferred, local value.
   ///
@@ -646,7 +719,7 @@ public:
   /// we know the operand is already local to D.  Note D can be ALL though. In
   /// that case, when the device-specific function on D processes this
   /// TensorTransfer, it should send the operand to all devices but itself.
-  void makeOperandLocal(DeviceType deviceType, SILInstruction *inst,
+  void makeOperandLocal(DeviceId deviceId, SILInstruction *inst,
                         unsigned operIdx) {
     auto opValue = inst->getOperand(operIdx);
 
@@ -675,14 +748,13 @@ public:
       // insert this new inst at the beginning of the function.
       SILBuilder B(&srcFn.front().front());
       auto &ctx = B.getModule().getASTContext();
-      identityOpBuilder.addAttribute({
-          ctx.getIdentifier(TF_DEVICE_ATTR),
-          SymbolicValue::getString(
-              getDeviceString(deviceInfo.primaryDeviceType),
-              ctx.getAllocator())});
+      identityOpBuilder.addAttribute(
+          {ctx.getIdentifier(TF_DEVICE_ATTR),
+           SymbolicValue::getString(getDeviceString(deviceInfo.primaryDeviceId),
+                                    ctx.getAllocator())});
       auto *identityOpInst = identityOpBuilder.build(
           B, ctx, srcFn.getLocation(), {opValue->getType()});
-      markInstForDevice(deviceInfo.primaryDeviceType, identityOpInst);
+      markInstForDevice(deviceInfo.primaryDeviceId, identityOpInst);
 
       auto newValue = getSingleValueResult(identityOpInst);
       // Replace all users with the value produced by the new identity op inst,
@@ -698,31 +770,33 @@ public:
     auto *operandInst = opValue->getDefiningInstruction();
     assert(operandInst && "value must be defined by an instruction");
 
-    DeviceType operandDeviceType = getSomeDevicePlacement(operandInst);
+    DeviceId operandDeviceId = getSomeDevicePlacement(operandInst);
     // Already on this device -- we are done.
-    if (operandDeviceType == DeviceType::ALL ||
-        instByDevice[(unsigned)deviceType].count(operandInst))
+    if (operandDeviceId.type == DeviceType::ALL ||
+        instByDevice.hasInstOnDevice(operandInst, deviceId))
       return;
     // If `inst` runs on ALL devices but the graph only involves 1 device, can
     // also skip the send.
-    if (deviceType == DeviceType::ALL && deviceInfo.numUsedDeviceTypes == 1)
+    if (deviceId.type == DeviceType::ALL &&
+        deviceInfo.getUsedDeviceIds().size() == 1)
       return;
 
-    assert(operandDeviceType != DeviceType::ALL);
-    assert(operandDeviceType != deviceType);
+    assert(operandDeviceId != AllDeviceId);
+    assert(operandDeviceId != deviceId);
     // See if we have previously emitted a TensorTransfer from
-    // `operandDeviceType` to `deviceType`.
+    // `operandDeviceId` to `deviceId`.
     // FIXME: If we earlier sent the value to GPU device, and later lookup the
     // same value with dest device set to ALL, we will be generating another
     // send here, but it could be optimized away.
-    auto lookupKey = KeyByInstDestDevice(operandInst, (unsigned)deviceType);
-    if (!transferInstsByDestDevice.count(lookupKey)) {
+    auto destDeviceValue = transferInstsByDestDevice.getSILValueOfInstOnDevice(
+        operandInst, deviceId);
+    if (!destDeviceValue) {
       assert(isTensorFlowValue(opValue->getType()) &&
              "Can only transfer TensorFlow values");
 
       // Now we create a TensorTransfer graph_op inst. This inst cannot have its
       // src device set to ALL, but dest device can be ALL.
-      assert(deviceInfo.numUsedDeviceTypes >= 2);
+      assert(deviceInfo.getUsedDeviceIds().size() >= 2);
 
       // This inst has type:
       // <T> (T) {transferId$int, srcDevice$str, destDevice$str} -> T
@@ -741,12 +815,11 @@ public:
            SymbolicValue::getInteger(nextTensorTransferId++, 32)});
       newInstBuilder.addAttribute(
           {ctx.getIdentifier("srcDevice"),
-           SymbolicValue::getString(getDeviceString(operandDeviceType),
+           SymbolicValue::getString(getDeviceString(operandDeviceId),
                                     allocator)});
       newInstBuilder.addAttribute(
           {ctx.getIdentifier("destDevice"),
-           SymbolicValue::getString(getDeviceString(deviceType),
-                                    allocator)});
+           SymbolicValue::getString(getDeviceString(deviceId), allocator)});
       // The operand must have been produced by a graph_op inst, or an
       // UncheckedRefCastInst.
       if (auto *graphOpInst = dyn_cast<GraphOperationInst>(operandInst)) {
@@ -763,49 +836,53 @@ public:
       auto *transferInst = newInstBuilder.build(B, ctx, loc,
                                                 {opValue->getType()});
 
-      markInstForDevice(operandDeviceType, transferInst);
-      markInstForDevice(deviceType, transferInst);
-      transferInstsByDestDevice[lookupKey] = getSingleValueResult(transferInst);
+      markInstForDevice(operandDeviceId, transferInst);
+      markInstForDevice(deviceId, transferInst);
+      destDeviceValue = getSingleValueResult(transferInst);
+      transferInstsByDestDevice.insertInstOnDevice(operandInst, deviceId,
+                                                   destDeviceValue);
     }
-    inst->setOperand(operIdx, transferInstsByDestDevice[lookupKey]);
+    assert(destDeviceValue);
+    inst->setOperand(operIdx, destDeviceValue);
   }
 
-  DeviceType getSomeDevicePlacement(SILInstruction* inst) const {
+  DeviceId getSomeDevicePlacement(SILInstruction *inst) const {
     assert(inst);
     // First check on the ALL pseudo-device, since an instruction running there
     // will guarantee to provide outputs to their use sites without having to do
     // tensor transfer.
-    if (instByDevice[(unsigned)DeviceType::ALL].count(inst)) {
-      return DeviceType::ALL;
+    if (instByDevice.hasInstOnDevice(inst, AllDeviceId)) {
+      return AllDeviceId;
     }
 
-    Optional<DeviceType> operandDeviceType = None;
-    for (auto type : deviceInfo.getUsedDeviceTypes()) {
-      if (instByDevice[(unsigned)type].count(inst)) {
-        operandDeviceType = type;
+    Optional<DeviceId> operandDeviceId = None;
+    for (auto encodedDeviceId : deviceInfo.getUsedDeviceIds()) {
+      auto deviceId = encodedDeviceId;
+      if (instByDevice.hasInstOnDevice(inst, deviceId)) {
+        operandDeviceId = deviceId;
         break;
       }
     }
-    if (!operandDeviceType.hasValue()) {
+    if (!operandDeviceId.hasValue()) {
       inst->print(llvm::errs());
       llvm_unreachable(
           "The above instruction has not been marked for device placement: \n");
     }
-    return operandDeviceType.getValue();
+    return operandDeviceId.getValue();
   }
 
-  void markInstForDevice(DeviceType deviceType, SILInstruction *inst) {
-    instByDevice[(unsigned)deviceType].insert(inst);
-    if (deviceType == DeviceType::ALL) {
+  void markInstForDevice(DeviceId deviceId, SILInstruction *inst) {
+    instByDevice.insertInstOnDevice(inst, deviceId);
+    if (deviceId.type == DeviceType::ALL) {
       markInstForAllDevices(inst);
     }
   }
 
   void markInstForAllDevices(SILInstruction *inst) {
-    for (auto deviceType : deviceInfo.getUsedDeviceTypes()) {
-      instByDevice[(unsigned)deviceType].insert(inst);
+    for (auto deviceId : deviceInfo.getUsedDeviceIds()) {
+      instByDevice.insertInstOnDevice(inst, deviceId);
     }
-    instByDevice[(unsigned)DeviceType::ALL].insert(inst);
+    instByDevice.insertInstOnDevice(inst, AllDeviceId);
   }
 };
 
@@ -819,9 +896,8 @@ DevicePartitioner::DevicePartitioner(SILTransform &parentTransform,
 
 DevicePartitioner::~DevicePartitioner() { delete impl; }
 
-SILFunction *DevicePartitioner::extractFunctionForDevice(
-    DeviceType deviceType) {
-  return impl->extractFunctionForDevice(deviceType);
+SILFunction *DevicePartitioner::extractFunctionForDevice(DeviceId deviceId) {
+  return impl->extractFunctionForDevice(deviceId);
 }
 
 }  // end namespace tf

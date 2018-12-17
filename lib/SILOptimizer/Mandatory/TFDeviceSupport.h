@@ -37,17 +37,22 @@ struct GraphOperationInfo;
 
 StringRef getDeviceString(const GraphOperationInfo &graphOpInfo);
 
-DeviceType getDeviceType(const GraphOperationInfo &graphOpInfo);
+DeviceId getDeviceId(const GraphOperationInfo &graphOpInfo);
 
 /// The returned string can be used to construct SIL function names.
-static inline std::string getDeviceShortName(DeviceType deviceType) {
-  switch (deviceType) {
+/// e.g. "tmp3_main.tf_13_CPU.device_partition", where 13 is the device
+/// index. The compiler runtime relies on the string suffix pattern
+/// "13_CPU.device_partition" to decode the device index 13, and use it to place
+/// the graph function invocation on a TF device like
+/// "/job:localhost/replica:0/task:0/device:CPU:13".
+static inline std::string getDeviceShortName(DeviceId deviceId) {
+  switch (deviceId.type) {
   case DeviceType::CPU:
-    return "CPU";
+    return llvm::utostr(deviceId.index) + "_CPU";
   case DeviceType::GPU:
-    return "GPU";
+    return llvm::utostr(deviceId.index) + "_GPU";
   case DeviceType::TPU:
-    return "TPU";
+    return llvm::utostr(deviceId.index) + "_TPU";
   case DeviceType::ALL:
     return "ALL";
   case DeviceType::INVALID:
@@ -76,7 +81,7 @@ public:
   ///   a _Send() node to CPU.
   /// - The extracted function for CPU device has _Recv node from GPU to read
   ///   a, and adds its output with const tensor b to produce the sum result.
-  SILFunction *extractFunctionForDevice(DeviceType deviceType);
+  SILFunction *extractFunctionForDevice(DeviceId deviceId);
 };
 
 } // end namespace tf

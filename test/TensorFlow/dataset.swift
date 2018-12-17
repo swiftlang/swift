@@ -59,7 +59,7 @@ public func model() {
 
 // CHECK:      node {
 // CHECK-NEXT:   name: "{{.*}}model{{.*}}"
-// CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_CPU.device_partition"
+// CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_0_CPU.device_partition"
 // CHECK:      node {
 // CHECK-NEXT:  name: "tfc_output_0_{{.*}}model{{.*}}"
 

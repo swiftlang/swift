@@ -50,14 +50,14 @@ public func test1SendWithParam(x: Float) {
 // The _Send node should be hooked up as a control dependency on the return
  // node, so that Sends gets run before the function returns.
 // CHECK-GPU:        function {
-// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_GPU.device_partition"
+// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_0_CPU.device_partition"
+// CHECK-GPU:        function {
+// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_0_GPU.device_partition"
 // CHECK-GPU:          node_def {
 // CHECK-GPU:            name: "RunControlDependency"
 // CHECK-GPU:            op: "Identity"
 // CHECK-GPU-NEXT:       input: "op/test1SendWithParam.x_
 // CHECK-GPU-NEXT:       input: "^tf_send_0"
-// CHECK-GPU:        function {
-// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_CPU.device_partition"
 
 public func test2Sends() {
   var a = Tensor<Float>(1.0)
@@ -359,7 +359,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
   var b = atariSim(a_host).toAccelerator()
   // This is the correct location
-  // expected-error @+1 {{TPU infeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
+  // expected-error @+1 {{did you specify shape?}}
   b += a_tpu
   _hostOp(b)
 }
@@ -423,7 +423,7 @@ public func resourceHandlesCanBeSentOrReceived() {
 public func resourceHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
   _hostOp(iterator)
 }
 
@@ -447,7 +447,7 @@ public func variantHandlesCanBeSentOrReceived() {
 public func variantHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
   let nextIterator: VariantHandle =
     #tfop("IteratorGetNextAsOptional", iterator,
     output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])

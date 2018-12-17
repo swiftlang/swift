@@ -1766,7 +1766,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result =
       createConstTensor(scalarsElementType, scalars, shape, inst->getType(),
-                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
+                        inst->getLoc(), deviceInfo.primaryDeviceId, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);
@@ -1838,8 +1838,7 @@ transformTensorFromScalar(ApplyInst *apply,
     auto constant = createConstTensor(
         eltType, scalarValue,
         SymbolicValue::getArray({}, int32Ty, ctx.getAllocator()),
-        origResult->getType(), getUserSourceLocation(apply), DeviceType::ALL,
-        B);
+        origResult->getType(), getUserSourceLocation(apply), AllDeviceId, B);
     LLVM_DEBUG(llvm::dbgs()
                << "  The resulting const node is: " << *constant << "\n");
     origResult->replaceAllUsesWith(constant->getResult(0));
@@ -1936,7 +1935,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars1D(
   B.setCurrentDebugScope(inst->getDebugScope());
   auto result =
       createConstTensor(scalarElementType, scalars, shape, inst->getType(),
-                        inst->getLoc(), deviceInfo.primaryDeviceType, B);
+                        inst->getLoc(), deviceInfo.primaryDeviceId, B);
 
   // Replace the old instruction with the new one.
   inst->replaceAllUsesPairwiseWith(result);

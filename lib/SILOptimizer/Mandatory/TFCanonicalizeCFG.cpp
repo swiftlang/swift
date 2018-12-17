@@ -371,10 +371,10 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
       {context.getIdentifier("value$tensor"),
        SymbolicValue::getInteger(APInt(bitwidth, value),
                                  context.getAllocator())});
-  deviceInfo.handleDevicePlacement(
-      "Const",
-      /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), &opBuilder);
+  deviceInfo.handleDevicePlacement("Const",
+                                   /*opDevice*/ getDeviceString(AllDeviceId),
+                                   builder.getModule().getASTContext(),
+                                   &opBuilder);
   GraphOperationInst *constNode = opBuilder.build(
       builder, context, location,
       {convertElementTypeToTensorValueType(intType)});
@@ -1288,7 +1288,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         createTFIntegerConst(*deviceInfo, builder, headerLocation,
                              /*bitwidth*/ 32, exitIndices.lookup(trueBlock)));
     deviceInfo->handleDevicePlacement(
-        equalOpName, /*opDevice*/ getDeviceString(DeviceType::ALL),
+        equalOpName, /*opDevice*/ getDeviceString(AllDeviceId),
         builder.getModule().getASTContext(), &equalOpBuilder);
     GraphOperationInst *condTensorInst = equalOpBuilder.build(
         builder, context, headerLocation,

@@ -292,7 +292,7 @@ bool tf::isStatefulOp(const GraphOperationInst *graphOp) {
 GraphOperationInst *
 tf::createConstTensor(Type elementType, SymbolicValue scalars,
                       SymbolicValue shape, SILType resultType, SILLocation loc,
-                      DeviceType targetDevice, SILBuilder &B) {
+                      DeviceId targetDevice, SILBuilder &B) {
   auto &context = B.getASTContext();
   auto &allocator = context.getAllocator();
 
@@ -339,10 +339,10 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
   ASTContext &context = builder.getASTContext();
   GraphOperationBuilder opBuilder("tf_tensor_to_i1");
   opBuilder.addArgument(value);
-  deviceInfo.handleDevicePlacement(
-      "tf_tensor_to_i1",
-      /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), &opBuilder);
+  deviceInfo.handleDevicePlacement("tf_tensor_to_i1",
+                                   /*opDevice*/ getDeviceString(AllDeviceId),
+                                   builder.getModule().getASTContext(),
+                                   &opBuilder);
   GraphOperationInst *condValue = opBuilder.build(
       builder, context, location,
       {SILType::getBuiltinIntegerType(1, context)});

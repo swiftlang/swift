@@ -357,7 +357,7 @@ public func SR8443(n: Int32) {
 // CHECK-LABEL: --- TFPartition GraphDef Proto:
 // CHECK:   function {
 // CHECK:    signature {
-// CHECK:      name: "{{.*}}SR8443{{.*}}.tf_CPU.device_partition"
+// CHECK:      name: "{{.*}}SR8443{{.*}}_CPU.device_partition"
 // CHECK:    node_def {
 // CHECK:      name: "RunControlDependency"
 // CHECK:      op: "Identity"
