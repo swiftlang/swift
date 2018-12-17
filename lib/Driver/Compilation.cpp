@@ -247,10 +247,11 @@ namespace driver {
       if (ScheduledCommands.count(cmd))
         return;
       llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
-      IncrementalTracer->printPath(
-        llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
-          out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
-        });
+      if (!Comp.getEnableExperimentalDependencies())
+        IncrementalTracer->printPath(
+                                     llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
+                                       out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
+                                     });
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
