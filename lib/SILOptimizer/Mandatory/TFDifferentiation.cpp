@@ -2640,7 +2640,7 @@ public:
     SILValue pullback = vjpDirectResults.back();
 
     // Store the original result to the value map.
-    ValueMap.insert({ai, originalDirectResult});
+    mapValue(ai, originalDirectResult);
 
     // Checkpoint the original results.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
@@ -2779,7 +2779,7 @@ public:
     auto origDirResultFromPrimal =
         joinElements(origDirResults, builder, primalCall->getLoc());
     // Store the original result from primal to the value map.
-    ValueMap.insert({ai, origDirResultFromPrimal});
+    mapValue(ai, origDirResultFromPrimal);
 
     // FIXME: Handle indirect passing. One possible way is to scan the entire
     // data flow to determine whether the primal value struct should be
@@ -2836,8 +2836,8 @@ public:
     auto srcTy = li->getOperand()->getType().getASTType();
     auto loc = remapLocation(li->getLoc());
     auto loq = getBufferLOQ(getOpASTType(srcTy), *getPrimal());
-    ValueMap.insert(
-        {li, getBuilder().createLoad(loc, getOpValue(li->getOperand()), loq)});
+    mapValue(
+        li, getBuilder().createLoad(loc, getOpValue(li->getOperand()), loq));
   }
 };
 } // end anonymous namespace
@@ -3140,26 +3140,27 @@ namespace {
 class AdjointRematCloner final
     : public SILClonerWithScopes<AdjointRematCloner> {
   friend class AdjointEmitter;
-      
+
+private:
   SmallVector<std::pair<SILInstruction *, SILInstruction *>, 8>
       scopeMarkingInstructions;
 
-private:
+  SmallPtrSet<SILValue, 32> mapped;
+
   SILFunction &getOriginal() { return getBuilder().getFunction(); }
 
 public:
   AdjointRematCloner(SILFunction &fn) : SILClonerWithScopes(fn) {}
 
-  void insertValueMapping(SILValue valueInOriginal, SILValue valueInAdjoint) {
-    auto insertion = ValueMap.insert({valueInOriginal, valueInAdjoint});
-    assert(insertion.second && "The original value was mapped before");
+  void mapValue(SILValue origValue, SILValue mappedValue) {
+    SILClonerWithScopes::mapValue(origValue, mappedValue);
+    mapped.insert(origValue);
   }
 
   SILValue lookUpValue(SILValue valueInOriginal) {
-    auto lookup = ValueMap.find(valueInOriginal);
-    if (lookup == ValueMap.end())
+    if (!mapped.count(valueInOriginal))
       return nullptr;
-    return lookup->getSecond();
+    return getMappedValue(valueInOriginal);
   }
 
   void setInsertionPointBeforeAnyTerminator(SILBasicBlock *bb) {
@@ -3366,7 +3367,7 @@ public:
     // parameters".
     for (auto pair : zip(original.getArgumentsWithoutIndirectResults(),
                          originalParametersInAdj))
-      rematCloner.insertValueMapping(std::get<0>(pair), std::get<1>(pair));
+      rematCloner.mapValue(std::get<0>(pair), std::get<1>(pair));
 
     // Assign adjoint to the return value.
     //   y = tuple (y0, ..., yn)
@@ -3545,7 +3546,7 @@ public:
     // Memorize this value mapping in the remat cloner, when we are not
     // extracting a nested primal value aggregate.
     if (!nested)
-      rematCloner.insertValueMapping(value, extracted);
+      rematCloner.mapValue(value, extracted);
     return extracted;
   }
 
@@ -3977,8 +3978,7 @@ public:
 
 void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
   assert(inst->getFunction() == &getOriginal());
-  auto lookup = rematCloner.ValueMap.find(inst->getResults()[0]);
-  if (lookup != rematCloner.ValueMap.end())
+  if (rematCloner.lookUpValue(inst->getResults()[0]))
     return;
   // Find the nearest common dominator of the corresponding adjoint blocks of
   // all user blocks of the value.
