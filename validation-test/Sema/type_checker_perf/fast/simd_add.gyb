@@ -2,8 +2,6 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-import SIMDOperators
-
 func test(_ s: SIMD4<Float>,
 %for i in range(0, N):
   _ s${i}: SIMD4<Float>,
