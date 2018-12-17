@@ -372,6 +372,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       // type. This is layering a partial fix upon a total hack.
       if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
         signature = asd->getOverloadSignatureType();
+    } else if (decl->getDeclContext()->isTypeContext()) {
+      // Do not apply shadowing rules for member types.
+      continue;
     }
 
     // Record this declaration based on its signature.
