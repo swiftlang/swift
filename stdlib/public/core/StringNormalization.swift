@@ -123,16 +123,6 @@ private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
 ) -> (Int, Int) {
-  // Quick check if a scalar is NFC and a segment starter
-  @inline(__always) func isNFCStarter(_ scalar: Unicode.Scalar) -> Bool {
-    // Fast-path: All scalars up through U+02FF are NFC and have boundaries
-    // before them
-    if scalar.value < 0x300 { return true }
-
-    // Otherwise, consult the properties
-    return scalar._hasNormalizationBoundaryBefore && scalar._isNFCQCYes
-  }
-  
   let outputBufferThreshold = outputBuffer.count - 4
   
   // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
@@ -150,7 +140,7 @@ private func fastFill(
 
     if _slowPath(
          !sourceBuffer.hasNormalizationBoundary(before: inputCount &+ len)
-      || !isNFCStarter(scalar)
+      || !scalar._isNFCStarter
     ) {
       break
     }
