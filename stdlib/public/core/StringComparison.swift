@@ -406,14 +406,14 @@ extension _StringGutsSlice {
     var right_icuInputBuffer = right_icuInputBuffer
     var right_icuOutputBuffer = right_icuOutputBuffer
   
-    var leftNormalizationIndex = String.Index(encodedOffset: 0)
-    var rightNormalizationIndex = String.Index(encodedOffset: 0)
-    var leftBufferIndex = 0
-    var rightBufferIndex = 0
-    var leftBufferCount = 0
-    var rightBufferCount = 0
-    let leftCachedEndIndex = String.Index(encodedOffset: left_sourceBuffer.count)
-    let rightCachedEndIndex = String.Index(encodedOffset: right_sourceBuffer.count)
+    var leftNextReadPosition = String.Index(encodedOffset: 0)
+    var rightNextReadPosition = String.Index(encodedOffset: 0)
+    var leftOutputBufferIndex = 0
+    var rightOutputBufferIndex = 0
+    var leftOutputBufferCount = 0
+    var rightOutputBufferCount = 0
+    let leftEndIndex = String.Index(encodedOffset: left_sourceBuffer.count)
+    let rightEndIndex = String.Index(encodedOffset: right_sourceBuffer.count)
   
     var hasLeftBufferOwnership = false
     var hasRightBufferOwnership = false
@@ -442,46 +442,46 @@ extension _StringGutsSlice {
     }
   
     repeat {
-      if leftBufferIndex == leftBufferCount {
+      if leftOutputBufferIndex == leftOutputBufferCount {
         let result = _fastNormalize(
-          readIndex: leftNormalizationIndex,
+          readIndex: leftNextReadPosition,
           sourceBuffer: left_sourceBuffer,
           outputBuffer: &left_outputBuffer,
           icuInputBuffer: &left_icuInputBuffer,
           icuOutputBuffer: &left_icuOutputBuffer
         )
-        _internalInvariant(result.nextReadPosition != leftNormalizationIndex)
-        leftBufferCount = result.amountFilled
-        leftBufferIndex = 0
-        leftNormalizationIndex = result.nextReadPosition
+        _internalInvariant(result.nextReadPosition != leftNextReadPosition)
+        leftOutputBufferCount = result.amountFilled
+        leftOutputBufferIndex = 0
+        leftNextReadPosition = result.nextReadPosition
         if result.reallocatedBuffers {
           _internalInvariant(!hasLeftBufferOwnership)
           hasLeftBufferOwnership = true
         }
       }
-      if rightBufferIndex == rightBufferCount {
+      if rightOutputBufferIndex == rightOutputBufferCount {
         let result = _fastNormalize(
-          readIndex: rightNormalizationIndex,
+          readIndex: rightNextReadPosition,
           sourceBuffer: right_sourceBuffer,
           outputBuffer: &right_outputBuffer,
           icuInputBuffer: &right_icuInputBuffer,
           icuOutputBuffer: &right_icuOutputBuffer
         )
-        _internalInvariant(result.nextReadPosition != rightNormalizationIndex)
-        rightBufferCount = result.amountFilled
-        rightBufferIndex = 0
-        rightNormalizationIndex = result.nextReadPosition
+        _internalInvariant(result.nextReadPosition != rightNextReadPosition)
+        rightOutputBufferCount = result.amountFilled
+        rightOutputBufferIndex = 0
+        rightNextReadPosition = result.nextReadPosition
         if result.reallocatedBuffers {
           _internalInvariant(!hasRightBufferOwnership)
           hasRightBufferOwnership = true
         }
       }
-      while leftBufferIndex < leftBufferCount && rightBufferIndex < rightBufferCount {
-        let leftCU = left_outputBuffer[leftBufferIndex]
-        let rightCU = right_outputBuffer[rightBufferIndex]
+      while leftOutputBufferIndex < leftOutputBufferCount && rightOutputBufferIndex < rightOutputBufferCount {
+        let leftCU = left_outputBuffer[leftOutputBufferIndex]
+        let rightCU = right_outputBuffer[rightOutputBufferIndex]
         if leftCU == rightCU {
-          leftBufferIndex += 1
-          rightBufferIndex += 1
+          leftOutputBufferIndex += 1
+          rightOutputBufferIndex += 1
           continue
         } else if leftCU < rightCU {
           return expecting == .less
@@ -489,18 +489,18 @@ extension _StringGutsSlice {
           return false
         }
       }
-    } while (leftNormalizationIndex < leftCachedEndIndex
-    || leftBufferIndex < leftBufferCount)
-    && (rightNormalizationIndex < rightCachedEndIndex
-    || rightBufferIndex < rightBufferCount)
+    } while (leftNextReadPosition < leftEndIndex
+    || leftOutputBufferIndex < leftOutputBufferCount)
+    && (rightNextReadPosition < rightEndIndex
+    || rightOutputBufferIndex < rightOutputBufferCount)
     
   
     //At least one of them ran out of code units, whichever it was is the "smaller" string
-    if leftNormalizationIndex < leftCachedEndIndex 
-    || leftBufferIndex < leftBufferCount {
+    if leftNextReadPosition < leftEndIndex 
+    || leftOutputBufferIndex < leftOutputBufferCount {
       return false
-    } else if rightNormalizationIndex < rightCachedEndIndex
-    || rightBufferIndex < rightBufferCount {
+    } else if rightNextReadPosition < rightEndIndex
+    || rightOutputBufferIndex < rightOutputBufferCount {
       return expecting == .less
     } else {
       //They both ran out
@@ -528,14 +528,14 @@ extension _StringGutsSlice {
     var right_icuInputBuffer = right_icuInputBuffer
     var right_icuOutputBuffer = right_icuOutputBuffer
   
-    var leftNormalizationIndex = left_range.lowerBound
-    var rightNormalizationIndex = right_range.lowerBound
-    var leftBufferIndex = 0
-    var rightBufferIndex = 0
-    var leftBufferCount = 0
-    var rightBufferCount = 0
-    let leftCachedEndIndex = left_range.upperBound
-    let rightCachedEndIndex = right_range.upperBound
+    var leftNextReadPosition = left_range.lowerBound
+    var rightNextReadPosition = right_range.lowerBound
+    var leftOutputBufferIndex = 0
+    var rightOutputBufferIndex = 0
+    var leftOutputBufferCount = 0
+    var rightOutputBufferCount = 0
+    let leftEndIndex = left_range.upperBound
+    let rightEndIndex = right_range.upperBound
   
     var hasLeftBufferOwnership = false
     var hasRightBufferOwnership = false
@@ -564,48 +564,48 @@ extension _StringGutsSlice {
     }
   
     repeat {
-      if leftBufferIndex == leftBufferCount {
+      if leftOutputBufferIndex == leftOutputBufferCount {
         let result = _foreignNormalize(
-          readIndex: leftNormalizationIndex,
-          endIndex: leftCachedEndIndex,
+          readIndex: leftNextReadPosition,
+          endIndex: leftEndIndex,
           guts: left_guts,
           outputBuffer: &left_outputBuffer,
           icuInputBuffer: &left_icuInputBuffer,
           icuOutputBuffer: &left_icuOutputBuffer
         )
-        _internalInvariant(result.nextReadPosition != leftNormalizationIndex)
-        leftBufferCount = result.amountFilled
-        leftBufferIndex = 0
-        leftNormalizationIndex = result.nextReadPosition
+        _internalInvariant(result.nextReadPosition != leftNextReadPosition)
+        leftOutputBufferCount = result.amountFilled
+        leftOutputBufferIndex = 0
+        leftNextReadPosition = result.nextReadPosition
         if result.reallocatedBuffers {
           _internalInvariant(!hasLeftBufferOwnership)
           hasLeftBufferOwnership = true
         }
       }
-      if rightBufferIndex == rightBufferCount {
+      if rightOutputBufferIndex == rightOutputBufferCount {
         let result = _foreignNormalize(
-          readIndex: rightNormalizationIndex,
-          endIndex: rightCachedEndIndex,
+          readIndex: rightNextReadPosition,
+          endIndex: rightEndIndex,
           guts: right_guts,
           outputBuffer: &right_outputBuffer,
           icuInputBuffer: &right_icuInputBuffer,
           icuOutputBuffer: &right_icuOutputBuffer
         )
-        _internalInvariant(result.nextReadPosition != rightNormalizationIndex)
-        rightBufferCount = result.amountFilled
-        rightBufferIndex = 0
-        rightNormalizationIndex = result.nextReadPosition
+        _internalInvariant(result.nextReadPosition != rightNextReadPosition)
+        rightOutputBufferCount = result.amountFilled
+        rightOutputBufferIndex = 0
+        rightNextReadPosition = result.nextReadPosition
         if result.reallocatedBuffers {
           _internalInvariant(!hasRightBufferOwnership)
           hasRightBufferOwnership = true
         }
       }
-      while leftBufferIndex < leftBufferCount && rightBufferIndex < rightBufferCount {
-        let leftCU = left_outputBuffer[leftBufferIndex]
-        let rightCU = right_outputBuffer[rightBufferIndex]
+      while leftOutputBufferIndex < leftOutputBufferCount && rightOutputBufferIndex < rightOutputBufferCount {
+        let leftCU = left_outputBuffer[leftOutputBufferIndex]
+        let rightCU = right_outputBuffer[rightOutputBufferIndex]
         if leftCU == rightCU {
-          leftBufferIndex += 1
-          rightBufferIndex += 1
+          leftOutputBufferIndex += 1
+          rightOutputBufferIndex += 1
           continue
         } else if leftCU < rightCU {
           return expecting == .less
@@ -613,18 +613,18 @@ extension _StringGutsSlice {
           return false
         }
       }
-    } while (leftNormalizationIndex < leftCachedEndIndex
-    || leftBufferIndex < leftBufferCount)
-    && (rightNormalizationIndex < rightCachedEndIndex
-    || rightBufferIndex < rightBufferCount)
+    } while (leftNextReadPosition < leftEndIndex
+    || leftOutputBufferIndex < leftOutputBufferCount)
+    && (rightNextReadPosition < rightEndIndex
+    || rightOutputBufferIndex < rightOutputBufferCount)
     
   
     //At least one of them ran out of code units, whichever it was is the "smaller" string
-    if leftNormalizationIndex < leftCachedEndIndex 
-    || leftBufferIndex < leftBufferCount {
+    if leftNextReadPosition < leftEndIndex 
+    || leftOutputBufferIndex < leftOutputBufferCount {
       return false
-    } else if rightNormalizationIndex < rightCachedEndIndex
-    || rightBufferIndex < rightBufferCount {
+    } else if rightNextReadPosition < rightEndIndex
+    || rightOutputBufferIndex < rightOutputBufferCount {
       return expecting == .less
     } else {
       //They both ran out

@@ -79,6 +79,7 @@ extension Unicode.Scalar {
 extension UnsafeBufferPointer where Element == UInt8 {
   internal func isOnUnicodeScalarBoundary(_ index: Int) -> Bool {
     guard index < count else {
+      _internalInvariant(index == count)
       return true
     }
     return !_isContinuation(self[index])
