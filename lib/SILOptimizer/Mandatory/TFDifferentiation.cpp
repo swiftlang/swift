@@ -1676,10 +1676,37 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                                                   cetn->getOperand(), builder,
                                                   loc, substituteOperand);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-    auto noEscapeType = operandFnTy->getWithExtInfo(operandFnTy->getExtInfo().withNoEscape());
+    auto noEscapeType = operandFnTy->getWithExtInfo(
+        operandFnTy->getExtInfo().withNoEscape());
     auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
     return builder.createConvertEscapeToNoEscape(
-        loc, innerNewFunc, silTy, cetn->isEscapedByUser(), cetn->isLifetimeGuaranteed());
+        loc, innerNewFunc, silTy, cetn->isEscapedByUser(),
+        cetn->isLifetimeGuaranteed());
+  }
+  // convert_function
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
+    // `convert_function` does not have a fixed typing rule because it can
+    // convert between function types as long as they are ABI-compatible. Here
+    // we match specific patterns.
+    auto origTargetFnTy = cfi->getType().castTo<SILFunctionType>();
+    auto origSourceFnTy =
+        cfi->getOperand()->getType().castTo<SILFunctionType>();
+    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
+                                                  cfi->getOperand(), builder,
+                                                  loc, substituteOperand);
+    // Match a conversion from escaping to `@noescape`
+    CanSILFunctionType targetType;
+    if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
+        origSourceFnTy == origTargetFnTy->getWithExtInfo(
+            origTargetFnTy->getExtInfo().withNoEscape(false))) {
+      auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
+      targetType = operandFnTy->getWithExtInfo(
+          operandFnTy->getExtInfo().withNoEscape(true));
+    }
+    assert(targetType && "Unhandled convert_function pattern");
+    auto silTy = SILType::getPrimitiveObjectType(targetType);
+    return builder.createConvertFunction(loc, innerNewFunc, silTy,
+                                         cfi->withoutActuallyEscaping());
   }
   llvm_unreachable("Unhandled function convertion instruction");
 }
