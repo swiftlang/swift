@@ -2,7 +2,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Basic)) %S/../Inputs/conditional_conformance_basic_conformances.swift -module-name Basic -emit-module -emit-module-path %t/Basic.swiftmodule
 // RUN: %target-build-swift-dylib(%t/%target-library-name(WithAssoc)) %S/../Inputs/conditional_conformance_with_assoc.swift -module-name WithAssoc -emit-module -emit-module-path %t/WithAssoc.swiftmodule
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Subclass)) %S/../Inputs/conditional_conformance_subclass.swift -module-name Subclass -emit-module -emit-module-path %t/Subclass.swiftmodule
-// RUN: %target-build-swift -I%t -L%t -lBasic -lWithAssoc -lSubclass %s -o %t/conditional_conformances_modules -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift -I%t -L%t -lBasic -lWithAssoc -lSubclass %s -o %t/conditional_conformances_modules %target-rpath(%t)
 // RUN: %target-run %t/conditional_conformances_modules %t/%target-library-name(Basic) %t/%target-library-name(WithAssoc) %t/%target-library-name(Subclass)
 
 // REQUIRES: executable_test
