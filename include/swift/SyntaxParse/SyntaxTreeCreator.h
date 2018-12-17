@@ -25,6 +25,12 @@ namespace syntax {
   class SyntaxArena;
 }
 
+/// Receives the parsed syntax info from the parser and constructs a persistent
+/// syntax tree by converting the data into \c RawSyntax objects, allocated from
+/// a \c SyntaxArena.
+///
+/// It also handles caching re-usable RawSyntax objects and skipping parsed
+/// nodes via consulting a \c SyntaxParsingCache.
 class SyntaxTreeCreator: public SyntaxParseActions {
   RC<syntax::SyntaxArena> Arena;
 
