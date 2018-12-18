@@ -1,0 +1,13 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:SlsSQ7ElementRpzrlE5index2of5IndexQzSgAB_tF",
+    "LeftComment": "index",
+    "RightUsr": "",
+    "RightComment": "firstIndex",
+    "ModuleName": "Swift"
+  },
+]
