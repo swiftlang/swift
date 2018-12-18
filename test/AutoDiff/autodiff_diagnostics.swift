@@ -6,8 +6,8 @@
 
 // expected-note @+1 {{value defined here}}
 func foo(_ f: (Float) -> Float) -> Float {
-  // expected-error @+1 {{differentiating an opaque function is not supported yet}}
-  return #gradient(f)(0)
+  // expected-error @+1 {{function is not differentiable}}
+  return gradient(at: 0, in: f)
 }
 
 //===----------------------------------------------------------------------===//
@@ -18,7 +18,7 @@ func one_to_one_0(_ x: Float) -> Float {
   return x + 2
 }
 
-_ = #gradient(one_to_one_0) // okay!
+_ = gradient(at: 0, in: one_to_one_0) // okay!
 
 //===----------------------------------------------------------------------===//
 // Generics
@@ -42,14 +42,14 @@ func uses_optionals(_ x: Float) -> Float {
   return maybe!
 }
 
-_ = #gradient(uses_optionals) // expected-error {{function is not differentiable}}
+_ = gradient(at: 0, in: uses_optionals) // expected-error {{function is not differentiable}}
 
 func f0(_ x: Float) -> Float {
   return x // okay!
 }
 
 func nested(_ x: Float) -> Float {
-  return #gradient(f0)(x) // expected-note {{nested differentiation is not supported yet}}
+  return gradient(at: x, in: f0) // expected-note {{nested differentiation is not supported yet}}
 }
 
 func middle(_ x: Float) -> Float {
@@ -66,7 +66,7 @@ func func_to_diff(_ x: Float) -> Float {
 }
 
 func calls_grad_of_nested(_ x: Float) -> Float {
-  return #gradient(func_to_diff)(x) // expected-error {{function is not differentiable}}
+  return gradient(at: x, in: func_to_diff) // expected-error {{function is not differentiable}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -85,4 +85,4 @@ func if_else(_ x: Float, _ flag: Bool) -> Float {
 }
 
 // expected-error @+1 {{function is not differentiable}}
-_ = #gradient(if_else, wrt: .0)
+_ = gradient(at: 0) { x in if_else(0, true) }
