@@ -45,19 +45,6 @@ def make_missing_child(child):
         return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
 
 
-def make_missing_parsed_child(child):
-    """
-    Generates a C++ call to make the parsed raw syntax for a given Child
-    object.
-    """
-    assert(child.is_token())
-    token = child.main_token()
-    tok_kind = token.kind if token else "unknown"
-    return \
-        'Rec.recordMissingToken(tok::%s, SourceLoc())' % \
-        (tok_kind)
-
-
 def check_child_condition_raw(child):
     """
     Generates a C++ closure to check whether a given raw syntax node can

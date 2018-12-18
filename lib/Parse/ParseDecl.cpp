@@ -4419,8 +4419,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (SyntaxContext->isEnabled()) {
       SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
       SyntaxContext->addSyntax(
-        ParsedSyntaxRecorder::recordBlankAccessorList(listLoc,
-                                                SyntaxContext->getRecorder()));
+        ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
     }
     accessors.RBLoc = consumeToken(tok::r_brace);
 

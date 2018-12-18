@@ -20,6 +20,7 @@
 
 #include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxNodes.h"
 
 using namespace swift;
@@ -56,7 +57,7 @@ Parsed${node.name}Builder::record() {
   finishLayout();
   auto raw = Rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind},
     Layout);
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
 }
 
 Parsed${node.name}
@@ -64,19 +65,33 @@ Parsed${node.name}Builder::makeDeferred() {
   finishLayout();
   auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
     Layout);
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
+}
+
+Parsed${node.name}
+Parsed${node.name}Builder::build() {
+  if (IsBacktracking)
+    return makeDeferred();
+  return record();
 }
 
 void Parsed${node.name}Builder::finishLayout() {
 % if node.children:
 %   for (idx, child) in enumerate(node.children):
 %     if not child.is_optional:
-  if (Layout[${idx}].isNull())
+  if (Layout[${idx}].isNull()) {
 %       if child.is_token():
-    Layout[${idx}] = ${make_missing_parsed_child(child)};
+%         token = child.main_token()
+%         tok_kind = token.kind if token else "unknown"
+    if (IsBacktracking) {
+      Layout[${idx}] = ParsedRawSyntaxNode::makeDeferredMissing(tok::${tok_kind}, SourceLoc());
+    } else {
+      Layout[${idx}] = Rec.recordMissingToken(tok::${tok_kind}, SourceLoc());
+    }
 %       else:
     llvm_unreachable("need missing non-token nodes ?");
 %       end
+  }
 %     end
 %   end
 % end

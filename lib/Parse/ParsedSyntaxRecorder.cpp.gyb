@@ -19,6 +19,7 @@
 
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxFactory.h"
 
 using namespace swift;
@@ -72,12 +73,15 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
 % for node in SYNTAX_NODES:
 %   if node.children:
 %     child_params = []
+%     child_move_args = []
 %     for child in node.children:
 %         param_type = "Parsed%s" % child.type_name
 %         if child.is_optional:
 %            param_type = "Optional<%s>" % param_type
 %         child_params.append("%s %s" % (param_type, child.name))
+%         child_move_args.append("std::move(%s)" % (child.name))
 %     child_params = ', '.join(child_params)
+%     child_move_args = ', '.join(child_move_args)
 Parsed${node.name}
 ParsedSyntaxRecorder::record${node.syntax_kind}(${child_params},
                                        ParsedRawSyntaxRecorder &rec) {
@@ -90,7 +94,7 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(${child_params},
 %       end
 %     end
   });
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
 }
 
 Parsed${node.name}
@@ -104,12 +108,21 @@ ParsedSyntaxRecorder::defer${node.syntax_kind}(${child_params}) {
 %       end
 %     end
   });
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
 }
+
+Parsed${node.name}
+ParsedSyntaxRecorder::make${node.syntax_kind}(${child_params},
+    SyntaxParsingContext &SPCtx) {
+  if (SPCtx.isBacktracking())
+    return defer${node.syntax_kind}(${child_move_args});
+  return record${node.syntax_kind}(${child_move_args}, SPCtx.getRecorder());
+}
+
 %   elif node.is_syntax_collection():
 Parsed${node.name}
 ParsedSyntaxRecorder::record${node.syntax_kind}(
-    ArrayRef<Parsed${node.collection_element_type}> &elements,
+    ArrayRef<Parsed${node.collection_element_type}> elements,
     ParsedRawSyntaxRecorder &rec) {
   SmallVector<ParsedRawSyntaxNode, 16> layout;
   layout.reserve(elements.size());
@@ -118,12 +131,12 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(
   }
   auto raw = rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind},
                              layout);
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
 }
 
 Parsed${node.name}
 ParsedSyntaxRecorder::defer${node.syntax_kind}(
-    ArrayRef<Parsed${node.collection_element_type}> &elements) {
+    ArrayRef<Parsed${node.collection_element_type}> elements) {
   SmallVector<ParsedRawSyntaxNode, 16> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
@@ -131,22 +144,37 @@ ParsedSyntaxRecorder::defer${node.syntax_kind}(
   }
   auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
                              layout);
-  return Parsed${node.name}(raw);
+  return Parsed${node.name}(std::move(raw));
 }
 
 Parsed${node.name}
-ParsedSyntaxRecorder::recordBlank${node.syntax_kind}(SourceLoc loc,
-        ParsedRawSyntaxRecorder &rec) {
-  auto raw = rec.recordEmptyRawSyntaxCollection(SyntaxKind::${node.syntax_kind}, loc);
-  return Parsed${node.name}(raw);
+ParsedSyntaxRecorder::make${node.syntax_kind}(
+    ArrayRef<Parsed${node.collection_element_type}> elements,
+    SyntaxParsingContext &SPCtx) {
+  if (SPCtx.isBacktracking())
+    return defer${node.syntax_kind}(elements);
+  return record${node.syntax_kind}(elements, SPCtx.getRecorder());
+}
+
+Parsed${node.name}
+ParsedSyntaxRecorder::makeBlank${node.syntax_kind}(SourceLoc loc,
+        SyntaxParsingContext &SPCtx) {
+  ParsedRawSyntaxNode raw;
+  if (SPCtx.isBacktracking()) {
+    // FIXME: 'loc' is not preserved when capturing a deferred layout.
+    raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind}, {});
+  } else {
+    raw = SPCtx.getRecorder().recordEmptyRawSyntaxCollection(SyntaxKind::${node.syntax_kind}, loc);
+  }
+  return Parsed${node.name}(std::move(raw));
 }
 %   end
 % end
 
 ParsedTupleTypeElementSyntax
-ParsedSyntaxRecorder::recordTupleTypeElement(ParsedTypeSyntax Type,
+ParsedSyntaxRecorder::makeTupleTypeElement(ParsedTypeSyntax Type,
                                     llvm::Optional<ParsedTokenSyntax> TrailingComma,
-                                    ParsedRawSyntaxRecorder &rec) {
-  return recordTupleTypeElement(None, None, None, None, Type, None, None,
-                              TrailingComma, rec);
+                                    SyntaxParsingContext &SPCtx) {
+  return makeTupleTypeElement(None, None, None, None, Type, None, None,
+                              TrailingComma, SPCtx);
 }

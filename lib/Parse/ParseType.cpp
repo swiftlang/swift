@@ -216,7 +216,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
   auto makeMetatypeTypeSyntax = [&]() {
     if (!SyntaxContext->isEnabled())
       return;
-    ParsedMetatypeTypeSyntaxBuilder Builder(SyntaxContext->getRecorder());
+    ParsedMetatypeTypeSyntaxBuilder Builder(*SyntaxContext);
     auto TypeOrProtocol = SyntaxContext->popToken();
     auto Period = SyntaxContext->popToken();
     auto BaseType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
@@ -224,7 +224,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
       .useTypeOrProtocol(TypeOrProtocol)
       .usePeriod(Period)
       .useBaseType(BaseType);
-    SyntaxContext->addSyntax(Builder.record());
+    SyntaxContext->addSyntax(Builder.build());
   };
   
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
@@ -425,7 +425,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       return nullptr;
 
     if (SyntaxContext->isEnabled()) {
-      ParsedFunctionTypeSyntaxBuilder Builder(SyntaxContext->getRecorder());
+      ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
       Builder.useArrow(SyntaxContext->popToken());
       if (throwsLoc.isValid())
@@ -442,10 +442,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           .useArguments(Arguments)
           .useRightParen(RightParen);
       } else {
-        Builder.addTupleTypeElement(ParsedSyntaxRecorder::recordTupleTypeElement(
-            InputNode, /*TrailingComma=*/None, SyntaxContext->getRecorder()));
+        Builder.addTupleTypeElement(ParsedSyntaxRecorder::makeTupleTypeElement(
+            InputNode, /*TrailingComma=*/None, *SyntaxContext));
       }
-      SyntaxContext->addSyntax(Builder.record());
+      SyntaxContext->addSyntax(Builder.build());
     }
 
     TupleTypeRepr *argsTyR = nullptr;
@@ -708,13 +708,13 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     consumeToken(); // consume '&'
 
     if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-      ParsedCompositionTypeElementSyntaxBuilder Builder(SyntaxContext->getRecorder());
+      ParsedCompositionTypeElementSyntaxBuilder Builder(*SyntaxContext);
       auto Ampersand = SyntaxContext->popToken();
       auto Type = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
       Builder
         .useAmpersand(Ampersand)
         .useType(Type);
-      SyntaxContext->addSyntax(Builder.record());
+      SyntaxContext->addSyntax(Builder.build());
     }
 
     // Parse next type.
@@ -727,9 +727,9 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   } while (Tok.isContextualPunctuator("&"));
 
   if (SyntaxContext->isEnabled() && Status.isSuccess()) {
-    auto LastNode = ParsedSyntaxRecorder::recordCompositionTypeElement(
+    auto LastNode = ParsedSyntaxRecorder::makeCompositionTypeElement(
         SyntaxContext->popIf<ParsedTypeSyntax>().getValue(), None,
-        SyntaxContext->getRecorder());
+        *SyntaxContext);
     SyntaxContext->addSyntax(LastNode);
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
@@ -1122,7 +1122,7 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     TyR = new (Context)
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
     if (SyntaxContext->isEnabled()) {
-      ParsedDictionaryTypeSyntaxBuilder Builder(SyntaxContext->getRecorder());
+      ParsedDictionaryTypeSyntaxBuilder Builder(*SyntaxContext);
       auto RightSquareBracket = SyntaxContext->popToken();
       auto ValueType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
       auto Colon = SyntaxContext->popToken();
@@ -1134,13 +1134,13 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
         .useColon(Colon)
         .useKeyType(KeyType)
         .useLeftSquareBracket(LeftSquareBracket);
-      SyntaxNode.emplace(Builder.record());
+      SyntaxNode.emplace(Builder.build());
     }
   } else {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
     if (SyntaxContext->isEnabled()) {
-      ParsedArrayTypeSyntaxBuilder Builder(SyntaxContext->getRecorder());
+      ParsedArrayTypeSyntaxBuilder Builder(*SyntaxContext);
       auto RightSquareBracket = SyntaxContext->popToken();
       auto ElementType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
       auto LeftSquareBracket = SyntaxContext->popToken();
@@ -1148,7 +1148,7 @@ SyntaxParserResult<ParsedTypeSyntax, TypeRepr> Parser::parseTypeCollection() {
         .useRightSquareBracket(RightSquareBracket)
         .useElementType(ElementType)
         .useLeftSquareBracket(LeftSquareBracket);
-      SyntaxNode.emplace(Builder.record());
+      SyntaxNode.emplace(Builder.build());
     }
   }
     
@@ -1205,11 +1205,11 @@ Parser::parseTypeOptional(TypeRepr *base) {
   if (SyntaxContext->isEnabled()) {
     auto QuestionMark = SyntaxContext->popToken();
     if (auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>()) {
-      ParsedOptionalTypeSyntaxBuilder Builder(SyntaxContext->getRecorder());
+      ParsedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
       Builder
         .useQuestionMark(QuestionMark)
         .useWrappedType(WrappedType.getValue());
-      SyntaxNode.emplace(Builder.record());
+      SyntaxNode.emplace(Builder.build());
     } else {
       // Undo the popping of the question mark
       SyntaxContext->addSyntax(QuestionMark);
@@ -1227,14 +1227,13 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
       new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
   llvm::Optional<ParsedTypeSyntax> SyntaxNode;
   if (SyntaxContext->isEnabled()) {
-    ParsedImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(
-        SyntaxContext->getRecorder());
+    ParsedImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(*SyntaxContext);
     auto ExclamationMark = SyntaxContext->popToken();
     auto WrappedType = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     Builder
       .useExclamationMark(ExclamationMark)
       .useWrappedType(WrappedType);
-    SyntaxNode.emplace(Builder.record());
+    SyntaxNode.emplace(Builder.build());
   }
   return makeSyntaxResult(SyntaxNode, TyR);
 }

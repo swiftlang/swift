@@ -23,16 +23,19 @@
 
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 
 namespace swift {
 
 class ParsedRawSyntaxRecorder;
+class SyntaxParsingContext;
 
 % for node in SYNTAX_NODES:
 %   if node.is_buildable():
 %     child_count = len(node.children)
 class Parsed${node.name}Builder {
   ParsedRawSyntaxRecorder &Rec;
+  bool IsBacktracking;
   ParsedRawSyntaxNode Layout[${child_count}] = {
 %     for child in node.children:
     ParsedRawSyntaxNode::null(),
@@ -40,7 +43,8 @@ class Parsed${node.name}Builder {
   };
 
 public:
-  explicit Parsed${node.name}Builder(ParsedRawSyntaxRecorder &rec) : Rec(rec) {}
+  explicit Parsed${node.name}Builder(SyntaxParsingContext &SPCtx)
+    : Rec(SPCtx.getRecorder()), IsBacktracking(SPCtx.isBacktracking()) {}
 
 %     for child in node.children:
   Parsed${node.name}Builder &use${child.name}(Parsed${child.type_name} ${child.name});
@@ -52,10 +56,11 @@ public:
 %       end
 %     end
 
-  Parsed${node.name} record();
+  Parsed${node.name} build();
   Parsed${node.name} makeDeferred();
 
 private:
+  Parsed${node.name} record();
   void finishLayout();
 };
 
