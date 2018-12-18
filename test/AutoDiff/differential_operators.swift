@@ -26,7 +26,7 @@ BuiltinDifferentialOperatorTests.test("Trivial") {
   }
 
   do {
-    let (value: y, gradient: grad) = gradient(at: 4.0) { x in
+    let (value: y, gradient: grad) = valueWithGradient(at: 4.0) { x in
       x * x * t
     }
     expectEqual(16, y)
