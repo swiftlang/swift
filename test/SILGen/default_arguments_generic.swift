@@ -11,7 +11,7 @@ struct Zim<T: ExpressibleByIntegerLiteral> {
   static func zang<U: ExpressibleByFloatLiteral>(_: U.Type, _ x: T = 0, y: U = 0.5) { }
 }
 
-// CHECK-LABEL: sil hidden @$s25default_arguments_generic3baryyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s25default_arguments_generic3baryyF : $@convention(thin) () -> () {
 func bar() {
   // CHECK: [[FOO_DFLT:%.*]] = function_ref @$s25default_arguments_generic3foo
   // CHECK: apply [[FOO_DFLT]]<Int>
@@ -38,7 +38,7 @@ struct Generic<T: Initializable> {
 struct InitializableImpl: Initializable {
   init() {}
 }
-// CHECK-LABEL: sil hidden @$s25default_arguments_generic17testInitializableyyF
+// CHECK-LABEL: sil hidden [ossa] @$s25default_arguments_generic17testInitializableyyF
 func testInitializable() {
   // Previously the metatype construction crashed in the type checker
   // and the ".init" form crashed in SILGen. Test both forms.
@@ -57,7 +57,7 @@ func testInitializable() {
 
 // Local generic functions with default arguments
 
-// CHECK-LABEL: sil hidden @$s25default_arguments_generic5outer1tyx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s25default_arguments_generic5outer1tyx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
 func outer<T>(t: T) {
   func inner1(x: Int = 0) {}
 

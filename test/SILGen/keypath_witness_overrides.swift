@@ -6,7 +6,7 @@
 // table entry for a protocol requirement is introduced.
 import protocol_overrides
 
-// CHECK-LABEL: sil hidden @$s25keypath_witness_overrides18getWritableKeyPath_5indexs03AnyfG0Cx_5IndexQzt09protocol_C015OverridesSetterRzSHAGRQlF
+// CHECK-LABEL: sil hidden [ossa] @$s25keypath_witness_overrides18getWritableKeyPath_5indexs03AnyfG0Cx_5IndexQzt09protocol_C015OverridesSetterRzSHAGRQlF
 func getWritableKeyPath<OS: OverridesSetter>(_ c: OS, index: OS.Index) -> AnyKeyPath
 where OS.Index: Hashable {
   // CHECK: keypath $WritableKeyPath<OS, OS.Element>,
@@ -19,8 +19,8 @@ where OS.Index: Hashable {
   return keypath
 }
 
-// CHECK-LABEL: sil shared [thunk] @$s18protocol_overrides14OriginalGetterPy7ElementQz5IndexQzcipAA15OverridesSetterRzSHAGRQlxxTK
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18protocol_overrides14OriginalGetterPy7ElementQz5IndexQzcipAA15OverridesSetterRzSHAGRQlxxTK
 // CHECK: witness_method $OS, #OriginalGetter.subscript!getter.1
 
-// CHECK-LABEL: sil shared [thunk] @$s18protocol_overrides10AddsSetterPy7ElementQz5IndexQzcipAA09OverridesD0RzSHAGRQlxxTk
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s18protocol_overrides10AddsSetterPy7ElementQz5IndexQzcipAA09OverridesD0RzSHAGRQlxxTk
 // CHECK-LABEL: witness_method $OS, #AddsSetter.subscript!setter.1

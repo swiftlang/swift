@@ -36,20 +36,20 @@ enum NoValues {
 
 extension Enum: Equatable where T: Equatable {}
 // CHECK-FRAGILE-LABEL: // static Enum<A>.__derived_enum_equals(_:_:)
-// CHECK-FRAGILE-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-FRAGILE-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 // CHECK-RESILIENT-LABEL: // static Enum<A>.== infix(_:_:)
-// CHECK-RESILIENT-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 
 extension Enum: Hashable where T: Hashable {}
 // CHECK-LABEL: // Enum<A>.hashValue.getter
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
 
 // CHECK-LABEL: // Enum<A>.hash(into:)
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
 
 extension NoValues: CaseIterable {}
 // CHECK-LABEL: // static NoValues.allCases.getter
-// CHECK-NEXT: sil hidden @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
 
 
 // Witness tables for Enum

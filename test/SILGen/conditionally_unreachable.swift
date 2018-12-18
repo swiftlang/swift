@@ -16,7 +16,7 @@ func condUnreachable() {
   }
 }
 
-// RAW-LABEL: sil hidden @$s25conditionally_unreachable15condUnreachableyyF 
+// RAW-LABEL: sil hidden [ossa] @$s25conditionally_unreachable15condUnreachableyyF 
 // RAW:         cond_br {{%.*}}, [[YEA:bb[0-9]+]], [[NAY:bb[0-9]+]]
 // RAW:       [[YEA]]:
 // RAW:         function_ref @foo

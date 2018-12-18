@@ -12,14 +12,14 @@ struct Z<T: P, U: Hashable, V: Q> { }
 extension X: P { } // retroactive
 extension Y: Q { } // retroactive
 
-// CHECK: sil hidden @$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAHPyHCg_AiJ1QAAHPyHCg1_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAHPyHCg_AiJ1QAAHPyHCg1_GF
 func test0(_: Z<X, Int, Y>) { }
 
 struct Z2<T: P> {
   struct Inner<V: Q> { }
 }
 
-// CHECK: sil hidden @$s20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg0_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg0_GF
 func test1(_: Z2<X>.Inner<Y>) { }
 
 extension X: Hashable {
@@ -38,5 +38,5 @@ extension Z: Equatable where T: Hashable, V: Equatable {
 struct RequiresEquatable<T: Equatable> { }
 
 // Conditional requirement involves retroactive conformances.
-// CHECK: sil hidden @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg1_GAOSQHPAISHAAHPyHC_AKSQAAHPyHCHCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg1_GAOSQHPAISHAAHPyHC_AKSQAAHPyHCHCg_GF
 func test2(_: RequiresEquatable<Z<X, Int, Y>>) { }

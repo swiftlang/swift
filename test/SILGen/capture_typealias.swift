@@ -8,7 +8,7 @@ func call(f: () -> Int) -> Int {
   return f()
 }
 
-// CHECK: sil hidden @$s17capture_typealias3fooyyF : $@convention(thin) () -> () {
+// CHECK: sil hidden [ossa] @$s17capture_typealias3fooyyF : $@convention(thin) () -> () {
 // CHECK: function_ref [[CLOSURE:@\$s17capture_typealias3fooyyFBi64_yXEfU_]]
 func foo() {
   typealias X = Int
@@ -19,4 +19,4 @@ func foo() {
   }
 }
 
-// CHECK: sil private @$s17capture_typealias3fooyyFBi64_yXEfU_ : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: sil private [ossa] @$s17capture_typealias3fooyyFBi64_yXEfU_ : $@convention(thin) () -> Builtin.Int64 {

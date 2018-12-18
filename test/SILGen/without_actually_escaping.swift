@@ -3,7 +3,7 @@
 
 var escapeHatch: Any = 0
 
-// CHECK-LABEL: sil hidden @$s25without_actually_escaping9letEscape1fyycyyXE_tF
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping9letEscape1fyycyyXE_tF
 func letEscape(f: () -> ()) -> () -> () {
   // CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> ()):
   // CHECK: [[THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
@@ -20,9 +20,9 @@ func letEscape(f: () -> ()) -> () -> () {
 
 // thunk for @callee_guaranteed () -> ()
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
 
-// CHECK-LABEL: sil hidden @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
+// CHECK-LABEL: sil hidden [ossa] @$s25without_actually_escaping14letEscapeThrow1fyycyycyKXE_tKF
 // CHECK: bb0([[ARG:%.*]] : $@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)):
 // CHECK: [[CVT:%.*]] = function_ref @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR
 // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CVT]]([[ARG]])
@@ -50,7 +50,7 @@ func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
 
 // thunk for @callee_guaranteed () -> (@owned @escaping @callee_guaranteed () -> (), @error @owned Error)
 // The thunk must be [without_actually_escaping].
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [without_actually_escaping] [ossa] @$sIeg_s5Error_pIgozo_Ieg_sAA_pIegozo_TR : $@convention(thin) (@noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error Error)) -> (@owned @callee_guaranteed () -> (), @error Error) {
 
 // We used to crash on this example because we would use the wrong substitution
 // map.

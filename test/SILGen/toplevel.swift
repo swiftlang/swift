@@ -7,7 +7,7 @@ func trap() -> Never {
 }
 
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil [ossa] @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
@@ -122,11 +122,11 @@ defer {
 
 
 
-// CHECK-LABEL: sil hidden @$s8toplevel7print_xyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_xyyF
 
-// CHECK-LABEL: sil hidden @$s8toplevel7print_yyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_yyyF
 
-// CHECK: sil hidden @$s8toplevel13testGlobalCSESiyF
+// CHECK: sil hidden [ossa] @$s8toplevel13testGlobalCSESiyF
 // CHECK-NOT: global_addr
 // CHECK: %0 = global_addr @$s8toplevel1xSivp : $*Int
 // CHECK-NOT: global_addr

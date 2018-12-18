@@ -19,7 +19,7 @@ class Phoûx : NSObject, Fooable {
 }
 
 // witness for Foo.foo uses the foreign-to-native thunk:
-// CHECK-LABEL: sil private [transparent] [thunk] @$sSo3FooC14objc_witnesses7FooableA2cDP3foo{{[_0-9a-zA-Z]*}}FTW
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$sSo3FooC14objc_witnesses7FooableA2cDP3foo{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @$sSo3FooC3foo{{[_0-9a-zA-Z]*}}FTO
 
 // witness for Phoûx.foo uses the Swift vtable
@@ -37,7 +37,7 @@ protocol Bells {
 extension Gizmo : Bells {
 }
 
-// CHECK: sil private [transparent] [thunk] @$sSo5GizmoC14objc_witnesses5BellsA2cDP{{[_0-9a-zA-Z]*}}fCTW
+// CHECK: sil private [transparent] [thunk] [ossa] @$sSo5GizmoC14objc_witnesses5BellsA2cDP{{[_0-9a-zA-Z]*}}fCTW
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
@@ -62,9 +62,9 @@ protocol Subscriptable {
   subscript(x: Int) -> Any { get }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$sSo7NSArrayC14objc_witnesses13SubscriptableA2cDPyypSicigTW : $@convention(witness_method: Subscriptable) (Int, @in_guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$sSo7NSArrayC14objc_witnesses13SubscriptableA2cDPyypSicigTW : $@convention(witness_method: Subscriptable) (Int, @in_guaranteed NSArray) -> @out Any {
 // CHECK:         function_ref @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo7NSArrayCyypSicigTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         objc_method {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
 
@@ -78,11 +78,11 @@ class Electron : Orbital {
   @objc dynamic var quantumNumber: Int = 0
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$s14objc_witnesses8ElectronC13quantumNumberSivgTD
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivgTD
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivsTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$s14objc_witnesses8ElectronC13quantumNumberSivsTD
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivsTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8ElectronC13quantumNumberSivsTD
 
 // witness is a dynamic thunk and is public:
 
@@ -94,8 +94,8 @@ public class Positron : Lepton {
   @objc public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$s14objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @$s14objc_witnesses8PositronC4spinSfvgTD
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s14objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] [ossa] @$s14objc_witnesses8PositronC4spinSfvgTD
 
 // Override of property defined in @objc extension
 
@@ -109,7 +109,7 @@ extension NSObject : Atom {
   @objc var valence: Int { get { return 1 } set { } }
 }
 
-// CHECK-LABEL: sil shared @$sSo8NSObjectC14objc_witnessesE7valenceSivM : $@yield_once @convention(method) (@guaranteed NSObject) -> @yields @inout Int {
+// CHECK-LABEL: sil shared [ossa] @$sSo8NSObjectC14objc_witnessesE7valenceSivM : $@yield_once @convention(method) (@guaranteed NSObject) -> @yields @inout Int {
 // CHECK: objc_method %0 : $NSObject, #NSObject.valence!getter.1.foreign
 // CHECK: yield
 // CHECK: objc_method %0 : $NSObject, #NSObject.valence!setter.1.foreign

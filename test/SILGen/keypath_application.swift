@@ -6,7 +6,7 @@ class B {}
 protocol P {}
 protocol Q {}
 
-// CHECK-LABEL: sil hidden @{{.*}}loadable
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}loadable
 func loadable(readonly: A, writable: inout A,
               value: B,
               kp: KeyPath<A, B>,
@@ -106,7 +106,7 @@ func loadable(readonly: A, writable: inout A,
   writable[keyPath: rkp] = value
 } // CHECK-LABEL: } // end sil function '{{.*}}loadable
 
-// CHECK-LABEL: sil hidden @{{.*}}addressOnly
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}addressOnly
 func addressOnly(readonly: P, writable: inout P,
                  value: Q,
                  kp: KeyPath<P, Q>,
@@ -135,7 +135,7 @@ func addressOnly(readonly: P, writable: inout P,
   writable[keyPath: rkp] = value
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}reabstracted
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}reabstracted
 func reabstracted(readonly: @escaping () -> (),
                   writable: inout () -> (),
                   value: @escaping (A) -> B,
@@ -165,7 +165,7 @@ func reabstracted(readonly: @escaping () -> (),
   writable[keyPath: rkp] = value
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}partial
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}partial
 func partial<A>(valueA: A,
                 valueB: Int,
                 pkpA: PartialKeyPath<A>,
@@ -192,7 +192,7 @@ extension Int {
   var tt: Int { get { return 0 } set { } }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}writebackNesting
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}writebackNesting
 func writebackNesting(x: inout Int,
                       y: WritableKeyPath<Int, Int>,
                       z: WritableKeyPath<Int, Int>,

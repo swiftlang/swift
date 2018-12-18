@@ -32,7 +32,7 @@ class ConcreteClass : NotClassBound, ClassBound, ClassBound2 {
 
 class ConcreteSubclass : ConcreteClass { }
 
-// CHECK-LABEL: sil hidden @$ss19class_bound_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$ss19class_bound_generic{{[_0-9a-zA-Z]*}}F
 func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
@@ -47,7 +47,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$ss21class_bound_generic_2{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$ss21class_bound_generic_2{{[_0-9a-zA-Z]*}}F
 func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
@@ -61,7 +61,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$ss20class_bound_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$ss20class_bound_protocol{{[_0-9a-zA-Z]*}}F
 func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $ClassBound):
@@ -75,7 +75,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$ss32class_bound_protocol_composition{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$ss32class_bound_protocol_composition{{[_0-9a-zA-Z]*}}F
 func class_bound_protocol_composition(x: ClassBound & NotClassBound)
 -> ClassBound & NotClassBound {
   var x = x
@@ -90,14 +90,14 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$ss19class_bound_erasure{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$ss19class_bound_erasure{{[_0-9a-zA-Z]*}}F
 func class_bound_erasure(x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[PROTO:%.*]] = init_existential_ref {{%.*}} : $ConcreteClass, $ClassBound
   // CHECK: return [[PROTO]]
 }
 
-// CHECK-LABEL: sil hidden @$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF :
+// CHECK-LABEL: sil hidden [ossa] @$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF :
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
@@ -109,7 +109,7 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 }
 // CHECK: } // end sil function '$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
 
-// CHECK-LABEL: sil hidden @$ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
+// CHECK-LABEL: sil hidden [ossa] @$ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
 // CHECK: bb0([[ARG0:%.*]] : $*NotClassBound, [[ARG1:%.*]] : @guaranteed $ClassBound & NotClassBound):
 // CHECK:   [[X_OPENED:%.*]] = open_existential_ref [[ARG1]] : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[ARG0]] : $*NotClassBound, [[OPENED_TYPE]]
@@ -120,7 +120,7 @@ func class_bound_to_unbound_existential_upcast
   return x
 }
 
-// CHECK-LABEL: sil hidden @$ss18class_bound_method1xys10ClassBound_p_tF :
+// CHECK-LABEL: sil hidden [ossa] @$ss18class_bound_method1xys10ClassBound_p_tF :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassBound):
 func class_bound_method(x: ClassBound) {
   var x = x
@@ -152,7 +152,7 @@ protocol InheritsMutatingMethod : class, HasMutatingMethod {}
 
 func takesInOut<T>(_: inout T) {}
 
-// CHECK-LABEL: sil hidden @$ss27takesInheritsMutatingMethod1x1yys0bcD0_pz_s5ValueVtF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$ss27takesInheritsMutatingMethod1x1yys0bcD0_pz_s5ValueVtF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
 func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
                                  y: Value) {
   // CHECK:      [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*InheritsMutatingMethod

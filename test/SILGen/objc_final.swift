@@ -6,14 +6,14 @@ import Foundation
 
 final class Foo {
   @objc func foo() {}
-  // CHECK-LABEL: sil hidden [thunk] @$s10objc_final3FooC3foo{{[_0-9a-zA-Z]*}}FTo
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s10objc_final3FooC3foo{{[_0-9a-zA-Z]*}}FTo
 
   @objc var prop: Int = 0
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @$s10objc_final3FooC4propSivgTo
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @$s10objc_final3FooC4propSivsTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s10objc_final3FooC4propSivgTo
+  // CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s10objc_final3FooC4propSivsTo
 }
 
-// CHECK-LABEL: sil hidden @$s10objc_final7callFooyyAA0D0CF
+// CHECK-LABEL: sil hidden [ossa] @$s10objc_final7callFooyyAA0D0CF
 func callFoo(_ x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.

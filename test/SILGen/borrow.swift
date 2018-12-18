@@ -13,7 +13,7 @@ final class C {
 
 func useD(_ d: D) {}
 
-// CHECK-LABEL: sil hidden @$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s6borrow44lvalueBorrowShouldBeAtEndOfFormalAccessScope{{.*}} : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%.*]] = alloc_box ${ var C }, var, name "c"
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]

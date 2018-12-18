@@ -5,7 +5,7 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : @owned $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -21,7 +21,7 @@ extension Hive {
   // not a convenience initializer, which means it does not have an initializing
   // entry point at all.
 
-  // CHECK-LABEL: sil hidden @$sSo4HiveC17objc_factory_initE10otherQueenABSo3BeeC_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$sSo4HiveC17objc_factory_initE10otherQueenABSo3BeeC_tcfC
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
@@ -45,7 +45,7 @@ extension Hive {
 }
 
 extension SomeClass {
-  // CHECK-LABEL: sil hidden @$sSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%.*]] : $Double,
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
@@ -56,7 +56,7 @@ extension SomeClass {
 }
 
 class SubHive : Hive {
-  // CHECK-LABEL: sil hidden @$s17objc_factory_init7SubHiveC20delegatesToInheritedACyt_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s17objc_factory_init7SubHiveC20delegatesToInheritedACyt_tcfC
   // CHECK: bb0([[METATYPE:%.*]] : $@thick SubHive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SubHive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var SubHive }

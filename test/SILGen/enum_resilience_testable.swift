@@ -14,7 +14,7 @@
 // Resilient enums are always address-only, and switches must include
 // a default case
 
-// CHECK-LABEL: sil hidden @$s24enum_resilience_testable15resilientSwitchyy0d1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s24enum_resilience_testable15resilientSwitchyy0d1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
 // CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt.1: bb3, case #Medium.Postcard!enumelt.1: bb4, default bb5

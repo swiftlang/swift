@@ -4,7 +4,7 @@ import ImportAsMember
 
 func makeMetatype() -> Struct1.Type { return Struct1.self }
 
-// CHECK-LABEL: sil @$s10cf_members17importAsUnaryInityyF
+// CHECK-LABEL: sil [ossa] @$s10cf_members17importAsUnaryInityyF
 public func importAsUnaryInit() {
   // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
@@ -12,7 +12,7 @@ public func importAsUnaryInit() {
   a = f(())
 }
 
-// CHECK-LABEL: sil @$s10cf_members3foo{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [ossa] @$s10cf_members3foo{{[_0-9a-zA-Z]*}}F
 public func foo(_ x: Double) {
 // CHECK: bb0([[X:%.*]] : $Double):
   // CHECK: [[GLOBALVAR:%.*]] = global_addr @IAMStruct1GlobalVar
@@ -236,42 +236,42 @@ public func foo(_ x: Double) {
 }
 // CHECK: } // end sil function '$s10cf_members3foo{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V5valueABSd_tcfCTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V5valueABSd_tcfCTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V9translate7radiansABSd_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V9translate7radiansABSd_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V5scaleyABSdFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V5scaleyABSdFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V12staticMethods5Int32VyFZTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V12staticMethods5Int32VyFZTO
 // CHECK:       bb0([[SELF:%.*]] : $@thin Struct1.Type):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V13selfComesLast1xySd_tFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V13selfComesLast1xySd_tFTO
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTO
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTO
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : $Struct1):
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 
-// CHECK-LABEL: sil @$s10cf_members3bar{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [ossa] @$s10cf_members3bar{{[_0-9a-zA-Z]*}}F
 public func bar(_ x: Double) {
   // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
   let ps = CCPowerSupply(watts: x)
@@ -292,7 +292,7 @@ public func bar(_ x: Double) {
   c()
 }
 
-// CHECK-LABEL: sil @$s10cf_members28importGlobalVarsAsProperties{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil [ossa] @$s10cf_members28importGlobalVarsAsProperties{{[_0-9a-zA-Z]*}}F
 public func importGlobalVarsAsProperties()
     -> (Double, CCPowerSupply, CCPowerSupply?) {
   // CHECK: global_addr @kCCPowerSupplyDC

@@ -23,7 +23,7 @@ struct ObjectValue {
   var a : Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK-LABEL: sil [ossa] @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
@@ -40,7 +40,7 @@ struct ObjectValue {
 // CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [trivial] [[ELT11]]
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function 'test_store_trivial'
-sil @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+sil [ossa] @test_store_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
@@ -53,7 +53,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[BOX:%.*]] = alloc_box
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
@@ -70,7 +70,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 // CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [init] [[ELT11]]
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function 'test_store_owned'
-sil @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+sil [ossa] @test_store_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
@@ -83,7 +83,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK-LABEL: sil [ossa] @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box
 // CHECK:   [[PB_BOX:%.*]] = project_box [[BOX]]
@@ -100,7 +100,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 // CHECK:   store [[DESTRUCTURE_TUP_RHS_RHS]] to [trivial] [[ELT11]]
 // CHECK:   destroy_value [[BOX]]
 // CHECK: } // end sil function 'test_assign_trivial'
-sil @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+sil [ossa] @test_assign_trivial : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
@@ -113,7 +113,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+// CHECK-LABEL: sil [ossa] @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $TripleInt, [[ARG1:%.*]] : $TripleInt, [[ARG2:%.*]] : $TripleInt):
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
@@ -136,7 +136,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 // CHECK:   store [[TUP1_2nd_11]] to [trivial] [[PROJ_BOX_11]] : $*TripleInt
 // CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
 // CHECK: } // end sil function 'test_assign_trivial_2'
-sil @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
+sil [ossa] @test_assign_trivial_2 : $@convention(thin) (TripleInt, TripleInt, TripleInt) -> () {
 bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(TripleInt, (TripleInt, TripleInt))>, 0
@@ -151,7 +151,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
@@ -168,7 +168,7 @@ bb0(%0 : $TripleInt, %1 : $TripleInt, %1a : $TripleInt):
 // CHECK:   store [[TUP_D_11]] to [init] [[PROJ_BOX_11]] : $*Builtin.NativeObject
 // CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
 // CHECK: } // end sil function 'test_assign_owned'
-sil @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+sil [ossa] @test_assign_owned : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
@@ -181,7 +181,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : @owned $Builtin.NativeObject, [[ARG2:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:   [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0
@@ -212,7 +212,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : 
 
 // CHECK:   destroy_value [[BOX]] : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
 // CHECK: } // end sil function 'test_assigned_owned_2'
-sil @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+sil [ossa] @test_assigned_owned_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject, %1a : @owned $Builtin.NativeObject):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <(Builtin.NativeObject, (Builtin.NativeObject, Builtin.NativeObject))>, 0

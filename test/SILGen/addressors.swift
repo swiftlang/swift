@@ -104,7 +104,7 @@ var global: Int32 {
   unsafeAddress {
     return UnsafePointer(uninitAddr)
   }
-// CHECK: sil hidden @$s10addressors6globals5Int32Vvlu : $@convention(thin) () -> UnsafePointer<Int32> {
+// CHECK-LABEL: sil hidden @$s10addressors6globals5Int32Vvlu : $@convention(thin) () -> UnsafePointer<Int32> {
 // CHECK:   [[T0:%.*]] = global_addr @$s10addressors10uninitAddrSpys5Int32VGvp : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T1:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
@@ -199,7 +199,7 @@ struct D : Subscriptable {
   }
 }
 // Setter.
-// SILGEN-LABEL: sil hidden [transparent] @$s10addressors1DVys5Int32VAEcis
+// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEcis
 // SILGEN: bb0([[VALUE:%.*]] : $Int32, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   debug_value [[VALUE]] : $Int32
 // SILGEN:   debug_value [[I]] : $Int32
@@ -212,7 +212,7 @@ struct D : Subscriptable {
 // SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
 // SILGEN:   assign [[VALUE]] to [[ACCESS]] : $*Int32
 
-// SILGEN-LABEL: sil hidden [transparent] @$s10addressors1DVys5Int32VAEciM
+// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEciM
 // SILGEN: bb0([[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   [[SELF_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
 // SILGEN:   [[T0:%.*]] = function_ref @$s10addressors1DVys5Int32VAEciau

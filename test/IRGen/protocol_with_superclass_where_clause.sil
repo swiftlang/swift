@@ -27,7 +27,7 @@ class MoreDerived : Concrete, SubProto {}
 
 // CHECK-objc-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, {{.*}} {
 // CHECK-native-LABEL: define hidden swiftcc void @checkExistentialDowncast(%T24protocol_with_superclass8ConcreteC*, %swift.refcounted*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**, %T24protocol_with_superclass8ConcreteC*, i8**) {{.*}} {
-sil hidden @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @owned SuperProto, @owned SuperProto & Concrete, @owned ProtoRefinesClass, @owned SubProto) -> () {
+sil hidden [ossa] @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @owned SuperProto, @owned SuperProto & Concrete, @owned ProtoRefinesClass, @owned SubProto) -> () {
 bb0(%0 : @owned $Concrete, %1 : @owned $SuperProto, %2 : @owned $SuperProto & Concrete, %3 : @owned $ProtoRefinesClass, %4 : @owned $SubProto):
 
   // CHECK:             [[ISA_ADDR:%.*]] = bitcast %T24protocol_with_superclass8ConcreteC* %0 to %swift.type**

@@ -9,24 +9,24 @@ sil_stage canonical
 
 import Builtin
 
-sil @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
+sil [ossa] @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
 bb0(%0 : $Builtin.Int32):
   %1 = unconditional_checked_cast_value %0 : $Builtin.Int32 to $T
   return %1 : $T
 }
 
-sil @opaque_identity : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @opaque_identity : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : @owned $T):
   return %0 : $T
 }
 
-sil @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+sil [ossa] @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
   %1 = copy_value %0 : $T
   return %1 : $T
 }
 
-sil @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : @owned $T):
   %1 = begin_borrow %0 : $T
   %2 = copy_value %1 : $T
@@ -37,7 +37,7 @@ bb0(%0 : @owned $T):
   return %11 : $T
 }
 
-sil @opaque_arg_borrow : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @opaque_arg_borrow : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : @owned $T):
   %1 = begin_borrow %0 : $T
   %9 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
@@ -47,7 +47,7 @@ bb0(%0 : @owned $T):
   return %11 : $T
 }
 
-sil @opaque_arg_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+sil [ossa] @opaque_arg_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : @guaranteed $T):
   %1 = copy_value %0 : $T
   %2 = begin_borrow %1 : $T
@@ -60,14 +60,14 @@ bb0(%0 : @guaranteed $T):
 
 typealias AnyObject = Builtin.AnyObject
 
-sil @takeType : $@convention(thin) (@thick AnyObject.Type) -> () {
+sil [ossa] @takeType : $@convention(thin) (@thick AnyObject.Type) -> () {
 bb0(%0 : $@thick AnyObject.Type):
   %18 = tuple ()
   return %18 : $()
 }
 
 // Test an unconditional cast from an owned value to a trivial value.
-sil @castToTrivial : $@convention(thin) (@owned AnyObject) -> () {
+sil [ossa] @castToTrivial : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %6 = function_ref @takeType : $@convention(thin) (@thick AnyObject.Type) -> ()
   %8 = begin_borrow %0 : $AnyObject
@@ -80,7 +80,7 @@ bb0(%0 : @owned $AnyObject):
   return %18 : $()
 }
 
-sil @passTrivialAsOpaqueValue : $@convention(thin) (Builtin.Int64) -> () {
+sil [ossa] @passTrivialAsOpaqueValue : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
   %1 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
   %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> @out T

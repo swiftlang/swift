@@ -13,7 +13,7 @@ import Builtin
 // CHECK: Value: %2 = argument of bb1 : $Builtin.NativeObject
 //
 // TODO: Better error message here.
-sil @no_end_borrow_error : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @no_end_borrow_error : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 
@@ -27,7 +27,7 @@ bb1(%1 : @guaranteed $Builtin.NativeObject):
 // CHECK-NEXT:     Value: %2 = argument of bb1 : $Builtin.NativeObject
 // CHECK-NEXT:     Post Dominating Failure Blocks:
 // CHECK-NEXT:         bb3
-sil @leak_along_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @leak_along_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 
@@ -51,7 +51,7 @@ bb3:
 // CHECK-NEXT:     Post Dominating Failure Blocks:
 // CHECK-NEXT:         bb5
 
-sil @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [ossa] @leak_along_subarg_path : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 
@@ -75,7 +75,7 @@ bb5:
 }
 
 // CHECK-NOT: Function: 'good_order'
-sil @good_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @good_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb5
@@ -116,7 +116,7 @@ bb5:
 // CHECK-NEXT: User:  end_borrow %4 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 // CHECK-NOT: Block: bb1
-sil @bad_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @bad_order : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb5
@@ -167,7 +167,7 @@ bb5:
 
 // NOTE: We use the expected numbered value in the output to make it easier to
 // match the filecheck patterns with the input.
-sil @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb7
@@ -248,7 +248,7 @@ bb7:
 // CHECK-NEXT: User:   end_borrow %4 : $Builtin.NativeObject
 // CHECK-NEXT: Block: bb2
 // CHECK-NOT: Block
-sil @bad_order_add_a_level_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @bad_order_add_a_level_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
   cond_br undef, bb1, bb7
@@ -296,7 +296,7 @@ bb7:
 // CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
 // CHECK-NOT: Block
 // CHECK-NOT: Function: 'owned_argument_overuse_br1'
-sil @owned_argument_overuse_br1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @owned_argument_overuse_br1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   br bb1(%0 : $Builtin.NativeObject)
@@ -313,7 +313,7 @@ bb1(%1 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: Block: bb0
 // CHECK-NOT: Block
 // CHECK-NOT: Function: 'owned_argument_overuse_br2'
-sil @owned_argument_overuse_br2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @owned_argument_overuse_br2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   br bb1(%0 : $Builtin.NativeObject)
@@ -333,7 +333,7 @@ bb1(%1 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: Error! Found a leaked owned value that was never consumed.
 // CHECK-NEXT: Value: %3 = argument of bb1 : $Builtin.NativeObject
 // CHECK-NOT: Function: 'owned_argument_overuse_condbr1'
-sil @owned_argument_overuse_condbr1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @owned_argument_overuse_condbr1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
@@ -353,7 +353,7 @@ bb2:
 // CHECK-NEXT: Block: bb0
 // CHECK-NOT: Block
 // CHECK-NOT: Function: 'owned_argument_overuse_condbr2'
-sil @owned_argument_overuse_condbr2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @owned_argument_overuse_condbr2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2

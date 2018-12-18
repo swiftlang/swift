@@ -53,15 +53,15 @@ class Nonfinal<T> {
 
 extension Final: Encodable where T: Encodable {}
 // CHECK-LABEL: // Final<A>.encode(to:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class5FinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Final<T>) -> @error Error {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class5FinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Final<T>) -> @error Error {
 
 extension Final: Decodable where T: Decodable {}
 // CHECK-LABEL: // Final<A>.init(from:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class5FinalCAASeRzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable> (@in Decoder, @thick Final<T>.Type) -> (@owned Final<T>, @error Error) {
 
 extension Nonfinal: Encodable where T: Encodable {}
 // CHECK-LABEL: // Nonfinal<A>.encode(to:)
-// CHECK-NEXT: sil hidden @$s29synthesized_conformance_class8NonfinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Nonfinal<T>) -> @error Error {
+// CHECK-NEXT: sil hidden [ossa] @$s29synthesized_conformance_class8NonfinalCAASERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Encodable> (@in_guaranteed Encoder, @guaranteed Nonfinal<T>) -> @error Error {
 
 // Witness tables for Final
 

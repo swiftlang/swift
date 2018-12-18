@@ -75,6 +75,6 @@ entry:
 }
 
 sil @$s15enum_spare_bits1DCACycfcTo : $@convention(thin) (@owned D) -> @owned D {
-entry(%x : @owned $D):
+entry(%x : $D):
   return undef : $D
 }

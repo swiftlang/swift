@@ -4,7 +4,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @$s11switch_objc13matchesEither5input1a1bSbSo4HiveC_A2GtF :
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_objc13matchesEither5input1a1bSbSo4HiveC_A2GtF :
 func matchesEither(input: Hive, a: Hive, b: Hive) -> Bool {
   switch input {
   // CHECK:   function_ref @$s10ObjectiveC2teoiySbSo8NSObjectC_ADtF
