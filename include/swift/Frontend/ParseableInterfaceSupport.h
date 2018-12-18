@@ -61,13 +61,15 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
+                                          StringRef prebuiltCacheDir,
                                           DependencyTracker *tracker,
                                           ModuleLoadingMode loadMode)
     : SerializedModuleLoaderBase(ctx, tracker, loadMode),
-      CacheDir(cacheDir)
+      CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
   {}
 
   std::string CacheDir;
+  std::string PrebuiltCacheDir;
 
   /// Wire up the SubInvocation's InputsAndOutputs to contain both input and
   /// output filenames.
@@ -86,11 +88,11 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
-  create(ASTContext &ctx, StringRef cacheDir,
-         DependencyTracker *tracker,
-         ModuleLoadingMode loadMode) {
+  create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
-        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker, loadMode));
+        new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
+                                           tracker, loadMode));
   }
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as

@@ -19,6 +19,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -472,32 +473,70 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
     return std::make_error_code(std::errc::not_supported);
   }
 
-  // At this point we're either in PreferParseable mode or there's no credible
-  // adjacent .swiftmodule so we'll go ahead and start trying to convert the
-  // .swiftinterface.
+  // If we have a prebuilt cache path, check that too if the interface comes
+  // from the SDK.
+  if (!PrebuiltCacheDir.empty()) {
+    StringRef SDKPath = Ctx.SearchPathOpts.SDKPath;
+    if (!SDKPath.empty() && hasPrefix(llvm::sys::path::begin(InPath),
+                                      llvm::sys::path::end(InPath),
+                                      llvm::sys::path::begin(SDKPath),
+                                      llvm::sys::path::end(SDKPath))) {
+      // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
+      // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
+      // cache key here.
+      OutPath = PrebuiltCacheDir;
 
-  // Set up a _potential_ sub-invocation to consume the .swiftinterface and emit
-  // the .swiftmodule.
-  CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(), CacheDir);
-  computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
-  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
+      // FIXME: Would it be possible to only have architecture-specific names
+      // here? Then we could skip this check.
+      StringRef InParentDirName =
+          llvm::sys::path::filename(llvm::sys::path::parent_path(InPath));
+      if (llvm::sys::path::extension(InParentDirName) == ".swiftmodule") {
+        assert(llvm::sys::path::stem(InParentDirName) == ModuleID.first.str());
+        llvm::sys::path::append(OutPath, InParentDirName);
+      }
+      llvm::sys::path::append(OutPath, ModuleFilename);
 
-  // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags, dependencyTracker)) {
-    if (::buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
-                                             SubInvocation, CacheDir,
-                                             dependencyTracker))
-      return std::make_error_code(std::errc::invalid_argument);
+      if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+                                 dependencyTracker)) {
+        OutPath.clear();
+      }
+    }
+  }
+
+  if (OutPath.empty()) {
+    // At this point we're either in PreferParseable mode or there's no credible
+    // adjacent .swiftmodule so we'll go ahead and start trying to convert the
+    // .swiftinterface.
+
+    // Set up a _potential_ sub-invocation to consume the .swiftinterface and
+    // emit the .swiftmodule.
+    CompilerInvocation SubInvocation =
+        createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(),
+                                                 CacheDir);
+    computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
+    configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
+
+    // Evaluate if we need to run this sub-invocation, and if so run it.
+    if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
+                               dependencyTracker)) {
+      if (::buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
+                                               SubInvocation, CacheDir,
+                                               dependencyTracker))
+        return std::make_error_code(std::errc::invalid_argument);
+    }
   }
 
   // Finish off by delegating back up to the SerializedModuleLoaderBase
   // routine that can load the recently-manufactured serialized module.
   LLVM_DEBUG(llvm::dbgs() << "Loading " << OutPath
              << " via normal module loader\n");
+  // FIXME: This will never find the swiftdoc file, because that's in the
+  // original directory. We should probably just not try to match the signature
+  // of the overridable entry point.
   auto ErrorCode = SerializedModuleLoaderBase::openModuleFiles(
-      ModuleID, CacheDir, llvm::sys::path::filename(OutPath),
-      ModuleDocFilename, ModuleBuffer, ModuleDocBuffer, Scratch);
+      ModuleID, llvm::sys::path::parent_path(OutPath),
+      llvm::sys::path::filename(OutPath), ModuleDocFilename, ModuleBuffer,
+      ModuleDocBuffer, Scratch);
   LLVM_DEBUG(llvm::dbgs() << "Loaded " << OutPath
              << " via normal module loader");
   if (ErrorCode) {
