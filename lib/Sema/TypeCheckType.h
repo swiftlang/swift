@@ -16,10 +16,18 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_TYPE_H
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "llvm/ADT/None.h"
 
 namespace swift {
+
+class ASTContext;
+class TypeRepr;
+class ComponentIdentTypeRepr;
+class GenericEnvironment;
+class GenericSignature;
+class GenericSignatureBuilder;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -318,7 +326,7 @@ public:
                                       GenericEnvironment *genericEnv);
 
   /// Retrieve the ASTContext in which this resolution occurs.
-  ASTContext &getASTContext() const { return dc->getASTContext(); }
+  ASTContext &getASTContext() const;
 
   /// Retrieve the declaration context in which type resolution will be
   /// performed.
