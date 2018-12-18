@@ -30,6 +30,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // api-ms-win-core-interlocked-l1-1-0.dll
+    module interlocked {
+      header "interlockedapi.h"
+      export *
+    }
+
     // api-ms-win-core-libloader-l1-1-0.dll
     module libloader {
       header "libloaderapi.h"
