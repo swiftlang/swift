@@ -7659,6 +7659,9 @@ public:
     Extractee(AutoDiffAssociatedFunctionKind kind);
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
+
+    Optional<AutoDiffAssociatedFunctionKind>
+    getExtracteeAsAssociatedFunction() const;
   };
 
 private:
@@ -7684,12 +7687,9 @@ public:
   }
 
   AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
-    assert(extractee != Extractee::Original);
-    switch (extractee) {
-    case Extractee::JVP: return AutoDiffAssociatedFunctionKind::JVP;
-    case Extractee::VJP: return AutoDiffAssociatedFunctionKind::VJP;
-    case Extractee::Original: llvm_unreachable("Cannot be Original");
-    }
+    auto kind = extractee.getExtracteeAsAssociatedFunction();
+    assert(kind);
+    return *kind;
   }
 
   SILValue getFunctionOperand() const {

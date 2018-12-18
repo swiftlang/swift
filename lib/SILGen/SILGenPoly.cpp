@@ -3762,17 +3762,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           /*isMethod*/ true);
       auto autoDiffFn = SGF.B.createAutoDiffFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
-      AutoDiffFunctionExtractInst::Extractee extractee;
-      switch (autoDiffFuncId->getKind()) {
-      case AutoDiffAssociatedFunctionKind::JVP:
-        extractee = AutoDiffFunctionExtractInst::Extractee::JVP;
-        break;
-      case AutoDiffAssociatedFunctionKind::VJP:
-        extractee = AutoDiffFunctionExtractInst::Extractee::VJP;
-        break;
-      }
       return SGF.B.createAutoDiffFunctionExtract(
-          loc, extractee, /*differentiationOrder*/ 1, autoDiffFn);
+          loc,
+          AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+          /*differentiationOrder*/ 1, autoDiffFn);
     }
 
     return SGF.emitGlobalFunctionRef(loc, witness);

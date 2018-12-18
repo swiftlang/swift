@@ -688,6 +688,19 @@ AutoDiffFunctionExtractInst::Extractee::Extractee(StringRef string) {
   rawValue = *result;
 }
 
+Optional<AutoDiffAssociatedFunctionKind>
+AutoDiffFunctionExtractInst::Extractee::getExtracteeAsAssociatedFunction()
+    const {
+  switch (rawValue) {
+  case Original:
+    return None;
+  case JVP:
+    return {AutoDiffAssociatedFunctionKind::JVP};
+  case VJP:
+    return {AutoDiffAssociatedFunctionKind::VJP};
+  }
+}
+
 SILType AutoDiffFunctionExtractInst::
 getExtracteeType(SILValue function, Extractee extractee,
                  unsigned differentiationOrder, SILModule &module) {
@@ -695,25 +708,17 @@ getExtracteeType(SILValue function, Extractee extractee,
   assert(fnTy->getExtInfo().isDifferentiable());
   auto originalFnTy =
       fnTy->getWithExtInfo(fnTy->getExtInfo().withDifferentiable(false));
-  CanSILFunctionType resultFnTy;
-  switch (extractee) {
-  case Extractee::Original:
+
+  auto kindOpt = extractee.getExtracteeAsAssociatedFunction();
+  if (!kindOpt) {
+    assert(extractee == Extractee::Original);
     assert(differentiationOrder == 0);
-    resultFnTy = originalFnTy;
-    break;
-  case Extractee::JVP:
-    resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
-        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-        differentiationOrder, AutoDiffAssociatedFunctionKind::JVP, module,
-        LookUpConformanceInModule(module.getSwiftModule()));
-    break;
-  case Extractee::VJP:
-    resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
-        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-        differentiationOrder, AutoDiffAssociatedFunctionKind::VJP, module,
-        LookUpConformanceInModule(module.getSwiftModule()));
-    break;
+    return SILType::getPrimitiveObjectType(originalFnTy);
   }
+  auto resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        differentiationOrder, *kindOpt, module,
+        LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }
 
