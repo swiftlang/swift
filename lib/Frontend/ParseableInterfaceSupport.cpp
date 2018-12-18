@@ -168,7 +168,7 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
 static void computeCachedOutputPath(ASTContext &Ctx,
                                     const CompilerInvocation &SubInvocation,
                                     StringRef InPath,
-                                    llvm::SmallString<128> &OutPath) {
+                                    llvm::SmallString<256> &OutPath) {
   OutPath = SubInvocation.getClangModuleCachePath();
   llvm::sys::path::append(OutPath, SubInvocation.getModuleName());
   OutPath.append("-");
@@ -437,12 +437,11 @@ static bool serializedASTLooksValidOrCannotBeRead(clang::vfs::FileSystem &FS,
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
-std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
-    AccessPathElem ModuleID, StringRef DirName, StringRef ModuleFilename,
+std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
+    AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
     StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
-    llvm::SmallVectorImpl<char> &Scratch) {
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
 
   namespace path = llvm::sys::path;
 
@@ -452,10 +451,10 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
-  llvm::SmallString<128> ModPath, InPath, OutPath;
+  llvm::SmallString<256> ModPath, InPath, OutPath;
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
-  ModPath = DirName;
+  ModPath = DirPath;
   path::append(ModPath, ModuleFilename);
 
   auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
@@ -531,12 +530,10 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // routine that can load the recently-manufactured serialized module.
   LLVM_DEBUG(llvm::dbgs() << "Loading " << OutPath
              << " via normal module loader\n");
-  // FIXME: This will never find the swiftdoc file, because that's in the
-  // original directory. We should probably just not try to match the signature
-  // of the overridable entry point.
+  llvm::SmallString<256> DocPath{DirPath};
+  path::append(DocPath, ModuleDocFilename);
   auto ErrorCode = SerializedModuleLoaderBase::openModuleFiles(
-      ModuleID, path::parent_path(OutPath), path::filename(OutPath),
-      ModuleDocFilename, ModuleBuffer, ModuleDocBuffer, Scratch);
+      ModuleID, OutPath, DocPath, ModuleBuffer, ModuleDocBuffer);
   LLVM_DEBUG(llvm::dbgs() << "Loaded " << OutPath
              << " via normal module loader");
   if (ErrorCode) {
