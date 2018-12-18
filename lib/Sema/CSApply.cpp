@@ -575,7 +575,7 @@ namespace {
                     TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
                                                  ctx);
                   refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
-                                                    loc, /*Implicit=*/true);
+                                                    loc, /*Implicit=*/false);
                 } else {
                   auto declRefExpr =  new (ctx) DeclRefExpr(witness, loc,
                                                             /*Implicit=*/false);
