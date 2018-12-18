@@ -108,6 +108,11 @@ popd
 cmake --build "S:/build/Ninja-DebugAssert/llvm-windows-amd64"
 ```
 
+- If you intend to build any libraries, update your path to include the LLVM tools.
+```cmd
+set PATH=%PATH%;S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin
+```
+
 ### 7. Build Swift
 - This must be done from within a developer command prompt and could take hours 
   depending on your system.
@@ -172,7 +177,7 @@ cmake -G "Ninja" "S:/lldb"^
   -DLLDB_PATH_TO_SWIFT_BUILD="S:/build/Ninja-DebugAssert/swift-windows-amd64"^
   -DLLVM_ENABLE_ASSERTIONS=YES
 popd
-cmake --build "S:/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+cmake --build "S:/build/Ninja-DebugAssert/lldb-windows-amd64"
 ```
 
 ### 9. Running tests on Windows
@@ -188,7 +193,25 @@ Running the testsuite on Windows has additional external dependencies.  You must
 ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
 ```
 
-### 10. Build swift-corelibs-foundation
+### 10. Build swift-corelibs-libdispatch
+
+```cmd
+mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
+pushd "S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"
+cmake -G "Ninja"^
+  -DCMAKE_BUILD_TYPE=Debug^
+  -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_CXX_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
+  -DSwift_DIR="S:/build/Ninja-DebugAssert/swift-windows-amd64/lib/cmake/swift"^
+  -DENABLE_SWIFT=YES^
+  -DENABLE_TESTING=NO^
+  S:/swift-corelibs-libdispatch
+popd
+cmake --build
+```
+
+### 11. Build swift-corelibs-foundation
 
 ```cmd
 mkdir "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
@@ -196,16 +219,20 @@ pushd "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
 cmake -G "Ninja"^
   -DCMAKE_BUILD_TYPE=Debug^
   -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/bin/clang-cl.exe"^
+  -DCMAKE_SWIFT_COMPILER="S:/build/Ninja-DebugAssert/swift-windows-amd64/bin/swiftc.exe"^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-VS15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-VS15-x64-release-static-ipv6-sspi-winssl/include"^
   -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE="S:/swift-corelibs-libdispatch"^
+  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD="S:/build/Ninja-DebugAssert/swift-corelibs-libdispatch-windows-amd64"^
    "S:/swift-corelibs-foundation"
+ cmake --build "S:/build/Ninja-DebugAssert/swift-corelibs-foundation-windows-amd64"
+
 ```
 
-### 11. Install Swift on Windows
+### 12. Install Swift on Windows
 
 - Run ninja install:
 ```cmd 
