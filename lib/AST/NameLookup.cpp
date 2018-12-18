@@ -249,6 +249,24 @@ static void recordShadowedDeclsAfterSignatureMatch(
         break;
       }
 
+      // Prefer declarations in the any module over those in the standard
+      // library module.
+      if (auto swiftModule = ctx.getStdlibModule()) {
+        if ((firstModule == swiftModule) != (secondModule == swiftModule)) {
+          // If the second module is the standard library module, the second
+          // declaration is shadowed by the first.
+          if (secondModule == swiftModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // Otherwise, the first declaration is shadowed by the second. There is
+          // no point in continuing to compare the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+
       // Prefer declarations in an overlay to similar declarations in
       // the Clang module it customizes.
       if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
@@ -331,26 +349,33 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       }
     }
 
-    // We need an interface type here.
-    if (typeResolver)
-      typeResolver->resolveDeclSignature(decl);
+    CanType signature;
 
-    // If the decl is currently being validated, this is likely a recursive
-    // reference and we'll want to skip ahead so as to avoid having its type
-    // attempt to desugar itself.
-    if (!decl->hasValidSignature())
+    if (!isa<TypeDecl>(decl)) {
+      // We need an interface type here.
+      if (typeResolver)
+        typeResolver->resolveDeclSignature(decl);
+
+      // If the decl is currently being validated, this is likely a recursive
+      // reference and we'll want to skip ahead so as to avoid having its type
+      // attempt to desugar itself.
+      if (!decl->hasValidSignature())
+        continue;
+
+      // FIXME: the canonical type makes a poor signature, because we don't
+      // canonicalize away default arguments.
+      signature = decl->getInterfaceType()->getCanonicalType();
+
+      // FIXME: The type of a variable or subscript doesn't include
+      // enough context to distinguish entities from different
+      // constrained extensions, so use the overload signature's
+      // type. This is layering a partial fix upon a total hack.
+      if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+        signature = asd->getOverloadSignatureType();
+    } else if (decl->getDeclContext()->isTypeContext()) {
+      // Do not apply shadowing rules for member types.
       continue;
-
-    // FIXME: the canonical type makes a poor signature, because we don't
-    // canonicalize away default arguments.
-    auto signature = decl->getInterfaceType()->getCanonicalType();
-
-    // FIXME: The type of a variable or subscript doesn't include
-    // enough context to distinguish entities from different
-    // constrained extensions, so use the overload signature's
-    // type. This is layering a partial fix upon a total hack.
-    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-      signature = asd->getOverloadSignatureType();
+    }
 
     // Record this declaration based on its signature.
     auto &known = collisions[signature];
@@ -1168,6 +1193,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                                : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, TypeResolver, DC, extraImports);
+
+  // Always perform name shadowing for type lookup.
+  if (options.contains(Flags::TypeLookup)) {
+    removeShadowedDecls(CurModuleResults, &M);
+  }
 
   for (auto VD : CurModuleResults)
     Results.push_back(LookupResultEntry(VD));
