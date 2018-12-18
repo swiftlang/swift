@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -redundant-load-elim -dead-store-elim | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim -dead-store-elim | %FileCheck %s
 
 // NOTE, the order redundant-load and dead-store are ran is important. we have a pass dependence for some
 // of the tests to work.

@@ -3,7 +3,7 @@
 // RUN: llvm-bcanalyzer %t/def_basic_objc.swiftmodule | %FileCheck %s
 
 // RUN: %target-build-swift -Xfrontend %clang-importer-sdk -emit-sil -I %t %s -o %t/basic_sil_objc.sil
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %t/basic_sil_objc.sil -performance-linker -I %t | %FileCheck %S/Inputs/def_basic_objc.sil
+// RUN: %target-sil-opt %t/basic_sil_objc.sil -performance-linker -I %t | %FileCheck %S/Inputs/def_basic_objc.sil
 
 // This test currently is written such that no optimizations are assumed.
 // REQUIRES: swift_test_mode_optimize_none

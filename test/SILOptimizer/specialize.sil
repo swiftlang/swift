@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer -save-optimization-record-path=%t.yaml %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-partial-specialization -generic-specializer -save-optimization-record-path=%t.yaml %s | %FileCheck %s
 // RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
 
 sil_stage canonical

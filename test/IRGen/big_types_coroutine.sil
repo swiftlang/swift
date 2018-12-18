@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -loadable-address -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -loadable-address -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: OS=macosx

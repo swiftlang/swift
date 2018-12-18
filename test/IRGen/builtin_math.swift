@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
+// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
 #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
 import Darwin

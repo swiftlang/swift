@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // These tests exercise the same SILCombine optimization as
 // existential_type_propagation.sil, but cover additional corner

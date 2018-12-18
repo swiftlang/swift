@@ -208,11 +208,6 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
 static llvm::cl::opt<bool>
 PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-static llvm::cl::opt<bool>
-AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
     "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
     llvm::cl::init(false),
@@ -348,8 +343,6 @@ int main(int argc, char **argv) {
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-    AssumeUnqualifiedOwnershipWhenParsing;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name WitnessTableWithGP | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name WitnessTableWithGP | %FileCheck %s
 
 // REQUIRES: disabled
 // FIXME: <rdar://problem/20592011>

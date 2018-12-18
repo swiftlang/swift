@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
-// RUN: %target-build-swift -Xfrontend -assume-parsing-unqualified-ownership-sil -Xllvm -verify-skip-convert-escape-to-noescape-attributes -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-build-swift -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_partial_apply_ownership.swiftmodule %s
+// RUN: %target-build-swift -Xllvm -verify-skip-convert-escape-to-noescape-attributes -emit-sil -I %t %s | %FileCheck %s
 
 import Builtin
 
