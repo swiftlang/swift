@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-parse-stdlib-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import Swift
@@ -6,20 +6,39 @@ import StdlibUnittest
 
 var BuiltinDifferentialOperatorTests = TestSuite("BuiltinDifferentialOperators")
 
-@inlinable
-func valueWithPullback<T, R>(
-  at x: T, in f: @autodiff (T) -> R
-) -> (R, (R.CotangentVector) -> T.CotangentVector)
-  where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffApplyVJP(f, x)
-}
-
 BuiltinDifferentialOperatorTests.test("Trivial") {
   let t = 1.0
-  let (y, pullback) = valueWithPullback(at: 4.0) { x in
-    x * x * t
+  do {
+    let (value: y, pullback: pb) = valueWithPullback(at: 4.0) { x in
+      x * x * t
+    }
+    expectEqual(16, y)
+    expectEqual(8, pb(1))
+    expectEqual(0, pb(0))
   }
-  expectEqual(8, pullback(1))
+
+  do {
+    let pb = pullback(at: 4.0) { x in
+      x * x * t
+    }
+    expectEqual(8, pb(1))
+    expectEqual(0, pb(0))
+  }
+
+  do {
+    let (value: y, gradient: grad) = valueWithGradient(at: 4.0) { x in
+      x * x * t
+    }
+    expectEqual(16, y)
+    expectEqual(8, grad)
+  }
+
+  do {
+    let grad = gradient(at: 4.0) { x in
+      x * x * t
+    }
+    expectEqual(8, grad)
+  }
 }
 
 runAllTests()

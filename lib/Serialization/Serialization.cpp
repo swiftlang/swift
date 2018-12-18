@@ -890,6 +890,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
   BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
   BLOCK_RECORD(sil_block, SIL_INST_GRADIENT);
+  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)

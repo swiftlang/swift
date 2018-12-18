@@ -94,25 +94,33 @@ public extension Differentiable where TangentVector == CotangentVector {
 // Differential Operators
 //===----------------------------------------------------------------------===//
 
-// FIXME(rxwei): Fix SR-9458.
-#if false
-
+/* TODO: This will be available when we support forward-mode differentiation.
 @inlinable
 public func valueWithDifferential<T, R>(
-  at x: T, in f: @escaping @autodiff (T) -> R
+  at x: T, in f: @autodiff (T) -> R
 ) -> (value: R, differential: (T.TangentVector) -> R.TangentVector)
   where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffGetJVP(f)(x)
+  return Builtin.autodiffApplyJVP(f, x)
 }
+ */
 
 @inlinable
 public func valueWithPullback<T, R>(
-  at x: T, in f: @escaping @autodiff (T) -> R
+  at x: T, in f: @autodiff (T) -> R
 ) -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
   where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffGetVJP(f)(x)
+  return Builtin.autodiffApplyVJP(f, x)
 }
 
+@inlinable
+public func pullback<T, R>(
+  at x: T, in f: @autodiff (T) -> R
+) -> (R.CotangentVector) -> T.CotangentVector
+  where T : Differentiable, R : Differentiable {
+  return Builtin.autodiffApplyVJP(f, x).1
+}
+
+/* TODO: These will be available when we support forward-mode differentiation.
 @inlinable
 public func derivative<T, R>(
   at x: T, in f: @escaping @autodiff (T) -> R
@@ -131,17 +139,29 @@ public func derivative<T, R>(
         T.TangentVector == T {
   return { x in derivative(at: x, in: f) }
 }
+ */
 
 @inlinable
-public func gradient<T, R>(
-  at x: T, in f: @escaping @autodiff (T) -> R
-) -> T.CotangentVector
+public func valueWithGradient<T, R>(
+  at x: T, in f: @autodiff (T) -> R
+) -> (value: R, gradient: T.CotangentVector)
   where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
         R.CotangentVector == R {
   let (y, pullback) = valueWithPullback(at: x, in: f)
+  return (y, pullback(1))
+}
+
+@inlinable
+public func gradient<T, R>(
+  at x: T, in f: @autodiff (T) -> R
+) -> T.CotangentVector
+  where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  let (_, pullback) = Builtin.autodiffApplyVJP(f, x)
   return pullback(1)
 }
 
+/* FIXME(rxwei): Make @autodiff functions ref-countable.
 @inlinable
 public func gradient<T, R>(
   of f: @escaping @autodiff (T) -> R
@@ -150,8 +170,7 @@ public func gradient<T, R>(
         R.CotangentVector == R {
   return { x in gradient(at: x, in: f) }
 }
-
-#endif
+ */
 
 //===----------------------------------------------------------------------===//
 // Builtins
