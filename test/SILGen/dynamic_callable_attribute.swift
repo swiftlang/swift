@@ -17,7 +17,7 @@ public func foo(a: Callable) {
   a(1, 2, 3, label: 4)
 }
 
-// CHECK-LABEL: sil @foo
+// CHECK-LABEL: sil [ossa] @foo
 // CHECK: bb0(%0 : $Callable):
 // CHECK: [[DYN_CALL_1:%.*]] = function_ref @$s26dynamic_callable_attribute8CallableV15dynamicallyCall13withArgumentsySaySiG_tF
 // CHECK-NEXT: apply [[DYN_CALL_1]]

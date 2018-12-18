@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library  %s | %FileCheck %s
 import Swift
 
-// CHECK-LABEL: sil @{{.*}}apply{{.*}} : $@convention(thin) (@noescape @callee_guaranteed () -> Int)
+// CHECK-LABEL: sil [ossa] @{{.*}}apply{{.*}} : $@convention(thin) (@noescape @callee_guaranteed () -> Int)
 // bb0(%0 : $@noescape @callee_guaranteed () -> Int):
 //   [[B1:%.*]] = begin_borrow %0 : $@noescape @callee_guaranteed () -> Int
 //   [[C1:%.*]] = copy_value %2 : $@noescape @callee_guaranteed () -> Int
@@ -20,7 +20,7 @@ public func apply(_ f : () -> Int) -> Int {
   return f()
 }
 
-// CHECK-LABEL: sil @{{.*}}test{{.*}} : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [ossa] @{{.*}}test{{.*}} : $@convention(thin) () -> ()
 // CHECK:   [[C1:%.*]] = function_ref @{{.*}}test{{.*}} : $@convention(thin) () -> Int
 // CHECK:   [[C2:%.*]] = convert_function [[C1]] : $@convention(thin) () -> Int to $@convention(thin) @noescape () -> Int
 // CHECK:   [[C3:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> Int to $@noescape @callee_guaranteed () -> Int

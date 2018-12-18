@@ -4,7 +4,7 @@ func subclassFloatLiteral() -> Bar {
   let x: Bar = 1.0
   return x
 }
-// CHECK-LABEL: sil hidden @$s13required_init20subclassFloatLiteralAA3BarCyF
+// CHECK-LABEL: sil hidden [ossa] @$s13required_init20subclassFloatLiteralAA3BarCyF
 // CHECK:         class_method {{%.*}} : $@thick Foo.Type, #Foo.init!allocator.1
 
 class Foo: ExpressibleByFloatLiteral {

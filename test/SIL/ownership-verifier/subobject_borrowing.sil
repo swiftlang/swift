@@ -37,7 +37,7 @@ sil @guaranteed_use_of_nativeobject : $@convention(thin) (@guaranteed Builtin.Na
 //
 
 // NEGATIVE-TEST-NOT: Function: 'value_subobject_without_corresponding_end_borrow'
-sil @value_subobject_without_corresponding_end_borrow : $@convention(thin) (@owned B) -> () {
+sil [ossa] @value_subobject_without_corresponding_end_borrow : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
@@ -59,7 +59,7 @@ bb0(%0 : @owned $B):
 // CHECK: Consuming User:   end_borrow %1 : $B
 // CHECK: Non Consuming User:   %4 = struct_extract %2 : $A, #A.ptr
 // CHECK: Block: bb0
-sil @value_subobject_with_use_after_end_borrow : $@convention(thin) (@owned B) -> () {
+sil [ossa] @value_subobject_with_use_after_end_borrow : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
@@ -84,7 +84,7 @@ bb0(%0 : @owned $B):
 // the borrow root, not from each of the subobjects of the borrow.
 // NEGATIVE-TEST: Function: 'value_subobject_with_destroy_of_subobject'
 // NEGATIVE-TEST-NOT: Function: 'value_subobject_with_destroy_of_subobject'
-sil @value_subobject_with_destroy_of_subobject : $@convention(thin) (@owned B) -> () {
+sil [ossa] @value_subobject_with_destroy_of_subobject : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
@@ -104,7 +104,7 @@ bb0(%0 : @owned $B):
 // CHECK: Consuming User:   end_borrow %1 : $B
 // CHECK: Non Consuming User:   %6 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
 // CHECK: Block: bb0
-sil @value_different_subobject_kinds_multiple_levels : $@convention(thin) (@owned B) -> () {
+sil [ossa] @value_different_subobject_kinds_multiple_levels : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
   %1 = begin_borrow %0 : $B
   %2 = struct_extract %1 : $B, #B.a1
@@ -122,7 +122,7 @@ bb0(%0 : @owned $B):
 //
 
 // NEGATIVE-TEST-NOT: Function: 'funcarg_subobject_basic_test'
-sil @funcarg_subobject_basic_test : $@convention(thin) (@guaranteed B) -> () {
+sil [ossa] @funcarg_subobject_basic_test : $@convention(thin) (@guaranteed B) -> () {
 bb0(%0 : @guaranteed $B):
   %2 = struct_extract %0 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr
@@ -141,7 +141,7 @@ bb0(%0 : @guaranteed $B):
 // CHECK: Value:   %4 = tuple_extract %3 : $(Builtin.NativeObject, Builtin.NativeObject), 1
 // CHECK: User:   destroy_value %4 : $Builtin.NativeObject
 // CHECK: Conv: guaranteed
-sil @funcarg_subobject_with_destroy_of_subobject : $@convention(thin) (@guaranteed B) -> () {
+sil [ossa] @funcarg_subobject_with_destroy_of_subobject : $@convention(thin) (@guaranteed B) -> () {
 bb0(%0 : @guaranteed $B):
   %2 = struct_extract %0 : $B, #B.a1
   %3 = struct_extract %2 : $A, #A.ptr2

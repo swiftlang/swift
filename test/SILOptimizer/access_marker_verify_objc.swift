@@ -34,7 +34,7 @@ class testCFString {
 class HasBlockImpl: HasBlock {
   @objc func block(_: (Int) -> Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo : $@convention(objc_method) (@convention(block) @noescape (Int) -> Int, HasBlockImpl) -> () {
 // CHECK: bb0(%0 : @unowned $@convention(block) @noescape (Int) -> Int, %1 : @unowned $HasBlockImpl):
 // CHECK:   [[CP:%.*]] = copy_block %0 : $@convention(block) @noescape (Int) -> Int
             // function_ref thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
@@ -47,7 +47,7 @@ class HasBlockImpl: HasBlock {
 // CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo'
 
 // thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
 // CHECK:   %{{.*}} = apply %1(%0) : $@convention(block) @noescape (Int) -> Int
 // CHECK:  return %{{.*}} : $Int                               
@@ -55,7 +55,7 @@ class HasBlockImpl: HasBlock {
 
 // --- C global.
 // The verifier should ignore this access.
-// CHECK-LABEL: sil hidden @$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ : $@convention(method) (@thick GlobalProperty.Type) -> @owned CFString {
+// CHECK-LABEL: sil hidden [ossa] @$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ : $@convention(method) (@thick GlobalProperty.Type) -> @owned CFString {
 // CHECK: bb0(%0 : $@thick GlobalProperty.Type):
 // CHECK:   [[GA:%.*]] = global_addr @constCGlobal : $*Optional<CFString>
 // CHECK:   [[STR:%.*]] = load [copy] [[GA]] : $*Optional<CFString>            

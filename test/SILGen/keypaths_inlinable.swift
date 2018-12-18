@@ -11,7 +11,7 @@ public struct KeypathStruct {
   public subscript(x: Int, y: String) -> Bool { get { return false } set { } }
 }
 
-// CHECK-LABEL: sil [serialized] @$s18keypaths_inlinable11usesKeypathyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] [ossa] @$s18keypaths_inlinable11usesKeypathyyF : $@convention(thin) () -> ()
 @inlinable public func usesKeypath() {
   // FRAGILE: keypath $WritableKeyPath<KeypathStruct, Int>, (root $KeypathStruct; stored_property #KeypathStruct.stored : $Int)
   // RESILIENT: keypath $WritableKeyPath<KeypathStruct, Int>, (root $KeypathStruct; settable_property $Int,  id @$s18keypaths_inlinable13KeypathStructV6storedSivg : $@convention(method) (@in_guaranteed KeypathStruct) -> Int, getter @$s18keypaths_inlinable13KeypathStructV6storedSivpACTKq : $@convention(thin) (@in_guaranteed KeypathStruct) -> @out Int, setter @$s18keypaths_inlinable13KeypathStructV6storedSivpACTkq : $@convention(thin) (@in_guaranteed Int, @inout KeypathStruct) -> (), external #KeypathStruct.stored)
@@ -26,21 +26,21 @@ public struct KeypathStruct {
   _ = \KeypathStruct[0, ""]
 }
 
-// RESILIENT-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructV6storedSivpACTKq : $@convention(thin) (@in_guaranteed KeypathStruct) -> @out Int
+// RESILIENT-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructV6storedSivpACTKq : $@convention(thin) (@in_guaranteed KeypathStruct) -> @out Int
 // RESILIENT: function_ref @$s18keypaths_inlinable13KeypathStructV6storedSivg
 
-// RESILIENT-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructV6storedSivpACTkq : $@convention(thin) (@in_guaranteed Int, @inout KeypathStruct) -> ()
+// RESILIENT-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructV6storedSivpACTkq : $@convention(thin) (@in_guaranteed Int, @inout KeypathStruct) -> ()
 // RESILIENT: function_ref @$s18keypaths_inlinable13KeypathStructV6storedSivs
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq : $@convention(thin) (@in_guaranteed KeypathStruct) -> @out String
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq : $@convention(thin) (@in_guaranteed KeypathStruct) -> @out String
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructV8computedSSvpACTkq : $@convention(thin) (@in_guaranteed String, @inout KeypathStruct) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructV8computedSSvpACTkq : $@convention(thin) (@in_guaranteed String, @inout KeypathStruct) -> ()
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSiSSTHq : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSiSSTHq : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSiSSThq : $@convention(thin) (UnsafeRawPointer) -> Int
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSiSSThq : $@convention(thin) (UnsafeRawPointer) -> Int
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTKq : $@convention(thin) (@in_guaranteed KeypathStruct, UnsafeRawPointer) -> @out Bool
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTKq : $@convention(thin) (@in_guaranteed KeypathStruct, UnsafeRawPointer) -> @out Bool
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTkq : $@convention(thin) (@in_guaranteed Bool, @inout KeypathStruct, UnsafeRawPointer) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTkq : $@convention(thin) (@in_guaranteed Bool, @inout KeypathStruct, UnsafeRawPointer) -> ()
 

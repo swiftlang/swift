@@ -14,7 +14,7 @@ struct D {
   var (i, j) : (Int, Double) = (2, 3.5)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$s19default_constructor1DV1iSivpfi : $@convention(thin) () -> (Int, Double)
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s19default_constructor1DV1iSivpfi : $@convention(thin) () -> (Int, Double)
 // CHECK:      [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.IntLiteral, 2
 // CHECK:      [[FN:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
@@ -27,7 +27,7 @@ struct D {
 // CHECK-NEXT: return [[RESULT]] : $(Int, Double)
 
 
-// CHECK-LABEL: sil hidden @$s19default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
+// CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
 // CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
@@ -43,7 +43,7 @@ class E {
   var i = Int64()
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$s19default_constructor1EC1is5Int64Vvpfi : $@convention(thin) () -> Int64
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s19default_constructor1EC1is5Int64Vvpfi : $@convention(thin) () -> Int64
 // CHECK:      [[IADDR:%[0-9]+]] = alloc_stack $Int64
 // CHECK:      [[INTTYPE:%[0-9]+]] = metatype $@thick Int64.Type
 // CHECK:      [[INIT:%[0-9]+]] = function_ref @$sSzsExycfC : $@convention(method)
@@ -52,7 +52,7 @@ class E {
 // CHECK-NEXT: dealloc_stack [[IADDR]]
 // CHECK-NEXT: return [[VALUE]] : $Int64
 
-// CHECK-LABEL: sil hidden @$s19default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
+// CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
 // CHECK: bb0([[SELFIN:%[0-9]+]] : @owned $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
 // CHECK: [[INIT:%[0-9]+]] = function_ref @$s19default_constructor1EC1is5Int64Vvpfi : $@convention(thin) () -> Int64
@@ -69,7 +69,7 @@ class E {
 
 class F : E { }
 
-// CHECK-LABEL: sil hidden @$s19default_constructor1FCACycfc : $@convention(method) (@owned F) -> @owned F
+// CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1FCACycfc : $@convention(method) (@owned F) -> @owned F
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : @owned $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
@@ -96,13 +96,13 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init()
 // CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
-// CHECK-NEXT: sil hidden @$s19default_constructor1GV{{[_0-9a-zA-Z]*}}fC
+// CHECK-NEXT: sil hidden [ossa] @$s19default_constructor1GV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NOT: default_constructor.G.init()
 
 struct H<T> {
   var opt: T?
 
-  // CHECK-LABEL: sil hidden @$s19default_constructor1HVyACyxGqd__clufC : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
+  // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1HVyACyxGqd__clufC : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
   // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @$s19default_constructor1HV3optxSgvpfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
   // CHECK-NEXT: [[OPT_T:%[0-9]+]] = alloc_stack $Optional<T>
   // CHECK-NEXT: apply [[INIT_FN]]<T>([[OPT_T]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
@@ -114,7 +114,7 @@ struct H<T> {
 struct I {
   var x: Int = 0
 
-  // CHECK-LABEL: sil hidden @$s19default_constructor1IVyACxclufC : $@convention(method) <T> (@in T, @thin I.Type) -> I {
+  // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1IVyACxclufC : $@convention(method) <T> (@in T, @thin I.Type) -> I {
   // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @$s19default_constructor1IV1xSivpfi : $@convention(thin) () -> Int
   // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT_FN]]() : $@convention(thin) () -> Int
   // CHECK: [[X_ADDR:%[0-9]+]] = struct_element_addr {{.*}} : $*I, #I.x

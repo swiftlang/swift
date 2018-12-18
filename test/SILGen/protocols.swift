@@ -20,7 +20,7 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
   return subscriptableGet[i]
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_rvalue_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols16subscriptableGetAA013SubscriptableC0_pvp : $*SubscriptableGet
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*SubscriptableGet
@@ -42,7 +42,7 @@ func use_subscript_lvalue_get(_ i : Int) -> Int {
   return subscriptableGetSet[i]
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_lvalue_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols19subscriptableGetSetAA013SubscriptablecD0_pvp : $*SubscriptableGetSet
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*SubscriptableGetSet
@@ -60,7 +60,7 @@ func use_subscript_lvalue_set(_ i : Int) {
   subscriptableGetSet[i] = i
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_lvalue_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols19subscriptableGetSetAA013SubscriptablecD0_pvp : $*SubscriptableGetSet
 // CHECK: [[READ:%.*]] = begin_access [modify] [dynamic] [[GLOB]] : $*SubscriptableGetSet
@@ -76,7 +76,7 @@ func use_subscript_lvalue_set(_ i : Int) {
 func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(_ generic : T, idx : Int) -> Int {
   return generic[idx]
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_rvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_archetype_rvalue_get
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]]
@@ -90,7 +90,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(_ generic : T, idx
 func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inout T, idx : Int) -> Int {
   return generic[idx]
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_archetype_lvalue_get
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %0 : $*T
 // CHECK: [[GUARANTEEDSTACK:%[0-9]+]] = alloc_stack $T
@@ -106,7 +106,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inou
 func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(_ generic: inout T, idx : Int) {
   generic[idx] = idx
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
@@ -132,7 +132,7 @@ var propertyGetSet : PropertyWithGetterSetter
 func use_property_rvalue_get() -> Int {
   return propertyGet.a
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_property_rvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_rvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols11propertyGetAA18PropertyWithGetter_pvp : $*PropertyWithGetter
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*PropertyWithGetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
@@ -147,7 +147,7 @@ func use_property_rvalue_get() -> Int {
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_lvalue_get
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols14propertyGetSetAA24PropertyWithGetterSetter_pvp : $*PropertyWithGetterSetter
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[GLOB]] : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
@@ -160,7 +160,7 @@ func use_property_lvalue_set(_ x : Int) {
   propertyGetSet.b = x
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_lvalue_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @$s9protocols14propertyGetSetAA24PropertyWithGetterSetter_pvp : $*PropertyWithGetterSetter
 // CHECK: [[READ:%.*]] = begin_access [modify] [dynamic] [[GLOB]] : $*PropertyWithGetterSetter
@@ -176,7 +176,7 @@ func use_property_archetype_rvalue_get<T : PropertyWithGetter>(_ generic : T) ->
   return generic.a
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_rvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_archetype_rvalue_get
 // CHECK: bb0(%0 : $*T):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]]
@@ -191,7 +191,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(_ generic :
   return generic.b
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_archetype_lvalue_get
 // CHECK: bb0(%0 : $*T):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
@@ -205,7 +205,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(_ generic :
 func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: inout T, v : Int) {
   generic.b = v
 }
-// CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}use_property_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
@@ -218,7 +218,7 @@ protocol Initializable {
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden @$s9protocols27use_initializable_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s9protocols27use_initializable_archetype{{[_0-9a-zA-Z]*}}F
 func use_initializable_archetype<T: Initializable>(_ t: T, i: Int) {
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
   // CHECK:   [[T_META:%[0-9]+]] = metatype $@thick T.Type
@@ -231,7 +231,7 @@ func use_initializable_archetype<T: Initializable>(_ t: T, i: Int) {
   T(int: i)
 }
 
-// CHECK: sil hidden @$s9protocols29use_initializable_existential{{[_0-9a-zA-Z]*}}F
+// CHECK: sil hidden [ossa] @$s9protocols29use_initializable_existential{{[_0-9a-zA-Z]*}}F
 func use_initializable_existential(_ im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
 // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick Initializable.Type to $@thick (@opened([[N:".*"]]) Initializable).Type
@@ -260,7 +260,7 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil private [transparent] [thunk] @$s9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetter, #ClassWithGetter.a!getter.1 : (ClassWithGetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetter) -> Int
@@ -283,7 +283,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW : $@convention(witness_method: PropertyWithGetterSetter) (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW : $@convention(witness_method: PropertyWithGetterSetter) (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow %0
 // CHECK-NEXT: [[FUN:%.*]] = class_method [[CCOPY_LOADED]] : $ClassWithGetterSetter, #ClassWithGetterSetter.b!getter.1 : (ClassWithGetterSetter) -> () -> Int, $@convention(method) (@guaranteed ClassWithGetterSetter) -> Int
@@ -300,7 +300,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
   func methodUsingProperty() -> Int {
     return a
   }
-  // CHECK-LABEL: sil hidden @$s9protocols23ClassWithStoredPropertyC011methodUsingE0SiyF
+  // CHECK-LABEL: sil hidden [ossa] @$s9protocols23ClassWithStoredPropertyC011methodUsingE0SiyF
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value [[ARG]]
   // CHECK-NOT: copy_value
@@ -317,7 +317,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
   func methodUsingProperty() -> Int {
     return a
   }
-  // CHECK-LABEL: sil hidden @$s9protocols24StructWithStoredPropertyV011methodUsingE0SiyF
+  // CHECK-LABEL: sil hidden [ossa] @$s9protocols24StructWithStoredPropertyV011methodUsingE0SiyF
   // CHECK: bb0(%0 : $StructWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredProperty, #StructWithStoredProperty.a
@@ -334,7 +334,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // thunking code being too dumb but it is harmless to program
 // correctness.
 //
-// CHECK-LABEL: sil private [transparent] [thunk] @$s9protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load [trivial] [[C]]
 // CHECK-NEXT: function_ref
@@ -354,14 +354,14 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   func methodUsingProperty() -> Int {
     return a
   }
-  // CHECK-LABEL: sil hidden @$s9protocols29StructWithStoredClassPropertyV011methodUsingF0SiyF
+  // CHECK-LABEL: sil hidden [ossa] @$s9protocols29StructWithStoredClassPropertyV011methodUsingF0SiyF
   // CHECK: bb0(%0 : @guaranteed $StructWithStoredClassProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredClassProperty, #StructWithStoredClassProperty.a
   // CHECK-NEXT: return %2 : $Int
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$s9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW : $@convention(witness_method: PropertyWithGetter) (@in_guaranteed StructWithStoredClassProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY_LOADED:%.*]] = load_borrow [[C]]
 // CHECK-NEXT: function_ref
@@ -379,7 +379,7 @@ protocol ExistentialProperty {
 func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
     let b = t.p.b
 }
-// CHECK-LABEL: sil hidden @$s9protocols27testExistentialPropertyRead{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s9protocols27testExistentialPropertyRead{{[_0-9a-zA-Z]*}}F
 // CHECK:      [[READ:%.*]] = begin_access [read] [unknown] %0 : $*T
 // CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter
 // CHECK:      [[T_TEMP:%.*]] = alloc_stack $T
@@ -402,7 +402,7 @@ func modify(_ x: inout Int) {}
 func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
-// CHECK-LABEL: sil hidden @$s9protocols14modifyPropertyyyxzAA0C16WithGetterSetterRzlF
+// CHECK-LABEL: sil hidden [ossa] @$s9protocols14modifyPropertyyyxzAA0C16WithGetterSetterRzlF
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
 // CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!modify.1
 // CHECK:      ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[WITNESS_FN]]<T>
@@ -422,7 +422,7 @@ public func test(_ p: Proto) {
   p.val.x += 1
 }
 
-// CHECK-LABEL: sil @$s9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed Proto) -> ()
+// CHECK-LABEL: sil [ossa] @$s9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}") Proto, #Proto.val!modify
 // CHECK: ([[BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[MAT]]

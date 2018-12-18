@@ -18,7 +18,7 @@ func g() {}
 
 func z(_ i: Int) {}
 
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test1yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test1yyF
 func test1() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -44,7 +44,7 @@ func test1() {
 }
 
 // Fallthrough should work even if the next case is normally unreachable
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test2yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test2yyF
 func test2() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -69,7 +69,7 @@ func test2() {
   d()
 }
 
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test3yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test3yyF
 func test3() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -131,7 +131,7 @@ func test4() {
   // CHECK-NEXT: return
 }
 
-// Fallthrough into case block with binding // CHECK-LABEL: sil hidden @$s18switch_fallthrough5test5yyF
+// Fallthrough into case block with binding // CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test5yyF
 func test5() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}

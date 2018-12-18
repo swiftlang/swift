@@ -21,7 +21,7 @@ func takesConstRawPointer(_ x: UnsafeRawPointer) {}
 func takesOptConstRawPointer(_ x: UnsafeRawPointer?, and: Int) {}
 func takesOptOptConstRawPointer(_ x: UnsafeRawPointer??, and: Int) {}
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion0A9ToPointeryySpySiG_SPySiGSvtF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion0A9ToPointeryySpySiG_SPySiGSvtF
 // CHECK: bb0([[MP:%.*]] : $UnsafeMutablePointer<Int>, [[CP:%.*]] : $UnsafePointer<Int>, [[MRP:%.*]] : $UnsafeMutableRawPointer):
 func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   _ cp: UnsafePointer<Int>, _ mrp: UnsafeMutableRawPointer) {
@@ -84,7 +84,7 @@ func pointerToPointer(_ mp: UnsafeMutablePointer<Int>,
   // CHECK: apply [[TAKES_CONST_RAW_POINTER]]
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion14arrayToPointeryyF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion14arrayToPointeryyF
 func arrayToPointer() {
   var ints = [1,2,3]
 
@@ -137,7 +137,7 @@ func arrayToPointer() {
   // CHECK: destroy_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion15stringToPointeryySSF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion15stringToPointeryySSF
 func stringToPointer(_ s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[CONVERT_STRING:%.*]] = function_ref @$ss40_convertConstStringToUTF8PointerArgument{{[_0-9a-zA-Z]*}}F
@@ -170,7 +170,7 @@ func stringToPointer(_ s: String) {
   // CHECK: destroy_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion14inoutToPointeryyF 
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion14inoutToPointeryyF 
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box ${ var Int }
@@ -222,7 +222,7 @@ func takesPlusOnePointer(_ x: UnsafeMutablePointer<C>) {}
 func takesPlusZeroPointer(_ x: AutoreleasingUnsafeMutablePointer<C>) {}
 func takesPlusZeroOptionalPointer(_ x: AutoreleasingUnsafeMutablePointer<C?>) {}
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion19classInoutToPointeryyF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion19classInoutToPointeryyF
 func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box ${ var C }
@@ -256,14 +256,14 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] @$s18pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s18pointer_conversion18ObjCMethodBridgingC0A4Args{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(_ x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}
 }
 
 // rdar://problem/21505805
-// CHECK-LABEL: sil hidden @$s18pointer_conversion22functionInoutToPointeryyF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion22functionInoutToPointeryyF
 func functionInoutToPointer() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed () -> () }
   var f: () -> () = {}
@@ -274,7 +274,7 @@ func functionInoutToPointer() {
 }
 
 // rdar://problem/31781386
-// CHECK-LABEL: sil hidden @$s18pointer_conversion20inoutPointerOrderingyyF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion20inoutPointerOrderingyyF
 func inoutPointerOrdering() {
   // CHECK: [[ARRAY_BOX:%.*]] = alloc_box ${ var Array<Int> }
   // CHECK: [[ARRAY:%.*]] = project_box [[ARRAY_BOX]] :
@@ -303,7 +303,7 @@ func inoutPointerOrdering() {
 }
 
 // rdar://problem/31542269
-// CHECK-LABEL: sil hidden @$s18pointer_conversion20optArrayToOptPointer5arrayySaySiGSg_tF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion20optArrayToOptPointer5arrayySaySiGSg_tF
 func optArrayToOptPointer(array: [Int]?) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
@@ -332,7 +332,7 @@ func optArrayToOptPointer(array: [Int]?) {
   takesOptConstPointer(array, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion013optOptArrayTodD7Pointer5arrayySaySiGSgSg_tF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion013optOptArrayTodD7Pointer5arrayySaySiGSgSg_tF
 func optOptArrayToOptOptPointer(array: [Int]??) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
@@ -372,7 +372,7 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   takesOptOptConstPointer(array, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion21optStringToOptPointer6stringySSSg_tF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion21optStringToOptPointer6stringySSSg_tF
 func optStringToOptPointer(string: String?) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF
@@ -401,7 +401,7 @@ func optStringToOptPointer(string: String?) {
   takesOptConstRawPointer(string, and: sideEffect1())
 }
 
-// CHECK-LABEL: sil hidden @$s18pointer_conversion014optOptStringTodD7Pointer6stringySSSgSg_tF
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion014optOptStringTodD7Pointer6stringySSSgSg_tF
 func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   [[COPY:%.*]] = copy_value %0
   // CHECK:   [[SIDE1:%.*]] = function_ref @$s18pointer_conversion11sideEffect1SiyF

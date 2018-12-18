@@ -3,7 +3,7 @@
 import gizmo
 
 extension Gizmo {
-  // CHECK-LABEL: sil hidden @$sSo5GizmoC24objc_init_ref_delegationE{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [ossa] @$sSo5GizmoC24objc_init_ref_delegationE{{[_0-9a-zA-Z]*}}fC
   convenience init(int i: Int) {
     // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF_META:%[0-9]+]] : $@thick Gizmo.Type):
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Gizmo }

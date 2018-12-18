@@ -17,12 +17,12 @@ class SwiftGizmo : Gizmo {
 
   @NSManaged func kvc()
 
-  // CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC1x{{[_0-9a-zA-Z]*}}fgTo
-  // CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC1x{{[_0-9a-zA-Z]*}}fsTo
-  // CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC3kvc{{[_0-9a-zA-Z]*}}FTo
+  // CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC1x{{[_0-9a-zA-Z]*}}fgTo
+  // CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC1x{{[_0-9a-zA-Z]*}}fsTo
+  // CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC3kvc{{[_0-9a-zA-Z]*}}FTo
 
   // Make sure that we're calling through the @objc entry points.
-  // CHECK-LABEL: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed SwiftGizmo) -> () {
+  // CHECK-LABEL: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC7modifyX{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed SwiftGizmo) -> () {
   func modifyX() {
     // CHECK:   [[GETTER:%[0-9]+]] = objc_method [[SELF:%.*]] : $SwiftGizmo, #SwiftGizmo.x!getter.1.foreign : (SwiftGizmo) -> () -> X, $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
     // CHECK-NEXT: apply [[GETTER]]([[SELF]]) : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
@@ -33,7 +33,7 @@ class SwiftGizmo : Gizmo {
     // CHECK: return
   }
 
-  // CHECK-LABEL: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC8testFunc{{[_0-9a-zA-Z]*}}F
   func testFunc() {
     // CHECK: = objc_method %0 : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : (SwiftGizmo) -> () -> (), $@convention(objc_method) (SwiftGizmo) -> ()
     // CHECK: return
@@ -69,7 +69,7 @@ extension FinalGizmo {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s19objc_attr_NSManaged9testFinalySSAA0E5GizmoCF : $@convention(thin) (@guaranteed FinalGizmo) -> @owned String {
+// CHECK-LABEL: sil hidden [ossa] @$s19objc_attr_NSManaged9testFinalySSAA0E5GizmoCF : $@convention(thin) (@guaranteed FinalGizmo) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $FinalGizmo):
 // CHECK: objc_method [[ARG]] : $FinalGizmo, #FinalGizmo.kvc2!1.foreign : (FinalGizmo) -> () -> (), $@convention(objc_method) (FinalGizmo) -> ()
 // CHECK-NOT: return
@@ -103,15 +103,15 @@ class FinalEntity: NSObject, EntityIDProto {
 	@NSManaged final var entityID: String
 }
 
-// CHECK-LABEL: sil shared @$s19objc_attr_NSManaged11FinalEntityC8entityIDSSvM : $@yield_once @convention(method) (@guaranteed FinalEntity) -> @yields @inout String
+// CHECK-LABEL: sil shared [ossa] @$s19objc_attr_NSManaged11FinalEntityC8entityIDSSvM : $@yield_once @convention(method) (@guaranteed FinalEntity) -> @yields @inout String
 // CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!getter.1.foreign
 // CHECK: yield
 // CHECK: objc_method {{.*}} : $FinalEntity, #FinalEntity.entityID!setter.1.foreign
 // CHECK: return
 
-// CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
-// CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfsTo
-// CHECK-NOT: sil hidden @$s19objc_attr_NSManaged10{{[_0-9a-zA-Z]*}}FinalGizmoC1yytfgTo
+// CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfgTo : $@convention(objc_method) (SwiftGizmo) -> @autoreleased X
+// CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10SwiftGizmoC1xAA1XCfsTo
+// CHECK-NOT: sil hidden [ossa] @$s19objc_attr_NSManaged10{{[_0-9a-zA-Z]*}}FinalGizmoC1yytfgTo
 
 // The vtable should not contain any entry points for getters and setters.
 // CHECK-LABEL: sil_vtable SwiftGizmo {

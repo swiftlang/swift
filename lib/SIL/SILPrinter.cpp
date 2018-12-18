@@ -2345,6 +2345,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
     OS << "[canonical] ";
 
+  // If this function is not an external declaration /and/ is in ownership ssa
+  // form, print [ossa].
+  if (!isExternalDeclaration() && hasOwnership())
+    OS << "[ossa] ";
+
   printName(OS);
   OS << " : $";
   

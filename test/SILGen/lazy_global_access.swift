@@ -12,10 +12,10 @@ struct Fooo {
   static var staticProp = 0
 }
 
-// MAIN: sil hidden @$s18lazy_global_access8usePropsSi_SityF : $@convention(thin) () -> (Int, Int) {
+// MAIN: sil hidden [ossa] @$s18lazy_global_access8usePropsSi_SityF : $@convention(thin) () -> (Int, Int) {
 // MAIN:   global_addr @$s18lazy_global_access0B4PropSivp : $*Int
 // MAIN:   function_ref @$s18lazy_global_access4FoooV10staticPropSivau : $@convention(thin) () -> Builtin.RawPointer
-// LIBRARY: sil hidden @$s18lazy_global_access8usePropsSi_SityF : $@convention(thin) () -> (Int, Int) {
+// LIBRARY: sil hidden [ossa] @$s18lazy_global_access8usePropsSi_SityF : $@convention(thin) () -> (Int, Int) {
 // LIBRARY:   function_ref @$s18lazy_global_access0B4PropSivau : $@convention(thin) () -> Builtin.RawPointer
 // LIBRARY:   function_ref @$s18lazy_global_access4FoooV10staticPropSivau : $@convention(thin) () -> Builtin.RawPointer
 func useProps() -> (Int, Int) {

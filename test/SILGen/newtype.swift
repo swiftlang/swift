@@ -16,7 +16,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
   return ErrorDomain(rawValue: str)
 }
 
-// CHECK-RAW-LABEL: sil shared [transparent] [serializable] @$sSo14SNTErrorDomaina8rawValueABSS_tcfC
+// CHECK-RAW-LABEL: sil shared [transparent] [serializable] [ossa] @$sSo14SNTErrorDomaina8rawValueABSS_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : @owned $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
@@ -36,7 +36,7 @@ func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
 }
 
-// CHECK-RAW-LABEL: sil shared [serializable] @$sSo14SNTErrorDomaina8rawValueSSvg
+// CHECK-RAW-LABEL: sil shared [serializable] [ossa] @$sSo14SNTErrorDomaina8rawValueSSvg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : @guaranteed $ErrorDomain):
 // CHECK-RAW: [[STORED_VALUE:%[0-9]+]] = struct_extract [[SELF]] : $ErrorDomain, #ErrorDomain._rawValue
 // CHECK-RAW: [[STORED_VALUE_COPY:%.*]] = copy_value [[STORED_VALUE]]
@@ -47,21 +47,21 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
-  // CHECK-RAW-LABEL: sil hidden @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF : $@convention(method) (@guaranteed Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
-  // CHECK-RAW: sil hidden [thunk] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> @autoreleased Optional<ErrorDomain> {
+  // CHECK-RAW-LABEL: sil hidden [ossa] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF : $@convention(method) (@guaranteed Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] [ossa] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> @autoreleased Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }  
 
-  // CHECK-RAW-LABEL: sil hidden @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFF : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
-  // CHECK-RAW: sil hidden [thunk] @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
+  // CHECK-RAW-LABEL: sil hidden [ossa] @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFF : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
+  // CHECK-RAW: sil hidden [thunk] [ossa] @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
   @objc func integerPassThrough(_ ed: MyInt) -> MyInt {
     return ed
   }  
 }
 
 // These use a bridging conversion with a specialization of a generic witness.
-// CHECK-RAW-LABEL: sil hidden @$s7newtype15bridgeToNewtypeSo8MyStringayF
+// CHECK-RAW-LABEL: sil hidden [ossa] @$s7newtype15bridgeToNewtypeSo8MyStringayF
 func bridgeToNewtype() -> MyString {
 // CHECK-RAW: [[STRING:%.*]] = apply
 // CHECK-RAW: [[TO_NS:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
@@ -74,7 +74,7 @@ func bridgeToNewtype() -> MyString {
   return "foo" as NSString as MyString
 }
 
-// CHECK-RAW-LABEL: sil hidden @$s7newtype17bridgeFromNewtype6stringSSSo8MyStringa_tF
+// CHECK-RAW-LABEL: sil hidden [ossa] @$s7newtype17bridgeFromNewtype6stringSSSo8MyStringa_tF
 func bridgeFromNewtype(string: MyString) -> String {
 // CHECK-RAW: [[FROM_MY:%.*]] = function_ref @$ss20_SwiftNewtypeWrapperPss21_ObjectiveCBridgeable8RawValueRpzrlE09_bridgeToD1CAD_01_D5CTypeQZyF : $@convention(method) <τ_0_0 where τ_0_0 : _SwiftNewtypeWrapper, τ_0_0.RawValue : _ObjectiveCBridgeable> (@in_guaranteed τ_0_0) -> @owned τ_0_0.RawValue._ObjectiveCType
 // CHECK-RAW: [[NS:%.*]] = apply [[FROM_MY]]<MyString>(

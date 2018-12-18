@@ -8,7 +8,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results11testNonnullySayypGSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results11testNonnullySayypGSo4TestCF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
 // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullArray!getter.1.foreign : (Test) -> () -> [Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
 // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
@@ -21,7 +21,7 @@ func testNonnull(_ obj: Test) -> [Any] {
   return obj.nonnullArray
 } // CHECK: } // end sil function '$s20objc_bridged_results11testNonnullySayypGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results12testNullableySayypGSgSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results12testNullableySayypGSgSo4TestCF
 func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullableArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
@@ -47,7 +47,7 @@ func testNullable(_ obj: Test) -> [Any]? {
   return obj.nullableArray
 } // CHECK: } // end sil function '$s20objc_bridged_results12testNullableySayypGSgSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF
 func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nullUnspecifiedArray!getter.1.foreign : (Test) -> () -> [Any]?, $@convention(objc_method) (Test) -> @autoreleased Optional<NSArray>
@@ -74,7 +74,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
 } // CHECK: } // end sil function '$s20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF'
 
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF
 func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
@@ -87,7 +87,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   return obj.nonnullDictionary
 } // CHECK: } // end sil function '$s20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF
 func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
@@ -100,7 +100,7 @@ func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   return obj.nonnullSet
 } // CHECK: } // end sil function '$s20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results17testNonnullStringySSSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results17testNonnullStringySSSo4TestCF
 func testNonnullString(_ obj: Test) -> String {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullString!getter.1.foreign : (Test) -> () -> String, $@convention(objc_method) (Test) -> @autoreleased Optional<NSString>
@@ -113,7 +113,7 @@ func testNonnullString(_ obj: Test) -> String {
   return obj.nonnullString
 } // CHECK: } // end sil function '$s20objc_bridged_results17testNonnullStringySSSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results13testClassPropSSyF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results13testClassPropSSyF
 func testClassProp() -> String {
   // CHECK: [[CLASS:%.+]] = metatype $@objc_metatype Test.Type
   // CHECK: [[METHOD:%.+]] = objc_method [[CLASS]] : $@objc_metatype Test.Type, #Test.nonnullSharedString!getter.1.foreign : (Test.Type) -> () -> String, $@convention(objc_method) (@objc_metatype Test.Type) -> @autoreleased Optional<NSString>
@@ -129,7 +129,7 @@ func testClassProp() -> String {
 // Note: This doesn't really "work" in that it doesn't accept a nil value the
 // way the others do, because subscripts are thunked. But the main thing is
 // not to crash trying to generate the thunk.
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results20testNonnullSubscriptySayypGSo4TestCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results20testNonnullSubscriptySayypGSo4TestCF
 func testNonnullSubscript(_ obj: Test) -> [Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.subscript!getter.1.foreign : (Test) -> (Int) -> [Any], $@convention(objc_method) (Int, Test) -> @autoreleased Optional<NSArray>
@@ -143,7 +143,7 @@ func testNonnullSubscript(_ obj: Test) -> [Any] {
 } // CHECK: } // end sil function '$s20objc_bridged_results20testNonnullSubscriptySayypGSo4TestCF'
 
 
-// CHECK-LABEL: sil hidden @$s20objc_bridged_results19testPerformSelectoryySo8NSObjectCF
+// CHECK-LABEL: sil hidden [ossa] @$s20objc_bridged_results19testPerformSelectoryySo8NSObjectCF
 func testPerformSelector(_ obj: NSObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NSObject):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $NSObject, #NSObject.perform!1.foreign

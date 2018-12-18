@@ -181,7 +181,7 @@ bb0:
 
 // CHECK-LABEL: define swiftcc {{(dllexport )?}}{{(protected )?}}i64 @accessClassWithResilientField(%T31completely_fragile_class_layout23ClassWithResilientFieldC*)
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
-bb0(%0 : @guaranteed $ClassWithResilientField):
+bb0(%0 : $ClassWithResilientField):
 
 // CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
 // CHECK-NEXT:   [[SELF_ADDR:%.*]] = bitcast %T31completely_fragile_class_layout23ClassWithResilientFieldC* %0 to i8*
@@ -192,7 +192,7 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
   %1 = ref_element_addr %0 : $ClassWithResilientField, #ClassWithResilientField.third
 
 // CHECK-NEXT:   [[VALUE:%.*]] = load i64, i64* [[FIELD_PTR]], align 8
-  %2 = load [trivial] %1 : $*Int
+  %2 = load %1 : $*Int
 
 // CHECK-NEXT:   ret i64 [[VALUE]]
   return %2 : $Int

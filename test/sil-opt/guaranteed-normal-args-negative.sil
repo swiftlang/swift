@@ -8,7 +8,7 @@ sil_stage canonical
 
 import TestModule
 
-sil @callFoo : $@convention(thin) (@owned Foo) -> () {
+sil [ossa] @callFoo : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : @owned $Foo):
   %1 = class_method %0 : $Foo, #Foo.doSomething!1 : (Foo) -> (Foo) -> (), $@convention(method) (@guaranteed Foo, @owned Foo) -> ()
   destroy_value %0 : $Foo
