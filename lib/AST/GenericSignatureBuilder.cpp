@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -44,7 +45,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
-#include "GenericSignatureBuilderImpl.h"
 
 using namespace swift;
 using llvm::DenseMap;
