@@ -269,7 +269,7 @@ public final class _ExecutionContext {
 
   /// The stack for holding the current device scoping information.
   @usableFromInline
-  var deviceScopes: [DeviceKind] = [.`default`]
+  var deviceScopes: [(DeviceKind, UInt32)] = [(.`default`, 0)]
 
   /// Initializes a new execution context by initializing available devices.
   @usableFromInline
@@ -615,7 +615,20 @@ private class TFEState {
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
       let deviceName: String
-      if opType.hasSuffix("_CPU.device_partition") {
+      if opType.hasSuffix("_RUNTIME.device_partition") {
+        // get the device by calling runtime
+        // TODO: unify with _TFCOpSetDeviceFromScope below.
+        // TODO: support device index.
+        // deviceName = context.cpuDeviceNamePrefix + deviceIndexStr
+        let device = context.currentDevice
+        switch device.0 {
+        // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
+        case .cpu: deviceName = "\(context.cpuDeviceNamePrefix)\(device.1)"
+        case .gpu: deviceName = "\(context.gpuDeviceNamePrefix!)\(device.1)"
+        // TODO: process default properly.
+        default: deviceName = "\(context.cpuDeviceNamePrefix)\(device.1)"
+        }
+      } else if opType.hasSuffix("_CPU.device_partition") {
         // The op type can be: tmp3_main.tf_17_CPU.device_partition. We want to
         // extract the device index "17" out of the above name, and use it to
         // form a TF device string like
@@ -1558,20 +1571,24 @@ public enum DeviceKind {
 }
 
 internal extension _ExecutionContext {
-  var currentDeviceKind: DeviceKind {
+  var currentDevice: (DeviceKind, UInt32) {
     return sync {
-      deviceScopes.last ?? .default
+      deviceScopes.last ?? (.default, 0)
     }
   }
 
   @usableFromInline
-  func pushDeviceScope(_ kind: DeviceKind) {
+  // @_silgen_name("_swift_tfc_PushDeviceScope")
+  func pushDeviceScope(_ kind: DeviceKind, _ index: UInt32) {
     sync {
-      deviceScopes.append(kind)
+      deviceScopes.append((kind, index))
     }
   }
 
   @usableFromInline
+  // TODO: find out why uncommenting the line below would cause linker failure
+  // because this function symbol cannot be found.
+  // @_silgen_name("_swift_tfc_PopDeviceScope")
   func popDeviceScope() {
     sync {
       internalConsistencyCheck(deviceScopes.popLast() != nil)
@@ -1589,9 +1606,45 @@ internal extension _ExecutionContext {
 @inlinable
 public func withDevice<R>(_ kind: DeviceKind,
                           perform body: () throws -> R) rethrows -> R {
-  _ExecutionContext.global.pushDeviceScope(kind)
+  // internalConsistencyCheck(false, "pushing device scope \(kind).")
+  _ExecutionContext.global.pushDeviceScope(kind, 0)
   let result = try body()
   _ExecutionContext.global.popDeviceScope()
+  return result
+}
+
+@_silgen_name("_swift_tfc_PushDeviceScope")
+@usableFromInline @inline(never)
+internal func pushDeviceScope(_ kind: DeviceKind, _ index: UInt32) {
+  debugLog("pushing device scope (\(kind), \(index)).")
+  // internalConsistencyCheck(false, "pushing device scope (\(kind), \(index)).")
+  _ExecutionContext.global.pushDeviceScope(kind, index)
+}
+
+@_silgen_name("_swift_tfc_PopDeviceScope")
+@usableFromInline @inline(never)
+internal func popDeviceScope() {
+  debugLog("popping device scope.")
+  _ExecutionContext.global.popDeviceScope()
+}
+
+/// Same as above, but with device index support.
+// TODO: merge with `withDevice` above.
+//
+// @inline(never)
+//
+// this could get inlined before partition pass starts, in which case we
+// generate a partitionable func at the caller.
+
+@inline(never)
+// @inlinable // @inline(__always)
+// @_silgen_name("_swift_tfc_withDevice")
+public func withDevice<R>(_ kind: DeviceKind, _ index: UInt32,
+                          perform body: () throws -> R) rethrows -> R {
+  // internalConsistencyCheck(false, "pushing device scope (\(kind), \(index)).")
+  pushDeviceScope(kind, index)
+  let result = try body()
+  popDeviceScope()
   return result
 }
 
@@ -1599,8 +1652,8 @@ public func withDevice<R>(_ kind: DeviceKind,
 @_cdecl("_swift_tfc_OpSetDeviceFromScope")
 func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
   let context = _ExecutionContext.global
-  let device = context.currentDeviceKind
-  switch device {
+  let device = context.currentDevice
+  switch device.0 {
   // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
   case .cpu: TFE_OpSetDevice(op, "\(context.cpuDeviceNamePrefix)0", status)
   case .gpu: TFE_OpSetDevice(op, "\(context.gpuDeviceNamePrefix!)0", status)

@@ -39,27 +39,6 @@ StringRef getDeviceString(const GraphOperationInfo &graphOpInfo);
 
 DeviceId getDeviceId(const GraphOperationInfo &graphOpInfo);
 
-/// The returned string can be used to construct SIL function names.
-/// e.g. "tmp3_main.tf_13_CPU.device_partition", where 13 is the device
-/// index. The compiler runtime relies on the string suffix pattern
-/// "13_CPU.device_partition" to decode the device index 13, and use it to place
-/// the graph function invocation on a TF device like
-/// "/job:localhost/replica:0/task:0/device:CPU:13".
-static inline std::string getDeviceShortName(DeviceId deviceId) {
-  switch (deviceId.type) {
-  case DeviceType::CPU:
-    return llvm::utostr(deviceId.index) + "_CPU";
-  case DeviceType::GPU:
-    return llvm::utostr(deviceId.index) + "_GPU";
-  case DeviceType::TPU:
-    return llvm::utostr(deviceId.index) + "_TPU";
-  case DeviceType::ALL:
-    return "ALL";
-  case DeviceType::INVALID:
-    llvm_unreachable("Unsupported device type");
-  }
-}
-
 /// Partitions an accelerator SIL function into a set of per-device SIL
 /// functions.
 class DevicePartitioner {

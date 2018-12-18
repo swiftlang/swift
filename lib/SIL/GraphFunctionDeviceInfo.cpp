@@ -26,8 +26,23 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 
+#undef DEBUG_TYPE
+#define DEBUG_TYPE "tfdeviceinfo"
+
 using namespace swift;
 using namespace tf;
+
+// When true, ops in the generated graph functions need not have a device
+// attribute. In that case, the (single-device) graph function must be executed
+// as a DeviceType::RUNTIME function, where the device of that function call is
+// obtained from runtime.
+// TODO: When true, add support for compile-time device stack evaluation and
+// default device as set via compiler flag tf-target-gpu. More generally,
+// extend the "true" code path to subsume the "false" code path.
+llvm::cl::opt<bool> TFUseDeviceStack(
+    "tf-use-device-stack", llvm::cl::init(false),
+    llvm::cl::desc("When true, graph_ops will receive their device placement "
+                   "at compile time, based on the withDevice() construct."));
 
 // Only DataType attributes are considered in this CanRunOnDevice property. All
 // others are currently not relevant for kernel selection.
@@ -185,6 +200,11 @@ std::string GraphFunctionDeviceInfo::handleDevicePlacement(
 void GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice, ASTContext &ctx,
     GraphOperationBuilder *opBuilder) {
+  // TODO: add compile-time device stack evaluation support.
+  // e.g. if this graph_op is contained within withDevice(.cpu, 1), place
+  // that op on CPU:1 at compile time.
+  if (TFUseDeviceStack)
+    return;
 
   auto deviceString =
       handleDevicePlacement(opType, opDevice, opBuilder->getAttributes());
@@ -196,6 +216,17 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
   opBuilder->addAttribute(
       {ctx.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
+}
+
+GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
+                                                 bool isTPUInfeedEnabled)
+    // When `TFUseDeviceStack` is true, ignore `primaryDeviceId` provided at
+    // compile time (e.g. via compiler flag); instead use runtime device info.
+    : primaryDeviceId(TFUseDeviceStack ? RuntimeDeviceId : primaryDeviceId),
+      isTPUInfeedEnabled(isTPUInfeedEnabled) {
+  assert(primaryDeviceId.type != DeviceType::ALL);
+  if (!TFUseDeviceStack)
+    usedDeviceIds.insert(primaryDeviceId);
 }
 
 DeviceId GraphFunctionDeviceInfo::chooseDevice(

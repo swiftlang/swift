@@ -2058,6 +2058,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       tensorOpsSet.insert(inst);
 
       auto opDevice = getDeviceId(GraphOperationInfo(graphOp));
+      assert(opDevice.isValid());
       deviceInfo.markDeviceUsed(opDevice);
     }
   }

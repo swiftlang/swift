@@ -18,15 +18,19 @@
 #define SWIFT_SIL_GRAPHFUNCTIONDEVICEINFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
 class SILFunction;
 struct GraphOperationAttribute;
+class GraphOperationInst;
+class SILInstruction;
 
 namespace tf {
 class GraphOperationBuilder;
@@ -43,6 +47,8 @@ enum class DeviceType {
   /// scalar will run on all such devices, in case it is a loop iteration count
   /// and the loop runs on all devices.
   ALL,
+  /// Device placement is done at runtime.
+  RUNTIME,
 };
 
 /// The device id represents a local device, with two components: device type
@@ -63,7 +69,46 @@ struct DeviceId {
     return (unsigned)type < (unsigned)rhs.type ||
            (type == rhs.type && index == rhs.index);
   }
+
+  bool isValid() const { return type != DeviceType::INVALID; }
+
+  void print(llvm::raw_ostream &OS) const;
+
+  void dump() const { print(llvm::errs()); }
 };
+
+/// The returned string can be used to construct SIL function names.
+/// e.g. "tmp3_main.tf_13_CPU.device_partition", where 13 is the device
+/// index. The compiler runtime relies on the string suffix pattern
+/// "13_CPU.device_partition" to decode the device index 13, and use it to place
+/// the graph function invocation on a TF device like
+/// "/job:localhost/replica:0/task:0/device:CPU:13".
+static inline std::string getDeviceShortName(DeviceId deviceId) {
+  switch (deviceId.type) {
+  case DeviceType::CPU:
+    return llvm::utostr(deviceId.index) + "_CPU";
+  case DeviceType::GPU:
+    return llvm::utostr(deviceId.index) + "_GPU";
+  case DeviceType::TPU:
+    return llvm::utostr(deviceId.index) + "_TPU";
+  case DeviceType::ALL:
+    return "ALL";
+  case DeviceType::RUNTIME:
+    return "RUNTIME";
+  case DeviceType::INVALID:
+    llvm_unreachable("Unsupported device type");
+  }
+}
+
+inline void DeviceId::print(llvm::raw_ostream &OS) const {
+  // This may not be the best format for human reading, but it's convenient.
+  OS << getDeviceShortName(*this);
+}
+
+inline raw_ostream &operator<<(raw_ostream &OS, DeviceId deviceId) {
+  deviceId.print(OS);
+  return OS;
+}
 
 } // end namespace tf
 } // namespace swift
@@ -108,6 +153,8 @@ static const char TF_DEFAULT_TPU_DEVICE[] = "TPU_SYSTEM";
 static const char TF_ALL_DEVICES[] = "ALL_DEVICES";
 
 static DeviceId AllDeviceId = DeviceId{DeviceType::ALL, (unsigned)-1};
+static DeviceId RuntimeDeviceId = DeviceId{DeviceType::RUNTIME, 0};
+static DeviceId InvalidDeviceId = DeviceId{DeviceType::INVALID, 0};
 
 static inline DeviceType _getOpDeviceType(llvm::StringRef device) {
   if (device.startswith(TF_CPU_DEVICE_STRING_PREFIX))
@@ -156,6 +203,8 @@ static inline std::string getDeviceString(DeviceId deviceId) {
     return TF_DEFAULT_TPU_DEVICE;
   case DeviceType::ALL:
     return TF_ALL_DEVICES;
+  case DeviceType::RUNTIME:
+    return "";
   case DeviceType::INVALID:
     llvm_unreachable("Unsupported device type");
   }
@@ -211,12 +260,7 @@ struct GraphFunctionDeviceInfo {
                         ASTContext &ctx, GraphOperationBuilder *opBuilder);
 
 private:
-  GraphFunctionDeviceInfo(DeviceId primaryDeviceId, bool isTPUInfeedEnabled)
-      : primaryDeviceId(primaryDeviceId),
-        isTPUInfeedEnabled(isTPUInfeedEnabled) {
-    assert(primaryDeviceId.type != DeviceType::ALL);
-    usedDeviceIds.insert(primaryDeviceId);
-  }
+  GraphFunctionDeviceInfo(DeviceId primaryDeviceId, bool isTPUInfeedEnabled);
 
   // `attributes` are used here to determine kernel availability (primarily
   // dtype constraints).
