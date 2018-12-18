@@ -72,3 +72,8 @@ class C { // expected-note {{in declaration of 'C'}}
   #error("private error") // expected-error  {{private error}}
   func bar() {}
 }
+
+protocol MyProtocol {
+  #warning("warnings can show up in protocols too!") // expected-warning {{warnings can show up in protocols too!}}
+}
+
