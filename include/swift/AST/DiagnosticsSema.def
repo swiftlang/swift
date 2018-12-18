@@ -2817,6 +2817,16 @@ ERROR(builtin_string_literal_broken_proto,none,
 ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
+ERROR(character_literal_overflow,none,
+      "character literal '%1' overflows when stored into %0", (Type, unsigned))
+ERROR(character_literal_quotes,none,
+      "integers can only be expressed by single quoted character literals", ())
+ERROR(character_literal_not_cluster,none,
+      "character literal is not a single extended grapheme cluster", ())
+WARNING(character_literal_migration,none,
+      "double quotes deprecated in favour of single quotes to express %0",
+      (Type))
+
 // Array literals
 ERROR(should_use_dictionary_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "

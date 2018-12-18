@@ -30,6 +30,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Unicode.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -2061,6 +2062,25 @@ namespace {
       DeclName builtinLiteralFuncName;
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
+      bool notCharacter = stringLiteral && !stringLiteral->isCharacterLiteral();
+
+      if (stringLiteral && stringLiteral->isCharacterLiteral() &&
+          !stringLiteral->isSingleExtendedGraphemeCluster())
+        tc.diagnose(expr->getLoc(), diag::character_literal_not_cluster);
+
+      auto migrateQuotes = [&]() {
+        if (notCharacter) {
+          SourceManager &SM = tc.Context.SourceMgr;
+          SourceRange range = stringLiteral->getSourceRange();
+          range.End = Lexer::getLocForEndOfToken(SM, range.Start);
+          StringRef body = SM
+          .extractText(CharSourceRange(SM, range.Start, range.End))
+          .drop_front().drop_back();
+
+          tc.diagnose(expr->getLoc(), diag::character_literal_migration, type)
+          .fixItReplaceChars(range.Start, range.End, "'" + body.str() + "'");
+        }
+      };
 
       if (isStringLiteral) {
         literalType = tc.Context.Id_StringLiteralType;
@@ -2101,6 +2121,8 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
+
+        migrateQuotes();
       } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
@@ -2121,6 +2143,25 @@ namespace {
             diag::builtin_unicode_scalar_literal_broken_proto;
 
         stringLiteral->setEncoding(StringLiteralExpr::OneUnicodeScalar);
+
+        migrateQuotes();
+
+        // Check that character literal does not overflow destination when int.
+        if (auto structTy = dyn_cast<StructType>(type->getCanonicalType())) {
+          auto valueProp = structTy->getDecl()->getStoredProperties().front();
+          if (auto intTy = dyn_cast<BuiltinIntegerType>(valueProp->getType()
+                                                        ->getCanonicalType())) {
+            if (notCharacter)
+              tc.diagnose(expr->getLoc(), diag::character_literal_quotes);
+
+            StringRef Encoded = stringLiteral->getValue();
+            unsigned codepoint = unicode::extractFirstUnicodeScalar(Encoded);
+            if (intTy->isFixedWidth() && intTy->getFixedWidth() < 32 &&
+                codepoint >= (1 << intTy->getFixedWidth()))
+              tc.diagnose(expr->getLoc(), diag::character_literal_overflow,
+                          type, codepoint);
+          }
+        }
       }
 
       return convertLiteralInPlace(expr,

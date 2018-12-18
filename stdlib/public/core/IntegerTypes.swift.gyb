@@ -1663,6 +1663,19 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
+extension ${Self} :
+    _ExpressibleByBuiltinUnicodeScalarLiteral,
+    ExpressibleByUnicodeScalarLiteral {
+  @_transparent
+  public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
+    self = ${Self}(truncatingIfNeeded: UInt32(value))
+  }
+  @_transparent
+  public init(unicodeScalarLiteral value: ${Self}) {
+    self = value
+  }
+}
+
 // FIXME(integers): this section here is to help the typechecker,
 // as it seems to have problems with a pattern where the nonmutating operation
 // is defined on a protocol in terms of a mutating one that is itself defined

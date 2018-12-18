@@ -327,11 +327,13 @@ static void validateMultilineIndents(const Token &Str, DiagnosticEngine *Diags);
 
 void Lexer::formStringLiteralToken(const char *TokStart,
                                    bool IsMultilineString,
-                                   unsigned CustomDelimiterLen) {
+                                   unsigned CustomDelimiterLen,
+                                   bool IsCharacterLiteral) {
   formToken(tok::string_literal, TokStart);
   if (NextToken.is(tok::eof))
     return;
-  NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen);
+  NextToken.setStringLiteral(IsMultilineString, CustomDelimiterLen,
+                             IsCharacterLiteral);
 
   if (IsMultilineString && Diags)
     validateMultilineIndents(NextToken, Diags);
@@ -1787,51 +1789,6 @@ static void validateMultilineIndents(const Token &Str,
                                   commonIndentation);
 }
 
-/// Emit diagnostics for single-quote string and suggest replacement
-/// with double-quoted equivalent.
-static void diagnoseSingleQuoteStringLiteral(const char *TokStart,
-                                             const char *TokEnd,
-                                             DiagnosticEngine *D) {
-  assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!D)
-    return;
-
-  SmallString<32> replacement;
-  replacement.push_back('"');
-  const char *Ptr = TokStart + 1;
-  const char *OutputPtr = Ptr;
-
-  while (*Ptr++ != '\'' && Ptr < TokEnd) {
-    if (Ptr[-1] == '\\') {
-      if (*Ptr == '\'') {
-        replacement.append(OutputPtr, Ptr - 1);
-        OutputPtr = Ptr + 1;
-        // Un-escape single quotes.
-        replacement.push_back('\'');
-      } else if (*Ptr == '(') {
-        // Preserve the contents of interpolation.
-        Ptr = skipToEndOfInterpolatedExpression(Ptr + 1, replacement.end(),
-                                                /*IsMultiline=*/false);
-        assert(*Ptr == ')');
-      }
-      // Skip over escaped characters.
-      ++Ptr;
-    } else if (Ptr[-1] == '"') {
-      replacement.append(OutputPtr, Ptr - 1);
-      OutputPtr = Ptr;
-      // Escape double quotes.
-      replacement.append("\\\"");
-    }
-  }
-  assert(Ptr == TokEnd && Ptr[-1] == '\'');
-  replacement.append(OutputPtr, Ptr - 1);
-  replacement.push_back('"');
-
-  D->diagnose(Lexer::getSourceLoc(TokStart), diag::lex_single_quote_string)
-      .fixItReplaceChars(Lexer::getSourceLoc(TokStart),
-                         Lexer::getSourceLoc(TokEnd), replacement);
-}
-
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
@@ -1892,17 +1849,11 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
     wasErroneous |= CharValue == ~1U;
   }
 
-  if (QuoteChar == '\'') {
-    assert(!IsMultilineString && CustomDelimiterLen == 0 &&
-           "Single quoted string cannot have custom delimitor, nor multiline");
-    diagnoseSingleQuoteStringLiteral(TokStart, CurPtr, Diags);
-  }
-
   if (wasErroneous)
     return formToken(tok::unknown, TokStart);
 
   return formStringLiteralToken(TokStart, IsMultilineString,
-                                CustomDelimiterLen);
+                                CustomDelimiterLen, QuoteChar == '\'');
 }
 
 

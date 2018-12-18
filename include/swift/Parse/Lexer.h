@@ -515,7 +515,7 @@ private:
   void formToken(tok Kind, const char *TokStart);
   void formEscapedIdentifierToken(const char *TokStart);
   void formStringLiteralToken(const char *TokStart, bool IsMultilineString,
-                              unsigned CustomDelimiterLen);
+                        unsigned CustomDelimiterLen, bool IsCharacterLiteral);
 
   /// Advance to the end of the line.
   /// If EatNewLine is true, CurPtr will be at end of newline character.
