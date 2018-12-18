@@ -723,6 +723,7 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   if (auto ty = decl->getTypeLoc().getType())
     return ty->hasError();
 
+  auto origContext = options.getContext();
   options.setContext(None);
 
   // If the element is a variadic parameter, resolve the parameter type as if
@@ -764,6 +765,12 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
       hadError = true;
     }
     TL.setType(Ty);
+
+    // Disallow variadic parameters in enum elements.
+    if (!hadError && origContext == TypeResolverContext::EnumElementDecl) {
+      TC.diagnose(decl->getStartLoc(), diag::enum_element_ellipsis);
+      hadError = true;
+    }
   }
 
   if (hadError)
