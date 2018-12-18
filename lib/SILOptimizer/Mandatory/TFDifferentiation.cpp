@@ -3187,20 +3187,13 @@ private:
   SmallVector<std::pair<SILInstruction *, SILInstruction *>, 8>
       scopeMarkingInstructions;
 
-  SmallPtrSet<SILValue, 32> mapped;
-
   SILFunction &getOriginal() { return getBuilder().getFunction(); }
 
 public:
   AdjointRematCloner(SILFunction &fn) : SILClonerWithScopes(fn) {}
 
-  void mapValue(SILValue origValue, SILValue mappedValue) {
-    SILClonerWithScopes::mapValue(origValue, mappedValue);
-    mapped.insert(origValue);
-  }
-
   SILValue lookUpValue(SILValue valueInOriginal) {
-    if (!mapped.count(valueInOriginal))
+    if (!isValueCloned(valueInOriginal))
       return nullptr;
     return getMappedValue(valueInOriginal);
   }
