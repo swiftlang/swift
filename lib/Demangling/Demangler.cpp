@@ -610,6 +610,7 @@ NodePointer Demangler::demangleOperator() {
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
+      case 'P': return demangleProtocolConformanceRef();
       default:
         pushBack();
         pushBack();
@@ -1294,7 +1295,7 @@ NodePointer Demangler::popAnyProtocolConformance() {
   });
 }
 
-NodePointer Demangler::popProtocolConformanceRef() {
+NodePointer Demangler::demangleProtocolConformanceRef() {
   NodePointer module = popModule();
   NodePointer proto = popProtocol();
   auto protocolConformanceRef =
@@ -1309,7 +1310,7 @@ NodePointer Demangler::popProtocolConformanceRef() {
 
 NodePointer Demangler::demangleConcreteProtocolConformance() {
   NodePointer conditionalConformanceList = popAnyProtocolConformanceList();
-  NodePointer conformanceRef = popProtocolConformanceRef();
+  NodePointer conformanceRef = popNode(Node::Kind::ProtocolConformanceRef);
   NodePointer type = popNode(Node::Kind::Type);
   return createWithChildren(Node::Kind::ConcreteProtocolConformance,
                             type, conformanceRef, conditionalConformanceList);
