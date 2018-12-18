@@ -444,6 +444,8 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     llvm::SmallVectorImpl<char> &Scratch) {
 
+  namespace path = llvm::sys::path;
+
   // If running in OnlySerialized mode, ParseableInterfaceModuleLoader
   // should not have been constructed at all.
   assert(LoadMode != ModuleLoadingMode::OnlySerialized);
@@ -454,11 +456,11 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   ModPath = DirName;
-  llvm::sys::path::append(ModPath, ModuleFilename);
+  path::append(ModPath, ModuleFilename);
 
   auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
   InPath = ModPath;
-  llvm::sys::path::replace_extension(InPath, Ext);
+  path::replace_extension(InPath, Ext);
   if (!FS.exists(InPath))
     return std::make_error_code(std::errc::no_such_file_or_directory);
 
@@ -477,10 +479,10 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // from the SDK.
   if (!PrebuiltCacheDir.empty()) {
     StringRef SDKPath = Ctx.SearchPathOpts.SDKPath;
-    if (!SDKPath.empty() && hasPrefix(llvm::sys::path::begin(InPath),
-                                      llvm::sys::path::end(InPath),
-                                      llvm::sys::path::begin(SDKPath),
-                                      llvm::sys::path::end(SDKPath))) {
+    if (!SDKPath.empty() && hasPrefix(path::begin(InPath),
+                                      path::end(InPath),
+                                      path::begin(SDKPath),
+                                      path::end(SDKPath))) {
       // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
       // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
       // cache key here.
@@ -488,13 +490,12 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
 
       // FIXME: Would it be possible to only have architecture-specific names
       // here? Then we could skip this check.
-      StringRef InParentDirName =
-          llvm::sys::path::filename(llvm::sys::path::parent_path(InPath));
-      if (llvm::sys::path::extension(InParentDirName) == ".swiftmodule") {
-        assert(llvm::sys::path::stem(InParentDirName) == ModuleID.first.str());
-        llvm::sys::path::append(OutPath, InParentDirName);
+      StringRef InParentDirName = path::filename(path::parent_path(InPath));
+      if (path::extension(InParentDirName) == ".swiftmodule") {
+        assert(path::stem(InParentDirName) == ModuleID.first.str());
+        path::append(OutPath, InParentDirName);
       }
-      llvm::sys::path::append(OutPath, ModuleFilename);
+      path::append(OutPath, ModuleFilename);
 
       if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
                                  dependencyTracker)) {
@@ -534,9 +535,8 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // original directory. We should probably just not try to match the signature
   // of the overridable entry point.
   auto ErrorCode = SerializedModuleLoaderBase::openModuleFiles(
-      ModuleID, llvm::sys::path::parent_path(OutPath),
-      llvm::sys::path::filename(OutPath), ModuleDocFilename, ModuleBuffer,
-      ModuleDocBuffer, Scratch);
+      ModuleID, path::parent_path(OutPath), path::filename(OutPath),
+      ModuleDocFilename, ModuleBuffer, ModuleDocBuffer, Scratch);
   LLVM_DEBUG(llvm::dbgs() << "Loaded " << OutPath
              << " via normal module loader");
   if (ErrorCode) {
