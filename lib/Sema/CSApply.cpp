@@ -6869,20 +6869,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // SWIFT_ENABLE_TENSORFLOW
       auto fromEI = fromFunc->getExtInfo();
       // Handle implicit conversion from @autodiff.
-      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
-        fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable())
-                ->castTo<FunctionType>();
-        expr = cs.cacheType(new (tc.Context)
-                            AutoDiffFunctionExpr(expr, fromFunc));
-      }
-      // Handle implicit conversion to @autodiff.
-      else if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
+      if (fromEI.isDifferentiable() && !toEI.isDifferentiable()) {
         fromFunc = fromFunc->withExtInfo(fromEI.withDifferentiable(false))
                 ->castTo<FunctionType>();
         expr = cs.cacheType(new (tc.Context)
             AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
       }
-      
       // If we have a ClosureExpr, then we can safely propagate tensorflow
       // convention to the closure expression.
       // NOTE: we also need to check if the closure captures any values.
@@ -6930,8 +6922,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
 
-      return cs.cacheType(new (tc.Context)
-                              FunctionConversionExpr(expr, toType));
+      // SWIFT_ENABLE_TENSORFLOW
+      auto toEINoAdConversion =
+          toEI.withDifferentiable(fromEI.isDifferentiable());
+      auto toFuncNoADConversion = toFunc->withExtInfo(toEINoAdConversion);
+      expr = cs.cacheType(new (tc.Context)
+                              FunctionConversionExpr(expr,
+                                                     toFuncNoADConversion));
+
+      // Make the conversion to @autodiff happen after all other conversions,
+      // because some of the other conversions are not currently supported on
+      // @autodiff functions. (e.g. escape_to_noescape).
+      // After we do support those conversions, the order will no longer matter.
+      if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
+        expr = cs.cacheType(new (tc.Context)
+                            AutoDiffFunctionExpr(expr, toFunc));
+      }
+
+      return expr;
     }
   }
 
