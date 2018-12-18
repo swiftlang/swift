@@ -34,7 +34,7 @@ sil_vtable C {}
 
 //   CHECK: @"$s5class1CCMf" = internal global <{ {{.*}} }> <{
 // \ CHECK:   void ([[C_CLASS]]*)* @"$s5class1CCfD",
-// \ CHECK:   i8** @"$sBoWV",
+// \ CHECK:   i8** {{@"$sBoWV"|null}},
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @"$s5class1CCMm" to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
