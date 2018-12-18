@@ -77,3 +77,8 @@ protocol MyProtocol {
   #warning("warnings can show up in protocols too!") // expected-warning {{warnings can show up in protocols too!}}
 }
 
+#warning("""
+         warnings support multi-line string literals
+         """) // expected-warning @-2 {{warnings support multi-line string literals}}
+
+#warning(#"warnings support \(custom string delimiters)"#) // expected-warning {{warnings support \\(custom string delimiters)}}
