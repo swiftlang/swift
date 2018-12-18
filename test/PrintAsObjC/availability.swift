@@ -179,7 +179,7 @@
 // CHECK-NEXT: - (nonnull instancetype)initWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedOnMacOSFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE;
-// CHECK-NEXT: @end
+// CHECK: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'DeprecatedAvailability' has been renamed to 'SWTReplacementAvailable'")
 // CHECK-LABEL: @interface DeprecatedAvailability
