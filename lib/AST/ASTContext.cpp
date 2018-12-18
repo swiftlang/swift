@@ -5306,6 +5306,8 @@ AutoDiffAssociatedFunctionIdentifier *
 AutoDiffAssociatedFunctionIdentifier::get(
     AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
     AutoDiffParameterIndices *parameterIndices, ASTContext &C) {
+  assert(parameterIndices);
+
   auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
 
   llvm::FoldingSetNodeID id;

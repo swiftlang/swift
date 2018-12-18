@@ -219,6 +219,12 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
   if (constant.autoDiffAssociatedFunctionIdentifier)
     return;
 
+  // FIXME: When the underyling uncurried function is in a different module,
+  // `DA->getCheckedParameterIndices()` is `nullptr` so we can't generate the
+  // VJP of the curry thunk.
+  if (!DA->getCheckedParameterIndices())
+    return;
+
   auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
     AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
     DA->getCheckedParameterIndices(), SwiftModule->getASTContext());

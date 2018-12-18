@@ -207,19 +207,6 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
   return result;
 }
 
-/// If `isMethod` is true, returns the non-self part of `functionType`. (e.g.
-/// "(Self) -> (A, B) -> R" becomes "(A, B) -> R"). Otherwise, returns
-/// `functionType` unmodified.
-static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
-                                            bool isMethod) {
-  if (isMethod) {
-    assert(functionType->getNumParams() == 1 &&
-           "unexpected num params for method");
-    return functionType->getResult()->castTo<AnyFunctionType>();
-  }
-  return functionType;
-}
-
 static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
   unsigned numAutoDiffParameterIndices = 0;
   while (fnTy != nullptr) {
