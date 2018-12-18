@@ -79,6 +79,11 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   static void configureSubInvocationInputsAndOutputs(
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath);
 
+  static bool buildSwiftModuleFromSwiftInterface(
+    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker);
+
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,

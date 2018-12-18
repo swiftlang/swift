@@ -301,16 +301,18 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
   return false;
 }
 
-static bool buildSwiftModuleFromSwiftInterface(
+bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
-    CompilerInvocation &SubInvocation, StringRef ModuleCachePath,
-    DependencyTracker *OuterTracker) {
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
     // Note that we don't assume ModuleCachePath is the same as the Clang
     // module cache path at this point.
     if (!ModuleCachePath.empty())
       (void)llvm::sys::fs::create_directory(ModuleCachePath);
+
+    configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
     FrontendOptions &FEOpts = SubInvocation.getFrontendOptions();
     const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
@@ -514,14 +516,13 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
         createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(),
                                                  CacheDir);
     computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
-    configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
     // Evaluate if we need to run this sub-invocation, and if so run it.
     if (!swiftModuleIsUpToDate(FS, ModuleID, OutPath, Diags,
                                dependencyTracker)) {
-      if (::buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
-                                               SubInvocation, CacheDir,
-                                               dependencyTracker))
+      if (buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
+                                             SubInvocation, InPath, OutPath,
+                                             CacheDir, dependencyTracker))
         return std::make_error_code(std::errc::invalid_argument);
     }
   }
@@ -549,13 +550,13 @@ ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     StringRef InPath, StringRef OutPath) {
   CompilerInvocation SubInvocation =
       createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir);
-  configureSubInvocationInputsAndOutputs(SubInvocation, InPath, OutPath);
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
-  return ::buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
-                                              SubInvocation, /*CachePath*/"",
-                                              /*OuterTracker*/nullptr);
+  return buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
+                                            SubInvocation, InPath, OutPath,
+                                            /*CachePath*/"",
+                                            /*OuterTracker*/nullptr);
 }
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
