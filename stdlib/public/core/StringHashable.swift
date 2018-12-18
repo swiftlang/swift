@@ -105,7 +105,7 @@ extension _StringGutsSlice {
       }
       _internalInvariant(result.nextReadPosition != index)
       index = result.nextReadPosition
-      if result.reallocatedBuffers {
+      if result.allocatedBuffers {
         _internalInvariant(!hasBufferOwnership)
         hasBufferOwnership = true
       }
@@ -145,7 +145,7 @@ extension _StringGutsSlice {
       }
       _internalInvariant(result.nextReadPosition != index)
       index = result.nextReadPosition
-      if result.reallocatedBuffers {
+      if result.allocatedBuffers {
         _internalInvariant(!hasBufferOwnership)
         hasBufferOwnership = true
       }

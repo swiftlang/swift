@@ -506,7 +506,7 @@ extension _StringGutsSlice {
         leftOutputBufferCount = result.amountFilled
         leftOutputBufferIndex = 0
         leftNextReadPosition = result.nextReadPosition
-        if result.reallocatedBuffers {
+        if result.allocatedBuffers {
           _internalInvariant(!hasLeftBufferOwnership)
           hasLeftBufferOwnership = true
         }
@@ -522,7 +522,7 @@ extension _StringGutsSlice {
         rightOutputBufferCount = result.amountFilled
         rightOutputBufferIndex = 0
         rightNextReadPosition = result.nextReadPosition
-        if result.reallocatedBuffers {
+        if result.allocatedBuffers {
           _internalInvariant(!hasRightBufferOwnership)
           hasRightBufferOwnership = true
         }
