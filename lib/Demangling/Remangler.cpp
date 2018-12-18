@@ -1657,6 +1657,7 @@ void Remangler::mangleProtocolConformanceRef(Node *node) {
   manglePureProtocol(node->getChild(0));
   if (node->getNumChildren() > 1)
     mangleChildNode(node, 1);
+  Buffer << "HP";
 }
 
 void Remangler::mangleConcreteProtocolConformance(Node *node) {

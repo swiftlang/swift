@@ -2293,6 +2293,8 @@ void ASTMangler::appendProtocolConformanceRef(
   // are global anyway.
   if (isRetroactiveConformance(conformance))
     appendModule(conformance->getDeclContext()->getParentModule());
+
+  appendOperator("HP");
 }
 
 /// Retrieve the index of the conformance requirement indicated by the
