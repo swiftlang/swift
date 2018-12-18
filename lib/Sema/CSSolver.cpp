@@ -251,8 +251,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
   while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
     auto *constraint = &ActiveConstraints.front();
-    ActiveConstraints.pop_front();
-    assert(constraint->isActive() && "Worklist constraint is not active?");
+    deactivateConstraint(constraint);
 
     // Simplify this constraint.
     switch (simplifyConstraint(*constraint)) {
@@ -269,35 +268,20 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         log << ")\n";
       }
 
-      if (solverState)
-        solverState->retireConstraint(constraint);
-
-      CG.removeConstraint(constraint);
+      retireConstraint(constraint);
       break;
 
     case SolutionKind::Solved:
-      if (solverState) {
+      if (solverState)
         ++solverState->NumSimplifiedConstraints;
-
-        // This constraint has already been solved; retire it.
-        solverState->retireConstraint(constraint);
-      }
-
-      // Remove the constraint from the constraint graph.
-      CG.removeConstraint(constraint);
+      retireConstraint(constraint);
       break;
 
     case SolutionKind::Unsolved:
       if (solverState)
         ++solverState->NumUnsimplifiedConstraints;
-
-      InactiveConstraints.push_back(constraint);
       break;
     }
-
-    // This constraint is not active. We delay this operation until
-    // after simplification to avoid re-insertion.
-    constraint->setActive(false);
 
     // Check whether a constraint failed. If so, we're done.
     if (failedConstraint && !ContinueAfterFailures) {
@@ -388,10 +372,7 @@ ConstraintSystem::SolverState::~SolverState() {
 #endif
 
     // Transfer the constraint to "active" set.
-    CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
-                                CS.InactiveConstraints, constraint);
-
-    constraint->setActive(true);
+    CS.activateConstraint(constraint);
   }
 
   // Restore debugging state.
