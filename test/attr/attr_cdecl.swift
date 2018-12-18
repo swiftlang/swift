@@ -18,7 +18,11 @@ var computed: Int {
 
 struct SwiftStruct { var x, y: Int }
 enum SwiftEnum { case A, B }
+#if os(Windows) && arch(x86_64)
+@objc enum CEnum: Int32 { case A, B }
+#else
 @objc enum CEnum: Int { case A, B }
+#endif
 
 @_cdecl("swiftStruct")
 func swiftStruct(x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
