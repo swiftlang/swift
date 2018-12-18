@@ -59,7 +59,11 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
   // Phase 2: Syntactic Transformations
   // Don't run these passes if we're already in newest Swift version.
   if (EffectiveVersion != CurrentVersion) {
-    auto FailedSyntacticPasses = M.performSyntacticPasses();
+    SyntacticPassOptions Opts;
+
+    // Type of optional try changes since Swift 5.
+    Opts.RunOptionalTryMigration = !EffectiveVersion.isVersionAtLeast(5);
+    auto FailedSyntacticPasses = M.performSyntacticPasses(Opts);
     if (FailedSyntacticPasses) {
       return true;
     }
@@ -173,7 +177,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
   return Instance;
 }
 
-bool Migrator::performSyntacticPasses() {
+bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
   clang::FileSystemOptions ClangFileSystemOptions;
   clang::FileManager ClangFileManager { ClangFileSystemOptions };
 
@@ -197,8 +201,10 @@ bool Migrator::performSyntacticPasses() {
 
   runAPIDiffMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
                          getMigratorOptions());
-  runOptionalTryMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
-                        getMigratorOptions());
+  if (Opts.RunOptionalTryMigration) {
+    runOptionalTryMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                               getMigratorOptions());
+  }
 
   Edits.commit(Editor.getEdits());
 
