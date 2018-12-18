@@ -614,6 +614,30 @@ bb0(%0 : $Builtin.RawPointer):
   return %2 : $Builtin.RawPointer
 }
 
+sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil @dead_closure_elimination
+// CHECK:      bb0(%0 : $C):
+// CHECK-NEXT:   cond_br
+// CHECK-NOT:  strong_release
+// CHECK:      bb2:
+// CHECK-NEXT:   strong_release %0
+// CHECK         return
+sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %2 : $@callee_guaranteed () -> ()
+  strong_release %2 : $@callee_guaranteed () -> ()
+  br bb2
+bb2:
+  release_value %2 : $@callee_guaranteed () -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
 ////////////////////////////////////////////
 // Load Proj To GEP Load Canonicalization //
 ////////////////////////////////////////////
