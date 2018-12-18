@@ -1996,6 +1996,28 @@ public:
       solverState->retireConstraint(constraint);
   }
 
+  /// Transfer given constraint from to active list
+  /// for solver to attempt its simplification.
+  void activateConstraint(Constraint *constraint) {
+    assert(!constraint->isActive() && "Constraint is already active");
+    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
+                             constraint);
+    constraint->setActive(true);
+  }
+
+  void deactivateConstraint(Constraint *constraint) {
+    assert(constraint->isActive() && "Constraint is already inactive");
+    InactiveConstraints.splice(InactiveConstraints.end(),
+                               ActiveConstraints, constraint);
+    constraint->setActive(false);
+  }
+
+  void retireConstraint(Constraint *constraint) {
+    if (constraint->isActive())
+      deactivateConstraint(constraint);
+    removeInactiveConstraint(constraint);
+  }
+
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
 

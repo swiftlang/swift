@@ -227,11 +227,8 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
       [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
-  for (auto constraint : inactiveConstraints) {
-    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
-                             constraint);
-    constraint->setActive(true);
-  }
+  for (auto *constraint : inactiveConstraints)
+    activateConstraint(constraint);
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
