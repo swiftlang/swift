@@ -60,12 +60,12 @@ public let DataBenchmarks = [
     BenchmarkInfo(name: "DataAppendDataLargeToSmall", runFunction: run_AppendDataLargeToSmall, tags: [.validation, .api, .Data]),
     BenchmarkInfo(name: "DataAppendDataLargeToMedium", runFunction: run_AppendDataLargeToMedium, tags: [.validation, .api, .Data]),
     BenchmarkInfo(name: "DataAppendDataLargeToLarge", runFunction: run_AppendDataLargeToLarge, tags: [.validation, .api, .Data, .skip]),
-    BenchmarkInfo(name: "DataToStringEmpty", runFunction: run_DataToStringEmpty, tags: [.validation, .api, .Data]),
-    BenchmarkInfo(name: "DataToStringSmall", runFunction: run_DataToStringSmall, tags: [.validation, .api, .Data]),
-    BenchmarkInfo(name: "DataToStringMedium", runFunction: run_DataToStringMedium, tags: [.validation, .api, .Data]),
-    BenchmarkInfo(name: "StringToDataEmpty", runFunction: run_StringToDataEmpty, tags: [.validation, .api, .Data]),
-    BenchmarkInfo(name: "StringToDataSmall", runFunction: run_StringToDataSmall, tags: [.validation, .api, .Data]),
-    BenchmarkInfo(name: "StringToDataMedium", runFunction: run_StringToDataMedium, tags: [.validation, .api, .Data]),
+    BenchmarkInfo(name: "DataToStringEmpty", runFunction: run_DataToStringEmpty, tags: [.validation, .api, .Data], legacyFactor: 50),
+    BenchmarkInfo(name: "DataToStringSmall", runFunction: run_DataToStringSmall, tags: [.validation, .api, .Data], legacyFactor: 50),
+    BenchmarkInfo(name: "DataToStringMedium", runFunction: run_DataToStringMedium, tags: [.validation, .api, .Data], legacyFactor: 50),
+    BenchmarkInfo(name: "StringToDataEmpty", runFunction: run_StringToDataEmpty, tags: [.validation, .api, .Data], legacyFactor: 50),
+    BenchmarkInfo(name: "StringToDataSmall", runFunction: run_StringToDataSmall, tags: [.validation, .api, .Data], legacyFactor: 50),
+    BenchmarkInfo(name: "StringToDataMedium", runFunction: run_StringToDataMedium, tags: [.validation, .api, .Data], legacyFactor: 50),
 ]
 
 enum SampleKind {
@@ -165,7 +165,7 @@ func sampleData(_ type: SampleKind) -> Data {
     case .string: return sampleString()
     case .immutableBacking: return sampleBridgedNSData()
     }
-    
+
 }
 
 func benchmark_AccessBytes(_ N: Int, _ data: Data) {
@@ -598,7 +598,7 @@ public func run_createMediumArray(_ N: Int) {
 @inline(never)
 public func run_DataToStringEmpty(_ N: Int) {
     let d = Data()
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let s = String(decoding: d, as: UTF8.self)
         blackHole(s)
     }
@@ -607,7 +607,7 @@ public func run_DataToStringEmpty(_ N: Int) {
 @inline(never)
 public func run_DataToStringSmall(_ N: Int) {
     let d = Data([0x0D, 0x0A])
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let s = String(decoding: d, as: UTF8.self)
         blackHole(s)
     }
@@ -616,7 +616,7 @@ public func run_DataToStringSmall(_ N: Int) {
 @inline(never)
 public func run_DataToStringMedium(_ N: Int) {
     let d = Data([0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A])
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let s = String(decoding: d, as: UTF8.self)
         blackHole(s)
     }
@@ -625,7 +625,7 @@ public func run_DataToStringMedium(_ N: Int) {
 @inline(never)
 public func run_StringToDataEmpty(_ N: Int) {
     let s = ""
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let d = Data(s.utf8)
         blackHole(d)
     }
@@ -634,7 +634,7 @@ public func run_StringToDataEmpty(_ N: Int) {
 @inline(never)
 public func run_StringToDataSmall(_ N: Int) {
     let s = "\r\n"
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let d = Data(s.utf8)
         blackHole(d)
     }
@@ -643,7 +643,7 @@ public func run_StringToDataSmall(_ N: Int) {
 @inline(never)
 public func run_StringToDataMedium(_ N: Int) {
     let s = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
-    for _ in 0..<10000 * N {
+    for _ in 0..<200 * N {
         let d = Data(s.utf8)
         blackHole(d)
     }
