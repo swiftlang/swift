@@ -133,6 +133,11 @@ def enable_experimental_dependencies :
 Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
+def driver_verify_experimental_dependency_graph_after_every_import :
+Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+InternalDebugOpt,
+HelpText<"Debug DriverGraph by verifying it after every import">;
+
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 

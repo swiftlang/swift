@@ -47,13 +47,11 @@ LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
-  // For debugging, emit dot files before and after.
+  auto r = loadFromBuffer(Cmd, *buffer.get());
   // TODO: add flag to control dot file creation
   emitDotFileForJob(diags, Cmd);
-  verify();
-  auto r = loadFromBuffer(Cmd, *buffer.get());
-  emitDotFileForJob(diags, Cmd);
-  verify();
+  if (verifyExperimentalDependencyGraphAfterEveryImport)
+    verify();
   return r;
 }
 
@@ -74,6 +72,7 @@ bool DriverGraph::isMarked(const Job *cmd) const {
 void DriverGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
                                  const Job *job,
                                  DependencyGraph<const Job *>::MarkTracer *) {
+  assert(verify() && "Cannot mark graph in bad state.");
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
   std::unordered_set<const DriverNode *> visitedNodeSet;
   const StringRef swiftDeps = getSwiftDeps(job);
@@ -371,12 +370,14 @@ void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
 // MARK: DriverGraph debugging
 //==============================================================================
 
-void DriverGraph::verify() const {
+bool DriverGraph::verify() const {
   // TODO: split up each three parts
   FrontendStatsTracer tracer(stats, "experimental-dependencies-verify");
   verifyNodeMapEntries();
   verifyCanFindEachJob();
   verifyEachJobIsTracked();
+
+  return true;
 }
 
 void DriverGraph::verifyNodeMapEntries() const {

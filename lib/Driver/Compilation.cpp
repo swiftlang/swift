@@ -120,7 +120,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
-                         bool EnableExperimentalDependencies)
+                         bool EnableExperimentalDependencies,
+                         bool VerifyExperimentalDependencyGraphAfterEveryImport)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -142,8 +143,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
-    EnableExperimentalDependencies(EnableExperimentalDependencies) {
-        
+    EnableExperimentalDependencies(EnableExperimentalDependencies),
+    VerifyExperimentalDependencyGraphAfterEveryImport(
+      VerifyExperimentalDependencyGraphAfterEveryImport) {
+      
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -691,7 +694,9 @@ namespace driver {
       : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
         TQ(std::move(TaskQueue)) {
       if (Comp.getEnableExperimentalDependencies())
-        ExpDepGraph.emplace(Comp.getStatsReporter());
+        ExpDepGraph.emplace(
+            Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
+            Comp.getStatsReporter());
       else if (Comp.getShowIncrementalBuildDecisions() ||
                Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;

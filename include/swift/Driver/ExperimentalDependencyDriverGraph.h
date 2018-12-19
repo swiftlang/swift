@@ -134,6 +134,8 @@ class DriverGraph {
   /// files for the same job distinct, keep a sequence number for each job.
   std::unordered_map<const driver::Job *, unsigned> dotFileSequenceNumberByJob;
 
+  const bool verifyExperimentalDependencyGraphAfterEveryImport;
+
   /// For helping with performance tuning, may be null:
   UnifiedStatsReporter *const stats;
 
@@ -184,7 +186,13 @@ public:
   using NodeType = DriverNode;
 
   /// \p stats may be null
-  DriverGraph(UnifiedStatsReporter *stats) : stats(stats) {}
+  DriverGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
+              UnifiedStatsReporter *stats)
+      : verifyExperimentalDependencyGraphAfterEveryImport(
+            verifyExperimentalDependencyGraphAfterEveryImport),
+        stats(stats) {
+    assert(verify() && "DriverGraph should be fine when created");
+  }
 
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
@@ -228,7 +236,8 @@ public:
   void markExternal(SmallVectorImpl<const driver::Job *> &uses,
                     StringRef externalDependency);
 
-  void verify() const;
+  /// Return true or abort
+  bool verify() const;
 
 private:
   void verifyNodeMapEntries() const;
