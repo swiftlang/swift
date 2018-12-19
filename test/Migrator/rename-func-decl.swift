@@ -18,3 +18,7 @@ class MySubTopLevelType: ToplevelType {
 class MySubTopLevelType2: ToplevelType {
   override func member(_ x: @escaping (((([(Any)])?))) -> Void) {}
 }
+
+class SubCities: Cities {
+  override var yogurt: Int { return 2 }
+}
