@@ -37,7 +37,11 @@
         "icu": {
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
-        }
+        },
+        "libcxx": {
+            "remote": { "id": "apple/swift-libcxx" } },
+        "clang-tools-extra": {
+            "remote": { "id": "apple/swift-clang-tools-extra" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -60,7 +64,9 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
-                "icu": "release-61-1"
+                "icu": "release-61-1",
+                "clang-tools-extra": "stable",
+                "libcxx": "stable"
             }
         },
         "next" : {
@@ -84,7 +90,9 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
-                "icu": "release-61-1"
+                "icu": "release-61-1",
+                "clang-tools-extra": "upstream-with-swift",
+                "libcxx": "upstream-with-swift"
             }
         },
         "swift-3.0-branch" : {
@@ -211,7 +219,9 @@
                 "swift-integration-tests": "swift-5.0-branch",
                 "swift-xcode-playground-support": "swift-5.0-branch",
                 "ninja": "release",
-                "icu": "release-61-1"
+                "icu": "release-61-1",
+                "clang-tools-extra": "swift-5.0-branch",
+                "libcxx": "swift-5.0-branch"
             }
         }
     }
