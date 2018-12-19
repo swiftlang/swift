@@ -78,6 +78,10 @@ TypeResolution TypeResolution::forContextual(DeclContext *dc,
   return result;
 }
 
+ASTContext &TypeResolution::getASTContext() const {
+  return dc->getASTContext();
+}
+
 GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   assert(stage == TypeResolutionStage::Interface);
   if (!complete.builder) {
