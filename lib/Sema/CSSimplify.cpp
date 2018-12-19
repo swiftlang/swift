@@ -1076,6 +1076,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     subKind = ConstraintKind::Conversion;
     break;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
@@ -1138,6 +1139,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Equal:
     return rep1 != rep2;
 
+  case ConstraintKind::OpaqueUnderlyingType:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
@@ -1306,6 +1308,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType:
     subKind = ConstraintKind::Subtype;
     break;
 
@@ -2204,6 +2207,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OperatorArgumentConversion:
       return formUnsolvedResult();
 
+    case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
@@ -4657,6 +4661,40 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
+                                             TypeMatchOptions flags,
+                                             ConstraintLocatorBuilder locator) {
+  // Open the second type, which must be an opaque archetype, to try to
+  // infer the first type using its constraints.
+  auto opaque2 = type2->castTo<OpaqueTypeArchetypeType>();
+
+  // Open the generic signature of the opaque decl, and bind the "outer" generic
+  // params to our context. The remaining axes of freedom on the type variable
+  // corresponding to the underlying type should be the constraints on the
+  // underlying return type.
+  OpenedTypeMap replacements;
+  openGeneric(nullptr, DC, opaque2->getBoundSignature(),
+              /*skip self*/ false,
+              locator, replacements);
+  
+  auto underlyingTyVar = openType(opaque2->getInterfaceType(),
+                                  replacements);
+  assert(underlyingTyVar);
+  
+  if (auto dcSig = DC->getGenericSignatureOfContext()) {
+    for (auto param : dcSig->getGenericParams()) {
+      addConstraint(ConstraintKind::Bind,
+                    openType(param, replacements),
+                    DC->mapTypeIntoContext(param),
+                    locator);
+    }
+  }
+
+  addConstraint(ConstraintKind::Equal, type1, underlyingTyVar, locator);
+  return getTypeMatchSuccess();
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
@@ -6410,6 +6448,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::OperatorArgumentConversion:
     return matchTypes(first, second, kind, subflags, locator);
 
+  case ConstraintKind::OpaqueUnderlyingType:
+    return simplifyOpaqueUnderlyingTypeConstraint(first, second,
+                                                  subflags, locator);
+
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
 
@@ -6662,7 +6704,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::OperatorArgumentConversion: {
+  case ConstraintKind::OperatorArgumentConversion:
+  case ConstraintKind::OpaqueUnderlyingType: {
     // Relational constraints.
     auto matchKind = constraint.getKind();
 
