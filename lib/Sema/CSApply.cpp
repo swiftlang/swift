@@ -3885,8 +3885,9 @@ namespace {
     }
 
     Expr *visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      simplifyExprType(expr);
-      assert(expr->getType()->isEqual(expr->getSubExpr()->getType()));
+      // Since `LazyInitializerExpr` should always have a type set,
+      // there is no need to do anything here.
+      assert(cs.getType(expr)->isEqual(expr->getSubExpr()->getType()));
       return expr;
     }
     
