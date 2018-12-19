@@ -59,6 +59,19 @@ module WinSDK [system] [extern_c] {
       header "synchapi.h"
       export *
     }
+
+    // api-ms-win-core-sysinfo-l1-1-0.dll
+    module sysinfo {
+      header "sysinfoapi.h"
+      export *
+    }
+
+    // api-ms-win-core-timezone-l1-1-0.dll
+    module timezone {
+      header "timezoneapi.h"
+      export *
+    }
   }
+
 }
 
