@@ -22,7 +22,7 @@ public func testSendsInALoopGPU() {
   var count = 1
 
   while count < maxCount {
-    a += a
+    a += a    // expected-warning  {{implicitly copied to the host}}
     // One send.
     _hostOp(a.toHost())
     count += 1
