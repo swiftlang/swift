@@ -99,6 +99,9 @@ for sdk in $SDKS_ORDERED; do
     DEPENDS_ON+="CoreGraphics"
   fi
 
+  if [[ "$1" == "simd" ]]; then
+    DEPENDS_ON+="SIMDOperators"
+  fi
 
   echo "$DEPENDS_ON"
   if [[ $UPDATE_CMAKE == 1 ]]; then
