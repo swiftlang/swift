@@ -49,19 +49,19 @@ bb0(%0 : @trivial $Builtin.FPIEEE32, %1 : @trivial $Builtin.FPIEEE32):
 sil [Onone] @main : $@convention(thin) (Builtin.FPIEEE32) -> () {
 bb0(%0 : @trivial $Builtin.FPIEEE32):
   %simple_mul = function_ref @simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  %simple_mul_grad = gradient [source 0] [wrt 0, 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %simple_mul_ad = autodiff_function [wrt 0 1] [order 1] %simple_mul : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %simple_div = function_ref @simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  %simple_div_grad = gradient [source 0] [wrt 0, 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %simple_div_ad = autodiff_function [wrt 0 1] [order 1] %simple_div : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %chain_rule = function_ref @chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  %chain_rule_grad = gradient [source 0] [wrt 0, 1] %chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %chain_rule_ad = autodiff_function [wrt 0 1] [order 1] %chain_rule : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %add_literals = function_ref @add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  %add_literals_grad = gradient [source 0] [wrt 0, 1] %add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %add_literals_ad = autodiff_function [wrt 0 1] [order 1] %add_literals : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %fanout = function_ref @fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
-  %fanout_grad = gradient [source 0] [wrt 0, 1] %fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
+  %fanout_ad = autodiff_function [wrt 0 1] [order 1] %fanout : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.FPIEEE32
 
   %ret = tuple ()
   return %ret : $()

@@ -10,7 +10,7 @@ func squared(_ x: Float) -> Float {
   return x * x
 }
 
-#gradient(squared)(20)
+_ = gradient(at: 20, in: squared)
 
 // CHECK-LABEL: sil hidden @{{.*}}squared{{.*}}__primal_src_0_wrt_0
 // CHECK: [[PV:%.*]] = struct ${{.*}}squared{{.*}}__Type__src_0_wrt_0 ({{.*}} : $Builtin.FPIEEE32)
