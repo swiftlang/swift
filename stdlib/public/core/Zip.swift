@@ -69,16 +69,14 @@ public func zip<Sequence1, Sequence2>(
 ///     // Prints "four: 4"
 @_fixed_layout // generic-performance
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
-  @usableFromInline // generic-performance
-  internal let _sequence1: Sequence1
-  @usableFromInline // generic-performance
-  internal let _sequence2: Sequence2
+  public let sequence1: Sequence1
+  public let sequence2: Sequence2
 
   /// Creates an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   @inlinable // generic-performance
   internal init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
-    (_sequence1, _sequence2) = (sequence1, sequence2)
+    (self.sequence1, self.sequence2) = (sequence1, sequence2)
   }
 }
 
@@ -87,9 +85,9 @@ extension Zip2Sequence {
   @_fixed_layout // generic-performance
   public struct Iterator {
     @usableFromInline // generic-performance
-    internal var _baseStream1: Sequence1.Iterator
+    internal var _iterator1: Sequence1.Iterator
     @usableFromInline // generic-performance
-    internal var _baseStream2: Sequence2.Iterator
+    internal var _iterator2: Sequence2.Iterator
     @usableFromInline // generic-performance
     internal var _reachedEnd: Bool = false
 
@@ -99,7 +97,7 @@ extension Zip2Sequence {
     _ iterator1: Sequence1.Iterator, 
     _ iterator2: Sequence2.Iterator
     ) {
-      (_baseStream1, _baseStream2) = (iterator1, iterator2)
+      (_iterator1, _iterator2) = (iterator1, iterator2)
     }
   }
 }
@@ -124,8 +122,8 @@ extension Zip2Sequence.Iterator: IteratorProtocol {
       return nil
     }
 
-    guard let element1 = _baseStream1.next(),
-          let element2 = _baseStream2.next() else {
+    guard let element1 = _iterator1.next(),
+          let element2 = _iterator2.next() else {
       _reachedEnd = true
       return nil
     }
@@ -141,7 +139,7 @@ extension Zip2Sequence: Sequence {
   @inlinable // generic-performance
   public __consuming func makeIterator() -> Iterator {
     return Iterator(
-      _sequence1.makeIterator(),
-      _sequence2.makeIterator())
+      sequence1.makeIterator(),
+      sequence2.makeIterator())
   }
 }
