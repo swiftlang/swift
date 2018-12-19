@@ -9,6 +9,7 @@ open class Cities {
   open func buderim() -> Cities? { return Cities(x: 1) }
   open func noosa() -> [[String : Cities]?] { return [] }
   open func maroochy(x: Int?, y: Int?) {}
+  open var yogurt: Int { return 1 }
   public struct CityKind {
     public static let Town = 1
     public static let Village = 1
