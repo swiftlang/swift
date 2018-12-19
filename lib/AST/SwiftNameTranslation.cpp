@@ -16,6 +16,7 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/Basic/StringExtras.h"
@@ -49,6 +50,14 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   }
 
   return VD->getBaseName().getIdentifier().str();
+}
+
+std::string swift::objc_translation::
+getErrorDomainStringForObjC(const EnumDecl *ED) {
+  std::string buffer = ED->getParentModule()->getNameStr();
+  buffer += ".";
+  buffer += ED->getNameStr();
+  return buffer;
 }
 
 bool swift::objc_translation::

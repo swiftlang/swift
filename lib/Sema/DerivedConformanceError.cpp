@@ -22,8 +22,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/SwiftNameTranslation.h"
 
 using namespace swift;
+using namespace swift::objc_translation;
 
 static void deriveBodyBridgedNSError_enum_nsErrorDomain(
               AbstractFunctionDecl *domainDecl, void *) {
@@ -39,10 +41,7 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
   auto TC = domainDecl->getInnermostTypeContext();
   auto ED = TC->getSelfEnumDecl();
 
-  std::string buffer = M->getNameStr();
-  buffer += ".";
-  buffer += ED->getNameStr();
-  StringRef value(C.AllocateCopy(buffer));
+  StringRef value(C.AllocateCopy(getErrorDomainStringForObjC(ED)));
 
   auto string = new (C) StringLiteralExpr(value, SourceRange(), /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), string, /*implicit*/ true);
@@ -57,12 +56,9 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
-  //     return "\(self)"
+  //     return "ModuleName.SomeEnum"
   //   }
   // }
-
-  // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
-  // If this changes, please change PrintAsObjC as well.
 
   ASTContext &C = derived.TC.Context;
 
