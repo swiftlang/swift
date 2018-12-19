@@ -1072,10 +1072,10 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON: {{^}}enum d2300_EnumDeclWithValues1 : Int {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
-// PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}}{{$}}
+// PASS_COMMON-DAG: {{^}}  typealias RawValue = Int
+// PASS_COMMON-DAG: {{^}}  init?(rawValue: Int){{$}}
+// PASS_COMMON-DAG: {{^}}  var rawValue: Int { get }{{$}}
+// PASS_COMMON: {{^}}}{{$}}
 
 enum d2400_EnumDeclWithValues2 : Double {
   case EDV3_First = 10
@@ -1084,10 +1084,10 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON: {{^}}enum d2400_EnumDeclWithValues2 : Double {{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_First{{$}}
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
-// PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
-// PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
-// PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
-// PASS_COMMON-NEXT: {{^}}}{{$}}
+// PASS_COMMON-DAG: {{^}}  typealias RawValue = Double
+// PASS_COMMON-DAG: {{^}}  init?(rawValue: Double){{$}}
+// PASS_COMMON-DAG: {{^}}  var rawValue: Double { get }{{$}}
+// PASS_COMMON: {{^}}}{{$}}
 
 //===---
 //===--- Custom operator printing.

@@ -1,8 +1,5 @@
 // REQUIRES: objc_interop
 
-// SourceKit is expected to produce documentation in source order.
-// UNSUPPORTED: swift_evolve
-
 // FIXME: the test output we're comparing to is specific to macOS.
 // REQUIRES-ANY: OS=macosx
 
