@@ -11,6 +11,7 @@ protocol P {
 protocol Q { func quinn() }
 extension Int: P, Q { func paul() {}; mutating func priscilla() {}; func quinn() {} }
 extension String: P, Q { func paul() {}; mutating func priscilla() {}; func quinn() {} }
+extension Array: P, Q { func paul() {}; mutating func priscilla() {}; func quinn() {} }
 
 class C {}
 class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
@@ -23,22 +24,22 @@ var computedFoo: __opaque P {  // FIXME expected-error{{'opaque' types are only 
   set { _ = newValue + 1 }
 }
 func bar() -> __opaque P {
-  return 1 // FIXME expected-error{{convert}}
+  return 1
 }
 func bas() -> __opaque P & Q {
-  return 1 // FIXME expected-error{{convert}}
+  return 1
 }
 func zim() -> __opaque C {
-  return D() // FIXME expected-error{{convert}}
+  return D()
 }
 func zang() -> __opaque C & P & Q {
-  return D() // FIXME expected-error{{convert}}
+  return D()
 }
 func zung() -> __opaque AnyObject {
-  return D() // FIXME expected-error{{convert}}
+  return D()
 }
 func zoop() -> __opaque Any {
-  return D() // FIXME expected-error{{convert}}
+  return D()
 }
 
 //let zingle = {() -> __opaque P in 1 } // FIXME ex/pected-error{{'opaque' types are only implemented}}
@@ -51,7 +52,7 @@ func blibble(blobble: __opaque P) {} // expected-error{{'opaque' types are only 
 
 let blubble: () -> __opaque P = { 1 } // expected-error{{'opaque' types are only implemented}}
 
-func blib() -> P & __opaque Q { return 1 } // expected-error{{'opaque' should appear at the beginning}} // FIXME expected-error{{convert}}
+func blib() -> P & __opaque Q { return 1 } // expected-error{{'opaque' should appear at the beginning}}
 func blab() -> (P, __opaque Q) { return (1, 2) } // expected-error{{'opaque' types are only implemented}}
 func blob() -> (__opaque P) -> P { return { $0 } } // expected-error{{'opaque' types are only implemented}}
 
@@ -63,10 +64,10 @@ let zwoggle: __opaque (() -> ()) = {} // FIXME expected-error{{'opaque' types ar
 
 // Type-checking of expressions of opaque type
 
-func alice() -> __opaque P { return 1 } // FIXME expected-error{{convert}}
-func bob() -> __opaque P { return 1 } // FIXME expected-error{{convert}}
+func alice() -> __opaque P { return 1 }
+func bob() -> __opaque P { return 1 }
 
-func grace<T: P>(_ x: T) -> __opaque P { return x } // FIXME expected-error{{convert}}
+func grace<T: P>(_ x: T) -> __opaque P { return x }
 
 func typeIdentity() {
   do {
@@ -125,3 +126,34 @@ func typeIdentity() {
   }
 }
 
+func recursion(x: Int) -> __opaque P {
+  if x == 0 {
+    return 0
+  }
+  return recursion(x: x - 1)
+}
+
+func noReturnStmts() -> __opaque P { fatalError() } // expected-error{{no return statements}}
+
+func mismatchedReturnTypes(_ x: Bool, _ y: Int, _ z: String) -> __opaque P { // expected-error{{do not have matching underlying types}}
+  if x {
+    return y // expected-note{{underlying type 'Int'}}
+  } else {
+    return z // expected-note{{underlying type 'String'}}
+  }
+}
+
+func jan() -> __opaque P {
+  return [marcia(), marcia(), marcia()]
+}
+func marcia() -> __opaque P {
+  return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}}
+}
+
+/* TODO: diagnostics
+struct DoesNotConform {}
+
+func doesNotConform() -> __opaque P {
+  return DoesNotConform()
+}
+*/

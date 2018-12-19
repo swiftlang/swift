@@ -2078,6 +2078,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
     csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
 
+  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
+    csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
+
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
