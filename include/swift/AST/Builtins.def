@@ -423,9 +423,29 @@ BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
+///
+/// Parameters: object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use "aligned" allocation,
+/// and the memory will be aligned to _swift_MinAllocationAlignment.
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
 /// DeallocRaw has type (Builtin.RawPointer, Int, Int) -> ()
+///
+/// Parameters: object address, object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use the "aligned" deallocation
+/// path, which assumes that "aligned" allocation was used.
+///
+/// Note that the alignment value provided to `deallocRaw` must be identical to
+/// the alignment value provided to `allocRaw` when the memory at this address
+/// was allocated.
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().
