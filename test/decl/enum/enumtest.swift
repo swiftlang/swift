@@ -326,3 +326,10 @@ enum Lens<T> {
   case baz((inout T) -> ()) // ok
   case quux((inout T, inout T) -> ()) // ok
 }
+
+// In the long term, these should be legal, but we don't support them right
+// now and we shouldn't pretend to.
+// rdar://46684504
+enum HasVariadic {
+  case variadic(x: Int...) // expected-error {{variadic enum cases are not supported}}
+}
