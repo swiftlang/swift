@@ -28,19 +28,19 @@ func /*trailing:def*/withTrailingClosure(x: Int, y: () -> Int) {}
 /*trailing:call*/withTrailingClosure(x: 2)
 { return 1}
 
-func /*trailing-only:def*/trailingOnly(a: () -> ()) {}
-/*trailing-only:call*/trailingOnly(a: {})
-/*trailing-only:call*/trailingOnly {}
+func /*trailing-only:def*/betterName(b: () -> ()) {}
+/*trailing-only:call*/betterName(b: {})
+/*trailing-only:call*/betterName {}
 
 
-func /*varargs:def*/betterName(a: Int..., b: Int, c: Int) {}
+func /*varargs:def*/withVarargs(x: Int..., y: Int, _: Int) {}
 
 // valid
-/*varargs:call*/betterName(a: 1, 2, 3, b: 2, c: 4)
-/*varargs:call*/betterName(b: 2, c: 4)
+/*varargs:call*/withVarargs(x: 1, 2, 3, y: 2, 4)
+/*varargs:call*/withVarargs(y: 2, 4)
 
 // false positives
-/*varargs:call*/betterName(a: 1, b: 2, c: 4, 5)
+/*varargs:call*/withVarargs(x: 1, y: 2, 4, 5)
 
 //invalid
 /*varargs:call*/withVarargs(2, y: 2)
