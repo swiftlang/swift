@@ -39,6 +39,12 @@ HashingWorkloads = AllWorkloads[:-1]
 LegacyFactor = dict(abnormal=20, emoji=4, latin1=2, fastPrenormal=10,
                     slowerPrenormal=10, nonBMPSlowestPrenormal=10, zalgo=25)
 
+def legacyFactor(name):
+  lf = LegacyFactor.get(name)
+  return (
+    ',\n\t\tlegacyFactor: {0}'.format(lf) if lf else
+    '')
+}%
 public let StringComparison: [BenchmarkInfo] = [
 % for Name in ComparisonWorkloads:
   BenchmarkInfo(
