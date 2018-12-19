@@ -395,7 +395,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var stopNow = _stdlib_AtomicInt(0)
 
   var trialBarrier: _stdlib_Barrier
-  var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
+  var trialSpinBarrier = _stdlib_AtomicInt()
 
   var raceData: [RT.RaceData] = []
   var workerStates: [_RaceTestWorkerState<RT>] = []
