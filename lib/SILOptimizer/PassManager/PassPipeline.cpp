@@ -635,7 +635,6 @@ SILPassPipelinePlan SILPassPipelinePlan::getTFPartitionPassPipeline() {
   SILPassPipelinePlan P;
   P.startPipeline("TensorFlow Partitioning");
   P.addTFDeabstraction();
-  addSimplifyCFGSILCombinePasses(P);
   P.addTFPartition();
   return P;
 }

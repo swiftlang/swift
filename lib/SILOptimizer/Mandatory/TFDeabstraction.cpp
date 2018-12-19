@@ -155,7 +155,7 @@ namespace {
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
-    void propagateSSAValues();
+    void propagateSSAValues(SmallVectorImpl<SILInstruction *> &relevantInsts);
     void checkAttributesAndFormGraphOps();
     void
     evaluateAttributesAndDoPacking(GraphOperationInst *origInst,
@@ -1683,11 +1683,12 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPhiArgument *, 8> &checkedPhis) {
 /// intervening struct/tuple wrappers.
 /// This is essential in deabstracting constant tfop attribute values, and also
 /// helps reduce sends/recvs involving tensor operands.
-void TFDeabstraction::propagateSSAValues() {
+void TFDeabstraction::propagateSSAValues(
+    SmallVectorImpl<SILInstruction *> &relevantInsts) {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateSSAValues");
 
   SmallPtrSet<SILPhiArgument*, 8> checkedPhis;
-  for (auto *op : tensorOps) {
+  for (auto *op : relevantInsts) {
     for (auto &operand : op->getAllOperands()) {
       // Get the propagated value.
       auto newVal = propagateSSAOperand(operand.get(), checkedPhis);
@@ -2566,7 +2567,7 @@ void TFDeabstraction::doIt() {
   // Now that we've promoted all the allocations in the way of our dataflow,
   // go through and propagate any tuple/struct values that are in the way of
   // our analysis.
-  propagateSSAValues();
+  propagateSSAValues(tensorOps);
 
   logCurrentState("After propagateSSAValues", /*detailed*/ true);
 
@@ -2594,6 +2595,23 @@ void TFDeabstraction::doIt() {
   // functions in the performance inliner and therefore, the optimzier does not
   // see the redundant memory allocations. Fix them now.
   optimizeMemoryAllocations(fn);
+
+  logCurrentState("After optimizeMemoryAllocations", /*detailed*/true);
+
+  // During the forming of graph_op instructions, redundant instructions (such
+  // as/ `StructInst`) may be introduced. Run another round of
+  // propagateSSAValues on the newly formed graph ops.
+  {
+    SmallVector<SILInstruction*, 32> newTensorOps;
+    for (SILBasicBlock &bb : fn) {
+      for (SILInstruction & inst : bb) {
+        if (auto graphOp = dyn_cast<GraphOperationInst>(&inst)) {
+          newTensorOps.push_back(&inst);
+        }
+      }
+    }
+    propagateSSAValues(newTensorOps);
+  }
 
   logCurrentState("Before Cleanup", /*detailed*/true);
 
