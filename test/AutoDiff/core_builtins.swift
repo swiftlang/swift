@@ -5,7 +5,7 @@ import Swift
 
 func evaldiff<T: Differentiable, U: Differentiable>(_ f: @autodiff (T) -> U, _ x: T) -> (U, (T.TangentVector) -> U.TangentVector)
   where T == T.TangentVector {
-  return Builtin.autodiffApplyJVP(f, x)
+  return Builtin.autodiffApply_jvp(f, x)
 }
 
 // CHECK-SIL-LABEL: @{{.*}}evaldiff{{.*}}
@@ -27,10 +27,19 @@ func evaldiff<T: Differentiable, U: Differentiable>(_ f: @autodiff (T) -> U, _ x
 // CHECK-SIL:   dealloc_stack [[ORIG_FN_ARG_COPY]] : $*T
 // CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T) -> @out U.TangentVector
 
+func evaldiff2<T: Differentiable, U: Differentiable, V: Differentiable>(_ f: @autodiff (T, U) -> V, _ x: T, _ y: U) -> (V, (T.TangentVector, U.TangentVector) -> V.TangentVector)
+  where T == T.TangentVector, U == U.TangentVector {
+  return Builtin.autodiffApply_jvp_arity2(f, x, y)
+}
+
+// CHECK-LABEL: @{{.*}}evaldiff2{{.*}}
+// CHECK: bb0({{.*}} : @trivial $*V, [[DIFFED:%.*]] : @trivial $@autodiff @noescape @callee_guaranteed (@in_guaranteed T, @in_guaranteed U) -> @out V, {{.*}} : @trivial $*T, {{.*}} : @trivial $*U):
+// CHECK:   autodiff_function_extract [jvp] [order 1] [[DIFFED]] : $@autodiff @noescape @callee_guaranteed (@in_guaranteed T, @in_guaranteed U) -> @out V // user: %14
+
 func methoddiff<T: Differentiable, U: Differentiable, R: Differentiable>(_ f: @autodiff (T) -> (U) -> R, _ x: T, _ y: U)
     -> (R, (T.TangentVector, U.TangentVector) -> R.TangentVector)
   where T == T.TangentVector, U == U.TangentVector {
-  return Builtin.autodiffApplyMethodJVP(f, x, y)
+  return Builtin.autodiffApply_jvp_method(f, x, y)
 }
 
 // CHECK-SIL-LABEL: @{{.*}}methoddiff{{.*}}

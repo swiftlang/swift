@@ -6,38 +6,75 @@ import StdlibUnittest
 
 var BuiltinDifferentialOperatorTests = TestSuite("BuiltinDifferentialOperators")
 
-BuiltinDifferentialOperatorTests.test("Trivial") {
+BuiltinDifferentialOperatorTests.test("Unary") {
   let t = 1.0
   do {
-    let (value: y, pullback: pb) = valueWithPullback(at: 4.0) { x in
-      x * x * t
+    let (value: y, pullback: pb) = valueWithPullback(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
     }
-    expectEqual(16, y)
-    expectEqual(8, pb(1))
-    expectEqual(0, pb(0))
+    expectEqual(20, y)
+    expectEqual((5, 4), pb(1))
+    expectEqual((0, 0), pb(0))
   }
 
   do {
-    let pb = pullback(at: 4.0) { x in
-      x * x * t
+    let pb = pullback(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
     }
-    expectEqual(8, pb(1))
-    expectEqual(0, pb(0))
+    expectEqual((5, 4), pb(1))
+    expectEqual((0, 0), pb(0))
   }
 
   do {
-    let (value: y, gradient: grad) = valueWithGradient(at: 4.0) { x in
-      x * x * t
+    let (value: y, gradient: grad) = valueWithGradient(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
     }
-    expectEqual(16, y)
-    expectEqual(8, grad)
+    expectEqual(20, y)
+    expectEqual((5, 4), grad)
   }
 
   do {
-    let grad = gradient(at: 4.0) { x in
-      x * x * t
+    let grad = gradient(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
     }
-    expectEqual(8, grad)
+    expectEqual((5, 4), grad)
+  }
+}
+
+BuiltinDifferentialOperatorTests.test("Binary") {
+  let t = 1.0
+  do {
+    let (value: y, pullback: pb) = 
+      valueWithPullback(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
+    }
+    expectEqual(20, y)
+    expectEqual((5, 4), pb(1))
+    expectEqual((0, 0), pb(0))
+  }
+
+  do {
+    let pb = pullback(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
+    }
+    expectEqual((5, 4), pb(1))
+    expectEqual((0, 0), pb(0))
+  }
+
+  do {
+    let (value: y, gradient: grad) = 
+      valueWithGradient(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
+    }
+    expectEqual(20, y)
+    expectEqual((5, 4), grad)
+  }
+
+  do {
+    let grad = gradient(at: 4.0, 5.0) { x0, x1 in
+      x0 * x1 * t
+    }
+    expectEqual((5, 4), grad)
   }
 }
 

@@ -11,7 +11,7 @@ func pullback<T, U, R>(
   at x: (T, U), in f: @autodiff (T) -> (U) -> R
 ) -> (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)
   where T : Differentiable, U : Differentiable, R : Differentiable {
-  return Builtin.autodiffApplyMethodVJP(f, x.0, x.1).1
+  return Builtin.autodiffApply_vjp_method(f, x.0, x.1).1
 }
 
 protocol DiffReq : Differentiable {

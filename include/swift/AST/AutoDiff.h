@@ -426,6 +426,14 @@ getOffsetForAutoDiffAssociatedFunction(unsigned order,
 
 unsigned
 getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
+
+// Retrieve config from the function name of a variant of
+// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+// Returns true if the function name is parsed successfully.
+bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
+                                   AutoDiffAssociatedFunctionKind &kind,
+                                   unsigned &arity, unsigned &order,
+                                   bool &rethrows, bool &isMethod);
 } // end namespace autodiff
 
 class BuiltinFloatType;

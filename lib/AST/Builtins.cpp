@@ -1030,7 +1030,7 @@ static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned order, unsigned arity, bool rethrows, bool isMethod) {
+    unsigned arity, unsigned order, bool rethrows, bool isMethod) {
   assert(arity >= 1);
   assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
@@ -1774,7 +1774,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
-
+  // SWIFT_ENABLE_TENSORFLOW
+  if (OperationName.startswith("autodiffApply_")) {
+    AutoDiffAssociatedFunctionKind kind;
+    unsigned arity, order;
+    bool rethrows, isMethod;
+    if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
+                                                 order, rethrows, isMethod))
+      return nullptr;
+    return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
+                                              order, rethrows, isMethod);
+  }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
@@ -2045,22 +2055,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffPopFromTape(Context, Id);
   case BuiltinValueKind::AutoDiffDestroyTape:
     return getAutoDiffDestroyTape(Context, Id);
-  case BuiltinValueKind::AutoDiffApplyJVP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false, /*isMethod*/ false);
-  case BuiltinValueKind::AutoDiffApplyVJP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false, /*isMethod*/ false);
-  case BuiltinValueKind::AutoDiffApplyMethodJVP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false, /*isMethod*/ true);
-  case BuiltinValueKind::AutoDiffApplyMethodVJP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false, /*isMethod*/ true);
+  case BuiltinValueKind::AutoDiffApply:
+    llvm_unreachable("Handled above");
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 

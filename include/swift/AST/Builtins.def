@@ -376,15 +376,8 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
 // SWIFT_ENABLE_TENSORFLOW
-/// autodiffApplyJVP has type <T: Differentiable, R: Differentiable>
-///     ((T) -> R, T) -> (R, (T.TangentVector) -> R.TangentVector).
-BUILTIN_SIL_OPERATION(AutoDiffApplyJVP, "autodiffApplyJVP", Special)
-/// autodiffApplyVJP has type <T: Differentiable, R: Differentiable>
-///     ((T) -> R, T) -> (R, (R.CotangentVector) -> T.CotangentVector).
-BUILTIN_SIL_OPERATION(AutoDiffApplyVJP, "autodiffApplyVJP", Special)
-
-BUILTIN_SIL_OPERATION(AutoDiffApplyMethodJVP, "autodiffApplyMethodJVP", Special)
-BUILTIN_SIL_OPERATION(AutoDiffApplyMethodVJP, "autodiffApplyMethodVJP", Special)
+/// autodiffApply
+BUILTIN_SIL_OPERATION(AutoDiffApply, "autodiffApply", Special)
 
 #undef BUILTIN_SIL_OPERATION
 

@@ -306,6 +306,9 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicStore;
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
+  // SWIFT_ENABLE_TENSORFLOW
+  else if (OperationName.startswith("autodiffApply_"))
+    Info.ID = BuiltinValueKind::AutoDiffApply;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, attrs) .Case(name, BuiltinValueKind::id)

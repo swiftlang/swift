@@ -1043,7 +1043,8 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 
 // SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
-    AutoDiffAssociatedFunctionKind kind, SILGenFunction &SGF, SILLocation loc,
+    AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
+    bool rethrows, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, Expr *argument, SGFContext C) {
   // Get values of the original function and arguments.
   auto *argTuple = cast<TupleExpr>(argument);
@@ -1169,44 +1170,24 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
-static ManagedValue emitBuiltinAutoDiffApplyJVP(SILGenFunction &SGF,
-                                                SILLocation loc,
-                                                SubstitutionMap substitutions,
-                                                Expr *argument,
-                                                SGFContext C) {
-  return emitBuiltinAutoDiffApplyAssociatedFunction(
-      AutoDiffAssociatedFunctionKind::JVP, SGF, loc, substitutions,
-      argument, C);
-}
-
-static ManagedValue emitBuiltinAutoDiffApplyVJP(SILGenFunction &SGF,
-                                                SILLocation loc,
-                                                SubstitutionMap substitutions,
-                                                Expr *argument,
-                                                SGFContext C) {
-  return emitBuiltinAutoDiffApplyAssociatedFunction(
-      AutoDiffAssociatedFunctionKind::VJP, SGF, loc, substitutions,
-      argument, C);
-}
-
-static ManagedValue emitBuiltinAutoDiffApplyMethodJVP(SILGenFunction &SGF,
-                                                SILLocation loc,
-                                                SubstitutionMap substitutions,
-                                                Expr *argument,
-                                                SGFContext C) {
-  return emitBuiltinAutoDiffApplyAssociatedFunction(
-      AutoDiffAssociatedFunctionKind::JVP, SGF, loc, substitutions,
-      argument, C);
-}
-
-static ManagedValue emitBuiltinAutoDiffApplyMethodVJP(SILGenFunction &SGF,
-                                                SILLocation loc,
-                                                SubstitutionMap substitutions,
-                                                Expr *argument,
-                                                SGFContext C) {
-  return emitBuiltinAutoDiffApplyAssociatedFunction(
-      AutoDiffAssociatedFunctionKind::VJP, SGF, loc, substitutions,
-      argument, C);
+static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             SubstitutionMap substitutions,
+                                             Expr *argument, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  AutoDiffAssociatedFunctionKind kind;
+  unsigned arity, order;
+  bool rethrows, isMethod;
+  auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
+      builtinName, kind, arity, order, rethrows, isMethod);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
+                                                    rethrows, SGF, loc,
+                                                    substitutions, argument, C);
 }
 
 Optional<SpecializedEmitter>
