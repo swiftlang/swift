@@ -3498,6 +3498,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(enum_element_ellipsis,none,
+      "variadic enum cases are not supported", ())
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
