@@ -348,8 +348,7 @@ extension _StringGutsSlice {
                 sourceBuffer: leftUTF8,
                 outputBuffer: &outputBuffer,
                 icuInputBuffer: &icuInputBuffer,
-                icuOutputBuffer: &icuOutputBuffer
-              )
+                icuOutputBuffer: &icuOutputBuffer)
             },
             normalizeRight: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
               _fastNormalize(
@@ -357,10 +356,8 @@ extension _StringGutsSlice {
                 sourceBuffer: rightUTF8,
                 outputBuffer: &outputBuffer,
                 icuInputBuffer: &icuInputBuffer,
-                icuOutputBuffer: &icuOutputBuffer
-              )
-            }
-          )
+                icuOutputBuffer: &icuOutputBuffer)
+            })
         }
       }
     } else {
@@ -381,8 +378,7 @@ extension _StringGutsSlice {
             guts: _guts,
             outputBuffer: &outputBuffer,
             icuInputBuffer: &icuInputBuffer,
-            icuOutputBuffer: &icuOutputBuffer
-          )
+            icuOutputBuffer: &icuOutputBuffer)
         },
         normalizeRight: { readIndex, outputBuffer, icuInputBuffer, icuOutputBuffer in
           _foreignNormalize(
@@ -391,10 +387,8 @@ extension _StringGutsSlice {
             guts: other._guts,
             outputBuffer: &outputBuffer,
             icuInputBuffer: &icuInputBuffer,
-            icuOutputBuffer: &icuOutputBuffer
-          )
-        }
-      )
+            icuOutputBuffer: &icuOutputBuffer)
+        })
     }
   }
   
@@ -413,14 +407,12 @@ extension _StringGutsSlice {
       _ readIndex: String.Index,
       _ outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
       _ icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
-      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
-    ) -> NormalizationResult,
+      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>) -> NormalizationResult,
     normalizeRight: (
       _ readIndex: String.Index,
       _ outputBuffer: inout UnsafeMutableBufferPointer<UInt8>,
       _ icuInputBuffer: inout UnsafeMutableBufferPointer<UInt16>,
-      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
-    ) -> NormalizationResult
+      _ icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>) -> NormalizationResult
   ) -> Bool {
     var left_outputBuffer = left_outputBuffer
     var left_icuInputBuffer = left_icuInputBuffer
@@ -470,8 +462,7 @@ extension _StringGutsSlice {
           leftNextReadPosition,
           &left_outputBuffer,
           &left_icuInputBuffer,
-          &left_icuOutputBuffer
-        )
+          &left_icuOutputBuffer)
         _internalInvariant(result.nextReadPosition != leftNextReadPosition)
         leftOutputBufferCount = result.amountFilled
         leftOutputBufferIndex = 0
@@ -486,8 +477,7 @@ extension _StringGutsSlice {
           rightNextReadPosition,
           &right_outputBuffer,
           &right_icuInputBuffer,
-          &right_icuOutputBuffer
-        )
+          &right_icuOutputBuffer)
         _internalInvariant(result.nextReadPosition != rightNextReadPosition)
         rightOutputBufferCount = result.amountFilled
         rightOutputBufferIndex = 0

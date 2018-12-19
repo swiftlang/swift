@@ -350,63 +350,46 @@ internal func _fastNormalize(
     _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
     
     return NormalizationResult(
-      amountFilled: filled, nextReadPosition: nextIndex, allocatedBuffers: false
-    )
+      amountFilled: filled, nextReadPosition: nextIndex, allocatedBuffers: false)
   }
   var allocatedBuffers = false
-  let (read, filled) = transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer) ?? {
+  func performWithAllocationIfNecessary<R>(
+    preserving preserveDataIn: _BufferToCopy, _ f: () -> R?
+  ) -> R {
+    if let result = f() {
+      return result
+    }
     _allocateBuffers(
       sourceCount: sourceBuffer.count,
-      preserveDataIn: .none,
+      preserveDataIn: preserveDataIn,
       outputBuffer: &outputBuffer,
       icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
+      icuOutputBuffer: &icuOutputBuffer)
     _internalInvariant(!allocatedBuffers)
     allocatedBuffers = true
-    return transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer)!
-  }()
+    return f()!
+  }
+  
+  let (read, filled) = performWithAllocationIfNecessary(preserving: .none) { () -> (Int, Int)? in
+    return transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer)
+  }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
   _internalInvariant(sourceBuffer.isOnUnicodeScalarBoundary(nextIndex.encodedOffset))
   
-  let normalized = _tryNormalize(
-    UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer
-  ) ?? {
-    _allocateBuffers(
-      sourceCount: sourceBuffer.count,
-      preserveDataIn: .icuInput,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    _internalInvariant(!allocatedBuffers)
-    allocatedBuffers = true
+  let normalized = performWithAllocationIfNecessary(preserving: .icuInput) { () -> Int? in
     return _tryNormalize(
-      UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer)!
-  }()
+      UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer)
+  }
   
-  let (_, transcoded) = transcodeValidUTF16ToUTF8(
-    UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-    into: outputBuffer
-  ) ?? {
-    _allocateBuffers(
-      sourceCount: sourceBuffer.count,
-      preserveDataIn: .icuOutput,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    _internalInvariant(!allocatedBuffers)
-    allocatedBuffers = true
+  let (_, transcoded) = performWithAllocationIfNecessary(preserving: .icuOutput) {
+  () -> (Int, Int)? in
     return transcodeValidUTF16ToUTF8(
       UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-      into: outputBuffer
-    )!
-  }()
+      into: outputBuffer)
+  }
   return NormalizationResult(
-    amountFilled: transcoded, nextReadPosition: nextIndex, allocatedBuffers: allocatedBuffers
-  )
+    amountFilled: transcoded, nextReadPosition: nextIndex, allocatedBuffers: allocatedBuffers)
 }
 
 internal func _foreignNormalize(
@@ -418,69 +401,47 @@ internal func _foreignNormalize(
   icuOutputBuffer: inout UnsafeMutableBufferPointer<UInt16>
 ) -> NormalizationResult {
   var allocatedBuffers = false
-  let (read, filled) = foreignFill(
-    readIndex: readIndex.encodedOffset, endIndex: endIndex.encodedOffset, guts, into: icuInputBuffer
-  ) ?? {
+  func performWithAllocationIfNecessary<R>(
+    preserving preserveDataIn: _BufferToCopy, _ f: () -> R?
+  ) -> R {
+    if let result = f() {
+      return result
+    }
     _allocateBuffers(
       sourceCount: guts.count,
-      preserveDataIn: .none,
+      preserveDataIn: preserveDataIn,
       outputBuffer: &outputBuffer,
       icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
+      icuOutputBuffer: &icuOutputBuffer)
     _internalInvariant(!allocatedBuffers)
     allocatedBuffers = true
+    return f()!
+  }
+  let (read, filled) = performWithAllocationIfNecessary(preserving: .none) { () -> (Int, Int)? in
     return foreignFill(
       readIndex: readIndex.encodedOffset, 
       endIndex: endIndex.encodedOffset, 
       guts, 
-      into: icuInputBuffer
-    )!
-  }()
+      into: icuInputBuffer)
+  }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
   _internalInvariant(guts.isOnUnicodeScalarBoundary(nextIndex))
   
-  let normalized = _tryNormalize(
-    UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]),
-    into: icuOutputBuffer
-  ) ?? {
-    _allocateBuffers(
-      sourceCount: guts.count,
-      preserveDataIn: .icuInput,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    _internalInvariant(!allocatedBuffers)
-    allocatedBuffers = true
+  let normalized = performWithAllocationIfNecessary(preserving: .icuInput) { () -> Int? in
     return _tryNormalize(
-      UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer
-    )!
-  }()
+      UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer)
+  }
   
-  let (_, transcoded) = transcodeValidUTF16ToUTF8(
-    UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-    into: outputBuffer
-  ) ?? {
-    _allocateBuffers(
-      sourceCount: guts.count,
-      preserveDataIn: .icuOutput,
-      outputBuffer: &outputBuffer,
-      icuInputBuffer: &icuInputBuffer,
-      icuOutputBuffer: &icuOutputBuffer
-    )
-    _internalInvariant(!allocatedBuffers)
-    allocatedBuffers = true
+  let (_, transcoded) = performWithAllocationIfNecessary(preserving: .icuOutput) {
+  () -> (Int, Int)? in
     return transcodeValidUTF16ToUTF8(
       UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-      into: outputBuffer
-    )!
-  }()
+      into: outputBuffer)!
+  }
 
   return NormalizationResult(
-    amountFilled: transcoded, nextReadPosition: nextIndex, allocatedBuffers: allocatedBuffers
-  )
+    amountFilled: transcoded, nextReadPosition: nextIndex, allocatedBuffers: allocatedBuffers)
 }
 
 private func foreignFill(
