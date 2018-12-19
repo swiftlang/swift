@@ -267,10 +267,6 @@ public final class _ExecutionContext {
   /// The mutex for preventing potential concurrent access.
   private var mutex: pthread_mutex_t = pthread_mutex_t()
 
-  /// The stack for holding the current device scoping information.
-  @usableFromInline
-  var deviceScopes: [DeviceKind] = [.`default`]
-
   /// Initializes a new execution context by initializing available devices.
   @usableFromInline
   init() {
@@ -1548,8 +1544,6 @@ func _TFCOpSetAttrStringArray(_ op: CTFEOp,
 
 /// A TensorFlow device kind.
 public enum DeviceKind {
-  /// Default device.
-  case `default`
   /// Central processing units.
   case cpu
   /// Graphics processing units.
@@ -1557,41 +1551,75 @@ public enum DeviceKind {
   // TODO: TPU?
 }
 
-internal extension _ExecutionContext {
-  var currentDeviceKind: DeviceKind {
-    return sync {
-      deviceScopes.last ?? .default
+@usableFromInline
+class _ThreadLocalState {
+  var deviceScopes: [(kind: DeviceKind, index: UInt)?] = []
+
+  private static let key: pthread_key_t = {
+    var key = pthread_key_t()
+    pthread_key_create(&key) {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      let _: AnyObject = Unmanaged.fromOpaque($0).takeRetainedValue()
+#else
+      let _: AnyObject = Unmanaged.fromOpaque($0!).takeRetainedValue()
+#endif
     }
+    return key
+  }()
+
+  var _currentDevice: (DeviceKind, UInt)? {
+    return deviceScopes.last ?? nil
   }
 
   @usableFromInline
-  func pushDeviceScope(_ kind: DeviceKind) {
-    sync {
-      deviceScopes.append(kind)
-    }
+  func pushDevice(_ device: (DeviceKind, UInt)?) {
+    deviceScopes.append(device)
   }
 
   @usableFromInline
-  func popDeviceScope() {
-    sync {
-      internalConsistencyCheck(deviceScopes.popLast() != nil)
+  func popDevice() {
+    internalConsistencyCheck(deviceScopes.popLast() != nil)
+  }
+
+  @usableFromInline
+  static var value: _ThreadLocalState {
+    if let state = pthread_getspecific(key) {
+      return Unmanaged.fromOpaque(state).takeUnretainedValue()
     }
+    let state = _ThreadLocalState()
+    pthread_setspecific(key, Unmanaged.passRetained(state).toOpaque())
+    return state
   }
 }
 
 /// Executes a closure, making TensorFlow operations run on a specific kind of
-/// device unless specified otherwise.
+/// device.
 ///
 /// - Parameters:
 ///   - kind: A kind of device to run TensorFlow operations on.
+///   - index: The device to run the ops on.
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
 @inlinable
-public func withDevice<R>(_ kind: DeviceKind,
+public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                           perform body: () throws -> R) rethrows -> R {
-  _ExecutionContext.global.pushDeviceScope(kind)
+  _ThreadLocalState.value.pushDevice((kind, index))
   let result = try body()
-  _ExecutionContext.global.popDeviceScope()
+  _ThreadLocalState.value.popDevice()
+  return result
+}
+
+/// Executes a closure, allowing TensorFlow to place TensorFlow operations on
+/// any device. This should restore the default placement behavior.
+///
+/// - Parameters:
+///   - body: A closure whose TensorFlow operations are to be executed on the
+///     specified kind of device.
+@inlinable
+public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
+  _ThreadLocalState.value.pushDevice(nil)
+  let result = try body()
+  _ThreadLocalState.value.popDevice()
   return result
 }
 
@@ -1599,12 +1627,14 @@ public func withDevice<R>(_ kind: DeviceKind,
 @_cdecl("_swift_tfc_OpSetDeviceFromScope")
 func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
   let context = _ExecutionContext.global
-  let device = context.currentDeviceKind
-  switch device {
-  // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
-  case .cpu: TFE_OpSetDevice(op, "\(context.cpuDeviceNamePrefix)0", status)
-  case .gpu: TFE_OpSetDevice(op, "\(context.gpuDeviceNamePrefix!)0", status)
-  default: break
+  if let (kind, index) = _ThreadLocalState.value._currentDevice {
+    switch kind {
+    // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
+    case .cpu:
+      TFE_OpSetDevice(op, "\(context.cpuDeviceNamePrefix)\(index)", status)
+    case .gpu:
+      TFE_OpSetDevice(op, "\(context.gpuDeviceNamePrefix!)\(index)", status)
+    }
   }
 }
 

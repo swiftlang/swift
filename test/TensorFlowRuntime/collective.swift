@@ -61,6 +61,21 @@ CollectiveTests.testAllBackends("GroupWithSize2") {
   _hostOp(t)
   expectEqualWithScalarTensor(2, t)
 }
+#else
+CollectiveTests.testAllBackends("GroupWithSize2") {
+  // Need 2 or more CPU devices for this test.
+  let x = Tensor<Float>(1.0)
+
+  _runOnNDevices(2) { i in
+    withDevice(.cpu, UInt(i)) {
+      let t = Raw.collectiveReduce(x, groupSize: 2, groupKey: 2, instanceKey: 2,
+          mergeOp: .add, finalOp: .id, subdivOffsets: [0])
+
+      _hostOp(t)
+      expectEqualWithScalarTensor(2, t)
+    }
+  }
+}
 #endif // TF_DYNAMIC_COMPILATION
 
 _RuntimeConfig.cpuDeviceCount = 3
