@@ -84,7 +84,7 @@ public func run_StringWalk(_ N: Int) {
 }
 
 // Extended String benchmarks:
-let baseMultiplier = 10_000
+let baseMultiplier = 250
 let unicodeScalarsMultiplier = baseMultiplier
 let charactersMultiplier = baseMultiplier / 5
 
@@ -95,404 +95,477 @@ public var StringWalk = [
   BenchmarkInfo(
     name: "StringWalk",
     runFunction: run_StringWalk,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_unicodeScalars",
     runFunction: run_StringWalk_ascii_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters",
     runFunction: run_StringWalk_ascii_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_ascii_unicodeScalars",
     runFunction: run_CharIteration_ascii_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_ascii_unicodeScalars",
     runFunction: run_CharIndexing_ascii_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_ascii_unicodeScalars_Backwards",
     runFunction: run_StringWalk_ascii_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_ascii_characters_Backwards",
     runFunction: run_StringWalk_ascii_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_ascii_unicodeScalars_Backwards",
     runFunction: run_CharIteration_ascii_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_ascii_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_ascii_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_utf16_unicodeScalars",
     runFunction: run_StringWalk_utf16_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters",
     runFunction: run_StringWalk_utf16_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_utf16_unicodeScalars",
     runFunction: run_CharIteration_utf16_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_utf16_unicodeScalars",
     runFunction: run_CharIndexing_utf16_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_utf16_unicodeScalars_Backwards",
     runFunction: run_StringWalk_utf16_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_utf16_characters_Backwards",
     runFunction: run_StringWalk_utf16_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_utf16_unicodeScalars_Backwards",
     runFunction: run_CharIteration_utf16_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_utf16_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_utf16_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_tweet_unicodeScalars",
     runFunction: run_StringWalk_tweet_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters",
     runFunction: run_StringWalk_tweet_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_tweet_unicodeScalars",
     runFunction: run_CharIteration_tweet_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_tweet_unicodeScalars",
     runFunction: run_CharIndexing_tweet_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_tweet_unicodeScalars_Backwards",
     runFunction: run_StringWalk_tweet_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_tweet_characters_Backwards",
     runFunction: run_StringWalk_tweet_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_tweet_unicodeScalars_Backwards",
     runFunction: run_CharIteration_tweet_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_tweet_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_tweet_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_japanese_unicodeScalars",
     runFunction: run_StringWalk_japanese_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters",
     runFunction: run_StringWalk_japanese_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_japanese_unicodeScalars",
     runFunction: run_CharIteration_japanese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_japanese_unicodeScalars",
     runFunction: run_CharIndexing_japanese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_japanese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_japanese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_japanese_characters_Backwards",
     runFunction: run_StringWalk_japanese_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_japanese_unicodeScalars_Backwards",
     runFunction: run_CharIteration_japanese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_japanese_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_japanese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_chinese_unicodeScalars",
     runFunction: run_StringWalk_chinese_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters",
     runFunction: run_StringWalk_chinese_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_chinese_unicodeScalars",
     runFunction: run_CharIteration_chinese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_chinese_unicodeScalars",
     runFunction: run_CharIndexing_chinese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_chinese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_chinese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_chinese_characters_Backwards",
     runFunction: run_StringWalk_chinese_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_chinese_unicodeScalars_Backwards",
     runFunction: run_CharIteration_chinese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_chinese_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_chinese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_korean_unicodeScalars",
     runFunction: run_StringWalk_korean_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters",
     runFunction: run_StringWalk_korean_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_korean_unicodeScalars",
     runFunction: run_CharIteration_korean_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_korean_unicodeScalars",
     runFunction: run_CharIndexing_korean_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_korean_unicodeScalars_Backwards",
     runFunction: run_StringWalk_korean_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_korean_characters_Backwards",
     runFunction: run_StringWalk_korean_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_korean_unicodeScalars_Backwards",
     runFunction: run_CharIteration_korean_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_korean_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_korean_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_russian_unicodeScalars",
     runFunction: run_StringWalk_russian_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters",
     runFunction: run_StringWalk_russian_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_russian_unicodeScalars",
     runFunction: run_CharIteration_russian_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_russian_unicodeScalars",
     runFunction: run_CharIndexing_russian_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_russian_unicodeScalars_Backwards",
     runFunction: run_StringWalk_russian_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_russian_characters_Backwards",
     runFunction: run_StringWalk_russian_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_russian_unicodeScalars_Backwards",
     runFunction: run_CharIteration_russian_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_russian_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_russian_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_unicodeScalars",
     runFunction: run_StringWalk_punctuated_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters",
     runFunction: run_StringWalk_punctuated_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_punctuated_unicodeScalars",
     runFunction: run_CharIteration_punctuated_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_punctuated_unicodeScalars",
     runFunction: run_CharIndexing_punctuated_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_unicodeScalars_Backwards",
     runFunction: run_StringWalk_punctuated_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuated_characters_Backwards",
     runFunction: run_StringWalk_punctuated_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_punctuated_unicodeScalars_Backwards",
     runFunction: run_CharIteration_punctuated_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_punctuated_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_punctuated_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_unicodeScalars",
     runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters",
     runFunction: run_StringWalk_punctuatedJapanese_characters,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_punctuatedJapanese_unicodeScalars",
     runFunction: run_CharIteration_punctuatedJapanese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_punctuatedJapanese_unicodeScalars",
     runFunction: run_CharIndexing_punctuatedJapanese_unicodeScalars,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_unicodeScalars_Backwards",
     runFunction: run_StringWalk_punctuatedJapanese_unicodeScalars_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "StringWalk_punctuatedJapanese_characters_Backwards",
     runFunction: run_StringWalk_punctuatedJapanese_characters_Backwards,
-    tags: [.api, .String, .skip]),
+    tags: [.api, .String, .skip],
+    legacyFactor: 40),
 
 
   BenchmarkInfo(
     name: "CharIteration_punctuatedJapanese_unicodeScalars_Backwards",
     runFunction: run_CharIteration_punctuatedJapanese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 
   BenchmarkInfo(
     name: "CharIndexing_punctuatedJapanese_unicodeScalars_Backwards",
     runFunction: run_CharIndexing_punctuatedJapanese_unicodeScalars_Backwards,
-    tags: [.validation, .api, .String]),
+    tags: [.validation, .api, .String],
+    legacyFactor: 40),
 ]
 
 
