@@ -813,6 +813,10 @@ enum class ConstraintSystemFlags {
   /// If set, constraint system always reuses type of pre-typechecked
   /// expression, and doesn't dig into its subexpressions.
   ReusePrecheckedType = 0x20,
+  
+  /// If set, the top-level expression may be able to provide an underlying
+  /// type for the contextual opaque archetype.
+  UnderlyingTypeForOpaqueReturnType = 0x40,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2648,7 +2652,13 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
-  /// \brief Attempt to simplify the BridgingConversion constraint.
+  /// Attempt to simplify an OpaqueUnderlyingType constraint.
+  SolutionKind simplifyOpaqueUnderlyingTypeConstraint(Type type1,
+                                              Type type2,
+                                              TypeMatchOptions flags,
+                                              ConstraintLocatorBuilder locator);
+  
+  /// Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
                                          TypeMatchOptions flags,

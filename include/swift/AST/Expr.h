@@ -2877,6 +2877,17 @@ public:
   }
 };
 
+/// Use an opaque type to abstract a value of the underlying concrete type.
+class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
+public:
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnderlyingToOpaque;
+  }
+};
+
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.
 ///

@@ -2525,8 +2525,108 @@ public:
   }
 
 };
+  
+/// An AST walker that determines the underlying type of an opaque return decl
+/// from its associated function body.
+class OpaqueUnderlyingTypeChecker : public ASTWalker {
+  TypeChecker &TC;
+  AbstractFunctionDecl *Implementation;
+  OpaqueTypeDecl *OpaqueDecl;
+  SmallVector<std::pair<Expr*, Type>, 4> Candidates;
+public:
+  OpaqueUnderlyingTypeChecker(TypeChecker &TC,
+                              AbstractFunctionDecl *Implementation,
+                              OpaqueTypeDecl *OpaqueDecl)
+    : TC(TC),
+      Implementation(Implementation),
+      OpaqueDecl(OpaqueDecl)
+  {
+    
+  }
+  
+  void check() {
+    Implementation->getBody()->walk(*this);
+    
+    // If there are no candidates, then the body has no return statements, and
+    // we have nothing to infer the underlying type from.
+    if (Candidates.empty()) {
+      TC.diagnose(Implementation->getLoc(),
+                  diag::opaque_type_no_underlying_type_candidates);
+      return;
+    }
+    
+    // Check whether all of the underlying type candidates match up.
+    auto opaqueTypeInContext =
+      Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType());
+    Type underlyingType = Candidates.front().second;
+    
+    bool mismatch = false;
+    for (auto otherCandidate : llvm::makeArrayRef(Candidates).slice(1)) {
+      // Disregard tautological candidates.
+      if (otherCandidate.second->isEqual(opaqueTypeInContext))
+        continue;
+        
+      if (!underlyingType->isEqual(otherCandidate.second)) {
+        mismatch = true;
+        break;
+      }
+    }
+    
+    if (mismatch) {
+      TC.diagnose(Implementation->getLoc(),
+                  diag::opaque_type_mismatched_underlying_type_candidates);
+      for (auto candidate : Candidates) {
+        TC.diagnose(candidate.first->getLoc(),
+                    diag::opaque_type_underlying_type_candidate_here,
+                    candidate.second);
+      }
+      return;
+    }
+    
+    // The underlying type can't be defined recursively
+    // in terms of the opaque type itself.
+    auto isSelfReferencing = underlyingType.findIf([&](Type t) -> bool {
+      return t->isEqual(opaqueTypeInContext);
+    });
+    
+    if (isSelfReferencing) {
+      TC.diagnose(Candidates.front().first->getLoc(),
+                  diag::opaque_type_self_referential_underlying_type,
+                  underlyingType);
+      return;
+    }
+    
+    // If we have one successful candidate, then save it as the underlying type
+    // of the opaque decl.
+    // Form a substitution map that defines it in terms of the other context
+    // generic parameters.
+    underlyingType = underlyingType->mapTypeOutOfContext();
+    auto underlyingSubs = SubstitutionMap::get(
+      OpaqueDecl->getOpaqueInterfaceGenericSignature(),
+      [&](SubstitutableType *t) -> Type {
+        if (t->isEqual(OpaqueDecl->getUnderlyingInterfaceType())) {
+          return underlyingType;
+        }
+        return Type(t);
+      },
+      LookUpConformanceInModule(OpaqueDecl->getModuleContext()));
+    
+    OpaqueDecl->setUnderlyingTypeSubstitutions(underlyingSubs);
+  }
+  
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(E)) {
+      assert(E->getType()->isEqual(
+       Implementation->mapTypeIntoContext(OpaqueDecl->getDeclaredInterfaceType()))
+             && "unexpected opaque type in function body");
+      
+      Candidates.push_back(std::make_pair(underlyingToOpaque->getSubExpr(),
+                                  underlyingToOpaque->getSubExpr()->getType()));
+    }
+    return std::make_pair(false, E);
+  }
+};
 } // end anonymous namespace
-
 
 // After we have scanned the entire region, diagnose variables that could be
 // declared with a narrower usage kind.
@@ -2945,6 +3045,12 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
   AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+  
+  // If the function has an opaque return type, check the return expressions
+  // to determine the underlying type.
+  if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
+    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+  }
 }
 
 // Perform MiscDiagnostics on Switch Statements.

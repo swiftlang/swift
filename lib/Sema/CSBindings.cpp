@@ -432,6 +432,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
+    case ConstraintKind::OpaqueUnderlyingType:
       // Constraints from which we can't do anything.
       break;
 

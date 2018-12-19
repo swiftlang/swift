@@ -147,6 +147,9 @@ enum class ConstraintKind : char {
   /// \brief The first type is a function type, the second is the function's
   /// result type.
   FunctionResult,
+  /// The first type is a type that's a candidate to be the underlying type of
+  /// the second opaque archetype.
+  OpaqueUnderlyingType,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -481,6 +484,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::OpaqueUnderlyingType:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

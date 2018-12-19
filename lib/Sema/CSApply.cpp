@@ -6699,6 +6699,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return cs.cacheType(new (tc.Context)
                             UnresolvedTypeConversionExpr(expr, toType));
 
+  // Use an opaque type to abstract a value of the underlying concrete type.
+  if (toType->getAs<OpaqueTypeArchetypeType>()) {
+    return cs.cacheType(new (tc.Context)
+                        UnderlyingToOpaqueExpr(expr, toType));
+  }
+  
   llvm_unreachable("Unhandled coercion");
 }
 
