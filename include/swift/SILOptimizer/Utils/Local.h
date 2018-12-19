@@ -608,6 +608,11 @@ void promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
 bool runSROAOnInsts(ArrayRef<AllocStackInst *> Insts,
                     const std::function<bool(AllocStackInst *)> &shouldExplode);
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Run PredictableMemoryOptimizations pass on the given function.
+bool optimizeMemoryAllocations(SILFunction &Fn);
+
+
 /// Move only data structure that is the result of findLocalApplySite.
 ///
 /// NOTE: Generally it is not suggested to have move only types that contain

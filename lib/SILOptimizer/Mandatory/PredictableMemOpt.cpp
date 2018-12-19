@@ -1366,7 +1366,9 @@ bool AllocOptimize::doIt() {
   return Changed;
 }
 
-static bool optimizeMemoryAllocations(SILFunction &Fn) {
+// SWIFT_ENABLE_TENSORFLOW
+namespace swift {
+bool optimizeMemoryAllocations(SILFunction &Fn) {
   bool Changed = false;
   for (auto &BB : Fn) {
     auto I = BB.begin(), E = BB.end();
@@ -1407,6 +1409,7 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
   }
   return Changed;
 }
+} // namespace swift
 
 namespace {
 

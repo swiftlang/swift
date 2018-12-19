@@ -2574,6 +2574,27 @@ void TFDeabstraction::doIt() {
   // flatten array attributes, and form graph_op instructions.
   checkAttributesAndFormGraphOps();
 
+  logCurrentState("After checkAttributesAndFormGraphOps", /*detailed*/ true);
+
+  // After graph_op instructions are formed, we have some opportunities for
+  // optimizing code that would result in better code for partitioning. We do
+  // them now.
+  //
+  // e.g., the inlining of functions (like allocateUninitializedArray) may
+  // result in the following code snippet in a function:
+  //     %9 = alloc_stack $Int32
+  //     store %0 to %9 : $*Int32
+  //     %11 = load %9 : $*Int32
+  //     %12 = struct_extract %11 : $Int32, #Int32._value
+  // The optimizer can rewrite the code snippet as follows:
+  //     %12 = struct_extract %0 : $Int32, #Int32._value
+  //
+  // However, the optimizer misses opportunities to optimize away such redundant
+  // memory allocations because we prevent inlining of calls to special
+  // functions in the performance inliner and therefore, the optimzier does not
+  // see the redundant memory allocations. Fix them now.
+  optimizeMemoryAllocations(fn);
+
   logCurrentState("Before Cleanup", /*detailed*/true);
 
   // Remove code that is dead now that tensor operations are formed.
