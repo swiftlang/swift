@@ -1,5 +1,3 @@
-// TODO: Change to normal %target-run-simple-swift when there are stdlib
-// functions for differentiating methods.
 // RUN: %target-run-simple-parse-stdlib-swift
 
 import Swift
