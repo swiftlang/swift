@@ -379,7 +379,7 @@ bool FrontendGraph::verify() const {
   DependencyKey::verifyNodeKindNames();
   DependencyKey::verifyDeclAspectNames();
   // Ensure Keys are unique
-  std::unordered_map<DependencyKey, FrontendNode *> nodesByKey;
+  std::unordered_map<DependencyKey, FrontendNode *> nodesSeen;
   // Ensure each node only appears once.
   std::unordered_set<void *> nodes;
   forEachNode([&](FrontendNode *n) {
@@ -387,7 +387,7 @@ bool FrontendGraph::verify() const {
     assert(nodes.insert(n).second &&
            "Frontend should have memoized this node.");
 
-    auto iterInserted = nodesByKey.insert(std::make_pair(n->getKey(), n));
+    auto iterInserted = nodesSeen.insert(std::make_pair(n->getKey(), n));
     if (!iterInserted.second) {
       llvm::errs() << "Duplicate frontend keys: ";
       iterInserted.first->second->dump();

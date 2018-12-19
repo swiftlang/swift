@@ -691,7 +691,7 @@ namespace driver {
       : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
         TQ(std::move(TaskQueue)) {
       if (Comp.getEnableExperimentalDependencies())
-        ExpDepGraph.emplace();
+        ExpDepGraph.emplace(Comp.getStatsReporter());
       else if (Comp.getShowIncrementalBuildDecisions() ||
                Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;

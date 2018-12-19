@@ -43,6 +43,7 @@ using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
 
 LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
                                      DiagnosticEngine &diags) {
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-loadFromPath");
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
@@ -70,9 +71,10 @@ bool DriverGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-void DriverGraph::markTransitive(
-    SmallVectorImpl<const Job *> &visited, const Job *job,
-    DependencyGraph<const Job *>::MarkTracer *tracer) {
+void DriverGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
+                                 const Job *job,
+                                 DependencyGraph<const Job *>::MarkTracer *) {
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
   std::unordered_set<const DriverNode *> visitedNodeSet;
   const StringRef swiftDeps = getSwiftDeps(job);
   // Do the traversal.
@@ -113,6 +115,7 @@ std::vector<std::string> DriverGraph::getExternalDependencies() const {
 // Add every (swiftdeps) use of the external dependency to uses.
 void DriverGraph::markExternal(SmallVectorImpl<const Job *> &uses,
                                StringRef externalDependency) {
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-markExternal");
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
   DependencyKey key =
@@ -137,6 +140,8 @@ void DriverGraph::markExternal(SmallVectorImpl<const Job *> &uses,
 //==============================================================================
 
 LoadResult DriverGraph::integrate(const FrontendGraph &g) {
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-integrate");
+
   StringRef swiftDeps = g.getSwiftDepsFromSourceFileProvide();
   // When done, disappearedNodes contains the nodes which no longer exist.
   auto disappearedNodes = nodeMap[swiftDeps];
@@ -340,6 +345,8 @@ void DriverGraph::checkTransitiveClosureForCascading(
 // Emitting Dot file for DriverGraph ===========================================
 
 void DriverGraph::emitDotFileForJob(DiagnosticEngine &diags, const Job *job) {
+  FrontendStatsTracer tracer(stats,
+                             "experimental-dependencies-emitDotFileForJob");
   emitDotFile(diags, dotFilenameForJob(job));
 }
 
@@ -365,38 +372,89 @@ void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
 //==============================================================================
 
 void DriverGraph::verify() const {
+  // TODO: split up each three parts
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-verify");
+  verifyNodeMapEntries();
+  verifyCanFindEachJob();
+  verifyEachJobIsTracked();
+}
+
+void DriverGraph::verifyNodeMapEntries() const {
+  FrontendStatsTracer tracer(stats,
+                             "experimental-dependencies-verifyNodeMapEntries");
   // TODO: disable when not debugging
   std::array<std::unordered_map<DependencyKey,
                                 std::unordered_map<std::string, DriverNode *>>,
              2>
-      nodesByKey;
+      nodesSeenInNodeMap;
   nodeMap.verify([&](const std::string &swiftDepsString,
                      const DependencyKey &key, DriverNode *n,
-                     unsigned mapIndex) {
-    assert(mapIndex < nodesByKey.size());
-
-    auto &nodesBySwiftDeps = nodesByKey[mapIndex][n->getKey()];
-    auto iterInserted = nodesBySwiftDeps.insert(std::make_pair(
-        n->getSwiftDeps().hasValue() ? n->getSwiftDeps().getValue()
-                                     : std::string(),
-        n));
-    if (!iterInserted.second) {
-      llvm_unreachable("duplicate driver keys");
-    }
-    const DependencyKey &nodeKey = n->getKey();
-    const Optional<std::string> swiftDeps =
-        swiftDepsString.empty() ? None : Optional<std::string>(swiftDepsString);
-    assert(n->getSwiftDeps() == swiftDeps ||
-           mapCorruption("Node misplaced for swiftDeps"));
-    assert(nodeKey == key || mapCorruption("Node misplaced for key"));
-    nodeKey.verify();
-    assert((nodeKey.getKind() != NodeKind::externalDepend ||
-            externalDependencies.count(nodeKey.getName()) == 1) &&
-           "Ensure each external dependency is tracked exactly once");
+                     unsigned submapIndex) {
+    verifyNodeMapEntry(nodesSeenInNodeMap, swiftDepsString, key, n,
+                       submapIndex);
   });
+}
+
+void DriverGraph::verifyNodeMapEntry(
+    std::array<
+        std::unordered_map<DependencyKey,
+                           std::unordered_map<std::string, DriverNode *>>,
+        2> &nodesSeenInNodeMap,
+    const std::string &swiftDepsString, const DependencyKey &key, DriverNode *n,
+    const unsigned submapIndex) const {
+  verifyNodeIsUniqueWithinSubgraph(nodesSeenInNodeMap, swiftDepsString, key, n,
+                                   submapIndex);
+  verifyNodeIsInRightEntryInNodeMap(swiftDepsString, key, n);
+  key.verify();
+  verifyExternalDependencyUniqueness(key);
+}
+
+void DriverGraph::verifyNodeIsUniqueWithinSubgraph(
+    std::array<
+        std::unordered_map<DependencyKey,
+                           std::unordered_map<std::string, DriverNode *>>,
+        2> &nodesSeenInNodeMap,
+    const std::string &swiftDepsString, const DependencyKey &key,
+    DriverNode *const n, const unsigned submapIndex) const {
+  assert(submapIndex < nodesSeenInNodeMap.size());
+  auto iterInserted = nodesSeenInNodeMap[submapIndex][n->getKey()].insert(
+      std::make_pair(n->getSwiftDeps().hasValue() ? n->getSwiftDeps().getValue()
+                                                  : std::string(),
+                     n));
+  if (!iterInserted.second) {
+    llvm_unreachable("duplicate driver keys");
+  }
+}
+
+void DriverGraph::verifyNodeIsInRightEntryInNodeMap(
+    const std::string &swiftDepsString, const DependencyKey &key,
+    const DriverNode *const n) const {
+  const DependencyKey &nodeKey = n->getKey();
+  const Optional<std::string> swiftDeps =
+      swiftDepsString.empty() ? None : Optional<std::string>(swiftDepsString);
+  assert(n->getSwiftDeps() == swiftDeps ||
+         mapCorruption("Node misplaced for swiftDeps"));
+  assert(nodeKey == key || mapCorruption("Node misplaced for key"));
+}
+
+void DriverGraph::verifyExternalDependencyUniqueness(
+    const DependencyKey &key) const {
+  assert((key.getKind() != NodeKind::externalDepend ||
+          externalDependencies.count(key.getName()) == 1) &&
+         "Ensure each external dependency is tracked exactly once");
+}
+
+void DriverGraph::verifyCanFindEachJob() const {
+  FrontendStatsTracer tracer(stats,
+                             "experimental-dependencies-verifyCanFindEachJob");
   for (const auto p : jobsBySwiftDeps) {
     getJob(p.first);
   }
+}
+
+void DriverGraph::verifyEachJobIsTracked() const {
+  FrontendStatsTracer tracer(
+      stats, "experimental-dependencies-verifyEachJobIsTracked");
   nodeMap.forEachKey1(
       [&](const std::string &swiftDeps, const typename NodeMap::Key2Map &) {
         ensureJobIsTracked(swiftDeps);

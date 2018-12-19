@@ -134,6 +134,9 @@ class DriverGraph {
   /// files for the same job distinct, keep a sequence number for each job.
   std::unordered_map<const driver::Job *, unsigned> dotFileSequenceNumberByJob;
 
+  /// For helping with performance tuning, may be null:
+  UnifiedStatsReporter *const stats;
+
   /// Encapsulate the invariant between where the node resides in
   /// nodesBySwiftDepsFile and the swiftDeps node instance variable here.
   void addToMap(DriverNode *n) {
@@ -180,7 +183,8 @@ public:
   /// For templates such as DotFileEmitter.
   using NodeType = DriverNode;
 
-  DriverGraph() = default;
+  /// \p stats may be null
+  DriverGraph(UnifiedStatsReporter *stats) : stats(stats) {}
 
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
@@ -227,6 +231,40 @@ public:
   void verify() const;
 
 private:
+  void verifyNodeMapEntries() const;
+
+  /// Called for each \ref nodeMap entry during verification.
+  /// \p nodesSeenInNodeMap ensures that nodes are unique in each submap
+  /// \p swiftDepsString is the swiftdeps file name in the map
+  /// \p key is the DependencyKey in the map
+  /// \p n is the node for that map entry
+  void verifyNodeMapEntry(
+      std::array<
+          std::unordered_map<DependencyKey,
+                             std::unordered_map<std::string, DriverNode *>>,
+          2> &nodesSeenInNodeMap,
+      const std::string &swiftDepsString, const DependencyKey &key,
+      DriverNode *n, unsigned submapIndex) const;
+
+  /// See DriverGraph::verifyNodeMapEntry for argument descriptions
+  void verifyNodeIsUniqueWithinSubgraph(
+      std::array<
+          std::unordered_map<DependencyKey,
+                             std::unordered_map<std::string, DriverNode *>>,
+          2> &nodesSeenInNodeMap,
+      const std::string &swiftDepsString, const DependencyKey &key,
+      DriverNode *n, unsigned submapIndex) const;
+
+  /// See DriverGraph::verifyNodeMapEntry for argument descriptions
+  void verifyNodeIsInRightEntryInNodeMap(const std::string &swiftDepsString,
+                                         const DependencyKey &key,
+                                         const DriverNode *n) const;
+
+  void verifyExternalDependencyUniqueness(const DependencyKey &key) const;
+
+  void verifyCanFindEachJob() const;
+  void verifyEachJobIsTracked() const;
+
   static bool mapCorruption(const char *msg) {
     llvm_unreachable(msg);
   }
