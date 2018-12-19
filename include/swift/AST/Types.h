@@ -4791,6 +4791,14 @@ public:
     return Substitutions;
   }
   
+  /// Get the generic signature used to build out this archetype. This is
+  /// equivalent to the OpaqueTypeDecl's interface generic signature, with
+  /// all of the generic parameters aside from the opaque type's interface
+  /// type same-type-constrained to their substitutions for this type.
+  GenericSignature *getBoundSignature() const {
+    return BoundSignature;
+  }
+  
   /// Get the underlying type of the opaque type, if it's known.
   Type getUnderlyingType() const;
   
