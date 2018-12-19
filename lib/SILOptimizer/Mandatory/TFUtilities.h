@@ -20,6 +20,7 @@
 
 #include "TFDeviceSupport.h"
 #include "swift/AST/TensorFlow.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -188,6 +189,17 @@ public:
   bool containsTensorFlowValue(SILType ty, bool checkHigherOrderFunctions) {
     return containsTensorFlowValue(ty.getASTType(), checkHigherOrderFunctions);
   }
+
+  /// Return true if this is a "array.uninitialized" call, which creates an
+  /// array and returns it with uninitialized elements for the caller to fill
+  /// in.
+  static bool isArrayUninitialized(SILInstruction *call);
+
+  /// Returns true if this is special callee (e.g., allocateUninitializedArray)
+  /// that should not be inlined in performance inliner so that the
+  /// TFDeabstraction still sees the higher-level semenatics.
+  static bool isSpecialNoInlineCallee(FullApplySite site,
+                                      const SILFunction &callee);
 };
 
 /// Represent the TF graph of a graph function named `graphFnName`, which

@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "tf-partition"
 #include "TFCanonicalizeCFG.h"
-#include "TFDeabstraction.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"

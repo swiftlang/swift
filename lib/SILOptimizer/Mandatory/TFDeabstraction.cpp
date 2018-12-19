@@ -24,7 +24,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-deabstraction"
-#include "TFDeabstraction.h"
 #include "TFConstExpr.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -179,18 +178,6 @@ void TFDeabstraction::logCurrentState(const char *name, bool isDetailed) {
   outs->flush();
 }
 
-
-/// Return true if this is a "array.uninitialized" call, which creates an array
-/// and returns it with uninitialized elements for the caller to fill in.
-static bool isArrayUninitialized(SILInstruction *call) {
-  auto *apply = dyn_cast<ApplyInst>(call);
-  if (!apply) return false;
-
-  if (auto fn = apply->getCalleeFunction())
-    return fn->hasSemanticsAttr("array.uninitialized");
-  return false;
-}
-
 /// Scan the function looking for call sites that should be inlined to expose
 /// tensor operations, and inline them to expose those ops.
 void TFDeabstraction::inlineCalls() {
@@ -238,7 +225,7 @@ void TFDeabstraction::inlineCalls() {
     // leave in abstracted form for easier analysis.  For things like
     // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
     // construction calls beacuse we end up removing them anyway.
-    if (isArrayUninitialized(site.getInstruction()))
+    if (tfc.isArrayUninitialized(site.getInstruction()))
       return false;
 
     // Never inline _allocateUninitializedArray (even of Tensors).  It is the
@@ -2622,6 +2609,32 @@ void TFDeabstraction::doIt() {
   maybeLogFuncSize(fn, "AfterDA");
 }
 
+namespace {
+
+/// A helper class to launch deabstraction on functions.
+class TFDeabstractionHelper {
+public:
+  TFDeabstractionHelper(SILTransform &transform, SILModule *module)
+      : transform(transform), module(module), constantEvaluator(*module) {}
+
+  /// Deabstract the given function and returns true if this function was
+  /// deabstracted. If the flag forceTFFunctions is true, forces partitioning of
+  /// functions that operate on Tensors even if it would have been rejected
+  /// otherwise.
+  bool deabstract(SILFunction &fn, bool forceTFFunctions);
+
+  /// Deabstract functions. If acceleratorOnly is set, tensorflow convention
+  /// functions are deabstracted. Otherwise, all functions other than tensorflow
+  /// convention functions are deabstracted,
+  void deabstractFunctions(bool acceleratorOnly);
+
+private:
+  SILTransform &transform;
+  SILModule *module;
+  ConstExprEvaluator constantEvaluator;
+  TensorFunctionClassifier tfc;
+};
+
 bool TFDeabstractionHelper::deabstract(SILFunction &fn, bool forceTFFunctions) {
   if (!tfc.shouldBePartitioned(&fn, forceTFFunctions))
     return false;
@@ -2637,18 +2650,19 @@ bool TFDeabstractionHelper::deabstract(SILFunction &fn, bool forceTFFunctions) {
   return true;
 }
 
-void TFDeabstractionHelper::deabstractAcceleratorOnlyFunctions() {
-  // Loop over all of the functions in the current module processing them -
-  // iff they look like they could be the top level of a deabstraction
-  // context.
-  for (auto &fn : *module) {
-    if (!isAcceleratorOnly(fn))
-      continue;
-    deabstract(fn, /*forceTFFunctions*/false);
+void TFDeabstractionHelper::deabstractFunctions(bool acceleratorOnly) {
+  if (acceleratorOnly) {
+    // Loop over all of the functions in the current module processing them -
+    // iff they look like they could be the top level of a deabstraction
+    // context.
+    for (auto &fn : *module) {
+      if (!isAcceleratorOnly(fn))
+        continue;
+      deabstract(fn, /*forceTFFunctions*/false);
+    }
+    return;
   }
-}
 
-void TFDeabstractionHelper::deabstractNonAcceleratorOnlyFunctions() {
   // Only tensorflow convention functions should be deabstracted in dynamic
   // compilation mode, which already happens in the deabsraction pass.
   if (llvm::TFDynamicCompilation)
@@ -2704,18 +2718,7 @@ void TFDeabstractionHelper::deabstractNonAcceleratorOnlyFunctions() {
   return;
 }
 
-bool TFDeabstractionHelper::isSpecialNoInlineCallee(FullApplySite site,
-                                            const SILFunction &callee) {
-  // Check for array internals which we could be inlined, but prefer to
-  // leave in abstracted form for easier analysis.  For things like
-  // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
-  // construction calls beacuse we end up removing them anyway.
-  if (isArrayUninitialized(site.getInstruction()))
-    return true;
-
-  // Check if this is a well-known function in const expr evaluator.
-  return ConstExprEvaluator::isWellKnownFunction(&callee);
-}
+} // namespace
 
 namespace {
   struct TFDeabstractionPass : public SILModuleTransform {
@@ -2749,9 +2752,10 @@ void TFDeabstractionPass::run() {
 
   TFDeabstractionHelper helper(*this, module);
   if (PM->getStageName() == "TensorFlow Partitioning") {
-    helper.deabstractNonAcceleratorOnlyFunctions();
+    helper.deabstractFunctions(/*acceleratorOnly*/false);
   } else {
-    helper.deabstractAcceleratorOnlyFunctions();
+    // This will be invoked as part of the mandatory diagnostic pipeline.
+    helper.deabstractFunctions(/*acceleratorOnly*/true);
   }
 }
 

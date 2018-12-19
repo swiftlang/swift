@@ -488,3 +488,27 @@ bool TensorFunctionClassifier::containsTensorFlowValue(
 
   return false;
 }
+
+/// Return true if this is a "array.uninitialized" call, which creates an array
+/// and returns it with uninitialized elements for the caller to fill in.
+bool TensorFunctionClassifier::isArrayUninitialized(SILInstruction *call) {
+  auto *apply = dyn_cast<ApplyInst>(call);
+  if (!apply) return false;
+
+  if (auto fn = apply->getCalleeFunction())
+    return fn->hasSemanticsAttr("array.uninitialized");
+  return false;
+}
+
+bool TensorFunctionClassifier::isSpecialNoInlineCallee(
+    FullApplySite site, const SILFunction &callee) {
+  // Check for array internals which we could be inlined, but prefer to
+  // leave in abstracted form for easier analysis.  For things like
+  // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
+  // construction calls beacuse we end up removing them anyway.
+  if (isArrayUninitialized(site.getInstruction()))
+    return true;
+
+  // Check if this is a well-known function in const expr evaluator.
+  return ConstExprEvaluator::isWellKnownFunction(&callee);
+}
