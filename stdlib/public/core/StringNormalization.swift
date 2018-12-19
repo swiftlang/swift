@@ -206,7 +206,7 @@ internal struct NormalizationResult {
 private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
-) -> (Int, Int)? {
+) -> (read: Int, writen: Int)? {
   let outputBufferThreshold = outputBuffer.count - 4
   
   // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
@@ -245,7 +245,7 @@ private func fastFill(
 private func transcodeSegmentToUTF16(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> (Int, Int)? {
+) -> (read: Int, writen: Int)? {
   var readIndex = 0
   var writeIndex = 0
   let outputCount = outputBuffer.count
@@ -277,7 +277,7 @@ private func transcodeSegmentToUTF16(
 private func transcodeValidUTF16ToUTF8(
   _ sourceBuffer: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt8>
-) -> (Int, Int)? {
+) -> (read: Int, writen: Int)? {
   var readIndex = 0
   var writeIndex = 0
   let outputCount = outputBuffer.count
@@ -449,7 +449,7 @@ private func foreignFill(
   endIndex gutsEndIndex: Int,
   _ guts: _StringGuts,
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> (Int, Int)? {
+) -> (read: Int, writen: Int)? {
   var readIndex = gutsReadIndex
   var outputWriteIndex = 0
   let outputCount = outputBuffer.count
