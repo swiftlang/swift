@@ -3885,8 +3885,10 @@ namespace {
     }
 
     Expr *visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      simplifyExprType(expr);
-      assert(expr->getType()->isEqual(expr->getSubExpr()->getType()));
+      auto type = simplifyType(cs.getType(expr));
+      cs.setType(expr, type);
+
+      assert(type->isEqual(expr->getSubExpr()->getType()));
       return expr;
     }
     

@@ -2918,7 +2918,10 @@ namespace {
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      return expr->getType();
+      if (auto type = expr->getType())
+        return type;
+
+      return CS.createTypeVariable(CS.getConstraintLocator(expr));
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
