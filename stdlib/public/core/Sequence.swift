@@ -800,6 +800,18 @@ extension Sequence where Element : Equatable {
   }
 }
 
+extension ContiguousArray {
+  /// Rotates array in place to the left by specified distance.
+  @usableFromInline
+  mutating func _rotate(left distance: Int) {
+    guard distance > 0 else { return }
+    let i = index(startIndex, offsetBy: distance)
+    self[startIndex..<i].reverse()
+    self[i..<endIndex].reverse()
+    self.reverse()
+  }
+}
+
 extension Sequence {
 
   /// Returns the longest possible subsequences of the sequence, in order, that
@@ -891,7 +903,7 @@ extension Sequence {
     // Put incoming elements into a ring buffer to save space. Once all
     // elements are consumed, reorder the ring buffer and return it.
     // This saves memory for sequences particularly longer than `maxLength`.
-    var ringBuffer: [Element] = []
+    var ringBuffer = ContiguousArray<Element>()
     ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = 0
@@ -901,20 +913,12 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i += 1
-        i %= maxLength
+        i = (i + 1) % maxLength
       }
     }
 
-    if i != ringBuffer.startIndex {
-      var rotated: [Element] = []
-      rotated.reserveCapacity(ringBuffer.count)
-      rotated += ringBuffer[i..<ringBuffer.endIndex]
-      rotated += ringBuffer[0..<i]
-      return rotated
-    } else {
-      return ringBuffer
-    }
+    ringBuffer._rotate(left: i)
+    return Array(ringBuffer)
   }
 
   /// Returns a sequence containing all but the given number of initial
