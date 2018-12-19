@@ -33,6 +33,89 @@ internal enum _Normalization {
   // the normal form. For NFC, that is 3x.
   internal static let _maxNFCExpansionFactor = 3
   internal static let _maxUTF16toUTF8ExpansionFactor = 3
+
+  internal typealias _SegmentOutputBuffer = _FixedArray16<UInt16>
+}
+
+//
+// Pointer casting helpers
+//
+@inline(__always)
+private func _unsafeMutableBufferPointerCast<T, U>(
+  _ ptr: UnsafeMutablePointer<T>,
+  _ count: Int,
+  to: U.Type = U.self
+) -> UnsafeMutableBufferPointer<U> {
+  return UnsafeMutableBufferPointer(
+    start: UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: U.self),
+    count: count
+  )
+}
+@inline(__always)
+private func _unsafeBufferPointerCast<T, U>(
+  _ ptr: UnsafePointer<T>,
+  _ count: Int,
+  to: U.Type = U.self
+) -> UnsafeBufferPointer<U> {
+  return UnsafeBufferPointer(
+    start: UnsafeRawPointer(ptr).assumingMemoryBound(to: U.self),
+    count: count
+  )
+}
+internal func _castOutputBuffer(
+  _ ptr: UnsafeMutablePointer<_FixedArray16<UInt8>>,
+  endingAt endIdx: Int = 16
+) -> UnsafeMutableBufferPointer<UInt8> {
+  let bufPtr: UnsafeMutableBufferPointer<UInt8> =
+    _unsafeMutableBufferPointerCast(
+      ptr, 16)
+  return UnsafeMutableBufferPointer<UInt8>(rebasing: bufPtr[..<endIdx])
+}
+internal func _castOutputBuffer(
+  _ ptr: UnsafeMutablePointer<_Normalization._SegmentOutputBuffer>,
+  endingAt endIdx: Int = _Normalization._SegmentOutputBuffer.capacity
+) -> UnsafeMutableBufferPointer<UInt16> {
+  let bufPtr: UnsafeMutableBufferPointer<UInt16> =
+    _unsafeMutableBufferPointerCast(
+      ptr, _Normalization._SegmentOutputBuffer.capacity)
+  return UnsafeMutableBufferPointer<UInt16>(rebasing: bufPtr[..<endIdx])
+}
+internal func _castOutputBuffer(
+  _ ptr: UnsafePointer<_Normalization._SegmentOutputBuffer>,
+  endingAt endIdx: Int = _Normalization._SegmentOutputBuffer.capacity
+) -> UnsafeBufferPointer<UInt16> {
+  let bufPtr: UnsafeBufferPointer<UInt16> =
+    _unsafeBufferPointerCast(
+      ptr, _Normalization._SegmentOutputBuffer.capacity)
+  return UnsafeBufferPointer<UInt16>(rebasing: bufPtr[..<endIdx])
+}
+
+extension _StringGuts {
+  internal func foreignHasNormalizationBoundary(
+    before index: String.Index
+  ) -> Bool {
+    let offset = index.encodedOffset
+    if offset == 0 || offset == count {
+      return true
+    }
+
+    let scalar = foreignErrorCorrectedScalar(startingAt: index).0
+    return scalar._hasNormalizationBoundaryBefore
+  }
+}
+extension UnsafeBufferPointer where Element == UInt8 {
+  internal func hasNormalizationBoundary(before index: Int) -> Bool {
+    if index == 0 || index == count {
+      return true
+    }
+    assert(!_isContinuation(self[_unchecked: index]))
+
+    // Sub-300 latiny fast-path
+    if self[_unchecked: index] < 0xCC { return true }
+
+    let cu = _decodeScalar(self, startingAt: index).0
+    return cu._hasNormalizationBoundaryBefore
+  }
 }
 
 extension Unicode.Scalar {

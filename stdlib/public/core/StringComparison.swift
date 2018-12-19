@@ -277,36 +277,6 @@ internal enum _StringComparisonResult {
   }
 }
 
-extension _StringGutsSlice {
-  @inline(__always)
-  @_effects(readonly)
-  internal func withNFCCodeUnitsIterator<R>(
-    _ f: (_NormalizedUTF8CodeUnitIterator) throws -> R
-  ) rethrows -> R {
-    defer { _fixLifetime(self) }
-    if self.isNFCFastUTF8 {
-      return try self.withFastUTF8 {
-        return try f(_NormalizedUTF8CodeUnitIterator($0, range: 0..<$0.count))
-      }
-    }
-    if self.isFastUTF8 {
-      return try self.withFastUTF8 {
-        return try f(_NormalizedUTF8CodeUnitIterator($0, range: 0..<$0.count))
-      }
-    }
-    return try f(_NormalizedUTF8CodeUnitIterator(
-      foreign: self._guts, range: self.range))
-  }
-  @inline(__always)
-  @_effects(readonly)
-  internal func withNFCCodeUnitsIterator_2<R>(
-    _ f: (_NormalizedUTF8CodeUnitIterator_2) throws -> R
-  ) rethrows -> R {
-    defer { _fixLifetime(self) }
-    return try f(_NormalizedUTF8CodeUnitIterator_2(self))
-  }
-}
-
 // Perform a binary comparison of bytes in memory. Return value is negative if
 // less, 0 if equal, positive if greater.
 @_effects(readonly)
@@ -316,7 +286,7 @@ internal func _binaryCompare<UInt8>(
   var cmp = Int(truncatingIfNeeded:
     _swift_stdlib_memcmp(
       lhs.baseAddress._unsafelyUnwrappedUnchecked,
-      rhs.baseAddress._unsafelyUnwrappedUnchecked,
+      rhs.baseAddress._unsafelyUnwrappedUnchecked,  
       Swift.min(lhs.count, rhs.count)))
   if cmp == 0 {
     cmp = lhs.count &- rhs.count
