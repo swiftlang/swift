@@ -2859,6 +2859,51 @@ public:
   }
 };
 
+/// Use an opaque type to abstract a value of the underlying concrete type.
+class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {
+public:
+  UnderlyingToOpaqueExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::UnderlyingToOpaque, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnderlyingToOpaque;
+  }
+};
+
+/// TupleShuffleExpr - This represents a permutation of a tuple value to a new
+/// tuple type.
+class TupleShuffleExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<TupleShuffleExpr, unsigned> {
+  friend TrailingObjects;
+
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return Bits.TupleShuffleExpr.NumElementMappings;
+  }
+
+private:
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<unsigned> elementMapping,
+                   Type ty)
+    : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty) {
+    Bits.TupleShuffleExpr.NumElementMappings = elementMapping.size();
+    std::uninitialized_copy(elementMapping.begin(), elementMapping.end(),
+                            getTrailingObjects<unsigned>());
+  }
+
+public:
+  static TupleShuffleExpr *create(ASTContext &ctx, Expr *subExpr,
+                                  ArrayRef<unsigned> elementMapping,
+                                  Type ty);
+
+  ArrayRef<unsigned> getElementMapping() const {
+    return {getTrailingObjects<unsigned>(),
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumElementMappings)};
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::TupleShuffle;
+  }
+};
+
 /// DestructureTupleExpr - Destructure a tuple value produced by a source
 /// expression, binding the elements to OpaqueValueExprs, then evaluate the
 /// result expression written in terms of the OpaqueValueExprs.
