@@ -241,7 +241,10 @@ public struct UnsafeRawPointer: _Pointer {
   /// trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces aligned
+    // deallocation. This ensures that the runtime's allocation and
+    // deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Binds the memory to the specified type and returns a typed pointer to the
@@ -577,6 +580,14 @@ public struct UnsafeMutableRawPointer: _Pointer {
   public static func allocate(
     byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
+    // Force manually allocated memory to use the "aligned" allocation
+    // path so that deallocation does not require the original
+    // alignment. The runtime guarantees "aligned" allocation for either 
+    // alignment > _minAllocationAlignment or alignment == 0.
+    var alignment = alignment
+    if alignment <= _minAllocationAlignment() {
+      alignment = 0
+    }
     return UnsafeMutableRawPointer(Builtin.allocRaw(
         byteCount._builtinWordValue, alignment._builtinWordValue))
   }
@@ -587,7 +598,10 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces aligned
+    // deallocation. This ensures that the runtime's allocation and
+    // deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Binds the memory to the specified type and returns a typed pointer to the

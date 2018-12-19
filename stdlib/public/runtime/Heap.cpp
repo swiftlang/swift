@@ -48,19 +48,47 @@ using namespace swift;
 
 #endif
 
+// When swift_slowAlloc is called with "default" alignment (alignMask ==
+// ~(size_t(0))), it will execute the "aligned allocation path" (AlignedAlloc)
+// using this value for the alignment.
+//
+// This must be the same value as minAllocationAlignment defined in the stdlib.
+static const size_t _swift_MinAllocationAlignment = 16;
 
+// This assert ensures that manually allocated memory always uses the
+// AlignedAlloc path. The stdlib will use "default" alignment for any user
+// requested alignment less than or equal to Swift.minAllocationAlignment. The
+// runtime must ensure that any alignment > _swift_MinAllocationAlignment also
+// uses the "aligned" deallocation path.
+static_assert(_swift_MinAllocationAlignment > MALLOC_ALIGN_MASK);
 
+// When alignMask == ~(size_t(0)), allocation uses the "default"
+// _swift_MinAllocationAlignment. This is different than calling swift_slowAlloc
+// with `alignMask == _swift_MinAllocationAlignment - 1` because it forces
+// the use of AlignedAlloc. This allows manually allocated to memory to always
+// be deallocated with AlignedFree without knowledge of its original allocation
+// alignment.
 void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
   void *p;
+  // This check also forces "default" alignment to use AlignedAlloc.
   if (alignMask <= MALLOC_ALIGN_MASK) {
     p = malloc(size);
   } else {
-    p = AlignedAlloc(size, alignMask + 1);
+    size_t alignment = (alignMask == ~(size_t(0)))
+                           ? _swift_MinAllocationAlignment
+                           : alignMask + 1;
+    p = AlignedAlloc(size, alignment);
   }
   if (!p) swift::crash("Could not allocate memory.");
   return p;
 }
 
+// Unknown alignment is specified by passing alignMask == ~(size_t(0)),
+// forcing the AlignedFree deallocation path for unknown alignment.
+//
+// The memory deallocated with unknown alignment must have been allocated with
+// either "default" alignment, or alignment > _swift_MinAllocationAlignment,
+// to guarantee that it was allocated with AllignedAlloc.
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   if (alignMask <= MALLOC_ALIGN_MASK) {
     free(ptr);

@@ -225,7 +225,10 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces aligned
+    // deallocation. This ensures that the runtime's allocation and
+    // deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.
@@ -568,8 +571,15 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
-    let rawPtr =
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    var align = Builtin.alignof(Pointee.self)
+    // Force manually allocated memory to use the "aligned" allocation
+    // path so that deallocation does not require the original
+    // alignment. The runtime guarantees "aligned" allocation for either 
+    // alignment > _minAllocationAlignment or alignment == 0.
+    if Int(align) <= _minAllocationAlignment() {
+      align = (0)._builtinWordValue
+    }
+    let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
@@ -580,8 +590,10 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue,
-                       Builtin.alignof(Pointee.self))
+    // Passing zero alignment to the runtime forces aligned
+    // deallocation. This ensures that the runtime's allocation and
+    // deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.

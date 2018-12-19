@@ -342,6 +342,29 @@ internal func _isValidAddress(_ address: UInt) -> Bool {
   return address >= _swift_abi_LeastValidPointerValue
 }
 
+// Manually allocated memory is at least 16-byte aligned in Swift.
+//
+// This is done so that users do not need to specify the allocation
+// alignment when manually deallocating memory via Unsafe[Raw][Buffer]Pointer.
+//
+// Any user specified alignment less than or equal to
+// _minAllocationAlignment results in a runtime request for "default"
+// alignment. This guarantees that manual allocation always uses an
+// "aligned" runtime allocation. If an allocation is "aligned" then it
+// must be freed using an "aligned" deallocation. The converse must
+// also hold. Since manual Unsafe*Pointer deallocation is always
+// "aligned", the user does not actually need to specify the original
+// alignment.
+//
+// This not not @inlinable, because it has not been exposed as ABI,
+// but it does need to agree with the runtime implementation of
+// swift_slowAlloc.
+@inline(__always)
+@usableFromInline
+internal func _minAllocationAlignment() -> Int {
+  return 16
+}
+
 //===--- Builtin.BridgeObject ---------------------------------------------===//
 
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
