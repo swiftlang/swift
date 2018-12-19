@@ -6,18 +6,18 @@ import TensorFlow
 
 var someGlobal = Tensor<Int32>(1)
 
+// expected-warning @+1 {{value implicitly copied to the host}}
 public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tensor<Int32> {
   // expected-warning @-1 {{'z' implicitly copied to the accelerator}}
 
   var a = z
   if c {
     if d { fatalError() }
-		// expected-warning @+2 {{method result implicitly copied to the accelerator}}
-    // expected-warning @+1 {{value implicitly copied to the host}}
     a = a + a // expected-note {{value used here}}
   } else {
     if d { fatalError() }
 
+    // expected-warning @+1 {{value implicitly copied to the accelerator}}
     a = someGlobal
   }
 
@@ -387,9 +387,8 @@ public func inlineDeabstracted_a() -> Tensor<Float> {
 }
 // expected-warning @+1 {{implicitly copied}}
 public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
-  // expected-error @+3 {{op named 'Dummy' is not registered in TensorFlow}}
-  // expected-error @+2 {{op named 'Dummy' is not registered in TensorFlow}}
-  // expected-error @+1 {{op named 'Dummy' is not registered in TensorFlow}}
+	// expected-warning @+2 3 {{value implicitly copied to the host}}
+  // expected-error @+1 3 {{op named 'Dummy' is not registered in TensorFlow}}
   let aggregate: AggregateStruct = #tfop("Dummy") // packs results
 
   // expected-note @+1 {{value used here}}
