@@ -95,7 +95,7 @@ public func testSharedRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
         throw TestError.NegativeOutOfBound
       }
     } // expected-note 2 {{value used here}}
-  } catch { // expected-note 3 {{value used here}}
+  } catch { // expected-note 4 {{value used here}}
     var i: Int32 = 0
     while i < 2 {
       // expected-warning @+1 2 {{value implicitly copied to the host}}
@@ -107,7 +107,6 @@ public func testSharedRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
 }
 
 SESERegionTests.testAllBackends("testSharedRegionWithLoop") {
-	// expected-note @+1 {{value used here}}
   expectEqualWithScalarTensor(1, testSharedRegionWithLoop(99))
 #if !CUDA
   // TODO fix.
