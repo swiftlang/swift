@@ -891,7 +891,7 @@ extension Sequence {
     // Put incoming elements into a ring buffer to save space. Once all
     // elements are consumed, reorder the ring buffer and return it.
     // This saves memory for sequences particularly longer than `maxLength`.
-    var ringBuffer = ContiguousArray<Element>()
+    var ringBuffer: [Element] = []
     ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = 0
@@ -901,16 +901,20 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = (i + 1) % maxLength
+        i += 1
+        i %= maxLength
       }
     }
 
-    if i != ringBuffer.startIndex { // Rotate the array in-place
-      ringBuffer[0..<i].reverse()
-      ringBuffer[i..<ringBuffer.endIndex].reverse()
-      ringBuffer[0..<ringBuffer.endIndex].reverse()
+    if i != ringBuffer.startIndex {
+      var rotated: [Element] = []
+      rotated.reserveCapacity(ringBuffer.count)
+      rotated += ringBuffer[i..<ringBuffer.endIndex]
+      rotated += ringBuffer[0..<i]
+      return rotated
+    } else {
+      return ringBuffer
     }
-    return Array(ringBuffer)
   }
 
   /// Returns a sequence containing all but the given number of initial
