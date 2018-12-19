@@ -383,6 +383,9 @@ BUILTIN_SIL_OPERATION(AutoDiffApplyJVP, "autodiffApplyJVP", Special)
 ///     ((T) -> R, T) -> (R, (R.CotangentVector) -> T.CotangentVector).
 BUILTIN_SIL_OPERATION(AutoDiffApplyVJP, "autodiffApplyVJP", Special)
 
+BUILTIN_SIL_OPERATION(AutoDiffApplyMethodJVP, "autodiffApplyMethodJVP", Special)
+BUILTIN_SIL_OPERATION(AutoDiffApplyMethodVJP, "autodiffApplyMethodVJP", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

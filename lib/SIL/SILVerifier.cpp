@@ -4590,11 +4590,22 @@ public:
   /// Verify the [differentiable] attribute.
   void verifyDifferentiableAttr(SILFunction *F,
                                        SILDifferentiableAttr &Attr) {
+    std::function<unsigned(Type)> countParams;
+    countParams = [&](Type type) -> unsigned {
+      auto *fnTy = type->getAs<SILFunctionType>();
+      if (!fnTy)
+        return 0;
+      if (fnTy->getNumResults() != 1)
+        return fnTy->getNumParameters();
+      return fnTy->getNumParameters() +
+             countParams(fnTy->getResults()[0].getType());
+    };
+
     // Parameter indices must be specified.
     require(!Attr.getIndices().parameters.empty(),
             "Parameter indices cannot be empty");
     // Verify if specified parameter indices are valid.
-    auto numParams = F->getLoweredFunctionType()->getNumParameters();
+    auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;
     for (auto paramIdx : Attr.getIndices().parameters.set_bits()) {
       require(paramIdx < numParams, "Parameter index out of bounds.");

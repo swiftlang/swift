@@ -93,7 +93,10 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
   auto *vd = thunk.getDecl();
 
   // Reference the next uncurrying level of the function.
-  SILDeclRef next = SILDeclRef(vd, thunk.kind);
+  // SWIFT_ENABLE_TENSORFLOW
+  SILDeclRef next = SILDeclRef(vd, thunk.kind, /*isCurried*/ false,
+                               /*isForeign*/ false,
+                               thunk.autoDiffAssociatedFunctionIdentifier);
   assert(!next.isCurried);
 
   // If the function is natively foreign, reference its foreign entry point.
@@ -205,6 +208,41 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
 
   SILGenFunction(*this, *f, SwiftModule).emitCurryThunk(constant);
   postEmitFunction(constant, f);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // If we emitted a curry thunk for a differentiable function, then also emit a
+  // curry thunk for its VJP and mark that as the VJP of the curry thunk.
+  auto *DA = fd->getAttrs().getAttribute<DifferentiableAttr>();
+  if (!DA)
+    return;
+
+  if (constant.autoDiffAssociatedFunctionIdentifier)
+    return;
+
+  // FIXME: When the underyling uncurried function is in a different module,
+  // `DA->getCheckedParameterIndices()` is `nullptr` so we can't generate the
+  // VJP of the curry thunk.
+  if (!DA->getCheckedParameterIndices())
+    return;
+
+  auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+    AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+    DA->getCheckedParameterIndices(), SwiftModule->getASTContext());
+  auto vjpConstant = constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
+  emitCurryThunk(vjpConstant);
+
+  auto loweredParamIndices = DA->getCheckedParameterIndices()->getLowered(
+      fd->getInterfaceType()->castTo<AnyFunctionType>());
+  auto vjpName =
+      SwiftModule->getASTContext().getIdentifier(vjpConstant.mangle()).str();
+  auto *SILDA = SILDifferentiableAttr::create(
+      M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
+      /*primalName*/ StringRef(),
+      /*adjointName*/ StringRef(),
+      /*adjointIsPrimitive*/ false,
+      /*jvpName*/ StringRef(),
+      /*vjpName*/ vjpName);
+  f->addDifferentiableAttr(SILDA);
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
