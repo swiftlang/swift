@@ -55,8 +55,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
-  add_subdirectory(SIMDOperators)
   add_subdirectory(SwiftOnoneSupport)
+
+  # NOTE(compnerd) this must come after the SwiftOnoneSupport as the current
+  # cross-compilation support has to hand roll the import library setup which
+  # requires that the target is setup prior to use.
+  add_subdirectory(SIMDOperators)
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

@@ -255,119 +255,13 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
-/// Clone the given generic parameters in the given list. We don't need any
-/// of the requirements, because they will be inferred.
-static GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                            DeclContext *dc,
-                                            GenericParamList *fromParams) {
-  // Clone generic parameters.
-  SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
-  for (auto fromGP : *fromParams) {
-    // Create the new generic parameter.
-    auto toGP = new (ctx) GenericTypeParamDecl(dc, fromGP->getName(),
-                                               SourceLoc(),
-                                               fromGP->getDepth(),
-                                               fromGP->getIndex());
-    toGP->setImplicit(true);
-
-    // Record new generic parameter.
-    toGenericParams.push_back(toGP);
-  }
-
-  auto toParams = GenericParamList::create(ctx, SourceLoc(), toGenericParams,
-                                           SourceLoc());
-
-  auto outerParams = fromParams->getOuterParameters();
-  if (outerParams != nullptr)
-    outerParams = cloneGenericParams(ctx, dc, outerParams);
-  toParams->setOuterParameters(outerParams);
-
-  return toParams;
-}
-
-/// FIXME: Similar to TypeChecker::prepareGenericParamList(), which needs
-/// to be separated from the type checker.
-static void prepareGenericParamList(GenericParamList *genericParams) {
-  unsigned depth = genericParams->getDepth();
-  for (auto gp : *genericParams) {
-    if (gp->getDepth() == depth)
-      return;
-
-    gp->setDepth(depth);
-  }
-
-  if (auto outerGenericParams = genericParams->getOuterParameters())
-    prepareGenericParamList(outerGenericParams);
-}
-
-/// Ensure that the outer generic parameters of the given generic
-/// context have been configured.
-static void configureOuterGenericParams(const GenericContext *dc) {
-  auto genericParams = dc->getGenericParams();
-
-  // If we already configured the outer parameters, we're done.
-  if (genericParams && genericParams->getOuterParameters())
-    return;
-
-  DeclContext *outerDC = dc->getParent();
-  while (!outerDC->isModuleScopeContext()) {
-    if (auto outerDecl = outerDC->getAsDecl()) {
-      if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
-        if (genericParams)
-          genericParams->setOuterParameters(outerGenericDC->getGenericParams());
-
-        configureOuterGenericParams(outerGenericDC);
-        return;
-      }
-    }
-
-    outerDC = outerDC->getParent();
-  }
-}
-
 /// Bind the given extension to the given nominal type.
 static void bindExtensionToNominal(ExtensionDecl *ext,
                                    NominalTypeDecl *nominal) {
   if (ext->alreadyBoundToNominal())
     return;
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    // For a protocol extension, build the generic parameter list.
-    auto genericParams = proto->createGenericParams(ext);
-    prepareGenericParamList(genericParams);
-    ext->setGenericParams(genericParams);
-  } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
-    // Make sure the generic parameters are set up.
-    configureOuterGenericParams(nominal);
-
-    // Clone the generic parameter list of a generic type.
-    prepareGenericParamList(genericParams);
-    ext->setGenericParams(
-        cloneGenericParams(ext->getASTContext(), ext, genericParams));
-  }
-
-  // If we have a trailing where clause, deal with it now.
-  // For now, trailing where clauses are only permitted on protocol extensions.
-  if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
-    if (!(nominal->getGenericParamsOfContext() || isa<ProtocolDecl>(nominal))) {
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      ext->diagnose(diag::extension_nongeneric_trailing_where,
-                    nominal->getFullName())
-        .highlight(trailingWhereClause->getSourceRange());
-      ext->setTrailingWhereClause(nullptr);
-    } else {
-      // Merge the trailing where clause into the generic parameter list.
-      // FIXME: Long-term, we'd like clients to deal with the trailing where
-      // clause explicitly, but for now it's far more direct to represent
-      // the trailing where clause as part of the requirements.
-      ext->getGenericParams()->addTrailingWhereClause(
-        ext->getASTContext(),
-        trailingWhereClause->getWhereLoc(),
-        trailingWhereClause->getRequirements());
-    }
-  }
-
+  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 

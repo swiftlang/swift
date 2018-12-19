@@ -85,6 +85,7 @@ public:
   IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(Frozen)
+  IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(Implements)
   IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
@@ -285,7 +286,6 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
-  void visitHasStorageAttr(HasStorageAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
@@ -426,16 +426,6 @@ void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
                                  attr->getAttrName());
-}
-
-void AttributeEarlyChecker::visitHasStorageAttr(HasStorageAttr *attr) {
-  auto *VD = cast<VarDecl>(D);
-  if (VD->getDeclContext()->getSelfClassDecl())
-    return;
-  auto nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl();
-  if (nominalDecl && isa<StructDecl>(nominalDecl))
-    return;
-  diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
 }
 
 static Optional<Diag<bool,Type>>

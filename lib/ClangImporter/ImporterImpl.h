@@ -181,16 +181,6 @@ enum class ImportTypeKind {
   Enum
 };
 
-enum class Bridgeability {
-  /// This context does not permit bridging at all.  For example, the
-  /// target of a C pointer.
-  None,
-
-  /// This context permits all kinds of bridging.  For example, the
-  /// imported result of a method declaration.
-  Full
-};
-
 /// Controls whether a typedef for \p type should name the fully-bridged Swift
 /// type or the original Clang type.
 ///

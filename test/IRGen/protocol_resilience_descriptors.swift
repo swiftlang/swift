@@ -29,6 +29,9 @@
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$s18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$s18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)
 
+// Associated conformance descriptor for inherited protocol
+// CHECK-DEFINITION-LABEL: s18resilient_protocol24ResilientDerivedProtocolPAA0c4BaseE0Tb" ={{( dllexport)?}}{{( protected)?}} alias
+
 // Associated type and conformance
 
 // CHECK-DEFINITION: @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl" ={{( dllexport)?}}{{( protected)?}} alias
@@ -58,8 +61,9 @@ public struct Y { }
 
 // CHECK-USAGE-LABEL: @"$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMc" =
 // CHECK-USAGE-SAME: i32 131072,
-// CHECK-USAGE-SAME: i16 1,
-// CHECK-USAGE-SAME: i16 0
+// CHECK-USAGE-SAME: i16 0,
+// CHECK-USAGE-SAME: i16 0,
+// CHECK-USAGE-SAME: i32 0
 extension Y: OtherResilientProtocol { }
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =
@@ -74,6 +78,12 @@ where Element: ProtocolWithRequirements, Element.T == Y {
   public typealias T = Element.T
   public func first() { }
   public func second() { }
+}
+
+// CHECK-USAGE: @"$s31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAAMc" =
+// CHECK-SAME: @"associated conformance 31protocol_resilience_descriptors17ConformsToDerivedV010resilient_A009ResilientF8ProtocolAaD0h4BaseI0"
+public struct ConformsToDerived : ResilientDerivedProtocol {
+  public func requirement() -> Int { return 0 }
 }
 
 // ----------------------------------------------------------------------------

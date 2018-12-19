@@ -10,6 +10,7 @@
 // RUN: %target-build-swift -g %S/main.swift %t/linker/library.o -I %t/linker/ -L %t/linker/ -o %t/linker/main
 
 import library
+import enum library.Result
 
 func testFunction<T>(withCompletion completion: (Result<T, Error>) -> Void) { }
 testFunction { (result: GenericResult<Int>) in }

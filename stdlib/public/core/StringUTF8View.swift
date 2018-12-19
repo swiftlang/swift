@@ -510,3 +510,13 @@ extension String.Index {
     return target._guts.isOnUnicodeScalarBoundary(self)
   }
 }
+
+extension String.UTF8View {
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    guard _guts.isFastUTF8 else { return nil }
+    return try _guts.withFastUTF8(body)
+  }
+}

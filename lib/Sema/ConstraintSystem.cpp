@@ -1190,20 +1190,6 @@ ConstraintSystem::getTypeOfMemberReference(
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
-  ParameterTypeFlags baseFlags;
-  // FIXME(diagnostics): `InOutType` could appear here as a result
-  // of successful re-typecheck of the one of the sub-expressions e.g.
-  // `let _: Int = { (s: inout S) in s.bar() }`. On the first
-  // attempt to type-check whole expression `s.bar()` - is going
-  // to have a base which points directly to declaration of `S`.
-  // But when diagnostics attempts to type-check `s.bar()` standalone
-  // its base would be tranformed into `InOutExpr -> DeclRefExr`,
-  // and `InOutType` is going to be recorded in constraint system.
-  if (auto objType = baseObjTy->getInOutObjectType()) {
-    baseObjTy = objType;
-    baseFlags = baseFlags.withInOut(true);
-  }
-
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1215,7 +1201,7 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
-  FunctionType::Param baseObjParam(baseObjTy, Identifier(), baseFlags);
+  FunctionType::Param baseObjParam(baseObjTy);
 
   // Don't open existentials when accessing typealias members of
   // protocols.
@@ -1457,6 +1443,40 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
   }
 }
 
+/// If there are any SIMD operators in the overload set, partition the set so
+/// that the SIMD operators come at the end.
+static ArrayRef<OverloadChoice> partitionSIMDOperators(
+                                  ArrayRef<OverloadChoice> choices,
+                                  SmallVectorImpl<OverloadChoice> &scratch) {
+  // If the first element isn't an operator, none of them are.
+  if (!choices[0].isDecl() ||
+      !isa<FuncDecl>(choices[0].getDecl()) ||
+      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
+      choices[0].getDecl()->getASTContext().LangOpts
+        .SolverEnableOperatorDesignatedTypes)
+    return choices;
+
+  // Check whether we have any SIMD operators.
+  bool foundSIMDOperator = false;
+  for (const auto &choice : choices) {
+    if (isSIMDOperator(choice.getDecl())) {
+      foundSIMDOperator = true;
+      break;
+    }
+  }
+
+  if (!foundSIMDOperator)
+    return choices;
+
+  scratch.assign(choices.begin(), choices.end());
+  std::stable_partition(scratch.begin(), scratch.end(),
+                        [](const OverloadChoice &choice) {
+                          return !isSIMDOperator(choice.getDecl());
+                        });
+
+  return scratch;
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1472,6 +1492,9 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+
+  SmallVector<OverloadChoice, 4> scratchChoices;
+  choices = partitionSIMDOperators(choices, scratchChoices);
 
   SmallVector<Constraint *, 4> overloads;
   

@@ -12,7 +12,7 @@ class C {
     // CHECK: {{^}}  @_implicitly_unwrapped_optional @_hasInitialValue var iuo: Int!
     var iuo: Int!
 
-    // CHECK: {{^}}  lazy var lazyIsntARealInit: Int
+    // CHECK: {{^}}  @_hasStorage lazy var lazyIsntARealInit: Int
     lazy var lazyIsntARealInit: Int = 0
 
     init() {

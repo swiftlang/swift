@@ -164,9 +164,9 @@ func test5(_ myorigin: CGPoint) {
   // Dot syntax.
   _ = x2.origin.x
   _ = x1.size.area()
-  _ = (r : x1.size).r.area()
+  _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
   _ = x1.size.area()
-  _ = (r : x1.size).r.area()
+  _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
   
   _ = x1.area
 
@@ -325,4 +325,11 @@ enum Lens<T> {
 
   case baz((inout T) -> ()) // ok
   case quux((inout T, inout T) -> ()) // ok
+}
+
+// In the long term, these should be legal, but we don't support them right
+// now and we shouldn't pretend to.
+// rdar://46684504
+enum HasVariadic {
+  case variadic(x: Int...) // expected-error {{variadic enum cases are not supported}}
 }

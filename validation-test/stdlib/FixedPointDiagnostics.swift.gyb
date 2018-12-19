@@ -87,23 +87,22 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    _ = ${T}(1) + Stride(0) // expected-error {{'+' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
-    _ = Stride(1) + ${T}(0) // expected-error {{'+' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
-    _ = ${T}(1) - Stride(0) // expected-error {{'-' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
+    _ = ${T}(1) + Stride(0) // expected-error {{}} expected-note {{}}
+    _ = Stride(1) + ${T}(0) // expected-error {{}} expected-note {{}}
+    _ = ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}}
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1) // expected-error {{'+=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
-    x -= Stride(1) // expected-error {{'-=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
+    x += Stride(1) // expected-error {{}} expected-note {{}}
+    x -= Stride(1) // expected-error {{}} expected-note {{}}
 
-    // Terrible over-specific error, but at least disabled
-    _ = (x - x) as Stride // expected-error {{'(@lvalue ${T}, @lvalue ${T}) -> ${T}' is not convertible to '(${T}, ${T}) -> ${T}'}}
+    _ = (x - x) as Stride // expected-error {{}}
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    (x + x) as Stride   // expected-error {{cannot convert value of type '${T}' to type 'Stride' (aka 'Int') in coercion}}
+    (x + x) as Stride   // expected-error {{}}
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     // These tests are expected to start failing when we get improved diagnostics.

@@ -26,7 +26,12 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
-/// A type-erased key path, from any root type to any resulting value type.
+/// A type-erased key path, from any root type to any resulting value
+/// type. NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
+/// The two must coexist, so it was renamed. The old name must not be
+/// used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
+/// Swift._AnyKeyPath.
+@_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable
@@ -2396,6 +2401,29 @@ internal func _getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
   return end - base
 }
 
+// Resolve a mangled name in a generic environment, described by either a
+// flat GenericEnvironment * (if the bottom tag bit is 0) or possibly-nested
+// ContextDescriptor * (if the bottom tag bit is 1)
+internal func _getTypeByMangledNameInEnvironmentOrContext(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt,
+  genericEnvironmentOrContext: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
+  -> Any.Type? {
+
+  let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
+  if taggedPointer & 1 == 0 {
+    return _getTypeByMangledNameInEnvironment(name, nameLength,
+                      genericEnvironment: genericEnvironmentOrContext,
+                      genericArguments: genericArguments)
+  } else {
+    let context = UnsafeRawPointer(bitPattern: taggedPointer & ~1)
+    return _getTypeByMangledNameInContext(name, nameLength,
+                      genericContext: context,
+                      genericArguments: genericArguments)
+  }
+}
+
 // Resolve the given generic argument reference to a generic argument.
 internal func _resolveKeyPathGenericArgReference(
     _ reference: UnsafeRawPointer,
@@ -2431,8 +2459,8 @@ internal func _resolveKeyPathGenericArgReference(
                                           capacity: nameLength + 1)
   // FIXME: Could extract this information from the mangled name.
   guard let result =
-    _getTypeByMangledName(namePtr, UInt(nameLength),
-                         genericEnvironment: genericEnvironment,
+    _getTypeByMangledNameInEnvironmentOrContext(namePtr, UInt(nameLength),
+                         genericEnvironmentOrContext: genericEnvironment,
                          genericArguments: arguments)
     else {
       let nameStr = String._fromUTF8Repairing(

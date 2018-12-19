@@ -119,6 +119,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
         subscript.withPathElement(PathEltKind::SubscriptMember));
+  } else if (isa<MemberRefExpr>(anchor)) {
+    ConstraintLocatorBuilder memberRef(locator);
+    locator =
+        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
@@ -1220,5 +1224,19 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
   emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
       .highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool NonOptionalUnwrapFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+
+  auto diagnostic = diag::invalid_optional_chain;
+  if (isa<ForceValueExpr>(anchor))
+    diagnostic = diag::invalid_force_unwrap;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, BaseType)
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getEndLoc());
+
   return true;
 }

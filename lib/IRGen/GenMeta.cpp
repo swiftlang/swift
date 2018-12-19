@@ -729,6 +729,15 @@ namespace {
               B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
         }
 
+        if (entry.isBase()) {
+          // Define a base conformance descriptor, which is just an associated
+          // conformance descriptor for a base protocol.
+          BaseConformance conformance(Proto, entry.getBase());
+          IGM.defineBaseConformanceDescriptor(
+              conformance,
+              B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy));
+        }
+
         auto reqt = B.beginStruct(IGM.ProtocolRequirementStructTy);
 
         auto info = getRequirementInfo(entry);
@@ -1189,37 +1198,6 @@ namespace {
     }
     return numFields;
   }
-  
-  /// Track the field types of a struct or class for reflection metadata
-  /// emission.
-  static void
-  addFieldTypes(IRGenModule &IGM, NominalTypeDecl *type,
-                NominalTypeDecl::StoredPropertyRange storedProperties) {
-    SmallVector<CanType, 4> types;
-    for (VarDecl *prop : storedProperties) {
-      auto propertyType = type->mapTypeIntoContext(prop->getInterfaceType())
-                              ->getCanonicalType();
-      types.push_back(propertyType);
-    }
-
-    IGM.addFieldTypes(types);
-  }
-  
-  /// Track the payload types of an enum for reflection metadata
-  /// emission.
-  static void addFieldTypes(IRGenModule &IGM,
-                            ArrayRef<EnumImplStrategy::Element> enumElements) {
-    SmallVector<CanType, 4> types;
-
-    for (auto &elt : enumElements) {
-      auto caseType = elt.decl->getParentEnum()->mapTypeIntoContext(
-        elt.decl->getArgumentInterfaceType())
-          ->getCanonicalType();
-      types.push_back(caseType);
-    }
-
-    IGM.addFieldTypes(types);
-  }
 
   class StructContextDescriptorBuilder
     : public TypeContextDescriptorBuilderBase<StructContextDescriptorBuilder,
@@ -1255,7 +1233,9 @@ namespace {
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
 
-      addFieldTypes(IGM, getType(), properties);
+      // For any nominal type metadata required for reflection.
+      for (auto *prop : properties)
+        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1327,7 +1307,9 @@ namespace {
       // uint32_t NumEmptyCases;
       B.addInt32(Strategy.getElementsWithNoPayload().size());
 
-      addFieldTypes(IGM, Strategy.getElementsWithPayload());
+      // For any nominal type metadata required for reflection.
+      for (auto elt : Strategy.getElementsWithPayload())
+        IGM.IRGen.noteUseOfTypeMetadata(elt.decl->getArgumentInterfaceType());
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1637,7 +1619,9 @@ namespace {
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
 
-      addFieldTypes(IGM, getType(), properties);
+      // For any nominal type metadata required for reflection.
+      for (auto *prop : properties)
+        IGM.IRGen.noteUseOfTypeMetadata(prop->getValueInterfaceType());
     }
   };
 } // end anonymous namespace
@@ -1761,10 +1745,6 @@ IRGenModule::getAddrOfAnonymousContextDescriptor(DeclContext *DC,
   auto entity = LinkEntity::forAnonymousDescriptor(DC);
   return getAddrOfSharedContextDescriptor(entity, definition,
     [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
-}
-
-void IRGenModule::addFieldTypes(ArrayRef<CanType> fieldTypes) {
-  IRGen.addFieldTypes(fieldTypes, this);
 }
 
 static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,

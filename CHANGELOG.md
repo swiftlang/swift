@@ -24,6 +24,109 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* Swift 3 mode has been removed. Supported values for the `-swift-version`
+  flag are `4`, `4.2`, and `5`.
+
+* [SE-0228][]:
+
+  String interpolation has been overhauled to improve its performance,
+  clarity, and efficiency.
+
+  Note that the old `_ExpressibleByStringInterpolation` protocol has been
+  removed; any code making use of this protocol will need to be updated
+  for the new design. An `#if compiler` block can be used to conditionalize
+  code between 4.2 and 5.0, for example:
+  
+  ```swift
+  #if compiler(<5.0)
+  extension MyType : _ExpressibleByStringInterpolation { ... }
+  #else
+  extension MyType : ExpressibleByStringInterpolation { ... }
+  #endif
+  ```
+
+* [SE-0213][]:
+
+  If `T` conforms to one of the `ExpressibleBy*` protocols and `literal` is a
+  literal expression, then `T(literal)` will construct a literal of type `T`
+  using the corresponding protocol, rather than calling a constructor member
+  of `T` with a value of  the protocol's default literal type.
+
+  For example, expressions like `UInt64(0xffff_ffff_ffff_ffff)` are now valid,
+  where previously they would overflow the default integer literal type of `Int`.
+
+* [SE-0230][]:
+
+  In Swift 5 mode, `try?` with an expression of Optional type will flatten the
+  resulting Optional, instead of returning an Optional of an Optional.
+
+* [SR-5719][]:
+
+  In Swift 5 mode, `@autoclosure` parameters can no longer be forwarded to
+  `@autoclosure` arguments in another function call. Instead, you must explicitly
+  call the function value with `()`; the call itself is wrapped inside an
+  implicit closure, guaranteeing the same behavior as in Swift 4 mode.
+
+  Example:
+
+  ```swift
+  func foo(_ fn: @autoclosure () -> Int) {}
+  func bar(_ fn: @autoclosure () -> Int) {
+    foo(fn)   // Incorrect, `fn` can't be forwarded and has to be called
+    foo(fn()) // Ok
+  }
+  ```
+
+* [SR-8109][]:
+
+  Single-element labeled tuple expressions, for example `(label: 123)`, were
+  allowed in some contexts but often resulted in surprising, inconsistent
+  behavior that varied across compiler releases. They are now completely
+  disallowed.
+
+  Note that single-element labeled _types_, for example `var x: (label: Int)`,
+  have already been prohibited since Swift 3.
+
+* [SR-695][]:
+
+  In Swift 5 mode, a class method returning `Self` can no longer be overridden
+  with a method returning a non-final concrete class type. Such code is not
+  type safe and will need to be updated.
+
+  For example,
+
+  ```swift
+  class Base {
+    class func factory() -> Self { ... }
+  }
+
+  class Derived : Base {
+    class override func factory() -> Derived { ... }
+  }
+  ```
+
+* In Swift 5 mode, the type of `self` in a convenience initializer of a non-final
+  class is now the dynamic `Self` type, and not the concrete class type.
+
+* [SR-5581][]:
+
+  Protocols can now constrain their conforming types to those that subclasses a
+  given class. Two equivalent forms are supported:
+
+  ```swift
+  protocol MyView : UIView { ... }
+  protocol MyView where Self : UIView { ... }
+  ```
+
+  Note that Swift 4.2 accepted the second form, but it was not fully implemented
+  and could sometimes crash at compile time or run time.
+
+* [SR-631][]:
+
+  Extension binding now supports extensions of nested types which themselves are
+  defined inside extensions. Previously this could fail with some declaration orders,
+  producing spurious "undeclared type" errors.
+
 * [SR-7139][]:
 
   Exclusive memory access is now enforced at runtime by default in
@@ -113,7 +216,7 @@ Swift 5.0
 
 * [SE-0214][]:
 
-  Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
+  The `DictionaryLiteral` type has been renamed to `KeyValuePairs`.
   A typealias preserves the old name for compatibility.
 
 * [SR-2608][]
@@ -121,8 +224,16 @@ Swift 5.0
   Default arguments are now printed in SourceKit-generated interfaces for Swift
   modules, instead of just using a placeholder `default`.
 
-* Notable bug fix: unowned and unowned(unsafe) variables now support optional
-  types.
+* `unowned` and `unowned(unsafe)` variables now support Optional types.
+
+* Designated initializers with variadic parameters are now correctly inherited
+  in subclasses.
+
+* Extensions of concrete subclasses of generic classes can now contain
+  `@objc` members.
+
+* Complex recursive type definitions involving classes and generics that would
+  previously cause deadlocks at run time are now fully supported.
 
 * [SR-419][]
 
@@ -7293,9 +7404,13 @@ Swift 1.0
 [SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
 [SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
 [SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
+[SE-0228]: <https://github.com/apple/swift-evolution/blob/master/proposals/0228-fix-expressiblebystringinterpolation.md>
+[SE-0230]: <https://github.com/apple/swift-evolution/blob/master/proposals/0230-flatten-optional-try.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
+[SR-631]: <https://bugs.swift.org/browse/SR-631>
+[SR-695]: <https://bugs.swift.org/browse/SR-695>
 [SR-1009]: <https://bugs.swift.org/browse/SR-1009>
 [SR-1446]: <https://bugs.swift.org/browse/SR-1446>
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
@@ -7304,5 +7419,8 @@ Swift 1.0
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-5581]: <https://bugs.swift.org/browse/SR-5581>
+[SR-5719]: <https://bugs.swift.org/browse/SR-5719>
 [SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
+[SR-8109]: <https://bugs.swift.org/browse/SR-8109>

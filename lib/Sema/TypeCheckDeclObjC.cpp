@@ -760,7 +760,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
     if (!VD->hasInterfaceType()) {
-      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+      VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
                    VD->getName());
       return false;
     }
@@ -988,7 +988,7 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
+  return classDecl->hasObjCMembers();
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has

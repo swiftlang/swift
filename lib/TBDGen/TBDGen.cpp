@@ -105,6 +105,12 @@ void TBDGenVisitor::addAssociatedConformanceDescriptor(
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addBaseConformanceDescriptor(
+                                           BaseConformance conformance) {
+  auto entity = LinkEntity::forBaseConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -420,6 +426,43 @@ static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
   return false;
 }
 
+#ifndef NDEBUG
+static bool isValidProtocolMemberForTBDGen(const Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::TypeAlias:
+  case DeclKind::AssociatedType:
+  case DeclKind::Var:
+  case DeclKind::Subscript:
+  case DeclKind::PatternBinding:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+    return true;
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::Module:
+  case DeclKind::Param:
+  case DeclKind::EnumElement:
+  case DeclKind::Extension:
+  case DeclKind::TopLevelCode:
+  case DeclKind::Import:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::MissingMember:
+  case DeclKind::EnumCase:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+  }
+}
+#endif
+
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
@@ -432,15 +475,18 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
 
-      // Skip inherited requirements.
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType()))
-        continue;
-
-      AssociatedConformance conformance(
-        PD,
-        req.getFirstType()->getCanonicalType(),
-        req.getSecondType()->castTo<ProtocolType>()->getDecl());
-      addAssociatedConformanceDescriptor(conformance);
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
+        BaseConformance conformance(
+          PD,
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addBaseConformanceDescriptor(conformance);
+      } else {
+        AssociatedConformance conformance(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addAssociatedConformanceDescriptor(conformance);
+      }
     }
 
     for (auto *member : PD->getMembers()) {
@@ -471,11 +517,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   // (NB. anything within an active IfConfigDecls also appears outside). Let's
   // assert this fact:
   for (auto *member : PD->getMembers()) {
-    auto isExpectedKind =
-        isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
-        isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-        isa<AbstractFunctionDecl>(member) || isa<IfConfigDecl>(member);
-    assert(isExpectedKind &&
+    assert(isValidProtocolMemberForTBDGen(member) &&
            "unexpected member of protocol during TBD generation");
   }
 #endif

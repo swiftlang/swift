@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -629,6 +630,9 @@ public:
       return;
     }
 
+    if (!isPublicOrUsableFromInline(nominal))
+      return;
+
     map[nominal].recordProtocols(directlyInherited);
 
     // Recurse to find any nested types.
@@ -647,8 +651,24 @@ public:
       return;
 
     const NominalTypeDecl *nominal = extension->getExtendedNominal();
+    if (!isPublicOrUsableFromInline(nominal))
+      return;
+
     map[nominal].recordConditionalConformances(extension->getInherited());
     // No recursion here because extensions are never nested.
+  }
+
+  /// Returns true if the conformance of \p nominal to \p proto is declared in
+  /// module \p M.
+  static bool conformanceDeclaredInModule(ModuleDecl *M,
+                                          const NominalTypeDecl *nominal,
+                                          ProtocolDecl *proto) {
+    SmallVector<ProtocolConformance *, 4> conformances;
+    nominal->lookupConformance(M, proto, conformances);
+    return llvm::all_of(conformances,
+                        [M](const ProtocolConformance *conformance) -> bool {
+      return M == conformance->getDeclContext()->getParentModule();
+    });
   }
 
   /// If there were any public protocols that need to be printed (i.e. they
@@ -657,6 +677,7 @@ public:
   void
   printSynthesizedExtensionIfNeeded(raw_ostream &out,
                                     const PrintOptions &printOptions,
+                                    ModuleDecl *M,
                                     const NominalTypeDecl *nominal) const {
     if (ExtraProtocols.empty())
       return;
@@ -682,10 +703,13 @@ public:
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
           return TypeWalker::Action::SkipChildren;
-        if (isPublicOrUsableFromInline(inherited)) {
+
+        if (isPublicOrUsableFromInline(inherited) &&
+            conformanceDeclaredInModule(M, nominal, inherited)) {
           protocolsToPrint.push_back(inherited);
           return TypeWalker::Action::SkipChildren;
         }
+
         return TypeWalker::Action::Continue;
       });
     }
@@ -769,7 +793,7 @@ bool swift::emitParseableInterface(raw_ostream &out,
   for (const auto &nominalAndCollector : inheritedProtocolMap) {
     const NominalTypeDecl *nominal = nominalAndCollector.first;
     const InheritedProtocolCollector &collector = nominalAndCollector.second;
-    collector.printSynthesizedExtensionIfNeeded(out, printOptions, nominal);
+    collector.printSynthesizedExtensionIfNeeded(out, printOptions, M, nominal);
     needDummyProtocolDeclaration |=
         collector.printInaccessibleConformanceExtensionIfNeeded(out,
                                                                 printOptions,

@@ -15,7 +15,7 @@ protocol ClassProto : class {}
 // CHECK-LABEL: define hidden swiftcc %TSo8NSObjectC* @checkedClassBoundCast(%swift.type*, %TSo8NSObjectC*, %swift.type* %T) #0 {
 // CHECK: [[OPAQUE_OBJ:%.+]] = bitcast %TSo8NSObjectC* %1 to i8*
 // CHECK: [[OPAQUE_CLASS:%.+]] = bitcast %swift.type* %T to i8*
-// CHECK: [[OPAQUE_RESULT:%.+]] = call i8* @swift_dynamicCastUnknownClassUnconditional(i8* [[OPAQUE_OBJ]], i8* [[OPAQUE_CLASS]])
+// CHECK: [[OPAQUE_RESULT:%.+]] = call i8* @swift_dynamicCastUnknownClassUnconditional(i8* [[OPAQUE_OBJ]], i8* [[OPAQUE_CLASS]], {{.*}})
 // CHECK: [[RESULT:%.+]] = bitcast i8* [[OPAQUE_RESULT]] to %TSo8NSObjectC*
 // CHECK: ret %TSo8NSObjectC* [[RESULT]]
 // CHECK: {{^}$}}
@@ -30,13 +30,13 @@ bb0(%unused : $@thick T.Type, %obj : $NSObject):
 
 // rdar://24924966
 // CHECK-LABEL: define hidden swiftcc void @metatype_to_objc_class(%swift.type*, %swift.type* %T)
-// CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* %0)
+// CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* %0, {{.*}})
 //   TODO: is this really necessary? also, this really shouldn't use a direct reference
 // CHECK-NEXT:  [[T1:%.*]] = bitcast %objc_object* [[T0]] to i8*
 // CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_Foo"
 // CHECK-NEXT:  [[T2:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T2a]])
 // CHECK-NEXT:  [[T3:%.*]] = bitcast %objc_class* [[T2]] to i8*
-// CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]])
+// CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]], {{.*}})
 sil hidden @metatype_to_objc_class : $@convention(thin) <T> (@thick T.Type) -> () {
 bb0(%metatype : $@thick T.Type):
   %result = unconditional_checked_cast %metatype : $@thick T.Type to $Foo
@@ -46,13 +46,13 @@ bb0(%metatype : $@thick T.Type):
 
 // CHECK-LABEL: define hidden swiftcc void @opt_metatype_to_objc_class({{(i32|i64)}}, %swift.type* %T)
 // CHECK:       [[ARG:%.*]] = inttoptr {{.*}} %0 to %swift.type*
-// CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* [[ARG]])
+// CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* [[ARG]], {{.*}})
 //   TODO: is this really necessary? also, this really shouldn't use a direct reference
 // CHECK-NEXT:  [[T1:%.*]] = bitcast %objc_object* [[T0]] to i8*
 // CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_Foo"
 // CHECK-NEXT:  [[T2:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T2a]])
 // CHECK-NEXT:  [[T3:%.*]] = bitcast %objc_class* [[T2]] to i8*
-// CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]])
+// CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]], {{.*}})
 sil hidden @opt_metatype_to_objc_class : $@convention(thin) <T> (Optional<@thick T.Type>) -> () {
 bb0(%metatype : $Optional<@thick T.Type>):
   %result = unconditional_checked_cast %metatype : $Optional<@thick T.Type> to $Foo

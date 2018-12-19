@@ -693,6 +693,16 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
   expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
 }
 
+//===----------------------------------------------------------------------===//
+// withContiguousMutableStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("withContiguousMutableStorageIfAvailable/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.withContiguousMutableStorageIfAvailable { _ in () }
+  expectCustomizable(tester, tester.log.withContiguousMutableStorageIfAvailable)
+}
+
 
 //===----------------------------------------------------------------------===//
 // Associated Type Inference

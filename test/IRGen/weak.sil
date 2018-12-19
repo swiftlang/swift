@@ -28,9 +28,9 @@ public struct A {
 }
 
 // size 8
-// flags 0x130007 == 1245191 (non-POD, non-inline, non-bitwise-takable)
 // stride 8
-// CHECK: @"$s4weak1AVWV" = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 1245191 to i8*), i8* inttoptr (i64 8 to i8*)]
+// flags 0x130007 == 1245191 (non-POD, non-inline, non-bitwise-takable)
+// CHECK: @"$s4weak1AVWV" = {{.*}} i64 8, i64 8, i32 1245191,
 
 sil @test_weak_load_store : $@convention(thin) (@inout A, Optional<C>) -> () {
 bb0(%0 : $*A, %1 : $Optional<C>):

@@ -338,7 +338,7 @@ DECL_ATTR(_implements, Implements,
   NotSerialized, 67)
 DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
   OnClass |
-  UserInaccessible | RejectByParser |
+  UserInaccessible |
   NotSerialized, 68)
 SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
   OnClass | LongAttribute | RejectByParser |

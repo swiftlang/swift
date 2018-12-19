@@ -104,6 +104,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.OmitNameOfInaccessibleProperties = true;
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
+  result.VarInitializers = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -591,11 +592,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
 
     printAccess(D->getFormalAccess());
+    bool shouldSkipSetterAccess =
+      llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess);
 
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getSetter()) {
         AccessLevel setterAccess = setter->getFormalAccess();
-        if (setterAccess != D->getFormalAccess())
+        if (setterAccess != D->getFormalAccess() && !shouldSkipSetterAccess)
           printAccess(setterAccess, "(set)");
       }
     }
@@ -865,6 +868,10 @@ static bool hasNonMutatingSetter(const AbstractStorageDecl *ASD) {
   return setter && setter->isExplicitNonMutating();
 }
 
+static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
+  return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -880,11 +887,20 @@ void PrintAST::printAttributes(const Decl *D) {
       Options.ExcludeAttrList.push_back(DAK_Final);
     }
 
-    // Don't print @_hasInitialValue if we're printing an initializer
-    // expression.
     if (auto vd = dyn_cast<VarDecl>(D)) {
+      // Don't print @_hasInitialValue if we're printing an initializer
+      // expression.
       if (vd->isInitExposedToClients())
         Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+
+      if (!Options.PrintForSIL) {
+        // Don't print @_hasStorage if the value is simply stored, or the
+        // decl is resilient.
+        if (vd->isResilient() ||
+            (vd->getImplInfo().isSimpleStored() &&
+             !hasLessAccessibleSetter(vd)))
+          Options.ExcludeAttrList.push_back(DAK_HasStorage);
+      }
     }
 
     // Don't print any contextual decl modifiers.
@@ -1610,18 +1626,27 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
 
-  // Never print anything for stored properties.
-  if (ASD->getAllAccessors().empty())
-    return;
-
   auto impl = ASD->getImplInfo();
 
-  // Treat StoredWithTrivialAccessors the same as Stored unless
-  // we're printing for SIL, in which case we want to distinguish it
-  // from a pure stored property.
+  // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
+    // ...unless we're printing for SIL, which expects a { get set? } on
+    //    trivial properties
     if (Options.PrintForSIL) {
       Printer << " { get " << (impl.supportsMutation() ? "set }" : "}");
+    }
+    // ...or you're private/internal(set), at which point we'll print
+    //    @_hasStorage var x: T { get }
+    else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
+      Printer << " {";
+      {
+        IndentRAII indentMore(*this);
+        indent();
+        Printer.printNewline();
+        Printer << "get";
+        Printer.printNewline();
+      }
+      Printer << "}";
     }
     return;
   }
@@ -1759,12 +1784,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
     case WriteImplKind::InheritedWithObservers: {
-      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
-      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
-      if (skippedDidSet && skippedWillSet) {
-        PrintAccessor(ASD->getGetter());
-        PrintAccessor(ASD->getSetter());
-      }
+      PrintAccessor(ASD->getGetter());
+      PrintAccessor(ASD->getSetter());
       break;
     }
     case WriteImplKind::Set:
@@ -2079,14 +2100,19 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     }
 
     if (Options.VarInitializers) {
-      // FIXME: Implement once we can pretty-print expressions.
+      auto vd = entry.getAnchoringVarDecl();
+      if (entry.hasInitStringRepresentation() &&
+          vd->isInitExposedToClients()) {
+        SmallString<128> scratch;
+        Printer << " = " << entry.getInitStringRepresentation(scratch);
+      }
     }
 
-    auto vd = entry.getAnchoringVarDecl();
-    if (entry.hasInitStringRepresentation() &&
-        vd->isInitExposedToClients()) {
-      SmallString<128> scratch;
-      Printer << " = " << entry.getInitStringRepresentation(scratch);
+    // If we're just printing a single pattern and it has accessors,
+    // print the accessors here. It is an error to add accessors to a
+    // pattern binding with multiple entries.
+    if (auto var = decl->getSingleVar()) {
+      printAccessors(var);
     }
   }
 }
@@ -2319,7 +2345,6 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
                        Options.BracketOptions.shouldCloseNominal(decl));
   }
 }
-
 static bool isStructOrClassContext(DeclContext *dc) {
   auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
@@ -3205,7 +3230,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
-      if (!VD->hasClangNode() && VD->getImplInfo().isSimpleStored())
+      if (!VD->hasClangNode() && VD->hasStorage())
         return false;
     }
 
@@ -3216,7 +3241,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         auto pattern =
           pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
-          if (!named->getDecl()->getImplInfo().isSimpleStored())
+          if (!named->getDecl()->hasStorage())
             return false;
         }
       }

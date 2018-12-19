@@ -46,19 +46,19 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$sBi64_WV", i32 8)
   var c: SSing
   // -- Multi-element structs use open-coded layouts
-  // CHECK:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_16_8_0_pod, i32 0, i32 0)
+  // CHECK:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_16_8_0_pod to i8**)
   var d: SMult
-  // CHECK-64:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_bt, i32 0, i32 0)
-  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_1000_bt, i32 0, i32 0)
+  // CHECK-64:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_16_8_7fffffff_bt to i8**)
+  // CHECK-32:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_8_4_1000_bt to i8**)
   var e: SMult2
-  // CHECK-64:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_bt, i32 0, i32 0)
-  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_1000_bt, i32 0, i32 0)
+  // CHECK-64:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_16_8_7fffffff_bt to i8**)
+  // CHECK-32:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_8_4_1000_bt to i8**)
   var f: SMult3
   // -- Single-case enum, shares layout of its field (Builtin.Int64)
   // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$sBi64_WV", i32 8)
   var g: ESing
   // -- Multi-case enum, open-coded layout
-  // CHECK:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_9_8_fe_pod, i32 0, i32 0)
+  // CHECK:    store i8** bitcast ({ [[INT]], [[INT]], i32, i32 }* @type_layout_9_8_fe_pod to i8**)
   var h: EMult
   // -- Single-element generic struct, shares layout of its field (T)
   // CHECK:       [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8

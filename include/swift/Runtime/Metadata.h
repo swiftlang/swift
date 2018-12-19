@@ -90,56 +90,26 @@ OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            OpaqueValue *src,
                            const Metadata *self);
  
-/// A value-witness table with extra inhabitants entry points.
-/// These entry points are available only if the HasExtraInhabitants flag bit is
-/// set in the 'flags' field.
-struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
-#define WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
-#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
-#include "swift/ABI/ValueWitness.def"
-
-#define SET_WITNESS(NAME) base.NAME,
-
-  constexpr ExtraInhabitantsValueWitnessTable()
-    : ValueWitnessTable{}, extraInhabitantFlags(),
-      storeExtraInhabitant(nullptr),
-      getExtraInhabitantIndex(nullptr) {}
-  constexpr ExtraInhabitantsValueWitnessTable(
-                            const ValueWitnessTable &base,
-                            ValueWitnessTypes::extraInhabitantFlags eif,
-                            ValueWitnessTypes::storeExtraInhabitant sei,
-                            ValueWitnessTypes::getExtraInhabitantIndex geii)
-    : ValueWitnessTable(base),
-      extraInhabitantFlags(eif),
-      storeExtraInhabitant(sei),
-      getExtraInhabitantIndex(geii) {}
-
-  static bool classof(const ValueWitnessTable *table) {
-    return table->flags.hasExtraInhabitants();
-  }
-};
-
 /// A value-witness table with enum entry points.
 /// These entry points are available only if the HasEnumWitnesses flag bit is
 /// set in the 'flags' field.
-struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
+struct EnumValueWitnessTable : ValueWitnessTable {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   ValueWitnessTypes::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
 
   constexpr EnumValueWitnessTable()
-    : ExtraInhabitantsValueWitnessTable(),
+    : ValueWitnessTable{},
       getEnumTag(nullptr),
       destructiveProjectEnumData(nullptr),
       destructiveInjectEnumTag(nullptr) {}
   constexpr EnumValueWitnessTable(
-          const ExtraInhabitantsValueWitnessTable &base,
+          const ValueWitnessTable &base,
           ValueWitnessTypes::getEnumTag getEnumTag,
           ValueWitnessTypes::destructiveProjectEnumData destructiveProjectEnumData,
           ValueWitnessTypes::destructiveInjectEnumTag destructiveInjectEnumTag)
-    : ExtraInhabitantsValueWitnessTable(base),
+    : ValueWitnessTable(base),
       getEnumTag(getEnumTag),
       destructiveProjectEnumData(destructiveProjectEnumData),
       destructiveInjectEnumTag(destructiveInjectEnumTag) {}
@@ -155,47 +125,44 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
 /// extra inhabitants, and miscellaneous flags about the type.
 struct TypeLayout {
   ValueWitnessTypes::size size;
-  ValueWitnessTypes::flags flags;
   ValueWitnessTypes::stride stride;
+  ValueWitnessTypes::flags flags;
+  ValueWitnessTypes::extraInhabitantCount extraInhabitantCount;
 
 private:
-  // Only available if the "hasExtraInhabitants" flag is set.
-  ValueWitnessTypes::extraInhabitantFlags extraInhabitantFlags;
-
   void _static_assert_layout();
 public:
   TypeLayout() = default;
   constexpr TypeLayout(ValueWitnessTypes::size size,
-                       ValueWitnessTypes::flags flags,
                        ValueWitnessTypes::stride stride,
-                       ValueWitnessTypes::extraInhabitantFlags eiFlags =
-                         ValueWitnessTypes::extraInhabitantFlags())
-    : size(size), flags(flags), stride(stride),
-      extraInhabitantFlags(eiFlags) {}
-
-  ValueWitnessTypes::extraInhabitantFlags getExtraInhabitantFlags() const {
-    assert(flags.hasExtraInhabitants());
-    return extraInhabitantFlags;
-  }
+                       ValueWitnessTypes::flags flags,
+                       ValueWitnessTypes::extraInhabitantCount xiCount)
+    : size(size), stride(stride), flags(flags), extraInhabitantCount(xiCount) {}
 
   const TypeLayout *getTypeLayout() const { return this; }
 
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
-  unsigned getNumExtraInhabitants() const;
+  unsigned getNumExtraInhabitants() const {
+    return extraInhabitantCount;
+  }
+
+  bool hasExtraInhabitants() const {
+    return extraInhabitantCount != 0;
+  }
 };
 
 inline void TypeLayout::_static_assert_layout() {
   #define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                               \
-    static_assert(offsetof(ExtraInhabitantsValueWitnessTable, FIELD)    \
-                    - offsetof(ExtraInhabitantsValueWitnessTable, size) \
+    static_assert(offsetof(ValueWitnessTable, FIELD)                    \
+                    - offsetof(ValueWitnessTable, size)                 \
                   == offsetof(TypeLayout, FIELD),                       \
                   "layout of " #FIELD " in TypeLayout doesn't match "   \
                   "value witness table")
   CHECK_TYPE_LAYOUT_OFFSET(size);
   CHECK_TYPE_LAYOUT_OFFSET(flags);
+  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantCount);
   CHECK_TYPE_LAYOUT_OFFSET(stride);
-  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantFlags);
 
   #undef CHECK_TYPE_LAYOUT_OFFSET
 }
@@ -204,6 +171,7 @@ template <>
 inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
   size = layout.size;
   stride = layout.stride;
+  extraInhabitantCount = layout.extraInhabitantCount;
 
   // Currently there is nothing in the runtime or ABI which tries to
   // asynchronously check completion, so we can just do a normal store here.
@@ -221,30 +189,9 @@ template <> inline bool ValueWitnessTable::checkIsComplete() const {
 }
 
 template <>
-inline const ExtraInhabitantsValueWitnessTable *
-ValueWitnessTable::_asXIVWT() const {
-  assert(ExtraInhabitantsValueWitnessTable::classof(this));
-  return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
-}
-
-template <>
 inline const EnumValueWitnessTable *ValueWitnessTable::_asEVWT() const {
   assert(EnumValueWitnessTable::classof(this));
   return static_cast<const EnumValueWitnessTable *>(this);
-}
-
-template <> inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
-  // If the table does not have extra inhabitant witnesses, then there are zero.
-  if (!flags.hasExtraInhabitants())
-    return 0;
-  return this->_asXIVWT()->extraInhabitantFlags.getNumExtraInhabitants();
-}
-
-inline unsigned TypeLayout::getNumExtraInhabitants() const {
-  // If the table does not have extra inhabitant witnesses, then there are zero.
-  if (!flags.hasExtraInhabitants())
-    return 0;
-  return extraInhabitantFlags.getNumExtraInhabitants();
 }
 
 // Standard value-witness tables.
@@ -252,22 +199,22 @@ inline unsigned TypeLayout::getNumExtraInhabitants() const {
 #define BUILTIN_TYPE(Symbol, _) \
   SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
 #define BUILTIN_POINTER_TYPE(Symbol, _) \
-  SWIFT_RUNTIME_EXPORT const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
 #include "swift/Runtime/BuiltinTypes.def"
 
 // The () -> () table can be used for arbitrary function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(FUNCTION_MANGLING);     // () -> ()
 
 // The @escaping () -> () table can be used for arbitrary escaping function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING);     // @noescape () -> ()
 
 // The @convention(thin) () -> () table can be used for arbitrary thin function types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable
+const ValueWitnessTable
   VALUE_WITNESS_SYM(THIN_FUNCTION_MANGLING);    // @convention(thin) () -> ()
 
 // The () table can be used for arbitrary empty types.
@@ -276,7 +223,7 @@ const ValueWitnessTable VALUE_WITNESS_SYM(EMPTY_TUPLE_MANGLING);        // ()
 
 // The table for aligned-pointer-to-pointer types.
 SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject.Type
+const ValueWitnessTable METATYPE_VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject.Type
 
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -289,7 +236,7 @@ static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 
 /// Return value witnesses for a pointer-aligned pointer type.
 static inline
-const ExtraInhabitantsValueWitnessTable &
+const ValueWitnessTable &
 getUnmanagedPointerPointerValueWitnesses() {
   return METATYPE_VALUE_WITNESS_SYM(Bo);
 }

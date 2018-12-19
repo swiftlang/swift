@@ -610,6 +610,7 @@ NodePointer Demangler::demangleOperator() {
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
+      case 'P': return demangleProtocolConformanceRef();
       default:
         pushBack();
         pushBack();
@@ -1294,7 +1295,7 @@ NodePointer Demangler::popAnyProtocolConformance() {
   });
 }
 
-NodePointer Demangler::popProtocolConformanceRef() {
+NodePointer Demangler::demangleProtocolConformanceRef() {
   NodePointer module = popModule();
   NodePointer proto = popProtocol();
   auto protocolConformanceRef =
@@ -1309,7 +1310,7 @@ NodePointer Demangler::popProtocolConformanceRef() {
 
 NodePointer Demangler::demangleConcreteProtocolConformance() {
   NodePointer conditionalConformanceList = popAnyProtocolConformanceList();
-  NodePointer conformanceRef = popProtocolConformanceRef();
+  NodePointer conformanceRef = popNode(Node::Kind::ProtocolConformanceRef);
   NodePointer type = popNode(Node::Kind::Type);
   return createWithChildren(Node::Kind::ConcreteProtocolConformance,
                             type, conformanceRef, conditionalConformanceList);
@@ -2041,10 +2042,10 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'n': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popAssocTypePath();
+      NodePointer conformingType = popAssocTypePath();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
-                                protoTy, assocTypePath, requirementTy);
+                                protoTy, conformingType, requirementTy);
     }
 
     case 'N': {
@@ -2054,6 +2055,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return createWithChildren(
                             Node::Kind::DefaultAssociatedConformanceAccessor,
                             protoTy, assocTypePath, requirementTy);
+    }
+
+    case 'b': {
+      NodePointer requirementTy = popProtocol();
+      NodePointer protoTy = popNode(Node::Kind::Type);
+      return createWithChildren(Node::Kind::BaseConformanceDescriptor,
+                                protoTy, requirementTy);
     }
 
     case 'H':
@@ -2423,11 +2431,16 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'T': {
       NodePointer ProtoTy = popNode(Node::Kind::Type);
-      auto AssocTypePath = popAssocTypePath();
-
+      NodePointer ConformingType = popAssocTypePath();
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::AssociatedTypeWitnessTableAccessor,
-                                Conf, AssocTypePath, ProtoTy);
+                                Conf, ConformingType, ProtoTy);
+    }
+    case 'b': {
+      NodePointer ProtoTy = popNode(Node::Kind::Type);
+      NodePointer Conf = popProtocolConformance();
+      return createWithChildren(Node::Kind::BaseWitnessTableAccessor,
+                                Conf, ProtoTy);
     }
     case 'O': {
       switch (nextChar()) {
