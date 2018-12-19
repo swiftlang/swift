@@ -2788,6 +2788,15 @@ public:
     return UnderlyingInterfaceType;
   }
   
+  Optional<SubstitutionMap> getUnderlyingTypeSubstitutions() const {
+    return UnderlyingTypeSubstitutions;
+  }
+  
+  void setUnderlyingTypeSubstitutions(SubstitutionMap subs) {
+    assert(!UnderlyingTypeSubstitutions.hasValue() && "resetting underlying type?!");
+    UnderlyingTypeSubstitutions = subs;
+  }
+  
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
 };

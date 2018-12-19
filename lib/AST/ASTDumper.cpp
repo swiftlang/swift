@@ -410,6 +410,11 @@ static void printName(raw_ostream &os, DeclName name) {
     os << name;
 }
 
+static void dumpSubstitutionMapRec(
+    SubstitutionMap map, llvm::raw_ostream &out,
+    SubstitutionMap::DumpStyle style, unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
+
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern> {
   public:
@@ -647,6 +652,13 @@ namespace {
         << Type(OTD->getUnderlyingInterfaceType()).getString();
       OS << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
+      if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
+        OS << " underlying:\n";
+        SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+        dumpSubstitutionMapRec(*underlyingSubs, OS,
+                               SubstitutionMap::DumpStyle::Full,
+                               Indent + 2, Dumped);
+      }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -2171,7 +2183,11 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-
+  void visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E){
+    printCommon(E, "underlying_to_opaque_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
     for (auto conf : E->getConformances()) {
@@ -2881,11 +2897,6 @@ void TypeRepr::dump() const {
 static void dumpProtocolConformanceRec(
     const ProtocolConformance *conformance, llvm::raw_ostream &out,
     unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
-
-static void dumpSubstitutionMapRec(
-    SubstitutionMap map, llvm::raw_ostream &out,
-    SubstitutionMap::DumpStyle style, unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
 static void dumpProtocolConformanceRefRec(

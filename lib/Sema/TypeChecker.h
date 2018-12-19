@@ -263,6 +263,21 @@ enum class TypeCheckExprFlags {
   /// If set, a conversion constraint should be specified so that the result of
   /// the expression is an optional type.
   ExpressionTypeMustBeOptional = 0x200,
+
+  /// FIXME(diagnostics): Once diagnostics are completely switched to new
+  /// framework, this flag could be removed as obsolete.
+  ///
+  /// If set, this is a sub-expression, and it is being re-typechecked
+  /// as part of the expression diagnostics, which is attempting to narrow
+  /// down failure location.
+  SubExpressionDiagnostics = 0x400,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression is the opaque
+  /// return type of the declaration being checked. The archetype should be
+  /// opened into a type variable to provide context to the expression, and
+  /// the resulting type will be a candidate for binding the underlying
+  /// type.
+  ConvertTypeIsOpaqueReturnType = 0x800,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

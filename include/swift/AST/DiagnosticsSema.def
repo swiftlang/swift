@@ -3209,6 +3209,18 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(opaque_type_no_underlying_type_candidates,none,
+      "function declares an opaque return type, but has no return statements "
+      "in its body from which to infer an underlying type", ())
+ERROR(opaque_type_mismatched_underlying_type_candidates,none,
+      "function declares an opaque return type, but the return statements "
+      "in its body do not have matching underlying types", ())
+NOTE(opaque_type_underlying_type_candidate_here,none,
+     "return statement has underlying type %0", (Type))
+ERROR(opaque_type_self_referential_underlying_type,none,
+      "function opaque return type was inferred as %0, which defines the "
+      "opaque type in terms of itself", (Type))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
 //------------------------------------------------------------------------------
