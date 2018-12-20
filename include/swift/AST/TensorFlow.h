@@ -92,7 +92,13 @@ namespace tf {
     bool containsTensorFlowValue(Type ty, bool checkHigherOrderFunctions);
 
   private:
-    bool structContainsTensorFlowValue(StructDecl *decl);
+    bool containsTensorFlowValueImpl(
+        Type ty, bool checkHigherOrderFunctions,
+        llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls);
+
+    bool
+    structContainsTensorFlowValue(StructDecl *decl,
+                                  llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls);
   };
 
   /// This class provides a single source of truth for the set of types that are

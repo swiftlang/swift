@@ -220,6 +220,14 @@ bool tf::flattenTensorFlowValueAggregate(Type ty,
 /// parameter of result contains any TensorFlow value type.
 bool TypeContainsTensorFlowValue::containsTensorFlowValue(
     Type ty, bool checkHigherOrderFunctions) {
+  llvm::SmallPtrSet<NominalTypeDecl*, 8> parentDecls;
+  return containsTensorFlowValueImpl(ty, checkHigherOrderFunctions,
+                                     parentDecls);
+}
+
+bool TypeContainsTensorFlowValue::containsTensorFlowValueImpl(
+    Type ty, bool checkHigherOrderFunctions,
+    llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls) {
   // If this type literally is a value type, then yep, we contain it.  This is
   // the base case.
   if (isTensorFlowValue(ty))
@@ -229,40 +237,43 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValue(
   // then the tuple itself does.
   if (auto *tuple = ty->getAs<TupleType>()) {
     for (auto &elt : tuple->getElements())
-      if (containsTensorFlowValue(elt.getType(), checkHigherOrderFunctions))
+      if (containsTensorFlowValueImpl(elt.getType(), checkHigherOrderFunctions,
+                                      parentDecls))
         return true;
     return false;
   }
 
   // Deabstraction scalarizes structs.
   if (auto *st = ty->getAs<StructType>())
-    return structContainsTensorFlowValue(st->getDecl());
+    return structContainsTensorFlowValue(st->getDecl(), parentDecls);
 
   // Deabstractions binds specialized generic structs.  Check if either the
   // struct itself or one of the generic arguments contains a tensor value.
   if (auto *bgst = ty->getAs<BoundGenericStructType>()) {
     // Check the generic arguments.
     for (auto arg : bgst->getGenericArgs())
-      if (containsTensorFlowValue(arg, checkHigherOrderFunctions))
+      if (containsTensorFlowValueImpl(arg, checkHigherOrderFunctions,
+                                      parentDecls))
         return true;
 
-    return structContainsTensorFlowValue(bgst->getDecl());
+    return structContainsTensorFlowValue(bgst->getDecl(), parentDecls);
   }
 
   // Handle still-generic types that may contain a tensor value.
   if (auto *ugst = ty->getAs<UnboundGenericType>())
     if (auto *decl = dyn_cast<StructDecl>(ugst->getDecl()))
-      return structContainsTensorFlowValue(decl);
+      return structContainsTensorFlowValue(decl, parentDecls);
 
   if (checkHigherOrderFunctions) {
     if (auto *fnType = ty->getAs<SILFunctionType>()) {
       for (auto &result : fnType->getResults())
-        if (containsTensorFlowValue(result.getType(),
-                                    checkHigherOrderFunctions))
+        if (containsTensorFlowValueImpl(result.getType(),
+                                        checkHigherOrderFunctions, parentDecls))
           return true;
 
       for (auto &param : fnType->getParameters())
-        if (containsTensorFlowValue(param.getType(), checkHigherOrderFunctions))
+        if (containsTensorFlowValueImpl(param.getType(),
+                                        checkHigherOrderFunctions, parentDecls))
           return true;
     }
   }
@@ -274,16 +285,22 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValue(
 
 /// Determine whether the given struct contains a TensorFlow value type, caching
 /// the result.
-bool TypeContainsTensorFlowValue::
-structContainsTensorFlowValue(StructDecl *decl) {
+bool TypeContainsTensorFlowValue::structContainsTensorFlowValue(
+    StructDecl *decl, llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls) {
+  // If we have a cycle, break it here.
+  if (parentDecls.count(decl) > 0) {
+    return false;
+  }
+  parentDecls.insert(decl);
   auto it = declContainsTensorFlowValue.find(decl);
   if (it != declContainsTensorFlowValue.end())
     return it->second;
 
   bool hasTensorFlowValue = false;
   for (auto p : decl->getStoredProperties())
-    if (containsTensorFlowValue(p->getType(),
-                                /*checkHigherOrderFunctions*/ false)) {
+    if (containsTensorFlowValueImpl(p->getType(),
+                                    /*checkHigherOrderFunctions*/ false,
+                                    parentDecls)) {
       hasTensorFlowValue = true;
       break;
     }
