@@ -5,7 +5,9 @@
 #include <limits.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <malloc/malloc.h>
 #include <objc/runtime.h>
+#include <Foundation/Foundation.h>
 
 // Implementation of ObjC classes
 // with bits set to mimic the pre-stable Swift ABI
@@ -14,9 +16,13 @@
 #if __has_include(<objc/objc-internal.h>)
 #include <objc/objc-internal.h>
 #else
-extern Class
-objc_initializeClassPair(Class superclass, const char *name,
-                         Class cls, Class metacls);
+extern "C" Class objc_initializeClassPair(Class superclass, const char *name, Class cls, Class metacls);
+extern "C" id _objc_rootRetain(id);
+extern "C" void _objc_rootRelease(id);
+extern "C" id _objc_rootAutorelease(id);
+extern "C" uintptr_t _objc_rootRetainCount(id);
+extern "C" bool _objc_rootTryRetain(id);
+extern "C" bool _objc_rootIsDeallocating(id);
 #endif
 
 // This class stands in for the pre-stable ABI's SwiftObject.
@@ -28,9 +34,9 @@ __attribute__((objc_root_class))
 @implementation SwiftObject
 +(void)initialize { }
 +(id)allocWithZone:(struct _malloc_zone_t *)zone {
-  return _objc_rootAllocWithZone(self, zone);
+  return class_createInstance(self, 0);
 }
-+(id)alloc { return _objc_rootAlloc(self); }
++(id)alloc { return [self allocWithZone:nil]; }
 +(id)class { return self; }
 -(id)class { return object_getClass(self); }
 +(id)superclass { return class_getSuperclass(self); }
@@ -61,7 +67,7 @@ __attribute__((objc_root_class))
 -(uintptr_t)retainCount { return _objc_rootRetainCount(self); }
 -(BOOL)_tryRetain { return _objc_rootTryRetain(self); }
 -(BOOL)_isDeallocating { return _objc_rootIsDeallocating(self); }
--(void)dealloc { _objc_rootDealloc(self); }
+-(void)dealloc { object_dispose(self); }
 
 -(BOOL)isKindOfClass:(Class)other {
   for (Class cls = object_getClass(self); cls; cls = class_getSuperclass(cls))
