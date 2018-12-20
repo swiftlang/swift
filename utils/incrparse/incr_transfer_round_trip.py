@@ -122,6 +122,10 @@ def main():
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
+    # FIXME: This check is transitional, once SwiftSyntax starts using the
+    # parser library it will become self-contained and not need
+    # swift-syntax-test for its lit tests. Contents of testWithParserLib()
+    # function will move here and replace what comes below.
     if not swift_syntax_test:
         pre_edit_file = temp_dir + '/' + test_file_name + '.' + test_case + \
             '.pre.swift'

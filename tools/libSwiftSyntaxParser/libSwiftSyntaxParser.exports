@@ -1,0 +1,5 @@
+swiftparse_parse_string
+swiftparse_parser_create
+swiftparse_parser_dispose
+swiftparse_parser_set_node_handler
+swiftparse_parser_set_node_lookup
