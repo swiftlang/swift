@@ -891,12 +891,11 @@ private:
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
           fingerprint, swiftDeps);
       // Since we don't have fingerprints yet, must rebuild every provider when
-      // interfaceHash changes. So when implementation (i.e. innards) of
+      // interfaceHash changes. So when interface (i.e. interface hash) of
       // sourceFile changes, every provides is dirty. And since we don't know
       // what happened, dirtyness might affect the interface.
       if (!p.getInterface()->getFingerprint().hasValue())
-        g.addArc(g.getSourceFileNodePair().getImplementation(),
-                 p.getInterface());
+        g.addArc(g.getSourceFileNodePair().getInterface(), p.getInterface());
     }
   }
 
