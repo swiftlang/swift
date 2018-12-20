@@ -220,10 +220,7 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
 
 GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
                                                  bool isTPUInfeedEnabled)
-    // When `TFUseDeviceStack` is true, ignore `primaryDeviceId` provided at
-    // compile time (e.g. via compiler flag); instead use runtime device info.
-    : primaryDeviceId(TFUseDeviceStack ? RuntimeDeviceId : primaryDeviceId),
-      isTPUInfeedEnabled(isTPUInfeedEnabled) {
+    : primaryDeviceId(primaryDeviceId), isTPUInfeedEnabled(isTPUInfeedEnabled) {
   assert(primaryDeviceId != AllDeviceId);
   if (!TFUseDeviceStack)
     usedDeviceIds.insert(primaryDeviceId);

@@ -213,7 +213,9 @@ static inline std::string getDeviceString(DeviceId deviceId) {
 /// This struct holds information about the deviceInfo of the graph we are
 /// generating.
 struct GraphFunctionDeviceInfo {
-  const DeviceId primaryDeviceId;
+  // The primary device that takes function args (if any) and return values.
+  // Only defined, and is const after finalizeUsedDevices() is called.
+  DeviceId primaryDeviceId;
   const bool isTPUInfeedEnabled;
 
   using UsedDeviceSet = llvm::SmallSet<DeviceId, 8>;
@@ -231,6 +233,35 @@ struct GraphFunctionDeviceInfo {
     if (device.type == DeviceType::ALL ||
         !usedDeviceIds.insert(device).second)
       return;
+  }
+
+  // Must be called after caller has scanned all graph_ops in the SIL function
+  // being processed, and called markDeviceUsed() on them.
+  void finalizeUsedDevices() {
+    // This is an edge case where we've only seen ops marked ALL_DEVICE
+    // (e.g. Const). In that case, usedDeviceIds should contain the RUNTIME
+    // device.
+    if (usedDeviceIds.empty()) {
+      primaryDeviceId = RuntimeDeviceId;
+      usedDeviceIds.insert(RuntimeDeviceId);
+      return;
+    }
+
+    if (usedDeviceIds.size() == 1) {
+      if (*usedDeviceIds.begin() == RuntimeDeviceId)
+        primaryDeviceId = RuntimeDeviceId;
+      return;
+    }
+
+    // For device partitioning to work, the device set cannot include the
+    // RUNTIME device along with some other device(s). This is because we don't
+    // know what the RUNTIME device is at compile time, so we cannot create
+    // sends/recvs graph nodes.
+    for (auto deviceId : usedDeviceIds) {
+      if (deviceId == RuntimeDeviceId)
+        assert(0 && "Cannot yet handle a multi-device function involving the "
+                    "RUNTIME device");
+    }
   }
 
   // Choose a device for the graphOpInst under construction and track the chosen
@@ -269,7 +300,12 @@ private:
                llvm::ArrayRef<GraphOperationAttribute> attributes) const;
 
   // Actual TF devices involved in the tensor computation.
-  // It cannot contain DeviceType::ALL.
+
+  // Invariants:
+  // 1. It cannot contain DeviceType::ALL.
+  // 2. It must contain primaryDeviceId after finalizeUsedDevices()
+  // 3. When there are >= 2 devices, it cannot contain the RUNTIME device.
+  // See finalizeUsedDevices() for more context.
   UsedDeviceSet usedDeviceIds;
 };
 

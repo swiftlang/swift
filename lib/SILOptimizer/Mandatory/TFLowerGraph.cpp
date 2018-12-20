@@ -2748,15 +2748,9 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   // we sort the device IDs first.
   SmallVector<DeviceId, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
                                      deviceInfo.getUsedDeviceIds().end());
-  // TODO: unify these two code paths
-  if (TFUseDeviceStack) {
-    assert(deviceIds.size() == 1);
-    assert(deviceIds[0] == RuntimeDeviceId);
-  }
   assert(!deviceIds.empty());
   llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
-  for (auto encodeDeviceId : deviceIds) {
-    auto deviceId = encodeDeviceId;
+  for (auto deviceId : deviceIds) {
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceId);
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal
