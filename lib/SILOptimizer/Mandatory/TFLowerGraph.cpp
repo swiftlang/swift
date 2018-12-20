@@ -44,6 +44,8 @@ static llvm::cl::opt<bool>
     TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
                 llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
+extern llvm::cl::opt<bool> TFUseDeviceStack;
+
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &ctx, SILLocation loc,
@@ -1611,7 +1613,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     }
   }
 
-  if (!hasDevice) {
+  if (!hasDevice && !TFUseDeviceStack) {
     inst->dump();
     llvm_unreachable("The above tensor op has no device set");
   }
@@ -2746,6 +2748,12 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   // we sort the device IDs first.
   SmallVector<DeviceId, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
                                      deviceInfo.getUsedDeviceIds().end());
+  // TODO: unify these two code paths
+  if (TFUseDeviceStack) {
+    assert(deviceIds.size() == 1);
+    assert(deviceIds[0] == RuntimeDeviceId);
+  }
+  assert(!deviceIds.empty());
   llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
   for (auto encodeDeviceId : deviceIds) {
     auto deviceId = encodeDeviceId;

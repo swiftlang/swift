@@ -37,16 +37,20 @@ using namespace tf;
 // Device Partitioning Utilities
 //===----------------------------------------------------------------------===//
 
-// Return the device attribute associated with `inst`, which is required to
-// exist.
+// Return the device attribute associated with `inst`, if any. Otherwise return
+// an empty string.
 StringRef swift::tf::getDeviceString(const GraphOperationInfo &graphOpInfo) {
   auto attr = graphOpInfo.getInst()->getAttributeNamed(TF_DEVICE_ATTR);
-  assert(attr.hasValue() && "Tensor op instruction has no device string");
-  return attr.getValue().getStringValue();
+  if (attr.hasValue())
+    return attr.getValue().getStringValue();
+  return StringRef();
 }
 
 DeviceId swift::tf::getDeviceId(const GraphOperationInfo &graphOpInfo) {
-  return getOpDeviceId(getDeviceString(graphOpInfo));
+  auto deviceStr = getDeviceString(graphOpInfo);
+  if (!deviceStr.empty())
+    return getOpDeviceId(deviceStr);
+  return RuntimeDeviceId;
 }
 
 //===----------------------------------------------------------------------===//
