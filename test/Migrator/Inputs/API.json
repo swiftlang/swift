@@ -531,6 +531,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities12ToplevelTypeC8trailingyyySayypGSgcF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "trailing2(a:)",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "TypeDecl",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
