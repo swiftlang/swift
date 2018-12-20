@@ -334,12 +334,18 @@ void DriverGraph::checkTransitiveClosureForCascading(
   // Moved this out of the following loop for effieciency.
   assert(potentiallyCascadingDef->getSwiftDeps().hasValue() &&
          "Should only call me for Decl nodes.");
-  const StringRef swiftDeps =
-      potentiallyCascadingDef->getSwiftDeps().getValue();
 
   forEachUseOf(potentiallyCascadingDef, [&](const DriverNode *u) {
-    if (u->getKey().isInterface())
-      rememberThatJobCascades(swiftDeps);
+    if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
+      // An interface depends on something. Thus, if that something changes
+      // the interface must be recompiled. But if an interface changes, then
+      // anything using that interface must also be recompiled.
+      // So, the job containing the interface "cascades", in other words
+      // whenever that job gets recompiled, anything depending on it
+      // (since we don't have interface-specific dependency info as of Dec.
+      // 2018) must be recompiled.
+      rememberThatJobCascades(u->getSwiftDeps().getValue());
+    }
     checkTransitiveClosureForCascading(visited, u);
   });
 }
