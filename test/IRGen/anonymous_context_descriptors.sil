@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+protocol P { }
+
+class Blah<T: P> {
+  private struct Inner<U: P> { }
+}
+
+// Anonymous descriptor
+// CHECK: @"$s29anonymous_context_descriptors4BlahC5Inner33{{.*}}MXX" =
+
+// Flags: anonymous (2) + generic (0x80) + unique (0x40)
+// CHECK-SAME: i32 194
+
+// Parent
+// CHECK-SAME: $s29anonymous_context_descriptors4BlahCMn
+
+// # generic header
+// CHECK-SAME: i16 2, i16 2
+// CHECK-SAME: i16 4, i16 0

@@ -510,6 +510,7 @@ namespace {
     
     void layout() {
       super::layout();
+      asImpl().addGenericSignature();
     }
   
     ConstantReference getParent() {
@@ -522,7 +523,7 @@ namespace {
     }
     
     GenericSignature *getGenericSignature() {
-      return nullptr;
+      return DC->getGenericSignatureOfContext();
     }
     
     bool isUniqueDescriptor() {
