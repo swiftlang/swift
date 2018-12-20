@@ -3468,8 +3468,15 @@ public:
       auto *cloned = pair.second;
       // The end-scope counterpart should be emitted to the adjoint block
       // corresponding to the original begin-scope instruction.
-      auto *endBB = getAdjointBlock(original->getParent());
-      getBuilder().setInsertionPoint(endBB);
+      LLVM_DEBUG(getADDebugStream() <<
+                 "Creating end-scope counterpart for " << *cloned);
+      SILInstruction *lastUser = nullptr;
+      for (auto use : cloned->getResults()[0]->getUses())
+        lastUser = use->getUser();
+      LLVM_DEBUG(getADDebugStream() <<
+                 "after last user " << *lastUser);
+      getBuilder().setInsertionPoint(lastUser->getParent(),
+                                     ++(lastUser->getIterator()));
       if (auto *bai = dyn_cast<BeginAccessInst>(original))
         getBuilder().createEndAccess(bai->getLoc(),
                                      cast<BeginAccessInst>(cloned),
@@ -3521,6 +3528,7 @@ public:
       addRetElt(i);
     }
     getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
+    LLVM_DEBUG(getADDebugStream() << "Generated adjoint\n" << adjoint);
     return errorOccurred;
   }
 
@@ -3741,8 +3749,8 @@ public:
     // argument list.
     SmallVector<SILValue, 8> allocsToCleanUp;
     for (auto param : ai->getIndirectSILResults()) {
-      // FIXME: Emit `dealloc_stack` somewhere!
       auto *buf = getBuilder().createAllocStack(loc, param->getType());
+      LLVM_DEBUG(getADDebugStream() << "Created " << *buf);
       args.push_back(buf);
       allocsToCleanUp.push_back(buf);
     }
@@ -3789,7 +3797,10 @@ public:
                                               ai->getSubstitutionMap(), args,
                                               /*isNonThrowing*/ false);
     // Clean up seed allocation.
+    LLVM_DEBUG(getADDebugStream() <<
+               "Cleaning up allocation for seed " << *seedBuf);
     getBuilder().createDeallocStack(loc, seedBuf);
+
     // If `applyAdj` is a tuple, extract all results.
     SmallVector<SILValue, 8> dirResults;
     extractAllElements(applyAdj, builder, dirResults);
@@ -3827,6 +3838,9 @@ public:
       addAdjointValue(ai->getArgument(origNumIndRes + i),
                       AdjointValue::getMaterialized(*allResultsIt++));
     }
+    // Clean up indirect result buffers
+    for (auto alloc : reversed(allocsToCleanUp))
+      builder.createDeallocStack(loc, alloc);
   }
 
   /// Handle `gradient` instruction.
@@ -4215,6 +4229,9 @@ AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
 SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
                                                               SILValue rhs) {
   // TODO: Optimize for the case when lhs == rhs.
+  LLVM_DEBUG(getADDebugStream() <<
+             "Emitting adjoint accumulation for lhs: " << lhs <<
+             " and rhs: " << rhs << "\n");
   assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
   assert(lhs->getType().isObject() && rhs->getType().isObject() &&
          "Adjoint types must be both object types!");
