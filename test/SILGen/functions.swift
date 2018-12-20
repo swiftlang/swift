@@ -522,35 +522,3 @@ func testNoescape2() {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
-
-enum PartialApplyEnumPayload<T, U> {
-  case Left(T)
-  case Right(U)
-}
-
-struct S {}
-struct C {}
-
-func partialApplyEnumCases(_ x: S, y: C) {
-  let left = PartialApplyEnumPayload<S, C>.Left
-  let left2 = left(S())
-
-  let right = PartialApplyEnumPayload<S, C>.Right
-  let right2 = right(C())
-}
-
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$sx9functions23PartialApplyEnumPayloadOyxq_GIegir_xADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
-// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
-// CHECK:         return [[THUNKED_CLOSURE]]
-// CHECK: } // end sil function '$s9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F'
-
-// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$sq_9functions23PartialApplyEnumPayloadOyxq_GIegir_q_ADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_1, @guaranteed @callee_guaranteed (@in τ_0_1) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
-// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
-// CHECK:         return [[THUNKED_CLOSURE]]
-// CHECK: } // end sil function '$s9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F'
