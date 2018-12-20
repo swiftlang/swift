@@ -113,6 +113,11 @@ std::vector<std::string> DriverGraph::getExternalDependencies() const {
   return out;
 }
 
+static std::string phoneyBalonyMangleTypeAsContext(const NominalTypeDecl *) {
+  llvm_unreachable(
+      "Should never be called; only used by frontend for NominalTypeDecls.");
+}
+
 // Add every (swiftdeps) use of the external dependency to uses.
 void DriverGraph::markExternal(SmallVectorImpl<const Job *> &uses,
                                StringRef externalDependency) {
@@ -121,7 +126,7 @@ void DriverGraph::markExternal(SmallVectorImpl<const Job *> &uses,
   // These nodes will depend on the *interface* of the external Decl.
   DependencyKey key =
       DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
-          externalDependency.str());
+          externalDependency.str(), phoneyBalonyMangleTypeAsContext);
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
   for (const DependencyKey &keyOfUse : usesByDef[key]) {
@@ -279,8 +284,8 @@ void DriverGraph::removeNode(DriverNode *n) {
 // MARK: DriverGraph access
 //==============================================================================
 
-void DriverGraph::forEachUseOf(
-    const DriverNode *def, llvm::function_ref<void(const DriverNode *)> fn) {
+void DriverGraph::forEachUseOf(const DriverNode *def,
+                               function_ref<void(const DriverNode *)> fn) {
   auto iter = usesByDef.find(def->getKey());
   if (iter == usesByDef.end())
     return;
@@ -288,8 +293,7 @@ void DriverGraph::forEachUseOf(
     forEachMatchingNode(useKey, fn);
 }
 
-void DriverGraph::forEachNode(
-    llvm::function_ref<void(const DriverNode *)> fn) const {
+void DriverGraph::forEachNode(function_ref<void(const DriverNode *)> fn) const {
   nodeMap.forEachEntry([&](const std::string &, const DependencyKey &,
                            DriverNode *n) { fn(n); });
 }
@@ -301,7 +305,7 @@ void DriverGraph::forEachMatchingNode(
 }
 
 void DriverGraph::forEachArc(
-    llvm::function_ref<void(const DriverNode *, const DriverNode *)> fn) const {
+    function_ref<void(const DriverNode *, const DriverNode *)> fn) const {
   /// Use find instead of [] because this is const
   for (const auto &defUse : usesByDef)
     forEachMatchingNode(defUse.first, [&](const DriverNode *defNode) {

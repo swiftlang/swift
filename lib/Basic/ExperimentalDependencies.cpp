@@ -369,10 +369,6 @@ FrontendGraph::findExistingNodeOrCreateIfNew(DependencyKey key,
       });
 }
 
-std::string DependencyKey::mangleTypeAsContext(const NominalTypeDecl *NTD) {
-  Mangle::ASTMangler Mangler;
-  return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
-}
 std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
 }
@@ -651,7 +647,8 @@ private:
 //==============================================================================
 
 template <NodeKind kind, typename Entity>
-std::string DependencyKey::computeContextForProvdedEntity(Entity) {
+std::string DependencyKey::computeContextForProvdedEntity(Entity,
+                                                          MangleTypeAsContext) {
   // Context field is not used for most kinds
   return "";
 }
@@ -661,25 +658,31 @@ std::string DependencyKey::computeContextForProvdedEntity(Entity) {
 template std::string
 DependencyKey::computeContextForProvdedEntity<NodeKind::topLevel,
                                               PrecedenceGroupDecl const *>(
-    const PrecedenceGroupDecl *D);
+    const PrecedenceGroupDecl *D, MangleTypeAsContext);
 template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D);
+    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D,
+                                          MangleTypeAsContext);
 template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D);
+    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D,
+                                              MangleTypeAsContext);
 template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D);
+    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D,
+                                                 MangleTypeAsContext);
 template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D);
+    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D,
+                                           MangleTypeAsContext);
 template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D);
-template std::string
-    DependencyKey::computeContextForProvdedEntity<NodeKind::sourceFileProvide,
-                                                  StringRef>(StringRef);
+    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D,
+                                                MangleTypeAsContext);
+template std::string DependencyKey::computeContextForProvdedEntity<
+    NodeKind::sourceFileProvide, StringRef>(StringRef, MangleTypeAsContext);
 
 /// \ref nominal dependencies are created from a Decl and use the context field.
 template <>
-std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::nominal, NominalTypeDecl const *>(const NominalTypeDecl *D) {
+std::string
+DependencyKey::computeContextForProvdedEntity<NodeKind::nominal,
+                                              NominalTypeDecl const *>(
+    const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
   return mangleTypeAsContext(D);
 }
 
@@ -689,7 +692,7 @@ template <>
 std::string
 DependencyKey::computeContextForProvdedEntity<NodeKind::potentialMember,
                                               NominalTypeDecl const *>(
-    const NominalTypeDecl *D) {
+    const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
   return mangleTypeAsContext(D);
 }
 
@@ -697,7 +700,8 @@ DependencyKey::computeContextForProvdedEntity<NodeKind::potentialMember,
 template <>
 std::string DependencyKey::computeContextForProvdedEntity<
     NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember,
+    MangleTypeAsContext mangleTypeAsContext) {
   return mangleTypeAsContext(holderAndMember.first);
 }
 
@@ -772,7 +776,7 @@ std::string DependencyKey::computeNameForProvidedEntity<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::topLevel, DeclBaseName>(
-    const DeclBaseName &dbn) {
+    const DeclBaseName &dbn, MangleTypeAsContext) {
   return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
                        dbn.userFacingName());
 }
@@ -780,7 +784,7 @@ DependencyKey::createDependedUponKey<NodeKind::topLevel, DeclBaseName>(
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, DeclBaseName>(
-    const DeclBaseName &dbn) {
+    const DeclBaseName &dbn, MangleTypeAsContext mangleTypeAsContext) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
                        dbn.userFacingName());
 }
@@ -788,7 +792,8 @@ DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, DeclBaseName>(
 template <>
 DependencyKey DependencyKey::createDependedUponKey<
     NodeKind::nominal, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
+    const std::pair<const NominalTypeDecl *, DeclBaseName> &p,
+    MangleTypeAsContext mangleTypeAsContext) {
   return DependencyKey(NodeKind::nominal, DeclAspect::interface,
                        mangleTypeAsContext(p.first), "");
 }
@@ -796,7 +801,8 @@ DependencyKey DependencyKey::createDependedUponKey<
 template <>
 DependencyKey DependencyKey::createDependedUponKey<
     NodeKind::member, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
+    const std::pair<const NominalTypeDecl *, DeclBaseName> &p,
+    MangleTypeAsContext mangleTypeAsContext) {
   const bool isMemberBlank = p.second.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
@@ -808,7 +814,7 @@ DependencyKey DependencyKey::createDependedUponKey<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::externalDepend, std::string>(
-    const std::string &file) {
+    const std::string &file, MangleTypeAsContext) {
   return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
                        file);
 }
@@ -830,13 +836,19 @@ class FrontendGraphConstructor {
   /// Name of the swiftDeps file, for inclusion in the constructed graph.
   StringRef swiftDeps;
 
+  /// Required to support the status quo dependency information.
+  /// Layering requires that this be passed in from the frontend.
+  MangleTypeAsContext mangleTypeAsContext;
+
   /// Graph under construction
   FrontendGraph g;
 
 public:
   FrontendGraphConstructor(SourceFile *SF, const DependencyTracker &depTracker,
-                           StringRef swiftDeps)
-      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps) {}
+                           StringRef swiftDeps,
+                           MangleTypeAsContext mangleTypeAsContext)
+      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
+        mangleTypeAsContext(mangleTypeAsContext) {}
 
   /// Construct the graph and return it.
   FrontendGraph construct() {
@@ -873,7 +885,9 @@ private:
       // Someday ...
       const Optional<std::string> fingerprint = None;
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
-          kind, DependencyKey::computeContextForProvdedEntity<kind>(declOrPair),
+          kind,
+          DependencyKey::computeContextForProvdedEntity<kind>(
+              declOrPair, mangleTypeAsContext),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
           fingerprint, swiftDeps);
       // Since we don't have fingerprints yet, must rebuild every provider when
@@ -893,7 +907,9 @@ private:
       const llvm::DenseMap<DeclBaseName, bool> &map) {
     for (const auto &p : map)
       addToGraphThatThisWholeFileDependsUpon(
-          DependencyKey::createDependedUponKey<kind>(p.first), p.second);
+          DependencyKey::createDependedUponKey<kind>(p.first,
+                                                     mangleTypeAsContext),
+          p.second);
   }
 
   /// Given a map of holder-and-member-names and isCascades, add the resulting
@@ -907,7 +923,8 @@ private:
   void addAllDependenciesOfAGivenType(ArrayRef<std::string> externals) {
     for (const auto &s : externals)
       addToGraphThatThisWholeFileDependsUpon(
-          DependencyKey::createDependedUponKey<NodeKind::externalDepend>(s),
+          DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
+              s, mangleTypeAsContext),
           true);
   }
 
@@ -931,10 +948,12 @@ void FrontendGraphConstructor::addAllDependenciesOfAGivenType(
   for (auto &entry : map) {
     // mangles twice in the name of symmetry
     addToGraphThatThisWholeFileDependsUpon(
-        DependencyKey::createDependedUponKey<NodeKind::nominal>(entry.first),
+        DependencyKey::createDependedUponKey<NodeKind::nominal>(
+            entry.first, mangleTypeAsContext),
         holdersOfCascadingMembers.count(entry.first.first) != 0);
     addToGraphThatThisWholeFileDependsUpon(
-        DependencyKey::createDependedUponKey<NodeKind::member>(entry.first),
+        DependencyKey::createDependedUponKey<NodeKind::member>(
+            entry.first, mangleTypeAsContext),
         entry.second);
   }
 }
@@ -947,7 +966,7 @@ void FrontendGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
       DependencyKey::computeContextForProvdedEntity<
-          NodeKind::sourceFileProvide>(swiftDeps),
+          NodeKind::sourceFileProvide>(swiftDeps, mangleTypeAsContext),
       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
           swiftDeps),
       getSourceFileFingerprint(), swiftDeps);
@@ -1007,13 +1026,14 @@ void FrontendGraph::verifySame(const FrontendGraph &other) const {
 
 bool swift::experimental_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath) {
+    const DependencyTracker &depTracker, StringRef outputPath,
+    MangleTypeAsContext mangleTypeAsContext) {
 
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  FrontendGraphConstructor gc(SF, depTracker, outputPath);
+  FrontendGraphConstructor gc(SF, depTracker, outputPath, mangleTypeAsContext);
   FrontendGraph g = gc.construct();
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {

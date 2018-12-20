@@ -66,6 +66,8 @@ using StringPairVec = PairVec<std::string, std::string>;
 template <typename First, typename Second>
 using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
 
+using MangleTypeAsContext = function_ref<std::string(const NominalTypeDecl *)>;
+
 //==============================================================================
 // MARK: General Utility classes
 //==============================================================================
@@ -312,7 +314,8 @@ private:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
-                               StringRef outputPath);
+                               StringRef outputPath,
+                               MangleTypeAsContext mangleTypeAsContext);
 
 //==============================================================================
 // MARK: Enums
@@ -458,7 +461,8 @@ public:
 
   /// Given some type of provided entity compute the context field of the key.
   template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvdedEntity(Entity);
+  static std::string computeContextForProvdedEntity(Entity,
+                                                    MangleTypeAsContext);
 
   /// Given some type of provided entity compute the name field of the key.
   template <NodeKind kind, typename Entity>
@@ -466,7 +470,8 @@ public:
 
   /// Given some type of depended-upon entity create the key.
   template <NodeKind kind, typename Entity>
-  static DependencyKey createDependedUponKey(const Entity &);
+  static DependencyKey createDependedUponKey(const Entity &,
+                                             MangleTypeAsContext);
 
   std::string humanReadableName() const;
 
@@ -499,10 +504,6 @@ public:
 
 private:
   // Name conversion helpers
-
-  /// Represent an aggregate for some kinds as a mangled type:
-  static std::string mangleTypeAsContext(const NominalTypeDecl *);
-
   static std::string demangleTypeAsContext(StringRef);
 
   /// name converters

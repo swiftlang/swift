@@ -212,12 +212,12 @@ public:
   std::string getGraphID() const { return "driver"; }
 
   void forEachUseOf(const DriverNode *def,
-                    llvm::function_ref<void(const DriverNode *)>);
+                    function_ref<void(const DriverNode *)>);
 
-  void forEachNode(llvm::function_ref<void(const DriverNode *)>) const;
+  void forEachNode(function_ref<void(const DriverNode *)>) const;
 
-  void forEachArc(
-      llvm::function_ref<void(const DriverNode *, const DriverNode *)>) const;
+  void
+  forEachArc(function_ref<void(const DriverNode *, const DriverNode *)>) const;
 
   /// Call \p fn for each node whose key matches \p key.
   void forEachMatchingNode(const DependencyKey &key,
