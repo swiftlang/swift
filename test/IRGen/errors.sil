@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu
-// REQUIRES: executable_test
 
 sil_stage canonical
 
