@@ -1105,6 +1105,24 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   }
 }
 
+static bool conformanceHasIdentity(const RootProtocolConformance *root) {
+  auto conformance = dyn_cast<NormalProtocolConformance>(root);
+  if (!conformance) {
+    assert(isa<SelfProtocolConformance>(root));
+    return true;
+  }
+
+  // Synthesized non-unique conformances all get collapsed together at run time.
+  if (conformance->isSynthesizedNonUnique())
+    return false;
+
+  // Objective-C protocol conformances are checked by the ObjC runtime.
+  if (conformance->getProtocol()->isObjC())
+    return false;
+
+  return true;
+}
+
 /// Determine whether the given protocol conformance is itself retroactive,
 /// meaning that there might be multiple conflicting conformances of the
 /// same type to the same protocol.
@@ -1115,20 +1133,7 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
     return false; // self-conformances are never retroactive.
   }
 
-  /// Non-retroactive conformances are... never retroactive.
-  if (!conformance->isRetroactive())
-    return false;
-
-  /// Synthesized non-unique conformances all get collapsed together at run
-  /// time.
-  if (conformance->isSynthesizedNonUnique())
-    return false;
-
-  /// Objective-C protocol conformances don't have identity.
-  if (conformance->getProtocol()->isObjC())
-    return false;
-
-  return true;
+  return conformance->isRetroactive();
 }
 
 /// Determine whether the given protocol conformance contains a retroactive
@@ -1139,7 +1144,8 @@ static bool containsRetroactiveConformance(
   // If the root conformance is retroactive, it's retroactive.
   const RootProtocolConformance *rootConformance =
       conformance->getRootConformance();
-  if (isRetroactiveConformance(rootConformance))
+  if (isRetroactiveConformance(rootConformance) &&
+      conformanceHasIdentity(rootConformance))
     return true;
 
   // If the conformance is conditional and any of the substitutions used to
@@ -2293,11 +2299,18 @@ void ASTMangler::appendProtocolConformanceRef(
   appendProtocolName(conformance->getProtocol());
 
   // For retroactive conformances, add a reference to the module in which the
-  // conformance resides. For @objc protocols, there is no point: conformances
-  // are global anyway.
-  if (isRetroactiveConformance(conformance)) {
-    appendModule(conformance->getDeclContext()->getParentModule());
+  // conformance resides. Otherwise, use an operator to indicate which known
+  // module it's associated with.
+  if (!conformanceHasIdentity(conformance)) {
+    // Same as "conformance module matches type", below.
     appendOperator("HP");
+  } else if (isRetroactiveConformance(conformance)) {
+    appendModule(conformance->getDeclContext()->getParentModule());
+  } else if (conformance->getDeclContext()->getParentModule() ==
+               conformance->getType()->getAnyNominal()->getParentModule()) {
+    appendOperator("HP");
+  } else {
+    appendOperator("Hp");
   }
 }
 

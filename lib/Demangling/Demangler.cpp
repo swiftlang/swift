@@ -610,7 +610,12 @@ NodePointer Demangler::demangleOperator() {
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
-      case 'P': return demangleProtocolConformanceRef();
+      case 'P':
+        return createWithChild(
+            Node::Kind::ProtocolConformanceRefInTypeModule, popProtocol());
+      case 'p':
+        return createWithChild(
+            Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
       default:
         pushBack();
         pushBack();
@@ -1295,21 +1300,27 @@ NodePointer Demangler::popAnyProtocolConformance() {
   });
 }
 
-NodePointer Demangler::demangleProtocolConformanceRef() {
+NodePointer Demangler::demangleRetroactiveProtocolConformanceRef() {
   NodePointer module = popModule();
   NodePointer proto = popProtocol();
   auto protocolConformanceRef =
-      createWithChildren(Node::Kind::ProtocolConformanceRef, proto, module);
+      createWithChildren(Node::Kind::ProtocolConformanceRefInOtherModule,
+                         proto, module);
   return protocolConformanceRef;
 }
 
 NodePointer Demangler::demangleConcreteProtocolConformance() {
   NodePointer conditionalConformanceList = popAnyProtocolConformanceList();
-  NodePointer conformanceRef = popNode(Node::Kind::ProtocolConformanceRef);
+
+  NodePointer conformanceRef =
+      popNode(Node::Kind::ProtocolConformanceRefInTypeModule);
   if (!conformanceRef) {
-    NodePointer proto = popProtocol();
-    conformanceRef = createWithChild(Node::Kind::ProtocolConformanceRef, proto);
+    conformanceRef =
+        popNode(Node::Kind::ProtocolConformanceRefInProtocolModule);
   }
+  if (!conformanceRef)
+    conformanceRef = demangleRetroactiveProtocolConformanceRef();
+
   NodePointer type = popNode(Node::Kind::Type);
   return createWithChildren(Node::Kind::ConcreteProtocolConformance,
                             type, conformanceRef, conditionalConformanceList);

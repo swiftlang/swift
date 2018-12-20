@@ -680,7 +680,15 @@ void Remangler::mangleRetroactiveConformance(Node *node) {
   unreachable("Retroactive conformances aren't in the old mangling");
 }
 
-void Remangler::mangleProtocolConformanceRef(Node *node) {
+void Remangler::mangleProtocolConformanceRefInTypeModule(Node *node) {
+  unreachable("Protocol conformance references aren't in the old mangling");
+}
+
+void Remangler::mangleProtocolConformanceRefInProtocolModule(Node *node) {
+  unreachable("Protocol conformance references aren't in the old mangling");
+}
+
+void Remangler::mangleProtocolConformanceRefInOtherModule(Node *node) {
   unreachable("Protocol conformance references aren't in the old mangling");
 }
 

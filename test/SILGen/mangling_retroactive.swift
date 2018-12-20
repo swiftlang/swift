@@ -12,14 +12,14 @@ struct Z<T: P, U: Hashable, V: Q> { }
 extension X: P { } // retroactive
 extension Y: Q { } // retroactive
 
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAHPyHCg_AiJ1QAAHPyHCg1_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF
 func test0(_: Z<X, Int, Y>) { }
 
 struct Z2<T: P> {
   struct Inner<V: Q> { }
 }
 
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg0_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAyHCg_AkL1QAAyHCg0_GF
 func test1(_: Z2<X>.Inner<Y>) { }
 
 extension X: Hashable {
@@ -38,7 +38,7 @@ extension Z: Equatable where T: Hashable, V: Equatable {
 struct RequiresEquatable<T: Equatable> { }
 
 // Conditional requirement involves retroactive conformances.
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg1_GAOSQAISHAAHPyHC_AKSQAAHPyHCHCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAyHCg_AkL1QAAyHCg1_GAOSQHPAISHAAyHC_AKSQAAyHCHCg_GF
 func test2(_: RequiresEquatable<Z<X, Int, Y>>) { }
 
 struct UnconditionallyP<T: Q>: P {}
@@ -48,7 +48,7 @@ struct RequiresP<T: P> {}
 // UnconditionallyP, even though UnconditionallyP's generic param uses a
 // retroactive conformance to conform to Q.
 func rdar46735592(_: RequiresP<UnconditionallyP<Y>>) { }
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAHPyHCg_GGF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAyHCg_GGF
 
 struct QImpl: Q {}
 struct ConditionallyP<T> {}
@@ -57,7 +57,7 @@ extension ConditionallyP: P where T: Q {}
 func useConditionallyP(_: RequiresP<ConditionallyP<QImpl>>) {}
 func useConditionallyP_retroactive(_: RequiresP<ConditionallyP<Y>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive17useConditionallyPyyAA9RequiresPVyAA0D1PVyAA5QImplVGGF
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive018useConditionallyP_B0yyAA9RequiresPVyAA0D1PVy12RetroactiveB1YVGAJ0F1A1PAiK1QAAHPyHC_HCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive018useConditionallyP_B0yyAA9RequiresPVyAA0D1PVy12RetroactiveB1YVGAJ0F1A1PHPAiK1QAAyHC_HCg_GF
 
 protocol Wrapper {
   associatedtype Wrapped
@@ -70,7 +70,7 @@ extension IndirectlyConditionallyP: P where T.Wrapped: Q {}
 func useIndirectlyConditionallyP(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<QImpl>>>) {}
 func useIndirectlyConditionallyP_retroactive(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<Y>>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive27useIndirectlyConditionallyPyyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVyAA5QImplVGGGF
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive028useIndirectlyConditionallyP_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0I1A1PAkN1QAAHPyHC_HCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive028useIndirectlyConditionallyP_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0I1A1PHPAkN1QAAyHC_HCg_GF
 
 struct IndirectlyConditionallyP2<T> {}
 extension IndirectlyConditionallyP2: P where T: Wrapper, T.Wrapped: Q {}
@@ -78,4 +78,12 @@ extension IndirectlyConditionallyP2: P where T: Wrapper, T.Wrapped: Q {}
 func useIndirectlyConditionallyP2(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<QImpl>>>) {}
 func useIndirectlyConditionallyP2_retroactive(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<Y>>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive28useIndirectlyConditionallyP2yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVyAA5QImplVGGGF
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive029useIndirectlyConditionallyP2_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0J1A1PAkN1QAAHPyHC_HCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive029useIndirectlyConditionallyP2_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0J1A1PHPAkN1QAAyHC_HCg_GF
+
+protocol NonRetroactive {}
+extension Y: NonRetroactive {}
+struct ConditionallyP2<T> {}
+extension ConditionallyP2: P where T: Q, T: NonRetroactive {}
+
+func useConditionallyP2(_: RequiresP<ConditionallyP2<Y>>) {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive18useConditionallyP2yyAA9RequiresPVyAA0dE0Vy12RetroactiveB1YVGAJ0G1A1PHPAiK1QAAyHC_AiA03NonG0HpyHCHCg_GF
