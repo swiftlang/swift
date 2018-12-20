@@ -50,6 +50,7 @@ set(SOURCES
   TensorProtocol.swift
   TensorShape.swift
   Utilities.swift
+  Threading.swift
   # NumPy bridging for `ShapedArray` and `Tensor`.
   NumpyConversion.swift)
 

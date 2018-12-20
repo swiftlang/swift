@@ -3086,17 +3086,13 @@ public:
   /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
   /// of the corresponding autodiff associated function.
   ///
-  /// Pass `selfUncurried = true` when the function type is for a method whose
-  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
-  ///
   /// \note The original function type (`self`) need not be `@autodiff`, and the
   /// resulting function will preserve all `ExtInfo` of the original function,
   /// including `@autodiff`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      LookupConformanceFn lookupConformance, bool isMethod,
-      bool selfUncurried = false);
+      LookupConformanceFn lookupConformance);
 
   AnyFunctionType *
   getAutoDiffAdjointFunctionType(AutoDiffParameterIndices *indices,

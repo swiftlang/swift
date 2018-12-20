@@ -2740,7 +2740,7 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
   ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
   auto loweredParamIndices =
-      E->getCheckedParameterIndices()->getLowered(origTy, /*isMethod*/ false);
+      E->getCheckedParameterIndices()->getLowered(origTy);
   SILAutoDiffConfig config(
       {E->getResultIndex(), loweredParamIndices}, options);
   auto gradInst =
@@ -5721,13 +5721,20 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 // SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
+  std::function<unsigned(Type)> countParams;
+  countParams = [&](Type type) -> unsigned {
+    auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy)
+      return 0;
+    return fnTy->getNumParams() + countParams(fnTy->getResult());
+  };
+
   // TODO(rxwei): Use the parameter indices and order specified in E's function
   // type.
-  auto *fnTy = E->getType()->castTo<AnyFunctionType>();
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto *diffFunc = SGF.B.createAutoDiffFunction(E,
-      SmallBitVector(fnTy->getNumParams(), true), 1, orig.forward(SGF));
-  return RValue(SGF, E, ManagedValue::forUnmanaged(diffFunc));
+      SmallBitVector(countParams(E->getType()), true), 1, orig.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 
 RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(

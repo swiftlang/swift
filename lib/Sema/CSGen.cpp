@@ -1274,13 +1274,14 @@ namespace {
 
       // Collect differentiation parameter indices.
       AutoDiffParameterIndicesBuilder autoDiffParameterIndicesBuilder(
-          originalTy, /*isMethod*/ false);
+          originalTy);
 
 
       // If no parameters are given, then differentiation is done with respect
       // to all parameters in the first parameter group.
       if (GE->getParameters().empty())
-        autoDiffParameterIndicesBuilder.setAllNonSelfParameters();
+        for (unsigned i : range(autoDiffParameterIndicesBuilder.size()))
+          autoDiffParameterIndicesBuilder.setParameter(i);
       // If parameters indices are specified, collect those parameters.
       else {
         int lastIndex = -1;
@@ -1300,7 +1301,7 @@ namespace {
                         originalTy, originalTy->getNumParams());
             return nullptr;
           }
-          autoDiffParameterIndicesBuilder.setNonSelfParameter(index);
+          autoDiffParameterIndicesBuilder.setParameter(index);
           lastIndex = index;
         }
       }
@@ -1312,8 +1313,7 @@ namespace {
       SmallVector<Type, 8> diffParamTypes;
       SmallVector<TupleTypeElt, 8> resultTypes;
       checkedWrtParamIndices->getSubsetParameterTypes(originalTy,
-                                                      diffParamTypes,
-                                                      /*isMethod*/ false);
+                                                      diffParamTypes);
       resultTypes.append(diffParamTypes.begin(), diffParamTypes.end());
 
       // Check that the differentiation parameter types are allowed.
