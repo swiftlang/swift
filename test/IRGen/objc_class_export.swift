@@ -56,7 +56,7 @@
 // CHECK-SAME:   %objc_class* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
-// CHECK-SAME:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
+// CHECK-SAME:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 {{1|2}}),
 // CHECK-SAME:   [[FOO]]* (%swift.type*)* @"$s17objc_class_export3FooC6createACyFZ",
 // CHECK-SAME:   void (double, double, double, double, [[FOO]]*)* @"$s17objc_class_export3FooC10drawInRect5dirtyySo6NSRectV_tF"
 // CHECK-SAME: }>, section "__DATA,__objc_data, regular"
