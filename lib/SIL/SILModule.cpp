@@ -173,6 +173,8 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
                               bool deserializeLazily) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
+  SILWitnessTable *wtable;
+
   auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(rootC);
@@ -190,16 +192,22 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
              "Found witness table that is not"
              " in the witness table lookup cache.");
 #endif
-    return nullptr;
+
+    // If we don't have a witness table and we're not going to try
+    // deserializing it, do not create a declaration.
+    if (!deserializeLazily)
+      return nullptr;
+
+    wtable = createWitnessTableDeclaration(C);
+  } else {
+    wtable = found->second;
+    assert(wtable != nullptr && "Should never map a conformance to a null witness"
+                            " table.");
+
+    // If we have a definition, return it.
+    if (wtable->isDefinition())
+      return wtable;
   }
-
-  SILWitnessTable *wtable = found->second;
-  assert(wtable != nullptr && "Should never map a conformance to a null witness"
-                          " table.");
-
-  // If we have a definition, return it.
-  if (wtable->isDefinition())
-    return wtable;
 
   // If the module is at or past the Lowered stage, then we can't do any
   // further deserialization, since pre-IRGen SIL lowering changes the types
