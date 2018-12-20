@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-static-assert -assume-parsing-unqualified-ownership-sil %s -dataflow-diagnostics -verify
+// RUN: %target-sil-opt -enable-experimental-static-assert %s -dataflow-diagnostics -verify
 
 sil_stage canonical
 

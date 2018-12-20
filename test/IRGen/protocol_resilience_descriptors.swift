@@ -6,7 +6,7 @@
 // Resilient protocol usage
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
 
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix=CHECK-USAGE
 
 // ----------------------------------------------------------------------------
 // Resilient protocol definition

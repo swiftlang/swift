@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables -enable-resilience | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=witness_tables -enable-resilience | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables -enable-resilience -O | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=witness_tables -enable-resilience | %target-sil-opt -module-name=witness_tables -enable-resilience | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name=witness_tables -enable-resilience -O | %FileCheck %s
 
 sil_stage raw
 

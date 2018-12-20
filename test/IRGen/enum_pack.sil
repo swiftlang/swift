@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 // This is a compile-only test. It checks if IRGen does not crash when packing
 // and unpacking enums (e.g. optionals) which contain empty structs as payloads.
