@@ -35,8 +35,8 @@ entry(%c : $C, %w : $Builtin.Word):
 // CHECK:         [[TAGGED_RESULT:%.*]] = bitcast [[BRIDGE]] %0 to [[C:%objc_object\*]]
 // CHECK:         br label %tagged-cont
 // CHECK:       not-tagged-pointer:
-// --                                                     0x00ff_ffff_ffff_fff8
-// CHECK:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
+// --                                                     0x0fff_ffff_ffff_fff8
+// CHECK:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 1152921504606846968
 // CHECK:         [[MASKED_RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C]]
 // CHECK:         br label %tagged-cont
 // CHECK:      tagged-cont:
