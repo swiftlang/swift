@@ -1343,6 +1343,8 @@ public:
                                            SILValue semanticValue,
                                            SILType storageType);
 
+  SILValue emitUnwrapIntegerResult(SILLocation loc, SILValue value);
+  
   /// Load an r-value out of the given address. This does not handle
   /// reabstraction or bridging. If that is needed, use the other emit load
   /// entry point.

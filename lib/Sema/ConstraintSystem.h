@@ -636,19 +636,6 @@ public:
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
 
-  /// \brief Convert the given expression to a logic value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must conform to the LogicValue protocol.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the expression converted to a logic value (Builtin i1).
-  Expr *convertBooleanTypeToBuiltinI1(Expr *expr,
-                                      ConstraintLocator *locator) const;
-
   /// \brief Convert the given optional-producing expression to a Bool
   /// indicating whether the optional has a value.
   ///

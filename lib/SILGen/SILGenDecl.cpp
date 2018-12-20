@@ -696,9 +696,12 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
        getUnmanagedValue();
   }
 
+  assert(testBool->getType().getASTType()->isBool());
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, testBool);
+
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
-  SGF.B.createCondBranch(loc, testBool, contBB, falseBB);
+  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB);
 
   SGF.B.setInsertionPoint(contBB);
 }
@@ -995,13 +998,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = cast<StructDecl>(SGF.getASTContext().getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(SGF.getASTContext().Id_value_);
-  assert(Members.size() == 1 &&
-         "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
-  auto *i1Val = SGF.B.createStructExtract(loc, value.forward(SGF), Member);
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, value.forward(SGF));
 
   // Branch on the boolean based on whether we're testing for true or false.
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
@@ -1010,7 +1007,7 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   if (!pattern->getValue())
     std::swap(trueBB, falseBB);
-  SGF.B.createCondBranch(loc, i1Val, trueBB, falseBB);
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
   SGF.B.setInsertionPoint(contBB);
 }
 
@@ -1268,6 +1265,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Evaluate the condition as an i1 value (guaranteed by Sema).
       FullExpr Scope(Cleanups, CleanupLocation(expr));
       booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
+      booleanTestValue = emitUnwrapIntegerResult(expr, booleanTestValue);
       booleanTestLoc = expr;
       break;
     }
