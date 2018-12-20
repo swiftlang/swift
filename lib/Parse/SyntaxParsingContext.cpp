@@ -69,7 +69,7 @@ SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
   if (IsBacktracking)
     return ParsedRawSyntaxNode::makeDeferred(Kind, Parts);
   else
-    return getRecorder().recordExactRawSyntax(Kind, Parts);
+    return getRecorder().recordRawSyntax(Kind, Parts);
 }
 
 ParsedRawSyntaxNode
@@ -83,7 +83,7 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
     if (nodeCreateK == SyntaxNodeCreationKind::Deferred || IsBacktracking) {
       rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout);
     } else {
-      rawNode = rec.recordExactRawSyntax(kind, layout);
+      rawNode = rec.recordRawSyntax(kind, layout);
     }
   };
   if (ParsedSyntaxRecorder::formExactLayoutFor(Kind, Parts, formNode))
@@ -279,10 +279,10 @@ static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
     AllTopLevel.push_back(RawNode);
   }
 
-  auto itemList = Recorder.recordExactRawSyntax(SyntaxKind::CodeBlockItemList,
-                                                AllTopLevel);
-  auto root = Recorder.recordExactRawSyntax(SyntaxKind::SourceFile,
-                                            { itemList, EOFToken });
+  auto itemList = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList,
+                                           AllTopLevel);
+  auto root = Recorder.recordRawSyntax(SyntaxKind::SourceFile,
+                                       { itemList, EOFToken });
   return root;
 }
 

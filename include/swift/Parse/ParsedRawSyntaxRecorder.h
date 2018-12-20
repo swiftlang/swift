@@ -46,17 +46,17 @@ public:
                                   const syntax::Trivia &leadingTrivia,
                                   const syntax::Trivia &trailingTrivia);
 
-  /// Record a missing token. \c loc can be invalid or an approximate location
+  /// Record a missing token. \p loc can be invalid or an approximate location
   /// of where the token would be if not missing.
   ParsedRawSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc);
 
-  /// The provided \c elements are an exact layout appropriate for the syntax
-  /// \c kind. Missing optional elements are represented with a null
+  /// The provided \p elements are an exact layout appropriate for the syntax
+  /// \p kind. Missing optional elements are represented with a null
   /// ParsedRawSyntaxNode object.
-  ParsedRawSyntaxNode recordExactRawSyntax(syntax::SyntaxKind kind,
+  ParsedRawSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
                                      ArrayRef<ParsedRawSyntaxNode> elements);
 
-  /// Record a raw syntax collecton without eny elements. \c loc can be invalid
+  /// Record a raw syntax collecton without eny elements. \p loc can be invalid
   /// or an approximate location of where an element of the collection would be
   /// if not missing.
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,

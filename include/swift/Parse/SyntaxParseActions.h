@@ -58,7 +58,7 @@ public:
 
   /// Used for incremental re-parsing.
   virtual std::pair<size_t, OpaqueSyntaxNode>
-      lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
+  lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
     return std::make_pair(0, nullptr);
   }
 };

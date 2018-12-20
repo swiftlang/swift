@@ -30,7 +30,11 @@ typedef void *OpaqueSyntaxNode;
 /// invocation, or 'deferred' which captures the data for a
 /// \c SyntaxParseActions invocation to occur later.
 ///
-/// The deferred form is used for when the parser is backtracking and when
+/// An \c OpaqueSyntaxNode can represent both the result of 'recording' a token
+/// as well as 'recording' a syntax layout, so there's only one
+/// \c RecordedSyntaxNode structure that can represent both.
+///
+/// The 'deferred' form is used for when the parser is backtracking and when
 /// there are instances that it's not clear what will be the final syntax node
 /// in the current parsing context.
 class ParsedRawSyntaxNode {
@@ -101,11 +105,14 @@ public:
   ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) {
     switch (other.DK) {
     case DataKind::Recorded:
-      new(&this->RecordedData)RecordedSyntaxNode(other.RecordedData); break;
+      new(&this->RecordedData)RecordedSyntaxNode(other.RecordedData);
+      break;
     case DataKind::DeferredLayout:
-      new(&this->DeferredLayout)DeferredLayoutNode(other.DeferredLayout); break;
+      new(&this->DeferredLayout)DeferredLayoutNode(other.DeferredLayout);
+      break;
     case DataKind::DeferredToken:
-      new(&this->DeferredToken)DeferredTokenNode(other.DeferredToken); break;
+      new(&this->DeferredToken)DeferredTokenNode(other.DeferredToken);
+      break;
     }
     this->SynKind = other.SynKind;
     this->TokKind = other.TokKind;
@@ -116,13 +123,16 @@ public:
     switch (other.DK) {
     case DataKind::Recorded:
       new(&this->RecordedData)RecordedSyntaxNode(
-          std::move(other.RecordedData)); break;
+          std::move(other.RecordedData));
+      break;
     case DataKind::DeferredLayout:
       new(&this->DeferredLayout)DeferredLayoutNode(
-          std::move(other.DeferredLayout)); break;
+          std::move(other.DeferredLayout));
+      break;
     case DataKind::DeferredToken:
       new(&this->DeferredToken)DeferredTokenNode(
-          std::move(other.DeferredToken)); break;
+          std::move(other.DeferredToken));
+      break;
     }
     this->SynKind = other.SynKind;
     this->TokKind = other.TokKind;

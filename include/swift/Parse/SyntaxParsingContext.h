@@ -43,7 +43,16 @@ enum class SyntaxContextKind {
 };
 
 enum class SyntaxNodeCreationKind {
+  /// This is for \c SyntaxParsingContext to collect the syntax data and create
+  /// a 'recorded' ParsedRawSyntaxNode object, which would be a result of
+  /// passing the index data to the \c SyntaxParseActions implementation.
   Recorded,
+  /// This is for \c SyntaxParsingContext to collect the syntax data and create
+  /// a 'deferred' ParsedRawSyntaxNode object, which captures the data for a
+  /// \c SyntaxParseActions invocation to occur later.
+  ///
+  /// This is intended to be used for when it's not clear what will be the final
+  /// syntax node in the current parsing context.
   Deferred,
 };
 

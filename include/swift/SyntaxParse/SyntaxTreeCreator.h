@@ -62,7 +62,7 @@ private:
                                    CharSourceRange range) override;
 
   std::pair<size_t, OpaqueSyntaxNode>
-      lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
+  lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
 };
 
 } // end namespace swift

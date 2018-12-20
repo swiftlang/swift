@@ -55,8 +55,7 @@ Parsed${node.name}Builder::add${child_elt}(Parsed${child_elt_type} ${child_elt})
 Parsed${node.name}
 Parsed${node.name}Builder::record() {
   finishLayout();
-  auto raw = Rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind},
-    Layout);
+  auto raw = Rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, Layout);
   return Parsed${node.name}(std::move(raw));
 }
 

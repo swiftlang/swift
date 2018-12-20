@@ -85,7 +85,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
 Parsed${node.name}
 ParsedSyntaxRecorder::record${node.syntax_kind}(${child_params},
                                        ParsedRawSyntaxRecorder &rec) {
-  auto raw = rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind}, {
+  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
     ${child.name}.hasValue() ? ${child.name}->getRaw() : ParsedRawSyntaxNode::null(),
@@ -129,8 +129,7 @@ ParsedSyntaxRecorder::record${node.syntax_kind}(
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
-  auto raw = rec.recordExactRawSyntax(SyntaxKind::${node.syntax_kind},
-                             layout);
+  auto raw = rec.recordRawSyntax(SyntaxKind::${node.syntax_kind}, layout);
   return Parsed${node.name}(std::move(raw));
 }
 

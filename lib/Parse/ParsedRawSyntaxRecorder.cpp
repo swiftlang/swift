@@ -52,7 +52,7 @@ getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
   if (node.isRecorded())
     return node;
   if (node.isDeferredLayout())
-    return rec.recordExactRawSyntax(node.getKind(), node.getDeferredChildren());
+    return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
   assert(node.isDeferredToken());
   const Token &tok = node.getToken();
   if (node.isMissing())
@@ -62,7 +62,7 @@ getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
 }
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordExactRawSyntax(SyntaxKind kind,
+ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
                                     ArrayRef<ParsedRawSyntaxNode> elements) {
   CharSourceRange range;
   SmallVector<OpaqueSyntaxNode, 16> subnodes;
