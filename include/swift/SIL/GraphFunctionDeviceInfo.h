@@ -213,7 +213,9 @@ static inline std::string getDeviceString(DeviceId deviceId) {
 /// This struct holds information about the deviceInfo of the graph we are
 /// generating.
 struct GraphFunctionDeviceInfo {
-  const DeviceId primaryDeviceId;
+  // The primary device that takes function args (if any) and return values.
+  // Only defined, and is const after finalizeUsedDevices() is called.
+  DeviceId primaryDeviceId;
   const bool isTPUInfeedEnabled;
 
   using UsedDeviceSet = llvm::SmallSet<DeviceId, 8>;
@@ -232,6 +234,10 @@ struct GraphFunctionDeviceInfo {
         !usedDeviceIds.insert(device).second)
       return;
   }
+
+  // Must be called after caller has scanned all graph_ops in the SIL function
+  // being processed, and called markDeviceUsed() on them.
+  void finalizeUsedDevices();
 
   // Choose a device for the graphOpInst under construction and track the chosen
   // device in `usedDeviceIds`.
@@ -269,7 +275,12 @@ private:
                llvm::ArrayRef<GraphOperationAttribute> attributes) const;
 
   // Actual TF devices involved in the tensor computation.
-  // It cannot contain DeviceType::ALL.
+
+  // Invariants:
+  // 1. It cannot contain DeviceType::ALL.
+  // 2. It must contain primaryDeviceId after finalizeUsedDevices()
+  // 3. When there are >= 2 devices, it cannot contain the RUNTIME device.
+  // See finalizeUsedDevices() for more context.
   UsedDeviceSet usedDeviceIds;
 };
 

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift %swift-tensorflow-test-run-extra-options
+// RUN: %target-run-use-device-stack-swift %swift-tensorflow-test-run-extra-options
 // RUN: %target-run-dynamic-compilation-swift %swift-tensorflow-test-run-extra-options
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
@@ -61,14 +61,15 @@ CollectiveTests.testAllBackends("GroupWithSize2") {
   _hostOp(t)
   expectEqualWithScalarTensor(2, t)
 }
-#else
-CollectiveTests.testAllBackends("GroupWithSize2") {
+#endif // TF_DYNAMIC_COMPILATION
+
+CollectiveTests.testAllBackends("GroupWithSize2_threads") {
   // Need 2 or more CPU devices for this test.
   let x = Tensor<Float>(1.0)
 
   _runOnNDevices(2) { i in
     withDevice(.cpu, UInt(i)) {
-      let t = Raw.collectiveReduce(x, groupSize: 2, groupKey: 2, instanceKey: 2,
+      let t = Raw.collectiveReduce(x, groupSize: 2, groupKey: 3, instanceKey: 3,
           mergeOp: .add, finalOp: .id, subdivOffsets: [0])
 
       _hostOp(t)
@@ -76,7 +77,6 @@ CollectiveTests.testAllBackends("GroupWithSize2") {
     }
   }
 }
-#endif // TF_DYNAMIC_COMPILATION
 
 _RuntimeConfig.cpuDeviceCount = 3
 runAllTests()

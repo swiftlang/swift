@@ -2063,6 +2063,8 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     }
   }
   hasTensorOps = !tensorOps.empty();
+  if (hasTensorOps)
+    deviceInfo.finalizeUsedDevices();
 
   // If there is nothing to do, or the ops in this function are malformed,
   // don't touch this function.

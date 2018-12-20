@@ -184,6 +184,55 @@ bool GraphFunctionDeviceInfo::isConfigOp(const GraphOperationInfo &opInfo) {
          opInfo.getOperationName() == "tfc.configureCPU";
 }
 
+void GraphFunctionDeviceInfo::finalizeUsedDevices() {
+  // In this edge case, all ops are placed on the ALL device (e.g. Const). In
+  // that case, usedDeviceIds should contain the RUNTIME device.
+  if (usedDeviceIds.empty()) {
+    primaryDeviceId = RuntimeDeviceId;
+    usedDeviceIds.insert(RuntimeDeviceId);
+    return;
+  }
+
+  // For device partitioning to work, the device set cannot include the RUNTIME
+  // device along with some other device(s). This is because we don't know what
+  // the RUNTIME device is at compile time, so we cannot create sends/recvs
+  // graph nodes.
+  bool multiDeviceWithRuntimeDevice =
+      (usedDeviceIds.size() > 1 && usedDeviceIds.count(RuntimeDeviceId));
+  assert(!multiDeviceWithRuntimeDevice &&
+         "Cannot yet handle a multi-device function involving the "
+         "RUNTIME device");
+  (void)multiDeviceWithRuntimeDevice;
+
+  // SIL functions can be processed in non-deterministic ordering, so the
+  // ordering of device ids being inserted into `deviceInfo` is not
+  // deterministic either.
+  // To make sure we produced deterministic SIL code (e.g. produce graph
+  // function for CPU, before GPU), which is useful at least for unit testing,
+  // we sort the device IDs.
+  auto sortDeviceIds = [](UsedDeviceSet &deviceSet) {
+    // `deviceSet` could be backed by a SmallVector instead of a tree-based
+    // container, so we need to sort its elements.
+    SmallVector<DeviceId, 8> deviceIds(deviceSet.begin(),
+                                       deviceSet.end());
+    assert(!deviceIds.empty());
+    llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
+    deviceSet.clear();
+    deviceSet.insert(deviceIds.begin(), deviceIds.end());
+  };
+  sortDeviceIds(usedDeviceIds);
+
+  if (!usedDeviceIds.count(primaryDeviceId)) {
+    // Example scenario: we set primary device to GPU via compiler flag, but the
+    // swift function being processed here has placed all ops on CPU. In that
+    // case, we want to set primary device to CPU.
+    //
+    // For now pick an arbitrary device as the primary. For optimized placement
+    // w.r.t the function args and return values, this might need tuning.
+    primaryDeviceId = *usedDeviceIds.begin();
+  }
+}
+
 std::string GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice,
     llvm::ArrayRef<GraphOperationAttribute> attributes) {
@@ -220,9 +269,9 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
 
 GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
                                                  bool isTPUInfeedEnabled)
-    // When `TFUseDeviceStack` is true, ignore `primaryDeviceId` provided at
-    // compile time (e.g. via compiler flag); instead use runtime device info.
-    : primaryDeviceId(TFUseDeviceStack ? RuntimeDeviceId : primaryDeviceId),
+    // When `TFUseDeviceStack` is true, set `primaryDeviceId` in
+    // finalizeUsedDevices()
+    : primaryDeviceId(TFUseDeviceStack ? InvalidDeviceId : primaryDeviceId),
       isTPUInfeedEnabled(isTPUInfeedEnabled) {
   assert(primaryDeviceId != AllDeviceId);
   if (!TFUseDeviceStack)
