@@ -144,20 +144,6 @@ void SILModule::deallocateInst(SILInstruction *I) {
 }
 
 SILWitnessTable *
-SILModule::createWitnessTableDeclaration(const ProtocolConformance *C) {
-  // If we are passed in a null conformance (a valid value), just return nullptr
-  // since we cannot map a witness table to it.
-  if (!C)
-    return nullptr;
-
-  // Extract the root conformance.
-  auto rootC = C->getRootConformance();
-  auto linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
-  return SILWitnessTable::create(*this, linkage,
-                                 const_cast<RootProtocolConformance *>(rootC));
-}
-
-SILWitnessTable *
 SILModule::lookUpWitnessTable(ProtocolConformanceRef C,
                               bool deserializeLazily) {
   // If we have an abstract conformance passed in (a legal value), just return
@@ -198,7 +184,9 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
     if (!deserializeLazily)
       return nullptr;
 
-    wtable = createWitnessTableDeclaration(C);
+    auto linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
+    wtable = SILWitnessTable::create(*this, linkage,
+                                 const_cast<RootProtocolConformance *>(rootC));
   } else {
     wtable = found->second;
     assert(wtable != nullptr && "Should never map a conformance to a null witness"
