@@ -517,9 +517,12 @@ final internal class _VaListBuilder {
 }
 #elseif arch(arm64) && os(Linux)
 
+// NOTE: older runtimes called this _VaListBuilder. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-final internal class _VaListBuilder {
+final internal class __VaListBuilder {
   @usableFromInline // FIXME(sil-serialize-all)
   internal init() {
     // Prepare the register save area.
