@@ -100,7 +100,7 @@ public func valueWithDifferential<T, R>(
   at x: T, in f: @autodiff (T) -> R
 ) -> (value: R, differential: (T.TangentVector) -> R.TangentVector)
   where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffApplyJVP(f, x)
+  return Builtin.autodiffApply_jvp(f, x)
 }
  */
 
@@ -109,7 +109,27 @@ public func valueWithPullback<T, R>(
   at x: T, in f: @autodiff (T) -> R
 ) -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
   where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffApplyVJP(f, x)
+  return Builtin.autodiffApply_vjp(f, x)
+}
+
+@inlinable
+public func valueWithPullback<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> R
+) -> (value: R,
+      pullback: (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable, R : Differentiable {
+  return Builtin.autodiffApply_vjp_arity2(f, x, y)
+}
+
+@inlinable
+public func valueWithPullback<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> R
+) -> (value: R,
+      pullback: (R.CotangentVector)
+        -> (T.CotangentVector, U.CotangentVector, V.CotangentVector))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable {
+  return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
 
 @inlinable
@@ -117,13 +137,31 @@ public func pullback<T, R>(
   at x: T, in f: @autodiff (T) -> R
 ) -> (R.CotangentVector) -> T.CotangentVector
   where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffApplyVJP(f, x).1
+  return Builtin.autodiffApply_vjp(f, x).1
+}
+
+@inlinable
+public func pullback<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> R
+) -> (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable, R : Differentiable {
+  return Builtin.autodiffApply_vjp_arity2(f, x, y).1
+}
+
+@inlinable
+public func pullback<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> R
+) -> (R.CotangentVector)
+    -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : Differentiable {
+  return Builtin.autodiffApply_vjp_arity3(f, x, y, z).1
 }
 
 /* TODO: These will be available when we support forward-mode differentiation.
 @inlinable
 public func derivative<T, R>(
-  at x: T, in f: @escaping @autodiff (T) -> R
+  at x: T, in f: @autodiff (T) -> R
 ) -> R.TangentVector
   where T : BinaryFloatingPoint & Differentiable, R : Differentiable,
         T.TangentVector == T {
@@ -152,13 +190,51 @@ public func valueWithGradient<T, R>(
 }
 
 @inlinable
+public func valueWithGradient<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> R
+) -> (value: R, gradient: (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable,
+        R : BinaryFloatingPoint & Differentiable, R.CotangentVector == R {
+  let (y, pullback) = valueWithPullback(at: x, y, in: f)
+  return (y, pullback(1))
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> R
+) -> (value: R,
+      gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : BinaryFloatingPoint & Differentiable, R.CotangentVector == R {
+  let (y, pullback) = valueWithPullback(at: x, y, z, in: f)
+  return (y, pullback(1))
+}
+
+@inlinable
 public func gradient<T, R>(
   at x: T, in f: @autodiff (T) -> R
 ) -> T.CotangentVector
   where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
         R.CotangentVector == R {
-  let (_, pullback) = Builtin.autodiffApplyVJP(f, x)
-  return pullback(1)
+  return pullback(at: x, in: f)(1)
+}
+
+@inlinable
+public func gradient<T, U, R>(
+  at x: T, _ y: U, in f: @autodiff (T, U) -> R
+) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : BinaryFloatingPoint & Differentiable, R.CotangentVector == R {
+  return pullback(at: x, y, in: f)(1)
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @autodiff (T, U, V) -> R
+) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : BinaryFloatingPoint & Differentiable, R.CotangentVector == R {
+  return pullback(at: x, y, z, in: f)(1)
 }
 
 /* FIXME(rxwei): Make @autodiff functions ref-countable.
