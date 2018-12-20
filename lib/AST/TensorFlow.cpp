@@ -220,14 +220,14 @@ bool tf::flattenTensorFlowValueAggregate(Type ty,
 /// parameter of result contains any TensorFlow value type.
 bool TypeContainsTensorFlowValue::containsTensorFlowValue(
     Type ty, bool checkHigherOrderFunctions) {
-  llvm::SmallPtrSet<NominalTypeDecl*, 8> parentDecls;
+  llvm::SetVector<NominalTypeDecl *> parentDecls;
   return containsTensorFlowValueImpl(ty, checkHigherOrderFunctions,
                                      parentDecls);
 }
 
 bool TypeContainsTensorFlowValue::containsTensorFlowValueImpl(
     Type ty, bool checkHigherOrderFunctions,
-    llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls) {
+    llvm::SetVector<NominalTypeDecl *> &parentDecls) {
   // If this type literally is a value type, then yep, we contain it.  This is
   // the base case.
   if (isTensorFlowValue(ty))
@@ -286,16 +286,16 @@ bool TypeContainsTensorFlowValue::containsTensorFlowValueImpl(
 /// Determine whether the given struct contains a TensorFlow value type, caching
 /// the result.
 bool TypeContainsTensorFlowValue::structContainsTensorFlowValue(
-    StructDecl *decl, llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls) {
-  // If we have a cycle, break it here.
+    StructDecl *decl, llvm::SetVector<NominalTypeDecl *> &parentDecls) {
   if (parentDecls.count(decl) > 0) {
+    // We have a cycle, break it here.
     return false;
   }
-  parentDecls.insert(decl);
   auto it = declContainsTensorFlowValue.find(decl);
   if (it != declContainsTensorFlowValue.end())
     return it->second;
 
+  parentDecls.insert(decl);
   bool hasTensorFlowValue = false;
   for (auto p : decl->getStoredProperties())
     if (containsTensorFlowValueImpl(p->getType(),
@@ -305,6 +305,7 @@ bool TypeContainsTensorFlowValue::structContainsTensorFlowValue(
       break;
     }
 
+  parentDecls.pop_back();
   return declContainsTensorFlowValue[decl] = hasTensorFlowValue;
 }
 

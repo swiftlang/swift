@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
   class CanType;
@@ -94,11 +95,10 @@ namespace tf {
   private:
     bool containsTensorFlowValueImpl(
         Type ty, bool checkHigherOrderFunctions,
-        llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls);
+        llvm::SetVector<NominalTypeDecl *> &parentDecls);
 
-    bool
-    structContainsTensorFlowValue(StructDecl *decl,
-                                  llvm::SmallPtrSetImpl<NominalTypeDecl *> &parentDecls);
+    bool structContainsTensorFlowValue(
+        StructDecl *decl, llvm::SetVector<NominalTypeDecl *> &parentDecls);
   };
 
   /// This class provides a single source of truth for the set of types that are
