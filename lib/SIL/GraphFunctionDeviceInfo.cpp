@@ -197,9 +197,12 @@ void GraphFunctionDeviceInfo::finalizeUsedDevices() {
   // device along with some other device(s). This is because we don't know what
   // the RUNTIME device is at compile time, so we cannot create sends/recvs
   // graph nodes.
-  if (usedDeviceIds.size() > 1 && usedDeviceIds.count(RuntimeDeviceId))
-    assert(0 && "Cannot yet handle a multi-device function involving the "
-                "RUNTIME device");
+  bool multiDeviceWithRuntimeDevice =
+      (usedDeviceIds.size() > 1 && usedDeviceIds.count(RuntimeDeviceId));
+  assert(!multiDeviceWithRuntimeDevice &&
+         "Cannot yet handle a multi-device function involving the "
+         "RUNTIME device");
+  (void)multiDeviceWithRuntimeDevice;
 
   // SIL functions can be processed in non-deterministic ordering, so the
   // ordering of device ids being inserted into `deviceInfo` is not
@@ -207,12 +210,17 @@ void GraphFunctionDeviceInfo::finalizeUsedDevices() {
   // To make sure we produced deterministic SIL code (e.g. produce graph
   // function for CPU, before GPU), which is useful at least for unit testing,
   // we sort the device IDs.
-  SmallVector<DeviceId, 8> deviceIds(usedDeviceIds.begin(),
-                                     usedDeviceIds.end());
-  assert(!deviceIds.empty());
-  llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
-  usedDeviceIds.clear();
-  usedDeviceIds.insert(deviceIds.begin(), deviceIds.end());
+  auto sortDeviceIds = [](UsedDeviceSet &deviceSet) {
+    // `deviceSet` could be backed by a SmallVector instead of a tree-based
+    // container, so we need to sort its elements.
+    SmallVector<DeviceId, 8> deviceIds(deviceSet.begin(),
+                                       deviceSet.end());
+    assert(!deviceIds.empty());
+    llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
+    deviceSet.clear();
+    deviceSet.insert(deviceIds.begin(), deviceIds.end());
+  };
+  sortDeviceIds(usedDeviceIds);
 
   if (!usedDeviceIds.count(primaryDeviceId)) {
     // Example scenario: we set primary device to GPU via compiler flag, but the
