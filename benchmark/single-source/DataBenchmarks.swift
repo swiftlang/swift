@@ -147,47 +147,27 @@ enum SampleKind {
   case immutableBacking
 }
 
+func fillBuffer(_ buffer: UnsafeMutableBufferPointer<UInt8>) {
+  for i in buffer.indices {
+    buffer[i] = UInt8(truncatingIfNeeded: i)
+  }
+}
+
 func sampleData(size: Int) -> Data {
   var data = Data(count: size)
-  data.withUnsafeMutableBytes { getRandomBuf(baseAddress: $0, count: size) }
+  data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> () in
+    for i in 0..<size {
+      bytes[i] = UInt8(truncatingIfNeeded: i)
+    }
+  }
   return data
-}
-
-#if os(Linux)
-import Glibc
-#endif
-
-@inline(__always)
-func getRandomBuf(_ arg: UnsafeMutableBufferPointer<UInt8>) {
-  #if os(Linux)
-  let fd = open("/dev/urandom", O_RDONLY)
-  defer { if (fd >= 0) { close(fd) } }
-  if fd >= 0 {
-    read(fd, arg.baseAddress, arg.count)
-  }
-  #else
-  arc4random_buf(arg.baseAddress, arg.count)
-  #endif
-}
-
-@inline(__always)
-func getRandomBuf(baseAddress: UnsafeMutablePointer<UInt8>, count: Int) {
-  #if os(Linux)
-  let fd = open("/dev/urandom", O_RDONLY)
-  defer { if (fd >= 0) { close(fd) } }
-  if fd >= 0 {
-    read(fd, baseAddress, count)
-  }
-  #else
-  arc4random_buf(baseAddress, count)
-  #endif
 }
 
 func sampleBridgedNSData() -> Data {
   let count = 1033
   var bytes = [UInt8](repeating: 0, count: count)
   bytes.withUnsafeMutableBufferPointer {
-    getRandomBuf($0)
+    fillBuffer($0)
   }
   let data = NSData(bytes: bytes, length: count)
   return Data(referencing: data)
@@ -244,7 +224,7 @@ func benchmark_AppendBytes(_ N: Int, _ count: Int, _ data_: Data) {
 func benchmark_AppendArray(_ N: Int, _ count: Int, _ data_: Data) {
   var bytes = [UInt8](repeating: 0, count: count)
   bytes.withUnsafeMutableBufferPointer {
-    getRandomBuf($0)
+    fillBuffer($0)
   }
   for _ in 0..<10000*N {
     var data = data_
