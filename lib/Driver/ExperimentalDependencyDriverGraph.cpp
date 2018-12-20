@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
@@ -44,6 +45,8 @@ using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
 LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
                                      DiagnosticEngine &diags) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-loadFromPath");
+  dotFileDirectory = path;
+  llvm::sys::path::remove_filename(dotFileDirectory);
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
@@ -63,11 +66,6 @@ LoadResult DriverGraph::loadFromBuffer(const Job *job,
     return DependencyGraphImpl::LoadResult::HadError;
   addIndependentNode(job);
   return integrate(fg.getValue());
-}
-
-bool DriverGraph::emitAndVerify(DiagnosticEngine &diags) {
-  emitDotFile(diags, "final");
-  return verify();
 }
 
 bool DriverGraph::isMarked(const Job *cmd) const {
@@ -455,4 +453,14 @@ void DriverGraph::verifyEachJobIsTracked() const {
       [&](const std::string &swiftDeps, const typename NodeMap::Key2Map &) {
         ensureJobIsTracked(swiftDeps);
       });
+}
+
+// TODO: use llvm::path facilities everywhere in experimental dependencies
+std::string DriverGraph::computePathForDotFile() const {
+  return dotFileDirectory.str().str() + "/" + "driver";
+}
+
+bool DriverGraph::emitAndVerify(DiagnosticEngine &diags) {
+  emitDotFile(diags, computePathForDotFile());
+  return verify();
 }

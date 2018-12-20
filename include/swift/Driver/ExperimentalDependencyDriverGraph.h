@@ -129,6 +129,13 @@ class DriverGraph {
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
 
+  /// For debugging, a dot file can be emitted. This file can be read into
+  /// various graph-drawing programs.
+  /// The driver emits this file into the same directory as the swiftdeps
+  /// files it reads, so remember that place here.
+  /// Initialize to /tmp in case no swiftdeps file has been read.
+  SmallString<128> dotFileDirectory = StringRef("/tmp");
+
   /// For debugging, the driver can write out a dot file, for instance when a
   /// Frontend swiftdeps is read and integrated. In order to keep subsequent
   /// files for the same name distinct, keep a sequence number for each name.
@@ -285,7 +292,11 @@ private:
   static bool mapCorruption(const char *msg) {
     llvm_unreachable(msg);
   }
- 
+
+  /// Use the known swiftDeps to find a directory for
+  /// the job-independent dot file.
+  std::string computePathForDotFile() const;
+
   /// Read a FrontendGraph belonging to \p job from \p buffer
   /// and integrate it into the DriverGraph.
   /// Used both the first time, and to reload the FrontendGraph.

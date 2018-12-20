@@ -694,9 +694,8 @@ public:
            usesOfMe == other.usesOfMe;
   }
 
-
-  /// True iff this node represents a decl in this file or the file itself.
-  /// False iff this node represents a use from another file.
+  /// True iff this frontend node represents a decl in this file or the file
+  /// itself. False iff this node represents a use from another file.
   bool isInSameFile() const { return getSwiftDeps().hasValue(); }
 
   size_t getSequenceNumber() const { return sequenceNumber; }
