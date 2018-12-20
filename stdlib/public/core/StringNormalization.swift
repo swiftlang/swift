@@ -170,6 +170,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
   
 }
 
+//If this returns nil, it means the outputBuffer ran out of space
 internal func _tryNormalize(
   _ input: UnsafeBufferPointer<UInt16>,
   into outputBuffer:
@@ -177,6 +178,8 @@ internal func _tryNormalize(
 ) -> Int? {
   return _tryNormalize(input, into: _castOutputBuffer(outputBuffer))
 }
+
+//If this returns nil, it means the outputBuffer ran out of space
 internal func _tryNormalize(
   _ input: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt16>
@@ -203,10 +206,11 @@ internal struct NormalizationResult {
   var allocatedBuffers: Bool
 }
 
+//If this returns nil, it means the outputBuffer ran out of space
 private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
-) -> (read: Int, writen: Int)? {
+) -> (read: Int, written: Int)? {
   let outputBufferThreshold = outputBuffer.count - 4
   
   // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
@@ -241,43 +245,42 @@ private func fastFill(
   return outputCount > 0 ? (inputCount, outputCount) : nil
 }
 
-// Transcodes a single segment from the source buffer to the outputBuffer as UTF16
-private func transcodeSegmentToUTF16(
-  _ sourceBuffer: UnsafeBufferPointer<UInt8>,
-  into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> (read: Int, writen: Int)? {
-  var readIndex = 0
-  var writeIndex = 0
+//Transcodes a single segment from the scalars provided by the closure to the outputBuffer as UTF16
+//If this returns nil, it means the outputBuffer ran out of space
+private func copyUTF16Segment(
+  boundedBy range: Range<Int>,
+  into outputBuffer: UnsafeMutableBufferPointer<UInt16>,
+  _ f: (Int) -> (Unicode.Scalar, Int)
+) -> (read: Int, written: Int)? {
+  var readIndex = range.lowerBound
+  var outputWriteIndex = 0
   let outputCount = outputBuffer.count
-  let sourceCount = sourceBuffer.count
-  
-  while readIndex < sourceCount {
-    let (scalar, length) = _decodeScalar(sourceBuffer, startingAt: readIndex)
-    
-    if scalar._hasNormalizationBoundaryBefore && readIndex != 0 {
+  while readIndex != range.upperBound {
+    let (scalar, length) = f(readIndex)
+    if scalar._hasNormalizationBoundaryBefore && readIndex != range.lowerBound {
       break
     }
     
     readIndex += length
     
     for cu in scalar.utf16 {
-      if writeIndex < outputCount {
-        outputBuffer[writeIndex] = cu
-        writeIndex += 1
+      if outputWriteIndex < outputCount {
+        outputBuffer[outputWriteIndex] = cu
+        outputWriteIndex += 1
       } else {
         return nil
       }
     }
   }
-  
-  return (readIndex, writeIndex)
+  return (readIndex - range.lowerBound, outputWriteIndex)
 }
 
 //transcodes the UTF16 segment stored in soureceBuffer into the outputBuffer as UTF8
+//If this returns nil, it means the outputBuffer ran out of space
 private func transcodeValidUTF16ToUTF8(
   _ sourceBuffer: UnsafeBufferPointer<UInt16>,
   into outputBuffer: UnsafeMutableBufferPointer<UInt8>
-) -> (read: Int, writen: Int)? {
+) -> Int? {
   var readIndex = 0
   var writeIndex = 0
   let outputCount = outputBuffer.count
@@ -299,7 +302,7 @@ private func transcodeValidUTF16ToUTF8(
       }
     }
   }
-  return (readIndex, writeIndex)
+  return writeIndex
 }
 
 internal enum _BufferToCopy {
@@ -324,11 +327,14 @@ internal func _allocateBuffers(
   case .none:
     break
   case .output:
-    newOutputBuffer.initialize(from: outputBuffer)
+    let (_, written) = newOutputBuffer.initialize(from: outputBuffer)
+    _internalInvariant(written == 16)
   case .icuInput:
-    newICUInputBuffer.initialize(from: icuInputBuffer)
+    let (_, written) = newICUInputBuffer.initialize(from: icuInputBuffer)
+    _internalInvariant(written == 16)
   case .icuOutput:
-    newICUOutputBuffer.initialize(from: icuOutputBuffer)
+    let (_, written) = newICUOutputBuffer.initialize(from: icuOutputBuffer)
+    _internalInvariant(written == 16)
   }
   
   outputBuffer = newOutputBuffer
@@ -371,7 +377,9 @@ internal func _fastNormalize(
   }
   
   let (read, filled) = performWithAllocationIfNecessary(preserving: .none) { () -> (Int, Int)? in
-    return transcodeSegmentToUTF16(rebasedSourceBuffer, into: icuInputBuffer)
+    return copyUTF16Segment(boundedBy: 0..<rebasedSourceBuffer.count, into: icuInputBuffer) {
+      return _decodeScalar(rebasedSourceBuffer, startingAt: $0)
+    }
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
@@ -382,8 +390,7 @@ internal func _fastNormalize(
       UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer)
   }
   
-  let (_, transcoded) = performWithAllocationIfNecessary(preserving: .icuOutput) {
-  () -> (Int, Int)? in
+  let transcoded = performWithAllocationIfNecessary(preserving: .icuOutput) { () -> Int? in
     return transcodeValidUTF16ToUTF8(
       UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
       into: outputBuffer)
@@ -418,11 +425,11 @@ internal func _foreignNormalize(
     return f()!
   }
   let (read, filled) = performWithAllocationIfNecessary(preserving: .none) { () -> (Int, Int)? in
-    return foreignFill(
-      readIndex: readIndex.encodedOffset, 
-      endIndex: endIndex.encodedOffset, 
-      guts, 
-      into: icuInputBuffer)
+    let start = readIndex.encodedOffset
+    let end = endIndex.encodedOffset
+    return copyUTF16Segment(boundedBy: start..<end, into: icuInputBuffer) { gutsOffset in
+      return guts.errorCorrectedScalar(startingAt: gutsOffset)
+    }
   }
   
   let nextIndex = readIndex.encoded(offsetBy: read)
@@ -433,42 +440,11 @@ internal func _foreignNormalize(
       UnsafeBufferPointer(rebasing: icuInputBuffer[..<filled]), into: icuOutputBuffer)
   }
   
-  let (_, transcoded) = performWithAllocationIfNecessary(preserving: .icuOutput) {
-  () -> (Int, Int)? in
+  let transcoded = performWithAllocationIfNecessary(preserving: .icuOutput) { () -> Int? in
     return transcodeValidUTF16ToUTF8(
       UnsafeBufferPointer<UInt16>(rebasing: icuOutputBuffer[..<normalized]),
-      into: outputBuffer)!
+      into: outputBuffer)
   }
-
   return NormalizationResult(
     amountFilled: transcoded, nextReadPosition: nextIndex, allocatedBuffers: allocatedBuffers)
-}
-
-private func foreignFill(
-  readIndex gutsReadIndex: Int,
-  endIndex gutsEndIndex: Int,
-  _ guts: _StringGuts,
-  into outputBuffer: UnsafeMutableBufferPointer<UInt16>
-) -> (read: Int, writen: Int)? {
-  var readIndex = gutsReadIndex
-  var outputWriteIndex = 0
-  let outputCount = outputBuffer.count
-  while readIndex != gutsEndIndex {
-    let (scalar, length) = guts.errorCorrectedScalar(startingAt: readIndex)
-    if scalar._hasNormalizationBoundaryBefore && readIndex != gutsReadIndex {
-      break
-    }
-    
-    readIndex += length
-    
-    for cu in scalar.utf16 {
-      if outputWriteIndex < outputCount {
-        outputBuffer[outputWriteIndex] = cu
-        outputWriteIndex += 1
-      } else {
-        return nil
-      }
-    }
-  }
-  return (readIndex - gutsReadIndex, outputWriteIndex)
 }

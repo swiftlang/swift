@@ -286,7 +286,7 @@ internal func _binaryCompare<UInt8>(
   var cmp = Int(truncatingIfNeeded:
     _swift_stdlib_memcmp(
       lhs.baseAddress._unsafelyUnwrappedUnchecked,
-      rhs.baseAddress._unsafelyUnwrappedUnchecked,  
+      rhs.baseAddress._unsafelyUnwrappedUnchecked,
       Swift.min(lhs.count, rhs.count)))
   if cmp == 0 {
     cmp = lhs.count &- rhs.count
