@@ -61,8 +61,7 @@ extension _StringGuts {
   }
 
   internal init(_ storage: _SharedStringStorage) {
-    // TODO(cleanup): We should probably pass whole perf flags struct around
-    self.init(_StringObject(storage, isASCII: false))
+    self.init(_StringObject(storage))
   }
 
   internal init(
@@ -109,18 +108,15 @@ extension _StringGuts {
     @inline(__always) get { return isFastUTF8 && _object.isASCII }
   }
 
-  @inlinable
-  internal var isNFC: Bool  {
-    @inline(__always) get { return _object.isNFC }
-  }
+  @inline(__always)
+  internal var isNFC: Bool { return _object.isNFC }
 
-  @inlinable
-  internal var isNFCFastUTF8: Bool  {
+  @inline(__always)
+  internal var isNFCFastUTF8: Bool {
     // TODO(String micro-performance): Consider a dedicated bit for this
-    @inline(__always) get { return _object.isNFC && isFastUTF8 }
+    return _object.isNFC && isFastUTF8
   }
 
-  @inlinable
   internal var hasNativeStorage: Bool { return _object.hasNativeStorage }
 
   internal var hasSharedStorage: Bool { return _object.hasSharedStorage }

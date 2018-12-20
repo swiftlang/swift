@@ -39,11 +39,11 @@ public func singleNonAsciiChar() -> Character {
 }
 
 // NOTE: -9223372036854775808 = 0x80 = immortal large discrim
-// NOTE: 25 = length in UTF-8 code units
+// NOTE: 1152921504606847001 = 25 (code unit length) | `isTailAllocated` perf flag
 //
 // CHECK-LABEL: define {{.*}}singleNonSmolChar
 // CHECK-NEXT: entry:
-// CHECK:   ret { i64, %swift.bridge* } { i64 25, %swift.bridge* {{.*}}@0{{.*}}i64 -9223372036854775808
+// CHECK:   ret { i64, %swift.bridge* } { i64 1152921504606847001, %swift.bridge* {{.*}}@0{{.*}}i64 -9223372036854775808
 public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }
