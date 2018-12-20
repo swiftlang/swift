@@ -218,3 +218,6 @@ Func MutableCollection.withContiguousMutableStorageIfAvailable(_:) has been adde
 Func Sequence.withContiguousStorageIfAvailable(_:) has been added as a protocol requirement
 
 Func Strideable....(_:_:) has been removed
+
+Struct Discriminator has been removed
+
