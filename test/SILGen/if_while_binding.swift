@@ -247,7 +247,7 @@ func if_multi_where() {
   // CHECK:   br [[DONE]]
 
   // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : @owned $String):
-  // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue() -> Builtin.Int1
+  // CHECK:   struct_extract {{.*}}
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
   if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
@@ -274,8 +274,7 @@ func if_leading_boolean(_ a : Int) {
   // CHECK: debug_value %0 : $Int, let, name "a"
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0{{.*}}) : $@convention({{.*}}) (Int, Int{{.*}}) -> Bool
 
-  // CHECK:      [[FN:%.*]] = function_ref {{.*}}
-  // CHECK-NEXT: [[EQRESULTI1:%[0-9]+]] = apply [[FN:%.*]]([[EQRESULT]]) : $@convention(method) (Bool) -> Builtin.Int1
+  // CHECK: [[EQRESULTI1:%[0-9]+]] = struct_extract {{.*}} : $Bool, #Bool._value
   // CHECK-NEXT: cond_br [[EQRESULTI1]], [[CHECKFOO:bb[0-9]+]], [[ELSE:bb[0-9]+]]
 
   // Call Foo and test for the optional being present.

@@ -281,25 +281,6 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   emitThrow(loc, error);
 }
 
-/// Unwrap a value of a wrapped integer type to get at the juicy
-/// Builtin.IntegerN value within.
-static SILValue emitUnwrapIntegerResult(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        SILValue value) {
-  // This is a loop because we want to handle types that wrap integer types,
-  // like ObjCBool (which may be Bool or Int8).
-  while (!value->getType().is<BuiltinIntegerType>()) {
-    auto structDecl = value->getType().getStructOrBoundGenericStruct();
-    assert(structDecl && "value for error result wasn't of struct type!");
-    assert(std::next(structDecl->getStoredProperties().begin())
-             == structDecl->getStoredProperties().end());
-    auto property = *structDecl->getStoredProperties().begin();
-    value = SGF.B.createStructExtract(loc, value, property);
-  }
-
-  return value;
-}
-
 /// Perform a foreign error check by testing whether the call result is zero.
 /// The call result is otherwise ignored.
 static void
@@ -312,7 +293,7 @@ emitResultIsZeroErrorCheck(SILGenFunction &SGF, SILLocation loc,
   }
 
   SILValue resultValue =
-    emitUnwrapIntegerResult(SGF, loc, result.getUnmanagedValue());
+    SGF.emitUnwrapIntegerResult(loc, result.getUnmanagedValue());
   auto resultType = resultValue->getType().getASTType();
 
   if (!resultType->isBuiltinIntegerType(1)) {
