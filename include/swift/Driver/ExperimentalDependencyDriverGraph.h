@@ -192,7 +192,7 @@ public:
               UnifiedStatsReporter *stats)
       : verifyExperimentalDependencyGraphAfterEveryImport(
           verifyExperimentalDependencyGraphAfterEveryImport),
-  emitExperimentalDependencyDotFileAfterEveryImport(
+        emitExperimentalDependencyDotFileAfterEveryImport(
           emitExperimentalDependencyDotFileAfterEveryImport),
         stats(stats) {
     assert(verify() && "DriverGraph should be fine when created");

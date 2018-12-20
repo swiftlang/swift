@@ -148,7 +148,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     VerifyExperimentalDependencyGraphAfterEveryImport(
       VerifyExperimentalDependencyGraphAfterEveryImport),
     EmitExperimentalDependencyDotFileAfterEveryImport(
-    EmitExperimentalDependencyDotFileAfterEveryImport) {
+      EmitExperimentalDependencyDotFileAfterEveryImport) {
       
 };
 

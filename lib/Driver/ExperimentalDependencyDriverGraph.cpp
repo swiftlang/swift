@@ -358,8 +358,7 @@ void DriverGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
 }
 
 void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
-  FrontendStatsTracer tracer(stats,
-                             "experimental-dependencies-emitDotFile");
+  FrontendStatsTracer tracer(stats, "experimental-dependencies-emitDotFile");
   DotFileEmitter<DriverGraph>(out, *this, true, false).emit();
 }
 
