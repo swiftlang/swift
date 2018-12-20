@@ -883,9 +883,10 @@ getWitnessMethodSubstitutions(
       witnessThunkSig);
 }
 
-static SubstitutionMap
-getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
-                              ProtocolConformanceRef CRef) {
+SubstitutionMap
+swift::getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
+                                     SILFunction *F,
+                                     ProtocolConformanceRef CRef) {
   auto witnessFnTy = F->getLoweredFunctionType();
   assert(witnessFnTy->getRepresentation() ==
          SILFunctionTypeRepresentation::WitnessMethod);
@@ -901,9 +902,9 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
       == CRef.getRequirement());
   auto *classWitness = witnessFnTy->getWitnessMethodClass(*mod);
 
-  return getWitnessMethodSubstitutions(
-      mod, CRef, requirementSig, witnessThunkSig,
-      origSubs, isDefaultWitness, classWitness);
+  return ::getWitnessMethodSubstitutions(mod, CRef, requirementSig,
+                                         witnessThunkSig, origSubs,
+                                         isDefaultWitness, classWitness);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a

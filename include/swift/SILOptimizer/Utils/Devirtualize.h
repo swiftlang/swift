@@ -48,6 +48,18 @@ void getAllSubclasses(ClassHierarchyAnalysis *CHA,
                       SILModule &M,
                       ClassHierarchyAnalysis::ClassList &Subs);
 
+/// Given an apply instruction of a protocol requirement and a witness method
+/// for the requirement, compute a substitution suitable for a direct call
+/// to the witness method.
+///
+/// \p Module SILModule
+/// \p AI ApplySite that applies a procotol method
+/// \p F SILFunction with convention @convention(witness_method)
+/// \p CRef a concrete ProtocolConformanceRef
+SubstitutionMap getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
+                                              SILFunction *F,
+                                              ProtocolConformanceRef CRef);
+
 /// Attempt to devirtualize the given apply site.  If this fails,
 /// the returned ApplySite will be null.
 ///
