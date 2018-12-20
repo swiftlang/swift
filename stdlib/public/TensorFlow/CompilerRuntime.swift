@@ -268,6 +268,7 @@ public final class _ExecutionContext {
   private var mutex: pthread_mutex_t = pthread_mutex_t()
 
   /// The stack for holding the current device scoping information.
+  // TODO: revert changes to this file and rebase onto https://github.com/apple/swift/pull/21327
   @usableFromInline
   var deviceScopes: [(DeviceKind, UInt32)] = [(.`default`, 0)]
 

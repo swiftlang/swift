@@ -39,10 +39,10 @@ using namespace tf;
 // TODO: When true, add support for compile-time device stack evaluation and
 // default device as set via compiler flag tf-target-gpu. More generally,
 // extend the "true" code path to subsume the "false" code path.
-llvm::cl::opt<bool> TFUseDeviceStack(
-    "tf-use-device-stack", llvm::cl::init(false),
-    llvm::cl::desc("When true, graph_ops will receive their device placement "
-                   "at compile time, based on the withDevice() construct."));
+llvm::cl::opt<bool>
+    TFUseDeviceStack("tf-use-device-stack", llvm::cl::init(false),
+                     llvm::cl::desc("When true, graph mode compilation "
+                                    "supports the withDevice() construct."));
 
 // Only DataType attributes are considered in this CanRunOnDevice property. All
 // others are currently not relevant for kernel selection.
@@ -224,7 +224,7 @@ GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
     // compile time (e.g. via compiler flag); instead use runtime device info.
     : primaryDeviceId(TFUseDeviceStack ? RuntimeDeviceId : primaryDeviceId),
       isTPUInfeedEnabled(isTPUInfeedEnabled) {
-  assert(primaryDeviceId.type != DeviceType::ALL);
+  assert(primaryDeviceId != AllDeviceId);
   if (!TFUseDeviceStack)
     usedDeviceIds.insert(primaryDeviceId);
 }

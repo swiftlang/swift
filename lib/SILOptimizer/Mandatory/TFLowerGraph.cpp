@@ -2751,7 +2751,6 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   // TODO: unify these two code paths
   if (TFUseDeviceStack) {
     assert(deviceIds.size() == 1);
-    llvm::errs() << "lowering: " << deviceIds[0] << "\n";
     assert(deviceIds[0] == RuntimeDeviceId);
   }
   assert(!deviceIds.empty());
