@@ -49,3 +49,33 @@ struct RequiresP<T: P> {}
 // retroactive conformance to conform to Q.
 func rdar46735592(_: RequiresP<UnconditionallyP<Y>>) { }
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAHPyHCg_GAlJ1PyHCg_GF
+
+struct QImpl: Q {}
+struct ConditionallyP<T> {}
+extension ConditionallyP: P where T: Q {}
+
+func useConditionallyP(_: RequiresP<ConditionallyP<QImpl>>) {}
+func useConditionallyP_retroactive(_: RequiresP<ConditionallyP<Y>>) {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive17useConditionallyPyyAA9RequiresPVyAA0D1PVyAA5QImplVGGF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive018useConditionallyP_B0yyAA9RequiresPVyAA0D1PVy12RetroactiveB1YVGAJ0F1A1PAiK1QAAHPyHC_HCg_GF
+
+protocol Wrapper {
+  associatedtype Wrapped
+}
+struct WrapperImpl<Wrapped>: Wrapper {}
+
+struct IndirectlyConditionallyP<T: Wrapper> {}
+extension IndirectlyConditionallyP: P where T.Wrapped: Q {}
+
+func useIndirectlyConditionallyP(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<QImpl>>>) {}
+func useIndirectlyConditionallyP_retroactive(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<Y>>>) {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive27useIndirectlyConditionallyPyyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVyAA5QImplVGGGF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive028useIndirectlyConditionallyP_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0I1A1PAkN1QAAHPyHC_HCg_GF
+
+struct IndirectlyConditionallyP2<T> {}
+extension IndirectlyConditionallyP2: P where T: Wrapper, T.Wrapped: Q {}
+
+func useIndirectlyConditionallyP2(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<QImpl>>>) {}
+func useIndirectlyConditionallyP2_retroactive(_: RequiresP<IndirectlyConditionallyP<WrapperImpl<Y>>>) {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive28useIndirectlyConditionallyP2yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVyAA5QImplVGGGF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive029useIndirectlyConditionallyP2_B0yyAA9RequiresPVyAA0dE1PVyAA11WrapperImplVy12RetroactiveB1YVGGAM0J1A1PAkN1QAAHPyHC_HCg_GF
