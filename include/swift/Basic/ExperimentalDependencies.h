@@ -797,7 +797,10 @@ public:
                                               Optional<std::string> swiftDeps);
 
   /// Add a node to a FrontendGraph that the Driver is reading.
-  void addDeserializedNode(FrontendNode *);
+  /// \p assertUniqueness adds extra checking if assertions are on.
+  /// Only turn on during verification in the frontend in order to save driver
+  /// time.
+  void addDeserializedNode(FrontendNode *, const bool assertUniqueness);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
@@ -806,11 +809,12 @@ public:
   }
 
   /// Read a swiftdeps file at \p path and return a FrontendGraph if successful.
-  Optional<FrontendGraph> static loadFromPath(StringRef);
+  Optional<FrontendGraph> static loadFromPath(StringRef, bool assertUniqueness);
 
   /// Read a swiftdeps file from \p buffer and return a FrontendGraph if
   /// successful.
-  Optional<FrontendGraph> static loadFromBuffer(llvm::MemoryBuffer &);
+  Optional<FrontendGraph> static loadFromBuffer(llvm::MemoryBuffer &,
+                                                bool assertUniqueness);
 
   void verifySame(const FrontendGraph &other) const;
 

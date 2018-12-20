@@ -58,7 +58,7 @@ LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
 LoadResult DriverGraph::loadFromBuffer(const Job *job,
                                        llvm::MemoryBuffer &buffer) {
 
-  Optional<FrontendGraph> fg = FrontendGraph::loadFromBuffer(buffer);
+  Optional<FrontendGraph> fg = FrontendGraph::loadFromBuffer(buffer, false);
   if (!fg)
     return DependencyGraphImpl::LoadResult::HadError;
   addIndependentNode(job);

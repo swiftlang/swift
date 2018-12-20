@@ -238,11 +238,13 @@ void NodeByNodeFrontendGraphEmitter<YAMLEmitter>::emitNode(
       [&](std::unordered_set<size_t> &s) { emitter.emitSetOfInts(s); });
 }
 
-void FrontendGraph::addDeserializedNode(FrontendNode *n) {
+void FrontendGraph::addDeserializedNode(FrontendNode *n,
+                                        const bool assertUniqueness) {
   addNode(n);
   assert(getNode(allNodes.size() - 1)); // verify seq no.
-  const bool wasInserted = memoizedNodes.insert(n->getKey(), n);
-  assert(wasInserted && "Frontend should have memoized this node.");
+  if (assertUniqueness)
+    assert(memoizedNodes.insert(n->getKey(), n) &&
+           "Frontend should have memoized this node.");
 }
 
 void Node::serializeOrDeserialize(
@@ -256,17 +258,21 @@ void Node::serializeOrDeserialize(
   assert(ensureThatTheSwiftDepsIsValidForSerialization());
 }
 
-Optional<FrontendGraph> FrontendGraph::loadFromPath(StringRef path) {
+Optional<FrontendGraph>
+FrontendGraph::loadFromPath(StringRef path, const bool assertUniqueness) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return None;
-  return loadFromBuffer(*buffer.get());
+  return loadFromBuffer(*buffer.get(), assertUniqueness);
 }
 
 Optional<FrontendGraph>
-FrontendGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
+FrontendGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
+                              const bool assertUniqueness) {
   FrontendGraph fg;
-  auto nodeCallback = [&fg](FrontendNode *n) { fg.addDeserializedNode(n); };
+  auto nodeCallback = [&fg, assertUniqueness](FrontendNode *n) {
+    fg.addDeserializedNode(n, assertUniqueness);
+  };
 
   if (parseDependencyFile(buffer, nodeCallback))
     return None;
@@ -411,7 +417,7 @@ bool FrontendGraph::verify() const {
 }
 
 bool FrontendGraph::verifyReadsWhatIsWritten(StringRef path) const {
-  auto loadedGraph = FrontendGraph::loadFromPath(path);
+  auto loadedGraph = FrontendGraph::loadFromPath(path, true);
   assert(loadedGraph.hasValue() &&
          "Should be able to read the exported graph.");
   verifySame(loadedGraph.getValue());
