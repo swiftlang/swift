@@ -22,3 +22,7 @@ class MySubTopLevelType2: ToplevelType {
 class SubCities: Cities {
   override var yogurt: Int { return 2 }
 }
+
+func boo(_ a: ToplevelType) {
+  a.trailing {  print($0!) }
+}
