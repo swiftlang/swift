@@ -633,7 +633,8 @@ Property behaviors are implemented using private protocol conformances.
 ::
 
   concrete-protocol-conformance ::= type protocol-conformance-ref any-protocol-conformance-list 'HC'
-  protocol-conformance-ref ::= protocol module? 'HP'
+  protocol-conformance-ref ::= protocol
+  protocol-conformance-ref ::= protocol module 'HP'
 
   any-protocol-conformance ::= concrete-protocol-conformance
   any-protocol-conformance ::= dependent-protocol-conformance

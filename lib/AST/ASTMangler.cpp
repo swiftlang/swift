@@ -2280,10 +2280,10 @@ void ASTMangler::appendProtocolConformanceRef(
   // For retroactive conformances, add a reference to the module in which the
   // conformance resides. For @objc protocols, there is no point: conformances
   // are global anyway.
-  if (isRetroactiveConformance(conformance))
+  if (isRetroactiveConformance(conformance)) {
     appendModule(conformance->getDeclContext()->getParentModule());
-
-  appendOperator("HP");
+    appendOperator("HP");
+  }
 }
 
 /// Retrieve the index of the conformance requirement indicated by the

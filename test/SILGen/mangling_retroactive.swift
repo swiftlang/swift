@@ -38,5 +38,14 @@ extension Z: Equatable where T: Hashable, V: Equatable {
 struct RequiresEquatable<T: Equatable> { }
 
 // Conditional requirement involves retroactive conformances.
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg1_GAOSQHPAISHAAHPyHC_AKSQAAHPyHCHCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive5test2yyAA17RequiresEquatableVyAA1ZVy12RetroactiveB1XVSiAG1YVAI0F1A1PAAHPyHCg_AkL1QAAHPyHCg1_GAOSQAISHAAHPyHC_AKSQAAHPyHCHCg_GF
 func test2(_: RequiresEquatable<Z<X, Int, Y>>) { }
+
+struct UnconditionallyP<T: Q>: P {}
+struct RequiresP<T: P> {}
+
+// RequiresP uses a non-retroactive conformance for its generic param
+// UnconditionallyP, even though UnconditionallyP's generic param uses a
+// retroactive conformance to conform to Q.
+func rdar46735592(_: RequiresP<UnconditionallyP<Y>>) { }
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAHPyHCg_GAlJ1PyHCg_GF
