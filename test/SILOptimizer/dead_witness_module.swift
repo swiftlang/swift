@@ -12,4 +12,4 @@ import TestModule
 
 testit(MyStruct())
 
-// CHECK: sil_witness_table MyStruct: Proto module TestModule{{$}}
+// CHECK-NOT: sil_witness_table MyStruct: Proto module TestModule
