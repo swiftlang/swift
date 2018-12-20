@@ -129,12 +129,13 @@ class DriverGraph {
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
 
-  /// For debugging, the driver writes out a dot file of the graph every time a
+  /// For debugging, the driver can write out a dot file, for instance when a
   /// Frontend swiftdeps is read and integrated. In order to keep subsequent
-  /// files for the same job distinct, keep a sequence number for each job.
-  std::unordered_map<const driver::Job *, unsigned> dotFileSequenceNumberByJob;
+  /// files for the same name distinct, keep a sequence number for each name.
+  std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
   const bool verifyExperimentalDependencyGraphAfterEveryImport;
+  const bool emitExperimentalDependencyDotFileAfterEveryImport;
 
   /// For helping with performance tuning, may be null:
   UnifiedStatsReporter *const stats;
@@ -187,13 +188,16 @@ public:
 
   /// \p stats may be null
   DriverGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
+              const bool emitExperimentalDependencyDotFileAfterEveryImport,
               UnifiedStatsReporter *stats)
       : verifyExperimentalDependencyGraphAfterEveryImport(
-            verifyExperimentalDependencyGraphAfterEveryImport),
+          verifyExperimentalDependencyGraphAfterEveryImport),
+  emitExperimentalDependencyDotFileAfterEveryImport(
+          emitExperimentalDependencyDotFileAfterEveryImport),
         stats(stats) {
     assert(verify() && "DriverGraph should be fine when created");
   }
-
+  
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
 
@@ -239,6 +243,10 @@ public:
   /// Return true or abort
   bool verify() const;
 
+  /// Don't want to do this after every integration--too slow--
+  /// So export this hook to the driver.
+  bool emitAndVerify(DiagnosticEngine &diags);
+
 private:
   void verifyNodeMapEntries() const;
 
@@ -277,7 +285,7 @@ private:
   static bool mapCorruption(const char *msg) {
     llvm_unreachable(msg);
   }
-
+ 
   /// Read a FrontendGraph belonging to \p job from \p buffer
   /// and integrate it into the DriverGraph.
   /// Used both the first time, and to reload the FrontendGraph.
@@ -346,10 +354,7 @@ private:
   /// For debugging, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
   void emitDotFileForJob(DiagnosticEngine &, const driver::Job *);
-
-  std::string dotFilenameForJob(const driver::Job *);
-
-  void emitDotFile(DiagnosticEngine &, StringRef outputPath);
+  void emitDotFile(DiagnosticEngine &, StringRef baseName);
   void emitDotFile() { emitDotFile(llvm::errs()); }
   void emitDotFile(llvm::raw_ostream &);
 

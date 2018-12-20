@@ -121,7 +121,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
                          bool EnableExperimentalDependencies,
-                         bool VerifyExperimentalDependencyGraphAfterEveryImport)
+                         bool VerifyExperimentalDependencyGraphAfterEveryImport,
+                         bool EmitExperimentalDependencyDotFileAfterEveryImport)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -145,7 +146,9 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     FilelistThreshold(FilelistThreshold),
     EnableExperimentalDependencies(EnableExperimentalDependencies),
     VerifyExperimentalDependencyGraphAfterEveryImport(
-      VerifyExperimentalDependencyGraphAfterEveryImport) {
+      VerifyExperimentalDependencyGraphAfterEveryImport),
+    EmitExperimentalDependencyDotFileAfterEveryImport(
+    EmitExperimentalDependencyDotFileAfterEveryImport) {
       
 };
 
@@ -696,6 +699,7 @@ namespace driver {
       if (Comp.getEnableExperimentalDependencies())
         ExpDepGraph.emplace(
             Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
+            Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
             Comp.getStatsReporter());
       else if (Comp.getShowIncrementalBuildDecisions() ||
                Comp.getStatsReporter())
@@ -773,6 +777,8 @@ namespace driver {
           llvm_unreachable("handled above");
         }
       }
+      if (ExpDepGraph.hasValue())
+        assert(ExpDepGraph.getValue().emitAndVerify(Comp.getDiags()));
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
@@ -1402,7 +1408,8 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                CompilationRecordPath + "~moduleonly");
     }
   }
-
+  if (State.ExpDepGraph.hasValue())
+    assert(State.ExpDepGraph.getValue().emitAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }

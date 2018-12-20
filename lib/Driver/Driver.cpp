@@ -929,6 +929,9 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_verify_experimental_dependency_graph_after_every_import);
+    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+        options::
+            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
 
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
@@ -950,7 +953,8 @@ Driver::buildCompilation(const ToolChain &TC,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
         EnableExperimentalDependencies,
-        VerifyExperimentalDependencyGraphAfterEveryImport);
+        VerifyExperimentalDependencyGraphAfterEveryImport,
+        EmitExperimentalDependencyDotFileAfterEveryImport);
   }
 
   // Construct the graph of Actions.

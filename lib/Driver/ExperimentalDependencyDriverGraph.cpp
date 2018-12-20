@@ -48,8 +48,8 @@ LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
   if (!buffer)
     return LoadResult::HadError;
   auto r = loadFromBuffer(Cmd, *buffer.get());
-  // TODO: add flag to control dot file creation
-  emitDotFileForJob(diags, Cmd);
+  if (emitExperimentalDependencyDotFileAfterEveryImport)
+    emitDotFileForJob(diags, Cmd);
   if (verifyExperimentalDependencyGraphAfterEveryImport)
     verify();
   return r;
@@ -65,6 +65,11 @@ LoadResult DriverGraph::loadFromBuffer(const Job *job,
   return integrate(fg.getValue());
 }
 
+bool DriverGraph::emitAndVerify(DiagnosticEngine &diags) {
+  emitDotFile(diags, "final");
+  return verify();
+}
+
 bool DriverGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
@@ -72,7 +77,6 @@ bool DriverGraph::isMarked(const Job *cmd) const {
 void DriverGraph::markTransitive(SmallVectorImpl<const Job *> &visited,
                                  const Job *job,
                                  DependencyGraph<const Job *>::MarkTracer *) {
-  assert(verify() && "Cannot mark graph in bad state.");
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
   std::unordered_set<const DriverNode *> visitedNodeSet;
   const StringRef swiftDeps = getSwiftDeps(job);
@@ -149,7 +153,6 @@ LoadResult DriverGraph::integrate(const FrontendGraph &g) {
   auto changedNodes = std::unordered_set<DependencyKey>();
 
   g.forEachNode([&](const FrontendNode *integrand) {
-    verify(); // xxx
     integrateUsesByDef(integrand, g);
     const auto key = integrand->getKey();
     Optional<DriverNode *> prexistingNodeInPlace =
@@ -166,8 +169,6 @@ LoadResult DriverGraph::integrate(const FrontendGraph &g) {
     // Track externalDependencies so Compilation can check them.
     if (integrand->getKey().getKind() == NodeKind::externalDepend)
       externalDependencies.insert(integrand->getKey().getName());
-
-    verify(); // xxx
   });
 
   for (auto &p : disappearedNodes) {
@@ -344,25 +345,21 @@ void DriverGraph::checkTransitiveClosureForCascading(
 // Emitting Dot file for DriverGraph ===========================================
 
 void DriverGraph::emitDotFileForJob(DiagnosticEngine &diags, const Job *job) {
-  FrontendStatsTracer tracer(stats,
-                             "experimental-dependencies-emitDotFileForJob");
-  emitDotFile(diags, dotFilenameForJob(job));
+  emitDotFile(diags, getSwiftDeps(job));
 }
 
-std::string DriverGraph::dotFilenameForJob(const Job *job) {
-  StringRef dependenciesFile = getSwiftDeps(job);
-  unsigned seqNo = dotFileSequenceNumberByJob[job]++;
-  return dependenciesFile.str() + "." + std::to_string(seqNo) + ".dot";
-}
-
-void DriverGraph::emitDotFile(DiagnosticEngine &diags, StringRef outputPath) {
-  withOutputFile(diags, outputPath, [&](llvm::raw_ostream &out) {
+void DriverGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
+  unsigned seqNo = dotFileSequenceNumber[baseName]++;
+  std::string fullName = baseName.str() + "." + std::to_string(seqNo) + ".dot";
+  withOutputFile(diags, fullName, [&](llvm::raw_ostream &out) {
     emitDotFile(out);
     return false;
   });
 }
 
 void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
+  FrontendStatsTracer tracer(stats,
+                             "experimental-dependencies-emitDotFile");
   DotFileEmitter<DriverGraph>(out, *this, true, false).emit();
 }
 
@@ -371,7 +368,6 @@ void DriverGraph::emitDotFile(llvm::raw_ostream &out) {
 //==============================================================================
 
 bool DriverGraph::verify() const {
-  // TODO: split up each three parts
   FrontendStatsTracer tracer(stats, "experimental-dependencies-verify");
   verifyNodeMapEntries();
   verifyCanFindEachJob();

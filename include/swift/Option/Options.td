@@ -138,6 +138,11 @@ Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
+def driver_emit_experimental_dependency_dot_file_after_every_import :
+Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+InternalDebugOpt,
+HelpText<"Debug DriverGraph by emitting it as a dot file after every import">;
+
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 

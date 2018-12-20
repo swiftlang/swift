@@ -212,6 +212,7 @@ private:
 
   /// Really slows down the driver--so only turn on when needed.
   const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
 
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
@@ -243,7 +244,8 @@ public:
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool EnableExperimentalDependencies = false,
-              bool VerifyExperimentalDependencyGraphAfterEveryImport = false);
+              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
+              bool EmitExperimentalDependencyDotFileAfterEveryImport = false);
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -306,6 +308,10 @@ public:
     return VerifyExperimentalDependencyGraphAfterEveryImport;
   }
 
+  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
+    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  }
+  
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
