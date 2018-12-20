@@ -385,6 +385,25 @@ public final class _ExecutionContext {
   }
 }
 
+/// Returns a valid TF device string such as
+/// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
+/// closest enclosing withDevice() construct.
+/// A return value of nil indicates the absence of withDevice().
+internal extension _ExecutionContext {
+  @usableFromInline
+  var currentDeviceName: String? {
+    if let (kind, index) = _ThreadLocalState.value._currentDevice {
+      switch kind {
+      case .cpu:
+        return "\(cpuDeviceNamePrefix)\(index)"
+      case .gpu:
+        return "\(gpuDeviceNamePrefix!)\(index)"
+      }
+    }
+    return nil
+  }
+}
+
 internal extension _ExecutionContext {
   /// Synchronously execute the body, preventing asynchronous computation from
   /// corrupting the context data.
@@ -612,7 +631,7 @@ private class TFEState {
       checkOk(status)
       let deviceName: String?
       if opType.hasSuffix("_RUNTIME.device_partition") {
-        deviceName = getcurrentDeviceName()
+        deviceName = _ExecutionContext.global.currentDeviceName
       } else if opType.hasSuffix("_CPU.device_partition") {
         // The op type can be: tmp3_main.tf_17_CPU.device_partition. We want to
         // extract the device index "17" out of the above name, and use it to
@@ -1631,29 +1650,10 @@ public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
   return result
 }
 
-
-/// Returns a valid TF device string such as
-/// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
-/// closest enclosing withDevice() construct.
-/// A return value of nil indicates the absence of withDevice().
-@usableFromInline
-func getcurrentDeviceName() -> String? {
-  let context = _ExecutionContext.global
-  if let (kind, index) = _ThreadLocalState.value._currentDevice {
-    switch kind {
-    case .cpu:
-      return "\(context.cpuDeviceNamePrefix)\(index)"
-    case .gpu:
-      return "\(context.gpuDeviceNamePrefix!)\(index)"
-    }
-  }
-  return nil
-}
-
 @usableFromInline
 @_cdecl("_swift_tfc_OpSetDeviceFromScope")
 func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
-  if let deviceName = getcurrentDeviceName() {
+  if let deviceName = _ExecutionContext.global.currentDeviceName {
     TFE_OpSetDevice(op, deviceName, status)
   }
 }

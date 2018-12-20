@@ -3,7 +3,7 @@
 import TensorFlow
 
 public func deviceFreeFunc() {
-  let y = withDevice(.cpu, 1) { () -> Tensor<Float> in
+  let y: Tensor<Float> = withDevice(.cpu, 1) {
     // Define this local function with inline never, so that we can partition
     // this function.
     // TODO: assess how to partition the withDevice closure itself.
