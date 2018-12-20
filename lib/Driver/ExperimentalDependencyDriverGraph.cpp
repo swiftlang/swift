@@ -107,10 +107,8 @@ void DriverGraph::addIndependentNode(const Job *job) {
 }
 
 std::vector<std::string> DriverGraph::getExternalDependencies() const {
-  std::vector<std::string> out;
-  std::copy(externalDependencies.begin(), externalDependencies.end(),
-            std::back_inserter(out));
-  return out;
+  return std::vector<std::string>(externalDependencies.begin(),
+                                  externalDependencies.end());
 }
 
 static std::string phoneyBalonyMangleTypeAsContext(const NominalTypeDecl *) {
@@ -158,14 +156,14 @@ LoadResult DriverGraph::integrate(const FrontendGraph &g) {
   g.forEachNode([&](const FrontendNode *integrand) {
     integrateUsesByDef(integrand, g);
     const auto key = integrand->getKey();
-    Optional<DriverNode *> prexistingNodeInPlace =
+    Optional<DriverNode *> preexistingNodeInPlace =
         integrand->getSwiftDeps().hasValue()
             ? nodeMap.find(integrand->getSwiftDeps().getValue(), key)
             : None;
-    if (prexistingNodeInPlace)
+    if (preexistingNodeInPlace)
       disappearedNodes.erase(key);
     const bool changed =
-        integrateFrontendNode(integrand, swiftDeps, prexistingNodeInPlace);
+        integrateFrontendNode(integrand, swiftDeps, preexistingNodeInPlace);
     if (changed)
       changedNodes.insert(key);
 
@@ -247,6 +245,8 @@ bool DriverGraph::integrateFrontendExpatNode(
     return false;
   }
   if (preexistingNodeInPlace) {
+    // Something was deleted from this file, but it still depends on that
+    // (baseName). Also, at this point there is no other matching node.
     preexistingNodeInPlace.getValue()->integrateFingerprintFrom(integrand);
     moveNodeToDifferentFile(preexistingNodeInPlace.getValue(), None);
   } else

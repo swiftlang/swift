@@ -412,7 +412,7 @@ class DependencyKey {
   NodeKind kind;
   DeclAspect aspect;
   /// The mangled context type name of the holder for \ref potentialMember, \ref
-  /// member, and \nominal kinds. Otherwise unused.
+  /// member, and \ref nominal kinds. Otherwise unused.
   std::string context;
   /// The basic name of the entity. Unused for \ref potentialMember and \ref
   /// nominal kinds.
@@ -450,9 +450,7 @@ public:
   bool operator!=(const DependencyKey &rhs) const { return !(*this == rhs); }
 
   size_t hash() const {
-    return std::hash<size_t>()(size_t(kind)) ^
-           std::hash<size_t>()(size_t(aspect) * size_t(NodeKind::kindCount)) ^
-           std::hash<std::string>()(name) ^ std::hash<std::string>()(context);
+    return llvm::hash_combine(kind, aspect, name, context);
   }
   bool isImplementation() const {
     return getAspect() == DeclAspect::implementation;
@@ -549,6 +547,7 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 /// will (eventually) have a fingerprint so that we can tell when an entity has
 /// changed. Arcs in the graph connect defs to uses, so that when something
 /// changes, a traversal of the arc reveals the entities needing to be rebuilt.
+///
 /// Some changes are transitive (i.e. “cascading”): given A -> B -> C, if the
 /// link from A to B cascades then C must be rebuilt even if B does not change.
 /// Rather than having two kinds of arcs, I am representing this distinction by
