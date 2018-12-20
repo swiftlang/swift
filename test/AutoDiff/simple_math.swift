@@ -12,58 +12,57 @@ import Glibc
 var SimpleMathTests = TestSuite("SimpleMath")
 
 SimpleMathTests.test("Arithmetics") {
-  let dfoo1 = #gradient({ (x: Float, y: Float) -> Float in
+  let foo1 = { (x: Float, y: Float) -> Float in
     return x * y
-  })
-  expectEqual((4, 3), dfoo1(3, 4))
-  let dfoo2 = #gradient({ (x: Float, y: Float) -> Float in
+  }
+  expectEqual((4, 3), gradient(at: 3, 4, in: foo1))
+  let foo2 = { (x: Float, y: Float) -> Float in
     return -x * y
-  })
-  expectEqual((-4, -3), dfoo2(3, 4))
-  let dfoo3 = #gradient({ (x: Float, y: Float) -> Float in
+  }
+  expectEqual((-4, -3), gradient(at: 3, 4, in: foo2))
+  let foo3 = { (x: Float, y: Float) -> Float in
     return -x + y
-  })
-  expectEqual((-1, 1), dfoo3(3, 4))
+  }
+  expectEqual((-1, 1), gradient(at: 3, 4, in: foo3))
 }
 
 SimpleMathTests.test("Fanout") {
-  let dfoo1 = #gradient({ (x: Float) -> Float in
+  let foo1 = { (x: Float) -> Float in
      x - x
-  })
-  expectEqual(0, dfoo1(100))
-  let dfoo2 = #gradient({ (x: Float) -> Float in
+  }
+  expectEqual(0, gradient(at: 100, in: foo1))
+  let foo2 = { (x: Float) -> Float in
      x + x
-  })
-  expectEqual(2, dfoo2(100))
-  let dfoo3 = #gradient({ (x: Float, y: Float) -> Float in
+  }
+  expectEqual(2, gradient(at: 100, in: foo2))
+  let foo3 = { (x: Float, y: Float) -> Float in
     x + x + x * y
-  })
-  expectEqual((4, 3), dfoo3(3, 2))
+  }
+  expectEqual((4, 3), gradient(at: 3, 2, in: foo3))
 }
 
 SimpleMathTests.test("FunctionCall") {
   func foo(_ x: Float, _ y: Float) -> Float {
     return 3 * x + { $0 * 3 }(3) * y
   }
-  expectEqual((3, 9), #gradient(foo)(3, 4))
-  expectEqual(3, #gradient(foo, wrt: .0)(3, 4))
+  expectEqual((3, 9), gradient(at: 3, 4, in: foo))
+  expectEqual(3, gradient(at: 3) { x in foo(x, 4) })
 }
 
 SimpleMathTests.test("ResultSelection") {
   func foo(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
-  expectEqual((1, 0), #gradient(foo, result: .0)(3, 3))
-  expectEqual((0, 1), #gradient(foo, result: .1)(3, 3))
+  expectEqual((1, 0), gradient(at: 3, 3, in: { x, y in foo(x, y).0 }))
+  expectEqual((0, 1), gradient(at: 3, 3, in: { x, y in foo(x, y).1 }))
 }
-
 
 SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {
     return z * x
   }
-  expectEqual(10, #gradient(foo)(0))
+  expectEqual(10, gradient(at: 0, in: foo))
 }
 
 var globalVar: Float = 10
@@ -72,18 +71,7 @@ SimpleMathTests.test("CaptureGlobal") {
     globalVar += 20
     return globalVar * x
   }
-  expectEqual(30, #gradient(foo)(0))
+  expectEqual(30, gradient(at: 0, in: foo))
 }
-
-// FIXME: Forced inlining through @_transparent doesn't work on differential
-// operators yet.
-//
-// SimpleMathTests.test("FunctionalDifferentialOperators") {
-//   let x: Float = 3
-//   let dydx = gradient(at: x) { x in
-//     x * x
-//   }
-//   expectEqual(6, dydx)
-// }
 
 runAllTests()

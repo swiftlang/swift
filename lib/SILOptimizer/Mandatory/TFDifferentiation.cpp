@@ -3544,7 +3544,8 @@ public:
     auto &builder = getBuilder();
     auto loc = remapLocation(ai->getLoc());
 
-    auto &nestedApplyActivities = getDifferentiationTask()->getNestedApplyActivities();
+    auto &nestedApplyActivities =
+        getDifferentiationTask()->getNestedApplyActivities();
     auto applyInfoLookUp = nestedApplyActivities.find(ai);
     // If no NestedApplyActivity was found, then this task doesn't need to be
     // differentiated.
@@ -3577,8 +3578,14 @@ public:
           loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
+      SILValue seedEltAddr;
+      if (auto tupleTy = seed.getType().getAs<TupleType>())
+        seedEltAddr = getBuilder().createTupleElementAddr(
+            loc, access, applyInfo.indices.source);
+      else
+        seedEltAddr = access;
       args.push_back(getBuilder().createLoad(
-          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
+          loc, seedEltAddr, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
 
@@ -3676,8 +3683,14 @@ public:
           loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
+      SILValue seedEltAddr;
+      if (auto tupleTy = seed.getType().getAs<TupleType>())
+        seedEltAddr = getBuilder().createTupleElementAddr(
+            loc, access, otherTask->getIndices().source);
+      else
+        seedEltAddr = access;
       args.push_back(getBuilder().createLoad(
-          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
+          loc, seedEltAddr, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
 
@@ -4024,7 +4037,8 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
     if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
       for (auto eltAndIdx : enumerate(val.getAggregateElements())) {
         auto idx = eltAndIdx.index();
-        auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
+        auto eltTy = SILType::getPrimitiveAddressType(
+            tupTy->getElementType(idx)->getCanonicalType());
         auto *eltBuf =
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
         materializeAdjointIndirectHelper(
