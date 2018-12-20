@@ -2740,17 +2740,7 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
   auto entryFnBaseName = graphFnNameForCaller;
   unsigned helperFuncId = 0;
   SmallVector<std::pair<StringRef, SILLocation>, 1> pendingGraphFnNames;
-  // SIL functions can be processed in non-deterministic ordering, so the
-  // ordering of device ids being inserted into `deviceInfo` is not
-  // deterministic either.
-  // To make sure we produced deterministic SIL code (e.g. produce graph
-  // function for CPU, before GPU), which is useful at least for unit testing,
-  // we sort the device IDs first.
-  SmallVector<DeviceId, 8> deviceIds(deviceInfo.getUsedDeviceIds().begin(),
-                                     deviceInfo.getUsedDeviceIds().end());
-  assert(!deviceIds.empty());
-  llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
-  for (auto deviceId : deviceIds) {
+  for (auto deviceId : deviceInfo.getUsedDeviceIds()) {
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceId);
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal

@@ -184,6 +184,47 @@ bool GraphFunctionDeviceInfo::isConfigOp(const GraphOperationInfo &opInfo) {
          opInfo.getOperationName() == "tfc.configureCPU";
 }
 
+void GraphFunctionDeviceInfo::finalizeUsedDevices() {
+  // In this edge case, all ops are placed on the ALL device (e.g. Const). In
+  // that case, usedDeviceIds should contain the RUNTIME device.
+  if (usedDeviceIds.empty()) {
+    primaryDeviceId = RuntimeDeviceId;
+    usedDeviceIds.insert(RuntimeDeviceId);
+    return;
+  }
+
+  // For device partitioning to work, the device set cannot include the RUNTIME
+  // device along with some other device(s). This is because we don't know what
+  // the RUNTIME device is at compile time, so we cannot create sends/recvs
+  // graph nodes.
+  if (usedDeviceIds.size() > 1 && usedDeviceIds.count(RuntimeDeviceId))
+    assert(0 && "Cannot yet handle a multi-device function involving the "
+                "RUNTIME device");
+
+  // SIL functions can be processed in non-deterministic ordering, so the
+  // ordering of device ids being inserted into `deviceInfo` is not
+  // deterministic either.
+  // To make sure we produced deterministic SIL code (e.g. produce graph
+  // function for CPU, before GPU), which is useful at least for unit testing,
+  // we sort the device IDs.
+  SmallVector<DeviceId, 8> deviceIds(usedDeviceIds.begin(),
+                                     usedDeviceIds.end());
+  assert(!deviceIds.empty());
+  llvm::array_pod_sort(deviceIds.begin(), deviceIds.end());
+  usedDeviceIds.clear();
+  usedDeviceIds.insert(deviceIds.begin(), deviceIds.end());
+
+  // Example scenario where the if condition below is true: we set primary
+  // device to GPU via compiler flag, but the swift function being processed
+  // here has placed all ops on CPU. In that case, we want to set primary
+  // device to CPU.
+  if (!usedDeviceIds.count(primaryDeviceId)) {
+    // For now pick an arbitrary used device as the primary. For optimized
+    // placement w.r.t the function args and return values, this might tuning.
+    primaryDeviceId = *usedDeviceIds.begin();
+  }
+}
+
 std::string GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice,
     llvm::ArrayRef<GraphOperationAttribute> attributes) {
@@ -220,7 +261,10 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
 
 GraphFunctionDeviceInfo::GraphFunctionDeviceInfo(DeviceId primaryDeviceId,
                                                  bool isTPUInfeedEnabled)
-    : primaryDeviceId(primaryDeviceId), isTPUInfeedEnabled(isTPUInfeedEnabled) {
+    // When `TFUseDeviceStack` is true, set `primaryDeviceId` in
+    // finalizeUsedDevices()
+    : primaryDeviceId(TFUseDeviceStack ? InvalidDeviceId : primaryDeviceId),
+      isTPUInfeedEnabled(isTPUInfeedEnabled) {
   assert(primaryDeviceId != AllDeviceId);
   if (!TFUseDeviceStack)
     usedDeviceIds.insert(primaryDeviceId);

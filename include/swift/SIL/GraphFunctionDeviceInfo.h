@@ -237,32 +237,7 @@ struct GraphFunctionDeviceInfo {
 
   // Must be called after caller has scanned all graph_ops in the SIL function
   // being processed, and called markDeviceUsed() on them.
-  void finalizeUsedDevices() {
-    // This is an edge case where we've only seen ops marked ALL_DEVICE
-    // (e.g. Const). In that case, usedDeviceIds should contain the RUNTIME
-    // device.
-    if (usedDeviceIds.empty()) {
-      primaryDeviceId = RuntimeDeviceId;
-      usedDeviceIds.insert(RuntimeDeviceId);
-      return;
-    }
-
-    if (usedDeviceIds.size() == 1) {
-      if (*usedDeviceIds.begin() == RuntimeDeviceId)
-        primaryDeviceId = RuntimeDeviceId;
-      return;
-    }
-
-    // For device partitioning to work, the device set cannot include the
-    // RUNTIME device along with some other device(s). This is because we don't
-    // know what the RUNTIME device is at compile time, so we cannot create
-    // sends/recvs graph nodes.
-    for (auto deviceId : usedDeviceIds) {
-      if (deviceId == RuntimeDeviceId)
-        assert(0 && "Cannot yet handle a multi-device function involving the "
-                    "RUNTIME device");
-    }
-  }
+  void finalizeUsedDevices();
 
   // Choose a device for the graphOpInst under construction and track the chosen
   // device in `usedDeviceIds`.
