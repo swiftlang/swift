@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck %s
 
 public func closureCaptureMutable() {
   var val: Float = 10

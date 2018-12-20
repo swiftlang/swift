@@ -84,6 +84,10 @@ class Type;
 
 /// Identifies a subset of a function's parameters.
 ///
+/// When a function is curried, identifies a subset of all parameters from all
+/// parameter lists. When differentiating such functions, we treat them as fully
+/// uncurried.
+///
 /// Works with AST-level function decls and types. Requires further lowering to
 /// work with SIL-level functions and types. (In particular, tuples must be
 /// exploded).
@@ -96,24 +100,28 @@ class AutoDiffParameterIndices : public llvm::FoldingSetNode {
   /// Bits corresponding to parameters in the set are "on", and bits
   /// corresponding to parameters not in the set are "off".
   ///
-  /// For non-method functions, the bits correspond to the function's
-  //// parameters in order. For example,
+  /// The bits correspond to the function's parameters in order. For example,
   ///
   ///   Function type: (A, B, C) -> R
   ///   Bits: [A][B][C]
   ///
-  /// For methods, the bits correspond to the function's non-self parameters
-  /// in order, followed by the function's self parameter. For example,
+  /// When the function is curried, the bits for the first parameter list come
+  /// last. For example,
+  ///
+  ///   Function type: (A, B) -> (C, D) -> R
+  ///   Bits: [C][D][A][B]
+  ///
+  /// Methods follow the same pattern:
   ///
   ///   Function type: (Self) -> (A, B, C) -> R
   ///   Bits: [A][B][C][Self]
   ///
-  const llvm::SmallBitVector indices;
+  const llvm::SmallBitVector parameters;
 
-  AutoDiffParameterIndices(llvm::SmallBitVector indices)
-      : indices(indices) {}
+  AutoDiffParameterIndices(llvm::SmallBitVector parameters)
+      : parameters(parameters) {}
 
-  static AutoDiffParameterIndices *get(llvm::SmallBitVector indices,
+  static AutoDiffParameterIndices *get(llvm::SmallBitVector parameters,
                                        ASTContext &C);
 
 public:
@@ -131,7 +139,7 @@ public:
   std::string getString() const;
 
   /// Tests whether this set of parameters is empty.
-  bool isEmpty() const { return indices.none(); }
+  bool isEmpty() const { return parameters.none(); }
 
   /// Pushes the subset's parameter's types to `paramTypes`, in the order in
   /// which they appear in the function type. For example,
@@ -140,23 +148,19 @@ public:
   ///   if "A" and "C" are in the set,
   ///   ==> pushes {A, C} to `paramTypes`.
   ///
+  ///   functionType = (A, B) -> (C, D) -> R
+  ///   if "A", "C", and "D" are in the set,
+  ///   ==> pushes {A, C, D} to `paramTypes`.
+  ///
   ///   functionType = (Self) -> (A, B, C) -> R
   ///   if "Self" and "C" are in the set,
   ///   ==> pushes {Self, C} to `paramTypes`.
   ///
-  /// Pass `isMethod = true` when the function is a method.
-  ///
-  /// Pass `selfUncurried = true` when the function type is for a method whose
-  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
-  ///
   void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes,
-                               bool isMethod,
-                               bool selfUncurried = false) const;
+                               SmallVectorImpl<Type> &paramTypes) const;
 
   /// Returns a bitvector for the SILFunction parameters corresponding to the
-  /// parameters in this set. In particular, this explodes tuples and puts the
-  /// method self parameter at the end. For example,
+  /// parameters in this set. In particular, this explodes tuples. For example,
   ///
   ///   functionType = (A, B, C) -> R
   ///   if "A" and "C" are in the set,
@@ -173,82 +177,59 @@ public:
   ///   ==> returns 1110
   ///   (because the lowered SIL type is (A, B, C, D) -> R)
   ///
-  /// Pass `isMethod = true` when the function is a method.
-  ///
-  /// Pass `selfUncurried = true` when the function type is for a method whose
-  /// self parameter has been uncurried as in (A, B, C, Self) -> R.
-  ///
-  llvm::SmallBitVector getLowered(AnyFunctionType *functionType,
-                                  bool isMethod,
-                                  bool selfUncurried = false) const;
+  llvm::SmallBitVector getLowered(AnyFunctionType *functionType) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    ID.AddInteger(indices.size());
-    for (unsigned setBit : indices.set_bits())
+    ID.AddInteger(parameters.size());
+    for (unsigned setBit : parameters.set_bits())
       ID.AddInteger(setBit);
   }
 };
 
 /// Builder for `AutoDiffParameterIndices`.
 class AutoDiffParameterIndicesBuilder {
-  llvm::SmallBitVector indices;
-  bool isMethod;
-
-  unsigned getNumNonSelfParameters() const;
+  llvm::SmallBitVector parameters;
 
 public:
   /// Start building an `AutoDiffParameterIndices` for the given function type.
-  /// `isMethod` specifies whether to treat the function as a method.
-  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType, bool isMethod,
+  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType,
                                   bool setAllParams = false);
 
   /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
   /// one if it has already been allocated in the `ASTContext`.
   AutoDiffParameterIndices *build(ASTContext &C) const;
 
-  /// Adds the indexed parameter to the set. When `isMethod` is not set,
-  /// the indices index into the first parameter list. For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   paramIndex = 0
-  ///   ==> adds "A" to the set.
-  ///
-  /// When `isMethod` is set, the indices index into the first non-self
-  /// parameter list. For example,
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   paramIndex = 0
-  ///   ==> adds "A" to the set.
-  ///
-  void setNonSelfParameter(unsigned parameterIndex);
+  /// Sets the parameter at `parameterIndex`. See
+  /// `AutoDiffParameterIndices::parameters` for documentation about the order.
+  void setParameter(unsigned parameterIndex);
 
-  /// Adds all the paramaters from the first non-self parameter list to the set.
-  /// For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   ==> adds "A", B", and "C" to the set.
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   ==> adds "A", B", and "C" to the set.
-  ///
-  void setAllNonSelfParameters();
-
-  /// Adds the self parameter to the set. `isMethod` must be set. For
-  /// example,
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   ==> adds "Self" to the set
-  ///
-  void setSelfParameter();
+  /// Returns the number of parameters.
+  unsigned size() { return parameters.size(); }
 };
 
 /// SIL-level automatic differentiation indices. Consists of a source index,
 /// i.e. index of the dependent result to differentiate from, and parameter
 /// indices, i.e. index of independent parameters to differentiate with
 /// respect to.
+///
+/// When a function is curried, parameter indices can refer to parameters from
+/// all parameter lists. When differentiating such functions, we treat them as
+/// fully uncurried.
 struct SILAutoDiffIndices {
   /// The index of the dependent result to differentiate from.
   unsigned source;
-  /// Indices of independent parameters to differentiate with respect to.
+  /// Independent parameters to differentiate with respect to. The bits
+  /// correspond to the function's parameters in order. For example,
+  ///
+  ///   Function type: (A, B, C) -> R
+  ///   Bits: [A][B][C]
+  ///
+  /// When the function is curried, the bits for the first parameter list come
+  /// last. For example,
+  ///
+  ///   Function type: (A, B) -> (C, D) -> R
+  ///   Bits: [C][D][A][B]
+  ///
   llvm::SmallBitVector parameters;
 
   /// Creates a set of AD indices from the given source index and a bit vector
@@ -445,6 +426,14 @@ getOffsetForAutoDiffAssociatedFunction(unsigned order,
 
 unsigned
 getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
+
+// Retrieve config from the function name of a variant of
+// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+// Returns true if the function name is parsed successfully.
+bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
+                                   AutoDiffAssociatedFunctionKind &kind,
+                                   unsigned &arity, unsigned &order,
+                                   bool &rethrows, bool &isMethod);
 } // end namespace autodiff
 
 class BuiltinFloatType;

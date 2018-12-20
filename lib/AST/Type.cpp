@@ -4109,7 +4109,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   // Compute the return type of the adjoint.
   SmallVector<TupleTypeElt, 8> retElts;
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod);
+  indices->getSubsetParameterTypes(this, wrtParamTypes);
   for (auto wrtParamType : wrtParamTypes)
     retElts.push_back(wrtParamType);
 
@@ -4159,7 +4159,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance, bool isMethod, bool selfUncurried) {
+    LookupConformanceFn lookupConformance) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4222,15 +4222,17 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   };
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(this, wrtParamTypes, isMethod,
-                                   selfUncurried);
+  indices->getSubsetParameterTypes(this, wrtParamTypes);
 
-  // If this is a method, unwrap the function type so that we can see the
-  // non-self parameters and the final result.
-  AnyFunctionType *unwrapped = this;
-  if (isMethod && !selfUncurried)
-    unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
-  Type originalResult = unwrapped->getResult();
+  // Unwrap curry levels.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  while (currentLevel != nullptr) {
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  Type originalResult = curryLevels.back()->getResult();
 
   // Build the closure type, which is different depending on whether this is a
   // JVP or VJP.
@@ -4295,14 +4297,15 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   retElts.push_back(originalResult);
   retElts.push_back(closure);
   auto retTy = TupleType::get(retElts, ctx);
-  auto *associatedFunction =
-      makeFunctionType(unwrapped, unwrapped->getParams(), retTy);
+  auto *associatedFunction = makeFunctionType(
+      curryLevels.back(), curryLevels.back()->getParams(), retTy);
 
-  // If this is a method, wrap the associated function type in an additional
-  // "(Self) ->" curry level.
-  if (isMethod && !selfUncurried)
-    associatedFunction =
-        makeFunctionType(this, getParams(), associatedFunction);
+  // Wrap the associated function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
+    associatedFunction = makeFunctionType(
+        curryLevel, curryLevel->getParams(), associatedFunction);
 
   return associatedFunction;
 }

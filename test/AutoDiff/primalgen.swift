@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck %s
 
 @inline(never)
 func print<T>(_ x: T) {

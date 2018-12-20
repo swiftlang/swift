@@ -55,8 +55,8 @@ using llvm::SmallDenseSet;
 using llvm::SmallSet;
 
 static llvm::cl::opt<bool> DifferentiationUseVJP(
-    "differentiation-use-vjp", llvm::cl::init(false),
-    llvm::cl::desc("Use the VJP during differentiation"));
+    "differentiation-use-vjp", llvm::cl::init(true),
+    llvm::cl::desc("Use the VJP to differentiate function applications"));
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -1656,15 +1656,18 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
   return nullptr;
 }
 
-/// Emits a reference to a VJP corresponding to `original`, differentiated with
-/// `indices`. On failure, returns a null `SILValue`.
+/// Emits a reference to the VJP of `original`, differentiated with respect to a
+/// superset of `desiredIndices`. Returns the `SILValue` for the VJP and the
+/// actual indices that the VJP is with respect to.
+///
+/// On failure, returns `None`.
 ///
 /// Creates new differentiation tasks, if necessary, using `invoker` as the
 /// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
 /// `taskCallback` for already-existing tasks), so that the caller can make sure
 /// that the task actually gets executed.
-static SILValue emitVJPReference(
-    ADContext &context, SILBuilder &builder, SILAutoDiffIndices indices,
+static Optional<std::pair<SILValue, SILAutoDiffIndices>> emitVJPReference(
+    ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
     SILValue original, DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
@@ -1676,11 +1679,13 @@ static SILValue emitVJPReference(
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunction();
     auto *task = context.lookUpOrRegisterDifferentiationTask(originalFn,
-                                                             indices, invoker);
+                                                             desiredIndices,
+                                                             invoker);
     taskCallback(task);
     auto *vjpRef = builder.createFunctionRef(loc, task->getVJP());
-    return reapplyFunctionConversion(vjpRef, originalFRI, original, builder,
-                                     loc);
+    auto convertedVJPRef = reapplyFunctionConversion(vjpRef, originalFRI,
+                                                     original, builder, loc);
+    return std::make_pair(convertedVJPRef, task->getIndices());
   }
   if (auto *witnessMethod = findWitnessMethod(original)) {
     auto loc = witnessMethod->getLoc();
@@ -1692,25 +1697,23 @@ static SILValue emitVJPReference(
       // TODO: If we move diagnostics into this function, then we can tell the
       // user that differentiation failed because the requirement is not
       // differentiable.
-      return SILValue();
+      return None;
     }
 
     // Check that the requirement indices are the same as the desired indices.
     auto *requirementParameterIndices = diffAttr->getCheckedParameterIndices();
     auto loweredRequirementIndices = requirementParameterIndices->getLowered(
-        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>(),
-        /*isMethod*/ true);
-    SILAutoDiffIndices requirementIndices(/*source*/ 0, loweredRequirementIndices);
+        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
+    SILAutoDiffIndices requirementIndices(/*source*/ 0,
+                                          loweredRequirementIndices);
 
-    // TODO:
-    // If we desire a superset of the available indices, then we should emit a
-    // diagnostic that the requirement can't be differentiated as much as we
-    // want.
-    // If we desire a subset of the available indices, then we should
-    // automatically convert the VJP to a VJP with the desired indices.
-    assert(requirementIndices == indices &&
-           "FIXME: handle the case where the requirement indices are "
-           "different from the desired indices.");
+    if (desiredIndices.source != requirementIndices.source ||
+        desiredIndices.parameters.test(requirementIndices.parameters)) {
+      // TODO: If we move diagnostics into this function, then we can tell the
+      // user that differentiation failed because the requirement isn't
+      // differentiable with respect to the right indices.
+      return None;
+    }
 
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto vjpType = originalType->getAutoDiffAssociatedFunctionType(
@@ -1727,12 +1730,14 @@ static SILValue emitVJPReference(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirement.asAutoDiffAssociatedFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(vjpType));
-
-    return reapplyFunctionConversion(vjpRef, witnessMethod, original, builder,
-                                     loc);
+    auto convertedVJPRef = reapplyFunctionConversion(vjpRef, witnessMethod,
+                                                     original, builder, loc);
+    return std::make_pair(convertedVJPRef, requirementIndices);
   }
 
-  return SILValue();
+  // TODO: If we move diagnostics into this function, then we can tell the
+  // user that differentiation failed because the function is opaque.
+  return None;
 }
 
 /// Create a builtin floating point value. The specified type must be a builtin
@@ -2111,8 +2116,9 @@ public:
   bool run();
 
 protected:
-  /// Get the primal, and lazily schedule a task to synthesize its body.
-  SILFunction *lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task);
+  /// If the task needs primal synthesis, and if primal synthesis for the task
+  /// hasn't been scheduled yet, then schedule primal synthesis.
+  void schedulePrimalSynthesisIfNeeded(DifferentiationTask *task);
 
 private:
   /// Processes a synthesis item. Returns true if any error occurs.
@@ -2565,20 +2571,24 @@ public:
 
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
-    getDifferentiationTask()->getNestedApplyActivities().insert({ai,
-                                                                 {indices}});
 
-    auto vjp = emitVJPReference(
+    // Emit the VJP.
+    auto vjpAndVJPIndices = emitVJPReference(
         context, builder, indices, getMappedValue(ai->getCallee()),
         /*invoker*/ {ai, synthesis.task},
         [&](DifferentiationTask *newTask) {
-           primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
+           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
-    if (!vjp) {
+    if (!vjpAndVJPIndices) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
+    auto vjp = vjpAndVJPIndices->first;
+
+    // Record the VJP's indices.
+    getDifferentiationTask()->getNestedApplyActivities().insert(
+        {ai, {vjpAndVJPIndices->second}});
 
     // Call the VJP using the original parameters.
     SmallVector<SILValue, 8> newArgs;
@@ -2688,7 +2698,16 @@ public:
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
     // Get the primal function from the task. If the task was newly created,
     // then we need to schedule a synthesis item for the primal.
-    auto *primalFn = primalGen.lookUpPrimalAndMaybeScheduleSynthesis(newTask);
+    primalGen.schedulePrimalSynthesisIfNeeded(newTask);
+    auto *primalFn = newTask->getPrimal();
+    if (!primalFn) {
+      // This happens when the function has a custom VJP (which suppresses
+      // primal synthesis and adjoint synthesis).
+      context.emitNondifferentiabilityError(
+          ai, synthesis.task, diag::autodiff_no_synthesized_primal_or_adjoint);
+      errorOccurred = true;
+      return;
+    }
     // Now that we have the primal, get ready to call it.
     // But before calling it, we need to convert the primal function like how
     // the original function is converted.
@@ -2844,25 +2863,21 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   return cloner.run();
 }
 
-SILFunction *
-PrimalGen::lookUpPrimalAndMaybeScheduleSynthesis(DifferentiationTask *task) {
-  auto *primal = task->getPrimal();
-  assert(primal && "requesting primal from task without primal");
-
+void PrimalGen::schedulePrimalSynthesisIfNeeded(DifferentiationTask *task) {
   if (task->getPrimalSynthesisState() == FunctionSynthesisState::Needed) {
+    auto *primal = task->getPrimal();
+    assert(primal);
     FunctionSynthesisItem synthesis{task->getOriginal(), primal,
                                     task->getIndices(), task};
     worklist.push_back(synthesis);
     task->setPrimalSynthesisState(FunctionSynthesisState::Pending);
   }
-
-  return primal;
 }
 
 bool PrimalGen::run() {
   // Push everything to the list of primal synthesis items.
   for (auto &task : context.getDifferentiationTasks())
-    lookUpPrimalAndMaybeScheduleSynthesis(task.get());
+    schedulePrimalSynthesisIfNeeded(task.get());
   // Process each item until empty.
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
@@ -3105,20 +3120,13 @@ private:
   SmallVector<std::pair<SILInstruction *, SILInstruction *>, 8>
       scopeMarkingInstructions;
 
-  SmallPtrSet<SILValue, 32> mapped;
-
   SILFunction &getOriginal() { return getBuilder().getFunction(); }
 
 public:
   AdjointRematCloner(SILFunction &fn) : SILClonerWithScopes(fn) {}
 
-  void mapValue(SILValue origValue, SILValue mappedValue) {
-    SILClonerWithScopes::mapValue(origValue, mappedValue);
-    mapped.insert(origValue);
-  }
-
   SILValue lookUpValue(SILValue valueInOriginal) {
-    if (!mapped.count(valueInOriginal))
+    if (!isValueCloned(valueInOriginal))
       return nullptr;
     return getMappedValue(valueInOriginal);
   }
@@ -4333,6 +4341,13 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
   if (attr->hasVJP())
     vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
 
+  if (vjp) {
+    // If we already have the vjp, then we don't need to synthesize anything.
+    primalSynthesisState = FunctionSynthesisState::NotNeeded;
+    adjointSynthesisState = FunctionSynthesisState::NotNeeded;
+    return;
+  }
+
   if (adjoint) {
     // If we already have an adjoint, then we don't need to synthesize the
     // primal or the adjoint.
@@ -4343,17 +4358,13 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
            "[differentiable] attr without adjoint should not have primal");
 
     // We don't have the primal or adjoint, so we need to synthesize them.
-    // TODO: Once the AD pass uses VJP, we don't need to synthesize primal or
-    // adjoint if VJP exists.
     primalSynthesisState = FunctionSynthesisState::Needed;
     adjointSynthesisState = FunctionSynthesisState::Needed;
     createEmptyPrimal();
     createEmptyAdjoint();
   }
 
-  // If there is no VJP, synthesize it.
-  if (!vjp)
-    createVJP();
+  createVJP();
 }
 
 void DifferentiationTask::createEmptyPrimal() {
@@ -4793,11 +4804,11 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
                            getModule());
   }
 
-  auto finalVJP = emitVJPReference(
-      context, builder, SILAutoDiffIndices(0, adfi->getParameterIndices()),
-      origFnOperand, DifferentiationInvoker(adfi),
-      [](DifferentiationTask *newTask) {});
-  if (!finalVJP) {
+  SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
+  auto finalVJPAndVJPIndices = emitVJPReference(
+      context, builder, desiredIndices, origFnOperand,
+      DifferentiationInvoker(adfi), [](DifferentiationTask *newTask) {});
+  if (!finalVJPAndVJPIndices) {
     // Find the original differential operator expression. Show an error at the
     // operator, highlight the argument, and show a note at the definition site
     // of the argument.
@@ -4807,6 +4818,10 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
           .highlight(expr->getSubExpr()->getSourceRange());
     return true;
   }
+  assert(finalVJPAndVJPIndices->second == desiredIndices &&
+         "FIXME: We could emit a thunk that converts the VJP to have the "
+         "desired indices.");
+  auto finalVJP = finalVJPAndVJPIndices->first;
 
   auto loc = parent->getLocation();
   auto *newADFI = builder.createAutoDiffFunction(

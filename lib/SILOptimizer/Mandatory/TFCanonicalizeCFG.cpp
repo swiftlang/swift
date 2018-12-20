@@ -410,18 +410,15 @@ public:
   }
 
   SILValue getMappedValue(SILValue Value) {
-    auto VI = ValueMap.find(Value);
-    if (VI != ValueMap.end())
-      return VI->second;
+    if (isValueCloned(Value))
+      return SILClonerWithScopes<BasicBlockCloner>::getMappedValue(Value);
     return Value;
   }
 
   /// Update ValueMap so that occurrences of `oldValue` are replaced with
   /// `newValue` when cloning.
   void updateValueMap(SILValue oldValue, SILValue newValue)  {
-    auto emplaceResult = ValueMap.try_emplace(oldValue, newValue);
-    assert(emplaceResult.second && "Updating the same key in ValueMap multiple "
-                                   "times during SESE cloning.");
+    mapValue(oldValue, newValue);
   }
 
   /// Utility to unroll one iteration of the loop or to clone the entire loop.
@@ -530,8 +527,9 @@ private:
     for (auto *arg : bb->getArguments()) {
       // Create a new argument and copy it into the ValueMap so future
       // references use it.
-      ValueMap[arg] = newBB->createPhiArgument(
-          arg->getType(), arg->getOwnershipKind(), arg->getDecl());
+      updateValueMap(arg, newBB->createPhiArgument(arg->getType(),
+                                                   arg->getOwnershipKind(),
+                                                   arg->getDecl()));
     }
     return newBB;
   }

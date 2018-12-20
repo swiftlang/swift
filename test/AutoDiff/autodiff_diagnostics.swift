@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-use-vjp=false %s
 
 //===----------------------------------------------------------------------===//
 // Top-level (before primal/adjoint synthesis)

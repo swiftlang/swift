@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -differentiation-use-vjp -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck %s
 
 @differentiable(reverse, adjoint: adjointId)
 func id(_ x: Float) -> Float {

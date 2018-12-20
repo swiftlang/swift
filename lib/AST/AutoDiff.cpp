@@ -67,17 +67,56 @@ autodiff::getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder) {
   return differentiationOrder * 2;
 }
 
-/// If `isMethod` is true, returns the non-self part of `functionType`. (e.g.
-/// "(Self) -> (A, B) -> R" becomes "(A, B) -> R"). Otherwise, returns
-/// `functionType` unmodified.
-static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
-                                            bool isMethod) {
-  if (isMethod) {
-    assert(functionType->getNumParams() == 1 &&
-           "unexpected num params for method");
-    return functionType->getResult()->castTo<AnyFunctionType>();
+bool autodiff::getBuiltinAutoDiffApplyConfig(
+    StringRef operationName, AutoDiffAssociatedFunctionKind &kind,
+    unsigned &arity, unsigned &order, bool &rethrows, bool &isMethod) {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!operationName.startswith("autodiffApply_"))
+    return false;
+  operationName = operationName.drop_front(strlen("autodiffApply_"));
+  // Parse 'jvp' or 'vjp'.
+  if (operationName.startswith("jvp"))
+    kind = AutoDiffAssociatedFunctionKind::JVP;
+  else if (operationName.startswith("vjp"))
+    kind = AutoDiffAssociatedFunctionKind::VJP;
+  operationName = operationName.drop_front(3);
+  // Parse '_arity'.
+  if (operationName.startswith("_arity")) {
+    operationName = operationName.drop_front(strlen("_arity"));
+    auto arityStr = operationName.take_while(llvm::isDigit);
+    operationName = operationName.drop_front(arityStr.size());
+    auto converted = llvm::to_integer(arityStr, arity);
+    assert(converted); (void)converted;
+    assert(arity > 0);
+  } else {
+    arity = 1;
   }
-  return functionType;
+  // Parse '_order'.
+  if (operationName.startswith("_order")) {
+    operationName = operationName.drop_front(strlen("_order"));
+    auto orderStr = operationName.take_while(llvm::isDigit);
+    auto converted = llvm::to_integer(orderStr, order);
+    operationName = operationName.drop_front(orderStr.size());
+    assert(converted); (void)converted;
+    assert(order > 0);
+  } else {
+    order = 1;
+  }
+  // Parse '_rethrows'.
+  if (operationName.startswith("_rethrows")) {
+    operationName = operationName.drop_front(strlen("_rethrows"));
+    rethrows = true;
+  } else {
+    rethrows = false;
+  }
+  // Parse '_method'.
+  if (operationName.startswith("_method")) {
+    operationName = operationName.drop_front(strlen("_method"));
+    isMethod = true;
+  } else {
+    isMethod = false;
+  }
+  return operationName.empty();
 }
 
 /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
@@ -88,15 +127,15 @@ AutoDiffParameterIndices::create(ASTContext &C, StringRef string) {
   if (string.size() < 1)
     return nullptr;
 
-  llvm::SmallBitVector indices(string.size());
-  for (unsigned i : range(indices.size())) {
+  llvm::SmallBitVector parameters(string.size());
+  for (unsigned i : range(parameters.size())) {
     if (string[i] == 'S')
-      indices.set(i);
+      parameters.set(i);
     else if (string[i] != 'U')
       return nullptr;
   }
 
-  return get(indices, C);
+  return get(parameters, C);
 }
 
 /// Returns a textual string description of these indices,
@@ -107,13 +146,21 @@ AutoDiffParameterIndices::create(ASTContext &C, StringRef string) {
 /// "U" means that the corresponding index is unset
 std::string AutoDiffParameterIndices::getString() const {
   std::string result;
-  for (unsigned i : range(indices.size())) {
-    if (indices[i])
+  for (unsigned i : range(parameters.size())) {
+    if (parameters[i])
       result += "S";
     else
       result += "U";
   }
   return result;
+}
+
+static void unwrapCurryLevels(AnyFunctionType *fnTy,
+                              SmallVectorImpl<AnyFunctionType *> &result) {
+  while (fnTy != nullptr) {
+    result.push_back(fnTy);
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
 }
 
 /// Pushes the subset's parameter's types to `paramTypes`, in the order in
@@ -123,31 +170,34 @@ std::string AutoDiffParameterIndices::getString() const {
 ///   if "A" and "C" are in the set,
 ///   ==> pushes {A, C} to `paramTypes`.
 ///
+///   functionType = (A, B) -> (C, D) -> R
+///   if "A", "C", and "D" are in the set,
+///   ==> pushes {A, C, D} to `paramTypes`.
+///
 ///   functionType = (Self) -> (A, B, C) -> R
 ///   if "Self" and "C" are in the set,
 ///   ==> pushes {Self, C} to `paramTypes`.
 ///
-/// Pass `isMethod = true` when the function is a method.
-///
-/// Pass `selfUncurried = true` when the function type is for a method whose
-/// self parameter has been uncurried as in (A, B, C, Self) -> R.
-///
 void AutoDiffParameterIndices::getSubsetParameterTypes(
-    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes,
-    bool isMethod, bool selfUncurried) const {
-  if (selfUncurried && isMethod) {
-    if (isMethod && indices[indices.size() - 1])
-      paramTypes.push_back(functionType->getParams()[functionType->getNumParams() - 1].getPlainType());
-    for (unsigned paramIndex : range(functionType->getNumParams() - 1))
-      if (indices[paramIndex])
-        paramTypes.push_back(functionType->getParams()[paramIndex].getPlainType());
-  } else {
-    AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethod);
-    if (isMethod && indices[indices.size() - 1])
-      paramTypes.push_back(functionType->getParams()[0].getPlainType());
-    for (unsigned paramIndex : range(unwrapped->getNumParams()))
-      if (indices[paramIndex])
-        paramTypes.push_back(unwrapped->getParams()[paramIndex].getPlainType());
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes) const {
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  unwrapCurryLevels(functionType, curryLevels);
+
+  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
+  unsigned currentOffset = 0;
+  for (unsigned curryLevelIndex : reversed(indices(curryLevels))) {
+    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
+    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
+  }
+
+  for (unsigned curryLevelIndex : indices(curryLevels)) {
+    auto *curryLevel = curryLevels[curryLevelIndex];
+    unsigned parameterIndexOffset =
+        curryLevelParameterIndexOffsets[curryLevelIndex];
+    for (unsigned paramIndex : range(curryLevel->getNumParams()))
+      if (parameters[parameterIndexOffset + paramIndex])
+        paramTypes.push_back(
+            curryLevel->getParams()[paramIndex].getPlainType());
   }
 }
 
@@ -161,8 +211,7 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 }
 
 /// Returns a bitvector for the SILFunction parameters corresponding to the
-/// parameters in this set. In particular, this explodes tuples and puts the
-/// method self parameter at the end. For example,
+/// parameters in this set. In particular, this explodes tuples. For example,
 ///
 ///   functionType = (A, B, C) -> R
 ///   if "A" and "C" are in the set,
@@ -179,18 +228,12 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 ///   ==> returns 1110
 ///   (because the lowered SIL type is (A, B, C, D) -> R)
 ///
-/// Pass `isMethod = true` when the function is a method.
-///
-/// Pass `selfUncurried = true` when the function type is a for method whose
-/// self parameter has been uncurried as in (A, B, C, Self) -> R.
-///
 llvm::SmallBitVector
-AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
-                                     bool isMethod, bool selfUncurried) const {
+AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  unwrapCurryLevels(functionType, curryLevels);
+
   // Calculate the lowered sizes of all the parameters.
-  AnyFunctionType *unwrapped = selfUncurried
-      ? functionType
-      : unwrapSelfParameter(functionType, isMethod);
   SmallVector<unsigned, 8> paramLoweredSizes;
   unsigned totalLoweredSize = 0;
   auto addLoweredParamInfo = [&](Type type) {
@@ -198,18 +241,17 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
     paramLoweredSizes.push_back(paramLoweredSize);
     totalLoweredSize += paramLoweredSize;
   };
-  for (auto &param : unwrapped->getParams())
-    addLoweredParamInfo(param.getPlainType());
-  if (isMethod && !selfUncurried)
-    addLoweredParamInfo(functionType->getParams()[0].getPlainType());
+  for (auto *curryLevel : reversed(curryLevels))
+    for (auto &param : curryLevel->getParams())
+      addLoweredParamInfo(param.getPlainType());
 
   // Construct the result by setting each range of bits that corresponds to each
   // "on" parameter.
   llvm::SmallBitVector result(totalLoweredSize);
   unsigned currentBitIndex = 0;
-  for (unsigned i : range(indices.size())) {
+  for (unsigned i : range(parameters.size())) {
     auto paramLoweredSize = paramLoweredSizes[i];
-    if (indices[i])
+    if (parameters[i])
       result.set(currentBitIndex, currentBitIndex + paramLoweredSize);
     currentBitIndex += paramLoweredSize;
   }
@@ -217,68 +259,26 @@ AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType,
   return result;
 }
 
-static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *functionType,
-                                               bool isMethod) {
-  return unwrapSelfParameter(functionType, isMethod)->getNumParams() +
-         (isMethod ? 1 : 0);
-}
-
-unsigned AutoDiffParameterIndicesBuilder::getNumNonSelfParameters() const {
-  return indices.size() - (isMethod ? 1 : 0);
+static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
+  unsigned numAutoDiffParameterIndices = 0;
+  while (fnTy != nullptr) {
+    numAutoDiffParameterIndices += fnTy->getNumParams();
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
+  return numAutoDiffParameterIndices;
 }
 
 AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
-    AnyFunctionType *functionType, bool isMethod, bool setAllParams) :
-    indices(getNumAutoDiffParameterIndices(functionType, isMethod),
-            setAllParams),
-    isMethod(isMethod) {
+    AnyFunctionType *functionType, bool setAllParams) :
+    parameters(getNumAutoDiffParameterIndices(functionType), setAllParams) {
 }
 
 AutoDiffParameterIndices *
 AutoDiffParameterIndicesBuilder::build(ASTContext &C) const {
-  return AutoDiffParameterIndices::get(indices, C);
+  return AutoDiffParameterIndices::get(parameters, C);
 }
 
-/// Adds the indexed parameter to the set. When `isMethod` is not set, the
-/// indices index into the first parameter list. For example,
-///
-///   functionType = (A, B, C) -> R
-///   paramIndex = 0
-///   ==> adds "A" to the set.
-///
-/// When `isMethod` is set, the indices index into the first non-self
-/// parameter list. For example,
-///
-///   functionType = (Self) -> (A, B, C) -> R
-///   paramIndex = 0
-///   ==> adds "A" to the set.
-///
-void AutoDiffParameterIndicesBuilder::setNonSelfParameter(unsigned paramIndex) {
-  assert(paramIndex < getNumNonSelfParameters() && "paramIndex out of bounds");
-  indices.set(paramIndex);
-}
-
-/// Adds all the paramaters from the first non-self parameter list to the set.
-/// For example,
-///
-///   functionType = (A, B, C) -> R
-///   ==> adds "A", B", and "C" to the set.
-///
-///   functionType = (Self) -> (A, B, C) -> R
-///   ==> adds "A", B", and "C" to the set.
-///
-void AutoDiffParameterIndicesBuilder::setAllNonSelfParameters() {
-  indices.set(0, getNumNonSelfParameters());
-}
-
-/// Adds the self parameter to the set. `isMethod` must be set. For
-/// example,
-///
-///   functionType = (Self) -> (A, B, C) -> R
-///   ==> adds "Self" to the set
-///
-void AutoDiffParameterIndicesBuilder::setSelfParameter() {
-  assert(isMethod &&
-         "trying to add self param to non-method parameter indices");
-  indices.set(indices.size() - 1);
+void AutoDiffParameterIndicesBuilder::setParameter(unsigned paramIndex) {
+  assert(paramIndex < parameters.size() && "paramIndex out of bounds");
+  parameters.set(paramIndex);
 }

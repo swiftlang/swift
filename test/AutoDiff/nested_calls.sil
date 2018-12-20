@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -differentiation-use-vjp -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck -check-prefix=CHECK-VJP %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck -check-prefix=CHECK-NOVJP %s
 
 import Builtin
 import Swift
@@ -44,89 +45,183 @@ bb0(%0 : @trivial $Float):
   return %6 : $Float
 }
 
-// CHECK-LABEL: struct AD__func_to_diff__Type__src_0_wrt_0 {
-// CHECK-NEXT:   @sil_stored var v_0: Float
-// CHECK-NEXT:   @sil_stored var pullback_0: (Float) -> Float
-// CHECK-NEXT: }
+// CHECK-VJP-LABEL: struct AD__func_to_diff__Type__src_0_wrt_0 {
+// CHECK-VJP-NEXT:   @sil_stored var v_0: Float
+// CHECK-VJP-NEXT:   @sil_stored var pullback_0: (Float) -> Float
+// CHECK-VJP-NEXT: }
 
-// CHECK-LABEL: struct AD__nested_func_without_diffattr__Type__src_0_wrt_0 {
-// CHECK-NEXT:   @sil_stored var v_0: Float
-// CHECK-NEXT:   @sil_stored var pullback_0: (Float) -> Float
-// CHECK-NEXT: }
+// CHECK-VJP-LABEL: struct AD__nested_func_without_diffattr__Type__src_0_wrt_0 {
+// CHECK-VJP-NEXT:   @sil_stored var v_0: Float
+// CHECK-VJP-NEXT:   @sil_stored var pullback_0: (Float) -> Float
+// CHECK-VJP-NEXT: }
 
-// CHECK-LABEL: @foo_prim : $@convention(thin) (Float) -> (Float, Float) {
-// CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = tuple (%0 : $Float, %0 : $Float)
-// CHECK:   return %1 : $(Float, Float)
-// CHECK: }
+// CHECK-VJP-LABEL: @foo_prim : $@convention(thin) (Float) -> (Float, Float) {
+// CHECK-VJP: bb0(%0 : $Float):
+// CHECK-VJP:   %1 = tuple (%0 : $Float, %0 : $Float)
+// CHECK-VJP:   return %1 : $(Float, Float)
+// CHECK-VJP: }
 
-// CHECK-LABEL: @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float):
-// CHECK:   return %0 : $Float
-// CHECK: }
+// CHECK-VJP-LABEL: @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float {
+// CHECK-VJP: bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float):
+// CHECK-VJP:   return %0 : $Float
+// CHECK-VJP: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
 
-// CHECK-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
 
-// CHECK-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
-// CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = function_ref @AD__nested_func_without_diffattr__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
-// CHECK:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
-// CHECK:   %5 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
-// CHECK:   %6 = apply %5(%3) : $@convention(thin) (Float) -> Float
-// CHECK:   %7 = tuple (%3 : $Float, %3 : $Float)
-// CHECK:   %8 = tuple_extract %7 : $(Float, Float), 0
-// CHECK:   %9 = struct $AD__func_to_diff__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
-// CHECK:   %10 = tuple (%9 : $AD__func_to_diff__Type__src_0_wrt_0, %8 : $Float)
-// CHECK:   return %10 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
-// CHECK: }
+// CHECK-VJP-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
+// CHECK-VJP: bb0(%0 : $Float):
+// CHECK-VJP:   %1 = function_ref @AD__nested_func_without_diffattr__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
+// CHECK-VJP:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
+// CHECK-VJP:   %5 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK-VJP:   %6 = apply %5(%3) : $@convention(thin) (Float) -> Float
+// CHECK-VJP:   %7 = tuple (%3 : $Float, %3 : $Float)
+// CHECK-VJP:   %8 = tuple_extract %7 : $(Float, Float), 0
+// CHECK-VJP:   %9 = struct $AD__func_to_diff__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %10 = tuple (%9 : $AD__func_to_diff__Type__src_0_wrt_0, %8 : $Float)
+// CHECK-VJP:   return %10 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
+// CHECK-VJP: }
 
-// CHECK-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
-// CHECK:   %4 = struct_extract %1 : $AD__func_to_diff__Type__src_0_wrt_0, #AD__func_to_diff__Type__src_0_wrt_0.pullback_0
-// CHECK:   %5 = alloc_stack $Float
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
-// CHECK:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
-// CHECK:   store %0 to %7 : $*Float
-// CHECK:   end_access %7 : $*Float
-// CHECK:   end_access %6 : $*Float
-// CHECK:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
-// CHECK:   %12 = load %11 : $*Float
-// CHECK:   end_access %11 : $*Float
-// CHECK:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
-// CHECK:   dealloc_stack %5 : $*Float
-// CHECK:   return %14 : $Float
-// CHECK: }
+// CHECK-VJP-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK-VJP: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
+// CHECK-VJP:   %4 = struct_extract %1 : $AD__func_to_diff__Type__src_0_wrt_0, #AD__func_to_diff__Type__src_0_wrt_0.pullback_0
+// CHECK-VJP:   %5 = alloc_stack $Float
+// CHECK-VJP:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-VJP:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
+// CHECK-VJP:   store %0 to %7 : $*Float
+// CHECK-VJP:   end_access %7 : $*Float
+// CHECK-VJP:   end_access %6 : $*Float
+// CHECK-VJP:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-VJP:   %12 = load %11 : $*Float
+// CHECK-VJP:   end_access %11 : $*Float
+// CHECK-VJP:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
+// CHECK-VJP:   dealloc_stack %5 : $*Float
+// CHECK-VJP:   return %14 : $Float
+// CHECK-VJP: }
 
-// CHECK-LABEL: @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
-// CHECK: bb0(%0 : $Float):
-// CHECK:   %1 = function_ref @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
-// CHECK:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
-// CHECK:   %5 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
-// CHECK:   %6 = tuple (%5 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %3 : $Float)
-// CHECK:   return %6 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
-// CHECK: }
+// CHECK-VJP-LABEL: @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
+// CHECK-VJP: bb0(%0 : $Float):
+// CHECK-VJP:   %1 = function_ref @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %3 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 0
+// CHECK-VJP:   %4 = tuple_extract %2 : $(Float, @callee_guaranteed (Float) -> Float), 1
+// CHECK-VJP:   %5 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%3 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
+// CHECK-VJP:   %6 = tuple (%5 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %3 : $Float)
+// CHECK-VJP:   return %6 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
+// CHECK-VJP: }
 
-// CHECK-LABEL: @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {
-// CHECK: bb0(%0 : $Float, %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
-// CHECK:   %4 = struct_extract %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, #AD__nested_func_without_diffattr__Type__src_0_wrt_0.pullback_0
-// CHECK:   %5 = alloc_stack $Float
-// CHECK:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
-// CHECK:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
-// CHECK:   store %0 to %7 : $*Float
-// CHECK:   end_access %7 : $*Float
-// CHECK:   end_access %6 : $*Float
-// CHECK:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
-// CHECK:   %12 = load %11 : $*Float
-// CHECK:   end_access %11 : $*Float
-// CHECK:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
-// CHECK:   dealloc_stack %5 : $*Float
-// CHECK:   return %14 : $Float
-// CHECK: }
+// CHECK-VJP-LABEL: @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK-VJP: bb0(%0 : $Float, %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
+// CHECK-VJP:   %4 = struct_extract %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, #AD__nested_func_without_diffattr__Type__src_0_wrt_0.pullback_0
+// CHECK-VJP:   %5 = alloc_stack $Float
+// CHECK-VJP:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-VJP:   %7 = begin_access [init] [static] [no_nested_conflict] %6 : $*Float
+// CHECK-VJP:   store %0 to %7 : $*Float
+// CHECK-VJP:   end_access %7 : $*Float
+// CHECK-VJP:   end_access %6 : $*Float
+// CHECK-VJP:   %11 = begin_access [read] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-VJP:   %12 = load %11 : $*Float
+// CHECK-VJP:   end_access %11 : $*Float
+// CHECK-VJP:   %14 = apply %4(%12) : $@callee_guaranteed (Float) -> Float
+// CHECK-VJP:   dealloc_stack %5 : $*Float
+// CHECK-VJP:   return %14 : $Float
+// CHECK-VJP: }
+
+// CHECK-NOVJP: @usableFromInline
+// CHECK-NOVJP: struct AD__func_to_diff__Type__src_0_wrt_0 {
+// CHECK-NOVJP:   @sil_stored var pv_0: AD__nested_func_without_diffattr__Type__src_0_wrt_0
+// CHECK-NOVJP:   @sil_stored var v_0: Float
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP: @usableFromInline
+// CHECK-NOVJP: struct AD__nested_func_without_diffattr__Type__src_0_wrt_0 {
+// CHECK-NOVJP:   @sil_stored var pv_0: Float
+// CHECK-NOVJP:   @sil_stored var v_0: Float
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: @foo_prim : $@convention(thin) (Float) -> (Float, Float) {
+// CHECK-NOVJP: bb0(%0 : $Float):
+// CHECK-NOVJP:   %1 = tuple (%0 : $Float, %0 : $Float)
+// CHECK-NOVJP:   return %1 : $(Float, Float)
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float {
+// CHECK-NOVJP: bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $Float):
+// CHECK-NOVJP:   return %0 : $Float
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
+
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
+
+// CHECK-NOVJP-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
+// CHECK-NOVJP: bb0(%0 : $Float):
+// CHECK-NOVJP:   %1 = function_ref @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
+// CHECK-NOVJP:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
+// CHECK-NOVJP:   %3 = tuple_extract %2 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float), 0
+// CHECK-NOVJP:   %4 = tuple_extract %2 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float), 1
+// CHECK-NOVJP:   // function_ref nested_func_without_diffattr
+// CHECK-NOVJP:   %5 = function_ref @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK-NOVJP:   %6 = apply %5(%4) : $@convention(thin) (Float) -> Float
+// CHECK-NOVJP:   %7 = tuple (%4 : $Float, %4 : $Float)
+// CHECK-NOVJP:   %8 = tuple_extract %7 : $(Float, Float), 0
+// CHECK-NOVJP:   %9 = struct $AD__func_to_diff__Type__src_0_wrt_0 (%3 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %4 : $Float)
+// CHECK-NOVJP:   %10 = tuple (%9 : $AD__func_to_diff__Type__src_0_wrt_0, %8 : $Float)
+// CHECK-NOVJP:   return %10 : $(AD__func_to_diff__Type__src_0_wrt_0, Float)
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: @AD__func_to_diff__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__func_to_diff__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK-NOVJP: bb0(%0 : $Float, %1 : $AD__func_to_diff__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
+// CHECK-NOVJP:   %4 = alloc_stack $Float
+// CHECK-NOVJP:   %5 = begin_access [init] [static] [no_nested_conflict] %4 : $*Float
+// CHECK-NOVJP:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-NOVJP:   store %0 to %6 : $*Float
+// CHECK-NOVJP:   end_access %6 : $*Float
+// CHECK-NOVJP:   end_access %5 : $*Float
+// CHECK-NOVJP:   %10 = begin_access [read] [static] [no_nested_conflict] %4 : $*Float
+// CHECK-NOVJP:   %11 = load %10 : $*Float
+// CHECK-NOVJP:   end_access %10 : $*Float
+// CHECK-NOVJP:   %13 = struct_extract %1 : $AD__func_to_diff__Type__src_0_wrt_0, #AD__func_to_diff__Type__src_0_wrt_0.pv_0
+// CHECK-NOVJP:   %14 = struct_extract %1 : $AD__func_to_diff__Type__src_0_wrt_0, #AD__func_to_diff__Type__src_0_wrt_0.v_0
+// CHECK-NOVJP:   %15 = function_ref @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float
+// CHECK-NOVJP:   %16 = apply %15(%11, %13, %14, %3) : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float
+// CHECK-NOVJP:   dealloc_stack %4 : $*Float
+// CHECK-NOVJP:   return %16 : $Float
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: @AD__nested_func_without_diffattr__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float) {
+// CHECK-NOVJP: bb0(%0 : $Float):
+// CHECK-NOVJP:   %1 = function_ref @foo_prim : $@convention(thin) (Float) -> (Float, Float)
+// CHECK-NOVJP:   %2 = apply %1(%0) : $@convention(thin) (Float) -> (Float, Float)
+// CHECK-NOVJP:   %3 = tuple_extract %2 : $(Float, Float), 0
+// CHECK-NOVJP:   %4 = tuple_extract %2 : $(Float, Float), 1
+// CHECK-NOVJP:   %5 = struct $AD__nested_func_without_diffattr__Type__src_0_wrt_0 (%3 : $Float, %4 : $Float)
+// CHECK-NOVJP:   %6 = tuple (%5 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %4 : $Float)
+// CHECK-NOVJP:   return %6 : $(AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float)
+// CHECK-NOVJP: }
+
+// CHECK-NOVJP-LABEL: @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 : $@convention(thin) (Float, AD__nested_func_without_diffattr__Type__src_0_wrt_0, Float, Float) -> Float {
+// CHECK-NOVJP: bb0(%0 : $Float, %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, %2 : $Float, %3 : $Float):
+// CHECK-NOVJP:   %4 = alloc_stack $Float
+// CHECK-NOVJP:   %5 = begin_access [init] [static] [no_nested_conflict] %4 : $*Float
+// CHECK-NOVJP:   %6 = begin_access [init] [static] [no_nested_conflict] %5 : $*Float
+// CHECK-NOVJP:   store %0 to %6 : $*Float
+// CHECK-NOVJP:   end_access %6 : $*Float
+// CHECK-NOVJP:   end_access %5 : $*Float
+// CHECK-NOVJP:   %10 = begin_access [read] [static] [no_nested_conflict] %4 : $*Float
+// CHECK-NOVJP:   %11 = load %10 : $*Float
+// CHECK-NOVJP:   end_access %10 : $*Float
+// CHECK-NOVJP:   %13 = struct_extract %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, #AD__nested_func_without_diffattr__Type__src_0_wrt_0.pv_0
+// CHECK-NOVJP:   %14 = struct_extract %1 : $AD__nested_func_without_diffattr__Type__src_0_wrt_0, #AD__nested_func_without_diffattr__Type__src_0_wrt_0.v_0
+// CHECK-NOVJP:   %15 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float, Float) -> Float
+// CHECK-NOVJP:   %16 = apply %15(%11, %13, %14, %3) : $@convention(thin) (Float, Float, Float, Float) -> Float
+// CHECK-NOVJP:   dealloc_stack %4 : $*Float
+// CHECK-NOVJP:   return %16 : $Float
+// CHECK-NOVJP: }

@@ -1030,7 +1030,7 @@ static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned order, unsigned arity, bool rethrows) {
+    unsigned arity, unsigned order, bool rethrows, bool isMethod) {
   assert(arity >= 1);
   assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
@@ -1039,8 +1039,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   // VJP:
   //   <...T...(arity), R> (@autodiff (...T) throws -> R, ...T)
   //       rethrows -> (R, (R.CotangentVector) -> ...T.CotangentVector)
-  BuiltinGenericSignatureBuilder builder(Context,
-                                         /*numGenericParams*/ 1 + arity);
+  unsigned numGenericParams = 1 + arity + (isMethod ? 1 : 0);
+  BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
   // Look up the Differentiable protocol.
   SmallVector<ValueDecl *, 1> diffableProtoLookup;
   Context.lookupInSwiftModule("Differentiable", diffableProtoLookup);
@@ -1055,6 +1055,11 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     builder.addConformanceRequirement(T, diffableProto);
     fnArgGens.push_back(T);
   }
+  Optional<decltype(fnResultGen)> selfArgGen;
+  if (isMethod) {
+    selfArgGen = makeGenericParam(arity + 1);
+    builder.addConformanceRequirement(*selfArgGen, diffableProto);
+  }
   // Generator for the first argument, i.e. the @autodiff function.
   BuiltinGenericSignatureBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the
@@ -1066,8 +1071,13 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      return FunctionType::get(params, fnResultGen.build(builder))
-          ->withExtInfo(extInfo);
+      auto innerFunction = FunctionType::get(params,
+                                             fnResultGen.build(builder));
+      if (!isMethod)
+        return innerFunction->withExtInfo(extInfo);
+      auto selfParam = FunctionType::Param(selfArgGen->build(builder));
+      return FunctionType::get({selfParam},
+                               innerFunction)->withExtInfo(extInfo);
     }
   };
   // Eagerly build the type of the first arg, then use that to compute the type
@@ -1077,16 +1087,21 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   origFnTy = origFnTy->withExtInfo(
       origFnTy->getExtInfo().withDifferentiable(false).withNoEscape(false));
   auto *paramIndices = AutoDiffParameterIndicesBuilder(
-      origFnTy, /*isMethod*/ false, /*setAllParams*/ true).build(Context);
+      origFnTy, /*setAllParams*/ true).build(Context);
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen {
     [=](BuiltinGenericSignatureBuilder &builder) -> Type {
-      return origFnTy->getAutoDiffAssociatedFunctionType(
+      auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
           paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
-          kind, /*lookupConformance*/ nullptr, /*isMethod*/ false)->getResult();
+          kind, /*lookupConformance*/ nullptr);
+      if (isMethod)
+        return assocFnTy->getResult()->castTo<AnyFunctionType>()->getResult();
+      return assocFnTy->getResult();
     }
   };
   builder.addParameter(firstArgGen);
+  if (isMethod)
+    builder.addParameter(*selfArgGen);
   for (auto argGen : fnArgGens)
     builder.addParameter(argGen);
   if (rethrows)
@@ -1759,7 +1774,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
-
+  // SWIFT_ENABLE_TENSORFLOW
+  if (OperationName.startswith("autodiffApply_")) {
+    AutoDiffAssociatedFunctionKind kind;
+    unsigned arity, order;
+    bool rethrows, isMethod;
+    if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
+                                                 order, rethrows, isMethod))
+      return nullptr;
+    return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
+                                              order, rethrows, isMethod);
+  }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
@@ -2030,14 +2055,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffPopFromTape(Context, Id);
   case BuiltinValueKind::AutoDiffDestroyTape:
     return getAutoDiffDestroyTape(Context, Id);
-  case BuiltinValueKind::AutoDiffApplyJVP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::JVP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false);
-  case BuiltinValueKind::AutoDiffApplyVJP:
-    return getAutoDiffApplyAssociatedFunction(Context, Id,
-        AutoDiffAssociatedFunctionKind::VJP, /*order*/ 1, /*arity*/ 1,
-        /*rethrows*/ false);
+  case BuiltinValueKind::AutoDiffApply:
+    llvm_unreachable("Handled above");
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
 
