@@ -48,7 +48,7 @@ struct RequiresP<T: P> {}
 // UnconditionallyP, even though UnconditionallyP's generic param uses a
 // retroactive conformance to conform to Q.
 func rdar46735592(_: RequiresP<UnconditionallyP<Y>>) { }
-// CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAHPyHCg_GAlJ1PyHCg_GF
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive12rdar46735592yyAA9RequiresPVyAA16UnconditionallyPVy12RetroactiveB1YVAI0F1A1QAAHPyHCg_GGF
 
 struct QImpl: Q {}
 struct ConditionallyP<T> {}

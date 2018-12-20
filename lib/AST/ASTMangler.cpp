@@ -1137,16 +1137,31 @@ static bool containsRetroactiveConformance(
                                       const ProtocolConformance *conformance,
                                       ModuleDecl *module) {
   // If the root conformance is retroactive, it's retroactive.
-  if (isRetroactiveConformance(conformance->getRootConformance()))
+  const RootProtocolConformance *rootConformance =
+      conformance->getRootConformance();
+  if (isRetroactiveConformance(rootConformance))
     return true;
 
-  // If any of the substitutions used to form this conformance are retroactive,
-  // it's retroactive.
+  // If the conformance is conditional and any of the substitutions used to
+  // satisfy the conditions are retroactive, it's retroactive.
   auto subMap = conformance->getSubstitutions(module);
-  for (auto conformance : subMap.getConformances()) {
-    if (conformance.isConcrete() &&
-        containsRetroactiveConformance(conformance.getConcrete(), module))
+  for (auto requirement : rootConformance->getConditionalRequirements()) {
+    if (requirement.getKind() != RequirementKind::Conformance)
+      continue;
+    ProtocolDecl *proto =
+        requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
+    Optional<ProtocolConformanceRef> conformance =
+        subMap.lookupConformance(requirement.getFirstType()->getCanonicalType(),
+                                 proto);
+    if (!conformance) {
+      // This should only happen when mangling invalid ASTs, but that happens
+      // for indexing purposes.
+      continue;
+    }
+    if (conformance->isConcrete() &&
+        containsRetroactiveConformance(conformance->getConcrete(), module)) {
       return true;
+    }
   }
 
   return false;
