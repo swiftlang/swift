@@ -212,7 +212,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   if (!VisitedConformances.insert(C).second)
     return;
   
-  SILWitnessTable *WT = Mod.lookUpWitnessTable(C, true);
+  SILWitnessTable *WT = Mod.lookUpWitnessTable(C, /*deserializeLazily=*/false);
 
   // If we don't find any witness table for the conformance, bail and return
   // false.
@@ -222,7 +222,7 @@ void SILLinkerVisitor::visitProtocolConformance(
     // Adding the declaration may allow us to now deserialize the body.
     // Force the body if we must deserialize this witness table.
     if (mustDeserialize) {
-      WT = Mod.lookUpWitnessTable(C, true);
+      WT = Mod.lookUpWitnessTable(C, /*deserializeLazily=*/true);
       assert(WT && WT->isDefinition()
              && "unable to deserialize witness table when we must?!");
     } else {

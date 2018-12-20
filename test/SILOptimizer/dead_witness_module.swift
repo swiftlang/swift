@@ -5,9 +5,11 @@
 // DeadFunctionElimination may not remove a method from a witness table which
 // is imported from another module.
 
+// FIXME: Ever since @usableFromInline began to be enforced, this test did not
+// test anything useful, and now the witness table is never deserialized at all.
+
 import TestModule
 
 testit(MyStruct())
 
-// CHECK: sil_witness_table public_external MyStruct: Proto module TestModule
-// CHECK-NEXT: method #Proto.confx!1: {{.*}} : @$s{{.*}}confx{{.*}}FTW
+// CHECK: sil_witness_table MyStruct: Proto module TestModule{{$}}
