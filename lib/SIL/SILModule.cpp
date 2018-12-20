@@ -144,8 +144,7 @@ void SILModule::deallocateInst(SILInstruction *I) {
 }
 
 SILWitnessTable *
-SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
-                                         SILLinkage linkage) {
+SILModule::createWitnessTableDeclaration(const ProtocolConformance *C) {
   // If we are passed in a null conformance (a valid value), just return nullptr
   // since we cannot map a witness table to it.
   if (!C)
@@ -153,7 +152,9 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C,
 
   // Extract the root conformance.
   auto rootC = C->getRootConformance();
-  return SILWitnessTable::create(*this, linkage, rootC);
+  auto linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
+  return SILWitnessTable::create(*this, linkage,
+                                 const_cast<RootProtocolConformance *>(rootC));
 }
 
 SILWitnessTable *

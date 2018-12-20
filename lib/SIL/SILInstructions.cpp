@@ -317,9 +317,7 @@ static void declareWitnessTable(SILModule &Mod,
   if (conformanceRef.isAbstract()) return;
   auto C = conformanceRef.getConcrete();
   if (!Mod.lookUpWitnessTable(C, false))
-    Mod.createWitnessTableDeclaration(C,
-        getLinkageForProtocolConformance(C->getRootNormalConformance(),
-                                         NotForDefinition));
+    Mod.createWitnessTableDeclaration(C);
 }
 
 AllocExistentialBoxInst *AllocExistentialBoxInst::create(

@@ -217,9 +217,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   // If we don't find any witness table for the conformance, bail and return
   // false.
   if (!WT) {
-    Mod.createWitnessTableDeclaration(
-        C, getLinkageForProtocolConformance(
-               C->getRootNormalConformance(), NotForDefinition));
+    Mod.createWitnessTableDeclaration(C);
 
     // Adding the declaration may allow us to now deserialize the body.
     // Force the body if we must deserialize this witness table.

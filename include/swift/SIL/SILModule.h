@@ -572,8 +572,7 @@ public:
 
   // Given a protocol conformance, attempt to create a witness table declaration
   // for it.
-  SILWitnessTable *
-  createWitnessTableDeclaration(ProtocolConformance *C, SILLinkage linkage);
+  SILWitnessTable *createWitnessTableDeclaration(const ProtocolConformance *C);
 
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
