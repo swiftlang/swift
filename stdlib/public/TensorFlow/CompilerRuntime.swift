@@ -610,8 +610,10 @@ private class TFEState {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
-      let deviceName: String
-      if opType.hasSuffix("_CPU.device_partition") {
+      let deviceName: String?
+      if opType.hasSuffix("_RUNTIME.device_partition") {
+        deviceName = getcurrentDeviceName()
+      } else if opType.hasSuffix("_CPU.device_partition") {
         // The op type can be: tmp3_main.tf_17_CPU.device_partition. We want to
         // extract the device index "17" out of the above name, and use it to
         // form a TF device string like
@@ -627,9 +629,13 @@ private class TFEState {
         let deviceIndexStr = deviceIndexSubstring(from: opTypePrefix)
         deviceName = context.gpuDeviceNamePrefix! + deviceIndexStr
       }
-      debugLog("Placing the op on device \(deviceName).")
-      TFE_OpSetDevice(op, deviceName, status)
-      checkOk(status)
+      if let deviceName = deviceName {
+        debugLog("Placing the op on device \(deviceName).")
+        TFE_OpSetDevice(op, deviceName, status)
+        checkOk(status)
+      } else {
+        debugLog("Not placing the op on any device.")
+      }
       ops.append(op!)
     }
   }
@@ -1600,7 +1606,9 @@ class _ThreadLocalState {
 ///   - index: The device to run the ops on.
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-@inlinable
+// Use inline never to ensure correctness in scoped device placement. See
+// https://bugs.swift.org/browse/SR-9535 for more context.
+@inline(never)
 public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
                           perform body: () throws -> R) rethrows -> R {
   _ThreadLocalState.value.pushDevice((kind, index))
@@ -1615,7 +1623,7 @@ public func withDevice<R>(_ kind: DeviceKind, _ index: UInt = 0,
 /// - Parameters:
 ///   - body: A closure whose TensorFlow operations are to be executed on the
 ///     specified kind of device.
-@inlinable
+@inline(never)
 public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
   _ThreadLocalState.value.pushDevice(nil)
   let result = try body()
@@ -1623,18 +1631,30 @@ public func withDefaultDevice<R>(perform body: () throws -> R) rethrows -> R {
   return result
 }
 
+
+/// Returns a valid TF device string such as
+/// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
+/// closest enclosing withDevice() construct.
+/// A return value of nil indicates the absence of withDevice().
 @usableFromInline
-@_cdecl("_swift_tfc_OpSetDeviceFromScope")
-func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
+func getcurrentDeviceName() -> String? {
   let context = _ExecutionContext.global
   if let (kind, index) = _ThreadLocalState.value._currentDevice {
     switch kind {
-    // Example device string: "/job:localhost/replica:0/task:0/device:CPU:0"
     case .cpu:
-      TFE_OpSetDevice(op, "\(context.cpuDeviceNamePrefix)\(index)", status)
+      return "\(context.cpuDeviceNamePrefix)\(index)"
     case .gpu:
-      TFE_OpSetDevice(op, "\(context.gpuDeviceNamePrefix!)\(index)", status)
+      return "\(context.gpuDeviceNamePrefix!)\(index)"
     }
+  }
+  return nil
+}
+
+@usableFromInline
+@_cdecl("_swift_tfc_OpSetDeviceFromScope")
+func _TFCOpSetDeviceFromScope(_ op: CTFEOp, _ status: CTFStatus) {
+  if let deviceName = getcurrentDeviceName() {
+    TFE_OpSetDevice(op, deviceName, status)
   }
 }
 
