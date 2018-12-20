@@ -214,13 +214,13 @@ void GraphFunctionDeviceInfo::finalizeUsedDevices() {
   usedDeviceIds.clear();
   usedDeviceIds.insert(deviceIds.begin(), deviceIds.end());
 
-  // Example scenario where the if condition below is true: we set primary
-  // device to GPU via compiler flag, but the swift function being processed
-  // here has placed all ops on CPU. In that case, we want to set primary
-  // device to CPU.
   if (!usedDeviceIds.count(primaryDeviceId)) {
-    // For now pick an arbitrary used device as the primary. For optimized
-    // placement w.r.t the function args and return values, this might tuning.
+    // Example scenario: we set primary device to GPU via compiler flag, but the
+    // swift function being processed here has placed all ops on CPU. In that
+    // case, we want to set primary device to CPU.
+    //
+    // For now pick an arbitrary device as the primary. For optimized placement
+    // w.r.t the function args and return values, this might need tuning.
     primaryDeviceId = *usedDeviceIds.begin();
   }
 }
