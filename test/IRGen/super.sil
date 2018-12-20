@@ -8,7 +8,7 @@
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-resilience -parse-sil -parse-as-library -emit-ir -I %t %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 enum Singleton {
   case F((Singleton) -> ())

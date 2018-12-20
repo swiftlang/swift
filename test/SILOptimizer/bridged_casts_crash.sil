@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -performance-constant-propagation %s | %FileCheck %s
+// RUN: %target-sil-opt -performance-constant-propagation %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

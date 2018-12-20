@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -S %s | %FileCheck %s --check-prefix=TAILCALL
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -S %s | %FileCheck %s --check-prefix=TAILCALL
 
 // REQUIRES: CPU=x86_64
 

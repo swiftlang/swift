@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  %s -verify -closure-specialize -assume-parsing-unqualified-ownership-sil -o -  | %FileCheck %s
+// RUN: %target-sil-opt  %s -verify -closure-specialize -o -  | %FileCheck %s
 
 // Make sure we do not specialize resilientCallee.
 

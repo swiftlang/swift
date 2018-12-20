@@ -24,7 +24,7 @@ using namespace swift;
 SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
                        SmallVectorImpl<SILInstruction *> *InsertedInstrs)
     : TempContext(GlobVar->getModule(), InsertedInstrs), C(TempContext),
-      F(nullptr), hasOwnership(false) {
+      F(nullptr) {
   setInsertionPoint(&GlobVar->StaticInitializerBlock);
 }
 

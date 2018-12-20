@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -assume-parsing-unqualified-ownership-sil -wmo -performance-constant-propagation -simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine -devirtualizer -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -wmo -performance-constant-propagation -simplify-cfg -sil-combine -jumpthread-simplify-cfg -sil-combine -devirtualizer -generic-specializer %s | %FileCheck %s
 //
 // <rdar://problem/46322928> Failure to devirtualize a protocol method applied to an opened existential blocks implemention of
 // DataProtocol.

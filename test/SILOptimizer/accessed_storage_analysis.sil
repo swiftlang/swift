@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null | %FileCheck %s
 
 sil_stage canonical
 

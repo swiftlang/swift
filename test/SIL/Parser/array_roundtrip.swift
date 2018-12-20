@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -Ounchecked | %target-sil-opt -assume-parsing-unqualified-ownership-sil
+// RUN: %target-swift-frontend %s -emit-sil -Ounchecked | %target-sil-opt
 
 // Fails if the positions of the two Collection subscript requirements are
 // reversed. rdar://problem/46650834

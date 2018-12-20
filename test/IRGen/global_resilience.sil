@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-resilience -emit-module -emit-module-path %t/resilient_struct.swiftmodule
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir -O %s
+// RUN: %target-swift-frontend -enable-resilience -I %t -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-resilience -I %t -emit-ir -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
