@@ -902,8 +902,7 @@ private:
   /// Given a map of names and isCascades, add the resulting dependencies to the
   /// graph.
   template <NodeKind kind>
-  void addAllDependenciesOfAGivenType(
-      const llvm::DenseMap<DeclBaseName, bool> &map) {
+  void addAllDependenciesFrom(const llvm::DenseMap<DeclBaseName, bool> &map) {
     for (const auto &p : map)
       addToGraphThatThisWholeFileDependsUpon(
           DependencyKey::createDependedUponKey<kind>(p.first,
@@ -913,13 +912,13 @@ private:
 
   /// Given a map of holder-and-member-names and isCascades, add the resulting
   /// dependencies to the graph.
-  void addAllDependenciesOfAGivenType(
+  void addAllDependenciesFrom(
       const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
                            bool> &);
 
   /// Given an array of external swiftDeps files, add the resulting external
   /// dependencies to the graph.
-  void addAllDependenciesOfAGivenType(ArrayRef<std::string> externals) {
+  void addAllDependenciesFrom(ArrayRef<std::string> externals) {
     for (const auto &s : externals)
       addToGraphThatThisWholeFileDependsUpon(
           DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
@@ -937,7 +936,7 @@ private:
 };
 } // namespace
 
-void FrontendGraphConstructor::addAllDependenciesOfAGivenType(
+void FrontendGraphConstructor::addAllDependenciesFrom(
     const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>
         &map) {
   std::unordered_set<const NominalTypeDecl *> holdersOfCascadingMembers;
@@ -995,13 +994,12 @@ void FrontendGraphConstructor::addProviderNodesToGraph() {
 void FrontendGraphConstructor::addDependencyArcsToGraph() {
   // TODO: express the multiple provides and depends streams with variadic
   // templates
-  addAllDependenciesOfAGivenType<NodeKind::topLevel>(
+  addAllDependenciesFrom<NodeKind::topLevel>(
       SF->getReferencedNameTracker()->getTopLevelNames());
-  addAllDependenciesOfAGivenType(
-      SF->getReferencedNameTracker()->getUsedMembers());
-  addAllDependenciesOfAGivenType<NodeKind::dynamicLookup>(
+  addAllDependenciesFrom(SF->getReferencedNameTracker()->getUsedMembers());
+  addAllDependenciesFrom<NodeKind::dynamicLookup>(
       SF->getReferencedNameTracker()->getDynamicLookupNames());
-  addAllDependenciesOfAGivenType(depTracker.getDependencies());
+  addAllDependenciesFrom(depTracker.getDependencies());
 }
 
 void FrontendGraphConstructor::addToGraphThatThisWholeFileDependsUpon(
