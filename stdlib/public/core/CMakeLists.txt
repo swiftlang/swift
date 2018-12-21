@@ -284,6 +284,10 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
 
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL Windows)
+  list(APPEND swift_core_private_link_libraries shell32)
+endif()
+
 add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
