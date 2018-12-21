@@ -331,7 +331,7 @@ class BenchmarkDoctor(object):
         self.driver = driver or BenchmarkDriver(args)
         self.results = {}
 
-        if args.markdown:
+        if hasattr(args, 'markdown') and args.markdown:
             self.console_handler = MarkdownReportHandler(sys.stdout)
         else:
             self.console_handler = logging.StreamHandler(sys.stdout)
