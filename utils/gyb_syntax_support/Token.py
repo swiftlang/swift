@@ -333,8 +333,6 @@ SYNTAX_TOKENS = [
                        serialization_code=117,
                        description='TensorFlow operation',
                        protocol='ExpressibleByTensorFlowOp'),
-    PoundKeyword('PoundAdjoint', 'adjoint', text='#adjoint',
-                 serialization_code=118),
     PoundKeyword('PoundAssert', 'assert', text='#assert',
                  serialization_code=119),
 ]

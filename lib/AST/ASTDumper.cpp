@@ -1863,22 +1863,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  void visitAdjointExpr(AdjointExpr *E) {
-    printCommon(E, "adjoint_expr");
-    PrintWithColorRAII(OS, TypeReprColor) << " base_type='";
-    if (auto *baseRepr = E->getBaseType().getTypeRepr())
-      baseRepr->print(PrintWithColorRAII(OS, TypeReprColor).getOS());
-    else
-      PrintWithColorRAII(OS, TypeReprColor) << "<<NULL>>";
-    PrintWithColorRAII(OS, TypeReprColor) << "'";
-    PrintWithColorRAII(OS, IdentifierColor) << " original_name='"
-      << E->getOriginalName() << "'";
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
       << " kind='" << E->getLiteralKindPlainName() << "'";

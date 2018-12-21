@@ -344,11 +344,6 @@ protected:
     NumArgLabels : 16
   );
 
-  // SWIFT_ENABLE_TENSORFLOW
-  SWIFT_INLINE_BITFIELD(AdjointExpr, Expr, 2,
-                        FunctionRefKind : 2
-  );
-
   enum { NumCheckedCastKindBits = 4 };
   SWIFT_INLINE_BITFIELD(CheckedCastExpr, Expr, NumCheckedCastKindBits,
     CastKind : NumCheckedCastKindBits
@@ -3830,64 +3825,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DynamicType;
-  }
-};
-
-// SWIFT_ENABLE_TENSORFLOW
-/// The `#adjoint(...)` expression returns the declared adjoint of functions
-/// with the `@differentiable(reverse, ...)` attribute.
-class AdjointExpr : public Expr {
-private:
-  SourceLoc Loc, LParenLoc;
-  // The original function name.
-  DeclName OriginalName;
-  DeclNameLoc OriginalNameLoc;
-  // The base type of the original function.
-  // This is non-null only when the original function is not top-level (i.e. it
-  // is an instance/static method).
-  TypeLoc BaseType;
-  // The resolved adjoint function declaration.
-  ConcreteDeclRef AdjointFunction = nullptr;
-  SourceLoc RParenLoc;
-
-  explicit AdjointExpr(SourceLoc loc, SourceLoc lParenLoc,
-                       DeclName originalName, DeclNameLoc originalNameLoc,
-                       TypeLoc baseType, SourceLoc rParenLoc)
-    : Expr(ExprKind::Adjoint, /*Implicit*/ false), Loc(loc),
-      LParenLoc(lParenLoc), OriginalName(originalName),
-      OriginalNameLoc(originalNameLoc), BaseType(baseType),
-      RParenLoc(rParenLoc) {
-    Bits.AdjointExpr.FunctionRefKind =
-      static_cast<unsigned>(FunctionRefKind::Unapplied);
-  }
-
-public:
-  static AdjointExpr *create(ASTContext &ctx, SourceLoc loc,
-                             SourceLoc lParenLoc, DeclName originalName,
-                             DeclNameLoc originalNameLoc, TypeRepr *baseType,
-                             SourceLoc rParenLoc);
-
-  DeclName getOriginalName() const { return OriginalName; }
-  DeclNameLoc getOriginalNameLoc() const { return OriginalNameLoc; }
-  TypeLoc getBaseType() const { return BaseType; }
-
-  ConcreteDeclRef getAdjointFunction() { return AdjointFunction; }
-  void setAdjointFunction(ConcreteDeclRef ref) { AdjointFunction = ref; }
-
-  SourceRange getSourceRange() const { return SourceRange(Loc, RParenLoc); }
-
-  /// Retrieve the kind of function reference.
-  FunctionRefKind getFunctionRefKind() const {
-    return static_cast<FunctionRefKind>(Bits.AdjointExpr.FunctionRefKind);
-  }
-
-  /// Set the kind of function reference.
-  void setFunctionRefKind(FunctionRefKind refKind) {
-    Bits.AdjointExpr.FunctionRefKind = static_cast<unsigned>(refKind);
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Adjoint;
   }
 };
 

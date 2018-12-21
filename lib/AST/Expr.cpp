@@ -366,7 +366,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   // SWIFT_ENABLE_TENSORFLOW
-  NO_REFERENCE(Adjoint);
   NO_REFERENCE(PoundAssert);
 
 #undef SIMPLE_REFERENCE
@@ -537,8 +536,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
-  // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::Adjoint:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -1168,15 +1165,6 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
   computeSingleArgumentType(ctx, arg, implicit, getType);
 
   return arg;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-AdjointExpr *
-AdjointExpr::create(ASTContext &ctx, SourceLoc loc, SourceLoc lParenLoc,
-                    DeclName originalName, DeclNameLoc originalNameLoc,
-                    TypeRepr *baseType, SourceLoc rParenLoc) {
-  return new (ctx) AdjointExpr(loc, lParenLoc, originalName, originalNameLoc,
-                               TypeLoc(baseType, Type()), rParenLoc);
 }
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,

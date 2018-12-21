@@ -2339,35 +2339,6 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Expr *visitAdjointExpr(AdjointExpr *expr) {
-      auto locator = cs.getConstraintLocator(expr);
-      auto adjointDeclRef = expr->getAdjointFunction();
-      auto adjointDecl = cast<FuncDecl>(adjointDeclRef.getDecl());
-
-      // If adjoint is within a type context (it is an instance/static method),
-      // use member locator.
-      if (adjointDecl->getInnermostTypeContext())
-        locator = cs.getConstraintLocator(expr, ConstraintLocator::Member);
-
-      // If adjoint has generic signature, calculate substitutions and update
-      // adjoint decl ref with them.
-      SubstitutionMap substitutions;
-      if (auto genSig = adjointDecl->getGenericSignature()) {
-        substitutions = solution.computeSubstitutions(genSig, locator);
-        expr->setAdjointFunction(
-          ConcreteDeclRef(adjointDecl, substitutions));
-      }
-
-      auto selected = solution.getOverloadChoice(locator);
-      auto simplifiedType = simplifyType(selected.openedFullType);
-      // For static methods, return result of curried method.
-      if (adjointDecl->isStatic())
-        simplifiedType = simplifiedType->castTo<AnyFunctionType>()->getResult();
-      cs.setType(expr, simplifiedType);
-      return expr;
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
       auto &ctx = cs.TC.Context;
 

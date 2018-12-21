@@ -739,25 +739,6 @@ NOTE(object_literal_resolve_import,none,
 // TensorFlow op literal
 ERROR(invalid_tfop,none, "%0", (StringRef))
 
-// '#adjoint(...)' expression for automatic differentiation
-ERROR(adjoint_expr_original_base_type_unresolved,none,
-      "could not resolve base type %0 of original function in #adjoint "
-      "expression", (TypeLoc))
-ERROR(adjoint_expr_original_not_func_decl,none,
-      "#adjoint expression can only be applied to function declarations, but %0"
-      "is not a function declaration", (DeclName))
-ERROR(adjoint_expr_original_func_decl_unresolved,none,
-      "original function declaration could not be resolved", ())
-ERROR(adjoint_expr_original_no_valid_differentiable_attr,none,
-      "the original function %0 does not declare a valid @differentiable "
-      "attribute", (DeclName))
-ERROR(adjoint_expr_original_overload_not_found,none,
-      "could not find original function %0 with valid @differentiable "
-      "attribute in #adjoint expression", (DeclName))
-ERROR(adjoint_expr_ambiguous_original_function_identifier,none,
-      "ambiguous or overloaded original function identifier %0 cannot be used "
-      "in #adjoint expression", (DeclName))
-
 ERROR(use_local_before_declaration,none,
       "use of local variable %0 before its declaration", (DeclName))
 ERROR(unsupported_existential_type,none,

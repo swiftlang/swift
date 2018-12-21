@@ -455,11 +455,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  Expr *visitAdjointExpr(AdjointExpr *E) {
-    return E;
-  }
-
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 

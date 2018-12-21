@@ -1242,9 +1242,6 @@ public:
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
-  /// SWIFT_ENABLE_TENSORFLOW
-  ParserResult<Expr> parseExprGradientBody(ExprKind kind);
-  ParserResult<Expr> parseExprAdjoint();
 
   StringRef copyAndStripUnderscores(StringRef text);
 
