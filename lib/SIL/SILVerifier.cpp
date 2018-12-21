@@ -2266,8 +2266,14 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    require(DI->getOperand()->getType().getClassOrBoundGenericClass(),
-            "Operand of dealloc_ref must be of class type");
+    auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
+    require(cd, "Operand of dealloc_ref must be of class type");
+
+    if (!DI->canAllocOnStack()) {
+      require(!cd->isResilient(F.getModule().getSwiftModule(),
+                              F.getResilienceExpansion()),
+              "cannot directly deallocate resilient class");
+    }
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -2281,6 +2287,9 @@ public:
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
+    require(!class2->isResilient(F.getModule().getSwiftModule(),
+                                 F.getResilienceExpansion()),
+            "cannot directly deallocate resilient class");
     while (class1 != class2) {
       class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
@@ -2453,6 +2462,9 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
+    require(!cd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient class");
 
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
@@ -2472,6 +2484,10 @@ public:
             "result of ref_tail_addr must be lvalue");
     SILType operandTy = RTAI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    require(cd, "ref_tail_addr operand must be a class instance");
+    require(!cd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
   }
 
