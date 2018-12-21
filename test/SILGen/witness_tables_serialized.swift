@@ -16,15 +16,17 @@ public struct PublicResilientStruct : PublicProtocol, InternalProtocol {}
 @usableFromInline
 internal struct InternalStruct : PublicProtocol, InternalProtocol {}
 
-// CHECK: sil_witness_table [serialized] PublicStruct: PublicProtocol
-// CHECK: sil_witness_table [serialized] PublicStruct: InternalProtocol
+// CHECK-DAG: sil_witness_table [serialized] PublicStruct: PublicProtocol
+// CHECK-DAG: sil_witness_table [serialized] PublicStruct: InternalProtocol
 
-// CHECK-NONRESILIENT: sil_witness_table [serialized] PublicResilientStruct: PublicProtocol
-// CHECK-NONRESILIENT: sil_witness_table [serialized] PublicResilientStruct: InternalProtocol
-// CHECK-RESILIENT: sil_witness_table PublicResilientStruct: PublicProtocol
-// CHECK-RESILIENT: sil_witness_table PublicResilientStruct: InternalProtocol
+// CHECK-RESILIENT-DAG: sil_witness_table InternalStruct: InternalProtocol
+// CHECK-RESILIENT-DAG: sil_witness_table InternalStruct: PublicProtocol
 
-// CHECK-NONRESILIENT: sil_witness_table [serialized] InternalStruct: PublicProtocol
-// CHECK-NONRESILIENT: sil_witness_table [serialized] InternalStruct: InternalProtocol
-// CHECK-RESILIENT: sil_witness_table InternalStruct: PublicProtocol
-// CHECK-RESILIENT: sil_witness_table InternalStruct: InternalProtocol
+// CHECK-RESILIENT-DAG: sil_witness_table PublicResilientStruct: PublicProtocol
+// CHECK-RESILIENT-DAG: sil_witness_table PublicResilientStruct: InternalProtocol
+
+// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] InternalStruct: InternalProtocol
+// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] InternalStruct: PublicProtocol
+
+// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PublicResilientStruct: PublicProtocol
+// CHECK-NONRESILIENT-DAG: sil_witness_table [serialized] PublicResilientStruct: InternalProtocol
