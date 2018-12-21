@@ -943,25 +943,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GradientInst: {
-    const GradientInst *GI = cast<GradientInst>(&SI);
-    auto operandType = GI->getOriginal()->getType();
-    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto operandRef = addValueRef(GI->getOriginal());
-    SmallVector<bool, 4> paramIndicesBitVec;
-    auto indices = GI->getIndices();
-    for (unsigned i : range(indices.parameters.size()))
-      paramIndicesBitVec.push_back(indices.parameters[i]);
-    SILInstGradientLayout::emitRecord(Out, ScratchRecord,
-                                      SILAbbrCodes[SILInstGradientLayout::Code],
-                                      GI->getOptions().toRaw(),
-                                      operandTypeRef,
-                                      unsigned(operandType.getCategory()),
-                                      operandRef,
-                                      indices.source,
-                                      paramIndicesBitVec);
-    break;
-  }
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto *adfi = cast<AutoDiffFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
@@ -2484,7 +2465,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstGraphOperationLayout>();
-  registerSILAbbr<SILInstGradientLayout>();
   registerSILAbbr<SILInstAutoDiffFunctionLayout>();
   registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
 

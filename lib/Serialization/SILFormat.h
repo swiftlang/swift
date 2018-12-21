@@ -174,7 +174,6 @@ namespace sil_block {
     // SWIFT_ENABLE_TENSORFLOW
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
     SIL_INST_GRAPH_OPERATION,
-    SIL_INST_GRADIENT,
     SIL_INST_AUTODIFF_FUNCTION,
     SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
 
@@ -419,16 +418,6 @@ namespace sil_block {
     BCArray<ValueIDField>  // 3 entries per argument (value, type, and type
                            // category)
     // followed by 2 entries per result type (type, and type category)
-  >;
-  
-  using SILInstGradientLayout = BCRecordLayout<
-    SIL_INST_GRADIENT,
-    BCFixed<3>,         // options
-    TypeIDField,
-    SILTypeCategoryField,
-    ValueIDField,
-    BCFixed<32>,        // result index
-    BCArray<BCFixed<1>> // parameter indices
   >;
 
   using SILInstAutoDiffFunctionLayout = BCRecordLayout<

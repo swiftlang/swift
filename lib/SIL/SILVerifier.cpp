@@ -1230,29 +1230,7 @@ public:
             "operand of end_apply must be a begin_apply");
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  void checkGradientInst(GradientInst *GI) {
-    CanSILFunctionType origFnTy = GI->getOriginalType();
-    require(origFnTy, "Original function value must have function type");
-    auto config = GI->getConfig();
-    require(config.getSourceIndex() < origFnTy->getNumResults(),
-            "Differentiation source index out of bounds");
-    llvm::SmallBitVector paramIndices = config.getParameterIndices();
-    require(!config.getParameterIndices().empty(),
-            "Parameter indices cannot be empty; they must be explicitly "
-            "specified");
-    // Verify differentiation parameters.
-    int lastIndex = -1;
-    for (auto index : paramIndices.set_bits()) {
-      require((int)index > lastIndex, "Parameter indices must be ascending");
-      auto paramTy = origFnTy->getParameters()[index].getType();
-      require(!(paramTy.isAnyClassReferenceType() ||
-                paramTy.isAnyExistentialType()),
-              "Cannot differentiate with respect to reference type or "
-              "existential type");
-    }
-  }
-
+  // SWIFT_ENABLE_TENSORFLOW
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     require(adfi->getDifferentiationOrder() > 0,
             "The differentiation order must be non-zero");

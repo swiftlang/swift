@@ -500,12 +500,6 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  GradientInst *createGradient(SILLocation loc, SILValue original,
-                               const SILAutoDiffConfig &config) {
-    return insert(GradientInst::create(getModule(), getSILDebugLocation(loc),
-                                       original, config));
-  }
-
   AutoDiffFunctionInst *createAutoDiffFunction(
       SILLocation loc, const llvm::SmallBitVector &parameterIndices,
       unsigned differentiationOrder, SILValue original,

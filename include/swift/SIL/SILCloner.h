@@ -907,17 +907,7 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
                                         getOpValue(Inst->getOperand())));
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst,
-      getBuilder().createGradient(getOpLocation(Inst->getLoc()),
-                                  getOpValue(Inst->getOriginal()),
-                                  Inst->getConfig()));
-}
-
+// SWIFT_ENABLE_TENSORFLOW
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {

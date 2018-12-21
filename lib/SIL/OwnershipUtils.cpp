@@ -44,7 +44,6 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
   // SWIFT_ENABLE_TENSORFLOW
-  case SILNodeKind::GradientInst:
   case SILNodeKind::AutoDiffFunctionInst:
   case SILNodeKind::AutoDiffFunctionExtractInst:
     return true;
