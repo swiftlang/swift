@@ -2036,8 +2036,9 @@ void lookupReplacedDecl(DeclName replacedDeclName,
                              replacement->getModuleScopeContext(), nullptr,
                              attr->getLocation());
     if (lookup.isSuccess()) {
-      for (auto entry : lookup.Results)
+      for (auto entry : lookup.Results) {
         results.push_back(entry.getValueDecl());
+      }
     }
     return;
   }
@@ -2051,6 +2052,28 @@ void lookupReplacedDecl(DeclName replacedDeclName,
       {typeCtx}, replacedDeclName, NL_QualifiedDefault, results);
 }
 
+/// Remove any argument labels from the interface type of the given value that
+/// are extraneous from the type system's point of view, producing the
+/// type to compare against for the purposes of dynamic replacement.
+static Type getDynamicComparisonType(ValueDecl *value) {
+  unsigned numArgumentLabels = 0;
+
+  if (isa<AbstractFunctionDecl>(value)) {
+    ++numArgumentLabels;
+
+    if (value->getDeclContext()->isTypeContext())
+      ++numArgumentLabels;
+  } else if (isa<SubscriptDecl>(value)) {
+    ++numArgumentLabels;
+  }
+
+  auto interfaceType = value->getInterfaceType();
+  if (interfaceType->hasError())
+    return interfaceType;
+
+  return interfaceType->removeArgumentLabels(numArgumentLabels);
+}
+
 static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
                                       AccessorDecl *replacement,
                                       DynamicReplacementAttr *attr,
@@ -2060,13 +2083,47 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   SmallVector<ValueDecl *, 4> results;
   lookupReplacedDecl(replacedVarName, attr, replacement, results);
 
+  // Filter out any accessors that won't work.
+  if (!results.empty()) {
+    auto replacementStorage = replacement->getStorage();
+    TC.validateDecl(replacementStorage);
+    Type replacementStorageType = getDynamicComparisonType(replacementStorage);
+    results.erase(std::remove_if(results.begin(), results.end(),
+        [&](ValueDecl *result) {
+          // Check for static/instance mismatch.
+          if (result->isStatic() != replacementStorage->isStatic())
+            return true;
+
+          // Check for type mismatch.
+          TC.validateDecl(result);
+          auto resultType = getDynamicComparisonType(result);
+          if (!resultType->isEqual(replacementStorageType)) {
+            return true;
+          }
+
+          return false;
+        }),
+        results.end());
+  }
+
   if (results.empty()) {
     TC.diagnose(attr->getLocation(),
                 diag::dynamic_replacement_accessor_not_found, replacedVarName);
     attr->setInvalid();
     return nullptr;
   }
-  assert(results.size() == 1 && "Should only have on var or fun");
+
+  if (results.size() > 1) {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_accessor_ambiguous, replacedVarName);
+    for (auto result : results) {
+      TC.diagnose(result,
+                  diag::dynamic_replacement_accessor_ambiguous_candidate,
+                  result->getModuleContext()->getFullName());
+    }
+    attr->setInvalid();
+    return nullptr;
+  }
 
   assert(!isa<FuncDecl>(results[0]));
   TC.validateDecl(results[0]);
@@ -2117,6 +2174,10 @@ findReplacedFunction(DeclName replacedFunctionName,
   lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
 
   for (auto *result : results) {
+    // Check for static/instance mismatch.
+    if (result->isStatic() != replacement->isStatic())
+      continue;
+
     TC.validateDecl(result);
     if (result->getInterfaceType()->getCanonicalType()->matches(
             replacement->getInterfaceType()->getCanonicalType(),
