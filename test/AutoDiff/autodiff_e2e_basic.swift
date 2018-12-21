@@ -10,10 +10,9 @@ func adjointId(_ seed: Float, _ originalValue: Float, _ x: Float) -> Float {
   return seed
 }
 
-_ = #gradient(id)(2)
+_ = gradient(at: 2, in: id)
 
-// CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0
-// CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0_s_p
+// CHECK-LABEL: @{{.*}}id{{.*}}__vjp_src_0_wrt_0
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 import func Darwin.exp
@@ -38,20 +37,17 @@ func adjointSigmoid(_ seed: Double, _ checkpoints: (Double, Double, Double), _ r
   return result * (1 - result)
 }
 
-let x = #gradient(sigmoid)(3)
-let (value: y, gradient: z) = #valueAndGradient(sigmoid)(4)
+let x = gradient(at: 3, in: sigmoid)
+let (value: y, gradient: z) = valueWithGradient(at: 4, in: sigmoid)
 print(x * z)
 
-// CHECK-LABEL: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_s_p
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_p
+// CHECK-LABEL: @{{.*}}sigmoid{{.*}}__vjp_src_0_wrt_0
 
-
+@differentiable(reverse)
 public func publicFunc(_ x: Float) -> Float {
   return x + x
 }
-_ = #gradient(publicFunc)
 
-// CHECK-LABEL: @{{.*}}publicFunc{{.*}}__grad_src_0_wrt_0
+// CHECK-LABEL: @{{.*}}publicFunc{{.*}}__vjp_src_0_wrt_0
 // CHECK: @{{.*}}publicFunc{{.*}}__primal_src_0_wrt_0
 // CHECK: @{{.*}}publicFunc{{.*}}__adjoint_src_0_wrt_0

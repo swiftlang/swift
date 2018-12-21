@@ -30,9 +30,6 @@ public protocol VectorNumeric : AdditiveArithmetic {
   /// vector space.
   associatedtype Shape
 
-  // TODO: This is a degenerate API. To be removed.
-  init(_ scalar: Scalar)
-
   /// Create an object in the vector space with the specified shape by
   /// repeatedly filling the object with the specified scalar value.
   ///

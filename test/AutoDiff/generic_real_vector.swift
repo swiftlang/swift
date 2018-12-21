@@ -43,5 +43,5 @@ public func test1() {
   func foo(_ x: Vector<Float>) -> Vector<Float> {
     return x + x
   }
-  _ = #gradient(foo)
+  _ = gradient(at: Vector(0), in: foo)
 }

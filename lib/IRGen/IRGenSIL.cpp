@@ -1961,17 +1961,8 @@ static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
 /// Gradient is not valid in canonical SIL yet. For now, we print a runtime
 /// error.
 void IRGenSILFunction::visitGradientInst(GradientInst *i) {
-  const std::string errMessage =
-      "Compiler bug: gradient should have been canonicalized.";
-  abortOnGraphOp(*this, errMessage.c_str());
-  for (auto result : i->getResults()) {
-    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
-    Explosion e;
-    for (auto &elt : schema)
-      e.add(llvm::UndefValue::get(elt.getScalarType()));
-    setLoweredExplosion(result, e);
-  }
-  return;
+  llvm_unreachable("The gradient instruction is deprecated and will be "
+                   "removed");
 }
 
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {

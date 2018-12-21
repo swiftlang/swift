@@ -72,23 +72,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Mangles an AD configuration. The mangling rule looks like
-///   "grad_src_<src_idx>_wrt_<param_idx0>_<param_idx1>_..._<options>"
-/// ... where options mangle as the following:
-///   "_s" : seedable
-///   "_p" : preserving_result
-///   "_d" : delayed
-static std::string mangleADConfig(const SILAutoDiffConfig &config) {
-  std::string result = "grad_" + config.indices.mangle();
-  if (config.isSeedable())
-    result += "_s";
-  if (config.isPreservingResult())
-    result += "_p";
-  if (config.isDelayed())
-    result += "_d";
-  return result;
-}
-
 /// Creates arguments in the entry block based on the function type.
 static void createEntryArguments(SILFunction *f) {
   auto *entry = f->getEntryBlock();
@@ -256,17 +239,12 @@ class ADContext;
 class DifferentiationTask;
 
 /// The invoker of a differentiation task. It can be some user syntax, e.g.
-/// `#gradient` expression, the differentiation pass, or nothing at all. This
-/// will be used to emit informative diagnostics.
+/// `AutoDiffFunctionExpr` expression, the differentiation pass, or nothing at
+/// all. This will be used to emit informative diagnostics.
 struct DifferentiationInvoker {
 public:
   /// The kind of the invoker of a differentiation task.
   enum class Kind {
-    // No known invoker. This is the case when the differentiation is requested
-    // from SIL source via a `gradient` instruction **without** being linked to
-    // a Swift AST node.
-    GradientInst,
-
     // No known invoker. This is the case when the differentiation is requested
     // from SIL source via a `autodiff_function` instruction **without** being
     // linked to a Swift AST node.
@@ -276,10 +254,10 @@ public:
     // associated differentiation task reference.
     IndirectDifferentiation,
 
-    // Invoked by a differential operator, such as `#gradient`, in the Swift
-    // source. This case has an associated differential operator, i.e. a
-    // `ReverseAutoDiffExpr`.
-    DifferentialOperator,
+    // Invoked by function conversion from a non-differentiable function to a
+    // differentiable one. The corresponding AST node is an
+    // `AutoDiffFunctionExpr`.
+    FunctionConversion,
 
     // Invoked by a `@differentiable` attribute in the Swift source. This case
     // has an associated `@differentiable` attribute.
@@ -294,10 +272,6 @@ public:
 private:
   Kind kind;
   union Value {
-    /// The instruction associated with the `GradientInst` case.
-    GradientInst *gradientInst;
-    Value(GradientInst *inst) : gradientInst(inst) {}
-
     /// The instruction associated with the `AutoDiffFunctionInst` case.
     AutoDiffFunctionInst *adFuncInst;
     Value(AutoDiffFunctionInst *inst) : adFuncInst(inst) {}
@@ -308,10 +282,9 @@ private:
     Value(ApplyInst *applyInst, DifferentiationTask *parentTask)
         : indirectDifferentiation({applyInst, parentTask}) {}
 
-    /// The differential operator associated with the `DifferentialOperator`
-    /// case.
-    ReverseAutoDiffExpr *differentialOperator;
-    Value(ReverseAutoDiffExpr *expr) : differentialOperator(expr) {}
+    /// The conversion expression associated with the `FunctionConversion` case.
+    AutoDiffFunctionExpr *functionConversion;
+    Value(AutoDiffFunctionExpr *expr) : functionConversion(expr) {}
 
     /// The `@differentiable` attribute associated with the
     /// `DifferentiableAttribute` case.
@@ -331,25 +304,18 @@ private:
   DifferentiationInvoker(Kind kind, Value value) : kind(kind), value(value) {}
 
 public:
-  DifferentiationInvoker(GradientInst *inst)
-      : kind(Kind::GradientInst), value(inst) {}
   DifferentiationInvoker(AutoDiffFunctionInst *inst)
       : kind(Kind::AutoDiffFunctionInst), value(inst) {}
   DifferentiationInvoker(ApplyInst *applyInst, DifferentiationTask *task)
       : kind(Kind::IndirectDifferentiation), value(applyInst, task) {}
-  DifferentiationInvoker(ReverseAutoDiffExpr *expr)
-      : kind(Kind::DifferentialOperator), value(expr) {}
+  DifferentiationInvoker(AutoDiffFunctionExpr *expr)
+      : kind(Kind::FunctionConversion), value(expr) {}
   DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
       : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
   DifferentiationInvoker(SILDifferentiableAttr *attr, SILFunction *f)
       : kind(Kind::SILDifferentiableAttribute), value(attr, f) {}
 
   Kind getKind() const { return kind; }
-
-  GradientInst *getGradientInst() const {
-    assert(kind == Kind::GradientInst);
-    return value.gradientInst;
-  }
 
   AutoDiffFunctionInst *getAutoDiffFunctionInst() const {
     assert(kind == Kind::AutoDiffFunctionInst);
@@ -362,9 +328,9 @@ public:
     return value.indirectDifferentiation;
   }
 
-  ReverseAutoDiffExpr *getDifferentialOperator() const {
-    assert(kind == Kind::DifferentialOperator);
-    return value.differentialOperator;
+  AutoDiffFunctionExpr *getFunctionConversion() const {
+    assert(kind == Kind::FunctionConversion);
+    return value.functionConversion;
   }
 
   std::pair<DifferentiableAttr *, FuncDecl *>
@@ -377,10 +343,6 @@ public:
   getSILDifferentiableAttribute() const {
     assert(kind == Kind::SILDifferentiableAttribute);
     return value.silDifferentiableAttribute;
-  }
-
-  bool isAnyDifferentialOperator() const {
-    return kind == Kind::DifferentialOperator || kind == Kind::GradientInst;
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -846,9 +808,6 @@ static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   os << "(differentiation_invoker ";
   switch (kind) {
-  case Kind::GradientInst:
-    os << "gradient_inst=(" << *getGradientInst() << ")";
-    break;
   case Kind::AutoDiffFunctionInst:
     os << "autodiff_function_inst=(" << *getAutoDiffFunctionInst() << ")";
     break;
@@ -858,11 +817,11 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
        << ") task=" << indDiff.second << ')';
     break;
   }
-  case Kind::DifferentialOperator: {
+  case Kind::FunctionConversion: {
     StreamPrinter printer(os);
     PrintOptions options;
     os << "differential_operator=(";
-    getDifferentialOperator()->print(printer, options);
+    getFunctionConversion()->print(printer, options);
     os << ')';
     break;
   }
@@ -922,8 +881,6 @@ enum class PrimalValueKind {
   TapeCheckpoint
 };
 
-using GradientLookUpKey = std::pair<SILFunction *, SILAutoDiffConfig>;
-
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
 //===----------------------------------------------------------------------===//
@@ -941,15 +898,6 @@ private:
 
   /// Shared pass manager.
   SILPassManager &passManager;
-
-  /// A mapping from functions and AD configurations to gradient functions.
-  ///
-  /// NOTE: The parameter index array is hashed by reference, which is expected
-  /// to point to [differentiable wrt ...]'s trailing index storage.
-  DenseMap<GradientLookUpKey, SILFunction *> gradientMap;
-  /// Canonical gradients to be filled.
-  SmallVector<std::pair<GradientLookUpKey, SILFunction *>, 32>
-      canonicalGradients;
 
   /// Queue of differentiation tasks.
   SmallVector<std::unique_ptr<DifferentiationTask>, 32> differentiationTasks;
@@ -990,11 +938,6 @@ public:
   ArrayRef<std::unique_ptr<DifferentiationTask>>
   getDifferentiationTasks() const {
     return differentiationTasks;
-  }
-
-  ArrayRef<std::pair<GradientLookUpKey, SILFunction *>>
-  getCanonicalGradients() const {
-    return canonicalGradients;
   }
 
   ProtocolDecl *getVectorNumericProtocol() const {
@@ -1039,21 +982,6 @@ public:
   /// of a function. The newly created struct will have the same generic
   /// parameters as the function.
   StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
-
-  void insertGradient(const GradientLookUpKey &key, SILFunction *gradient) {
-    gradientMap.insert({key, gradient});
-    if (key.second.isMaster())
-      canonicalGradients.push_back({key, gradient});
-  }
-
-  SILFunction *lookUpGradient(const GradientLookUpKey &key) const {
-    auto lookup = gradientMap.find(key);
-    return lookup == gradientMap.end() ? nullptr : lookup->getSecond();
-  }
-
-  SILFunction *lookUpCanonicalGradient(const DifferentiationTask *task) const {
-    return lookUpGradient({task->original, task->getMasterConfig()});
-  }
 
   /// Finds the `[differentiable]` attribute on the specified original function
   /// corresponding to the specified parameter indices. Returns nullptr if it
@@ -1213,10 +1141,9 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              << "\n"
              << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
-  // For a gradient instruction or a `[differentiable]` attribute that is not
-  // associated with any source location, we emit a diagnostic at the
-  // instruction source location.
-  case DifferentiationInvoker::Kind::GradientInst:
+  // For a `autodiff_function` instruction or a `[differentiable]` attribute
+  // that is not associated with any source location, we emit a diagnostic at
+  // the instruction source location.
   case DifferentiationInvoker::Kind::AutoDiffFunctionInst:
   case DifferentiationInvoker::Kind::SILDifferentiableAttribute:
     diagnose(opLoc,
@@ -1235,12 +1162,12 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     break;
   }
 
-  // For a differential operator, emit a "not differentiable" error on the
+  // For a function conversion, emit a "not differentiable" error on the
   // attribute first and a note on the non-differentiable operation.
-  case DifferentiationInvoker::Kind::DifferentialOperator: {
-    auto *expr = invoker.getDifferentialOperator();
+  case DifferentiationInvoker::Kind::FunctionConversion: {
+    auto *expr = invoker.getFunctionConversion();
     diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable)
-        .highlight(expr->getOriginalExpr()->getSourceRange());
+        .highlight(expr->getSubExpr()->getSourceRange());
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
@@ -2426,7 +2353,7 @@ protected:
     case SILInstructionKind::GlobalValueInst:
     case SILInstructionKind::KeyPathInst:
     case SILInstructionKind::MetatypeInst:
-    case SILInstructionKind::GradientInst:
+    case SILInstructionKind::AutoDiffFunctionExtractInst:
       return PrimalValueKind::Conversion;
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(inst);
@@ -2871,15 +2798,6 @@ public:
             getOpValue(origCallee)->getDefiningInstruction());
   }
 
-  /// Handle the primal transformation of a `gradient` instruction. The only
-  /// case that will incur visiting `gradient` instruction is nested
-  /// differentiation, which is not supported yet.
-  void visitGradientInst(GradientInst *gi) {
-    getContext().emitNondifferentiabilityError(
-        gi, getDifferentiationTask(), diag::autodiff_nested_not_supported);
-    errorOccurred = true;
-  }
-
   /// Primal has qualified ownership. We assign store ownership qualifier while
   /// cloning the `store` instruction.
   void visitStoreInst(StoreInst *si) {
@@ -2976,7 +2894,7 @@ bool PrimalGen::run() {
 // in a SIL module.
 //===----------------------------------------------------------------------===//
 
-/// The adjoint generator for all gradient functions. Executed after PrimalGen.
+/// The adjoint generator for all differentiation tasks.
 namespace {
 
 class AdjointGen {
@@ -3033,7 +2951,7 @@ bool AdjointGen::run() {
 
 namespace {
 
-/// A symbolic adjoint value that is capable of representing zero gradient 0 and
+/// A symbolic adjoint value that is capable of representing zero value 0 and
 /// 1, in addition to a materialized SILValue. This is expected to be passed
 /// around by value in most cases, as it's two words long.
 class AdjointValue {
@@ -3513,7 +3431,7 @@ public:
     };
 
     // The original's self parameter, if present, is the last parameter. But we
-    // want its gradient, if present, to be the first return element.
+    // want its cotangent, if present, to be the first return element.
     auto selfParamIndex = origParams.size() - 1;
     if (origTy->hasSelfParam() &&
         task->getIndices().isWrtParameter(selfParamIndex))
@@ -3634,7 +3552,8 @@ public:
     auto &builder = getBuilder();
     auto loc = remapLocation(ai->getLoc());
 
-    auto &nestedApplyActivities = getDifferentiationTask()->getNestedApplyActivities();
+    auto &nestedApplyActivities =
+        getDifferentiationTask()->getNestedApplyActivities();
     auto applyInfoLookUp = nestedApplyActivities.find(ai);
     // If no NestedApplyActivity was found, then this task doesn't need to be
     // differentiated.
@@ -3667,8 +3586,14 @@ public:
           loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
+      SILValue seedEltAddr;
+      if (auto tupleTy = seed.getType().getAs<TupleType>())
+        seedEltAddr = getBuilder().createTupleElementAddr(
+            loc, access, applyInfo.indices.source);
+      else
+        seedEltAddr = access;
       args.push_back(getBuilder().createLoad(
-          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
+          loc, seedEltAddr, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
 
@@ -3766,8 +3691,14 @@ public:
           loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
           /*noNestedConflict*/ true,
           /*fromBuiltin*/ false);
+      SILValue seedEltAddr;
+      if (auto tupleTy = seed.getType().getAs<TupleType>())
+        seedEltAddr = getBuilder().createTupleElementAddr(
+            loc, access, otherTask->getIndices().source);
+      else
+        seedEltAddr = access;
       args.push_back(getBuilder().createLoad(
-          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
+          loc, seedEltAddr, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
 
@@ -3841,14 +3772,6 @@ public:
     // Clean up indirect result buffers
     for (auto alloc : reversed(allocsToCleanUp))
       builder.createDeallocStack(loc, alloc);
-  }
-
-  /// Handle `gradient` instruction.
-  ///
-  /// NOTE: Nested differentiation is not supported yet.
-  void visitGradientInst(GradientInst *gi) {
-    // Rejected by PrimalGen already.
-    llvm_unreachable("Should've been rejected by PrimalGen");
   }
 
   /// Handle `struct` instruction.
@@ -4128,7 +4051,8 @@ static void materializeAdjointIndirectHelper(AdjointValue val,
     if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
       for (auto eltAndIdx : enumerate(val.getAggregateElements())) {
         auto idx = eltAndIdx.index();
-        auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
+        auto eltTy = SILType::getPrimitiveAddressType(
+            tupTy->getElementType(idx)->getCanonicalType());
         auto *eltBuf =
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
         materializeAdjointIndirectHelper(
@@ -4862,285 +4786,12 @@ void DifferentiationTask::createVJP() {
 // Differentiation pass implementation
 //===----------------------------------------------------------------------===//
 
-/// Given a `gradient` instruction, find the corresponding differential operator
-/// used in the AST. If no differential operator is found, return nullptr.
-static ReverseAutoDiffExpr *findDifferentialOperator(GradientInst *inst) {
-  return inst->getLoc().getAsASTNode<ReverseAutoDiffExpr>();
-}
-
 /// Given an `autodiff_function` instruction, find the corresponding
 /// differential operator used in the AST. If no differential operator is found,
 /// return nullptr.
 static AutoDiffFunctionExpr *findDifferentialOperator(
     AutoDiffFunctionInst *inst) {
   return inst->getLoc().getAsASTNode<AutoDiffFunctionExpr>();
-}
-
-// Retrieve or create an empty gradient function based on a `gradient`
-// instruction and replace all users of the `gradient` instruction with the
-// gradient function. Returns the gradient function.
-static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
-                                               GradientInst *gradInst,
-                                               SILFunction *original) {
-  auto &module = original->getModule();
-  auto &astCtx = module.getASTContext();
-  auto origTy = original->getLoweredFunctionType();
-  auto &config = gradInst->getConfig();
-
-  // Creates a gradient function based on the configuration.
-  auto createGradFunction = [&](const SILAutoDiffConfig &config) {
-    auto gradType = origTy->getGradientType(config, module);
-    std::string gradName =
-        "AD__" + original->getName().str() + "__" + mangleADConfig(config);
-    auto gradNameId = astCtx.getIdentifier(gradName);
-    SILOptFunctionBuilder fb(context.getTransform());
-    auto linkage = original->getLinkage();
-    if (linkage == SILLinkage::Public)
-      linkage = SILLinkage::PublicNonABI;
-    auto *gradFn =
-        fb.createFunction(linkage, gradNameId.str(), gradType,
-                          original->getGenericEnvironment(),
-                          original->getLocation(), original->isBare(),
-                          original->isTransparent(), original->isSerialized());
-    gradFn->setUnqualifiedOwnership();
-    gradFn->setDebugScope(new (module)
-                              SILDebugScope(original->getLocation(), gradFn));
-    return gradFn;
-  };
-
-  // Find the canonical gradient.
-  SILFunction *canonicalGrad = nullptr;
-  // The master AD config corresponds to the canonical gradient.
-  auto masterConfig = config.getWithCanonicalOptions();
-  // If the canonical gradient already exists, we'll simply use it. No
-  // differentiation is needed.
-  if (auto *existingGrad = context.lookUpGradient({original, masterConfig}))
-    canonicalGrad = existingGrad;
-  // Otherwise, create a canonical gradient and enqueue a differentiation task.
-  else {
-    // Create a canonical gradient.
-    canonicalGrad = createGradFunction(masterConfig);
-    context.insertGradient({original, masterConfig}, canonicalGrad);
-    // Enqueue a new differentiation task in the global context.
-    if (auto *diffOp = findDifferentialOperator(gradInst))
-      context.lookUpOrRegisterDifferentiationTask(
-          original, config.indices, diffOp);
-    else
-      context.lookUpOrRegisterDifferentiationTask(
-          original, config.indices, gradInst);
-  }
-
-  // If the requested gradient is not *both seedable and result-preserving*,
-  // emit wrapper function, emit a call to the canonical gradient function
-  // inside, and cache it. Otherwise, it's just the canonical gradient.
-  SILFunction *gradFn = nullptr;
-  if (config.isMaster())
-    gradFn = canonicalGrad;
-  else if (auto *existingGradFn = context.lookUpGradient({original, config}))
-    gradFn = existingGradFn;
-  else {
-    gradFn = createGradFunction(config);
-    // Create entry basic block.
-    auto *entry = gradFn->createBasicBlock();
-    createEntryArguments(gradFn);
-    // Build a call to the canonical gradient function.
-    SILBuilder builder(entry);
-    auto loc = gradFn->getLocation();
-    SILFunctionConventions gradConv(gradFn->getLoweredFunctionType(), module),
-        origConv(origTy, module),
-        canGradConv(canonicalGrad->getLoweredFunctionType(), module);
-    SmallVector<SILValue, 8> args;
-    SmallVector<SILValue, 1> stackAllocsToCleanUp;
-    // Prepare arguments.
-    // The first few arguments are the original arguments.
-    for (auto arg : gradFn->getArguments())
-      args.push_back(arg);
-    // If it's not seedable, we need to create a default seed.
-    if (!config.isSeedable()) {
-      auto seedTy = origTy->getResults()[config.getSourceIndex()].getType();
-      auto seedSILTy = SILType::getPrimitiveObjectType(seedTy);
-      // Call `<seed type>.init(1)` to create a default
-      // seed to feed into the canonical gradient.
-      auto *seedBuf = builder.createAllocStack(loc, seedSILTy);
-      createScalarValueIndirect(1, seedTy, seedBuf, loc, builder, context);
-      // If seed is address only, we'll clean up the buffer after calling the
-      // canonical gradient Otherwise, we just load the seed and deallocate the
-      // buffer.
-      if (seedSILTy.isAddressOnly(module)) {
-        stackAllocsToCleanUp.push_back(seedBuf);
-      } else {
-        auto loq = getBufferLOQ(seedSILTy.getASTType(), *gradFn);
-        auto seedBufAccess = builder.createBeginAccess(
-            loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-            /*noNestedConflict*/ false, /*fromBuiltin=*/false);
-        auto seed = builder.createLoad(loc, seedBufAccess, loq);
-        builder.createEndAccess(loc, seedBufAccess, /*aborted*/ false);
-        args.push_back(seed);
-        builder.createDeallocStack(loc, seedBuf);
-      }
-    }
-    // Call the canonical gradient function.
-    // %0 = function_ref ...
-    auto *canGradFnRef = builder.createFunctionRef(loc, canonicalGrad);
-    SubstitutionMap subMap;
-    if (auto *genEnv = gradFn->getGenericEnvironment())
-      subMap = genEnv->getForwardingSubstitutionMap();
-    // %1 = apply %0(...)
-    auto *resultAndGrad = builder.createApply(loc, canGradFnRef, subMap, args,
-                                              /*isNonThrowing*/ false);
-    // Clean up stack allocations made by seed passing when seed is addr-only.
-    for (auto alloc : stackAllocsToCleanUp)
-      builder.createDeallocStack(loc, alloc);
-    // If the config is result-preserving, or if all original results are
-    // indirect, we can just return whatever direct results the canonical
-    // gradient produces.
-    if (config.isPreservingResult() || origConv.getNumDirectSILResults() == 0) {
-      builder.createReturn(loc, resultAndGrad);
-    }
-    // Otherwise, return every tuple element of `resultAndGrad` except the
-    // first. For this, we have to build a bunch of `tuple_extract`s and
-    // re-gather them using `tuple`.
-    else {
-      unsigned numDirResults = canGradConv.getNumDirectSILResults();
-      SILValue result;
-      if (numDirResults == 2)
-        result = builder.createTupleExtract(loc, resultAndGrad, 1);
-      else {
-        SmallVector<SILValue, 8> grads;
-        for (unsigned i : range(1, numDirResults))
-          grads.push_back(builder.createTupleExtract(loc, resultAndGrad, i));
-        result = builder.createTuple(loc, gradConv.getSILResultType(), grads);
-      }
-      builder.createReturn(loc, result);
-    }
-
-    // Cache the newly created gradient wrapper (non-canonical).
-    context.insertGradient({original, config}, gradFn);
-  }
-
-  return gradFn;
-}
-
-/// Finish the canonical gradient function.
-///
-/// For the following original function type:
-///   (a1, a2, ..., an) -> r
-///
-/// The canonical gradient has the following type:
-///   (a1, a2, ..., an, seed) -> (r, a1, a0, ..., an)
-///
-/// In the canonical gradient function, we simply call the primal and the
-/// adjoint, and return a tuple of the original result and the gradient values.
-/// If the adjoint provides more gradient values than we need, we use the
-/// config to extract the ones we want.
-static void fillCanonicalGradient(SILFunction &canGrad,
-                                  const DifferentiationTask *task,
-                                  const SILAutoDiffConfig &config,
-                                  ADContext &context) {
-  assert(canGrad.empty() && "The gradient function must be empty");
-  auto &module = context.getModule();
-  auto canGradTy = canGrad.getLoweredFunctionType();
-  auto loc = canGrad.getLocation();
-  auto *primal = task->getPrimal();
-  assert(primal && "Primal does not exist?");
-  auto primalTy = primal->getLoweredFunctionType();
-  auto *adjoint = task->getAdjoint();
-  assert(adjoint && "Adjoint does not exist?");
-  auto adjointTy = adjoint->getLoweredFunctionType();
-  SILFunctionConventions primalConv(primalTy, module),
-      adjointConv(adjointTy, module), canGradConv(canGradTy, module);
-  // Create an entry basic block.
-  auto *entry = canGrad.createBasicBlock();
-  createEntryArguments(&canGrad);
-  // Initialize arguments.
-  SILBuilder builder(entry);
-  // Call primal with original arguments.
-  SmallVector<SILValue, 8> stackAllocsToCleanUp;
-  SmallVector<SILValue, 8> primalArgs;
-  // Add indirect results.
-  for (auto indResInfo : primalTy->getIndirectFormalResults()) {
-    auto objTy = SILType::getPrimitiveObjectType(indResInfo.getType());
-    auto resultBuf = builder.createAllocStack(loc, objTy);
-    stackAllocsToCleanUp.push_back(resultBuf);
-    primalArgs.push_back(resultBuf);
-  }
-  // Add original parameters. These are the canonical gradient's parameter
-  // arguments except the seed, which is the last argument.
-  for (auto arg : canGrad.getArgumentsWithoutIndirectResults().drop_back())
-    primalArgs.push_back(arg);
-  // %0 = function_ref @primal
-  auto *primalRef = builder.createFunctionRef(loc, primal);
-  // %1 = apply %0(...)
-  auto *primalApply = builder.createApply(
-      loc, primalRef, canGrad.getForwardingSubstitutionMap(), primalArgs,
-      /*isNonThrowing*/ false);
-  // Collect the primal's direct results.
-  SmallVector<SILValue, 8> primalResults;
-  if (primalConv.getNumDirectSILResults() == 1)
-    primalResults.push_back(primalApply);
-  else {
-    auto tupleSILTy = primalConv.getSILResultType();
-    for (unsigned i : range(primalConv.getNumDirectSILResults())) {
-      auto val = builder.createTupleExtract(loc, primalApply, i,
-                                            tupleSILTy.getTupleElementType(i));
-      primalResults.push_back(val);
-    }
-  }
-  // Call adjoint with original arguments, the checkpoints value and the seed.
-  SmallVector<SILValue, 8> adjointArgs;
-  // Add indirect results.
-  for (auto indRes : canGrad.getIndirectResults())
-    adjointArgs.push_back(indRes);
-  // Add seed.
-  adjointArgs.push_back(canGrad.getArguments().back());
-  // Add primal values and the original result (all returned by primal).
-  unsigned indResIdx = 0, dirResIdx = 0;
-  for (auto &resInfo : primalConv.getResults())
-    adjointArgs.push_back(resInfo.isFormalDirect() ? primalResults[dirResIdx++]
-                                                   : primalArgs[indResIdx++]);
-  // Add original parameters. These are the canonical gradient's parameters
-  // except the seed, which is the last.
-  for (auto arg : canGrad.getArgumentsWithoutIndirectResults().drop_back())
-    adjointArgs.push_back(arg);
-  // %2 = function_ref @adjoint
-  auto *adjRef = builder.createFunctionRef(loc, adjoint);
-  // %3 = apply %2(...)
-  auto *adjApply =
-      builder.createApply(loc, adjRef, canGrad.getForwardingSubstitutionMap(),
-                          adjointArgs, /*isNonThrowing*/ false);
-  // Release primal results. This includes primal values and original results.
-  for (unsigned i : indices(primalResults))
-    if (primalTy->getResults()[i].getConvention() == ResultConvention::Owned)
-      builder.createReleaseValue(loc, primalResults[i],
-                                 builder.getDefaultAtomicity());
-  // Clean up stack allocations.
-  for (auto val : reversed(stackAllocsToCleanUp))
-    builder.createDeallocStack(loc, val);
-  // Return the original result and the adjoint result as a tuple. If either one
-  // of the primal or the adjoint returns a tuple, join them in a flat tuple.
-  SmallVector<SILValue, 8> directResults;
-  // If the original result is a direct return, add it to the direct return list
-  // of the canonical gradient.
-  if (primalConv.getResults().back().isFormalDirect())
-    directResults.push_back(primalResults.back());
-  // Add the adjoint's results to the direct return list.
-  // If the adjoint returns one result, it's the subset we're looking for.
-  if (adjointConv.getNumDirectSILResults() == 1)
-    directResults.push_back(adjApply);
-  else {
-    auto tupleSILTy = adjApply->getType();
-    for (unsigned i : range(adjointConv.getNumDirectSILResults())) {
-      if (config.indices.isWrtParameter(i)) {
-        auto val = builder.createTupleExtract(
-          loc, adjApply, i, tupleSILTy.getTupleElementType(i));
-        directResults.push_back(val);
-      }
-    }
-  }
-  // Return these results as a tuple.
-  auto tupleRet =
-      builder.createTuple(loc, canGradConv.getSILResultType(), directResults);
-  builder.createReturn(loc, tupleRet);
 }
 
 /// The automatic differentiation pass.
@@ -5151,63 +4802,10 @@ public:
   void run() override;
 
 private:
-  /// Processes the given gradient instruction. This includes transforming it
-  /// into a normal `function_ref` to the synthesized gradient function, and
-  /// pushing a differentiation task onto the global list. Returns true if any
-  /// error occurred.
-  bool processGradientInst(GradientInst *gi, ADContext &context);
-
   bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
                                    ADContext &context);
 };
 } // end anonymous namespace
-
-bool Differentiation::processGradientInst(GradientInst *gi,
-                                          ADContext &context) {
-  SILFunction *parent = gi->getFunction();
-  auto operand = gi->getOperand(0);
-  SILFunction *gradFn = nullptr;
-  // If it traces back to a `function_ref`, differentiate that.
-  if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
-    auto *original = originalFRI->getReferencedFunction();
-    gradFn = lookUpOrSynthesizeGradient(context, gi, original);
-
-    // Replace the `gradient` instruction with the reference to the specified
-    // function.
-    SILBuilder builder(gi);
-    auto loc = parent->getLocation();
-    SILValue gradRef = builder.createFunctionRef(loc, gradFn);
-    // Traverse from the `gradient` instruction to the original
-    // `function_ref`. If there's any function convertion, do the same
-    // convertion for the gradient.
-    auto convertedGradFn = reapplyFunctionConversion(
-        gradRef, originalFRI, gi->getOriginal(), builder, loc);
-    // Replace uses of the `gradient` instruction with the converted (if
-    // necessary) gradient function value.
-    gi->replaceAllUsesWith(convertedGradFn);
-  }
-  // Differentiating opaque functions is not supported yet.
-  else {
-    // Find the original differential operator expression. Show an error at the
-    // operator, highlight the argument, and show a note at the definition site
-    // of the argument.
-    if (auto *expr = findDifferentialOperator(gi))
-      context
-          .diagnose(expr->getLoc(), diag::autodiff_opaque_function_unsupported)
-          .highlight(expr->getOriginalExpr()->getSourceRange());
-    else
-      context.diagnose(gi->getLoc().getSourceLoc(),
-                       diag::autodiff_opaque_function_unsupported);
-    // Emit a note at the definition site.
-    context.diagnose(gi->getOriginal().getLoc().getSourceLoc(),
-                     diag::autodiff_value_defined_here);
-    return true;
-  }
-  // We invalidate analyses on the parent function because the `gradient`
-  // instruction is transformed.
-  PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
-  return false;
-}
 
 bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
                                                   ADContext &context) {
@@ -5272,10 +4870,10 @@ void Differentiation::run() {
   auto &astCtx = module.getASTContext();
   debugDump(module);
 
-  // Collect [differentiable] attributes and gradient instructions to process.
+  // Collect `[differentiable]` attributes and `autodiff_function` instructions
+  // to process.
   SmallVector<std::pair<SILFunction *,
                         SILDifferentiableAttr *>, 8> diffAttrs;
-  SmallVector<GradientInst *, 16> gradInsts;
   SmallVector<AutoDiffFunctionInst *, 16> autodiffInsts;
   // Handle all the instructions and attributes in the module that trigger
   // differentiation.
@@ -5291,20 +4889,14 @@ void Differentiation::run() {
       astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
                             diag::autodiff_incomplete_differentiable_attr);
     }
-    for (SILBasicBlock &bb : f) {
-      for (SILInstruction &i : bb) {
-        // If `i` is a `gradient` instruction, i.e. the SIL-level differential
-        // operator, push it to the work list.
-        if (auto *gi = dyn_cast<GradientInst>(&i))
-          gradInsts.push_back(gi);
-        else if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i))
+    for (SILBasicBlock &bb : f)
+      for (SILInstruction &i : bb)
+        if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i))
           autodiffInsts.push_back(adfi);
-      }
-    }
   }
 
   // If nothing has triggered differentiation, there's nothing to do.
-  if (gradInsts.empty() && diffAttrs.empty() && autodiffInsts.empty())
+  if (diffAttrs.empty() && autodiffInsts.empty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
@@ -5327,25 +4919,7 @@ void Differentiation::run() {
         DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
   }
 
-  // Lower each gradient instruction to a function reference and replaces its
-  // uses with a function reference to its gradient.
-  //
-  // If the operand to the instruction traces back to a function reference that
-  // the compiler can see into, then we do further processing, i.e. retrieving
-  // or creating its gradient. Otherwise, it's differentiating an opaque
-  // function whose body isn't visible to the compiler. We don't have
-  // infrastructure support for this yet and currently it'll error out, but
-  // we'll look into adding a new function convention so that the primal and the
-  // adjoint can be passed along with the function.
-  //
-  // If any error occurs during `gradient` instruction processing, it won't be
-  // turned into a differentiation task. But we don't back out just yet - primal
-  // synthesis and adjoint synthesis for newly created differentiation tasks
-  // should still run because they will diagnose more errors.
   bool errorProcessingAutoDiffInsts = false;
-  for (auto *gi : gradInsts)
-    errorProcessingAutoDiffInsts |= processGradientInst(gi, context);
-
   for (auto *adfi : autodiffInsts)
     errorProcessingAutoDiffInsts |= processAutoDiffFunctionInst(adfi, context);
 
@@ -5361,24 +4935,10 @@ void Differentiation::run() {
   if (adjointGen.run())
     return;
 
-  // If there was any error that occurred during `gradient` instruction
+  // If there was any error that occurred during `autodiff_function` instruction
   // processing, back out.
   if (errorProcessingAutoDiffInsts)
     return;
-
-  // Fill the body of each empty canonical gradient function.
-  for (auto &canonicalGrad : context.getCanonicalGradients()) {
-    auto *original = canonicalGrad.first.first;
-    auto config = canonicalGrad.first.second;
-    auto *canGradFn = canonicalGrad.second;
-    auto *task = context.lookUpMinimalDifferentiationTask(
-        original, config.indices);
-    fillCanonicalGradient(*canGradFn, task, config, context);
-  }
-
-  // Remove all remaining `gradient` instructions.
-  for (auto *gi : gradInsts)
-    recursivelyDeleteTriviallyDeadInstructions(gi);
 
   LLVM_DEBUG(getADDebugStream() << "All differentiation finished\n");
 }

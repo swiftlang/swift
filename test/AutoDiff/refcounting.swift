@@ -33,7 +33,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equata
 func testOwnedVector(_ x: Vector) -> Vector {
   return x + x
 }
-_ = #gradient(testOwnedVector)
+_ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // CHECK-VJP-LABEL: struct {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0 {
 // CHECK-VJP-NEXT:   @sil_stored @usableFromInline
@@ -41,16 +41,6 @@ _ = #gradient(testOwnedVector)
 // CHECK-VJP-NEXT:   @sil_stored @usableFromInline
 // CHECK-VJP-NEXT:   var pullback_0: (Vector) -> (Vector, Vector)
 // CHECK-VJP-NEXT: }
-
-// CHECK-VJP-LABEL: @{{.*}}testOwnedVector{{.*}}__grad_src_0_wrt_0_s_p
-// CHECK-VJP:   [[PRIMAL:%.*]] = function_ref @{{.*}}testOwnedVector{{.*}}__primal_src_0_wrt_0
-// CHECK-VJP:   [[PRIMAL_RESULT:%.*]] = apply [[PRIMAL]]({{.*}})
-// CHECK-VJP:   [[NESTED_PRIMAL_VALUES:%.*]] = tuple_extract [[PRIMAL_RESULT]] : $({{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 0
-// CHECK-VJP:   [[ORIGINAL_RESULT:%.*]] = tuple_extract [[PRIMAL_RESULT]] : $({{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 1
-// CHECK-VJP:   [[ADJOINT:%.*]] = function_ref @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK-VJP:   {{.*}} = apply [[ADJOINT]]({{.*}}, [[NESTED_PRIMAL_VALUES]], [[ORIGINAL_RESULT]], {{.*}})
-// CHECK-VJP:   release_value [[NESTED_PRIMAL_VALUES]]
-// CHECK-VJP:   release_value [[ORIGINAL_RESULT]]
 
 // The primal should not release primal values.
 //
@@ -62,7 +52,6 @@ _ = #gradient(testOwnedVector)
 // CHECK-VJP-NOT:   release_value [[ADD_VJP_RESULT]]
 // CHECK-VJP-NOT:   release_value [[ADD_ORIGINAL_RESULT]]
 // CHECK-VJP-NOT:   release_value [[ADD_PULLBACK]]
-// CHECK-VJP:   } // end sil function '{{.*}}testOwnedVector{{.*}}__primal_src_0_wrt_0'
 
 // The adjoint should not release primal values because they are passed in as @guaranteed.
 //
@@ -71,23 +60,19 @@ _ = #gradient(testOwnedVector)
 // CHECK-VJP:   [[PULLBACK0:%.*]] = struct_extract [[PRIMAL_VALUES]] : ${{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0.pullback_0
 // CHECK-VJP-NOT:   release_value [[PULLBACK0]]
 // CHECK-VJP-NOT:   release_value [[PRIMAL_VALUES]]
-// CHECK-VJP:   } // end sil function '{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0'
 
-// CHECK-NOVJP-LABEL: struct {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0 {
-// CHECK-NOVJP-NEXT:   @sil_stored @usableFromInline
-// CHECK-NOVJP-NEXT:   var v_0: Vector
-// CHECK-NOVJP-NEXT: }
-// CHECK-NOVJP-LABEL: @{{.*}}testOwnedVector{{.*}}__grad_src_0_wrt_0_s_p
-// CHECK-NOVJP:   [[PRIMAL:%.*]] = function_ref @{{.*}}testOwnedVector{{.*}}__primal_src_0_wrt_0
-// CHECK-NOVJP:   [[PRIMAL_RESULT:%.*]] = apply [[PRIMAL]]({{.*}})
-// CHECK-NOVJP:   [[NESTED_PRIMAL_VALUES:%.*]] = tuple_extract [[PRIMAL_RESULT]] : $({{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 0
-// CHECK-NOVJP:   [[ORIGINAL_RESULT:%.*]] = tuple_extract [[PRIMAL_RESULT]] : $({{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 1
-// CHECK-NOVJP:   [[ADJOINT:%.*]] = function_ref @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
-// CHECK-NOVJP:   {{.*}} = apply [[ADJOINT]]({{.*}}, [[NESTED_PRIMAL_VALUES]], [[ORIGINAL_RESULT]], {{.*}})
-// CHECK-NOVJP:   release_value [[NESTED_PRIMAL_VALUES]]
-// CHECK-NOVJP:   release_value [[ORIGINAL_RESULT]]
-// The primal should not release primal values.
-//
+// CHECK-VJP-LABEL: @AD__{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector) {
+// CHECK-VJP: bb0([[X:%.*]] : $Vector):
+// CHECK-VJP:   [[PRIMAL:%.*]] = function_ref @AD__$s11refcounting15testOwnedVectoryAA0D0VADF__primal_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned AD__$s11refcounting15testOwnedVectoryAA0D0VADF__Type__src_0_wrt_0, @owned Vector)
+// CHECK-VJP:   [[PRIMAL_RES:%.*]] = apply [[PRIMAL]]([[X]])
+// CHECK-VJP:   [[PRIMVALS:%.*]] = tuple_extract [[PRIMAL_RES]] : $(AD__{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 0
+// CHECK-VJP:   [[ORIGRES:%.*]] = tuple_extract [[PRIMAL_RES]] : $(AD__{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, Vector), 1
+// CHECK-VJP:   retain_value [[PRIMVALS]] : $AD__{{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0
+// CHECK-VJP:   retain_value [[ORIGRES]] : $Vector
+// CHECK-VJP:   retain_value [[X]] : $Vector
+// CHECK-VJP:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
+// CHECK-VJP:   [[PULLBACK:%.*]] = partial_apply [callee_guaranteed] [[ADJOINT]]([[PRIMVALS]], [[ORIGRES]], [[X]])
+
 // CHECK-NOVJP-LABEL: @{{.*}}testOwnedVector{{.*}}__primal_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned {{.*}}testOwnedVector{{.*}}__Type__src_0_wrt_0, @owned Vector) {
 // CHECK-NOVJP:   [[ADD:%.*]] = function_ref @$s11refcounting6VectorV1poiyA2C_ACtFZ : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> @owned Vector
 // CHECK-NOVJP:   [[ADD_RESULT:%.*]] = apply [[ADD]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> @owned Vector
