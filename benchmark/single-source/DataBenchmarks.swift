@@ -75,7 +75,7 @@ public let DataBenchmarks = [
     runFunction: { append($0, bytes: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendArray",
-    runFunction: run_AppendArray, tags: d),
+    runFunction: { append($0, arraySize: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataReset",
     runFunction: run_Reset, tags: d),
@@ -220,14 +220,15 @@ func append(_ N: Int, bytes count: Int, to data: Data) {
   }
 }
 
-func benchmark_AppendArray(_ N: Int, _ count: Int, _ data_: Data) {
-  var bytes = [UInt8](repeating: 0, count: count)
+@inline(never)
+func append(_ N: Int, arraySize: Int, to data: Data) {
+  var bytes = [UInt8](repeating: 0, count: arraySize)
   bytes.withUnsafeMutableBufferPointer {
     fillBuffer($0)
   }
   for _ in 0..<10000*N {
-    var data = data_
-    data.append(contentsOf: bytes)
+    var copy = data
+    copy.append(contentsOf: bytes)
   }
 }
 
@@ -285,12 +286,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_AppendArray(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_AppendArray(N, 809, data)
 }
 
 @inline(never)
