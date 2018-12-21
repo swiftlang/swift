@@ -245,7 +245,8 @@ void FrontendGraph::addDeserializedNode(FrontendNode *n,
   assert(getNode(allNodes.size() - 1)); // verify seq no.
   if (assertUniqueness)
     assert(memoizedNodes.insert(n->getKey(), n) &&
-           "Frontend should have memoized this node.");
+           "Frontend nodes are identified by sequence number, therefore must "
+           "be unique.");
 }
 
 void Node::serializeOrDeserialize(
@@ -388,8 +389,9 @@ bool FrontendGraph::verify() const {
   std::unordered_set<void *> nodes;
   forEachNode([&](FrontendNode *n) {
     n->getKey().verify();
-    assert(nodes.insert(n).second &&
-           "Frontend should have memoized this node.");
+    assert(nodes.insert(n).second && "Frontend nodes are identified by "
+                                     "sequence number, therefore must be "
+                                     "unique.");
 
     auto iterInserted = nodesSeen.insert(std::make_pair(n->getKey(), n));
     if (!iterInserted.second) {
