@@ -120,6 +120,20 @@ class Test_parse_args(unittest.TestCase):
         self.assertTrue(parse_args(['check', '-v']).verbose)
         self.assertTrue(parse_args(['check', '--verbose']).verbose)
 
+    def test_check_supports_mardown_output(self):
+        self.assertFalse(parse_args(['check']).markdown)
+        self.assertTrue(parse_args(['check', '-md']).markdown)
+        self.assertTrue(parse_args(['check', '--markdown']).markdown)
+
+    def test_check_flags_are_mutually_exclusive(self):
+        with captured_output() as (out, err):
+            self.assertRaises(SystemExit,
+                              parse_args, ['check', '-md', '-v'])
+        self.assert_contains(
+            ['error:', 'argument -v/--verbose: ' +
+             'not allowed with argument -md/--markdown'],
+            err.getvalue())
+
 
 class ArgsStub(object):
     def __init__(self):
@@ -497,7 +511,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
     def setUp(self):
         super(TestBenchmarkDoctor, self).setUp()
-        self.args = Stub(verbose=False)
+        self.args = Stub(verbose=False, markdown=False)
         self._doctor_log_handler.reset()
         self.logs = self._doctor_log_handler.messages
 
@@ -516,8 +530,9 @@ class TestBenchmarkDoctor(unittest.TestCase):
     def test_supports_verbose_output(self):
         driver = BenchmarkDriverMock(tests=['B1', 'B2'])
         driver.verbose = True
+        self.args.verbose = True
         with captured_output() as (out, _):
-            BenchmarkDoctor(Stub(verbose=True), driver)
+            BenchmarkDoctor(self.args, driver)
         self.assert_contains(['Checking tests: B1, B2'], out.getvalue())
 
     def test_uses_report_formatter(self):
@@ -527,6 +542,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertTrue(isinstance(console_handler, logging.StreamHandler))
         self.assertTrue(isinstance(console_handler.formatter,
                                    LoggingReportFormatter))
+
+    def test_uses_optional_markdown_report_formatter(self):
+        self.args.markdown = True
+        with captured_output() as (_, _):
+            doc = BenchmarkDoctor(self.args, BenchmarkDriverMock(tests=['B1']))
+        self.assertTrue(doc)
+        console_handler = logging.getLogger('BenchmarkDoctor').handlers[1]
+        self.assertTrue(isinstance(console_handler, MarkdownReportHandler))
 
     def test_measure_10_independent_1s_benchmark_series(self):
         """Measurement strategy takes 5 i2 and 5 i1 series.
