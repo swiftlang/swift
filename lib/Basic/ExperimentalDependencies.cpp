@@ -643,12 +643,12 @@ private:
 } // namespace
 
 //==============================================================================
-// MARK: computeContextForProvdedEntity
+// MARK: computeContextForProvidedEntity
 //==============================================================================
 
 template <NodeKind kind, typename Entity>
-std::string DependencyKey::computeContextForProvdedEntity(Entity,
-                                                          MangleTypeAsContext) {
+std::string
+DependencyKey::computeContextForProvidedEntity(Entity, MangleTypeAsContext) {
   // Context field is not used for most kinds
   return "";
 }
@@ -656,8 +656,8 @@ std::string DependencyKey::computeContextForProvdedEntity(Entity,
 /// \ref nominal dependencies are created from a Decl and use the context field.
 template <>
 std::string
-DependencyKey::computeContextForProvdedEntity<NodeKind::nominal,
-                                              NominalTypeDecl const *>(
+DependencyKey::computeContextForProvidedEntity<NodeKind::nominal,
+                                               NominalTypeDecl const *>(
     const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
   return mangleTypeAsContext(D);
 }
@@ -666,15 +666,15 @@ DependencyKey::computeContextForProvdedEntity<NodeKind::nominal,
 /// context field.
 template <>
 std::string
-DependencyKey::computeContextForProvdedEntity<NodeKind::potentialMember,
-                                              NominalTypeDecl const *>(
+DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
+                                               NominalTypeDecl const *>(
     const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
   return mangleTypeAsContext(D);
 }
 
 /// \ref member dependencies are created from a pair and use the context field.
 template <>
-std::string DependencyKey::computeContextForProvdedEntity<
+std::string DependencyKey::computeContextForProvidedEntity<
     NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
     std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember,
     MangleTypeAsContext mangleTypeAsContext) {
@@ -862,7 +862,7 @@ private:
       const Optional<std::string> fingerprint = None;
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
           kind,
-          DependencyKey::computeContextForProvdedEntity<kind>(
+          DependencyKey::computeContextForProvidedEntity<kind>(
               declOrPair, mangleTypeAsContext),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
           fingerprint, swiftDeps);
@@ -939,7 +939,7 @@ void FrontendGraphConstructor::addAllDependenciesFrom(
 void FrontendGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
-      DependencyKey::computeContextForProvdedEntity<
+      DependencyKey::computeContextForProvidedEntity<
           NodeKind::sourceFileProvide>(swiftDeps, mangleTypeAsContext),
       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
           swiftDeps),

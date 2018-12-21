@@ -459,8 +459,8 @@ public:
 
   /// Given some type of provided entity compute the context field of the key.
   template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvdedEntity(Entity,
-                                                    MangleTypeAsContext);
+  static std::string computeContextForProvidedEntity(Entity,
+                                                     MangleTypeAsContext);
 
   /// Given some type of provided entity compute the name field of the key.
   template <NodeKind kind, typename Entity>
