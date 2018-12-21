@@ -458,9 +458,6 @@ namespace {
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     // SWIFT_ENABLE_TENSORFLOW
-    RValue visitGradientExpr(GradientExpr *E, SGFContext C);
-    RValue visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C);
-    RValue visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C);
     RValue visitAdjointExpr(AdjointExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
@@ -2729,39 +2726,6 @@ RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
   return visit(E->getSemanticExpr(), C);
-}
-
-/// SWIFT_ENABLE_TENSORFLOW
-static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
-                               ReverseAutoDiffExpr *E,
-                               SILGradientOptions options = None) {
-  SILLocation loc(E);
-  auto *origExpr = E->getOriginalExpr();
-  auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
-  ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
-  auto loweredParamIndices =
-      E->getCheckedParameterIndices()->getLowered(origTy);
-  SILAutoDiffConfig config(
-      {E->getResultIndex(), loweredParamIndices}, options);
-  auto gradInst =
-    RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF), config);
-  ManagedValue v = RVE.SGF.emitManagedRValueWithCleanup(gradInst);
-  return RValue(RVE.SGF, E, v);
-}
-
-RValue RValueEmitter::
-visitGradientExpr(GradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E);
-}
-
-RValue RValueEmitter::
-visitChainableGradientExpr(ChainableGradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, SILGradientFlags::Seedable);
-}
-
-RValue RValueEmitter::
-visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
-  return emitGradientInst(*this, C, E, SILGradientFlags::PreservingResult);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

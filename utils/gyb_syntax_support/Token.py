@@ -333,16 +333,10 @@ SYNTAX_TOKENS = [
                        serialization_code=117,
                        description='TensorFlow operation',
                        protocol='ExpressibleByTensorFlowOp'),
-    PoundKeyword('PoundGradient', 'gradient', text='#gradient',
-                 serialization_code=118),
-    PoundKeyword('PoundChainableGradient', 'chainableGradient',
-                 text='#chainableGradient', serialization_code=119),
-    PoundKeyword('PoundValueAndGradient', 'valueAndGradient',
-                 text='#valueAndGradient', serialization_code=120),
     PoundKeyword('PoundAdjoint', 'adjoint', text='#adjoint',
-                 serialization_code=121),
+                 serialization_code=118),
     PoundKeyword('PoundAssert', 'assert', text='#assert',
-                 serialization_code=122),
+                 serialization_code=119),
 ]
 
 SYNTAX_TOKEN_MAP = {token.name + 'Token': token for token in SYNTAX_TOKENS}

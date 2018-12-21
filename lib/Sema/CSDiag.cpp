@@ -557,9 +557,6 @@ private:
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  bool diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE);
-
   /// Diagnose the usage of 'subscript' instead of the operator when calling
   /// a subscript and offer a fixit if the inputs are compatible.
   bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);
@@ -597,7 +594,6 @@ private:
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
   // SWIFT_ENABLE_TENSORFLOW
-  bool visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE);
   bool visitPoundAssertExpr(PoundAssertExpr *PAE);
 };
 } // end anonymous namespace
@@ -6944,33 +6940,6 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-bool FailureDiagnosis::
-diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
-  // TODO: Sema diagnostics for gradient expressions could be improved by
-  // diagnosing non-differentiable arguments/non-differentiable constraints.
-  auto gradType = CS.getType(RADE);
-  auto gradFnType = gradType->getAs<AnyFunctionType>();
-  assert(gradFnType && "Gradient expression should have function type.");
-
-  // If there is no contextual type, there is no way to diagnose further.
-  auto contextualType = CS.getContextualType();
-  if (!contextualType) return false;
-
-  // If gradient expression has a generic primal, then conversion to the
-  // contextual type was not possible.
-  if (gradType->hasTypeVariable()) {
-    diagnose(RADE->getLoc(), diag::gradient_expr_incompatible_contextual_type,
-             contextualType);
-    return true;
-  }
-
-  return false;
-}
-
-bool FailureDiagnosis::visitReverseAutoDiffExpr(ReverseAutoDiffExpr *RADE) {
-  return diagnoseReverseAutoDiffExpr(RADE);
-}
-
 bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
   auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
   return !typeCheckChildIndependently(PAE->getCondition(), boolType,

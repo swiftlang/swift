@@ -739,28 +739,6 @@ NOTE(object_literal_resolve_import,none,
 // TensorFlow op literal
 ERROR(invalid_tfop,none, "%0", (StringRef))
 
-// '#gradient(...)' expression for automatic differentiation
-ERROR(gradient_expr_function_not_differentiable,none,
-      "function '%0' is not differentiable", (Identifier))
-ERROR(gradient_expr_not_a_function,none,
-      "only functions can be differentiated, but this expression has type %0",
-      (Type))
-ERROR(gradient_expr_original_func_decl_unresolved,none,
-      "original function declaration could not be resolved", ())
-ERROR(gradient_expr_parameter_self_unsupported,none,
-      "the 'self' parameter is unsupported by #gradient", ())
-ERROR(gradient_expr_parameter_indices_not_ascending,none,
-      "parameter indices must be ascending", ())
-ERROR(gradient_expr_parameter_index_out_of_bounds,none,
-      "the parameter index is out of bounds for type %0, which has %1 "
-      "parameters", (Type, unsigned))
-ERROR(gradient_expr_parameter_not_value_type,none,
-      "gradient parameter has non-value type %0 and thus cannot be a "
-      "differentiation parameter", (Type))
-ERROR(gradient_expr_incompatible_contextual_type,none,
-      "cannot convert gradient expression to incompatible contextual type %0",
-      (Type))
-
 // '#adjoint(...)' expression for automatic differentiation
 ERROR(adjoint_expr_original_base_type_unresolved,none,
       "could not resolve base type %0 of original function in #adjoint "

@@ -2339,46 +2339,6 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
-                                    bool preservingOriginalResult) {
-      auto gradType = simplifyType(cs.getType(expr));
-      auto gradFnType = gradType->getAs<AnyFunctionType>();
-      assert(gradFnType &&
-             "Gradient expression should've been assigned a function type");
-      cs.setType(expr, gradType);
-      cs.cacheExprTypes(expr);
-      // Verify that differentiation parameters conform to VectorNumeric.
-      auto *originalExpr = expr->getOriginalExpr();
-      auto originalType = cs.getType(originalExpr)->getAs<AnyFunctionType>();
-      assert(originalType && "Original should have function type");
-      auto gradParams = gradFnType->getParams();
-      assert(gradFnType->getNumParams() == originalType->getNumParams() &&
-             "The gradient function should have same number of parameters as "
-             "original function");
-      SmallVector<Type, 8> diffParamTypes;
-      if (expr->getParameters().empty()) {
-        for (auto &gradParam : gradParams)
-          diffParamTypes.push_back(gradParam.getPlainType());
-      } else {
-        for (auto &param : expr->getParameters())
-          diffParamTypes.push_back(gradParams[param.index].getPlainType());
-      }
-      return expr;
-    }
-
-    Expr *visitGradientExpr(GradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/false);
-    }
-    
-    Expr *visitChainableGradientExpr(ChainableGradientExpr *expr) {
-      llvm_unreachable("Unhandled");
-    }
-
-    Expr *visitValueAndGradientExpr(ValueAndGradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/true);
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
     Expr *visitAdjointExpr(AdjointExpr *expr) {
       auto locator = cs.getConstraintLocator(expr);
       auto adjointDeclRef = expr->getAdjointFunction();
