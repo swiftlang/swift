@@ -2383,6 +2383,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+  autoreleasepool {
   let nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
@@ -2406,6 +2409,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   _fixLifetime(nsd)
   _fixLifetime(d)
   _fixLifetime(bridgedBack)
+  }
 }
 
 
@@ -3243,9 +3247,9 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
-autoreleasepoolIfUnoptimizedReturnAutoreleased {
-  // Add an autorelease pool because ParallelArrayDictionary autoreleases
-  // values in objectForKey.
+  //some bridged NSDictionary operations on non-standard NSDictionary subclasses
+  //autorelease keys and values. Make sure the leak checker isn't confused
+autoreleasepool {
 
   let d = getParallelArrayBridgedNonverbatimDictionary()
   let identity1 = d._rawIdentifier()
@@ -5689,6 +5693,62 @@ DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 
   expectCrashLater()
   d.remove(at: i)
+}
+
+DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: false
+    ) { keys, values, count in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i))
+        (v + i).initialize(to: TestEquatableValueTy(i))
+        count += 1
+      }
+    }
+
+    let d2 = Dictionary(
+      uniqueKeysWithValues: (0..<c).map {
+        (TestKeyTy($0), TestEquatableValueTy($0))
+      })
+
+    for i in 0 ..< c {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d2, d1)
+  }
+}
+
+DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
+  for c in [0, 1, 2, 3, 5, 10, 25, 150] {
+    let d1 = Dictionary<TestKeyTy, TestEquatableValueTy>(
+      _unsafeUninitializedCapacity: c,
+      allowingDuplicates: true
+    ) { keys, values, count in
+      let k = keys.baseAddress!
+      let v = values.baseAddress!
+      for i in 0 ..< c {
+        (k + i).initialize(to: TestKeyTy(i / 2))
+        (v + i).initialize(to: TestEquatableValueTy(i / 2))
+        count += 1
+      }
+    }
+
+    let d2 = Dictionary(
+      (0 ..< c).map {
+        (TestKeyTy($0 / 2), TestEquatableValueTy($0 / 2))
+      },
+      uniquingKeysWith: { a, b in a })
+
+    expectEqual(d1.count, d2.count)
+    for i in 0 ..< c / 2 {
+      expectEqual(TestEquatableValueTy(i), d1[TestKeyTy(i)])
+    }
+    expectEqual(d2, d1)
+  }
 }
 
 DictionaryTestSuite.setUp {
