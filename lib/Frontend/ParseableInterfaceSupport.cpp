@@ -307,7 +307,8 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
-    StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
+    bool ShouldSerializeDeps) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
     // Note that we don't assume ModuleCachePath is the same as the Clang
@@ -411,7 +412,8 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
       SubError = true;
       return;
     }
-    SerializationOpts.Dependencies = Deps;
+    if (ShouldSerializeDeps)
+      SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
       serialize(Mod, SerializationOpts, SILMod.get());
     });
@@ -525,7 +527,8 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
                                dependencyTracker)) {
       if (buildSwiftModuleFromSwiftInterface(FS, Diags, ModuleID.second,
                                              SubInvocation, InPath, OutPath,
-                                             CacheDir, dependencyTracker))
+                                             CacheDir, dependencyTracker,
+                                             /*ShouldSerializeDeps*/true))
         return std::make_error_code(std::errc::invalid_argument);
     }
   }
@@ -557,10 +560,15 @@ ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
+  // FIXME: We don't really want to ignore dependencies here, but we have to
+  // identify which ones are important, and make them relocatable
+  // (SDK-relative) if we want to ship the built swiftmodules to another
+  // machine. Just leave them out for now.
   return buildSwiftModuleFromSwiftInterface(FS, Diags, /*DiagLoc*/SourceLoc(),
                                             SubInvocation, InPath, OutPath,
                                             /*CachePath*/"",
-                                            /*OuterTracker*/nullptr);
+                                            /*OuterTracker*/nullptr,
+                                            /*ShouldSerializeDeps*/false);
 }
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty

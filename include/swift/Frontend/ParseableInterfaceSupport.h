@@ -82,7 +82,8 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   static bool buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags, SourceLoc DiagLoc,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
-    StringRef ModuleCachePath, DependencyTracker *OuterTracker);
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker,
+    bool ShouldSerializeDeps);
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
