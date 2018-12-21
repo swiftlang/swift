@@ -131,7 +131,8 @@ static std::string getCacheHash(ASTContext &Ctx,
 
 static CompilerInvocation
 createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
-                                         StringRef CacheDir) {
+                                         StringRef CacheDir,
+                                         StringRef PrebuiltCacheDir) {
   auto &SearchPathOpts = Ctx.SearchPathOpts;
   auto &LangOpts = Ctx.LangOpts;
 
@@ -145,8 +146,10 @@ createInvocationForBuildingFromInterface(ASTContext &Ctx, StringRef ModuleName,
   SubInvocation.setInputKind(InputFileKind::SwiftModuleInterface);
   SubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   SubInvocation.setTargetTriple(LangOpts.Target);
-  SubInvocation.setClangModuleCachePath(CacheDir);
+
   SubInvocation.setModuleName(ModuleName);
+  SubInvocation.setClangModuleCachePath(CacheDir);
+  SubInvocation.getFrontendOptions().PrebuiltModuleCachePath = PrebuiltCacheDir;
 
   // Inhibit warnings from the SubInvocation since we are assuming the user
   // is not in a position to fix them.
@@ -514,7 +517,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
     // emit the .swiftmodule.
     CompilerInvocation SubInvocation =
         createInvocationForBuildingFromInterface(Ctx, ModuleID.first.str(),
-                                                 CacheDir);
+                                                 CacheDir, PrebuiltCacheDir);
     computeCachedOutputPath(Ctx, SubInvocation, InPath, OutPath);
 
     // Evaluate if we need to run this sub-invocation, and if so run it.
@@ -546,10 +549,11 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
 bool
 ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef ModuleName,
-    StringRef InPath, StringRef OutPath) {
+    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    StringRef ModuleName, StringRef InPath, StringRef OutPath) {
   CompilerInvocation SubInvocation =
-      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir);
+      createInvocationForBuildingFromInterface(Ctx, ModuleName, CacheDir,
+                                               PrebuiltCacheDir);
 
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;

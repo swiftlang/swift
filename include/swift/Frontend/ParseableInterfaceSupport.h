@@ -106,6 +106,7 @@ public:
   /// testing purposes.
   static bool buildSwiftModuleFromSwiftInterface(ASTContext &Ctx,
                                                  StringRef CacheDir,
+                                                 StringRef PrebuiltCacheDir,
                                                  StringRef ModuleName,
                                                  StringRef InPath,
                                                  StringRef OutPath);
