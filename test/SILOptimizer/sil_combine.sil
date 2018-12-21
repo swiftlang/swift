@@ -3673,3 +3673,42 @@ bb0(%0 : $Builtin.Int64):
   return %4 : $Builtin.Int64
 }
 
+// <rdar://46746188> crash in swift_getObjCClassFromObject
+// class TestDocument: NSPersistentDocument {
+//   override init() {
+//     super.init()
+//   }
+//   convenience init(type: String) throws {
+//     self.init()
+//   }
+// }
+// After inlining the __allocating_init, we have two uses of the value_metatype.
+// The second use goes through a thick_to_objc_metatype. When SILCombine replaces 
+// thick_to_objc_metatype with value_metatype, it cannot extend the liverange
+// of value_metatype's operand.
+@objc class TestObjCInit {
+  init()
+
+  convenience init(type: String) throws
+}
+// CHECK-LABEL: sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+// CHECK: bb0(%0 : $TestObjCInit):
+// CHECK:   [[VMT2:%.*]] = value_metatype $@objc_metatype TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   [[VMT:%.*]] = value_metatype $@thick TestObjCInit.Type, %0 : $TestObjCInit
+// CHECK:   dealloc_partial_ref %0 : $TestObjCInit, [[VMT]] : $@thick TestObjCInit.Type
+// CHECK-NOT: value_metatype
+// CHECK:   [[O:%.*]] = alloc_ref_dynamic [objc] [[VMT2]] : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+// CHECK:   [[M:%.*]] = objc_method [[O]] : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK:   apply [[M]]([[O]]) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+// CHECK-LABEL: } // end sil function 'objc_init_partial_dealloc'
+sil hidden [thunk] @objc_init_partial_dealloc : $@convention(objc_method) (@owned TestObjCInit) -> Optional<TestObjCInit> {
+bb0(%2 : $TestObjCInit):
+  %8 = value_metatype $@thick TestObjCInit.Type, %2 : $TestObjCInit
+  dealloc_partial_ref %2 : $TestObjCInit, %8 : $@thick TestObjCInit.Type
+  %11 = thick_to_objc_metatype %8 : $@thick TestObjCInit.Type to $@objc_metatype TestObjCInit.Type
+  %12 = alloc_ref_dynamic [objc] %11 : $@objc_metatype TestObjCInit.Type, $TestObjCInit
+  %13 = objc_method %12 : $TestObjCInit, #TestObjCInit.init!initializer.1.foreign : (TestObjCInit.Type) -> () -> TestObjCInit, $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
+  %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
+  return %19 : $Optional<TestObjCInit>
+}
