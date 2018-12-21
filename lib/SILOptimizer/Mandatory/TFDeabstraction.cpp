@@ -154,6 +154,7 @@ namespace {
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
+    // Propagate SSA values for all the operands used in `relevantInsts`.
     void propagateSSAValues(SmallVectorImpl<SILInstruction *> &relevantInsts);
     void checkAttributesAndFormGraphOps();
     void
@@ -2616,19 +2617,18 @@ class TFDeabstractionHelper {
 public:
   TFDeabstractionHelper(SILTransform &transform, SILModule *module)
       : transform(transform), module(module), constantEvaluator(*module) {}
-
-  /// Deabstract the given function and returns true if this function was
-  /// deabstracted. If the flag forceTFFunctions is true, forces partitioning of
-  /// functions that operate on Tensors even if it would have been rejected
-  /// otherwise.
-  bool deabstract(SILFunction &fn, bool forceTFFunctions);
-
   /// Deabstract functions. If acceleratorOnly is set, tensorflow convention
   /// functions are deabstracted. Otherwise, all functions other than tensorflow
   /// convention functions are deabstracted,
   void deabstractFunctions(bool acceleratorOnly);
 
 private:
+  /// Deabstract the given function and returns true if this function was
+  /// deabstracted. If the flag forceTFFunctions is true, forces partitioning of
+  /// functions that operate on Tensors even if it would have been rejected
+  /// otherwise.
+  bool deabstract(SILFunction &fn, bool forceTFFunctions);
+
   SILTransform &transform;
   SILModule *module;
   ConstExprEvaluator constantEvaluator;

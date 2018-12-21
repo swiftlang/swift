@@ -387,7 +387,7 @@ public func inlineDeabstracted_a() -> Tensor<Float> {
 }
 // expected-warning @+1 {{implicitly copied}}
 public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
-	// expected-warning @+2 3 {{value implicitly copied to the host}}
+  // expected-warning @+2 3 {{value implicitly copied to the host}}
   // expected-error @+1 3 {{op named 'Dummy' is not registered in TensorFlow}}
   let aggregate: AggregateStruct = #tfop("Dummy") // packs results
 

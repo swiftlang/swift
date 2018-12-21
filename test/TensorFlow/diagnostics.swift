@@ -49,7 +49,7 @@ public func testDevice() {
 // should be a single copy-to-host compiler warning.
 public func SR8412_CopyToHost() {
   for _ in 0...10 {
-		// This gets moved outside the loop by the compiler optimizations. So, no warnings. 
+    // This gets moved outside the loop by the compiler optimizations. So, no warnings. 
     let x = Tensor(1)  
     _hostOp(x)
   }
