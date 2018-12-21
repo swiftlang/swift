@@ -4099,6 +4099,9 @@ ERROR(inlinable_decl_not_public,
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
+ERROR(inlinable_resilient_deinit,
+      none, "deinitializer can only be '@inlinable' if the class is '@_fixed_layout'", ())
+
 //------------------------------------------------------------------------------
 // MARK: @_specialize diagnostics
 //------------------------------------------------------------------------------

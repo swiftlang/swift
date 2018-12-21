@@ -1992,6 +1992,16 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
                           access);
     return;
   }
+
+  // @inlinable cannot be applied to deinitializers in resilient classes.
+  if (auto *DD = dyn_cast<DestructorDecl>(D)) {
+    if (auto *CD = dyn_cast<ClassDecl>(DD->getDeclContext())) {
+      if (CD->isResilient()) {
+        diagnoseAndRemoveAttr(attr, diag::inlinable_resilient_deinit);
+        return;
+      }
+    }
+  }
 }
 
 void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
