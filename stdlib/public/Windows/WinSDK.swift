@@ -30,3 +30,6 @@ public let FALSE: BOOL = 0
 // minwindef.h
 public let TRUE: BOOL = 1
 
+// handleapi.h
+public let INVALID_HANDLE_VALUE: HANDLE = HANDLE(bitPattern: -1)!
+
