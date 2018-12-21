@@ -230,8 +230,8 @@ private:
 } // namespace
 
 template <>
-void NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>::emitNode(
-    const SourceFileDepGraphNode *n) const {
+void NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>::
+    emitNode(const SourceFileDepGraphNode *n) const {
   emitter.newNode();
   // Even though this method does not change the node,
   // the serializeOrDeserialize method does not know that the emitter
@@ -1025,7 +1025,9 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   SourceFileDepGraph g = gc.construct();
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
+        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g,
+                                                                           out)
+            .emit();
         return false;
       });
 

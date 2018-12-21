@@ -171,7 +171,8 @@ class ModuleDepGraph {
   /// Remove node from nodeMap, check invariants.
   ModuleDepGraphNode *eraseNodeFromMap(ModuleDepGraphNode *nodeToErase) {
     ModuleDepGraphNode *nodeActuallyErased = nodeMap.findAndErase(
-        nodeToErase->getSwiftDeps().getValueOr(std::string()), nodeToErase->getKey());
+        nodeToErase->getSwiftDeps().getValueOr(std::string()),
+        nodeToErase->getKey());
     assert(
         nodeToErase == nodeActuallyErased ||
         mapCorruption("Node found from key must be same as node holding key."));
