@@ -13,9 +13,13 @@
 #ifndef ExperimentalDependencies_h
 #define ExperimentalDependencies_h
 
-#include "swift/AST/Decl.h"
+//#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Range.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 #include <string>
 #include <unordered_map>
@@ -66,8 +70,6 @@ using StringPairVec = PairVec<std::string, std::string>;
 
 template <typename First, typename Second>
 using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
-
-using MangleTypeAsContext = function_ref<std::string(const NominalTypeDecl *)>;
 
 //==============================================================================
 // MARK: General Utility classes
@@ -315,8 +317,7 @@ private:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
-                               StringRef outputPath,
-                               MangleTypeAsContext mangleTypeAsContext);
+                               StringRef outputPath);
 
 //==============================================================================
 // MARK: Enums
@@ -461,8 +462,7 @@ public:
 
   /// Given some type of provided entity compute the context field of the key.
   template <NodeKind kind, typename Entity>
-  static std::string computeContextForProvidedEntity(Entity,
-                                                     MangleTypeAsContext);
+  static std::string computeContextForProvidedEntity(Entity);
 
   /// Given some type of provided entity compute the name field of the key.
   template <NodeKind kind, typename Entity>
@@ -470,8 +470,7 @@ public:
 
   /// Given some type of depended-upon entity create the key.
   template <NodeKind kind, typename Entity>
-  static DependencyKey createDependedUponKey(const Entity &,
-                                             MangleTypeAsContext);
+  static DependencyKey createDependedUponKey(const Entity &);
 
   std::string humanReadableName() const;
 
@@ -506,20 +505,7 @@ private:
   // Name conversion helpers
   static std::string demangleTypeAsContext(StringRef);
 
-  /// name converters
-  template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
-    return decl->getBaseName().userFacingName();
-  }
 
-  static std::string
-  getBaseName(const std::pair<const NominalTypeDecl *, const ValueDecl *>
-                  holderAndMember) {
-    return getBaseName(holderAndMember.second);
-  }
-
-  template <typename DeclT> static std::string getName(const DeclT *decl) {
-    return DeclBaseName(decl->getName()).userFacingName();
-  }
 };
 } // namespace experimental_dependencies
 } // namespace swift

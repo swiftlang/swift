@@ -117,11 +117,6 @@ std::vector<std::string> ModuleDepGraph::getExternalDependencies() const {
                                   externalDependencies.end());
 }
 
-static std::string phoneyBalonyMangleTypeAsContext(const NominalTypeDecl *) {
-  llvm_unreachable(
-      "Should never be called; only used by frontend for NominalTypeDecls.");
-}
-
 // Add every (swiftdeps) use of the external dependency to uses.
 void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
                                   StringRef externalDependency) {
@@ -130,7 +125,7 @@ void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
   // These nodes will depend on the *interface* of the external Decl.
   DependencyKey key =
       DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
-          externalDependency.str(), phoneyBalonyMangleTypeAsContext);
+          externalDependency.str());
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
   for (const DependencyKey &keyOfUse : usesByDef[key]) {

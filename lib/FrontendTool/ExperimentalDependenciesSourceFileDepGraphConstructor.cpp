@@ -442,12 +442,30 @@ private:
 } // namespace
 
 //==============================================================================
+// MARK: Helpers for key construction that must be in frontend
+//==============================================================================
+
+template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
+  return decl->getBaseName().userFacingName();
+}
+
+static std::string
+getBaseName(const std::pair<const NominalTypeDecl *, const ValueDecl *>
+            holderAndMember) {
+  return getBaseName(holderAndMember.second);
+}
+
+template <typename DeclT> static std::string getName(const DeclT *decl) {
+  return DeclBaseName(decl->getName()).userFacingName();
+}
+
+//==============================================================================
 // MARK: computeContextForProvidedEntity
 //==============================================================================
 
 template <NodeKind kind, typename Entity>
 std::string
-DependencyKey::computeContextForProvidedEntity(Entity, MangleTypeAsContext) {
+DependencyKey::computeContextForProvidedEntity(Entity) {
   // Context field is not used for most kinds
   return "";
 }
@@ -456,8 +474,7 @@ DependencyKey::computeContextForProvidedEntity(Entity, MangleTypeAsContext) {
 template <>
 std::string
 DependencyKey::computeContextForProvidedEntity<NodeKind::nominal,
-                                               NominalTypeDecl const *>(
-    const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
+                                               NominalTypeDecl const *> {
   return mangleTypeAsContext(D);
 }
 
@@ -467,7 +484,7 @@ template <>
 std::string
 DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
                                                NominalTypeDecl const *>(
-    const NominalTypeDecl *D, MangleTypeAsContext mangleTypeAsContext) {
+    const NominalTypeDecl *D) {
   return mangleTypeAsContext(D);
 }
 
@@ -475,8 +492,7 @@ DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
 template <>
 std::string DependencyKey::computeContextForProvidedEntity<
     NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember,
-    MangleTypeAsContext mangleTypeAsContext) {
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
   return mangleTypeAsContext(holderAndMember.first);
 }
 
@@ -551,7 +567,7 @@ std::string DependencyKey::computeNameForProvidedEntity<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::topLevel, DeclBaseName>(
-    const DeclBaseName &dbn, MangleTypeAsContext) {
+    const DeclBaseName &dbn) {
   return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
                        dbn.userFacingName());
 }
@@ -559,7 +575,7 @@ DependencyKey::createDependedUponKey<NodeKind::topLevel, DeclBaseName>(
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, DeclBaseName>(
-    const DeclBaseName &dbn, MangleTypeAsContext mangleTypeAsContext) {
+    const DeclBaseName &dbn) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
                        dbn.userFacingName());
 }
@@ -567,8 +583,7 @@ DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, DeclBaseName>(
 template <>
 DependencyKey DependencyKey::createDependedUponKey<
     NodeKind::nominal, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p,
-    MangleTypeAsContext mangleTypeAsContext) {
+    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
   return DependencyKey(NodeKind::nominal, DeclAspect::interface,
                        mangleTypeAsContext(p.first), "");
 }
@@ -576,8 +591,7 @@ DependencyKey DependencyKey::createDependedUponKey<
 template <>
 DependencyKey DependencyKey::createDependedUponKey<
     NodeKind::member, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p,
-    MangleTypeAsContext mangleTypeAsContext) {
+    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
   const bool isMemberBlank = p.second.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
@@ -589,7 +603,7 @@ DependencyKey DependencyKey::createDependedUponKey<
 template <>
 DependencyKey
 DependencyKey::createDependedUponKey<NodeKind::externalDepend, std::string>(
-    const std::string &file, MangleTypeAsContext) {
+    const std::string &file) {
   return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
                        file);
 }
@@ -682,8 +696,7 @@ private:
   void addAllDependenciesFrom(const llvm::DenseMap<DeclBaseName, bool> &map) {
     for (const auto &p : map)
       recordThatThisWholeFileDependsOn(
-          DependencyKey::createDependedUponKey<kind>(p.first,
-                                                     mangleTypeAsContext),
+          DependencyKey::createDependedUponKey<kind>(p.first),
           p.second);
   }
 
@@ -699,7 +712,7 @@ private:
     for (const auto &s : externals)
       recordThatThisWholeFileDependsOn(
           DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
-              s, mangleTypeAsContext),
+              s),
           true);
   }
 
@@ -723,11 +736,11 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     // mangles twice in the name of symmetry
     recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::nominal>(
-            entry.first, mangleTypeAsContext),
+            entry.first),
         holdersOfCascadingMembers.count(entry.first.first) != 0);
     recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::member>(
-            entry.first, mangleTypeAsContext),
+            entry.first),
         entry.second);
   }
 }
