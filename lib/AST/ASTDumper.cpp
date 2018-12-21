@@ -1864,37 +1864,6 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void printReverseAutoDiffExpr(ReverseAutoDiffExpr *E) {
-    OS << " original=";
-    E->getOriginalExpr()->dump(OS);
-    auto parameters = E->getParameters();
-    if (!parameters.empty()) {
-      OS << " wrt=(";
-      interleave(parameters, [&](const AutoDiffIndexParameter &param) {
-        OS << '.' << param.index;
-      }, [&]{
-        OS << ", ";
-      });
-      OS << ')';
-    }
-    OS << ')';
-  }
-
-  void visitGradientExpr(GradientExpr *E) {
-    printCommon(E, "gradient_expr");
-    printReverseAutoDiffExpr(E);
-  }
-  
-  void visitChainableGradientExpr(ChainableGradientExpr *E) {
-    printCommon(E, "chainable_gradient_expr");
-    printReverseAutoDiffExpr(E);
-  }
-
-  void visitValueAndGradientExpr(ValueAndGradientExpr *E) {
-    printCommon(E, "value_and_gradient_expr");
-    printReverseAutoDiffExpr(E);
-  }
-
   void visitAdjointExpr(AdjointExpr *E) {
     printCommon(E, "adjoint_expr");
     PrintWithColorRAII(OS, TypeReprColor) << " base_type='";

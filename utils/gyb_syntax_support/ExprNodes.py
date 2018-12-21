@@ -573,46 +573,6 @@ EXPR_NODES = [
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # e.g. "#gradient(foo(_:_:), wrt: .0, .1)"
-    Node('ReverseAutoDiffExpr', kind='Expr',
-         traits=['Parenthesized'],
-         children=[
-             Child('Identifier', kind='Token',
-                   token_choices=[
-                       'PoundGradientToken',
-                       'PoundChainableGradientToken',
-                       'PoundValueAndGradientToken',
-                   ]),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('OriginalFunction', kind='Expr'),
-             Child('Commna', kind='CommaToken', is_optional=True),
-             Child('WrtLabel', kind='IdentifierToken', is_optional=True,
-                   text_choices=['wrt']),
-             Child('Colon', kind='ColonToken', is_optional=True),
-             Child('DiffParams', kind='ReverseAutoDiffExprParamList',
-                   is_optional=True),
-             Child('RightParen', kind='RightParenToken'),
-         ]),
-
-    # reverse-autodiff-expr-param-list ->
-    #     gradient-expr-diff-param gradient-expr-diff-param-list?
-    Node('ReverseAutoDiffExprParamList', kind='SyntaxCollection',
-         element='ReverseAutoDiffExprParam'),
-
-    # reverse-autodiff-expr-param ->
-    #     differentiation-index-param ','?
-    Node('ReverseAutoDiffExprParam', kind='Syntax',
-         description='''
-         A differentiation parameter: a period followed by an unsigned integer \
-         (e.g. `.0`).
-         ''',
-         traits=['WithTrailingComma'],
-         children=[
-             Child('Index', kind='DifferentiationIndexParam'),
-             Child('TrailingComma', kind='CommaToken', is_optional=True),
-         ]),
-
-    # SWIFT_ENABLE_TENSORFLOW
     # e.g. #adjoint(foo(_:_:))
     Node('AdjointExpr', kind='Expr',
          traits=['Parenthesized'],

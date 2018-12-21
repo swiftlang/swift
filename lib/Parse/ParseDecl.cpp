@@ -923,7 +923,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       peekToken().getText() == "withRespectTo") {
     consumeToken(tok::comma);
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
-    diagnose(Tok, diag::autodiff_use_wrt_not_withrespectto)
+    diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();

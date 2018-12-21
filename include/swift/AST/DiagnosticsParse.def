@@ -1257,6 +1257,10 @@ ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
 // Adjoint expressions.
 ERROR(expr_adjoint_expected_function_name,PointsToFirstBadToken,
       "expected function name within '#adjoint` expression", ())
+ERROR(expr_expected_lparen,none,
+      "expected '(' in '%0' expression", (StringRef))
+ERROR(expr_expected_rparen,none,
+      "expected ')' in '%0' expression", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
@@ -1471,6 +1475,8 @@ ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a qualified %0 function", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to, e.g. (.0, w, b)", ())
+ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
+      "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 ERROR(attr_differentiable_parameter_index_must_be_positive_integer,PointsToFirstBadToken,
@@ -1661,26 +1667,6 @@ ERROR(availability_query_repeated_platform, none,
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
       "unknown %0 syntax exists in the source", (StringRef))
-
-// SWIFT_ENABLE_TENSORFLOW
-//------------------------------------------------------------------------------
-// AD-related expression parsing diagnostics
-//------------------------------------------------------------------------------
-ERROR(expr_expected_lparen,none,
-      "expected '(' in '%0' expression", (StringRef))
-ERROR(expr_expected_rparen,none,
-      "expected ')' in '%0' expression", (StringRef))
-ERROR(expr_expected_label,none,
-      "expected label '%1' in '%0' expression", (StringRef, StringRef))
-ERROR(expr_expected_function_to_differentiate,none,
-      "expected a function to be differentiated", ())
-ERROR(gradient_expr_expected_result_index,none,
-      "expected a result index with a leading dot", ())
-ERROR(gradient_expr_expected_parameter,none,
-      "expected a parameter, which must be the index of a function parameter "
-      "with a leading dot (e.g. '.0')", ())
-ERROR(autodiff_use_wrt_not_withrespectto,none,
-      "use 'wrt:' to specify parameters to differentiate with respect to", ())
 
 // SWIFT_ENABLE_TENSORFLOW
 //------------------------------------------------------------------------------

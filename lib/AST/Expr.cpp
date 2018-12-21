@@ -366,9 +366,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   // SWIFT_ENABLE_TENSORFLOW
-  NO_REFERENCE(Gradient);
-  NO_REFERENCE(ChainableGradient);
-  NO_REFERENCE(ValueAndGradient);
   NO_REFERENCE(Adjoint);
   NO_REFERENCE(PoundAssert);
 
@@ -541,9 +538,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
   // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::Gradient:
-  case ExprKind::ChainableGradient:
-  case ExprKind::ValueAndGradient:
   case ExprKind::Adjoint:
     return true;
 
@@ -1177,55 +1171,6 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-ReverseAutoDiffExpr::ReverseAutoDiffExpr(
-    ExprKind kind, SourceLoc loc, SourceLoc lParenLoc, Expr *originalExpr,
-    ArrayRef<AutoDiffIndexParameter> parameters, unsigned resultIndex,
-    SourceLoc rParenLoc)
-  : Expr(kind, /*Implicit=*/false), Loc(loc), LParenLoc(lParenLoc),
-    OriginalExpr(originalExpr), NumParameters(parameters.size()),
-    ResultIndex(resultIndex), RParenLoc(rParenLoc) {
-  std::copy(parameters.begin(), parameters.end(), getParametersData());
-}
-
-GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
-                                   SourceLoc lParenLoc, Expr *originalExpr,
-                                   ArrayRef<AutoDiffIndexParameter> parameters,
-                                   unsigned resultIndex, SourceLoc rParenLoc) {
-  unsigned numParams = parameters.size();
-  unsigned size =
-      sizeof(GradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
-  void *memory = ctx.Allocate(size, alignof(GradientExpr));
-  return new (memory) GradientExpr(loc, lParenLoc, originalExpr, parameters,
-                                   resultIndex, rParenLoc);
-}
-
-
-ChainableGradientExpr *
-ChainableGradientExpr::create(ASTContext &ctx, SourceLoc loc,
-                              SourceLoc lParenLoc, Expr *originalExpr,
-                              ArrayRef<AutoDiffIndexParameter> parameters,
-                              unsigned resultIndex, SourceLoc rParenLoc) {
-  unsigned numParams = parameters.size();
-  unsigned size = sizeof(ChainableGradientExpr)
-      + numParams * sizeof(AutoDiffIndexParameter);
-  void *memory = ctx.Allocate(size, alignof(ChainableGradientExpr));
-  return new (memory) ChainableGradientExpr(loc, lParenLoc, originalExpr,
-                                            parameters, resultIndex, rParenLoc);
-}
-
-ValueAndGradientExpr *
-ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
-                             SourceLoc lParenLoc, Expr *originalExpr,
-                             ArrayRef<AutoDiffIndexParameter> parameters,
-                             unsigned resultIndex, SourceLoc rParenLoc) {
-  unsigned numParams = parameters.size();
-  unsigned size =
-      sizeof(ValueAndGradientExpr) + numParams * sizeof(AutoDiffIndexParameter);
-  void *memory = ctx.Allocate(size, alignof(ValueAndGradientExpr));
-  return new (memory) ValueAndGradientExpr(loc, lParenLoc, originalExpr,
-                                           parameters, resultIndex, rParenLoc);
-}
-
 AdjointExpr *
 AdjointExpr::create(ASTContext &ctx, SourceLoc loc, SourceLoc lParenLoc,
                     DeclName originalName, DeclNameLoc originalNameLoc,
