@@ -72,8 +72,10 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
 }
 
 
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
-internal func _swift_stdlib_atomicLoadInt(
+// FIXME: ideally it should not be here, at the very least not public, but
+// @usableFromInline internal to be used by SwiftPrivate._stdlib_AtomicInt
+public // Existing uses outside stdlib
+func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
 #if arch(i386) || arch(arm)
   let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
@@ -97,8 +99,10 @@ internal func _swift_stdlib_atomicStoreInt(
 
 % for operation in ['Add', 'And', 'Or', 'Xor']:
 // Warning: no overflow checking.
-@usableFromInline // used by SwiftPrivate._stdlib_AtomicInt
-internal func _swift_stdlib_atomicFetch${operation}Int(
+// FIXME: ideally it should not be here, at the very least not public, but
+// @usableFromInline internal to be used by SwiftPrivate._stdlib_AtomicInt
+public // Existing uses outside stdlib
+func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
   let rawTarget = UnsafeMutableRawPointer(target)
