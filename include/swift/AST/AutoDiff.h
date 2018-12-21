@@ -27,11 +27,6 @@ enum class AutoDiffMode {
   Forward, Reverse
 };
 
-struct AutoDiffIndexParameter {
-  SourceLoc loc;
-  unsigned index;
-};
-
 class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };

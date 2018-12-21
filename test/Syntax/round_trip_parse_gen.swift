@@ -574,11 +574,6 @@ func bar(_ x: Float, _: Float) -> Float { return 1 }
 @differentiable(reverse, wrt: (self, .0, .1), primal: bar, adjoint: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
-#gradient(foo)
-#gradient(foo, wrt: .0, .1)
-#chainableGradient(foo, wrt: .0, .1)
-#valueAndGradient(foo, wrt: .0, .1)
-
 #adjoint(+)
 #adjoint(foo(_:_:))
 #adjoint(A.B.foo(_:))
