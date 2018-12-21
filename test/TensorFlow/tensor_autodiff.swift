@@ -8,10 +8,10 @@ public func matsquare(_ x: Tensor<Float>) -> Tensor<Float> {
 }
 
 public func test1() {
-  _ = #gradient(matsquare)(Tensor([[1, 1], [1, 1]]))
+  _ = pullback(at: Tensor([[1, 1], [1, 1]]), in: matsquare)
 }
 
-// CHECK: @{{.*}}matsquare{{.*}}__grad_src_0_wrt_0
+// CHECK: @{{.*}}matsquare{{.*}}__vjp_src_0_wrt_0
 
 // SR-8709
 public func selfmin(_ x: Tensor<Float>) -> Tensor<Float> {
@@ -19,7 +19,7 @@ public func selfmin(_ x: Tensor<Float>) -> Tensor<Float> {
 }
 
 public func test2() {
-  _ = #gradient(selfmin)(Tensor(1))
+  _ = pullback(at: Tensor(1), in: selfmin)
 }
 
-// CHECK: @{{.*}}selfmin{{.*}}__grad_src_0_wrt_0
+// CHECK: @{{.*}}selfmin{{.*}}__vjp_src_0_wrt_0

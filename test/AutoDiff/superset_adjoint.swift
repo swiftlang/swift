@@ -24,36 +24,35 @@ func calls_mulxy(_ x: Float, _ y: Float) -> Float {
 }
 
 SupersetAdjointTests.test("Superset") {
-  expectEqual(3, #gradient(mulxy, wrt: .0)(2, 3))
+  expectEqual(3, gradient(at: 2) { x in mulxy(x, 3) })
 }
 
 SupersetAdjointTests.test("SupersetNested") {
-  expectEqual(2, #gradient(calls_mulxy, wrt: .1)(2, 3))
+  expectEqual(2, gradient(at: 3) { y in calls_mulxy(2, y) })
 }
 
 SupersetAdjointTests.test("CrossModuleClosure") {
-  expectEqual(1, #gradient({ (x: Float, y: Float) in x + y }, wrt: .0)(1, 2))
+  expectEqual(1, gradient(at: Float(1)) { x in x + 2 })
 }
 
-// TODO: unbreak this test
-// SupersetAdjointTests.test("CrossModule") {
-//   expectEqual(1, #gradient((+) as (Float, Float) -> Float, wrt: .0)(1, 2))
-// }
+SupersetAdjointTests.test("CrossModule") {
+  expectEqual((1, 1), gradient(at: 1, 2, in: (+) as (Float, Float) -> Float))
+}
 
-// TODO: unbreak this one too
-// @differentiable(reverse, wrt: (.0, .1), adjoint: dx_T)
-// func x_T<T>(_ x: Float, _ y: T) -> Float {
+// FIXME: Unbreak this one.
+//
+// @differentiable(reverse, wrt: (.0, .1), vjp: dx_T)
+// func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
 //   if x > 1000 {
 //     return x
 //   }
 //   return x
 // }
-// func dx_T<T>(
-//     _ x: Float, _ y: T, primal: Float, seed: Float) -> (Float, T) {
-//   return (x, y)
+// func dx_T<T>(_ x: Float, _ y: T) -> (Float, (Float) -> (Float, T.TangentVector)) {
+//   return (x_T(x, y), { seed in (x, y) })
 // }
 // SupersetAdjointTests.test("IndirectResults") {
-//   expectEqual(3, #gradient(x_T, wrt: .0)(2, Float(3)))
+//   expectEqual(3, gradient(at: 2) { x in x_T(x, Float(3)) })
 // }
 
 runAllTests()
