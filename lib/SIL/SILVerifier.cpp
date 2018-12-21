@@ -1477,8 +1477,13 @@ public:
   }
 
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
+    SILGlobalVariable *RefG = AGI->getReferencedGlobal();
+    if (auto *VD = RefG->getDecl()) {
+      require(!VD->isResilient(F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
+              "cannot access storage of resilient global");
+    }
     if (F.isSerialized()) {
-      SILGlobalVariable *RefG = AGI->getReferencedGlobal();
       require(RefG->isSerialized()
                 || hasPublicVisibility(RefG->getLinkage()),
               "alloc_global inside fragile function cannot "
@@ -1490,6 +1495,11 @@ public:
     SILGlobalVariable *RefG = GAI->getReferencedGlobal();
     require(GAI->getType().getObjectType() == RefG->getLoweredType(),
             "global_addr/value must be the type of the variable it references");
+    if (auto *VD = RefG->getDecl()) {
+      require(!VD->isResilient(F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
+              "cannot access storage of resilient global");
+    }
     if (F.isSerialized()) {
       require(RefG->isSerialized()
               || hasPublicVisibility(RefG->getLinkage()),
