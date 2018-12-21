@@ -52,12 +52,12 @@ using namespace experimental_dependencies;
 
 /// YAML-specific code for emitting a SourceFileDepGraph.
 /// The file is written as just a series of nodes.
-class YAMLEmitter {
+class YAMLSourceFileDepGraphEmitter {
 private:
   llvm::raw_ostream &out;
 
 public:
-  YAMLEmitter(llvm::raw_ostream &out) : out(out) {
+  YAMLSourceFileDepGraphEmitter(llvm::raw_ostream &out) : out(out) {
     out << "# Experimental Dependencies\n";
   }
 
@@ -230,7 +230,7 @@ private:
 } // namespace
 
 template <>
-void NodeByNodeSourceFileDepGraphEmitter<YAMLEmitter>::emitNode(
+void NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>::emitNode(
     const SourceFileDepGraphNode *n) const {
   emitter.newNode();
   // Even though this method does not change the node,
@@ -503,11 +503,11 @@ void DependencyKey::verifyDeclAspectNames() {
 }
 
 bool DepGraphNode::ensureThatTheFingerprintIsValidForSerialization() const {
-  return YAMLEmitter::verifyOptionalString(fingerprint);
+  return YAMLSourceFileDepGraphEmitter::verifyOptionalString(fingerprint);
 }
 
 bool DepGraphNode::ensureThatTheSwiftDepsIsValidForSerialization() const {
-  return YAMLEmitter::verifyOptionalString(swiftDeps);
+  return YAMLSourceFileDepGraphEmitter::verifyOptionalString(swiftDeps);
 }
 
 void DepGraphNode::dump() const {
@@ -1025,7 +1025,7 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   SourceFileDepGraph g = gc.construct();
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        NodeByNodeSourceFileDepGraphEmitter<YAMLEmitter>(g, out).emit();
+        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
         return false;
       });
 

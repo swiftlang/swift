@@ -169,13 +169,13 @@ class ModuleDepGraph {
   }
 
   /// Remove node from nodeMap, check invariants.
-  ModuleDepGraphNode *eraseNodeFromMap(ModuleDepGraphNode *n) {
-    ModuleDepGraphNode *v = nodeMap.findAndErase(
-        n->getSwiftDeps().getValueOr(std::string()), n->getKey());
+  ModuleDepGraphNode *eraseNodeFromMap(ModuleDepGraphNode *nodeToErase) {
+    ModuleDepGraphNode *nodeActuallyErased = nodeMap.findAndErase(
+        nodeToErase->getSwiftDeps().getValueOr(std::string()), nodeToErase->getKey());
     assert(
-        n == v ||
+        nodeToErase == nodeActuallyErased ||
         mapCorruption("Node found from key must be same as node holding key."));
-    return n;
+    return nodeToErase;
   }
 
   static StringRef getSwiftDeps(const driver::Job *cmd) {
@@ -215,12 +215,12 @@ public:
   std::string getGraphID() const { return "driver"; }
 
   void forEachUseOf(const ModuleDepGraphNode *def,
-                    function_ref<void(const ModuleDepGraphNode *)>);
+                    function_ref<void(const ModuleDepGraphNode *use)>);
 
   void forEachNode(function_ref<void(const ModuleDepGraphNode *)>) const;
 
-  void forEachArc(function_ref<void(const ModuleDepGraphNode *,
-                                    const ModuleDepGraphNode *)>) const;
+  void forEachArc(function_ref<void(const ModuleDepGraphNode *def,
+                                    const ModuleDepGraphNode *use)>) const;
 
   /// Call \p fn for each node whose key matches \p key.
   void

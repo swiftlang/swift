@@ -66,12 +66,12 @@ LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
 LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
                                           llvm::MemoryBuffer &buffer) {
 
-  Optional<SourceFileDepGraph> fg =
+  Optional<SourceFileDepGraph> sourceFileDepGraph =
       SourceFileDepGraph::loadFromBuffer(buffer, false);
-  if (!fg)
+  if (!sourceFileDepGraph)
     return DependencyGraphImpl::LoadResult::HadError;
   addIndependentNode(job);
-  return integrate(fg.getValue());
+  return integrate(sourceFileDepGraph.getValue());
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {
