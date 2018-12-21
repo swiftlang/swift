@@ -1,4 +1,5 @@
 add_swift_host_library(swiftFrontendTool STATIC
+  ExperimentalDependenciesSourceFileDepGraphConstructor.cpp
   FrontendTool.cpp
   ImportedModules.cpp
   ReferenceDependencies.cpp
