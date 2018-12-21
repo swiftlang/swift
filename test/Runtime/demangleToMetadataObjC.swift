@@ -92,6 +92,7 @@ DemangleToMetadataTests.test("synthesized declarations") {
 }
 
 DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
+  expectNotNil(_typeByName("So17OS_dispatch_queueC8DispatchE10AttributesV"))
   expectEqual(DispatchQueue.Attributes.self,
     _typeByName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
 }
