@@ -489,7 +489,7 @@ public:
 
   void dump() const { llvm::errs() << std::string(*this) << "\n"; }
 
-  /// For debugging, see \ref TwoStageMap::verify
+  /// For debugging, needed for \ref TwoStageMap::verify
   operator std::string() const;
 
   bool verify() const;

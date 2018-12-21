@@ -320,9 +320,10 @@ FrontendNode *FrontendGraph::getNode(size_t sequenceNumber) const {
 
 InterfaceAndImplementationPair<FrontendNode>
 FrontendGraph::getSourceFileNodePair() const {
-  for (size_t i : {0, 1})
-    assert(getNode(i)->getKey().getKind() == NodeKind::sourceFileProvide &&
-           "First two must be sourceFileProvide nodes.");
+  assert(getNode(0)->getKey().getKind() == NodeKind::sourceFileProvide &&
+         "First node must be sourceFileProvide.");
+  assert(getNode(1)->getKey().getKind() == NodeKind::sourceFileProvide &&
+         "Second node must be sourceFileProvide.");
   return InterfaceAndImplementationPair<FrontendNode>(getNode(0), getNode(1));
 }
 
