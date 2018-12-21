@@ -444,7 +444,8 @@ SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap) const {
 }
 
 SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
-                                       LookupConformanceFn conformances) const {
+                                       LookupConformanceFn conformances,
+                                       SubstOptions options) const {
   if (empty()) return SubstitutionMap();
 
   SmallVector<Type, 4> newSubs;
@@ -454,7 +455,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
       newSubs.push_back(Type());
       continue;
     }
-    newSubs.push_back(type.subst(subs, conformances, SubstFlags::UseErrorType));
+    newSubs.push_back(type.subst(subs, conformances,
+                                 options | SubstFlags::UseErrorType));
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
@@ -474,10 +476,11 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
           conformance.getConcrete()->subst(subs, conformances)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this, SubstFlags::UseErrorType);
+      auto substType = origType.subst(*this,
+                                      options | SubstFlags::UseErrorType);
 
       newConformances.push_back(
-        conformance.subst(substType, subs, conformances));
+        conformance.subst(substType, subs, conformances, options));
     }
 
     oldConformances = oldConformances.slice(1);
@@ -485,6 +488,13 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
   assert(oldConformances.empty());
   return SubstitutionMap(genericSig, newSubs, newConformances);
+}
+
+SubstitutionMap
+SubstitutionMap::substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion exp)
+const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(exp);
+  return subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 SubstitutionMap

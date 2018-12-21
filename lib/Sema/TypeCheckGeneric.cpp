@@ -184,7 +184,7 @@ static Type getOpaqueResultType(TypeChecker &tc,
   
   // Try to resolve the constraint repr. It should be some kind of existential
   // type.
-  TypeResolutionOptions options(TypeResolverContext::FunctionResult);
+  TypeResolutionOptions options(TypeResolverContext::GenericRequirement);
   TypeLoc constraintTypeLoc(repr->getConstraint());
   // Pass along the error type if resolving the repr failed.
   bool validationError
