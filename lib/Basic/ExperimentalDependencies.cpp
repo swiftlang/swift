@@ -920,7 +920,7 @@ private:
   /// file must be recompiled if said def changes. However if \p cascades is
   /// true, then every other file that depends upon something provided here must
   /// be recompiled, too.
-  void recordThatThisWholeFileDependsOn(const DependencyKey &key,
+  void recordThatThisWholeFileDependsOn(const DependencyKey &,
                                         bool cascades);
 };
 } // namespace

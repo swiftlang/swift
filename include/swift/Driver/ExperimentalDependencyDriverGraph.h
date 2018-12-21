@@ -257,7 +257,7 @@ public:
 
   /// Don't want to do this after every integration--too slow--
   /// So export this hook to the driver.
-  bool emitAndVerify(DiagnosticEngine &diags);
+  bool emitAndVerify(DiagnosticEngine &);
 
 private:
   void verifyNodeMapEntries() const;
@@ -272,8 +272,8 @@ private:
                      DependencyKey,
                      std::unordered_map<std::string, ModuleDepGraphNode *>>,
                  2> &nodesSeenInNodeMap,
-      const std::string &swiftDepsString, const DependencyKey &key,
-      ModuleDepGraphNode *n, unsigned submapIndex) const;
+      const std::string &swiftDepsString, const DependencyKey &,
+      ModuleDepGraphNode *, unsigned submapIndex) const;
 
   /// See ModuleDepGraph::verifyNodeMapEntry for argument descriptions
   void verifyNodeIsUniqueWithinSubgraph(
@@ -281,15 +281,15 @@ private:
                      DependencyKey,
                      std::unordered_map<std::string, ModuleDepGraphNode *>>,
                  2> &nodesSeenInNodeMap,
-      const std::string &swiftDepsString, const DependencyKey &key,
-      ModuleDepGraphNode *n, unsigned submapIndex) const;
+      const std::string &swiftDepsString, const DependencyKey &,
+      ModuleDepGraphNode *, unsigned submapIndex) const;
 
   /// See ModuleDepGraph::verifyNodeMapEntry for argument descriptions
   void verifyNodeIsInRightEntryInNodeMap(const std::string &swiftDepsString,
-                                         const DependencyKey &key,
-                                         const ModuleDepGraphNode *n) const;
+                                         const DependencyKey &,
+                                         const ModuleDepGraphNode *) const;
 
-  void verifyExternalDependencyUniqueness(const DependencyKey &key) const;
+  void verifyExternalDependencyUniqueness(const DependencyKey &) const;
 
   void verifyCanFindEachJob() const;
   void verifyEachJobIsTracked() const;
