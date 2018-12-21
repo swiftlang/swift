@@ -579,36 +579,7 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
-                           SILValue original,
-                           const SILAutoDiffConfig &config)
-  : InstructionBase(debugLoc,
-                    getGradientSILType(module, original, config)),
-    Config(config), Operands(this, original) {}
-
-SILType GradientInst::getGradientSILType(
-    SILModule &module, SILValue original,
-    const SILAutoDiffConfig &config) {
-  // If parameter indices are empty, return an invalid type (empty tuple type).
-  // An "empty parameter indices" will be produced during verification.
-  if (config.indices.parameters.none()) {
-    auto invalidTy = TupleType::get({}, module.getASTContext());
-    return SILType::getPrimitiveObjectType(CanType(invalidTy));
-  }
-  auto origFnTy = original->getType().castTo<SILFunctionType>();
-  auto gradFnTy = origFnTy->getGradientType(config, module);
-  return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());
-}
-
-GradientInst *
-GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
-                     SILValue original,
-                     const SILAutoDiffConfig &config) {
-  void *buffer = M.allocateInst(sizeof(GradientInst), alignof(GradientInst));
-  return ::new (buffer) GradientInst(M, debugLoc, original, config);
-}
-
+// SWIFT_ENABLE_TENSORFLOW
 SILType
 AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
                                       unsigned differentiationOrder,

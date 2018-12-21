@@ -5420,37 +5420,6 @@ The rules on generic substitutions are identical to those of ``apply``.
 Automatic Differentiation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-These instructions perform automatic differentiation on functions. Currently,
-only reverse-mode differentiation is implemented, but eventually instructions
-for forward-mode differentiation may be added as well.
-
-.. SWIFT_ENABLE_TENSORFLOW
-
-gradient
-````````
-::
-
-  sil-instruction ::= 'gradient' sil-autodiff-param-indices?
-                      sil-autodiff-seedable? sil-autodiff-preserving-result?
-                      sil-value ':' sil-type
-  sil-autodiff-param-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
-  sil-autodiff-seedable ::= '[' 'seedable' ']'
-  sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
-
-  %original = function_ref @original : $(Float, Float) -> Float
-  %original_grad = gradient [wrt 0, 1] [preserving_result] \
-    %original : $(Float, Float) -> Float
-
-Computes the gradient function of a value ``%original`` using reverse-mode
-automatic differentiation.
-
-``%original`` must have function type and be differentiable.
-
-This instruction is only valid in raw SIL and is rewritten by the automatic
-differentiation pass.
-
-.. SWIFT_ENABLE_TENSORFLOW
-
 autodiff_function
 `````````````````
 

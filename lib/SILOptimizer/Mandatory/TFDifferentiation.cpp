@@ -792,10 +792,6 @@ public:
     return original == other.original && attr == other.attr;
   }
 
-  SILAutoDiffConfig getMasterConfig() const {
-    return SILAutoDiffConfig::getMaster(getIndices());
-  }
-
   void print(llvm::raw_ostream &os) const;
 };
 

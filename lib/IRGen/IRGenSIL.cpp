@@ -951,7 +951,6 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGradientInst(GradientInst *i);
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
@@ -1958,13 +1957,6 @@ static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Gradient is not valid in canonical SIL yet. For now, we print a runtime
-/// error.
-void IRGenSILFunction::visitGradientInst(GradientInst *i) {
-  llvm_unreachable("The gradient instruction is deprecated and will be "
-                   "removed");
-}
-
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
   // The original function and associated functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());

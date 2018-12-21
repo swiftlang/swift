@@ -1134,9 +1134,9 @@ static bool parseDifferentiableAttr(
   // Parse 'source'.
   unsigned SourceIndex;
   if (P.parseSpecificIdentifier(
-        "source", diag::sil_attr_differentiable_expected_keyword, "source") ||
+          "source", diag::sil_attr_differentiable_expected_keyword, "source") ||
       P.parseUnsignedInteger(SourceIndex, LastLoc,
-                             diag::sil_gradient_expected_source_index))
+           diag::sil_attr_differentiable_expected_source_index))
     return true;
   // Parse 'wrt'.
   if (P.parseSpecificIdentifier(
@@ -1149,7 +1149,7 @@ static bool parseDifferentiableAttr(
     unsigned Index;
     // TODO: Reject non-ascending parameter index lists.
     if (P.parseUnsignedInteger(Index, LastLoc,
-          diag::sil_reverse_autodiff_expected_parameter_index))
+            diag::sil_attr_differentiable_expected_parameter_index))
       return true;
     ParamIndices.push_back(Index);
     return false;
@@ -2934,84 +2934,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GradientInst: {
-    // Parse optional [source <index>].
-    unsigned sourceIndex = 0;
-    SourceLoc sourceIndexLoc;
-    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
-        parseVerbatim("source") ||
-        P.parseUnsignedInteger(sourceIndex, sourceIndexLoc,
-                               diag::sil_gradient_expected_source_index) ||
-        P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-      return true;
-    // Parse [wrt ...].
-    SmallVector<unsigned, 8> paramIndices;
-    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
-        parseVerbatim("wrt"))
-      return true;
-    auto parseIndex = [&]() -> bool {
-      unsigned index;
-      SourceLoc indexLoc;
-      // TODO: Reject non-ascending parameter index lists.
-      if (P.parseUnsignedInteger(index, indexLoc,
-                           diag::sil_reverse_autodiff_expected_parameter_index))
-        return true;
-      paramIndices.push_back(index);
-      return false;
-    };
-    if (parseIndex())
-      return true;
-    while (P.consumeIf(tok::comma))
-      if (parseIndex())
-        return true;
-    if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-      return true;
-    // Parse optional [seedable], [preserving_result] and [delayed].
-    SILGradientOptions existingOptions;
-    auto parseOption = [&]() -> bool {
-      SILGradientOptions option =
-        llvm::StringSwitch<SILGradientOptions>(P.Tok.getText())
-          .Case("seedable", SILGradientFlags::Seedable)
-          .Case("preserving_result", SILGradientFlags::PreservingResult)
-          .Case("delayed", SILGradientFlags::Delayed)
-          .Default(None);
-      P.consumeToken(tok::identifier);
-      if (!option) {
-        P.diagnose(P.Tok, diag::sil_reverse_autodiff_expected_option);
-        return true;
-      }
-      if (existingOptions.contains(option)) {
-        P.diagnose(P.Tok, diag::sil_reverse_autodiff_duplicate_option);
-        return true;
-      }
-      existingOptions |= option;
-      return P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]");
-    };
-    while (P.consumeIf(tok::l_square))
-      if (parseOption())
-        return true;
-    // Parse original function value.
-    UnresolvedValueName originalName;
-    SILType originalTy;
-    SourceLoc originalTyLoc;
-    if (parseValueName(originalName) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(originalTy, originalTyLoc))
-      return true;
-    auto originalFnTy = originalTy.getAs<SILFunctionType>();
-    if (!originalFnTy) {
-      P.diagnose(originalTyLoc, diag::expected_sil_type_kind, "be a function");
-      return true;
-    }
-    SILValue original = getLocalValue(originalName, originalTy, InstLoc, B);
-    if (parseSILDebugLocation(InstLoc, B))
-      return true;
-    SILAutoDiffConfig config(
-        {sourceIndex, paramIndices}, existingOptions);
-    ResultVal = B.createGradient(InstLoc, original, config);
-    break;
-  }
-
   case SILInstructionKind::AutoDiffFunctionInst: {
     // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
     //
@@ -3032,7 +2954,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       while (P.Tok.is(tok::integer_literal)) {
         unsigned index;
         if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_reverse_autodiff_expected_parameter_index))
+              diag::sil_inst_autodiff_expected_parameter_index))
           return true;
         if (index >= size)
           parameterIndices.resize((size *= 2));

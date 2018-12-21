@@ -7509,65 +7509,7 @@ class TryApplyInst final
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// GradientInst - Represents the gradient of another SIL function.
-class GradientInst final
-  : public InstructionBase<SILInstructionKind::GradientInst,
-                           SingleValueInstruction> {
-private:
-  friend SILBuilder;
-  /// The AD configuration.
-  SILAutoDiffConfig Config;
-  /// Space for 1 operand: the original function to be differentiated.
-  FixedOperandList<1> Operands;
-
-  GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               const SILAutoDiffConfig &config);
-
-  /// A utility function for computing the SIL type of the gradient of a
-  /// function, given the specified differentiation configuration options.
-  static SILType getGradientSILType(
-      SILModule &module, SILValue original,
-      const SILAutoDiffConfig &config);
-
-public:
-  ~GradientInst() {};
-
-  static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
-                              SILValue original,
-                              const SILAutoDiffConfig &config);
-
-  SILValue getOriginal() const { return Operands[0].get(); }
-
-  CanSILFunctionType getOriginalType() const {
-    return getOriginal()->getType().getAs<SILFunctionType>();
-  }
-
-  const SILAutoDiffConfig &getConfig() const {
-    return Config;
-  }
-
-  const SILAutoDiffIndices &getIndices() const {
-    return Config.indices;
-  }
-
-  SILGradientOptions getOptions() const {
-    return Config.options;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return Operands.asArray();
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return Operands.asArray();
-  }
-
-  static bool classof(const SILNode *N) {
-    return N->getKind() == SILNodeKind::GradientInst;
-  }
-};
-
+// SWIFT_ENABLE_TENSORFLOW
 /// `autodiff_function` - given a function and differentiation indices and its
 /// associated differentiation functions, create an `@autodiff` function that
 /// represents a bundle of these functions and configurations.

@@ -269,91 +269,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// Flags to define the semantics and the type signature of a gradient function.
-enum class SILGradientFlags : unsigned {
-  /// The gradient function is seedable, i.e. able to take a back-propagated
-  /// adjoint value as the last parameter.
-  Seedable = 1 << 0,
-  
-  /// The gradient function is preserving the result of the original function.
-  PreservingResult = 1 << 1,
-  
-  /// The adjoint computation is "delayed". We say that the adjoint computation
-  /// is delayed when when it's returned as a thunk.
-  Delayed = 1 << 2
-};
-using SILGradientOptions = OptionSet<SILGradientFlags>;
-static inline SILGradientOptions operator|(SILGradientFlags lhs,
-                                           SILGradientFlags rhs) {
-  return SILGradientOptions(unsigned(lhs) | unsigned(rhs));
-}
-
-/// SIL-level automatic differentiation configuration.
-struct SILAutoDiffConfig {
-  SILAutoDiffIndices indices;
-  SILGradientOptions options;
-
-  /*implicit*/
-  SILAutoDiffConfig(const SILAutoDiffIndices &indices,
-                    SILGradientOptions options)
-    : indices(indices), options(options) {}
-
-  /*implicit*/
-  SILAutoDiffConfig(const SILAutoDiffIndices &indices,
-                    bool seedable, bool preservingResult)
-    : SILAutoDiffConfig(indices, getCanonicalGradientOptions()) {}
-
-  unsigned getSourceIndex() const {
-    return indices.source;
-  }
-
-  llvm::SmallBitVector getParameterIndices() const {
-    return indices.parameters;
-  }
-
-  bool isSeedable() const {
-    return options.contains(SILGradientFlags::Seedable);
-  }
-
-  bool isPreservingResult() const {
-    return options.contains(SILGradientFlags::PreservingResult);
-  }
-
-  bool isDelayed() const {
-    return options.contains(SILGradientFlags::Delayed);
-  }
-
-  // FIXME: The master configuration should have all three gradient options
-  // enabled, that is, the canonical gradient should return a delayed gradient
-  // function. We need to handle this here as well as within the
-  // differentiation pass.
-  static SILGradientOptions getCanonicalGradientOptions() {
-    return SILGradientFlags::Seedable | SILGradientFlags::PreservingResult;
-  }
-
-  /// Returns the "master" configuration, which all variants with the same
-  /// parameter indices can derive from.
-  static SILAutoDiffConfig getMaster(const SILAutoDiffIndices &indices) {
-    return {
-      indices,
-      getCanonicalGradientOptions()
-    };
-  }
-
-  SILAutoDiffConfig getWithCanonicalOptions() const {
-    return getMaster(indices);
-  }
-
-  bool isMaster() const {
-    return options.toRaw() == getCanonicalGradientOptions().toRaw();
-  }
-
-  bool operator==(const SILAutoDiffConfig &other) const {
-    return indices == other.indices &&
-           options.toRaw() == other.options.toRaw();
-  }
-};
-
 /// The kind of an associated function.
 struct AutoDiffAssociatedFunctionKind {
   enum innerty : uint8_t {
@@ -548,8 +463,6 @@ public:
 namespace llvm {
 
 using swift::SILAutoDiffIndices;
-using swift::SILAutoDiffConfig;
-using swift::SILGradientFlags;
 using swift::OptionSet;
 
 template<typename T> struct DenseMapInfo;
@@ -575,33 +488,6 @@ template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static bool isEqual(const SILAutoDiffIndices &LHS,
                       const SILAutoDiffIndices &RHS) {
     return LHS == RHS;
-  }
-};
-
-template<> struct DenseMapInfo<SILAutoDiffConfig> {
-  static SILAutoDiffConfig getEmptyKey() {
-    return { DenseMapInfo<SILAutoDiffIndices>::getEmptyKey(), None };
-  }
-
-  static SILAutoDiffConfig getTombstoneKey() {
-    return {
-      DenseMapInfo<SILAutoDiffIndices>::getTombstoneKey(),
-      SILGradientFlags::Delayed
-    };
-  }
-
-  static unsigned getHashValue(const SILAutoDiffConfig &Val) {
-    return hash_combine(
-      DenseMapInfo<SILAutoDiffIndices>::getHashValue(Val.indices),
-      DenseMapInfo<unsigned>::getHashValue(Val.options.toRaw())
-    );
-  }
-
-  static bool isEqual(const SILAutoDiffConfig &LHS,
-                      const SILAutoDiffConfig &RHS) {
-    return DenseMapInfo<SILAutoDiffIndices>
-             ::isEqual(LHS.indices, RHS.indices) &&
-           LHS.options.toRaw() == RHS.options.toRaw();
   }
 };
 

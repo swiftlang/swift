@@ -977,7 +977,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            IsNonThrowingApply = 0;
   // SWIFT_ENABLE_TENSORFLOW
   unsigned NumArguments = 0;
-  unsigned GradResultIndex = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1083,11 +1082,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstGraphOperationLayout::readRecord(scratch, ValID, NumArguments,
                                             ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::GraphOperationInst;
-    break;
-  case SIL_INST_GRADIENT:
-    SILInstGradientLayout::readRecord(scratch, Attr, TyID, TyCategory, ValID,
-                                      GradResultIndex, ListOfValues);
-    RawOpCode = (unsigned)SILInstructionKind::GradientInst;
     break;
   case SIL_INST_AUTODIFF_FUNCTION:
     SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
@@ -1488,19 +1482,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GradientInst: {
-    auto ASTTy = MF->getType(TyID);
-    auto SILTy = getSILType(ASTTy, SILValueCategory::Object);
-    auto Val = getLocalValue(ValID, SILTy);
-    auto GradOpts = (SILGradientOptions)Attr;
-    llvm::SmallBitVector paramIndices(ListOfValues.size());
-    for (auto i : indices(ListOfValues))
-      paramIndices[i] = ListOfValues[i];
-    SILAutoDiffIndices indices(GradResultIndex, paramIndices);
-    SILAutoDiffConfig config(indices, GradOpts);
-    ResultVal = Builder.createGradient(Loc, Val, config);
-    break;
-  }
   case SILInstructionKind::AutoDiffFunctionInst: {
     auto numParamIndices = ListOfValues.size() - NumArguments * 3;
     auto paramIndices = ListOfValues.take_front(numParamIndices);
