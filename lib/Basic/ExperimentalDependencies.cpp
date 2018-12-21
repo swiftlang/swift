@@ -47,10 +47,10 @@ using namespace swift;
 using namespace experimental_dependencies;
 
 //==============================================================================
-// MARK: Emitting and reading FrontendGraph
+// MARK: Emitting and reading SourceFileDepGraph
 //==============================================================================
 
-/// YAML-specific code for emitting a FrontendGraph.
+/// YAML-specific code for emitting a SourceFileDepGraph.
 /// The file is written as just a series of nodes.
 class YAMLEmitter {
 private:
@@ -101,9 +101,9 @@ public:
 namespace {
 namespace yaml = llvm::yaml;
 
-/// YAML-specific logic to parse FrontendGraphs.
+/// YAML-specific logic to parse SourceFileDepGraphs.
 /// Just a sequence of nodes.
-class YAMLFrontendGraphParser {
+class YAMLSourceFileDepGraphParser {
 private:
   llvm::MemoryBuffer &inputBuffer;
 
@@ -111,13 +111,13 @@ private:
   bool hadError = false;
 
 public:
-  YAMLFrontendGraphParser(llvm::MemoryBuffer &inputBuffer)
+  YAMLSourceFileDepGraphParser(llvm::MemoryBuffer &inputBuffer)
       : inputBuffer(inputBuffer) {}
 
-  /// Scan the file, which is just a series of serialized FrontendNodes.
-  /// Each time the parser is positioned at the contents of a node,
-  /// call \p parseNodeCallback to parse the contents of a node.
-  /// This routine handles all the intra-node struct.
+  /// Scan the file, which is just a series of serialized
+  /// SourceFileDepGraphNodes. Each time the parser is positioned at the
+  /// contents of a node, call \p parseNodeCallback to parse the contents of a
+  /// node. This routine handles all the intra-node struct.
   /// \returns true for error
   bool forEachSerializedNode(function_ref<void()> parseNodeCallback) {
     // Setup
@@ -205,37 +205,38 @@ namespace {
 /// Emits a graph, one entry per node
 /// Emitter is templated so that maybe it could be a JSON emitter someday, for
 /// instance.
-template <typename Emitter> class NodeByNodeFrontendGraphEmitter {
+template <typename Emitter> class NodeByNodeSourceFileDepGraphEmitter {
 private:
   /// The graph to emit.
-  const FrontendGraph &g;
+  const SourceFileDepGraph &g;
 
   /// The syntax-specific emitter.de
   Emitter emitter;
 
 public:
-  NodeByNodeFrontendGraphEmitter(const FrontendGraph &g, llvm::raw_ostream &out)
+  NodeByNodeSourceFileDepGraphEmitter(const SourceFileDepGraph &g,
+                                      llvm::raw_ostream &out)
       : g(g), emitter(Emitter(out)) {}
 
 public:
   /// Emit a whole graph.
   void emit() const {
-    g.forEachNode([&](const FrontendNode *n) { emitNode(n); });
+    g.forEachNode([&](const SourceFileDepGraphNode *n) { emitNode(n); });
   }
 
 private:
-  void emitNode(const FrontendNode *) const;
+  void emitNode(const SourceFileDepGraphNode *) const;
 };
 } // namespace
 
 template <>
-void NodeByNodeFrontendGraphEmitter<YAMLEmitter>::emitNode(
-    const FrontendNode *n) const {
+void NodeByNodeSourceFileDepGraphEmitter<YAMLEmitter>::emitNode(
+    const SourceFileDepGraphNode *n) const {
   emitter.newNode();
   // Even though this method does not change the node,
   // the serializeOrDeserialize method does not know that the emitter
   // functions don't mutate the node.
-  auto nn = const_cast<FrontendNode *>(n);
+  auto nn = const_cast<SourceFileDepGraphNode *>(n);
   nn->serializeOrDeserialize(
       [&](size_t s) { emitter.emitInt(s); },
       [&](std::string &s) { emitter.emitString(s); },
@@ -243,8 +244,8 @@ void NodeByNodeFrontendGraphEmitter<YAMLEmitter>::emitNode(
       [&](std::unordered_set<size_t> &s) { emitter.emitSetOfInts(s); });
 }
 
-void FrontendGraph::addDeserializedNode(FrontendNode *n,
-                                        const bool assertUniqueness) {
+void SourceFileDepGraph::addDeserializedNode(SourceFileDepGraphNode *n,
+                                             const bool assertUniqueness) {
   addNode(n);
   assert(getNode(allNodes.size() - 1)); // verify seq no.
   if (assertUniqueness)
@@ -253,7 +254,7 @@ void FrontendGraph::addDeserializedNode(FrontendNode *n,
            "be unique.");
 }
 
-void Node::serializeOrDeserialize(
+void DepGraphNode::serializeOrDeserialize(
     function_ref<void(size_t &)> convertInt,
     function_ref<void(std::string &)> convertString,
     function_ref<void(Optional<std::string> &)> convertOptionalString) {
@@ -264,19 +265,19 @@ void Node::serializeOrDeserialize(
   assert(ensureThatTheSwiftDepsIsValidForSerialization());
 }
 
-Optional<FrontendGraph>
-FrontendGraph::loadFromPath(StringRef path, const bool assertUniqueness) {
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromPath(StringRef path, const bool assertUniqueness) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return None;
   return loadFromBuffer(*buffer.get(), assertUniqueness);
 }
 
-Optional<FrontendGraph>
-FrontendGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
-                              const bool assertUniqueness) {
-  FrontendGraph fg;
-  auto nodeCallback = [&fg, assertUniqueness](FrontendNode *n) {
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
+                                   const bool assertUniqueness) {
+  SourceFileDepGraph fg;
+  auto nodeCallback = [&fg, assertUniqueness](SourceFileDepGraphNode *n) {
     fg.addDeserializedNode(n, assertUniqueness);
   };
 
@@ -285,12 +286,12 @@ FrontendGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
   return std::move(fg);
 }
 
-bool FrontendGraph::parseDependencyFile(
+bool SourceFileDepGraph::parseDependencyFile(
     llvm::MemoryBuffer &buffer,
-    function_ref<void(FrontendNode *)> nodeCallback) {
-  YAMLFrontendGraphParser reader(buffer);
+    function_ref<void(SourceFileDepGraphNode *)> nodeCallback) {
+  YAMLSourceFileDepGraphParser reader(buffer);
   return reader.forEachSerializedNode([&]() {
-    auto n = new FrontendNode();
+    auto n = new SourceFileDepGraphNode();
     n->serializeOrDeserialize(
         [&](size_t &s) { reader.parseInt(s); },
         [&](std::string &s) { reader.parseString(s); },
@@ -300,58 +301,63 @@ bool FrontendGraph::parseDependencyFile(
   });
 }
 
-void FrontendNode::serializeOrDeserialize(
+void SourceFileDepGraphNode::serializeOrDeserialize(
     function_ref<void(size_t &)> convertInt,
     function_ref<void(std::string &)> convertString,
     function_ref<void(Optional<std::string> &)> convertOptionalString,
     function_ref<void(std::unordered_set<size_t> &)> convertSetOfInts) {
-  Node::serializeOrDeserialize(convertInt, convertString,
-                               convertOptionalString);
+  DepGraphNode::serializeOrDeserialize(convertInt, convertString,
+                                       convertOptionalString);
   convertInt(sequenceNumber);
   convertSetOfInts(usesOfMe);
 }
 
 //==============================================================================
-// MARK: FrontendGraph access
+// MARK: SourceFileDepGraph access
 //==============================================================================
 
-FrontendNode *FrontendGraph::getNode(size_t sequenceNumber) const {
+SourceFileDepGraphNode *
+SourceFileDepGraph::getNode(size_t sequenceNumber) const {
   assert(sequenceNumber < allNodes.size() && "Bad node index");
-  FrontendNode *n = allNodes[sequenceNumber];
+  SourceFileDepGraphNode *n = allNodes[sequenceNumber];
   assert(n->getSequenceNumber() == sequenceNumber &&
          "Bad sequence number in node or bad entry in allNodes.");
   return n;
 }
 
-InterfaceAndImplementationPair<FrontendNode>
-FrontendGraph::getSourceFileNodePair() const {
+InterfaceAndImplementationPair<SourceFileDepGraphNode>
+SourceFileDepGraph::getSourceFileNodePair() const {
   assert(getNode(0)->getKey().getKind() == NodeKind::sourceFileProvide &&
          "First node must be sourceFileProvide.");
   assert(getNode(1)->getKey().getKind() == NodeKind::sourceFileProvide &&
          "Second node must be sourceFileProvide.");
-  return InterfaceAndImplementationPair<FrontendNode>(getNode(0), getNode(1));
+  return InterfaceAndImplementationPair<SourceFileDepGraphNode>(getNode(0),
+                                                                getNode(1));
 }
 
-StringRef FrontendGraph::getSwiftDepsFromSourceFileProvide() const {
+StringRef SourceFileDepGraph::getSwiftDepsFromSourceFileProvide() const {
   return getSourceFileNodePair()
       .getInterface()
       ->getKey()
       .getSwiftDepsFromSourceFileProvide();
 }
 
-void FrontendGraph::forEachArc(
-    function_ref<void(const FrontendNode *def, const FrontendNode *use)> fn)
-    const {
-  forEachNode([&](const FrontendNode *defNode) {
-    forEachUseOf(defNode, [&](FrontendNode *useNode) { fn(defNode, useNode); });
+void SourceFileDepGraph::forEachArc(
+    function_ref<void(const SourceFileDepGraphNode *def,
+                      const SourceFileDepGraphNode *use)>
+        fn) const {
+  forEachNode([&](const SourceFileDepGraphNode *defNode) {
+    forEachUseOf(defNode, [&](SourceFileDepGraphNode *useNode) {
+      fn(defNode, useNode);
+    });
   });
 }
 
-InterfaceAndImplementationPair<FrontendNode>
-FrontendGraph::findExistingNodePairOrCreateAndAddIfNew(
+InterfaceAndImplementationPair<SourceFileDepGraphNode>
+SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
     NodeKind k, StringRef context, StringRef name,
     Optional<std::string> fingerprint, StringRef swiftDeps) {
-  InterfaceAndImplementationPair<FrontendNode> nodePair{
+  InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
       findExistingNodeOrCreateIfNew(
           DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
           swiftDeps.str()),
@@ -363,13 +369,13 @@ FrontendGraph::findExistingNodePairOrCreateAndAddIfNew(
   return nodePair;
 }
 
-FrontendNode *
-FrontendGraph::findExistingNodeOrCreateIfNew(DependencyKey key,
-                                             Optional<std::string> fingerprint,
-                                             Optional<std::string> swiftDeps) {
+SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
+    DependencyKey key, Optional<std::string> fingerprint,
+    Optional<std::string> swiftDeps) {
   return memoizedNodes.findExistingOrCreateIfNew(
-      key, [&](DependencyKey key) -> FrontendNode * {
-        FrontendNode *n = new FrontendNode(key, fingerprint);
+      key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
+        SourceFileDepGraphNode *n =
+            new SourceFileDepGraphNode(key, fingerprint);
         n->setSwiftDeps(swiftDeps);
         addNode(n);
         return n;
@@ -384,14 +390,14 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
 // MARK: Debugging
 //==============================================================================
 
-bool FrontendGraph::verify() const {
+bool SourceFileDepGraph::verify() const {
   DependencyKey::verifyNodeKindNames();
   DependencyKey::verifyDeclAspectNames();
   // Ensure Keys are unique
-  std::unordered_map<DependencyKey, FrontendNode *> nodesSeen;
+  std::unordered_map<DependencyKey, SourceFileDepGraphNode *> nodesSeen;
   // Ensure each node only appears once.
   std::unordered_set<void *> nodes;
-  forEachNode([&](FrontendNode *n) {
+  forEachNode([&](SourceFileDepGraphNode *n) {
     n->getKey().verify();
     assert(nodes.insert(n).second && "Frontend nodes are identified by "
                                      "sequence number, therefore must be "
@@ -411,17 +417,17 @@ bool FrontendGraph::verify() const {
     assert(
         (!n->getSwiftDeps().hasValue() ||
          n->getSwiftDeps().getValue() == getSwiftDepsFromSourceFileProvide()) &&
-        "How can a FrontendNode be from a different file?");
+        "How can a SourceFileDepGraphNode be from a different file?");
 
-    forEachUseOf(n, [&](FrontendNode *use) {
+    forEachUseOf(n, [&](SourceFileDepGraphNode *use) {
       assert(use != n && "Uses should be irreflexive.");
     });
   });
   return true;
 }
 
-bool FrontendGraph::verifyReadsWhatIsWritten(StringRef path) const {
-  auto loadedGraph = FrontendGraph::loadFromPath(path, true);
+bool SourceFileDepGraph::verifyReadsWhatIsWritten(StringRef path) const {
+  auto loadedGraph = SourceFileDepGraph::loadFromPath(path, true);
   assert(loadedGraph.hasValue() &&
          "Should be able to read the exported graph.");
   verifySame(loadedGraph.getValue());
@@ -496,15 +502,15 @@ void DependencyKey::verifyDeclAspectNames() {
 #undef CHECK_NAME
 }
 
-bool Node::ensureThatTheFingerprintIsValidForSerialization() const {
+bool DepGraphNode::ensureThatTheFingerprintIsValidForSerialization() const {
   return YAMLEmitter::verifyOptionalString(fingerprint);
 }
 
-bool Node::ensureThatTheSwiftDepsIsValidForSerialization() const {
+bool DepGraphNode::ensureThatTheSwiftDepsIsValidForSerialization() const {
   return YAMLEmitter::verifyOptionalString(swiftDeps);
 }
 
-void Node::dump() const {
+void DepGraphNode::dump() const {
   key.dump();
   if (fingerprint.hasValue())
     llvm::errs() << "fingerprint: " << fingerprint.getValue() << "";
@@ -516,7 +522,7 @@ void Node::dump() const {
     llvm::errs() << " no swiftDeps\n";
 }
 
-std::string Node::humanReadableName() const {
+std::string DepGraphNode::humanReadableName() const {
   auto filename = [](StringRef path) -> std::string {
     auto lastIndex = path.find_last_of('/');
     return lastIndex == StringRef::npos ? path : path.drop_front(lastIndex + 1);
@@ -529,7 +535,7 @@ std::string Node::humanReadableName() const {
 }
 
 //==============================================================================
-// MARK: Start of FrontendGraph building, specific to status quo
+// MARK: Start of SourceFileDepGraph building, specific to status quo
 //==============================================================================
 
 //==============================================================================
@@ -801,13 +807,14 @@ DependencyKey::createDependedUponKey<NodeKind::externalDepend, std::string>(
 }
 
 //==============================================================================
-// MARK: FrontendGraphConstructor
+// MARK: SourceFileDepGraphConstructor
 //==============================================================================
 
 namespace {
 
-/// Reads the information provided by the frontend and builds the FrontendGraph
-class FrontendGraphConstructor {
+/// Reads the information provided by the frontend and builds the
+/// SourceFileDepGraph
+class SourceFileDepGraphConstructor {
   /// The SourceFile containing the Decls.
   SourceFile *SF;
 
@@ -822,17 +829,18 @@ class FrontendGraphConstructor {
   MangleTypeAsContext mangleTypeAsContext;
 
   /// Graph under construction
-  FrontendGraph g;
+  SourceFileDepGraph g;
 
 public:
-  FrontendGraphConstructor(SourceFile *SF, const DependencyTracker &depTracker,
-                           StringRef swiftDeps,
-                           MangleTypeAsContext mangleTypeAsContext)
+  SourceFileDepGraphConstructor(SourceFile *SF,
+                                const DependencyTracker &depTracker,
+                                StringRef swiftDeps,
+                                MangleTypeAsContext mangleTypeAsContext)
       : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
         mangleTypeAsContext(mangleTypeAsContext) {}
 
   /// Construct the graph and return it.
-  FrontendGraph construct() {
+  SourceFileDepGraph construct() {
     // Order matters here, each function adds state used by the next one.
     addSourceFileNodesToGraph();
     addProviderNodesToGraph();
@@ -917,7 +925,7 @@ private:
 };
 } // namespace
 
-void FrontendGraphConstructor::addAllDependenciesFrom(
+void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>
         &map) {
   std::unordered_set<const NominalTypeDecl *> holdersOfCascadingMembers;
@@ -938,10 +946,10 @@ void FrontendGraphConstructor::addAllDependenciesFrom(
 }
 
 //==============================================================================
-// MARK: FrontendGraphConstructor: Adding nodes to the graph
+// MARK: SourceFileDepGraphConstructor: Adding nodes to the graph
 //==============================================================================
 
-void FrontendGraphConstructor::addSourceFileNodesToGraph() {
+void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
       DependencyKey::computeContextForProvidedEntity<
@@ -951,7 +959,7 @@ void FrontendGraphConstructor::addSourceFileNodesToGraph() {
       getSourceFileFingerprint(), swiftDeps);
 }
 
-void FrontendGraphConstructor::addProviderNodesToGraph() {
+void SourceFileDepGraphConstructor::addProviderNodesToGraph() {
   SourceFileDeclFinder demux(SF);
   // TODO: express the multiple provides and depends streams with variadic
   // templates
@@ -972,7 +980,7 @@ void FrontendGraphConstructor::addProviderNodesToGraph() {
   addAllProviderNodesOfAGivenType<NodeKind::dynamicLookup>(demux.classMembers);
 }
 
-void FrontendGraphConstructor::addDependencyArcsToGraph() {
+void SourceFileDepGraphConstructor::addDependencyArcsToGraph() {
   // TODO: express the multiple provides and depends streams with variadic
   // templates
   addAllDependenciesFrom<NodeKind::topLevel>(
@@ -983,13 +991,14 @@ void FrontendGraphConstructor::addDependencyArcsToGraph() {
   addAllDependenciesFrom(depTracker.getDependencies());
 }
 
-void FrontendGraphConstructor::recordThatThisWholeFileDependsOn(
+void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
     const DependencyKey &key, bool cascades) {
-  FrontendNode *def = g.findExistingNodeOrCreateIfNew(key, None, None);
+  SourceFileDepGraphNode *def =
+      g.findExistingNodeOrCreateIfNew(key, None, None);
   g.addArc(def, g.getSourceFileNodePair().useDependingOnCascading(cascades));
 }
 
-void FrontendGraph::verifySame(const FrontendGraph &other) const {
+void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
   assert(allNodes.size() == other.allNodes.size() &&
          "Both graphs must have same number of nodes.");
   for (size_t i : indices(allNodes)) {
@@ -1011,11 +1020,12 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  FrontendGraphConstructor gc(SF, depTracker, outputPath, mangleTypeAsContext);
-  FrontendGraph g = gc.construct();
+  SourceFileDepGraphConstructor gc(SF, depTracker, outputPath,
+                                   mangleTypeAsContext);
+  SourceFileDepGraph g = gc.construct();
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        NodeByNodeFrontendGraphEmitter<YAMLEmitter>(g, out).emit();
+        NodeByNodeSourceFileDepGraphEmitter<YAMLEmitter>(g, out).emit();
         return false;
       });
 
@@ -1023,7 +1033,7 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
 
   std::string dotFileName = outputPath.str() + ".dot";
   withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
-    DotFileEmitter<FrontendGraph>(out, g, false, false).emit();
+    DotFileEmitter<SourceFileDepGraph>(out, g, false, false).emit();
     return false;
   });
   return hadError;

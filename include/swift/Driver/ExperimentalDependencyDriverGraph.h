@@ -1,4 +1,5 @@
-//===--- ExperimentalDependencyDriverGraph.h --------------------*- C++ -*-===//
+//===--- ExperimentalDependencyModuleDepGraph.h --------------------*- C++
+//-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -39,20 +40,21 @@ namespace swift {
 namespace experimental_dependencies {
 
 //==============================================================================
-// MARK: DriverNode
+// MARK: ModuleDepGraphNode
 //==============================================================================
 
 /// A node in the DriverDependencyGraph
 /// Keep separate type from Node for type-checking.
-class DriverNode : public Node {
+class ModuleDepGraphNode : public DepGraphNode {
 
 public:
-  DriverNode(const DependencyKey &key, Optional<std::string> fingerprint)
-      : Node(key, fingerprint) {}
+  ModuleDepGraphNode(const DependencyKey &key,
+                     Optional<std::string> fingerprint)
+      : DepGraphNode(key, fingerprint) {}
 
   /// Integrate \p integrand's fingerprint into \p dn.
   /// \returns true if there was a change requiring recompilation.
-  bool integrateFingerprintFrom(const FrontendNode *integrand) {
+  bool integrateFingerprintFrom(const SourceFileDepGraphNode *integrand) {
     if (getFingerprint() == integrand->getFingerprint())
       return false;
     setFingerprint(integrand->getFingerprint());
@@ -69,11 +71,11 @@ public:
 };
 
 //==============================================================================
-// MARK: DriverGraph
+// MARK: ModuleDepGraph
 //==============================================================================
 
 /// See \ref Node in ExperimentalDependencies.h
-class DriverGraph {
+class ModuleDepGraph {
 
   /// Find nodes, first by the swiftDeps file, then by key.
   /// Supports searching specific files for a node matching a key.
@@ -92,7 +94,7 @@ class DriverGraph {
   ///
   /// Sadly, cannot use an optional string for a key.
   using NodeMap =
-      BiIndexedTwoStageMap<std::string, DependencyKey, DriverNode *>;
+      BiIndexedTwoStageMap<std::string, DependencyKey, ModuleDepGraphNode *>;
   NodeMap nodeMap;
 
   /// Since dependency keys use baseNames, they are coarser than individual
@@ -149,25 +151,26 @@ class DriverGraph {
 
   /// Encapsulate the invariant between where the node resides in
   /// nodesBySwiftDepsFile and the swiftDeps node instance variable here.
-  void addToMap(DriverNode *n) {
+  void addToMap(ModuleDepGraphNode *n) {
     nodeMap.insert(n->getSwiftDeps().getValueOr(std::string()), n->getKey(), n);
   }
 
-  /// When integrating a FrontendGraph, there might be a node representing a
-  /// Decl that had previously been read as an expat, that is a node
+  /// When integrating a SourceFileDepGraph, there might be a node representing
+  /// a Decl that had previously been read as an expat, that is a node
   /// representing a Decl in no known file (to that point). (Recall the the
   /// Frontend processes name lookups as dependencies, but does not record in
   /// which file the name was found.) In such a case, it is necessary to move
   /// the node to the proper collection.
-  void moveNodeToDifferentFile(DriverNode *n, Optional<std::string> newFile) {
+  void moveNodeToDifferentFile(ModuleDepGraphNode *n,
+                               Optional<std::string> newFile) {
     eraseNodeFromMap(n);
     n->setSwiftDeps(newFile);
     addToMap(n);
   }
 
   /// Remove node from nodeMap, check invariants.
-  DriverNode *eraseNodeFromMap(DriverNode *n) {
-    DriverNode *v = nodeMap.findAndErase(
+  ModuleDepGraphNode *eraseNodeFromMap(ModuleDepGraphNode *n) {
+    ModuleDepGraphNode *v = nodeMap.findAndErase(
         n->getSwiftDeps().getValueOr(std::string()), n->getKey());
     assert(
         n == v ||
@@ -191,18 +194,18 @@ class DriverGraph {
 
 public:
   /// For templates such as DotFileEmitter.
-  using NodeType = DriverNode;
+  using NodeType = ModuleDepGraphNode;
 
   /// \p stats may be null
-  DriverGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
-              const bool emitExperimentalDependencyDotFileAfterEveryImport,
-              UnifiedStatsReporter *stats)
+  ModuleDepGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
+                 const bool emitExperimentalDependencyDotFileAfterEveryImport,
+                 UnifiedStatsReporter *stats)
       : verifyExperimentalDependencyGraphAfterEveryImport(
-          verifyExperimentalDependencyGraphAfterEveryImport),
+            verifyExperimentalDependencyGraphAfterEveryImport),
         emitExperimentalDependencyDotFileAfterEveryImport(
-          emitExperimentalDependencyDotFileAfterEveryImport),
+            emitExperimentalDependencyDotFileAfterEveryImport),
         stats(stats) {
-    assert(verify() && "DriverGraph should be fine when created");
+    assert(verify() && "ModuleDepGraph should be fine when created");
   }
   
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
@@ -211,17 +214,18 @@ public:
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
 
-  void forEachUseOf(const DriverNode *def,
-                    function_ref<void(const DriverNode *)>);
+  void forEachUseOf(const ModuleDepGraphNode *def,
+                    function_ref<void(const ModuleDepGraphNode *)>);
 
-  void forEachNode(function_ref<void(const DriverNode *)>) const;
+  void forEachNode(function_ref<void(const ModuleDepGraphNode *)>) const;
 
-  void
-  forEachArc(function_ref<void(const DriverNode *, const DriverNode *)>) const;
+  void forEachArc(function_ref<void(const ModuleDepGraphNode *,
+                                    const ModuleDepGraphNode *)>) const;
 
   /// Call \p fn for each node whose key matches \p key.
-  void forEachMatchingNode(const DependencyKey &key,
-                           function_ref<void(const DriverNode *)>) const;
+  void
+  forEachMatchingNode(const DependencyKey &key,
+                      function_ref<void(const ModuleDepGraphNode *)>) const;
 
 public:
   // This section contains the interface to the status quo code in the driver.
@@ -263,26 +267,26 @@ private:
   /// \p key is the DependencyKey in the map
   /// \p n is the node for that map entry
   void verifyNodeMapEntry(
-      std::array<
-          std::unordered_map<DependencyKey,
-                             std::unordered_map<std::string, DriverNode *>>,
-          2> &nodesSeenInNodeMap,
+      std::array<std::unordered_map<
+                     DependencyKey,
+                     std::unordered_map<std::string, ModuleDepGraphNode *>>,
+                 2> &nodesSeenInNodeMap,
       const std::string &swiftDepsString, const DependencyKey &key,
-      DriverNode *n, unsigned submapIndex) const;
+      ModuleDepGraphNode *n, unsigned submapIndex) const;
 
-  /// See DriverGraph::verifyNodeMapEntry for argument descriptions
+  /// See ModuleDepGraph::verifyNodeMapEntry for argument descriptions
   void verifyNodeIsUniqueWithinSubgraph(
-      std::array<
-          std::unordered_map<DependencyKey,
-                             std::unordered_map<std::string, DriverNode *>>,
-          2> &nodesSeenInNodeMap,
+      std::array<std::unordered_map<
+                     DependencyKey,
+                     std::unordered_map<std::string, ModuleDepGraphNode *>>,
+                 2> &nodesSeenInNodeMap,
       const std::string &swiftDepsString, const DependencyKey &key,
-      DriverNode *n, unsigned submapIndex) const;
+      ModuleDepGraphNode *n, unsigned submapIndex) const;
 
-  /// See DriverGraph::verifyNodeMapEntry for argument descriptions
+  /// See ModuleDepGraph::verifyNodeMapEntry for argument descriptions
   void verifyNodeIsInRightEntryInNodeMap(const std::string &swiftDepsString,
                                          const DependencyKey &key,
-                                         const DriverNode *n) const;
+                                         const ModuleDepGraphNode *n) const;
 
   void verifyExternalDependencyUniqueness(const DependencyKey &key) const;
 
@@ -297,23 +301,24 @@ private:
   /// the job-independent dot file.
   std::string computePathForDotFile() const;
 
-  /// Read a FrontendGraph belonging to \p job from \p buffer
-  /// and integrate it into the DriverGraph.
-  /// Used both the first time, and to reload the FrontendGraph.
+  /// Read a SourceFileDepGraph belonging to \p job from \p buffer
+  /// and integrate it into the ModuleDepGraph.
+  /// Used both the first time, and to reload the SourceFileDepGraph.
   /// If any changes were observed, indicate same in the return vale.
   DependencyGraphImpl::LoadResult loadFromBuffer(const driver::Job *,
                                                  llvm::MemoryBuffer &);
 
-  /// Integrate a FrontendGraph into the receiver.
-  /// Integration happens when the driver needs to read FrontendGraph.
-  DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
+  /// Integrate a SourceFileDepGraph into the receiver.
+  /// Integration happens when the driver needs to read SourceFileDepGraph.
+  DependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
 
   /// Integrate the \p integrand into the receiver.
   /// Return a bool indicating if this node represents a change that must be
   /// propagated.
-  bool integrateFrontendNode(const FrontendNode *integrand,
-                             StringRef swiftDepsOfFrontendGraph,
-                             Optional<DriverNode *> preexistingNodeInPlace);
+  bool integrateSourceFileDepGraphNode(
+      const SourceFileDepGraphNode *integrand,
+      StringRef swiftDepsOfSourceFileDepGraph,
+      Optional<ModuleDepGraphNode *> preexistingNodeInPlace);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
@@ -321,10 +326,10 @@ private:
   /// prexisintExpat holds a node with the same key that already exists, but was
   /// not known to reside in any swiftDeps file. Return a bool indicating if
   /// this node represents a change that must be propagated.
-  bool
-  integrateFrontendDeclNode(const FrontendNode *integrand,
-                            Optional<DriverNode *> preexistingNodeInSameFile,
-                            Optional<DriverNode *> preexistingExpat);
+  bool integrateFrontendDeclNode(
+      const SourceFileDepGraphNode *integrand,
+      Optional<ModuleDepGraphNode *> preexistingNodeInSameFile,
+      Optional<ModuleDepGraphNode *> preexistingExpat);
 
   /// Integrate the \p integrand, a node that was not known to reside in any
   /// swiftDeps file. \p preexistingNodeInSameFile holds the node representing
@@ -335,28 +340,31 @@ private:
   /// swiftDeps file. Return a bool indicating if this node represents a change
   /// that must be propagated.
   bool integrateFrontendExpatNode(
-      const FrontendNode *integrand, StringRef swiftDepsOfFrontendGraph,
-      Optional<DriverNode *> preexistingNodeInSameFile,
-      Optional<DriverNode *> preexistingExpat, bool dupsExistInOtherFiles);
+      const SourceFileDepGraphNode *integrand,
+      StringRef swiftDepsOfSourceFileDepGraph,
+      Optional<ModuleDepGraphNode *> preexistingNodeInSameFile,
+      Optional<ModuleDepGraphNode *> preexistingExpat,
+      bool dupsExistInOtherFiles);
 
-  /// Create a brand-new DriverNode to integrate \p integrand.
-  DriverNode *integrateByCreatingANewNode(const FrontendNode *integrand);
+  /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
+  ModuleDepGraphNode *
+  integrateByCreatingANewNode(const SourceFileDepGraphNode *integrand);
 
   /// Integrate the dependencies of \p integrand which resides in \p
   /// integrandGraph into \p this.
-  void integrateUsesByDef(const FrontendNode *integrand,
-                          const FrontendGraph &integrandGraph);
+  void integrateUsesByDef(const SourceFileDepGraphNode *integrand,
+                          const SourceFileDepGraph &integrandGraph);
 
   /// If the programmer removes a Decl from a source file, the corresponding
-  /// DriverNode needs to be removed.
-  void removeNode(DriverNode *);
+  /// ModuleDepGraphNode needs to be removed.
+  void removeNode(ModuleDepGraphNode *);
 
   /// Starting with the uses of \p potentiallyCascadingDef,
   /// find any newly-cascading jobs.
   /// TODO: stop at marked jobs
   void checkTransitiveClosureForCascading(
-      std::unordered_set<const DriverNode *> &visited,
-      const DriverNode *potentiallyCascadingDef);
+      std::unordered_set<const ModuleDepGraphNode *> &visited,
+      const ModuleDepGraphNode *potentiallyCascadingDef);
 
   void rememberThatJobCascades(StringRef swiftDeps) {
     cascadingJobs.insert(swiftDeps);

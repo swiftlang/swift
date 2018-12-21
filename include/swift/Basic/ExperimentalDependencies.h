@@ -29,13 +29,14 @@
 // In future, we'll gather more information, feed it into this dependency
 // framework and get more selective recompilation.
 //
-// The frontend uses the information from the compiler to built a FrontendGraph
-// consisting of FrontendNodes. ExperimentalDependencies.* define these
-// structures, and ExperimentalDependenciesProducer has the frontend-unique code
-// used to build the FrontendGraph.
+// The frontend uses the information from the compiler to built a
+// SourceFileDepGraph consisting of SourceFileDepGraphNodes.
+// ExperimentalDependencies.* define these structures, and
+// ExperimentalDependenciesProducer has the frontend-unique code used to build
+// the SourceFileDepGraph.
 //
-// The driver reads the FrontendGraph and integrates it into its dependency
-// graph, a DriverGraph consisting of DriverNodes.
+// The driver reads the SourceFileDepGraph and integrates it into its dependency
+// graph, a ModuleDepGraph consisting of ModuleDepGraphNodes.
 
 // This file holds the declarations for the experimental dependency system
 // that are used by both the driver and frontend.
@@ -73,7 +74,7 @@ using MangleTypeAsContext = function_ref<std::string(const NominalTypeDecl *)>;
 //==============================================================================
 
 /// A general class to reuse objects that are keyed by a subset of their
-/// information. Used for \ref FrontendGraph::Memoizer.
+/// information. Used for \ref SourceFileDepGraph::Memoizer.
 
 template <typename KeyT, typename ValueT> class Memoizer {
   using Memos = typename std::unordered_map<KeyT, ValueT>;
@@ -98,14 +99,14 @@ public:
 
   /// Remember a new object (if differing from an existing one).
   /// \returns true iff the object was inserted.
-  /// See \ref FrontendNode::addNode.
+  /// See \ref SourceFileDepGraphNode::addNode.
   bool insert(KeyT key, ValueT value) {
     return memos.insert(std::make_pair(key, value)).second;
   }
 };
 
 /// A general container for double-indexing, used (indirectly) in the
-/// DriverGraph.
+/// ModuleDepGraph.
 template <typename Key1, typename Key2, typename Value> class TwoStageMap {
 public:
   // Define this here so it can be changed easily.
@@ -198,7 +199,7 @@ public:
 };
 
 /// Double-indexing in either order; symmetric about key order.
-/// The DriverGraph needs this structure.
+/// The ModuleDepGraph needs this structure.
 template <typename Key1, typename Key2, typename Value>
 class BiIndexedTwoStageMap {
   TwoStageMap<Key1, Key2, Value> map1;
@@ -369,7 +370,8 @@ template <typename FnT> void forEachAspect(FnT fn) {
 }
 
 /// A pair of nodes that represent the two aspects of a given entity.
-/// Templated in order to serve for either FrontendNodes or DriverNodes.
+/// Templated in order to serve for either SourceFileDepGraphNodes or
+/// ModuleDepGraphNodes.
 template <typename NodeT> class InterfaceAndImplementationPair {
   NodeT *interface;
   NodeT *implementation;
@@ -419,7 +421,7 @@ class DependencyKey {
   std::string name;
 
 public:
-  /// See \ref FrontendNode::FrontendNode().
+  /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DependencyKey()
       : kind(NodeKind::kindCount), aspect(DeclAspect::aspectCount), context(),
         name() {}
@@ -474,7 +476,7 @@ public:
   std::string humanReadableName() const;
 
   /// Convert to- or from- another format via the argument functions.
-  /// See \ref FrontendNode::serializeOrDeserialize.
+  /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
   void serializeOrDeserialize(function_ref<void(size_t &)> convertInt,
                               function_ref<void(std::string &)> convertString) {
     size_t k = size_t(kind);
@@ -538,15 +540,17 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 };
 
 //==============================================================================
-// MARK: Node
+// MARK: DepGraphNode
 //==============================================================================
 
 /// Part of an experimental, new, infrastructure that can handle fine-grained
-/// dependencies. The basic idea is a graph, where each node represents an
-/// entity in the program (a Decl or a source file/swiftdeps file). Each node
-/// will (eventually) have a fingerprint so that we can tell when an entity has
-/// changed. Arcs in the graph connect defs to uses, so that when something
-/// changes, a traversal of the arc reveals the entities needing to be rebuilt.
+/// dependencies. The basic idea is a graph, where each node represents the
+/// definition of entity in the program (a Decl or a source file/swiftdeps
+/// file). Each node will (eventually) have a fingerprint so that we can tell
+/// when an entity has changed. Arcs in the graph connect a definition that
+/// provides information to a definition that uses the information, so that when
+/// something changes, a traversal of the arc reveals the entities needing to be
+/// rebuilt.
 ///
 /// Some changes are transitive (i.e. “cascading”): given A -> B -> C, if the
 /// link from A to B cascades then C must be rebuilt even if B does not change.
@@ -560,7 +564,7 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 
 namespace swift {
 namespace experimental_dependencies {
-class Node {
+class DepGraphNode {
   /// Def->use arcs go by DependencyKey. There may be >1 node for a given key.
   DependencyKey key;
   /// The frontend records in the fingerprint, all of the information about an
@@ -585,19 +589,19 @@ class Node {
   Optional<std::string> swiftDeps;
 
 public:
-  /// See \ref FrontendNode::FrontendNode().
-  Node() : key(), fingerprint() {}
+  /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
+  DepGraphNode() : key(), fingerprint() {}
 
-  /// See FrontendNode::FrontendNode(...) and DriverNode::DriverNode(...)
-  /// Don't set swiftDeps on creation because this field can change if a
-  /// node is moved.
-  Node(DependencyKey key, Optional<std::string> fingerprint)
+  /// See SourceFileDepGraphNode::SourceFileDepGraphNode(...) and
+  /// ModuleDepGraphNode::ModuleDepGraphNode(...) Don't set swiftDeps on
+  /// creation because this field can change if a node is moved.
+  DepGraphNode(DependencyKey key, Optional<std::string> fingerprint)
       : key(key), fingerprint(fingerprint) {
     assert(ensureThatTheFingerprintIsValidForSerialization());
   }
-  Node(const Node &other) = default;
+  DepGraphNode(const DepGraphNode &other) = default;
 
-  bool operator==(const Node &other) const {
+  bool operator==(const DepGraphNode &other) const {
     return getKey() == other.getKey() &&
            getFingerprint() == other.getFingerprint() &&
            getSwiftDeps() == other.getSwiftDeps();
@@ -610,14 +614,14 @@ public:
     return fingerprint;
   }
 
-  /// When driver reads a FrontendNode, it may be a node that was created to
-  /// represent a name-lookup (a.k.a a "depend") in the frontend. In that case,
-  /// the node represents an entity that resides in some other file whose
-  /// swiftdeps file has not been read by the driver. Later, when the driver
-  /// does read the node corresponding to the actual Decl, that node may
-  /// (someday) have a fingerprint. In order to preserve the DriverNode's
-  /// identity but bring its fingerprint up to date, it needs to set the
-  /// fingerprint *after* the node has been created.
+  /// When driver reads a SourceFileDepGraphNode, it may be a node that was
+  /// created to represent a name-lookup (a.k.a a "depend") in the frontend. In
+  /// that case, the node represents an entity that resides in some other file
+  /// whose swiftdeps file has not been read by the driver. Later, when the
+  /// driver does read the node corresponding to the actual Decl, that node may
+  /// (someday) have a fingerprint. In order to preserve the
+  /// ModuleDepGraphNode's identity but bring its fingerprint up to date, it
+  /// needs to set the fingerprint *after* the node has been created.
   void setFingerprint(Optional<std::string> fp) {
     fingerprint = fp;
     assert(ensureThatTheFingerprintIsValidForSerialization());
@@ -647,7 +651,7 @@ public:
 
 protected:
   /// Convert to- or from- another format via the argument functions.
-  /// See \ref FrontendNode::serializeOrDeserialize.
+  /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
   void serializeOrDeserialize(
       function_ref<void(size_t &)> convertInt,
       function_ref<void(std::string &)> convertString,
@@ -659,17 +663,18 @@ private:
 };
 
 //==============================================================================
-// MARK: FrontendNode
+// MARK: SourceFileDepGraphNode
 //==============================================================================
 
-class FrontendGraph;
+class SourceFileDepGraph;
 
 /// A node in a graph that represents the dependencies computed when compiling a
-/// single primary source file. Such a graph is always constructed
-/// monotonically; it never shrinks or changes once finished. The frontend does
-/// not need to be able to remove nodes from the graph, so it can represent arcs
-/// with a simple format relying on sequence numbers.
-class FrontendNode : public Node {
+/// single primary source file. Each such node represents a definition. Such a
+/// graph is always constructed monotonically; it never shrinks or changes once
+/// finished. The frontend does not need to be able to remove nodes from the
+/// graph, so it can represent arcs with a simple format relying on sequence
+/// numbers.
+class SourceFileDepGraphNode : public DepGraphNode {
   /// To represent Arcs in a serializable fashion, the code puts all nodes in
   /// the graph in a vector (`allNodes`), and uses the index in that vector to
   /// refer to the node.
@@ -681,17 +686,17 @@ class FrontendNode : public Node {
 public:
   /// When the driver imports a node create an uninitialized instance for
   /// deserializing.
-  FrontendNode() : Node(), sequenceNumber(~0) {}
+  SourceFileDepGraphNode() : DepGraphNode(), sequenceNumber(~0) {}
 
   /// Used by the frontend to build nodes.
-  FrontendNode(DependencyKey key, Optional<std::string> fingerprint)
-      : Node(key, fingerprint) {
+  SourceFileDepGraphNode(DependencyKey key, Optional<std::string> fingerprint)
+      : DepGraphNode(key, fingerprint) {
     assert(key.verify());
   }
 
-  bool operator==(const FrontendNode &other) const {
-    return Node::operator==(other) && sequenceNumber == other.sequenceNumber &&
-           usesOfMe == other.usesOfMe;
+  bool operator==(const SourceFileDepGraphNode &other) const {
+    return DepGraphNode::operator==(other) &&
+           sequenceNumber == other.sequenceNumber && usesOfMe == other.usesOfMe;
   }
 
   /// True iff this frontend node represents a decl in this file or the file
@@ -723,45 +728,46 @@ public:
       function_ref<void(Optional<std::string> &)> convertOptionalString,
       function_ref<void(std::unordered_set<size_t> &)> convertSetOfInts);
 
-  void dump() const { Node::dump(); }
+  void dump() const { DepGraphNode::dump(); }
 };
 
 //==============================================================================
-// MARK: FrontendGraph
+// MARK: SourceFileDepGraph
 //==============================================================================
 
 /// The dependency graph produced by the frontend and consumed by the driver.
 /// See \ref Node in ExperimentalDependencies.h
-class FrontendGraph {
+class SourceFileDepGraph {
   /// Every node in the graph. Indices used for serialization.
   /// Use addNode instead of adding directly.
-  std::vector<FrontendNode *> allNodes;
+  std::vector<SourceFileDepGraphNode *> allNodes;
 
-  /// When the frontend constructs the FrontendGraph, it might encounter a
+  /// When the frontend constructs the SourceFileDepGraph, it might encounter a
   /// name-lookup ("Depend") or a Decl ("Provide") whose node would be
   /// indistinguishable from a node it has already constructed. So it memoizes
   /// those nodes, reusing an existing node rather than creating a new one.
   ///
-  /// In addition, when the driver deserializes FrontendGraphs,
+  /// In addition, when the driver deserializes SourceFileDepGraphs,
   /// this object ensures that the frontend memoized correctly.
-  Memoizer<DependencyKey, FrontendNode *> memoizedNodes;
+  Memoizer<DependencyKey, SourceFileDepGraphNode *> memoizedNodes;
 
 public:
   /// For templates such as DotFileEmitter.
-  using NodeType = FrontendNode;
+  using NodeType = SourceFileDepGraphNode;
 
-  FrontendGraph() = default;
-  FrontendGraph(const FrontendGraph &g) = delete;
-  FrontendGraph(FrontendGraph &&g) = default;
+  SourceFileDepGraph() = default;
+  SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
+  SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
   /// Nodes are owned by the graph.
-  ~FrontendGraph() {
-    forEachNode([&](FrontendNode *n) { delete n; });
+  ~SourceFileDepGraph() {
+    forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
   }
 
-  FrontendNode *getNode(size_t sequenceNumber) const;
+  SourceFileDepGraphNode *getNode(size_t sequenceNumber) const;
 
-  InterfaceAndImplementationPair<FrontendNode> getSourceFileNodePair() const;
+  InterfaceAndImplementationPair<SourceFileDepGraphNode>
+  getSourceFileNodePair() const;
 
   StringRef getSwiftDepsFromSourceFileProvide() const;
 
@@ -769,53 +775,57 @@ public:
     return getSourceFileNodePair().getInterface()->getKey().humanReadableName();
   }
 
-  void forEachNode(function_ref<void(FrontendNode *)> fn) const {
+  void forEachNode(function_ref<void(SourceFileDepGraphNode *)> fn) const {
     for (auto i : indices(allNodes))
       fn(getNode(i));
   }
 
-  void forEachArc(
-      function_ref<void(const FrontendNode *def, const FrontendNode *use)> fn)
-      const;
+  void forEachArc(function_ref<void(const SourceFileDepGraphNode *def,
+                                    const SourceFileDepGraphNode *use)>
+                      fn) const;
 
-  void forEachUseOf(const FrontendNode *n,
-                    function_ref<void(FrontendNode *)> fn) const {
+  void forEachUseOf(const SourceFileDepGraphNode *n,
+                    function_ref<void(SourceFileDepGraphNode *)> fn) const {
     n->forEachUseOfMe([&](size_t useIndex) { fn(getNode(useIndex)); });
   }
 
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
-  InterfaceAndImplementationPair<FrontendNode>
+  InterfaceAndImplementationPair<SourceFileDepGraphNode>
   findExistingNodePairOrCreateAndAddIfNew(NodeKind k, StringRef context,
                                           StringRef name,
                                           Optional<std::string> fingerprint,
                                           StringRef swiftDeps);
 
-  FrontendNode *findExistingNodeOrCreateIfNew(DependencyKey key,
-                                              Optional<std::string> fingerprint,
-                                              Optional<std::string> swiftDeps);
+  SourceFileDepGraphNode *
+  findExistingNodeOrCreateIfNew(DependencyKey key,
+                                Optional<std::string> fingerprint,
+                                Optional<std::string> swiftDeps);
 
-  /// Add a node to a FrontendGraph that the Driver is reading.
+  /// Add a node to a SourceFileDepGraph that the Driver is reading.
   /// \p assertUniqueness adds extra checking if assertions are on.
   /// Only turn on during verification in the frontend in order to save driver
   /// time.
-  void addDeserializedNode(FrontendNode *, const bool assertUniqueness);
+  void addDeserializedNode(SourceFileDepGraphNode *,
+                           const bool assertUniqueness);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
-  void addArc(FrontendNode *def, FrontendNode *use) {
+  void addArc(SourceFileDepGraphNode *def, SourceFileDepGraphNode *use) {
     getNode(def->getSequenceNumber())->addUseOfMe(use->getSequenceNumber());
   }
 
-  /// Read a swiftdeps file at \p path and return a FrontendGraph if successful.
-  Optional<FrontendGraph> static loadFromPath(StringRef, bool assertUniqueness);
-
-  /// Read a swiftdeps file from \p buffer and return a FrontendGraph if
+  /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful.
-  Optional<FrontendGraph> static loadFromBuffer(llvm::MemoryBuffer &,
-                                                bool assertUniqueness);
+  Optional<SourceFileDepGraph> static loadFromPath(StringRef,
+                                                   bool assertUniqueness);
 
-  void verifySame(const FrontendGraph &other) const;
+  /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
+  /// successful.
+  Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &,
+                                                     bool assertUniqueness);
+
+  void verifySame(const SourceFileDepGraph &other) const;
 
   // Fail with a message instead of returning false.
   bool verify() const;
@@ -824,7 +834,7 @@ public:
   bool verifyReadsWhatIsWritten(StringRef path) const;
 
 private:
-  void addNode(FrontendNode *n) {
+  void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
     assert(allNodes.size() < 2 ==
                (n->getKey().getKind() == NodeKind::sourceFileProvide) &&
@@ -835,16 +845,16 @@ private:
 
   /// Parse the swiftDeps file and invoke nodeCallback for each node.
   /// \returns true if had error.
-  static bool
-  parseDependencyFile(llvm::MemoryBuffer &,
-                      function_ref<void(FrontendNode *)> nodeCallback);
+  static bool parseDependencyFile(
+      llvm::MemoryBuffer &,
+      function_ref<void(SourceFileDepGraphNode *)> nodeCallback);
 };
 
 //==============================================================================
 // MARK: DotFileEmitter
 //==============================================================================
 
-/// To aid in debugging, both the FrontendGraph and the DriverGraph can
+/// To aid in debugging, both the SourceFileDepGraph and the ModuleDepGraph can
 /// be written out as dot files, which can be read into graphfiz and OmniGraffle
 /// to display the graphs.
 template <typename GraphT> class DotFileEmitter {
@@ -862,8 +872,8 @@ template <typename GraphT> class DotFileEmitter {
   /// The graph to write out.
   const GraphT &g;
 
-  /// Since DriverNodes have no sequence numbers, use the stringified pointer
-  /// value for an nodeID. Memoize the nodes here.
+  /// Since ModuleDepGraphNodes have no sequence numbers, use the stringified
+  /// pointer value for an nodeID. Memoize the nodes here.
   std::unordered_set<std::string> nodeIDs;
 
 public:
