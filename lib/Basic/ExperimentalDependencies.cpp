@@ -653,30 +653,6 @@ std::string DependencyKey::computeContextForProvdedEntity(Entity,
   return "";
 }
 
-// Seem to need to explicitly instantiate these:
-
-template std::string
-DependencyKey::computeContextForProvdedEntity<NodeKind::topLevel,
-                                              PrecedenceGroupDecl const *>(
-    const PrecedenceGroupDecl *D, MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D,
-                                          MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D,
-                                              MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D,
-                                                 MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D,
-                                           MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D,
-                                                MangleTypeAsContext);
-template std::string DependencyKey::computeContextForProvdedEntity<
-    NodeKind::sourceFileProvide, StringRef>(StringRef, MangleTypeAsContext);
-
 /// \ref nominal dependencies are created from a Decl and use the context field.
 template <>
 std::string
