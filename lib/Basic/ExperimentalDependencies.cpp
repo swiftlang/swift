@@ -152,7 +152,7 @@ public:
       return;
     }
     llvm::SmallString<64> scratch;
-    s = stoi(scalarNode->getValue(scratch).str());
+    scalarNode->getValue(scratch).getAsInteger(10, s);
     ++nextFieldOfNode;
   }
 
@@ -190,7 +190,9 @@ public:
         return;
       }
       llvm::SmallString<64> scratch;
-      s.insert(stoi(scalarNode->getValue(scratch).str()));
+      size_t i;
+      scalarNode->getValue(scratch).getAsInteger(10, i);
+      s.insert(i);
     }
     ++nextFieldOfNode;
   }
