@@ -549,7 +549,7 @@ public:
   ConstPtrVec<ValueDecl> classMembers;
 
   /// Construct me and separates the Decls.
-  /// Do not run this method through clang-format!
+  // clang-format off
   SourceFileDeclFinder(const SourceFile *const SF) {
     for (const Decl *const D : SF->Decls) {
       find<ExtensionDecl, DeclKind::Extension>(D, extensions) ||
@@ -562,6 +562,7 @@ public:
           find<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
                DeclKind::Accessor>(D, topValues);
     }
+    // clang-format on
     // The order is important because some of these use instance variables
     // computed by others.
     findNominalsFromExtensions();
