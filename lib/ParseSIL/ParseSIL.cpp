@@ -6184,6 +6184,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
 
   if (!wt)
     wt = SILWitnessTable::create(M, *Linkage, theConformance);
+  else
+    wt->setLinkage(*Linkage);
   wt->convertToDefinition(witnessEntries, conditionalConformances,
                           isSerialized);
   BodyScope.reset();
