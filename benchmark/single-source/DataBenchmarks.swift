@@ -80,12 +80,12 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataReset",
     runFunction: { resetBytes($0, in: 431..<809, data: medium) }, tags: d),
 
-  BenchmarkInfo(name: "DataReplaceSmall",
-    runFunction: run_ReplaceSmall, tags: d),
-  BenchmarkInfo(name: "DataReplaceMedium",
-    runFunction: run_ReplaceMedium, tags: d),
-  BenchmarkInfo(name: "DataReplaceLarge",
-    runFunction: run_ReplaceLarge, tags: d),
+  BenchmarkInfo(name: "DataReplaceSmall", runFunction: {
+    replace($0, data: medium, subrange:431..<809, with: small) }, tags: d),
+  BenchmarkInfo(name: "DataReplaceMedium", runFunction: {
+    replace($0, data: medium, subrange:431..<809, with: medium) }, tags: d),
+  BenchmarkInfo(name: "DataReplaceLarge", runFunction: {
+    replace($0, data: medium, subrange:431..<809, with: large) }, tags: d),
 
   BenchmarkInfo(name: "DataReplaceSmallBuffer",
     runFunction: run_ReplaceSmallBuffer, tags: d),
@@ -249,10 +249,16 @@ func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
   }
 }
 
-func benchmark_Replace(_ N: Int, _ range: Range<Data.Index>, _ data_: Data, _ replacement: Data) {
+@inline(never)
+func replace(
+  _ N: Int,
+  data: Data,
+  subrange range: Range<Data.Index>,
+  with replacement: Data
+) {
   for _ in 0..<10000*N {
-    var data = data_
-    data.replaceSubrange(range, with: replacement)
+    var copy = data
+    copy.replaceSubrange(range, with: replacement)
   }
 }
 
@@ -288,27 +294,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_ReplaceSmall(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.small)
-  benchmark_Replace(N, 431..<809, data, replacement)
-}
-
-@inline(never)
-public func run_ReplaceMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.medium)
-  benchmark_Replace(N, 431..<809, data, replacement)
-}
-
-@inline(never)
-public func run_ReplaceLarge(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.large)
-  benchmark_Replace(N, 431..<809, data, replacement)
 }
 
 @inline(never)
