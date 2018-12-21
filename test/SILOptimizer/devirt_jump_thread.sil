@@ -437,9 +437,6 @@ bb14(%48 : $Int32):
 }
 
 
-sil [transparent] [serialized] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
-
-
 sil [serialized] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
 
 

@@ -335,7 +335,7 @@ func testStringForEachStmt() {
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations21testStringForEachStmtyyF
   // CHECK: br {{.*}} line:[[@LINE-8]]:3
   // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-8]]:8
+  // CHECK: cond_br {{.*}} line:[[@LINE-8]]:10
   // Break branch:
   // CHECK: br {{.*}} line:[[@LINE-9]]:7
   // Looping back branch:
@@ -388,9 +388,9 @@ func testRepeatWhile() {
   
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations15testRepeatWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-6]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-5]]:11
+  // CHECK: cond_br {{.*}} line:[[@LINE-5]]:14
   // Loop back branch:
-  // CHECK: br {{.*}} line:[[@LINE-7]]:11  
+  // CHECK: br {{.*}} line:[[@LINE-7]]:14
 }
 
 
@@ -408,9 +408,9 @@ func testWhile() {
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations9testWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // While loop conditional branch:
-  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:9
+  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:11
   // If stmt condition branch:
-  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:8
+  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:10
   // Break branch:
   // CHECK: br {{.*}} line:[[@LINE-12]]:7
   // Looping back branch:
