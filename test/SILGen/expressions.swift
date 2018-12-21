@@ -444,7 +444,7 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
     : z
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBA]]
   // CHECK:   [[A:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK:   [[ACOND:%[0-9]+]] = apply {{.*}}([[A]])
+  // CHECK:   [[ACOND:%[0-9]+]] = struct_extract [[A]] : $Bool, #Bool._value
   // CHECK:   cond_br [[ACOND]], [[IF_A:bb[0-9]+]], [[ELSE_A:bb[0-9]+]]
   // CHECK: [[IF_A]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
@@ -453,7 +453,7 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   // CHECK: [[ELSE_A]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBB]]
   // CHECK:   [[B:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK:   [[BCOND:%[0-9]+]] = apply {{.*}}([[B]])
+  // CHECK:   [[BCOND:%[0-9]+]] = struct_extract [[B]] : $Bool, #Bool._value
   // CHECK:   cond_br [[BCOND]], [[IF_B:bb[0-9]+]], [[ELSE_B:bb[0-9]+]]
   // CHECK: [[IF_B]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBY]]

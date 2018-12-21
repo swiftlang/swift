@@ -416,7 +416,6 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["s33ExpressibleByUnicodeScalarLiteralP", ""]
 // CHECK-DAG: - !private ["Sx", "Stride"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
-// CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
 // CHECK-DAG: - !private ["4main17OtherFileIntArrayV", "deinit"]
 // CHECK-DAG: - !private ["4main18OtherFileOuterTypeV", "InnerType"]

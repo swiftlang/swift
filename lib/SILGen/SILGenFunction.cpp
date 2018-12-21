@@ -687,3 +687,19 @@ Optional<ASTNode> SILGenFunction::getPGOParent(ASTNode Node) const {
     return SP->getPGOParent(Node);
   return None;
 }
+
+SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
+                                                 SILValue value) {
+  // This is a loop because we want to handle types that wrap integer types,
+  // like ObjCBool (which may be Bool or Int8).
+  while (!value->getType().is<BuiltinIntegerType>()) {
+    auto structDecl = value->getType().getStructOrBoundGenericStruct();
+    assert(structDecl && "value for error result wasn't of struct type!");
+    assert(std::next(structDecl->getStoredProperties().begin())
+           == structDecl->getStoredProperties().end());
+    auto property = *structDecl->getStoredProperties().begin();
+    value = B.createStructExtract(loc, value, property);
+  }
+
+  return value;
+}
