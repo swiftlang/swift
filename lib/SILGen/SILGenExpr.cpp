@@ -457,8 +457,6 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
-    // SWIFT_ENABLE_TENSORFLOW
-    RValue visitAdjointExpr(AdjointExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -2726,43 +2724,6 @@ RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
   return visit(E->getSemanticExpr(), C);
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-RValue RValueEmitter::
-visitAdjointExpr(AdjointExpr *E, SGFContext C) {
-  ConcreteDeclRef adjointFunc = E->getAdjointFunction();
-  FuncDecl *adjointDecl = cast<FuncDecl>(adjointFunc.getDecl());
-  SILLocation loc(adjointDecl);
-  SILDeclRef adjointDeclRef(adjointDecl);
-
-  // If adjoint is an instance method, mark as curried.
-  if (adjointDecl->isInstanceMember()) {
-    adjointDeclRef = adjointDeclRef.asCurried();
-  }
-  auto adjointInfo = SGF.getConstantInfo(adjointDeclRef);
-
-  // Convert function ref to thick function type.
-  if (!adjointDecl->isStatic()) {
-    auto resultTy = E->getType()->getCanonicalType();
-    ManagedValue result =
-      SGF.emitClosureValue(loc, adjointDeclRef, resultTy,
-                           adjointFunc.getSubstitutions());
-    return RValue(SGF, loc, resultTy, result);
-  }
-  // Otherwise, apply metatype to static adjoint method.
-  SILValue ref = SGF.emitGlobalFunctionRef(loc, adjointDeclRef, adjointInfo);
-  auto subs = adjointFunc.getSubstitutions();
-  auto baseMeta = adjointInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs)
-    ->getSelfParameter().getType();
-  auto metatype = SGF.B.createMetatype(loc, SGF.getLoweredType(baseMeta));
-  auto partialApplyTy = SGF.B.getPartialApplyResultType(
-    adjointInfo.getSILType(), 1, SGF.getModule(), subs,
-    ParameterConvention::Direct_Guaranteed);
-  auto apply = SGF.B.createPartialApply(loc, ref, ref->getType(),
-    subs, { metatype }, partialApplyTy);
-  ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(apply);
-  return RValue(SGF, E, adjointValue);
 }
 
 RValue RValueEmitter::

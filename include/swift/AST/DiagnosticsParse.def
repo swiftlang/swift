@@ -1254,14 +1254,6 @@ ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
-// Adjoint expressions.
-ERROR(expr_adjoint_expected_function_name,PointsToFirstBadToken,
-      "expected function name within '#adjoint` expression", ())
-ERROR(expr_expected_lparen,none,
-      "expected '(' in '%0' expression", (StringRef))
-ERROR(expr_expected_rparen,none,
-      "expected ')' in '%0' expression", (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
