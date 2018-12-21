@@ -35,6 +35,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 
 // This file holds the definitions for the experimental dependency system
@@ -421,16 +422,12 @@ bool FrontendGraph::verifyReadsWhatIsWritten(StringRef path) const {
 }
 
 std::string DependencyKey::humanReadableName() const {
-  auto filename = [](StringRef path) {
-    auto lastIndex = path.find_last_of('/');
-    return lastIndex == StringRef::npos ? path : path.drop_front(lastIndex + 1);
-  };
   switch (kind) {
   case NodeKind::member:
     return demangleTypeAsContext(context) + "." + name;
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
-    return filename(name);
+    return llvm::sys::path::filename(name);
   case NodeKind::potentialMember:
     return demangleTypeAsContext(context) + ".*";
   case NodeKind::nominal:

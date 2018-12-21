@@ -45,8 +45,13 @@ using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
 LoadResult DriverGraph::loadFromPath(const Job *Cmd, StringRef path,
                                      DiagnosticEngine &diags) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-loadFromPath");
-  dotFileDirectory = path;
-  llvm::sys::path::remove_filename(dotFileDirectory);
+
+  if (driverDotFileBasePath.empty()) {
+    driverDotFileBasePath = path;
+    llvm::sys::path::remove_filename(driverDotFileBasePath);
+    llvm::sys::path::append(driverDotFileBasePath, "driver");
+  }
+
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
@@ -465,12 +470,8 @@ void DriverGraph::verifyEachJobIsTracked() const {
       });
 }
 
-// TODO: use llvm::path facilities everywhere in experimental dependencies
-std::string DriverGraph::computePathForDotFile() const {
-  return dotFileDirectory.str().str() + "/" + "driver";
-}
-
 bool DriverGraph::emitAndVerify(DiagnosticEngine &diags) {
-  emitDotFile(diags, computePathForDotFile());
+  if (!driverDotFileBasePath.empty())
+    emitDotFile(diags, driverDotFileBasePath);
   return verify();
 }

@@ -132,9 +132,9 @@ class DriverGraph {
   /// For debugging, a dot file can be emitted. This file can be read into
   /// various graph-drawing programs.
   /// The driver emits this file into the same directory as the swiftdeps
-  /// files it reads, so remember that place here.
-  /// Initialize to /tmp in case no swiftdeps file has been read.
-  SmallString<128> dotFileDirectory = StringRef("/tmp");
+  /// files it reads, so when reading a file compute the base path here.
+  /// Initialize to empty in case no swiftdeps file has been read.
+  SmallString<128> driverDotFileBasePath = StringRef("");
 
   /// For debugging, the driver can write out a dot file, for instance when a
   /// Frontend swiftdeps is read and integrated. In order to keep subsequent
