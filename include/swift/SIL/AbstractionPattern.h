@@ -298,9 +298,15 @@ class AbstractionPattern {
                      Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
     TheKind = unsigned(kind);
-    OrigType = origType;
+    // If origType is already
+    if (isa<SILFunctionType>(origType))
+      OrigType = origType;
+    else
+      OrigType = origType
+        .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal)
+        ->getCanonicalType();
     GenericSig = CanGenericSignature();
-    if (origType->hasTypeParameter())
+    if (OrigType->hasTypeParameter())
       GenericSig = signature;
   }
 

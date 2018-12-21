@@ -949,6 +949,7 @@ namespace {
                 loc,
                 payload,
                 base.getType().getObjectType(),
+                OpenedArchetype,
                 SGF.getASTContext().AllocateCopy(conformances));
       } else {
         assert(getSubstFormalType()->isBridgeableObjectType());
