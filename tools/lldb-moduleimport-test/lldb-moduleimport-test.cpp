@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
     if (Filename.empty())
       return true;
     if (!llvm::sys::fs::exists(llvm::Twine(Filename))) {
-      llvm::errs() << Filename << " does not exists, exiting.\n";
+      llvm::errs() << Filename << " does not exist, exiting.\n";
       return false;
     }
     if (!llvm::sys::fs::is_regular_file(llvm::Twine(Filename))) {
