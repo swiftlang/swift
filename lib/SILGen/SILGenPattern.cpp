@@ -1210,7 +1210,9 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
     testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
   }
 
-  SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
+  // Extract the i1 from the Bool struct.
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, testBool);
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
 
   SGF.B.setInsertionPoint(falseBB);
   failure(loc);
@@ -2250,15 +2252,8 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
 
   // Extract the i1 from the Bool struct.
-  StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Context.Id_value_);
-  assert(Members.size() == 1 &&
-         "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
-  auto *ETI = SGF.B.createStructExtract(loc, srcValue, Member);
-
-  SGF.B.createSwitchValue(loc, SILValue(ETI), defaultBB, caseBBs);
+  auto i1Value = SGF.emitUnwrapIntegerResult(loc, srcValue);
+  SGF.B.createSwitchValue(loc, i1Value, defaultBB, caseBBs);
 
   // Okay, now emit all the cases.
   for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
