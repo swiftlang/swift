@@ -330,11 +330,15 @@ class BenchmarkDoctor(object):
         super(BenchmarkDoctor, self).__init__()
         self.driver = driver or BenchmarkDriver(args)
         self.results = {}
-        self.console_handler = logging.StreamHandler(sys.stdout)
-        self.console_handler.setLevel(logging.DEBUG if args.verbose else
-                                      logging.INFO)
-        self.console_handler.setFormatter(
-            LoggingReportFormatter(use_color=sys.stdout.isatty()))
+
+        if args.markdown:
+            self.console_handler = MarkdownReportHandler(sys.stdout)
+        else:
+            self.console_handler = logging.StreamHandler(sys.stdout)
+            self.console_handler.setFormatter(
+                LoggingReportFormatter(use_color=sys.stdout.isatty()))
+            self.console_handler.setLevel(logging.DEBUG if args.verbose else
+                                          logging.INFO)
         self.log.addHandler(self.console_handler)
         self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
         self.requirements = [
@@ -350,6 +354,7 @@ class BenchmarkDoctor(object):
         """Close log handlers on exit."""
         for handler in list(self.log.handlers):
             handler.close()
+        self.log.removeHandler(self.console_handler)
 
     benchmark_naming_convention_re = re.compile(r'[A-Z][a-zA-Z0-9\-.!?]+')
     camel_humps_re = re.compile(r'[a-z][A-Z]')
@@ -703,9 +708,13 @@ def parse_args(args):
         'check',
         help='',
         parents=[shared_benchmarks_parser])
-    check_parser.add_argument(
+    check_group = check_parser.add_mutually_exclusive_group()
+    check_group.add_argument(
         '-v', '--verbose', action='store_true',
-        help='show more details during benchmark analysis',)
+        help='show more details during benchmark analysis')
+    check_group.add_argument(
+        '-md', '--markdown', action='store_true',
+        help='format report as Markdown table')
     check_parser.set_defaults(func=BenchmarkDoctor.run_check)
 
     compare_parser = subparsers.add_parser(
