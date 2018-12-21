@@ -641,7 +641,7 @@ final public class ForkJoinPool {
   internal let _maxThreads: Int
   /// Total number of threads: number of running threads plus the number of
   /// threads that are preparing to start).
-  internal let _totalThreads: _stdlib_AtomicInt = _stdlib_AtomicInt(0)
+  internal let _totalThreads = _stdlib_AtomicInt(0)
 
   internal var _runningThreads: [_ForkJoinWorkerThread] = []
   internal var _runningThreadsMutex: _ForkJoinMutex = _ForkJoinMutex()
