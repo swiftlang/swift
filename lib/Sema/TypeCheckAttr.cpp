@@ -2068,8 +2068,8 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   }
 
   auto interfaceType = value->getInterfaceType();
-  if (interfaceType->hasError())
-    return interfaceType;
+  if (!interfaceType)
+    return ErrorType::get(value->getASTContext());
 
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
