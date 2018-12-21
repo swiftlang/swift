@@ -51,6 +51,7 @@ extension Array : _ObjectiveCBridgeable {
     return unsafeBitCast(self._bridgeToObjectiveCImpl(), to: NSArray.self)
   }
 
+  @_specialize(where Element == Any)
   public static func _forceBridgeFromObjectiveC(
     _ source: NSArray,
     result: inout Array?
@@ -71,6 +72,7 @@ extension Array : _ObjectiveCBridgeable {
     result = _arrayForceCast([AnyObject](_cocoaArray: source))
   }
 
+  @_specialize(where Element == Any)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: NSArray,
     result: inout Array?
@@ -82,6 +84,7 @@ extension Array : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_specialize(where Element == Any)
   @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSArray?

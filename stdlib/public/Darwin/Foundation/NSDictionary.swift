@@ -323,6 +323,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     return success
   }
 
+  @_specialize(where Key == String, Value == Any)
   @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ d: NSDictionary?
