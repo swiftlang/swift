@@ -904,7 +904,7 @@ private:
   template <NodeKind kind>
   void addAllDependenciesFrom(const llvm::DenseMap<DeclBaseName, bool> &map) {
     for (const auto &p : map)
-      addToGraphThatThisWholeFileDependsUpon(
+      recordThatThisWholeFileDependsOn(
           DependencyKey::createDependedUponKey<kind>(p.first,
                                                      mangleTypeAsContext),
           p.second);
@@ -920,7 +920,7 @@ private:
   /// dependencies to the graph.
   void addAllDependenciesFrom(ArrayRef<std::string> externals) {
     for (const auto &s : externals)
-      addToGraphThatThisWholeFileDependsUpon(
+      recordThatThisWholeFileDependsOn(
           DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
               s, mangleTypeAsContext),
           true);
@@ -931,8 +931,8 @@ private:
   /// file must be recompiled if said def changes. However if \p cascades is
   /// true, then every other file that depends upon something provided here must
   /// be recompiled, too.
-  void addToGraphThatThisWholeFileDependsUpon(const DependencyKey &key,
-                                              bool cascades);
+  void recordThatThisWholeFileDependsOn(const DependencyKey &key,
+                                        bool cascades);
 };
 } // namespace
 
@@ -945,11 +945,11 @@ void FrontendGraphConstructor::addAllDependenciesFrom(
       holdersOfCascadingMembers.insert(entry.first.first);
   for (auto &entry : map) {
     // mangles twice in the name of symmetry
-    addToGraphThatThisWholeFileDependsUpon(
+    recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::nominal>(
             entry.first, mangleTypeAsContext),
         holdersOfCascadingMembers.count(entry.first.first) != 0);
-    addToGraphThatThisWholeFileDependsUpon(
+    recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::member>(
             entry.first, mangleTypeAsContext),
         entry.second);
@@ -1002,7 +1002,7 @@ void FrontendGraphConstructor::addDependencyArcsToGraph() {
   addAllDependenciesFrom(depTracker.getDependencies());
 }
 
-void FrontendGraphConstructor::addToGraphThatThisWholeFileDependsUpon(
+void FrontendGraphConstructor::recordThatThisWholeFileDependsOn(
     const DependencyKey &key, bool cascades) {
   FrontendNode *def = g.findExistingNodeOrCreateIfNew(key, None, None);
   g.addArc(def, g.getSourceFileNodePair().useDependingOnCascading(cascades));
