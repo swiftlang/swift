@@ -3932,8 +3932,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
 
@@ -4019,8 +4017,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
 
@@ -4044,9 +4040,12 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive switch_enum_addr must have a default "
-            "destination");
+    bool isExhaustive =
+        uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
+            "nonexhaustive switch_enum_addr must have a default destination");
+
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->args_empty(),
               "switch_enum_addr default destination must take "
