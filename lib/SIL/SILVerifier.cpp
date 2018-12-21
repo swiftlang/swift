@@ -2072,6 +2072,9 @@ public:
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
             "using StructInst");
+    require(!structDecl->isResilient(F.getModule().getSwiftModule(),
+                                     F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
 
@@ -2374,6 +2377,9 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(!EI->getField()->isStatic(),
             "cannot get address of static property with struct_element_addr");
     require(EI->getField()->hasStorage(),
@@ -2415,6 +2421,9 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(EI->getType().isAddress(),
             "result of struct_element_addr must be address");
     require(!EI->getField()->isStatic(),
@@ -2465,7 +2474,16 @@ public:
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_tail_addr operand must be a class instance");
   }
-  
+
+  void checkDestructureStructInst(DestructureStructInst *DSI) {
+    SILType operandTy = DSI->getOperand()->getType();
+    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    require(sd, "must struct_extract from struct");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
+  }
+
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return fnConv.getSILType(ft->getParameters().back());
   }
