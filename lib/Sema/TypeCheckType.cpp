@@ -3271,6 +3271,10 @@ public:
       visit(compound->getComponentRange().back());
       return false;
     }
+    // Arbitrary protocol constraints are OK on opaque types.
+    if (isa<OpaqueReturnTypeRepr>(T))
+      return false;
+    
     visit(T);
     return true;
   }

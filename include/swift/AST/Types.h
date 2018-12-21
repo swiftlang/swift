@@ -100,7 +100,8 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable      = 0x01,
 
-    /// This type expression contains an ArchetypeType.
+    /// This type expression contains a context-dependent archetype, either a
+    /// PrimaryArchetypeType or OpenedArchetypeType.
     HasArchetype         = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
@@ -127,8 +128,11 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
+    
+    /// This type contains an OpaqueTypeArchetype.
+    HasOpaqueArchetype   = 0x400,
 
-    Last_Property = HasDependentMember
+    Last_Property = HasOpaqueArchetype
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -147,10 +151,14 @@ public:
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
 
-  /// Does a type with these properties structurally contain an
-  /// archetype?
+  /// Does a type with these properties structurally contain a
+  /// context-dependent archetype (that is, a Primary- or OpenedArchetype)?
   bool hasArchetype() const { return Bits & HasArchetype; }
 
+  /// Does a type with these properties structurally contain an
+  /// archetype from an opaque type declaration?
+  bool hasOpaqueArchetype() const { return Bits & HasOpaqueArchetype; }
+  
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
@@ -539,11 +547,11 @@ public:
     return getRecursiveProperties().hasUnresolvedType();
   }
   
-  /// \brief Determine whether the type involves an archetype.
+  /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
   }
-
+  
   /// Determine whether the type involves an opened existential archetype.
   bool hasOpenedExistential() const {
     return getRecursiveProperties().hasOpenedExistential();
@@ -553,6 +561,11 @@ public:
   /// archetype.
   bool hasOpenedExistential(OpenedArchetypeType *opened);
 
+  /// Determine whether the type involves an opaque type.
+  bool hasOpaqueArchetype() const {
+    return getRecursiveProperties().hasOpaqueArchetype();
+  }
+  
   /// Determine whether the type is an opened existential type.
   ///
   /// To determine whether there is an opened existential type
@@ -4576,6 +4589,7 @@ using ArchetypeTrailingObjects = llvm::TrailingObjects<Base,
   ProtocolDecl *, Type, LayoutConstraint, AdditionalTrailingObjects...>;
 
 class PrimaryArchetypeType;
+class OpaqueTypeArchetypeType;
   
 /// An archetype is a type that represents a runtime type that is
 /// known to conform to some set of requirements.
@@ -4700,8 +4714,13 @@ public:
   /// Register a nested type with the given name.
   void registerNestedType(Identifier name, Type nested);
 
-  /// getPrimary - Return the primary archetype parent of this archetype.
+  /// Return the root archetype parent of this archetype if it's
+  /// a primary archetype, null if the archetype is neither a primary archetype
+  /// nor nested under one.
   PrimaryArchetypeType *getPrimary() const;
+  
+  /// Return the root archetype parent of this archetype.
+  ArchetypeType *getRoot() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4778,6 +4797,8 @@ class OpaqueTypeArchetypeType final : public ArchetypeType,
   GenericSignature *BoundSignature;
   
 public:
+  /// Get 
+  
   /// Get an opaque archetype representing the underlying type of the given
   /// opaque type decl.
   static OpaqueTypeArchetypeType *
@@ -4798,9 +4819,6 @@ public:
   GenericSignature *getBoundSignature() const {
     return BoundSignature;
   }
-  
-  /// Get the underlying type of the opaque type, if it's known.
-  Type getUnderlyingType() const;
   
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::OpaqueTypeArchetype;
@@ -4825,6 +4843,26 @@ private:
 };
 BEGIN_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(OpaqueTypeArchetypeType, ArchetypeType)
+
+/// A function object that can be used as a \c TypeSubstitutionFn and
+/// \c LookupConformanceFn for \c Type::subst style APIs to map opaque
+/// archetypes with underlying types visible at a given resilience expansion
+/// to their underlying types.
+class ReplaceOpaqueTypesWithUnderlyingTypes {
+  ResilienceExpansion expansion;
+
+public:
+  ReplaceOpaqueTypesWithUnderlyingTypes(ResilienceExpansion expansion)
+    : expansion(expansion) {}
+  
+  /// TypeSubstitutionFn
+  Type operator()(SubstitutableType *maybeOpaqueType) const;
+  
+  /// LookupConformanceFn
+  Optional<ProtocolConformanceRef> operator()(CanType maybeOpaqueType,
+                                              Type replacementType,
+                                              ProtocolDecl *protocol) const;
+};
   
 /// An archetype that represents the dynamic type of an opened existential.
 class OpenedArchetypeType final : public ArchetypeType,

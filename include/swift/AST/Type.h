@@ -53,8 +53,9 @@ class TypeBase;
 class Type;
 class TypeWalker;
 struct ExistentialLayout;
-
-/// \brief Type substitution mapping from substitutable types to their
+enum class ResilienceExpansion : unsigned;
+  
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -147,6 +148,8 @@ enum class SubstFlags {
   AllowLoweredTypes = 0x02,
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x04,
+  /// Substitute types involving opaque type archetypes.
+  SubstituteOpaqueArchetypes = 0x08,
 };
 
 /// Options for performing substitutions into a type.
@@ -312,6 +315,10 @@ public:
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
+  
+  /// Replace opaque types with their underlying types when visible at the given
+  /// resilience expansion.
+  Type substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion expansion) const;
 
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 

@@ -3673,7 +3673,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -4147,7 +4147,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 10,
+  static_assert(RecursiveTypeProperties::BitWidth == 11,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getType()->getRecursiveProperties();
@@ -4372,8 +4372,10 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
 
   // An opaque type isn't contextually dependent like other archetypes, so
   // by itself, it doesn't impose the "Has Archetype" recursive property,
-  // but the substituted types might.
-  RecursiveTypeProperties properties = {};
+  // but the substituted types might. A disjoint "Has Opaque Archetype" tracks
+  // the presence of opaque archetypes.
+  RecursiveTypeProperties properties =
+    RecursiveTypeProperties::HasOpaqueArchetype;
   for (auto type : Substitutions.getReplacementTypes()) {
     properties |= type->getRecursiveProperties();
   }
@@ -5161,6 +5163,9 @@ SILLayout *SILLayout::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
+  // TODO: Support resilient opaque types.
+  Substitutions = Substitutions
+    .substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal);
   // Canonicalize substitutions.
   Substitutions = Substitutions.getCanonical();
 

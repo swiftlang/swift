@@ -1913,8 +1913,8 @@ RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
                                                   SGFContext C) {
-  llvm_unreachable("todo");
-#warning "todo"
+  // TODO: For now, opaque types are always lowered to their underlying type.
+  return visit(E->getSubExpr(), C);
 }
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,

@@ -77,7 +77,9 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (isa<OpenedArchetypeType>(A))
+  if (isa<OpenedArchetypeType>(A->getRoot()))
+    return true;
+  if (isa<OpaqueTypeArchetypeType>(A->getRoot()))
     return true;
 
   // Find the primary archetype.
