@@ -124,6 +124,8 @@ public:
     llvm::SourceMgr SM;
     yaml::Stream stream(inputBuffer.getMemBufferRef(), SM);
     auto I = stream.begin();
+    // Every FrontEndGraph has at least two nodes, for the sourceFileProvide
+    // interface and implementation.
     if (I == stream.end() || !I->getRoot() || isa<yaml::NullNode>(I->getRoot()))
       return true;
     auto *nodeSequence = dyn_cast<yaml::SequenceNode>(I->getRoot());
