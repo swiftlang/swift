@@ -722,4 +722,23 @@ ErrorBridgingTests.test("Error archetype identity") {
     === nsError)
 }
 
+private class NonPrintAsObjCClass: NSObject {
+  @objc enum Error: Int, Swift.Error {
+    case foo
+  }
+}
+@objc private enum NonPrintAsObjCError: Int, Error {
+  case bar
+}
+
+ErrorBridgingTests.test("@objc enum error domains") {
+  // If an @objc enum error is not eligible for PrintAsObjC, we should treat it
+  // as though it inherited the default implementation, which calls
+  // String(reflecting:).
+  expectEqual(NonPrintAsObjCClass.Error.foo._domain,
+              String(reflecting: NonPrintAsObjCClass.Error.self))
+  expectEqual(NonPrintAsObjCError.bar._domain,
+              String(reflecting: NonPrintAsObjCError.self))
+}
+
 runAllTests()

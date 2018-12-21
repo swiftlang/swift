@@ -28,7 +28,34 @@ using namespace swift;
 using namespace swift::objc_translation;
 
 static void deriveBodyBridgedNSError_enum_nsErrorDomain(
-              AbstractFunctionDecl *domainDecl, void *) {
+                    AbstractFunctionDecl *domainDecl, void *) {
+  // enum SomeEnum {
+  //   @derived
+  //   static var _nsErrorDomain: String {
+  //     return _typeName(self, qualified: true)
+  //   }
+  // }
+
+  auto M = domainDecl->getParentModule();
+  auto &C = M->getASTContext();
+  auto self = domainDecl->getImplicitSelfDecl();
+
+  auto selfRef = new (C) DeclRefExpr(self, DeclNameLoc(), /*implicit*/ true);
+  auto stringType = TypeExpr::createForDecl(SourceLoc(), C.getStringDecl(),
+                                            domainDecl, /*implicit*/ true);
+  auto initReflectingCall =
+    CallExpr::createImplicit(C, stringType,
+                             { selfRef }, { C.getIdentifier("reflecting") });
+  auto ret =
+    new (C) ReturnStmt(SourceLoc(), initReflectingCall, /*implicit*/ true);
+
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc());
+
+  domainDecl->setBody(body);
+}
+
+static void deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
+                    AbstractFunctionDecl *domainDecl, void *) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -52,11 +79,12 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
 }
 
 static ValueDecl *
-deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived) {
+deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
+                        void (*synthesizer)(AbstractFunctionDecl *, void*)) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
-  //     return "ModuleName.SomeEnum"
+  //     ...
   //   }
   // }
 
@@ -74,7 +102,7 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived) {
   // Define the getter.
   auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       derived.TC, propDecl, stringTy);
-  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
+  getterDecl->setBodySynthesizer(synthesizer);
 
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
@@ -85,8 +113,17 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
   if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain)
-    return deriveBridgedNSError_enum_nsErrorDomain(*this);
+  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain) {
+    auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
+
+    auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
+    if (scope.isPublic() || scope.isInternal())
+      // PrintAsObjC may print this domain, so we should make sure we use the
+      // same string it will.
+      synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
+
+    return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
+  }
 
   TC.diagnose(requirement->getLoc(), diag::broken_errortype_requirement);
   return nullptr;
