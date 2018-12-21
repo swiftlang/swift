@@ -78,7 +78,7 @@ public let DataBenchmarks = [
     runFunction: { append($0, arraySize: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataReset",
-    runFunction: run_Reset, tags: d),
+    runFunction: { resetBytes($0, in: 431..<809, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataReplaceSmall",
     runFunction: run_ReplaceSmall, tags: d),
@@ -241,10 +241,11 @@ func append(_ N: Int, sequenceLength: Int, to data: Data) {
   }
 }
 
-func benchmark_Reset(_ N: Int, _ range: Range<Data.Index>, _ data_: Data) {
+@inline(never)
+func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
   for _ in 0..<10000*N {
-    var data = data_
-    data.resetBytes(in: range)
+    var copy = data
+    copy.resetBytes(in: range)
   }
 }
 
@@ -287,12 +288,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_Reset(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_Reset(N, 431..<809, data)
 }
 
 @inline(never)
