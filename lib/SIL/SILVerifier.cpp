@@ -119,6 +119,7 @@ namespace {
 
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
+                            ResilienceExpansion expansion,
                             llvm::function_ref<void(bool, StringRef)> require,
                             CanType &baseTy,
                             CanType leafTy,
@@ -211,6 +212,12 @@ void verifyKeyPathComponent(SILModule &M,
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
+    if (expansion == ResilienceExpansion::Minimal) {
+      require(property->getEffectiveAccess() >= AccessLevel::Public,
+              "Key path in serialized function cannot reference non-public "
+              "property");
+    }
+
     auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
                          ->getReferenceStorageReferent()
                          ->getCanonicalType();
@@ -218,6 +225,8 @@ void verifyKeyPathComponent(SILModule &M,
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
+    require(!property->isResilient(M.getSwiftModule(), expansion),
+            "cannot access storage of resilient property");
     auto propertyTy = loweredBaseTy.getFieldType(property, M);
     require(propertyTy.getObjectType()
               == loweredComponentTy.getObjectType(),
@@ -247,6 +256,12 @@ void verifyKeyPathComponent(SILModule &M,
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
       auto getter = component.getComputedPropertyGetter();
+      if (expansion == ResilienceExpansion::Minimal) {
+        require(getter->hasValidLinkageForFragileRef(),
+                "Key path in serialized function should not reference "
+                "less visible getters");
+      }
+
       auto substGetterType = getter->getLoweredFunctionType()
         ->substGenericArgs(M, patternSubs);
       require(substGetterType->getRepresentation() ==
@@ -286,6 +301,12 @@ void verifyKeyPathComponent(SILModule &M,
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
       
       auto setter = component.getComputedPropertySetter();
+      if (expansion == ResilienceExpansion::Minimal) {
+        require(setter->hasValidLinkageForFragileRef(),
+                "Key path in serialized function should not reference "
+                "less visible setters");
+      }
+
       auto substSetterType = setter->getLoweredFunctionType()
         ->substGenericArgs(M, patternSubs);
       
@@ -4242,7 +4263,7 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(),
+        verifyKeyPathComponent(F.getModule(), F.getResilienceExpansion(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
           baseTy,
           leafTy,
@@ -4879,15 +4900,16 @@ void SILProperty::verify(const SILModule &M) const {
 
   if (auto &component = getComponent()) {
     verifyKeyPathComponent(const_cast<SILModule&>(M),
-      require,
-      baseTy,
-      leafTy,
-      *component,
-      {},
-      canSig,
-      subs,
-      /*property descriptor*/true,
-      hasIndices);
+                           ResilienceExpansion::Maximal,
+                           require,
+                           baseTy,
+                           leafTy,
+                           *component,
+                           {},
+                           canSig,
+                           subs,
+                           /*property descriptor*/true,
+                           hasIndices);
     // verifyKeyPathComponent updates baseTy to be the projected type of the
     // component, which should be the same as the type of the declared storage
     require(baseTy == leafTy,
