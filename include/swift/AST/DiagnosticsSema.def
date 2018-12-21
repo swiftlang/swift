@@ -3886,6 +3886,10 @@ ERROR(dynamic_replacement_function_not_found, none,
      "replaced function %0 could not be found", (DeclName))
 ERROR(dynamic_replacement_accessor_not_found, none,
       "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_ambiguous, none,
+      "replaced accessor for %0 occurs in multiple places", (DeclName))
+NOTE(dynamic_replacement_accessor_ambiguous_candidate, none,
+      "candidate accessor found in module %0", (DeclName))
 ERROR(dynamic_replacement_function_of_type_not_found, none,
       "replaced function %0 of type %1 could not be found", (DeclName, Type))
 NOTE(dynamic_replacement_found_function_of_type, none,
