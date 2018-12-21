@@ -871,9 +871,13 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::NestedArchetype:
       llvm_unreachable("Cannot mangle free-standing archetypes");
 
-    case TypeKind::OpaqueTypeArchetype:
-#warning "todo"
-      llvm_unreachable("TODO");
+    case TypeKind::OpaqueTypeArchetype: {
+      // TODO: Mangle opaque archetypes as themselves, not their underlying type
+      auto underlyingType =
+        type.substOpaqueTypesWithUnderlyingTypes(ResilienceExpansion::Minimal);
+      assert(!underlyingType->isEqual(type));
+      return appendType(underlyingType->getCanonicalType());
+    }
       
     case TypeKind::DynamicSelf: {
       auto dynamicSelf = cast<DynamicSelfType>(tybase);

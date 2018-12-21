@@ -2370,12 +2370,16 @@ ArchetypeType::ArchetypeType(TypeKind Kind,
                           getSubclassTrailingObjects<ProtocolDecl *>());
 }
 
-PrimaryArchetypeType *ArchetypeType::getPrimary() const {
+ArchetypeType *ArchetypeType::getRoot() const {
   ArchetypeType *archetype = const_cast<ArchetypeType*>(this);
   while (auto child = dyn_cast<NestedArchetypeType>(archetype)) {
     archetype = child->getParent();
   }
-  return dyn_cast<PrimaryArchetypeType>(archetype);
+  return archetype;
+}
+
+PrimaryArchetypeType *ArchetypeType::getPrimary() const {
+  return dyn_cast<PrimaryArchetypeType>(getRoot());
 }
 
 PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
@@ -2431,6 +2435,83 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
     Substitutions(Substitutions),
     BoundSignature(BoundSignature)
 {
+}
+
+Type ReplaceOpaqueTypesWithUnderlyingTypes::operator()(
+                                     SubstitutableType *maybeOpaqueType) const {
+  auto archetype = dyn_cast<ArchetypeType>(maybeOpaqueType);
+  if (!archetype)
+    return maybeOpaqueType;
+  auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(archetype->getRoot());
+  if (!opaqueRoot)
+    return maybeOpaqueType;
+
+  auto subs = opaqueRoot->getOpaqueDecl()->getUnderlyingTypeSubstitutions();
+  
+  // TODO: Check the resilience expansion, and handle opaque types with
+  // unknown underlying types. For now, all opaque types are always
+  // fragile.
+  assert(subs.hasValue() && "resilient opaque types not yet supported");
+  
+  // Apply the underlying type substitutions to the interface type of the
+  // archetype in question. This will map the inner generic signature of the
+  // opaque type to its outer signature.
+  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  
+  // If the type still contains opaque types, recur.
+  if (substTy->hasOpaqueArchetype()) {
+    return substTy.substOpaqueTypesWithUnderlyingTypes(expansion);
+  }
+  return substTy;
+}
+
+Optional<ProtocolConformanceRef>
+ReplaceOpaqueTypesWithUnderlyingTypes::operator()(CanType maybeOpaqueType,
+                                                 Type replacementType,
+                                                 ProtocolDecl *protocol) const {
+  auto abstractRef = ProtocolConformanceRef(protocol);
+
+  // If we got here, we should've replaced an opaque archetype in the
+  // TypeSubstitutionFn above.
+  auto archetype = cast<ArchetypeType>(maybeOpaqueType);
+  auto opaqueRoot = cast<OpaqueTypeArchetypeType>(archetype->getRoot());
+  auto subs = opaqueRoot->getOpaqueDecl()->getUnderlyingTypeSubstitutions();
+  assert(subs.hasValue());
+
+  // Apply the underlying type substitutions to the interface type of the
+  // archetype in question. This will map the inner generic signature of the
+  // opaque type to its outer signature.
+  auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
+  auto partialSubstRef = abstractRef.subst(archetype->getInterfaceType(),
+                                           *subs);
+  
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+  auto substRef = partialSubstRef.subst(partialSubstTy,
+                                        opaqueRoot->getSubstitutions());
+  
+  // If the type still contains opaque types, recur.
+  if (substTy->hasOpaqueArchetype()) {
+    return substRef.substOpaqueTypesWithUnderlyingTypes(substTy, expansion);
+  }
+  return substRef;
+}
+
+Type Type::substOpaqueTypesWithUnderlyingTypes(
+                                          ResilienceExpansion expansion) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(expansion);
+  return subst(replacer, replacer,
+#warning "todo"
+               SubstFlags::SubstituteOpaqueArchetypes
+               // TODO: Currently lowered types always get opaque types
+               // substituted out of them. When we support opaque type resilience
+               // this won't be true anymore and we'll need to handle
+               // opaque type substitution in SILType::subst.
+               | SubstFlags::AllowLoweredTypes);
 }
 
 CanNestedArchetypeType NestedArchetypeType::getNew(
@@ -2962,8 +3043,10 @@ static Type substType(Type derivedType,
   }
 
   // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
-  if (!derivedType->hasArchetype() &&
-      !derivedType->hasTypeParameter())
+  if (!derivedType->hasArchetype()
+      && !derivedType->hasTypeParameter()
+      && (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
+          || !derivedType->hasOpaqueArchetype()))
     return derivedType;
 
   return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
