@@ -6,6 +6,8 @@
 #include "tensorflow/core/platform/init_main.h"
 
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <vector>
 
 extern "C" {
@@ -125,6 +127,35 @@ void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
     *reinterpret_cast<float *>(ptr) = vals[i];
     ptr += dtypeSize;
   }
+  return tensor;
+}
+
+/// A default deallocator function to pass in `TF_NewTensor`.
+static void tensorDataDeallocator(void *data, size_t len, void *arg) {
+  free(data);
+};
+
+// Also see convertValuesToTensor() in TFLowerGraph.cpp
+void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
+                                         TF_Status *status) {
+  // printf is kept for debugging purposes.
+  // printf("string val: %s, with len %d \n", val, valLen);
+
+  size_t offsetsSize = sizeof(uint64_t);
+  size_t totalSize = offsetsSize + TF_StringEncodedSize(valLen);
+
+  totalSize += offsetsSize;
+
+  void *baseAddr = malloc(totalSize);
+  auto *tensor =
+      TF_NewTensor(TF_STRING, /*dims*/ nullptr, /*num_dims*/ 0, baseAddr,
+                   totalSize, tensorDataDeallocator, nullptr);
+
+  uint64_t *offsets = (uint64_t *)baseAddr;
+  *offsets = 0;
+  char *dataStart = (char *)baseAddr + offsetsSize;
+  (void)TF_StringEncode(val, valLen, dataStart, totalSize, status);
+
   return tensor;
 }
 
