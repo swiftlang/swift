@@ -2493,8 +2493,6 @@ public:
       auto conformance = AMI->getConformance().getConcrete();
       require(conformance->getType()->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
-      require(AMI->getModule().lookUpWitnessTable(conformance, false),
-              "Could not find witness table for conformance");
     }
 
     require(AMI->getMember().requiresNewWitnessTableEntry(),
@@ -3204,13 +3202,6 @@ public:
       require(conformances[i].getRequirement() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
-
-      if (conformances[i].isConcrete()) {
-        auto conformance = conformances[i].getConcrete();
-        require(F.getModule().lookUpWitnessTable(conformance, false),
-                "Could not find witness table for conformance.");
-
-      }
     }
   }
 

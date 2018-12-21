@@ -301,7 +301,9 @@ _T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness
 _T0So11CrappyColorVs16RawRepresentableSCMA ---> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
 $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc ---> protocol conformance descriptor for protocol_conformance_records.NativeValueType : protocol_conformance_records.Runcible in protocol_conformance_records
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
-$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAHPyHCg_AiJ1QAAHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAyHCg_AiJ1QAAyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHPyHCg_AiJ1QHPyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PHpyHCg_AiJ1QHpyHCg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 _T0LiteralAByxGxd_tcfC ---> _T0LiteralAByxGxd_tcfC
 _T0XZ ---> _T0XZ
 _TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
