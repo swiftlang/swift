@@ -127,7 +127,6 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(offset: Int) {
-      _internalInvariant(offset >= 0)
       self.offset = offset
     }
 
