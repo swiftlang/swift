@@ -1908,8 +1908,9 @@ namespace {
       else
         (void)0;
       
-      // If the property has storage, emit the ivar name last.
-      if (prop->hasStorage())
+      // If the property is an instance property and has storage, emit the ivar
+      // name last.
+      if (!prop->isStatic() && prop->hasStorage())
         outs << ",V" << prop->getName();
     }
 
