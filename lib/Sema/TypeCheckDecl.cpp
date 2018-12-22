@@ -2223,8 +2223,10 @@ public:
           .fixItRemove(attr->getRange());
       }
     }
-  }
 
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>())
+      TC.checkDynamicReplacementAttribute(VD);
+  }
 
   void visitBoundVars(Pattern *P) {
     P->forEachVariable([&] (VarDecl *VD) { this->visitBoundVariable(VD); });
@@ -2845,12 +2847,6 @@ public:
   void visitVarDecl(VarDecl *VD) {
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
-
-    // Except if there is a dynamic replacement attribute.
-    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
-      TC.validateDecl(VD);
-      TC.checkDynamicReplacementAttribute(VD);
-    }
   }
 
   /// Determine whether the given declaration requires a definition.
