@@ -751,11 +751,6 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
-// Pass this into the experimental_dependences to prevent a layering violation
-static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
-  Mangle::ASTMangler Mangler;
-  return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
-}
 
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     CompilerInvocation &Invocation, CompilerInstance &Instance) {
@@ -774,8 +769,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
       if (Invocation.getLangOptions().EnableExperimentalDependencies)
         (void)experimental_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(), referenceDependenciesFilePath,
-            mangleTypeAsContext);
+            *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),

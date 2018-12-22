@@ -36,6 +36,8 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 
+
+
 // This file holds the code to build a SourceFileDepGraph in the frontend.
 // This graph captures relationships between definitions and uses, and
 // it is written to a file which is read by the driver in order to decide which
@@ -441,6 +443,11 @@ private:
 };
 } // namespace
 
+
+static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
+  Mangle::ASTMangler Mangler;
+  return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
+}
 //==============================================================================
 // MARK: Helpers for key construction that must be in frontend
 //==============================================================================
@@ -470,11 +477,11 @@ DependencyKey::computeContextForProvidedEntity(Entity) {
   return "";
 }
 
-/// \ref nominal dependencies are created from a Decl and use the context field.
+// \ref nominal dependencies are created from a Decl and use the context field.
 template <>
 std::string
 DependencyKey::computeContextForProvidedEntity<NodeKind::nominal,
-                                               NominalTypeDecl const *> {
+                                               NominalTypeDecl const *>(NominalTypeDecl const *D) {
   return mangleTypeAsContext(D);
 }
 
@@ -513,22 +520,22 @@ std::string
 DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
                                             PrecedenceGroupDecl const *>(
     const PrecedenceGroupDecl *D) {
-  return getName(D);
+                                              return ::getName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
-  return getName(D);
+      return ::getName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return getName(D);
+      return ::getName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
     NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return getName(D);
+      return ::getName(D);
 }
 template <>
 std::string DependencyKey::computeNameForProvidedEntity<
@@ -626,20 +633,14 @@ class SourceFileDepGraphConstructor {
   /// Name of the swiftDeps file, for inclusion in the constructed graph.
   StringRef swiftDeps;
 
-  /// Required to support the status quo dependency information.
-  /// Layering requires that this be passed in from the frontend.
-  MangleTypeAsContext mangleTypeAsContext;
-
   /// Graph under construction
   SourceFileDepGraph g;
 
 public:
   SourceFileDepGraphConstructor(SourceFile *SF,
                                 const DependencyTracker &depTracker,
-                                StringRef swiftDeps,
-                                MangleTypeAsContext mangleTypeAsContext)
-      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
-        mangleTypeAsContext(mangleTypeAsContext) {}
+                                StringRef swiftDeps)
+      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps) {}
 
   /// Construct the graph and return it.
   SourceFileDepGraph construct() {
@@ -678,7 +679,7 @@ private:
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
           kind,
           DependencyKey::computeContextForProvidedEntity<kind>(
-              declOrPair, mangleTypeAsContext),
+              declOrPair),
           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
           fingerprint, swiftDeps);
       // Since we don't have fingerprints yet, must rebuild every provider when
@@ -753,7 +754,7 @@ void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
       DependencyKey::computeContextForProvidedEntity<
-          NodeKind::sourceFileProvide>(swiftDeps, mangleTypeAsContext),
+          NodeKind::sourceFileProvide>(swiftDeps),
       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
           swiftDeps),
       getSourceFileFingerprint(), swiftDeps);
@@ -804,15 +805,13 @@ void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
 
 bool swift::experimental_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath,
-    MangleTypeAsContext mangleTypeAsContext) {
+    const DependencyTracker &depTracker, StringRef outputPath) {
 
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  SourceFileDepGraphConstructor gc(SF, depTracker, outputPath,
-                                   mangleTypeAsContext);
+  SourceFileDepGraphConstructor gc(SF, depTracker, outputPath);
   SourceFileDepGraph g = gc.construct();
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
