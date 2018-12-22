@@ -77,7 +77,7 @@ using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
 /// operator<< is needed for TwoStageMap::verify:
 class DependencyKey;
 raw_ostream &operator<<(raw_ostream &out, const DependencyKey &key);
-  
+
 /// A general class to reuse objects that are keyed by a subset of their
 /// information. Used for \ref SourceFileDepGraph::Memoizer.
 

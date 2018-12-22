@@ -184,7 +184,8 @@ std::string DependencyKey::asString() const {
 }
 
 /// Needed for TwoStageMap::verify:
-raw_ostream & experimental_dependencies::operator<<(raw_ostream &out, const DependencyKey &key) {
+raw_ostream &experimental_dependencies::operator<<(raw_ostream &out,
+                                                   const DependencyKey &key) {
   out << key.asString();
   return out;
 }
