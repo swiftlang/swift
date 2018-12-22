@@ -2506,23 +2506,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  if (!hadError) {
-    // If we're performing an binding to a weak or unowned variable from a
-    // constructor call, emit a warning that the instance will be immediately
-    // deallocated.
-    diagnoseUnownedImmediateDeallocation(*this, pattern, pbe.getEqualLoc(),
-                                         init);
-
-    // If we entered an initializer context, contextualize any
-    // auto-closures we might have created.
-    if (initContext) {
-      // Check safety of error-handling in the declaration, too.
-      checkInitializerErrorHandling(initContext, init);
-      (void)contextualizeInitializer(initContext, init);
-    }
-  } else {
+  if (hadError)
     PBD->setInvalid();
-  }
 
   PBD->setInitializerChecked(patternNumber);
   return hadError;

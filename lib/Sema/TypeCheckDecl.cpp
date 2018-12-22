@@ -30,6 +30,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -2236,6 +2237,8 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    DeclContext *DC = PBD->getDeclContext();
+
     // Check all the pattern/init pairs in the PBD.
     validatePatternBindingEntries(TC, PBD);
 
@@ -2296,9 +2299,9 @@ public:
     }
 
     bool isInSILMode = false;
-    if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
+    if (auto sourceFile = DC->getParentSourceFile())
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
-    bool isTypeContext = PBD->getDeclContext()->isTypeContext();
+    bool isTypeContext = DC->isTypeContext();
 
     // If this is a declaration without an initializer, reject code if
     // uninitialized vars are not allowed.
@@ -2314,8 +2317,6 @@ public:
 
         if (var->isInvalid() || PBD->isInvalid())
           return;
-
-        auto *varDC = var->getDeclContext();
 
         auto markVarAndPBDInvalid = [PBD, var] {
           PBD->setInvalid();
@@ -2334,9 +2335,9 @@ public:
 
         // Static/class declarations require an initializer unless in a
         // protocol.
-        if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
+        if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
           // ...but don't enforce this for SIL or parseable interface files.
-          switch (varDC->getParentSourceFile()->Kind) {
+          switch (DC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
@@ -2353,8 +2354,8 @@ public:
         }
 
         // Global variables require an initializer in normal source files.
-        if (varDC->isModuleScopeContext()) {
-          switch (varDC->getParentSourceFile()->Kind) {
+        if (DC->isModuleScopeContext()) {
+          switch (DC->getParentSourceFile()->Kind) {
           case SourceFileKind::Main:
           case SourceFileKind::REPL:
           case SourceFileKind::Interface:
@@ -2378,8 +2379,35 @@ public:
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-      if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
+      if (!PBD->getInit(i))
+        continue;
+
+      if (!PBD->isInitializerChecked(i))
         TC.typeCheckPatternBinding(PBD, i);
+
+      if (!PBD->isInvalid()) {
+        auto &entry = PBD->getPatternList()[i];
+        auto *init = PBD->getInit(i);
+
+        // If we're performing an binding to a weak or unowned variable from a
+        // constructor call, emit a warning that the instance will be immediately
+        // deallocated.
+        diagnoseUnownedImmediateDeallocation(TC, PBD->getPattern(i),
+                                              entry.getEqualLoc(),
+                                              init);
+
+        // If we entered an initializer context, contextualize any
+        // auto-closures we might have created.
+        if (!DC->isLocalContext()) {
+          auto *initContext = cast_or_null<PatternBindingInitializer>(
+              entry.getInitContext());
+          if (initContext) {
+            // Check safety of error-handling in the declaration, too.
+            TC.checkInitializerErrorHandling(initContext, init);
+            (void) TC.contextualizeInitializer(initContext, init);
+          }
+        }
+      }
     }
   }
 
