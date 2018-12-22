@@ -693,6 +693,14 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     return COAI;
   }
   if (auto *OEA = dyn_cast<OpenExistentialAddrInst>(OAI.OpenedArchetypeValue)) {
+    // Bail if ConcreteSILType is not the same SILType as the type stored in the
+    // existential after maximal reabstraction.
+    auto archetype = OpenedArchetypeType::getAny(SoleCEI.ExistentialType);
+    Lowering::AbstractionPattern abstractionPattern(archetype);
+    auto abstractTy = M.Types.getLoweredType(abstractionPattern, ConcreteType);
+    if (abstractTy != concreteSILType)
+       return None;
+
     SoleCEI.ConcreteValue =
       Builder.createUncheckedAddrCast(
         OEA->getLoc(), OEA, concreteSILType.getAddressType());
