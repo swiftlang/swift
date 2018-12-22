@@ -456,12 +456,6 @@ template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
   return decl->getBaseName().userFacingName();
 }
 
-static std::string
-getBaseName(const std::pair<const NominalTypeDecl *, const ValueDecl *>
-            holderAndMember) {
-  return getBaseName(holderAndMember.second);
-}
-
 template <typename DeclT> static std::string getName(const DeclT *decl) {
   return DeclBaseName(decl->getName()).userFacingName();
 }

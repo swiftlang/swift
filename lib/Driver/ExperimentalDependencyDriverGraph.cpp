@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/ExperimentalDependencyDriverGraph.h"
+// Next two includes needed for reporting errors opening dot file for writing.
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"

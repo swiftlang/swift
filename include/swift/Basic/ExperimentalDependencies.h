@@ -13,7 +13,6 @@
 #ifndef ExperimentalDependencies_h
 #define ExperimentalDependencies_h
 
-//#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/Hashing.h"
