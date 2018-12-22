@@ -1892,6 +1892,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // the context is missing).
   TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
 
+  // Make sure that typechecker knows that this is an attempt
+  // to diagnose a problem.
+  TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
+
   // Don't walk into non-single expression closure bodies, because
   // ExprTypeSaver and TypeNullifier skip them too.
   TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;

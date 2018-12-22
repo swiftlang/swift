@@ -758,6 +758,10 @@ public:
     bool IsError;
   };
 
+  /// Check whether current context has any errors associated with
+  /// ill-formed protocol conformances which haven't been produced yet.
+  bool hasDelayedConformanceErrors() const;
+
   /// Add a delayed diagnostic produced while type-checking a
   /// particular protocol conformance.
   void addDelayedConformanceDiag(NormalProtocolConformance *conformance,

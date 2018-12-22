@@ -2767,6 +2767,10 @@ ERROR(type_of_expression_is_ambiguous,none,
 ERROR(specific_type_of_expression_is_ambiguous,none,
       "expression type %0 is ambiguous without more context", (Type))
 
+ERROR(failed_to_produce_diagnostic,Fatal,
+      "failed to produce diagnostic for expression; "
+      "please file a bug report with your project", ())
+
 
 ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
