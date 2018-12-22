@@ -177,10 +177,16 @@ std::string DependencyKey::humanReadableName() const {
   }
 }
 
-DependencyKey::operator std::string() const {
+std::string DependencyKey::asString() const {
   return NodeKindNames[size_t(kind)] + " " +
          "aspect: " + DeclAspectNames[size_t(aspect)] + ", " +
          humanReadableName();
+}
+
+/// Needed for TwoStageMap::verify:
+raw_ostream & experimental_dependencies::operator<<(raw_ostream &out, const DependencyKey &key) {
+  out << key.asString();
+  return out;
 }
 
 bool DependencyKey::verify() const {

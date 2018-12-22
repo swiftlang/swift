@@ -74,6 +74,10 @@ using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
 // MARK: General Utility classes
 //==============================================================================
 
+/// operator<< is needed for TwoStageMap::verify:
+class DependencyKey;
+raw_ostream &operator<<(raw_ostream &out, const DependencyKey &key);
+  
 /// A general class to reuse objects that are keyed by a subset of their
 /// information. Used for \ref SourceFileDepGraph::Memoizer.
 
@@ -181,6 +185,10 @@ public:
   /// Check integrity and call \p verifyFn for each element, so that element can
   /// be verified.
   /// Verify absence of duplicates and call \p verifyFn for each element.
+  ///
+  /// Requirements:
+  // raw_ostream &operator<<(raw_ostream &out, const Key1 &), and
+  // raw_ostream &operator<<(raw_ostream &out, const Key2 &)
   void verify(function_ref<void(const Key1 &k1, const Key2 &k2, Value v)>
                   verifyFn) const {
     std::unordered_set<Value> vals;
@@ -487,10 +495,10 @@ public:
     convertString(context);
   }
 
-  void dump() const { llvm::errs() << std::string(*this) << "\n"; }
+  void dump() const { llvm::errs() << asString() << "\n"; }
 
   /// For debugging, needed for \ref TwoStageMap::verify
-  operator std::string() const;
+  std::string asString() const;
 
   bool verify() const;
 
