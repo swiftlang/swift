@@ -38,12 +38,12 @@ class ExistentialSpecializer : public SILFunctionTransform {
   /// Determine if the current function is a target for existential
   /// specialization of args.
   bool canSpecializeExistentialArgsInFunction(
-      ApplySite &Apply,
+      FullApplySite &Apply,
       llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
           &ExistentialArgDescriptor);
 
   /// Can Callee be specialized?
-  bool canSpecializeCalleeFunction(ApplySite &Apply);
+  bool canSpecializeCalleeFunction(FullApplySite &Apply);
 
   /// Specialize existential args in function F.
   void specializeExistentialArgsInAppliesWithinFunction(SILFunction &F);
@@ -70,82 +70,6 @@ public:
 };
 } // namespace
 
-/// Find concrete type from init_existential_refs/addrs.
-static bool findConcreteTypeFromInitExistential(SILValue Arg,
-                                                CanType &ConcreteType) {
-  if (auto *IER = dyn_cast<InitExistentialRefInst>(Arg)) {
-    ConcreteType = IER->getFormalConcreteType();
-    return true;
-  } else if (auto *IE = dyn_cast<InitExistentialAddrInst>(Arg)) {
-    ConcreteType = IE->getFormalConcreteType();
-    return true;
-  }
-  return false;
-}
-
-/// Find the concrete type of the existential argument. Wrapper
-/// for findInitExistential in Local.h/cpp. In future, this code
-/// can move to Local.h/cpp.
-static bool findConcreteType(ApplySite AI, int ArgIdx, CanType &ConcreteType) {
-  bool isCopied = false;
-  auto Arg = AI.getArgument(ArgIdx);
-
-  /// Ignore any unconditional cast instructions. Is it Safe? Do we need to
-  /// also add UnconditionalCheckedCastAddrInst? TODO.
-  if (auto *Instance = dyn_cast<UnconditionalCheckedCastInst>(Arg)) {
-    Arg = Instance->getOperand();
-  }
-
-  /// Return init_existential if the Arg is global_addr.
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(Arg)) {
-    SILValue InitExistential =
-        findInitExistentialFromGlobalAddrAndApply(GAI, AI, ArgIdx);
-    /// If the Arg is already init_existential, return the concrete type.
-    if (InitExistential &&
-        findConcreteTypeFromInitExistential(InitExistential, ConcreteType)) {
-      return true;
-    }
-  }
-
-  /// Handle AllocStack instruction separately.
-  if (auto *Instance = dyn_cast<AllocStackInst>(Arg)) {
-    if (SILValue Src =
-            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied)) {
-      Arg = Src;
-    }
-  }
-
-  /// If the Arg is already init_existential after getAddressofStackInit
-  /// call, return the concrete type.
-  if (findConcreteTypeFromInitExistential(Arg, ConcreteType)) {
-    return true;
-  }
-
-  /// Call findInitExistential and determine the init_existential.
-  ArchetypeType *OpenedArchetype = nullptr;
-  SILValue OpenedArchetypeDef;
-  auto FAS = FullApplySite::isa(AI.getInstruction());
-  if (!FAS)
-    return false;
-  SILInstruction *InitExistential =
-      findInitExistential(FAS.getArgumentOperands()[ArgIdx], OpenedArchetype,
-                          OpenedArchetypeDef, isCopied);
-  if (!InitExistential) {
-    LLVM_DEBUG(llvm::dbgs() << "ExistentialSpecializer Pass: Bail! Due to "
-                               "findInitExistential\n";);
-    return false;
-  }
-
-  /// Return the concrete type from init_existential returned from
-  /// findInitExistential.
-  if (auto *SingleVal = InitExistential->castToSingleValueInstruction()) {
-    if (findConcreteTypeFromInitExistential(SingleVal, ConcreteType)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 /// Check if the argument Arg is used in a destroy_use instruction.
 static void
 findIfCalleeUsesArgInDestroyUse(SILValue Arg,
@@ -162,17 +86,21 @@ findIfCalleeUsesArgInDestroyUse(SILValue Arg,
 /// Check if any apply argument meets the criteria for existential
 /// specialization.
 bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
-    ApplySite &Apply,
+    FullApplySite &Apply,
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
   auto *F = Apply.getReferencedFunction();
-  auto Args = F->begin()->getFunctionArguments();
+  auto CalleeArgs = F->begin()->getFunctionArguments();
   bool returnFlag = false;
 
-  /// Analyze the argument for protocol conformance.
-  for (unsigned Idx = 0, Num = Args.size(); Idx < Num; ++Idx) {
-    auto Arg = Args[Idx];
-    auto ArgType = Arg->getType();
+  /// Analyze the argument for protocol conformance.  Iterator over the callee's
+  /// function arguments.  The same SIL argument index is used for both caller
+  /// and callee side arguments.
+  auto origCalleeConv = Apply.getOrigCalleeConv();
+  assert(Apply.getCalleeArgIndexOfFirstAppliedArg() == 0);
+  for (unsigned Idx = 0, Num = CalleeArgs.size(); Idx < Num; ++Idx) {
+    auto CalleeArg = CalleeArgs[Idx];
+    auto ArgType = CalleeArg->getType();
     auto SwiftArgType = ArgType.getASTType();
 
     /// Checking for AnyObject and Any is added to ensure that we do not blow up
@@ -184,18 +112,21 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
 
     auto ExistentialRepr =
-        Arg->getType().getPreferredExistentialRepresentation(F->getModule());
+        CalleeArg->getType().getPreferredExistentialRepresentation(
+            F->getModule());
     if (ExistentialRepr != ExistentialRepresentation::Opaque &&
           ExistentialRepr != ExistentialRepresentation::Class)
       continue;
 
     /// Find the concrete type.
-    CanType ConcreteType;
-    if (!findConcreteType(Apply, Idx, ConcreteType)) {
+    Operand &ArgOper = Apply.getArgumentRef(Idx);
+    CanType ConcreteType =
+        ConcreteExistentialInfo(ArgOper.get(), ArgOper.getUser()).ConcreteType;
+    if (!ConcreteType) {
       LLVM_DEBUG(
           llvm::dbgs()
-              << "ExistentialSpecializer Pass: Bail! Due to findConcreteType "
-                 "for callee:"
+              << "ExistentialSpecializer Pass: Bail! cannot find ConcreteType "
+                 "for call argument to:"
               << F->getName() << " in caller:"
               << Apply.getInstruction()->getParent()->getParent()->getName()
               << "\n";);
@@ -205,15 +136,15 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     /// Determine attributes of the existential addr arguments such as
     /// destroy_use, immutable_access. 
     ExistentialTransformArgumentDescriptor ETAD;
-    ETAD.AccessType =
-        Apply.getOrigCalleeType()->getParameters()[Idx].isIndirectMutating() ||
-                Apply.getOrigCalleeType()->getParameters()[Idx].isConsumed()
-            ? OpenedExistentialAccess::Mutable
-            : OpenedExistentialAccess::Immutable;
+    auto paramInfo = origCalleeConv.getParamInfoForSILArg(Idx);
+    ETAD.AccessType = (paramInfo.isIndirectMutating() || paramInfo.isConsumed())
+                          ? OpenedExistentialAccess::Mutable
+                          : OpenedExistentialAccess::Immutable;
     ETAD.DestroyAddrUse = false;
-    if ((Args[Idx]->getType().getPreferredExistentialRepresentation(
-            F->getModule())) != ExistentialRepresentation::Class)
-      findIfCalleeUsesArgInDestroyUse(Arg, ETAD);
+    if ((CalleeArgs[Idx]->getType().getPreferredExistentialRepresentation(
+            F->getModule()))
+        != ExistentialRepresentation::Class)
+      findIfCalleeUsesArgInDestroyUse(CalleeArg, ETAD);
 
     /// Save the attributes
     ExistentialArgDescriptor[Idx] = ETAD;
@@ -226,12 +157,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 }
 
 /// Determine if this callee function can be specialized or not.
-bool ExistentialSpecializer::canSpecializeCalleeFunction(ApplySite &Apply) {
-
-  /// Do not handle partial applies.
-  if (isa<PartialApplyInst>(Apply.getInstruction())) {
-    return false;
-  }
+bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// Determine the caller of the apply.
   auto *Callee = Apply.getReferencedFunction();
@@ -285,7 +211,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
       auto *I = &*It;
 
       /// Is it an apply site?
-      ApplySite Apply = ApplySite::isa(I);
+      FullApplySite Apply = FullApplySite::isa(I);
       if (!Apply)
         continue;
 
