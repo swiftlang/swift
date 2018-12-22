@@ -2120,14 +2120,17 @@ public:
   }
 
   void visitBoundVariable(VarDecl *VD) {
-    TC.validateDecl(VD);
-
-    // Set up accessors.
-    maybeAddAccessorsToStorage(VD);
-
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
     // when the VarDecl is merely used from another file.
+    TC.validateDecl(VD);
+
+    // Set up accessors, also lowering lazy and @NSManaged properties.
+    maybeAddAccessorsToStorage(VD);
+
+    // Add the '@_hasStorage' attribute if this property is stored.
+    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
+      VD->getAttrs().add(new (TC.Context) HasStorageAttr(/*isImplicit=*/true));
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
@@ -2276,6 +2279,19 @@ public:
           // to make sure it is properly coerced to the pattern type.
           PBD->setInit(i, defaultInit);
         }
+      }
+
+      if (PBD->getInit(i)) {
+        // Add the attribute that preserves the "has an initializer" value across
+        // module generation, as required for TBDGen.
+        PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
+          if (VD->hasStorage() &&
+              !VD->getAttrs().hasAttribute<HasInitialValueAttr>()) {
+            auto *attr = new (TC.Context) HasInitialValueAttr(
+                /*IsImplicit=*/true);
+            VD->getAttrs().add(attr);
+          }
+        });
       }
     }
 
@@ -3686,10 +3702,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
     auto *PBD = VD->getParentPatternBinding();
-
-    // Add the '@_hasStorage' attribute if this property is stored.
-    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
-      VD->getAttrs().add(new (Context) HasStorageAttr(/*isImplicit=*/true));
 
     // Note that we need to handle the fact that some VarDecls don't
     // have a PatternBindingDecl, for example the iterator in a
