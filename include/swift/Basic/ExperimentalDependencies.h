@@ -184,24 +184,17 @@ public:
 
   /// Check integrity and call \p verifyFn for each element, so that element can
   /// be verified.
-  /// Verify absence of duplicates and call \p verifyFn for each element.
   ///
   /// Requirements:
   // raw_ostream &operator<<(raw_ostream &out, const Key1 &), and
   // raw_ostream &operator<<(raw_ostream &out, const Key2 &)
   void verify(function_ref<void(const Key1 &k1, const Key2 &k2, Value v)>
                   verifyFn) const {
-    std::unordered_set<Value> vals;
     for (const auto &p1 : map)
       for (const auto &p2 : p1.second) {
         const Key1 &k1 = p1.first;
         const Key2 &k2 = p2.first;
         Value const v = p2.second;
-        if (!vals.insert(v).second) {
-          llvm::errs() << "Duplicate value at (" << k1 << ", " << k2 << ") "
-                       << v << "\n";
-          llvm_unreachable("duplicate node");
-        }
         verifyFn(k1, k2, v);
       }
   }
