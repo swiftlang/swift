@@ -7,11 +7,6 @@ public struct Vector<T> : VectorNumeric {
   public var y: T
 
   public typealias ScalarElement = T
-  public typealias Dimensionality = ()
-
-  public init(dimensionality: (), repeating repeatedValue: T) {
-    self.init(repeatedValue)
-  }
 
   public init(_ scalar: T) {
     self.x = scalar
