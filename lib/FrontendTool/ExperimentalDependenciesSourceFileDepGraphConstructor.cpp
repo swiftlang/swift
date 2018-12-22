@@ -352,14 +352,14 @@ public:
   // clang-format off
     SourceFileDeclFinder(const SourceFile *const SF) {
       for (const Decl *const D : SF->Decls) {
-        find<ExtensionDecl, DeclKind::Extension>(D, extensions) ||
-        find<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
+        select<ExtensionDecl, DeclKind::Extension>(D, extensions) ||
+        select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
         DeclKind::PostfixOperator>(D, operators) ||
-        find<PrecedenceGroupDecl, DeclKind::PrecedenceGroup>(
+        select<PrecedenceGroupDecl, DeclKind::PrecedenceGroup>(
                                                              D, precedenceGroups) ||
-        find<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
+        select<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
         DeclKind::Class, DeclKind::Protocol>(D, topNominals) ||
-        find<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
+        select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
         DeclKind::Accessor>(D, topValues);
       }
     // clang-format on
@@ -427,17 +427,17 @@ private:
   /// \returns true if successful.
   template <typename DesiredDeclType, DeclKind firstKind,
             DeclKind... restOfKinds>
-  bool find(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
+  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
     if (D->getKind() == firstKind) {
       foundDecls.push_back(cast<DesiredDeclType>(D));
       return true;
     }
-    return find<DesiredDeclType, restOfKinds...>(D, foundDecls);
+    return select<DesiredDeclType, restOfKinds...>(D, foundDecls);
   }
 
   /// Terminate the template recursion.
   template <typename DesiredDeclType>
-  bool find(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
+  bool select(const Decl *const D, ConstPtrVec<DesiredDeclType> &foundDecls) {
     return false;
   }
 };
