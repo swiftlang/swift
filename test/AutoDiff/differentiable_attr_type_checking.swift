@@ -540,15 +540,23 @@ struct JVPStruct {
   let p: Float
 }
 
+extension JVPStruct : VectorNumeric {
+  static var zero: JVPStruct { return JVPStruct(p: 0) }
+  static func + (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
+    return JVPStruct(p: lhs.p + rhs.p)
+  }
+  static func - (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
+    return JVPStruct(p: lhs.p - rhs.p)
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: JVPStruct) -> JVPStruct {
+    return JVPStruct(p: lhs * rhs.p)
+  }
+}
+
 extension JVPStruct : Differentiable {
   typealias TangentVector = JVPStruct
   typealias CotangentVector = JVPStruct
-  func moved(toward direction: JVPStruct) -> JVPStruct {
-    return JVPStruct(p: p + direction.p)
-  }
-  func tangentVector(from cotangent: JVPStruct) -> JVPStruct {
-    return cotangent
-  }
 }
 
 extension JVPStruct {
@@ -634,15 +642,23 @@ struct VJPStruct {
   let p: Float
 }
 
+extension VJPStruct : VectorNumeric {
+  static var zero: VJPStruct { return VJPStruct(p: 0) }
+  static func + (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
+    return VJPStruct(p: lhs.p + rhs.p)
+  }
+  static func - (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
+    return VJPStruct(p: lhs.p - rhs.p)
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: VJPStruct) -> VJPStruct {
+    return VJPStruct(p: lhs * rhs.p)
+  }
+}
+
 extension VJPStruct : Differentiable {
   typealias TangentVector = VJPStruct
   typealias CotangentVector = VJPStruct
-  func moved(toward direction: VJPStruct) -> VJPStruct {
-    return VJPStruct(p: p + direction.p)
-  }
-  func tangentVector(from cotangent: VJPStruct) -> VJPStruct {
-    return cotangent
-  }
 }
 
 extension VJPStruct {

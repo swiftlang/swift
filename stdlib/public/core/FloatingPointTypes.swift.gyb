@@ -1832,12 +1832,7 @@ extension ${Self} : Strideable {
 //===----------------------------------------------------------------------===//
 
 extension ${Self} : VectorNumeric {
-  public typealias Shape = ()
   public typealias Scalar = ${Self}
-
-  public init(repeating repeatedValue: ${Self}, shape: ()) {
-    self = repeatedValue
-  }
 }
 
 extension ${Self} : Differentiable {

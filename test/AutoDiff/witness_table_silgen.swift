@@ -11,12 +11,15 @@ protocol Proto : Differentiable {
   func function3(_ x: Float, _ y: Float) -> Float
 }
 
-struct S : Proto {
+struct S : Proto, VectorNumeric {
+  static var zero: S { return S(p: 0) }
+  typealias Scalar = Float
+  static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
+  static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
+  static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
+
   typealias TangentVector = S
   typealias CotangentVector = S
-  func moved(toward vector: TangentVector) -> S {
-    fatalError("unimplemented")
-  }
 
   let p: Float
 

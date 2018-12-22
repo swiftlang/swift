@@ -63,16 +63,18 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 /// elements are of `Tangent` type.
 public protocol Differentiable {
   /// The tangent vector space of this differentiable manifold.
-  associatedtype TangentVector : Differentiable
-    where TangentVector.TangentVector == TangentVector
+  associatedtype TangentVector : Differentiable, VectorNumeric
+    where TangentVector.TangentVector == TangentVector,
+          TangentVector.Scalar : FloatingPoint
   /// The cotangent space of this differentiable manifold.
-  associatedtype CotangentVector : Differentiable
-    where CotangentVector.CotangentVector == CotangentVector
+  associatedtype CotangentVector : Differentiable, VectorNumeric
+    where CotangentVector.CotangentVector == CotangentVector,
+          CotangentVector.Scalar : FloatingPoint
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
   /// exponential map.
-  func moved(toward direction: TangentVector) -> Self
+  func moved(along direction: TangentVector) -> Self
 
   /// Convert a cotangent vector to its corresponding tangent vector.
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
@@ -80,7 +82,7 @@ public protocol Differentiable {
 
 public extension Differentiable
   where Self : VectorNumeric, TangentVector == Self {
-  func moved(toward direction: TangentVector) -> Self {
+  func moved(along direction: TangentVector) -> Self {
     return self + direction
   }
 }
