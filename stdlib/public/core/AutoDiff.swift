@@ -21,22 +21,10 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that represents an unranked vector space. Values of this type are
-/// elements in this vector space and with a specific shape.
+/// elements in this vector space and have either no shape or a static shape.
 public protocol VectorNumeric : AdditiveArithmetic {
   /// The type of scalars in the vector space.
   associatedtype Scalar : AdditiveArithmetic
-
-  /// The type whose values specifies the dimensionality of an object in the
-  /// vector space.
-  associatedtype Shape
-
-  /// Create an object in the vector space with the specified shape by
-  /// repeatedly filling the object with the specified scalar value.
-  ///
-  /// - Parameters:
-  ///   - shape: the shape
-  ///   - repeatedValue: the value repeat for the specified shape
-  init(repeating repeatedValue: Scalar, shape: Shape)
 
   static func * (lhs: Scalar, rhs: Self) -> Self
   static func *= (lhs: inout Self, rhs: Scalar)
@@ -50,6 +38,22 @@ public extension VectorNumeric {
   static func *= (lhs: inout Self, rhs: Scalar) {
     lhs = rhs * lhs
   }
+}
+
+/// A type that represents an unranked vector space. Values of this type are
+/// elements in this vector space and have a dynamic shape.
+public protocol ShapedVectorNumeric : VectorNumeric {
+  /// The type whose values specifies the dimensionality of an object in the
+  /// vector space.
+  associatedtype Shape
+
+  /// Create an object in the vector space with the specified shape by filling
+  /// the object with the specified scalar value.
+  ///
+  /// - Parameters:
+  ///   - shape: the shape
+  ///   - repeatedValue: the value repeat for the specified shape
+  init(repeating repeatedValue: Scalar, shape: Shape)
 }
 
 /// A type that mathematically represents a differentiable manifold whose

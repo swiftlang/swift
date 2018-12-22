@@ -7,14 +7,9 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
 
   public typealias TangentVector = Vector
   public typealias Scalar = Float
-  public typealias Shape = ()
 
   public static var zero: Vector {
     return Vector(0)
-  }
-
-  public init(repeating repeatedValue: Float, shape: ()) {
-    self.init(repeatedValue)
   }
 
   public init(_ scalar: Float) {

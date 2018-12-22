@@ -22,9 +22,6 @@ extension DenseLayer : Differentiable, VectorNumeric {
   static var zero: DenseLayer {
     return DenseLayer(w: 0, b: 0)
   }
-  init(repeating r: Float, shape: ()) {
-    self.init(w: r, b: r)
-  }
   static func + (lhs: DenseLayer, rhs: DenseLayer) -> DenseLayer {
     return DenseLayer(w: lhs.w + rhs.w, b: lhs.b + rhs.b)
   }
@@ -57,11 +54,6 @@ extension Model : Differentiable, VectorNumeric {
   typealias Scalar = Float
   static var zero: Model {
     return Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: DenseLayer.zero)
-  }
-  init(repeating r: Float, shape: ()) {
-    self.init(l1: DenseLayer(repeating: r, shape: ()),
-              l2: DenseLayer(repeating: r, shape: ()),
-              l3: DenseLayer(repeating: r, shape: ()))
   }
   static func + (lhs: Model, rhs: Model) -> Model {
     return Model(l1: lhs.l1 + rhs.l1, l2: lhs.l2 + rhs.l2, l3: lhs.l3 + rhs.l3)

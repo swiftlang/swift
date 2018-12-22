@@ -13,11 +13,7 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equata
   public var nonTrivialStuff = NonTrivialStuff()
   public typealias TangentVector = Vector
   public typealias Scalar = Float
-  public typealias Shape = ()
   public static var zero: Vector { return Vector(0) }
-  public init(repeating repeatedValue: Float, shape: ()) {
-    self.init(repeatedValue)
-  }
   public init(_ scalar: Float) { self.x = scalar; self.y = scalar }
   @differentiable(reverse, adjoint: fakeAdj)
   public static func + (lhs: Vector, rhs: Vector) -> Vector { abort() }
