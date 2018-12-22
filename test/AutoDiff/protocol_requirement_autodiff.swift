@@ -25,10 +25,7 @@ extension DiffReq {
 
 struct Quadratic : DiffReq, Equatable {
   typealias TangentVector = Quadratic
-  typealias CoangentVector = Quadratic
-  func moved(toward q: Quadratic) -> Quadratic {
-    return Quadratic(a + q.a, b + q.b, c + q.c)
-  }
+  typealias CotangentVector = Quadratic
 
   let a, b, c: Float
   init(_ a: Float, _ b: Float, _ c: Float) {
@@ -42,13 +39,26 @@ struct Quadratic : DiffReq, Equatable {
   }
 }
 
+extension Quadratic : VectorNumeric {
+  static var zero: Quadratic { return Quadratic(0, 0, 0) }
+  static func + (lhs: Quadratic, rhs: Quadratic) -> Quadratic {
+    return Quadratic(lhs.a + rhs.a, lhs.b + rhs.b, lhs.c + rhs.c)
+  }
+  static func - (lhs: Quadratic, rhs: Quadratic) -> Quadratic {
+  return Quadratic(lhs.a + rhs.a, lhs.b + rhs.b, lhs.c + rhs.c)
+}
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: Quadratic) -> Quadratic {
+    return Quadratic(lhs * rhs.a, lhs * rhs.b, lhs * rhs.c)
+  }
+}
+
 ProtocolRequirementAutodiffTests.test("Trivial") {
   expectEqual((Quadratic(0, 0, 1), 12), Quadratic(11, 12, 13).gradF(at: 0))
   expectEqual((Quadratic(1, 1, 1), 2 * 11 + 12),
               Quadratic(11, 12, 13).gradF(at: 1))
   expectEqual((Quadratic(4, 2, 1), 2 * 11 * 2 + 12),
               Quadratic(11, 12, 13).gradF(at: 2))
-
 }
 
 runAllTests()
