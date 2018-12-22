@@ -5185,7 +5185,23 @@ Type SubscriptDecl::getElementInterfaceType() const {
   auto elementTy = getInterfaceType();
   if (elementTy->is<ErrorType>())
     return elementTy;
-  return elementTy->castTo<AnyFunctionType>()->getResult();
+  auto fnTy = elementTy->castTo<AnyFunctionType>();
+  auto resultTy = fnTy->getResult();
+
+  // Make sure we don't return a dependent type if the context is not
+  // actually generic.  This can only happen with subscripts because we're
+  // apparently somewhat eager to leave dependent types as dependent
+  // because of generic subscripts.
+  if (resultTy->hasTypeParameter()) {
+    auto genericFnTy = cast<GenericFunctionType>(fnTy);
+    auto sig = genericFnTy->getGenericSignature();
+    if (sig->areAllParamsConcrete()) {
+      // It's a bit unfortunate to canonicalize here.
+      return sig->getCanonicalTypeInContext(resultTy);
+    }
+  }
+
+  return resultTy;
 }
 
 void SubscriptDecl::computeType() {
