@@ -174,12 +174,12 @@ func PolyOptionable_specialized_cases(_ t: Int) {
 // tuple implosion were not deallocated in enum constructors.
 struct String { var ptr: Builtin.NativeObject }
 
-enum Foo { case A(P, String) }
+enum Foo { case a(P, String) }
 
-// Curry Thunk for Foo.A(_:)
+// Curry Thunk for Foo.a(_:)
 //
-// CHECK-LABEL: sil shared [transparent] [thunk] @$ss3FooO1AyABs1P_p_SStcABmF
-// CHECK:         [[FN:%.*]] = function_ref @$ss3FooO1AyABs1P_p_SStcABmF
+// CHECK-LABEL: sil shared [transparent] [thunk] @$ss3FooO1ayABs1P_p_SStcABmF
+// CHECK:         [[FN:%.*]] = function_ref @$ss3FooO1ayABs1P_p_SStcABmF
 // CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[CANONICAL_THUNK_FN:%.*]] = function_ref @$ss1P_pSSs3FooOIegixr_sAA_pSSACIegngr_TR : $@convention(thin) (@in_guaranteed P, @guaranteed String, @guaranteed @callee_guaranteed (@in P, @owned String) -> @out Foo) -> @out Foo
@@ -187,20 +187,20 @@ enum Foo { case A(P, String) }
 // CHECK-NEXT:    return [[CANONICAL_THUNK]]
 // CHECK-NEXT:  }
 
-// Foo.A(_:)
-// CHECK-LABEL: sil shared [transparent] @$ss3FooO1AyABs1P_p_SStcABmF
-// CHECK: bb0([[ARG0:%.*]] : @trivial $*Foo, [[ARG1:%.*]] : @trivial $*P, [[ARG2:%.*]] : @owned $String, [[ARG3:%.*]] : @trivial $@thin Foo.Type):
-// CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr [[ARG0]] : $*Foo, #Foo.A!enumelt.1
+// Foo.a(_:)
+// CHECK-LABEL: sil shared [transparent] @$ss3FooO1ayABs1P_p_SStcABmF
+// CHECK: bb0([[ARG0:%.*]] : $*Foo, [[ARG1:%.*]] : $*P, [[ARG2:%.*]] : @owned $String, [[ARG3:%.*]] : $@thin Foo.Type):
+// CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr [[ARG0]] : $*Foo, #Foo.a!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
 // CHECK-NEXT:    copy_addr [take] [[ARG1]] to [initialization] [[LEFT]] : $*P
 // CHECK-NEXT:    store [[ARG2]] to [init] [[RIGHT]]
-// CHECK-NEXT:    inject_enum_addr [[ARG0]] : $*Foo, #Foo.A!enumelt.1
+// CHECK-NEXT:    inject_enum_addr [[ARG0]] : $*Foo, #Foo.a!enumelt.1
 // CHECK:         return
-// CHECK-NEXT:  } // end sil function '$ss3FooO1AyABs1P_p_SStcABmF'
+// CHECK-NEXT:  } // end sil function '$ss3FooO1ayABs1P_p_SStcABmF'
 
 func Foo_cases() {
-  _ = Foo.A
+  _ = Foo.a
 }
 
 enum Indirect<T> {
