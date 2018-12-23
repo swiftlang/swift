@@ -20,6 +20,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/YAMLTraits.h"
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -350,6 +351,33 @@ enum class NodeKind {
 const std::string NodeKindNames[]{
     "topLevel",      "nominal",        "potentialMember",  "member",
     "dynamicLookup", "externalDepend", "sourceFileProvide"};
+} // namespace experimental_dependencies
+} // namespace swift
+  
+  namespace llvm {
+    namespace yaml {
+      
+      template <>
+      struct ScalarEnumerationTraits<swift::experimental_dependencies::NodeKind> {
+        static void enumeration(IO &io, swift::experimental_dependencies::NodeKind &value) {
+          using NodeKind = swift::experimental_dependencies::NodeKind;
+          io.enumCase(value, "topLevel",          NodeKind::topLevel);
+          io.enumCase(value, "nominal",           NodeKind::nominal);
+          io.enumCase(value, "potentialMember",   NodeKind::potentialMember);
+          io.enumCase(value, "member",            NodeKind::member);
+          io.enumCase(value, "dynamicLookup",     NodeKind::dynamicLookup);
+          io.enumCase(value, "externalDepend",    NodeKind::externalDepend);
+          io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
+        }
+      };
+     } // namespace yaml
+  } // namespace llvm
+  
+  
+  
+  
+namespace swift {
+  namespace experimental_dependencies {
 
 /// Instead of the status quo scheme of two kinds of "Depends", cascading and
 /// non-cascading this code represents each entity ("Provides" in the status
@@ -369,6 +397,30 @@ template <typename FnT> void forEachAspect(FnT fn) {
   for (size_t i = 0; i < size_t(DeclAspect::aspectCount); ++i)
     fn(DeclAspect(i));
 }
+    
+  } // namespace experimental_dependencies
+} // namespace swift
+
+namespace llvm {
+  namespace yaml {
+    
+    template <>
+    struct ScalarEnumerationTraits<swift::experimental_dependencies::DeclAspect> {
+      static void enumeration(IO &io, swift::experimental_dependencies::DeclAspect &value) {
+        using DeclAspect = swift::experimental_dependencies::DeclAspect;
+        io.enumCase(value, "interface",       DeclAspect::interface);
+        io.enumCase(value, "implementation",  DeclAspect::implementation);
+      }
+    };
+  } // namespace yaml
+} // namespace llvm
+
+
+
+
+namespace swift {
+  namespace experimental_dependencies {
+
 
 /// A pair of nodes that represent the two aspects of a given entity.
 /// Templated in order to serve for either SourceFileDepGraphNodes or
@@ -412,6 +464,9 @@ public:
 /// nodes representing uses of that entity, even though the node may not really
 /// use the entity. For example, argument names of functions are ignored.
 class DependencyKey {
+  // For import/export
+  friend ::llvm::yaml::MappingTraits<DependencyKey>;
+  
   NodeKind kind;
   DeclAspect aspect;
   /// The mangled context type name of the holder for \ref potentialMember, \ref
@@ -510,6 +565,7 @@ private:
 } // namespace experimental_dependencies
 } // namespace swift
 
+
 template <>
 struct std::hash<typename swift::experimental_dependencies::DependencyKey> {
   size_t
@@ -524,6 +580,21 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
     return size_t(aspect);
   }
 };
+
+namespace llvm {
+  namespace yaml {
+    
+   template <>
+    struct MappingTraits<swift::experimental_dependencies::DependencyKey> {
+      static void mapping(IO &io, swift:: experimental_dependencies::DependencyKey &key) {
+        io.mapRequired("kind", key.kind);
+        io.mapRequired("aspect", key.aspect);
+        io.mapRequired("context", key.context);
+        io.mapRequired("name", key.name);
+      }
+    };
+  } // namespace yaml
+} // namespace llvm
 
 //==============================================================================
 // MARK: DepGraphNode
@@ -573,6 +644,8 @@ class DepGraphNode {
   /// If more than one source file has the same DependencyKey, then there
   /// will be one node for each in the driver.
   Optional<std::string> swiftDeps;
+  
+  friend ::llvm::yaml::MappingTraits<DepGraphNode>;
 
 public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
@@ -647,11 +720,28 @@ private:
   bool ensureThatTheFingerprintIsValidForSerialization() const;
   bool ensureThatTheSwiftDepsIsValidForSerialization() const;
 };
+} // namespace experimental_dependencies
+} // namespace swift
+
+namespace llvm {
+  namespace yaml {
+    
+    template <>
+    struct MappingTraits<swift::experimental_dependencies::DepGraphNode> {
+      static void mapping(IO &io,swift:: experimental_dependencies::DepGraphNode &node) {
+        io.mapRequired("key", node.key);
+        io.mapOptional("fingerprint", node.fingerprint);
+        io.mapOptional("swiftDeps", node.swiftDeps);
+      }
+    };
+  } // namespace yaml
+} // namespace llvm
 
 //==============================================================================
 // MARK: SourceFileDepGraphNode
 //==============================================================================
-
+namespace swift {
+  namespace experimental_dependencies {
 class SourceFileDepGraph;
 
 /// A node in a graph that represents the dependencies computed when compiling a
@@ -668,6 +758,8 @@ class SourceFileDepGraphNode : public DepGraphNode {
 
   /// Holds the sequence numbers of my uses.
   std::unordered_set<size_t> usesOfMe;
+  
+  friend ::llvm::yaml::MappingTraits<SourceFileDepGraphNode>;
 
 public:
   /// When the driver imports a node create an uninitialized instance for
@@ -716,12 +808,50 @@ public:
 
   void dump() const { DepGraphNode::dump(); }
 };
-
+  } // namespace experimental_dependencies
+} // namespace swift
+  
+  namespace llvm {
+    namespace yaml {
+      
+      template<>
+      struct ScalarTraits<size_t> {
+        static void output(const size_t &Val, void*, llvm::raw_ostream &out) {
+          out << Val;
+        }
+        static StringRef input(StringRef scalar, void *ctxt, size_t &value) {
+          return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
+        }
+        static QuotingType mustQuote(StringRef) { return QuotingType::None; }
+      };
+      
+      template <>
+      struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraphNode> {
+        using SourceFileDepGraphNode = swift:: experimental_dependencies::SourceFileDepGraphNode;
+        using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
+        
+        static void mapping(IO &io, SourceFileDepGraphNode &node) {
+          MappingTraits<DepGraphNode>::mapping(io, node);
+          io.mapRequired("sequenceNumber", node.sequenceNumber);
+          std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
+          io.mapRequired("usesOfMe", usesOfMeVec);
+          if (!io.outputting())
+            for (size_t u: usesOfMeVec)
+              node.usesOfMe.insert(u);
+        }
+      };
+    } // namespace yaml
+  } // namespace llvm
+  
+  
 //==============================================================================
 // MARK: SourceFileDepGraph
 //==============================================================================
 
-/// The dependency graph produced by the frontend and consumed by the driver.
+  namespace swift {
+    namespace experimental_dependencies {
+      
+      /// The dependency graph produced by the frontend and consumed by the driver.
 /// See \ref Node in ExperimentalDependencies.h
 class SourceFileDepGraph {
   /// Every node in the graph. Indices used for serialization.
@@ -736,6 +866,8 @@ class SourceFileDepGraph {
   /// In addition, when the driver deserializes SourceFileDepGraphs,
   /// this object ensures that the frontend memoized correctly.
   Memoizer<DependencyKey, SourceFileDepGraphNode *> memoizedNodes;
+  
+  friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
 
 public:
   /// For templates such as DotFileEmitter.
@@ -835,6 +967,47 @@ private:
       llvm::MemoryBuffer &,
       function_ref<void(SourceFileDepGraphNode *)> nodeCallback);
 };
+    } // namespace experimental_dependencies
+  } // namespace swift
+
+namespace llvm {
+  namespace yaml {
+    
+//    template <>
+//    struct SequenceTraits<std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *> > {
+//      using Vec = std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>;
+//      using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
+//      static size_t size(IO &io, Vec &vec) {
+//        return vec.size();
+//      }
+//      static SourceFileDepGraphNode*& element(IO &, Vec &vec, size_t index) {
+//        return vec[index];
+//      }
+//    };
+#error ownership and seq num check and memo check
+    template <>
+    struct SequenceTraits<swift::experimental_dependencies::SourceFileDepGraph> {
+      using SourceFileDepGraph = swift::experimental_dependencies::SourceFileDepGraph;
+      using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
+      static size_t size(IO *io, SourceFileDepGraph &seq) {
+        return seq.allNodes.size();
+      }
+      static SourceFileDepGraphNode& element(IO &io, SourceFileDepGraph &g, size_t index) {
+        return *g.allNodes[index];
+      }
+      static const bool flow = false;
+//      static void mapping(IO &io, swift::experimental_dependencies::SourceFileDepGraph &g) {
+//        io.mapRequired("allNodes", g.allNodes);
+//        // CHECK memoizedNodes
+//      }
+    };
+    
+    //qqq
+  } // namespace yaml
+} // namespace llvm
+
+namespace swift {
+  namespace experimental_dependencies {
 
 //==============================================================================
 // MARK: DotFileEmitter
