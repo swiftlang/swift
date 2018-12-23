@@ -427,10 +427,10 @@ int main(int argc, char **argv) {
       llvm::errs() << EC.message() << '\n';
       return 1;
     }
-    CI.getSILModule()->setOptRecordStream(
-        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
-                                              &CI.getSourceMgr()),
-        std::move(OptRecordFile));
+    auto Stream = llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+                                                        &CI.getSourceMgr());
+    CI.getSILModule()->setOptRecordStream(std::move(Stream),
+                                          std::move(OptRecordFile));
   }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {
