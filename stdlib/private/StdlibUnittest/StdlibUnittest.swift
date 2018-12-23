@@ -1029,6 +1029,8 @@ class _ParentProcess {
                               omittingEmptySubsequences: false)
         switch controlMessage[1] {
         case "expectCrash":
+          fallthrough
+        case "expectCrash\r":
           if isStdout {
             stdoutSeenCrashDelimiter = true
             anyExpectFailedInChild = controlMessage[2] == "true"
@@ -1037,6 +1039,8 @@ class _ParentProcess {
             expectingPreCrashMessage = String(controlMessage[2])
           }
         case "end":
+          fallthrough
+        case "end\r":
           if isStdout {
             stdoutEnd = true
             anyExpectFailedInChild = controlMessage[2] == "true"
