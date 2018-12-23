@@ -565,6 +565,7 @@ public:
 
   /// Convert to- or from- another format via the argument functions.
   /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
+  /// Only used when *not* using YAMLTraits
   void serializeOrDeserialize(function_ref<void(size_t &)> convertInt,
                               function_ref<void(std::string &)> convertString) {
     size_t k = size_t(kind);
@@ -745,13 +746,16 @@ public:
 protected:
   /// Convert to- or from- another format via the argument functions.
   /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
+  /// Only used when *not* using YAMLTraits
   void serializeOrDeserialize(
       function_ref<void(size_t &)> convertInt,
       function_ref<void(std::string &)> convertString,
       function_ref<void(Optional<std::string> &)> convertOptionalString);
 
 private:
+  /// Only used when *not* using YAMLTraits
   bool ensureThatTheFingerprintIsValidForSerialization() const;
+  /// Only used when *not* using YAMLTraits
   bool ensureThatTheSwiftDepsIsValidForSerialization() const;
 };
 } // namespace experimental_dependencies
@@ -834,6 +838,7 @@ public:
   /// Used by the frontend to export nodes to a swiftdeps file, and used by the
   /// driver to import them. The argument functions either read or write the
   /// instance variables as required.
+  /// Only used when *not* using YAMLTraits
   void serializeOrDeserialize(
       function_ref<void(size_t &)> convertInt,
       function_ref<void(std::string &)> convertString,
@@ -871,18 +876,16 @@ class SourceFileDepGraph {
   /// name-lookup ("Depend") or a Decl ("Provide") whose node would be
   /// indistinguishable from a node it has already constructed. So it memoizes
   /// those nodes, reusing an existing node rather than creating a new one.
-  ///
-  /// In addition, when the driver deserializes SourceFileDepGraphs,
-  /// this object ensures that the frontend memoized correctly.
   Memoizer<DependencyKey, SourceFileDepGraphNode *> memoizedNodes;
-  
-  
+
 public:
+  
+  /// Experimenting with llvm::YAMLTraits for import/export; may be slower
+  constexpr static const bool useYAMLTraits = true;
+  
   /// For templates such as DotFileEmitter.
   using NodeType = SourceFileDepGraphNode;
   
-  friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>;
   friend ::llvm::yaml::MappingTraits<SourceFileDepGraph>;
 
 
@@ -934,6 +937,7 @@ public:
                                 Optional<std::string> swiftDeps);
 
   /// Add a node to a SourceFileDepGraph that the Driver is reading.
+/// Only used when *not* using YAMLTraits
   void addDeserializedNode(SourceFileDepGraphNode *);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
@@ -970,6 +974,7 @@ private:
 
   /// Parse the swiftDeps file and invoke nodeCallback for each node.
   /// \returns true if had error.
+  /// Only used when *not* using YAMLTraits
   static bool parseDependencyFile(
       llvm::MemoryBuffer &,
       function_ref<void(SourceFileDepGraphNode *)> nodeCallback);
@@ -994,8 +999,7 @@ namespace llvm {
         io.mapRequired("sequenceNumber", node.sequenceNumber);
         std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
         io.mapRequired("usesOfMe", usesOfMeVec);
-        assert(node.sequenceNumber < g.allNodes.size());
-        assert(g.allNodes[node.sequenceNumber] == &node);
+        assert(g.getNode(node.sequenceNumber));
       }
     };
     
