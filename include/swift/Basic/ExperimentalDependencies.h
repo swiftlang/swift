@@ -890,6 +890,7 @@ public:
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
   friend ::llvm::yaml::MappingTraits<SourceFileDepGraph>;
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, bool>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, SourceFileDepNodeYAMLContext>;
 
 
   SourceFileDepGraph() = default;
@@ -1038,14 +1039,13 @@ namespace llvm {
     
     /// Top-level for the graph. Only real content is allNodes.
     template <>
-    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph, bool> {
+    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph, swift::experimental_dependencies::SourceFileDepNodeYAMLContext> {
       using SourceFileDepGraph = swift:: experimental_dependencies::SourceFileDepGraph;
       using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
       using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
       
-      static void mapping(IO &io, SourceFileDepGraph &g, bool &shouldAssertUniquenessWhenDeserializing) {
-        SourceFileDepNodeYAMLContext qqq;
-        io.mapRequired("allNodes", g.allNodes, qqq);
+      static void mapping(IO &io, SourceFileDepGraph &g, SourceFileDepNodeYAMLContext &ctx) {
+        io.mapRequired("allNodes", g.allNodes, ctx);
       }
     };
   

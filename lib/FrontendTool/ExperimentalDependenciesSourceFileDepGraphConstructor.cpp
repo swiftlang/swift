@@ -279,9 +279,10 @@ SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
                                    const bool shouldAssertUniquenessWhenDeserializing) {
   SourceFileDepGraph fg;
   SourceFileDepNodeYAMLContext context = std::make_pair(&fg, shouldAssertUniquenessWhenDeserializing); ///
-  bool qqq = shouldAssertUniquenessWhenDeserializing;
-  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), &qqq);
-  yamlReader >> fg;
+//  bool qqq = shouldAssertUniquenessWhenDeserializing;
+  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), &context);
+  if (yamlReader.setCurrentDocument())
+    yamlize(yamlReader, fg, true, context);
   return yamlReader.error() ? None : Optional<SourceFileDepGraph>(std::move(fg));
 //qqq  auto nodeCallback = [&fg, shouldAssertUniquenessWhenDeserializing](SourceFileDepGraphNode *n) {
 //    fg.addDeserializedNode(n, shouldAssertUniquenessWhenDeserializing);
@@ -817,7 +818,14 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
         bool qqq;
-        llvm::yaml::Output yamlWriter (out, &qqq);
+        SourceFileDepNodeYAMLContext context; //qqq nullptr?
+        llvm::yaml::Output yamlWriter (out, &context);
+        yamlWriter.beginDocuments();
+        if (yamlWriter.preflightDocument(0)) {
+          yamlize(yamlWriter, g, true, context);
+          yamlWriter.postflightDocument();
+        }
+        yamlWriter.endDocuments();
         yamlWriter << g;
 //qqq        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
         return false;
