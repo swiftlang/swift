@@ -244,11 +244,12 @@ void NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>::
       [&](std::unordered_set<size_t> &s) { emitter.emitSetOfInts(s); });
 }
 
+///qqq remve later
 void SourceFileDepGraph::addDeserializedNode(SourceFileDepGraphNode *n,
-                                             const bool assertUniqueness) {
+                                             const bool shouldAssertUniquenessWhenDeserializing) {
   addNode(n);
   assert(getNode(allNodes.size() - 1)); // verify seq no.
-  if (assertUniqueness)
+  if (shouldAssertUniquenessWhenDeserializing)
     assert(memoizedNodes.insert(n->getKey(), n) &&
            "Frontend nodes are identified by sequence number, therefore must "
            "be unique.");
@@ -266,23 +267,26 @@ void DepGraphNode::serializeOrDeserialize(
 }
 
 Optional<SourceFileDepGraph>
-SourceFileDepGraph::loadFromPath(StringRef path, const bool assertUniqueness) {
-  auto buffer = llvm::MemoryBuffer::getFile(path);
-  if (!buffer)
+SourceFileDepGraph::loadFromPath(StringRef path, const bool shouldAssertUniquenessWhenDeserializing) {
+  auto bufferOrError = llvm::MemoryBuffer::getFile(path);
+  if (!bufferOrError)
     return None;
-  return loadFromBuffer(*buffer.get(), assertUniqueness);
+return loadFromBuffer(*bufferOrError.get(), shouldAssertUniquenessWhenDeserializing);
 }
 
 Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
-                                   const bool assertUniqueness) {
+                                   const bool shouldAssertUniquenessWhenDeserializing) {
   SourceFileDepGraph fg;
-  auto nodeCallback = [&fg, assertUniqueness](SourceFileDepGraphNode *n) {
-    fg.addDeserializedNode(n, assertUniqueness);
-  };
-
-  if (parseDependencyFile(buffer, nodeCallback))
-    return None;
+  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), const_cast<bool*>(&shouldAssertUniquenessWhenDeserializing));
+  yamlReader >> fg;
+  return yamlReader.error() ? None : Optional<SourceFileDepGraph>(std::move(fg));
+//qqq  auto nodeCallback = [&fg, shouldAssertUniquenessWhenDeserializing](SourceFileDepGraphNode *n) {
+//    fg.addDeserializedNode(n, shouldAssertUniquenessWhenDeserializing);
+//  };
+//
+//  if (parseDependencyFile(buffer, nodeCallback))
+//    return None;
   return std::move(fg);
 }
 
@@ -807,11 +811,13 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   llvm::sys::fs::rename(outputPath, outputPath + "~");
   SourceFileDepGraphConstructor gc(SF, depTracker, outputPath);
   SourceFileDepGraph g = gc.construct();
+ 
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g,
-                                                                           out)
-            .emit();
+        bool shouldAssertUniquenessWhenDeserializing = false;
+        llvm::yaml::Output yamlWriter (out, &shouldAssertUniquenessWhenDeserializing);
+        yamlWriter << g;
+//qqq        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
         return false;
       });
 

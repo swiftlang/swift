@@ -47,6 +47,10 @@
 // These include the graph structures common to both programs and also
 // the frontend graph, which must be read by the driver.
 
+//==============================================================================
+// MARK: Shorthands
+//==============================================================================
+
 namespace swift {
 class DependencyTracker;
 class DiagnosticEngine;
@@ -55,9 +59,6 @@ class SourceFile;
 
 /// Use a new namespace to help keep the experimental code from clashing.
 namespace experimental_dependencies {
-//==============================================================================
-// MARK: Shorthands
-//==============================================================================
 
 using StringVec = std::vector<std::string>;
 
@@ -71,11 +72,17 @@ using StringPairVec = PairVec<std::string, std::string>;
 template <typename First, typename Second>
 using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
 
+} // experimental_dependencies
+} // swift
+
 //==============================================================================
 // MARK: General Utility classes
 //==============================================================================
 
-/// operator<< is needed for TwoStageMap::verify:
+namespace swift {
+  namespace experimental_dependencies {
+
+    /// operator<< is needed for TwoStageMap::verify:
 class DependencyKey;
 raw_ostream &operator<<(raw_ostream &out, const DependencyKey &key);
 
@@ -307,23 +314,46 @@ private:
     return true;
   }
 };
+  } // experimental_dependencies
+} // swift
 
 // End of general declarations
 
 //==============================================================================
 // MARK: Start of experimental-dependency-specific code
 //==============================================================================
+namespace swift {
+  namespace experimental_dependencies {
 
 /// The entry point into this system from the frontend:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
-
+} // namespace experimental_dependencies
+} // namespace swift
 //==============================================================================
 // MARK: Enums
 //==============================================================================
+  
+  // Needed to YAMLize the following enums:
+  namespace llvm {
+    namespace yaml {
+      template<>
+      struct ScalarTraits<size_t> {
+        static void output(const size_t &Val, void*, llvm::raw_ostream &out) {
+          out << Val;
+        }
+        static StringRef input(StringRef scalar, void *ctxt, size_t &value) {
+          return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
+        }
+        static QuotingType mustQuote(StringRef) { return QuotingType::None; }
+      };
+    } // namespace yaml
+  } // namespace llvm
 
+namespace swift {
+  namespace experimental_dependencies {
 /// Encode the current sorts of dependencies as kinds of nodes in the dependency
 /// graph, splitting the current *member* into \ref member and \ref
 /// potentialMember and adding \ref sourceFileProvide.
@@ -353,7 +383,7 @@ const std::string NodeKindNames[]{
     "dynamicLookup", "externalDepend", "sourceFileProvide"};
 } // namespace experimental_dependencies
 } // namespace swift
-  
+
   namespace llvm {
     namespace yaml {
       
@@ -452,11 +482,15 @@ public:
     return ifCascades ? interface : implementation;
   }
 };
-
+  } // experimental_dependencies
+} // swift
 //==============================================================================
 // MARK: DependencyKey
 //==============================================================================
 
+namespace swift {
+  namespace experimental_dependencies {
+    
 /// The dependency system loses some precision by lumping entities together for
 /// the sake of simplicity. In the future, it might be finer-grained. The
 /// DependencyKey carries the information needed to find all uses from a def
@@ -732,7 +766,7 @@ namespace llvm {
         io.mapRequired("key", node.key);
         io.mapOptional("fingerprint", node.fingerprint);
         io.mapOptional("swiftDeps", node.swiftDeps);
-      }
+        }
     };
   } // namespace yaml
 } // namespace llvm
@@ -743,6 +777,10 @@ namespace llvm {
 namespace swift {
   namespace experimental_dependencies {
 class SourceFileDepGraph;
+    
+    /// For YAMLTraits
+    /// bool is shouldAssertUniquenessWhenDeserializing
+using SourceFileDepNodeYAMLContext = std::pair<SourceFileDepGraph*, bool>;
 
 /// A node in a graph that represents the dependencies computed when compiling a
 /// single primary source file. Each such node represents a definition. Such a
@@ -760,6 +798,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
   std::unordered_set<size_t> usesOfMe;
   
   friend ::llvm::yaml::MappingTraits<SourceFileDepGraphNode>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
 
 public:
   /// When the driver imports a node create an uninitialized instance for
@@ -813,33 +852,8 @@ public:
   
   namespace llvm {
     namespace yaml {
-      
-      template<>
-      struct ScalarTraits<size_t> {
-        static void output(const size_t &Val, void*, llvm::raw_ostream &out) {
-          out << Val;
-        }
-        static StringRef input(StringRef scalar, void *ctxt, size_t &value) {
-          return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
-        }
-        static QuotingType mustQuote(StringRef) { return QuotingType::None; }
-      };
-      
-      template <>
-      struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraphNode> {
-        using SourceFileDepGraphNode = swift:: experimental_dependencies::SourceFileDepGraphNode;
-        using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
-        
-        static void mapping(IO &io, SourceFileDepGraphNode &node) {
-          MappingTraits<DepGraphNode>::mapping(io, node);
-          io.mapRequired("sequenceNumber", node.sequenceNumber);
-          std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
-          io.mapRequired("usesOfMe", usesOfMeVec);
-          if (!io.outputting())
-            for (size_t u: usesOfMeVec)
-              node.usesOfMe.insert(u);
-        }
-      };
+      // MappingContextTraits specialization moved to after SourceFileDepGraph to support sequence number checking
+
     } // namespace yaml
   } // namespace llvm
   
@@ -867,11 +881,14 @@ class SourceFileDepGraph {
   /// this object ensures that the frontend memoized correctly.
   Memoizer<DependencyKey, SourceFileDepGraphNode *> memoizedNodes;
   
-  friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
-
+  
 public:
   /// For templates such as DotFileEmitter.
   using NodeType = SourceFileDepGraphNode;
+  
+  friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, const bool>;
 
   SourceFileDepGraph() = default;
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
@@ -921,11 +938,11 @@ public:
                                 Optional<std::string> swiftDeps);
 
   /// Add a node to a SourceFileDepGraph that the Driver is reading.
-  /// \p assertUniqueness adds extra checking if assertions are on.
+  /// \p shouldAssertUniquenessWhenDeserializing adds extra checking if assertions are on.
   /// Only turn on during verification in the frontend in order to save driver
   /// time.
   void addDeserializedNode(SourceFileDepGraphNode *,
-                           const bool assertUniqueness);
+                           const bool shouldAssertUniquenessWhenDeserializing);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
@@ -936,12 +953,12 @@ public:
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful.
   Optional<SourceFileDepGraph> static loadFromPath(StringRef,
-                                                   bool assertUniqueness);
+                                                   bool shouldAssertUniquenessWhenDeserializing);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
   Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &,
-                                                     bool assertUniqueness);
+                                                     bool shouldAssertUniquenessWhenDeserializing);
 
   void verifySame(const SourceFileDepGraph &other) const;
 
@@ -973,45 +990,72 @@ private:
 namespace llvm {
   namespace yaml {
     
-//    template <>
-//    struct SequenceTraits<std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *> > {
-//      using Vec = std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>;
-//      using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
-//      static size_t size(IO &io, Vec &vec) {
-//        return vec.size();
-//      }
-//      static SourceFileDepGraphNode*& element(IO &, Vec &vec, size_t index) {
-//        return vec[index];
-//      }
-//    };
-#error ownership and seq num check and memo check
+    // Moved here to allow the sequenceNumber checking
     template <>
-    struct SequenceTraits<swift::experimental_dependencies::SourceFileDepGraph> {
+    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraphNode,
+    swift::experimental_dependencies::SourceFileDepNodeYAMLContext> {
+      using SourceFileDepGraphNode = swift:: experimental_dependencies::SourceFileDepGraphNode;
+      using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
       using SourceFileDepGraph = swift::experimental_dependencies::SourceFileDepGraph;
-      using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
-      static size_t size(IO *io, SourceFileDepGraph &seq) {
-        return seq.allNodes.size();
+      using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
+      
+      static void mapping(IO &io, SourceFileDepGraphNode &node, SourceFileDepNodeYAMLContext &ctxt) {
+        MappingTraits<DepGraphNode>::mapping(io, node);
+        io.mapRequired("sequenceNumber", node.sequenceNumber);
+        std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
+        io.mapRequired("usesOfMe", usesOfMeVec);
+        if (!io.outputting()) {
+          SourceFileDepGraph &g = *ctxt.first;
+          bool shouldAssertUniquenessWhenDeserializing = ctxt.second;
+          assert(node.sequenceNumber < g.allNodes.size());
+          assert(g.allNodes[node.sequenceNumber] == &node);
+          if (shouldAssertUniquenessWhenDeserializing)
+            assert(g.memoizedNodes.insert(node.getKey(), &node) &&
+                   "Frontend nodes are identified by sequence number, therefore must "
+                   "be unique.");
+        }
       }
-      static SourceFileDepGraphNode& element(IO &io, SourceFileDepGraph &g, size_t index) {
-        return *g.allNodes[index];
-      }
-      static const bool flow = false;
-//      static void mapping(IO &io, swift::experimental_dependencies::SourceFileDepGraph &g) {
-//        io.mapRequired("allNodes", g.allNodes);
-//        // CHECK memoizedNodes
-//      }
     };
     
-    //qqq
+    template <>
+    struct SequenceTraits<std::vector<swift::experimental_dependencies::SourceFileDepGraphNode*>> {
+      using SourceFileDepGraph = swift::experimental_dependencies::SourceFileDepGraph;
+      using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
+      static size_t size(IO *io, std::vector<SourceFileDepGraphNode*> &vec) {
+        return vec.size();
+      }
+      static SourceFileDepGraphNode& element(IO &io, std::vector<SourceFileDepGraphNode*> &vec, size_t index) {
+        while (vec.size() <= index)
+          vec.push_back( new SourceFileDepGraphNode());
+        return *vec[index];
+      }
+      static const bool flow = false;
+    };
+    
+    
+    /// Top-level for the graph. Only real content is allNodes.
+    template <>
+    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph,
+    const bool> {
+      using SourceFileDepGraph = swift:: experimental_dependencies::SourceFileDepGraph;
+      using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
+      using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
+      
+      static void mapping(IO &io, SourceFileDepGraph &g, const bool &shouldAssertUniquenessWhenDeserializing) {
+        SourceFileDepNodeYAMLContext ctxt = std::make_pair(&g, shouldAssertUniquenessWhenDeserializing);
+        io.mapRequired("allNodes", g.allNodes, ctxt);
+      }
+    };
+  
   } // namespace yaml
 } // namespace llvm
 
-namespace swift {
-  namespace experimental_dependencies {
 
 //==============================================================================
 // MARK: DotFileEmitter
 //==============================================================================
+namespace swift {
+  namespace experimental_dependencies {
 
 /// To aid in debugging, both the SourceFileDepGraph and the ModuleDepGraph can
 /// be written out as dot files, which can be read into graphfiz and OmniGraffle
