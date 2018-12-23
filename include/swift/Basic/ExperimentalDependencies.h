@@ -778,10 +778,6 @@ namespace swift {
   namespace experimental_dependencies {
 class SourceFileDepGraph;
     
-    /// For YAMLTraits
-    /// bool is shouldAssertUniquenessWhenDeserializing
-using SourceFileDepNodeYAMLContext = std::pair<SourceFileDepGraph*, bool>;
-
 /// A node in a graph that represents the dependencies computed when compiling a
 /// single primary source file. Each such node represents a definition. Such a
 /// graph is always constructed monotonically; it never shrinks or changes once
@@ -797,8 +793,7 @@ class SourceFileDepGraphNode : public DepGraphNode {
   /// Holds the sequence numbers of my uses.
   std::unordered_set<size_t> usesOfMe;
   
-  friend ::llvm::yaml::MappingTraits<SourceFileDepGraphNode>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>;
 
 public:
   /// When the driver imports a node create an uninitialized instance for
@@ -887,10 +882,8 @@ public:
   using NodeType = SourceFileDepGraphNode;
   
   friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>;
   friend ::llvm::yaml::MappingTraits<SourceFileDepGraph>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, bool>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, SourceFileDepNodeYAMLContext>;
 
 
   SourceFileDepGraph() = default;
@@ -941,11 +934,7 @@ public:
                                 Optional<std::string> swiftDeps);
 
   /// Add a node to a SourceFileDepGraph that the Driver is reading.
-  /// \p shouldAssertUniquenessWhenDeserializing adds extra checking if assertions are on.
-  /// Only turn on during verification in the frontend in order to save driver
-  /// time.
-  void addDeserializedNode(SourceFileDepGraphNode *,
-                           const bool shouldAssertUniquenessWhenDeserializing);
+  void addDeserializedNode(SourceFileDepGraphNode *);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
@@ -955,13 +944,11 @@ public:
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
   /// successful.
-  Optional<SourceFileDepGraph> static loadFromPath(StringRef,
-                                                   bool shouldAssertUniquenessWhenDeserializing);
+  Optional<SourceFileDepGraph> static loadFromPath(StringRef);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
-  Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &,
-                                                     bool shouldAssertUniquenessWhenDeserializing);
+  Optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
 
   void verifySame(const SourceFileDepGraph &other) const;
 
@@ -997,27 +984,18 @@ namespace llvm {
     // Moved here to allow the sequenceNumber checking
     template <>
     struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraphNode,
-    swift::experimental_dependencies::SourceFileDepNodeYAMLContext> {
+    swift::experimental_dependencies::SourceFileDepGraph> {
       using SourceFileDepGraphNode = swift:: experimental_dependencies::SourceFileDepGraphNode;
       using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
       using SourceFileDepGraph = swift::experimental_dependencies::SourceFileDepGraph;
-      using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
       
-      static void mapping(IO &io, SourceFileDepGraphNode &node, SourceFileDepNodeYAMLContext &ctxt) {
+      static void mapping(IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
         MappingTraits<DepGraphNode>::mapping(io, node);
         io.mapRequired("sequenceNumber", node.sequenceNumber);
         std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
         io.mapRequired("usesOfMe", usesOfMeVec);
-        if (!io.outputting()) {
-          SourceFileDepGraph &g = *ctxt.first;
-          bool shouldAssertUniquenessWhenDeserializing = ctxt.second;
-          assert(node.sequenceNumber < g.allNodes.size());
-          assert(g.allNodes[node.sequenceNumber] == &node);
-          if (shouldAssertUniquenessWhenDeserializing)
-            assert(g.memoizedNodes.insert(node.getKey(), &node) &&
-                   "Frontend nodes are identified by sequence number, therefore must "
-                   "be unique.");
-        }
+        assert(node.sequenceNumber < g.allNodes.size());
+        assert(g.allNodes[node.sequenceNumber] == &node);
       }
     };
     
@@ -1039,13 +1017,11 @@ namespace llvm {
     
     /// Top-level for the graph. Only real content is allNodes.
     template <>
-    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph, swift::experimental_dependencies::SourceFileDepNodeYAMLContext> {
+    struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraph> {
       using SourceFileDepGraph = swift:: experimental_dependencies::SourceFileDepGraph;
-      using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
-      using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
       
-      static void mapping(IO &io, SourceFileDepGraph &g, SourceFileDepNodeYAMLContext &ctx) {
-        io.mapRequired("allNodes", g.allNodes, ctx);
+      static void mapping(IO &io, SourceFileDepGraph &g) {
+        io.mapRequired("allNodes", g.allNodes, g);
       }
     };
   

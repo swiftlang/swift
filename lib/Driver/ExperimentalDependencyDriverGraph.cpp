@@ -68,7 +68,7 @@ LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
                                           llvm::MemoryBuffer &buffer) {
 
   Optional<SourceFileDepGraph> sourceFileDepGraph =
-      SourceFileDepGraph::loadFromBuffer(buffer, false);
+      SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
     return DependencyGraphImpl::LoadResult::HadError;
   addIndependentNode(job);

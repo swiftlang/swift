@@ -151,7 +151,7 @@ bool SourceFileDepGraph::verify() const {
 }
 
 bool SourceFileDepGraph::verifyReadsWhatIsWritten(StringRef path) const {
-  auto loadedGraph = SourceFileDepGraph::loadFromPath(path, true);
+  auto loadedGraph = SourceFileDepGraph::loadFromPath(path);
   assert(loadedGraph.hasValue() &&
          "Should be able to read the exported graph.");
   verifySame(loadedGraph.getValue());
