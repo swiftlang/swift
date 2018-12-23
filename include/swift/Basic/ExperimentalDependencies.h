@@ -889,6 +889,8 @@ public:
   friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
   friend ::llvm::yaml::MappingTraits<SourceFileDepGraph>;
+  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, bool>;
+
 
   SourceFileDepGraph() = default;
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
@@ -990,6 +992,7 @@ private:
 namespace llvm {
   namespace yaml {
     
+    
     // Moved here to allow the sequenceNumber checking
     template <>
     struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraphNode,
@@ -1035,13 +1038,14 @@ namespace llvm {
     
     /// Top-level for the graph. Only real content is allNodes.
     template <>
-    struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraph> {
+    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph, bool> {
       using SourceFileDepGraph = swift:: experimental_dependencies::SourceFileDepGraph;
       using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
       using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
       
-      static void mapping(IO &io, SourceFileDepGraph &g) {
-        io.mapRequired("allNodes", g.allNodes);
+      static void mapping(IO &io, SourceFileDepGraph &g, bool &shouldAssertUniquenessWhenDeserializing) {
+        SourceFileDepNodeYAMLContext qqq;
+        io.mapRequired("allNodes", g.allNodes, qqq);
       }
     };
   
