@@ -90,7 +90,7 @@ static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
 
 #  define SWIFT_THREAD_KEY_CREATE _stdlib_thread_key_create
 #  define SWIFT_THREAD_GETSPECIFIC FlsGetValue
-#  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == TRUE)
+#  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == FALSE)
 
 # else
 // Otherwise use the pthread API.
