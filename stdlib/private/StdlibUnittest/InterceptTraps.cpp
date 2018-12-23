@@ -19,6 +19,7 @@
 #if defined(_WIN32)
 #include <io.h>
 #include <process.h>
+#include <stdlib.h>
 #endif
 
 #include "swift/Runtime/Config.h"
@@ -49,6 +50,10 @@ SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 void installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
   setbuf(stdout, 0);
+
+#if defined(_WIN32)
+  _set_abort_behavior(1, _WRITE_ABORT_MSG);
+#endif
 
   signal(SIGILL,  CrashCatcher);
   signal(SIGABRT, CrashCatcher);
