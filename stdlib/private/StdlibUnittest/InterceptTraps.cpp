@@ -20,6 +20,8 @@
 #include <io.h>
 #include <process.h>
 #include <stdlib.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #endif
 
 #include "swift/Runtime/Config.h"
@@ -46,6 +48,23 @@ static void CrashCatcher(int Sig) {
   _exit(0);
 }
 
+#if defined(_WIN32)
+static LONG WINAPI
+VectoredCrashHandler(PEXCEPTION_POINTERS ExceptionInfo) {
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+  case EXCEPTION_ILLEGAL_INSTRUCTION:
+    _write(_fileno(stderr), "CRASHED: SIGTRAP\n", 17);
+    _exit(0);
+
+  case EXCEPTION_DATATYPE_MISALIGNMENT:
+    _write(_fileno(stderr), "CRASHED: SIGBUS\n", 16);
+    _exit(0);
+  }
+
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
 SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 void installTrapInterceptor() {
   // Disable buffering on stdout so that everything is printed before crashing.
@@ -59,7 +78,9 @@ void installTrapInterceptor() {
   signal(SIGABRT, CrashCatcher);
   signal(SIGFPE,  CrashCatcher);
   signal(SIGSEGV, CrashCatcher);
-#if !defined(_WIN32)
+#if defined(_WIN32)
+  AddVectoredExceptionHandler(TRUE, VectoredCrashHandler);
+#else
   signal(SIGTRAP, CrashCatcher);
   signal(SIGBUS,  CrashCatcher);
   signal(SIGSYS,  CrashCatcher);
