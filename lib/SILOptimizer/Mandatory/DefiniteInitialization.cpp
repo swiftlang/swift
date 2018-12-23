@@ -929,12 +929,13 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       // a diagnostic.
       if (!shouldEmitError(Use.Inst))
         continue;
-      
+
       std::string PropertyName;
       auto *VD = TheMemory.getPathStringToElement(i, PropertyName);
       diagnose(Module, Use.Inst->getLoc(),
-               diag::immutable_property_already_initialized, PropertyName);
-      
+               diag::immutable_property_already_initialized,
+               StringRef(PropertyName));
+
       if (auto *Var = dyn_cast<VarDecl>(VD)) {
         if (Var->getParentInitializer())
           diagnose(Module, SILLocation(VD),
@@ -1089,7 +1090,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 
     std::string PropertyName;
     auto VD = TheMemory.getPathStringToElement(i, PropertyName);
-    
+
     // Try to produce a specific error message about the inout use.  If this is
     // a call to a method or a mutating property access, indicate that.
     // Otherwise, we produce a generic error.
@@ -1154,15 +1155,15 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
                  : diag::using_mutating_accessor_on_immutable_value,
                accessor->getStorage()->getBaseName(),
                isa<SubscriptDecl>(accessor->getStorage()),
-               PropertyName);
+               StringRef(PropertyName));
     } else if (FD && FD->isOperator()) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*operator*/ 1, PropertyName);
+               FD->getName(), /*operator*/ 1, StringRef(PropertyName));
     } else if (FD && isSelfParameter) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               FD->getName(), /*method*/ 0, PropertyName);
+               FD->getName(), /*method*/ 0, StringRef(PropertyName));
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::assignment_to_immutable_value, StringRef(PropertyName));
