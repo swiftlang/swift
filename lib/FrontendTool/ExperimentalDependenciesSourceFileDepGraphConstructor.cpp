@@ -104,8 +104,8 @@ namespace yaml = llvm::yaml;
 
 /// YAML-specific logic to parse SourceFileDepGraphs.
 /// Just a sequence of nodes.
-  /// Only used when *not* using YAMLTraits
-  class YAMLSourceFileDepGraphParser {
+/// Only used when *not* using YAMLTraits
+class YAMLSourceFileDepGraphParser {
 private:
   llvm::MemoryBuffer &inputBuffer;
 
@@ -207,8 +207,8 @@ namespace {
 /// Emits a graph, one entry per node
 /// Emitter is templated so that maybe it could be a JSON emitter someday, for
 /// instance.
-  ///
-  /// Only used when *not* using YAMLTraits
+///
+/// Only used when *not* using YAMLTraits
 template <typename Emitter> class NodeByNodeSourceFileDepGraphEmitter {
 private:
   /// The graph to emit.
@@ -264,12 +264,11 @@ void DepGraphNode::serializeOrDeserialize(
   assert(ensureThatTheSwiftDepsIsValidForSerialization());
 }
 
-Optional<SourceFileDepGraph>
-SourceFileDepGraph::loadFromPath(StringRef path) {
+Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
   if (!bufferOrError)
     return None;
-return loadFromBuffer(*bufferOrError.get());
+  return loadFromBuffer(*bufferOrError.get());
 }
 
 Optional<SourceFileDepGraph>
@@ -280,13 +279,12 @@ SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
     yamlReader >> fg;
     if (yamlReader.error())
       return None;
-  }
-  else {
+  } else {
     auto nodeCallback = [&fg](SourceFileDepGraphNode *n) {
       fg.addDeserializedNode(n);
     };
-  if ( parseDependencyFile(buffer, nodeCallback))
-    return None;
+    if (parseDependencyFile(buffer, nodeCallback))
+      return None;
   }
   return fg;
 }
@@ -305,7 +303,6 @@ bool SourceFileDepGraph::parseDependencyFile(
     nodeCallback(n);
   });
 }
-
 
 void SourceFileDepGraphNode::serializeOrDeserialize(
     function_ref<void(size_t &)> convertInt,
@@ -813,16 +810,18 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   llvm::sys::fs::rename(outputPath, outputPath + "~");
   SourceFileDepGraphConstructor gc(SF, depTracker, outputPath);
   SourceFileDepGraph g = gc.construct();
- 
-  const bool hadError = withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-    if (SourceFileDepGraph::useYAMLTraits) {
-      llvm::yaml::Output yamlWriter(out);
-      yamlWriter << g;
-    }
-    else
-      NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
-    return false;
-  });
+
+  const bool hadError =
+      withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+        if (SourceFileDepGraph::useYAMLTraits) {
+          llvm::yaml::Output yamlWriter(out);
+          yamlWriter << g;
+        } else
+          NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(
+              g, out)
+              .emit();
+        return false;
+      });
 
   assert(g.verifyReadsWhatIsWritten(outputPath));
 
