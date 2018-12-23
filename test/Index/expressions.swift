@@ -45,3 +45,11 @@ func test1() { // CHECK: [[@LINE]]:6 | function/Swift | test1() | [[test1_USR:.*
     }
   }
 }
+
+@available(*, unavailable, renamed: "test")
+func test2(_ o: S1?) {
+    // CHECK: [[@LINE-1]]:6 | function/Swift | test2(_:) | {{.*}} | Def
+    // CHECK: [[@LINE-2]]:17 | struct/Swift | S1 | [[S1_USR]] | Ref
+    test(o)
+    // CHECK: [[@LINE-1]]:5 | function/Swift | test(_:) | {{.*}} | Ref
+}
