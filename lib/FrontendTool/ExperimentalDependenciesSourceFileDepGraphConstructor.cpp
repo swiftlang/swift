@@ -278,7 +278,8 @@ Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer,
                                    const bool shouldAssertUniquenessWhenDeserializing) {
   SourceFileDepGraph fg;
-  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), const_cast<bool*>(&shouldAssertUniquenessWhenDeserializing));
+  SourceFileDepNodeYAMLContext context = std::make_pair(&fg, shouldAssertUniquenessWhenDeserializing);
+  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), &context);
   yamlReader >> fg;
   return yamlReader.error() ? None : Optional<SourceFileDepGraph>(std::move(fg));
 //qqq  auto nodeCallback = [&fg, shouldAssertUniquenessWhenDeserializing](SourceFileDepGraphNode *n) {
@@ -814,8 +815,7 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
  
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        bool shouldAssertUniquenessWhenDeserializing = false;
-        llvm::yaml::Output yamlWriter (out, &shouldAssertUniquenessWhenDeserializing);
+        llvm::yaml::Output yamlWriter (out, nullptr);
         yamlWriter << g;
 //qqq        NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(g, out).emit();
         return false;

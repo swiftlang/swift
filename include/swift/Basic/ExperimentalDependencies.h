@@ -888,7 +888,7 @@ public:
   
   friend ::llvm::yaml::SequenceTraits<SourceFileDepGraph>;
   friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraphNode, SourceFileDepNodeYAMLContext>;
-  friend ::llvm::yaml::MappingContextTraits<SourceFileDepGraph, const bool>;
+  friend ::llvm::yaml::MappingTraits<SourceFileDepGraph>;
 
   SourceFileDepGraph() = default;
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
@@ -1021,10 +1021,10 @@ namespace llvm {
     struct SequenceTraits<std::vector<swift::experimental_dependencies::SourceFileDepGraphNode*>> {
       using SourceFileDepGraph = swift::experimental_dependencies::SourceFileDepGraph;
       using SourceFileDepGraphNode = swift::experimental_dependencies::SourceFileDepGraphNode;
-      static size_t size(IO *io, std::vector<SourceFileDepGraphNode*> &vec) {
+      static size_t size(IO &, std::vector<SourceFileDepGraphNode*> &vec) {
         return vec.size();
       }
-      static SourceFileDepGraphNode& element(IO &io, std::vector<SourceFileDepGraphNode*> &vec, size_t index) {
+      static SourceFileDepGraphNode& element(IO &, std::vector<SourceFileDepGraphNode*> &vec, size_t index) {
         while (vec.size() <= index)
           vec.push_back( new SourceFileDepGraphNode());
         return *vec[index];
@@ -1035,15 +1035,13 @@ namespace llvm {
     
     /// Top-level for the graph. Only real content is allNodes.
     template <>
-    struct MappingContextTraits<swift::experimental_dependencies::SourceFileDepGraph,
-    const bool> {
+    struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraph> {
       using SourceFileDepGraph = swift:: experimental_dependencies::SourceFileDepGraph;
       using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
       using SourceFileDepNodeYAMLContext = swift::experimental_dependencies::SourceFileDepNodeYAMLContext;
       
-      static void mapping(IO &io, SourceFileDepGraph &g, const bool &shouldAssertUniquenessWhenDeserializing) {
-        SourceFileDepNodeYAMLContext ctxt = std::make_pair(&g, shouldAssertUniquenessWhenDeserializing);
-        io.mapRequired("allNodes", g.allNodes, ctxt);
+      static void mapping(IO &io, SourceFileDepGraph &g) {
+        io.mapRequired("allNodes", g.allNodes);
       }
     };
   
