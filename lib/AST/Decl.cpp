@@ -5101,6 +5101,14 @@ ParamDecl::getDefaultValueStringRepresentation(
     auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
     if (!existing.empty())
       return existing;
+
+    if (!getDefaultValue()) {
+      // TypeChecker::checkDefaultArguments() nulls out the default value
+      // if it fails to type check it. This only seems to happen with an
+      // invalid/incomplete parameter list that contains a parameter with an
+      // unresolved default value.
+      return "<<empty>>";
+    }
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
