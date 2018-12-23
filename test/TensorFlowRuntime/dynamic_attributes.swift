@@ -404,4 +404,15 @@ DynamicAttributeTests.testAllBackends("ShapeAttribute TensorShape? nil") {
   expectEqual(t, result)
 }
 
+// A tensor typed attribute with a scalar string value  
+DynamicAttributeTests.testAllBackends("StringTensorAttribute SR-9555") {
+  func foo() {
+    _ = StringTensor("string")
+  }
+
+  withDevice(.cpu) {
+    foo()
+  }
+}
+
 runAllTests()

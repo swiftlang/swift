@@ -49,6 +49,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "tensorflow/c/c_api.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
@@ -2671,9 +2673,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         assert(0 && "dtype attr must have been processed!");
       }
 
-      if (attr.value.getKind() == SymbolicValue::String)
-        assert(0 && "TODO: support string typed tensor attr.");
-
       auto addScalar = [&](SymbolicValue value,
                            SmallVectorImpl<SymbolicValue> &elements) -> bool {
         value = value.lookThroughSingleElementAggregates();
@@ -2686,6 +2685,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       SmallVector<SymbolicValue, 4> elements;
       bool isFloat = false;
       SmallVector<int64_t, 4> shape;
+      llvm::Value *tensor = nullptr;
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
       auto attrValue = attr.value.lookThroughSingleElementAggregates();
@@ -2695,6 +2695,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         isFloat = (attrValue.getKind() == SymbolicValue::Float);
         if (addScalar(attrValue, elements))
           assert(0 && "Bad scalar value for tensor attr.");
+
+        if (attrValue.getKind() == SymbolicValue::String) {
+          auto str = attrValue.getStringValue();
+          auto strVal = IGM.getAddrOfGlobalString(str);
+          auto strLen = llvm::ConstantInt::get(IGM.Int32Ty, str.size());
+          auto *createTensorFn = IGM.getTFC_CreateScalarStringTensorFn();
+          tensor = Builder.CreateCall(createTensorFn, {strVal, strLen, status});
+        }
       } else {
         // Add all the elements to the elements list.
         CanType eltType;
@@ -2706,8 +2714,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         LLVM_DEBUG(llvm::dbgs()
                    << "The elt dtype of tensor-typed attr is " << eltType
                    << ", with tfDtype = " << tfDtype << ".\n");
-        // 1 means TF_FLOAT.
-        isFloat = tfDtype == 1;
+        isFloat = tfDtype == TF_FLOAT;
+
+        // String tensors are usually to represent metadata like file names in a
+        // dataset TF op, so scalar tensor support above should be sufficient.
+        assert(tfDtype != TF_STRING && "Only support scalar string tensors.");
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = i->getAttribute(nextAttributeNumber++).value;
@@ -2719,45 +2730,49 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       // Create llvm values for elements and shape, and then call
       // swift_tfc_CreateIntTensor() or swift_tfc_CreateFloatTensor().
-      Address tensorEltVals;
-      createArrayAndSize<SymbolicValue>(
-          elements, isFloat ? IGM.FloatTy : IGM.Int64Ty, "tensorEltVals",
-          [&](SymbolicValue elt) {
-            return isFloat ? llvm::ConstantFP::get(
-                                 IGM.FloatTy,
-                                 (double)elt.getFloatValue().convertToFloat())
-                           : llvm::ConstantInt::get(IGM.Int64Ty,
-                                                    elt.getIntegerValue()
-                                                        .sextOrTrunc(64)
-                                                        .getLimitedValue());
-          },
-          tensorEltVals);
+      if (!tensor) {
+        Address tensorEltVals;
+        createArrayAndSize<SymbolicValue>(
+            elements, isFloat ? IGM.FloatTy : IGM.Int64Ty, "tensorEltVals",
+            [&](SymbolicValue elt) {
+              return isFloat ? llvm::ConstantFP::get(
+                                   IGM.FloatTy,
+                                   (double)elt.getFloatValue().convertToFloat())
+                             : llvm::ConstantInt::get(IGM.Int64Ty,
+                                                      elt.getIntegerValue()
+                                                          .sextOrTrunc(64)
+                                                          .getLimitedValue());
+            },
+            tensorEltVals);
 
-      // Create the LLVM values representing shape.
-      Address dimVals;
-      llvm::Value *numDims = createArrayAndSize<int64_t>(
-          shape, IGM.Int64Ty, "dimVals",
-          [&](int64_t elt) { return llvm::ConstantInt::get(IGM.Int64Ty, elt); },
-          dimVals);
+        // Create the LLVM values representing shape.
+        Address dimVals;
+        llvm::Value *numDims = createArrayAndSize<int64_t>(
+            shape, IGM.Int64Ty, "dimVals",
+            [&](int64_t elt) {
+              return llvm::ConstantInt::get(IGM.Int64Ty, elt);
+            },
+            dimVals);
 
-      auto dimValsUntyped =
-          Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
-      auto tensorEltValsUntyped =
-          Builder.CreateBitCast(tensorEltVals.getAddress(), IGM.Int8PtrTy);
-      llvm::Value *tensor = nullptr;
-      if (isFloat) {
-        auto *createTensorFn = IGM.getTFC_CreateFloatTensorFn();
-        tensor =
-            Builder.CreateCall(createTensorFn, {numDims, dimValsUntyped,
-                                                tensorEltValsUntyped, status});
-      } else {
-        auto *createTensorFn = IGM.getTFC_CreateIntTensorFn();
-        auto dtypeVal = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
-        tensor = Builder.CreateCall(
-            createTensorFn,
-            {numDims, dimValsUntyped, tensorEltValsUntyped, dtypeVal, status});
+        auto dimValsUntyped =
+            Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
+        auto tensorEltValsUntyped =
+            Builder.CreateBitCast(tensorEltVals.getAddress(), IGM.Int8PtrTy);
+        if (isFloat) {
+          auto *createTensorFn = IGM.getTFC_CreateFloatTensorFn();
+          tensor = Builder.CreateCall(
+              createTensorFn,
+              {numDims, dimValsUntyped, tensorEltValsUntyped, status});
+        } else {
+          auto *createTensorFn = IGM.getTFC_CreateIntTensorFn();
+          auto dtypeVal = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
+          tensor = Builder.CreateCall(createTensorFn,
+                                      {numDims, dimValsUntyped,
+                                       tensorEltValsUntyped, dtypeVal, status});
+        }
+        checkOk(status);
       }
-      checkOk(status);
+      assert(tensor != nullptr);
 
       // Set up the tensor-typed value attr as in:
       //   TFE_OpSetAttrTensor(op, "value", tensor, status);

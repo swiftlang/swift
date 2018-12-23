@@ -1402,6 +1402,11 @@ FUNCTION(TFC_CreateFloatTensor, swift_tfc_CreateFloatTensor, C_CC,
          ARGS(Int32Ty, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFC_CreateScalarStringTensor, swift_tfc_CreateScalarStringTensor, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int32Ty, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
