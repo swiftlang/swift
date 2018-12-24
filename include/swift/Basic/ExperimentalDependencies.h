@@ -72,15 +72,9 @@ using StringPairVec = PairVec<std::string, std::string>;
 template <typename First, typename Second>
 using ConstPtrPairVec = std::vector<std::pair<const First *, const Second *>>;
 
-} // namespace experimental_dependencies
-} // namespace swift
-
 //==============================================================================
 // MARK: General Utility classes
 //==============================================================================
-
-namespace swift {
-namespace experimental_dependencies {
 
 /// operator<< is needed for TwoStageMap::verify:
 class DependencyKey;
@@ -314,34 +308,22 @@ private:
     return true;
   }
 };
-} // namespace experimental_dependencies
-} // namespace swift
 
 // End of general declarations
 
 //==============================================================================
 // MARK: Start of experimental-dependency-specific code
 //==============================================================================
-namespace swift {
-namespace experimental_dependencies {
 
 /// The entry point into this system from the frontend:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
-} // namespace experimental_dependencies
-} // namespace swift
 //==============================================================================
 // MARK: Enums
 //==============================================================================
 
-// Needed to YAMLize the following enums:
-LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
-
-
-namespace swift {
-namespace experimental_dependencies {
 /// Encode the current sorts of dependencies as kinds of nodes in the dependency
 /// graph, splitting the current *member* into \ref member and \ref
 /// potentialMember and adding \ref sourceFileProvide.
@@ -369,14 +351,8 @@ enum class NodeKind {
 const std::string NodeKindNames[]{
     "topLevel",      "nominal",        "potentialMember",  "member",
     "dynamicLookup", "externalDepend", "sourceFileProvide"};
-} // namespace experimental_dependencies
-} // namespace swift
 
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)
-
-namespace swift {
-namespace experimental_dependencies {
-
+  
 /// Instead of the status quo scheme of two kinds of "Depends", cascading and
 /// non-cascading this code represents each entity ("Provides" in the status
 /// quo), by a pair of nodes. One node represents the "implementation." If the
@@ -396,14 +372,8 @@ template <typename FnT> void forEachAspect(FnT fn) {
     fn(DeclAspect(i));
 }
 
-} // namespace experimental_dependencies
-} // namespace swift
-
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::DeclAspect)
 
 
-namespace swift {
-namespace experimental_dependencies {
 
 /// A pair of nodes that represent the two aspects of a given entity.
 /// Templated in order to serve for either SourceFileDepGraphNodes or
@@ -435,14 +405,10 @@ public:
     return ifCascades ? interface : implementation;
   }
 };
-} // namespace experimental_dependencies
-} // namespace swift
+
 //==============================================================================
 // MARK: DependencyKey
 //==============================================================================
-
-namespace swift {
-namespace experimental_dependencies {
 
 /// The dependency system loses some precision by lumping entities together for
 /// the sake of simplicity. In the future, it might be finer-grained. The
@@ -553,7 +519,6 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
   }
 };
 
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DependencyKey)
 
 
 
@@ -664,16 +629,11 @@ public:
 
   std::string humanReadableName() const;
 };
-} // namespace experimental_dependencies
-} // namespace swift
 
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DepGraphNode)
 
 //==============================================================================
 // MARK: SourceFileDepGraphNode
 //==============================================================================
-namespace swift {
-namespace experimental_dependencies {
 class SourceFileDepGraph;
 
 /// A node in a graph that represents the dependencies computed when compiling a
@@ -730,33 +690,13 @@ public:
   }
   void dump() const { DepGraphNode::dump(); }
 };
-} // namespace experimental_dependencies
-} // namespace swift
 
 
-namespace llvm {
-namespace yaml {
-  template <>
-  struct MappingContextTraits<
-  swift::experimental_dependencies::SourceFileDepGraphNode,
-  swift::experimental_dependencies::SourceFileDepGraph> {
-    using SourceFileDepGraphNode =
-    swift::experimental_dependencies::SourceFileDepGraphNode;
-    using SourceFileDepGraph =
-    swift::experimental_dependencies::SourceFileDepGraph;
-    
-    static void mapping(IO &io, SourceFileDepGraphNode &node,
-                        SourceFileDepGraph &g);
-  };
-} // namespace yaml
-} // namespace llvm
 
 //==============================================================================
 // MARK: SourceFileDepGraph
 //==============================================================================
 
-namespace swift {
-namespace experimental_dependencies {
 
 /// The dependency graph produced by the frontend and consumed by the driver.
 /// See \ref Node in ExperimentalDependencies.h
@@ -856,34 +796,12 @@ private:
     allNodes.push_back(n);
   }
 };
-} // namespace experimental_dependencies
-} // namespace swift
-
-namespace llvm {
-namespace yaml {
-
-template <>
-struct SequenceTraits<
-    std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>> {
-      using SourceFileDepGraphNode =  swift::experimental_dependencies::SourceFileDepGraphNode;
-      using NodeVec = std::vector<SourceFileDepGraphNode *>;
-  static size_t size(IO &, NodeVec &vec);
-  static SourceFileDepGraphNode &
-      element(IO &, NodeVec &vec, size_t index);
-};
 
 
-
-} // namespace yaml
-} // namespace llvm
-
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::SourceFileDepGraph)
 
 //==============================================================================
 // MARK: DotFileEmitter
 //==============================================================================
-namespace swift {
-namespace experimental_dependencies {
 
 /// To aid in debugging, both the SourceFileDepGraph and the ModuleDepGraph can
 /// be written out as dot files, which can be read into graphfiz and OmniGraffle
@@ -1008,5 +926,46 @@ private:
 
 } // end namespace experimental_dependencies
 } // end namespace swift
+
+//==============================================================================
+// MARK: Declarations for YAMLTraits for reading/writing of SourceFileDepGraph
+//==============================================================================
+
+LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::DeclAspect)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DependencyKey)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DepGraphNode)
+
+namespace llvm {
+  namespace yaml {
+    template <>
+    struct MappingContextTraits<
+    swift::experimental_dependencies::SourceFileDepGraphNode,
+    swift::experimental_dependencies::SourceFileDepGraph> {
+      using SourceFileDepGraphNode =
+      swift::experimental_dependencies::SourceFileDepGraphNode;
+      using SourceFileDepGraph =
+      swift::experimental_dependencies::SourceFileDepGraph;
+      
+      static void mapping(IO &io, SourceFileDepGraphNode &node,
+                          SourceFileDepGraph &g);
+    };
+    
+    template <>
+    struct SequenceTraits<
+    std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>> {
+      using SourceFileDepGraphNode =  swift::experimental_dependencies::SourceFileDepGraphNode;
+      using NodeVec = std::vector<SourceFileDepGraphNode *>;
+      static size_t size(IO &, NodeVec &vec);
+      static SourceFileDepGraphNode &
+      element(IO &, NodeVec &vec, size_t index);
+    };
+
+  } // namespace yaml
+} // namespace llvm
+
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::SourceFileDepGraph)
+
 
 #endif /* ExperimentalDependencies_h */
