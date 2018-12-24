@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=GlobalOpt %s -emit-sil -sil-verify-all | tee /tmp/xxx | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-inline-generics=false -Xllvm -sil-disable-pass=GlobalOpt %s -emit-sil -sil-verify-all | %FileCheck %s
 
 
 public protocol Foo {
