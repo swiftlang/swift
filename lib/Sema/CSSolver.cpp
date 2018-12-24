@@ -125,6 +125,12 @@ Solution ConstraintSystem::finalize() {
   }
   solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
 
+  // Remember all of the missing member references encountered,
+  // that helps diagnostics to avoid emitting error for each
+  // member in the chain.
+  for (auto *member : MissingMembers)
+    solution.MissingMembers.push_back(member);
+
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     // We shouldn't ever register disjunction choices multiple times,
@@ -232,6 +238,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
+
+  // Register any missing members encountered along this path.
+  MissingMembers.insert(solution.MissingMembers.begin(),
+                        solution.MissingMembers.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -305,6 +315,13 @@ template<typename T>
 void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
   assert(newSize <= vec.size() && "Not a truncation!");
   vec.erase(vec.begin() + newSize, vec.end());
+}
+
+template<typename T, unsigned N>
+void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
+  assert(newSize <= vec.size() && "Not a truncation!");
+  for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
+    vec.pop_back();
 }
 
 } // end anonymous namespace
@@ -409,6 +426,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
+  numMissingMembers = cs.MissingMembers.size();
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
@@ -458,6 +476,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
+
+  // Remove any missing members found along the current path.
+  truncate(cs.MissingMembers, numMissingMembers);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

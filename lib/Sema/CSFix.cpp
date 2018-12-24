@@ -245,3 +245,14 @@ UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
                                                    ConstraintLocator *locator) {
   return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
 }
+
+bool DefineMemberBasedOnUse::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+DefineMemberBasedOnUse *
+DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
+                               DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DefineMemberBasedOnUse(cs, baseType, member, locator);
+}
