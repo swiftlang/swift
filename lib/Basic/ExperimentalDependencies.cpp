@@ -272,76 +272,77 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
 //==============================================================================
 
 namespace llvm {
-  namespace yaml {
-    void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
-      out << Val;
-    }
-    StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt, size_t &value) {
-      return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
-    }
+namespace yaml {
+void ScalarTraits<size_t>::output(const size_t &Val, void *, raw_ostream &out) {
+  out << Val;
+}
+StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
+                                      size_t &value) {
+  return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
+}
 
-    void ScalarEnumerationTraits<NodeKind>::enumeration(IO &io,
-                     swift::experimental_dependencies::NodeKind &value) {
-      using NodeKind = swift::experimental_dependencies::NodeKind;
-      io.enumCase(value, "topLevel", NodeKind::topLevel);
-      io.enumCase(value, "nominal", NodeKind::nominal);
-      io.enumCase(value, "potentialMember", NodeKind::potentialMember);
-      io.enumCase(value, "member", NodeKind::member);
-      io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
-      io.enumCase(value, "externalDepend", NodeKind::externalDepend);
-      io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
-    }
-    
-    void ScalarEnumerationTraits<DeclAspect>::enumeration(IO &io,
-                            swift::experimental_dependencies::DeclAspect &value) {
-      using DeclAspect = swift::experimental_dependencies::DeclAspect;
-      io.enumCase(value, "interface", DeclAspect::interface);
-      io.enumCase(value, "implementation", DeclAspect::implementation);
-    }
-    
-    void MappingTraits<DependencyKey>::mapping(IO &io,
-                        swift::experimental_dependencies::DependencyKey &key) {
-      io.mapRequired("kind", key.kind);
-      io.mapRequired("aspect", key.aspect);
-      io.mapRequired("context", key.context);
-      io.mapRequired("name", key.name);
-    }
-    
-    void MappingTraits<DepGraphNode>::mapping(IO &io,
-                 swift::experimental_dependencies::DepGraphNode &node) {
-      io.mapRequired("key", node.key);
-      io.mapOptional("fingerprint", node.fingerprint);
-      io.mapOptional("swiftDeps", node.swiftDeps);
-    }
-    
-    void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::
-    mapping(IO &io, SourceFileDepGraphNode &node,
-                        SourceFileDepGraph &g) {
-      MappingTraits<DepGraphNode>::mapping(io, node);
-      io.mapRequired("sequenceNumber", node.sequenceNumber);
-      std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
-      io.mapRequired("usesOfMe", usesOfMeVec);
-      if (!io.outputting()) {
-        for (size_t u : usesOfMeVec)
-          node.usesOfMe.insert(u);
-      }
-      assert(g.getNode(node.sequenceNumber));
-    }
-    
-    size_t SequenceTraits<std::vector<SourceFileDepGraphNode *>>::size(IO &, std::vector<SourceFileDepGraphNode *> &vec) {
-      return vec.size();
-    }
-    
-    SourceFileDepGraphNode &
-    SequenceTraits<std::vector<SourceFileDepGraphNode *>>::
-    element(IO &, std::vector<SourceFileDepGraphNode *> &vec, size_t index) {
-      while (vec.size() <= index)
-        vec.push_back(new SourceFileDepGraphNode());
-      return *vec[index];
-    }
-    
-    void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
-      io.mapRequired("allNodes", g.allNodes, g);
-    }
-  } // namespace yaml
+void ScalarEnumerationTraits<NodeKind>::enumeration(
+    IO &io, swift::experimental_dependencies::NodeKind &value) {
+  using NodeKind = swift::experimental_dependencies::NodeKind;
+  io.enumCase(value, "topLevel", NodeKind::topLevel);
+  io.enumCase(value, "nominal", NodeKind::nominal);
+  io.enumCase(value, "potentialMember", NodeKind::potentialMember);
+  io.enumCase(value, "member", NodeKind::member);
+  io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
+  io.enumCase(value, "externalDepend", NodeKind::externalDepend);
+  io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
+}
+
+void ScalarEnumerationTraits<DeclAspect>::enumeration(
+    IO &io, swift::experimental_dependencies::DeclAspect &value) {
+  using DeclAspect = swift::experimental_dependencies::DeclAspect;
+  io.enumCase(value, "interface", DeclAspect::interface);
+  io.enumCase(value, "implementation", DeclAspect::implementation);
+}
+
+void MappingTraits<DependencyKey>::mapping(
+    IO &io, swift::experimental_dependencies::DependencyKey &key) {
+  io.mapRequired("kind", key.kind);
+  io.mapRequired("aspect", key.aspect);
+  io.mapRequired("context", key.context);
+  io.mapRequired("name", key.name);
+}
+
+void MappingTraits<DepGraphNode>::mapping(
+    IO &io, swift::experimental_dependencies::DepGraphNode &node) {
+  io.mapRequired("key", node.key);
+  io.mapOptional("fingerprint", node.fingerprint);
+  io.mapOptional("swiftDeps", node.swiftDeps);
+}
+
+void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
+    IO &io, SourceFileDepGraphNode &node, SourceFileDepGraph &g) {
+  MappingTraits<DepGraphNode>::mapping(io, node);
+  io.mapRequired("sequenceNumber", node.sequenceNumber);
+  std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
+  io.mapRequired("usesOfMe", usesOfMeVec);
+  if (!io.outputting()) {
+    for (size_t u : usesOfMeVec)
+      node.usesOfMe.insert(u);
+  }
+  assert(g.getNode(node.sequenceNumber));
+}
+
+size_t SequenceTraits<std::vector<SourceFileDepGraphNode *>>::size(
+    IO &, std::vector<SourceFileDepGraphNode *> &vec) {
+  return vec.size();
+}
+
+SourceFileDepGraphNode &
+SequenceTraits<std::vector<SourceFileDepGraphNode *>>::element(
+    IO &, std::vector<SourceFileDepGraphNode *> &vec, size_t index) {
+  while (vec.size() <= index)
+    vec.push_back(new SourceFileDepGraphNode());
+  return *vec[index];
+}
+
+void MappingTraits<SourceFileDepGraph>::mapping(IO &io, SourceFileDepGraph &g) {
+  io.mapRequired("allNodes", g.allNodes, g);
+}
+} // namespace yaml
 } // namespace llvm
