@@ -996,6 +996,10 @@ struct MappingContextTraits<
     io.mapRequired("sequenceNumber", node.sequenceNumber);
     std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
     io.mapRequired("usesOfMe", usesOfMeVec);
+    if (!io.outputting()) {
+      for (size_t u : usesOfMeVec)
+        node.usesOfMe.insert(u);
+    }
     assert(g.getNode(node.sequenceNumber));
   }
 };
@@ -1016,7 +1020,6 @@ struct SequenceTraits<
       vec.push_back(new SourceFileDepGraphNode());
     return *vec[index];
   }
-  static const bool flow = false;
 };
 
 /// Top-level for the graph. Only real content is allNodes.
