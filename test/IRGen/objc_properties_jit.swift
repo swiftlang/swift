@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
 
 import Foundation

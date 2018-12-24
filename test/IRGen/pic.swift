@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 

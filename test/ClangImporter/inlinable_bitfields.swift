@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %clang-importer-sdk %S/Inputs/inlinable_bitfields_other.swift -emit-module -emit-module-path %t/inlinable_bitfields_other.swiftmodule
 // RUN: %target-swift-frontend %clang-importer-sdk -I %t %s -emit-ir -disable-llvm-optzns -O | %FileCheck %s -DINT=i%target-ptrsize

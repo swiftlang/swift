@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %target-typecheck-verify-swift
 
 protocol P {

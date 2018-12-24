@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // XFAIL: CPU=armv7k

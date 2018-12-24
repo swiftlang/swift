@@ -1,4 +1,4 @@
-
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %target-swift-frontend -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: optimized_stdlib
 

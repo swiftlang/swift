@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
+// UNSUPPORTED: CPU=powerpc64le
 
 // Check that TSan does not report spurious races in witness table lookup.
 

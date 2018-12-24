@@ -1,3 +1,4 @@
+// UNSUPPORTED: CPU=powerpc64le
 // RUN: %empty-directory(%t)
 
 // 1. Not finding things is okay.
