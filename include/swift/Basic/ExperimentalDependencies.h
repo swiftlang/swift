@@ -337,19 +337,8 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
 //==============================================================================
 
 // Needed to YAMLize the following enums:
-namespace llvm {
-namespace yaml {
-template <> struct ScalarTraits<size_t> {
-  static void output(const size_t &Val, void *, llvm::raw_ostream &out) {
-    out << Val;
-  }
-  static StringRef input(StringRef scalar, void *ctxt, size_t &value) {
-    return scalar.getAsInteger(10, value) ? "could not parse size_t" : "";
-  }
-  static QuotingType mustQuote(StringRef) { return QuotingType::None; }
-};
-} // namespace yaml
-} // namespace llvm
+LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
+
 
 namespace swift {
 namespace experimental_dependencies {
@@ -383,25 +372,7 @@ const std::string NodeKindNames[]{
 } // namespace experimental_dependencies
 } // namespace swift
 
-namespace llvm {
-namespace yaml {
-
-template <>
-struct ScalarEnumerationTraits<swift::experimental_dependencies::NodeKind> {
-  static void enumeration(IO &io,
-                          swift::experimental_dependencies::NodeKind &value) {
-    using NodeKind = swift::experimental_dependencies::NodeKind;
-    io.enumCase(value, "topLevel", NodeKind::topLevel);
-    io.enumCase(value, "nominal", NodeKind::nominal);
-    io.enumCase(value, "potentialMember", NodeKind::potentialMember);
-    io.enumCase(value, "member", NodeKind::member);
-    io.enumCase(value, "dynamicLookup", NodeKind::dynamicLookup);
-    io.enumCase(value, "externalDepend", NodeKind::externalDepend);
-    io.enumCase(value, "sourceFileProvide", NodeKind::sourceFileProvide);
-  }
-};
-} // namespace yaml
-} // namespace llvm
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)
 
 namespace swift {
 namespace experimental_dependencies {
@@ -428,20 +399,8 @@ template <typename FnT> void forEachAspect(FnT fn) {
 } // namespace experimental_dependencies
 } // namespace swift
 
-namespace llvm {
-namespace yaml {
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::DeclAspect)
 
-template <>
-struct ScalarEnumerationTraits<swift::experimental_dependencies::DeclAspect> {
-  static void enumeration(IO &io,
-                          swift::experimental_dependencies::DeclAspect &value) {
-    using DeclAspect = swift::experimental_dependencies::DeclAspect;
-    io.enumCase(value, "interface", DeclAspect::interface);
-    io.enumCase(value, "implementation", DeclAspect::implementation);
-  }
-};
-} // namespace yaml
-} // namespace llvm
 
 namespace swift {
 namespace experimental_dependencies {
@@ -594,21 +553,9 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
   }
 };
 
-namespace llvm {
-namespace yaml {
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DependencyKey)
 
-template <>
-struct MappingTraits<swift::experimental_dependencies::DependencyKey> {
-  static void mapping(IO &io,
-                      swift::experimental_dependencies::DependencyKey &key) {
-    io.mapRequired("kind", key.kind);
-    io.mapRequired("aspect", key.aspect);
-    io.mapRequired("context", key.context);
-    io.mapRequired("name", key.name);
-  }
-};
-} // namespace yaml
-} // namespace llvm
+
 
 //==============================================================================
 // MARK: DepGraphNode
@@ -720,20 +667,7 @@ public:
 } // namespace experimental_dependencies
 } // namespace swift
 
-namespace llvm {
-namespace yaml {
-
-template <>
-struct MappingTraits<swift::experimental_dependencies::DepGraphNode> {
-  static void mapping(IO &io,
-                      swift::experimental_dependencies::DepGraphNode &node) {
-    io.mapRequired("key", node.key);
-    io.mapOptional("fingerprint", node.fingerprint);
-    io.mapOptional("swiftDeps", node.swiftDeps);
-  }
-};
-} // namespace yaml
-} // namespace llvm
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DepGraphNode)
 
 //==============================================================================
 // MARK: SourceFileDepGraphNode
@@ -799,11 +733,21 @@ public:
 } // namespace experimental_dependencies
 } // namespace swift
 
+
 namespace llvm {
 namespace yaml {
-// MappingContextTraits specialization moved to after SourceFileDepGraph to
-// support sequence number checking
-
+  template <>
+  struct MappingContextTraits<
+  swift::experimental_dependencies::SourceFileDepGraphNode,
+  swift::experimental_dependencies::SourceFileDepGraph> {
+    using SourceFileDepGraphNode =
+    swift::experimental_dependencies::SourceFileDepGraphNode;
+    using SourceFileDepGraph =
+    swift::experimental_dependencies::SourceFileDepGraph;
+    
+    static void mapping(IO &io, SourceFileDepGraphNode &node,
+                        SourceFileDepGraph &g);
+  };
 } // namespace yaml
 } // namespace llvm
 
@@ -918,62 +862,22 @@ private:
 namespace llvm {
 namespace yaml {
 
-// Moved here to allow the sequenceNumber checking
-template <>
-struct MappingContextTraits<
-    swift::experimental_dependencies::SourceFileDepGraphNode,
-    swift::experimental_dependencies::SourceFileDepGraph> {
-  using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
-  using DepGraphNode = swift::experimental_dependencies::DepGraphNode;
-  using SourceFileDepGraph =
-      swift::experimental_dependencies::SourceFileDepGraph;
-
-  static void mapping(IO &io, SourceFileDepGraphNode &node,
-                      SourceFileDepGraph &g) {
-    MappingTraits<DepGraphNode>::mapping(io, node);
-    io.mapRequired("sequenceNumber", node.sequenceNumber);
-    std::vector<size_t> usesOfMeVec(node.usesOfMe.begin(), node.usesOfMe.end());
-    io.mapRequired("usesOfMe", usesOfMeVec);
-    if (!io.outputting()) {
-      for (size_t u : usesOfMeVec)
-        node.usesOfMe.insert(u);
-    }
-    assert(g.getNode(node.sequenceNumber));
-  }
-};
-
 template <>
 struct SequenceTraits<
     std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>> {
-  using SourceFileDepGraph =
-      swift::experimental_dependencies::SourceFileDepGraph;
-  using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
-  static size_t size(IO &, std::vector<SourceFileDepGraphNode *> &vec) {
-    return vec.size();
-  }
+      using SourceFileDepGraphNode =  swift::experimental_dependencies::SourceFileDepGraphNode;
+      using NodeVec = std::vector<SourceFileDepGraphNode *>;
+  static size_t size(IO &, NodeVec &vec);
   static SourceFileDepGraphNode &
-  element(IO &, std::vector<SourceFileDepGraphNode *> &vec, size_t index) {
-    while (vec.size() <= index)
-      vec.push_back(new SourceFileDepGraphNode());
-    return *vec[index];
-  }
+      element(IO &, NodeVec &vec, size_t index);
 };
 
-/// Top-level for the graph. Only real content is allNodes.
-template <>
-struct MappingTraits<swift::experimental_dependencies::SourceFileDepGraph> {
-  using SourceFileDepGraph =
-      swift::experimental_dependencies::SourceFileDepGraph;
 
-  static void mapping(IO &io, SourceFileDepGraph &g) {
-    io.mapRequired("allNodes", g.allNodes, g);
-  }
-};
 
 } // namespace yaml
 } // namespace llvm
+
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::SourceFileDepGraph)
 
 //==============================================================================
 // MARK: DotFileEmitter
