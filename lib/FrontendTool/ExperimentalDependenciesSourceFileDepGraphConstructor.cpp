@@ -50,219 +50,6 @@ using namespace experimental_dependencies;
 // MARK: Emitting and reading SourceFileDepGraph
 //==============================================================================
 
-/// YAML-specific code for emitting a SourceFileDepGraph.
-/// The file is written as just a series of nodes.
-/// Only used when *not* using YAMLTraits
-class YAMLSourceFileDepGraphEmitter {
-private:
-  llvm::raw_ostream &out;
-
-public:
-  YAMLSourceFileDepGraphEmitter(llvm::raw_ostream &out) : out(out) {
-    out << "# Experimental Dependencies\n";
-  }
-
-  /// Mark the start of a node.
-  void newNode() const { out << "-\n"; }
-
-  /// Write out an integer field.
-  void emitInt(size_t n) const { out << " - " << n << "\n"; }
-
-  /// Write out a string field.
-  void emitString(const std::string &s) const {
-    out << " - \"" << llvm::yaml::escape(s) << "\"\n";
-  }
-
-  /// Write out an optional string field.
-  void emitOptionalString(const Optional<std::string> &s) const {
-    assert(verifyOptionalString(s));
-    out << " - \"" << (s.hasValue() ? llvm::yaml::escape(s.getValue()) : "")
-        << "\"\n";
-  }
-
-  /// Write out a set-of-integers field.
-  void emitSetOfInts(std::unordered_set<size_t> &numbers) const {
-    if (numbers.empty()) {
-      out << " - []\n";
-      return;
-    }
-    out << " - \n";
-    for (auto i : numbers)
-      out << "  - " << i << "\n";
-  }
-
-  static bool verifyOptionalString(const Optional<std::string> &s) {
-    assert((!s.hasValue() || s.getValue() != "") &&
-           "An optional string cannot be empty because None is serialized as "
-           "the empty string.");
-    return true;
-  }
-};
-
-namespace {
-namespace yaml = llvm::yaml;
-
-/// YAML-specific logic to parse SourceFileDepGraphs.
-/// Just a sequence of nodes.
-/// Only used when *not* using YAMLTraits
-class YAMLSourceFileDepGraphParser {
-private:
-  llvm::MemoryBuffer &inputBuffer;
-
-  yaml::SequenceNode::iterator nextFieldOfNode;
-  bool hadError = false;
-
-public:
-  YAMLSourceFileDepGraphParser(llvm::MemoryBuffer &inputBuffer)
-      : inputBuffer(inputBuffer) {}
-
-  /// Scan the file, which is just a series of serialized
-  /// SourceFileDepGraphNodes. Each time the parser is positioned at the
-  /// contents of a node, call \p parseNodeCallback to parse the contents of a
-  /// node. This routine handles all the intra-node struct.
-  /// \returns true for error
-  bool forEachSerializedNode(function_ref<void()> parseNodeCallback) {
-    // Setup
-    llvm::SourceMgr SM;
-    yaml::Stream stream(inputBuffer.getMemBufferRef(), SM);
-    auto I = stream.begin();
-    // Every FrontEndGraph has at least two nodes, for the sourceFileProvide
-    // interface and implementation.
-    if (I == stream.end() || !I->getRoot() || isa<yaml::NullNode>(I->getRoot()))
-      return true;
-    auto *nodeSequence = dyn_cast<yaml::SequenceNode>(I->getRoot());
-    if (!nodeSequence)
-      return true;
-
-    // Parse the nodes
-    for (yaml::Node &rawNode : *nodeSequence) {
-      auto *sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
-      if (!sequenceNodeNode)
-        return true;
-
-      nextFieldOfNode = sequenceNodeNode->begin();
-      parseNodeCallback();
-      if (nextFieldOfNode != sequenceNodeNode->end() || hadError)
-        return true;
-    }
-    return false;
-  }
-
-  void parseInt(size_t &s) {
-    yaml::ScalarNode *scalarNode =
-        dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
-    if (!scalarNode) {
-      hadError = true;
-      return;
-    }
-    llvm::SmallString<64> scratch;
-    scalarNode->getValue(scratch).getAsInteger(10, s);
-    ++nextFieldOfNode;
-  }
-
-  void parseString(std::string &s) {
-    auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
-    if (!scalarNode) {
-      hadError = true;
-      return;
-    }
-    llvm::SmallString<64> scratch;
-    s = scalarNode->getValue(scratch);
-    ++nextFieldOfNode;
-  }
-  void parseOptionalString(Optional<std::string> &s) {
-    auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
-    if (!scalarNode) {
-      hadError = true;
-      return;
-    }
-    llvm::SmallString<64> scratch;
-    auto stored = scalarNode->getValue(scratch);
-    s = stored.empty() ? None : Optional<std::string>(stored);
-    ++nextFieldOfNode;
-  }
-  void parseSetofInts(std::unordered_set<size_t> &s) {
-    auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*nextFieldOfNode);
-    if (!sequenceNode) {
-      hadError = true;
-      return;
-    }
-    for (auto &n : *sequenceNode) {
-      auto *scalarNode = dyn_cast<yaml::ScalarNode>(&n);
-      if (!scalarNode) {
-        hadError = true;
-        return;
-      }
-      llvm::SmallString<64> scratch;
-      size_t i;
-      scalarNode->getValue(scratch).getAsInteger(10, i);
-      s.insert(i);
-    }
-    ++nextFieldOfNode;
-  }
-};
-} // namespace
-
-namespace {
-/// Emits a graph, one entry per node
-/// Emitter is templated so that maybe it could be a JSON emitter someday, for
-/// instance.
-///
-/// Only used when *not* using YAMLTraits
-template <typename Emitter> class NodeByNodeSourceFileDepGraphEmitter {
-private:
-  /// The graph to emit.
-  const SourceFileDepGraph &g;
-
-  /// The syntax-specific emitter.de
-  Emitter emitter;
-
-public:
-  NodeByNodeSourceFileDepGraphEmitter(const SourceFileDepGraph &g,
-                                      llvm::raw_ostream &out)
-      : g(g), emitter(Emitter(out)) {}
-
-public:
-  /// Emit a whole graph.
-  void emit() const {
-    g.forEachNode([&](const SourceFileDepGraphNode *n) { emitNode(n); });
-  }
-
-private:
-  void emitNode(const SourceFileDepGraphNode *) const;
-};
-} // namespace
-
-template <>
-void NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>::
-    emitNode(const SourceFileDepGraphNode *n) const {
-  emitter.newNode();
-  // Even though this method does not change the node,
-  // the serializeOrDeserialize method does not know that the emitter
-  // functions don't mutate the node.
-  auto nn = const_cast<SourceFileDepGraphNode *>(n);
-  nn->serializeOrDeserialize(
-      [&](size_t s) { emitter.emitInt(s); },
-      [&](std::string &s) { emitter.emitString(s); },
-      [&](Optional<std::string> &s) { emitter.emitOptionalString(s); },
-      [&](std::unordered_set<size_t> &s) { emitter.emitSetOfInts(s); });
-}
-
-void SourceFileDepGraph::addDeserializedNode(SourceFileDepGraphNode *n) {
-  addNode(n);
-  assert(getNode(allNodes.size() - 1)); // verify seq no.
-}
-
-void DepGraphNode::serializeOrDeserialize(
-    function_ref<void(size_t &)> convertInt,
-    function_ref<void(std::string &)> convertString,
-    function_ref<void(Optional<std::string> &)> convertOptionalString) {
-  key.serializeOrDeserialize(convertInt, convertString);
-  convertOptionalString(fingerprint);
-  convertOptionalString(swiftDeps);
-  assert(ensureThatTheFingerprintIsValidForSerialization());
-  assert(ensureThatTheSwiftDepsIsValidForSerialization());
-}
 
 Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
@@ -274,58 +61,13 @@ Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
 Optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
   SourceFileDepGraph fg;
-  if (SourceFileDepGraph::useYAMLTraits) {
-    llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
-    yamlReader >> fg;
-    if (yamlReader.error())
-      return None;
-  } else {
-    auto nodeCallback = [&fg](SourceFileDepGraphNode *n) {
-      fg.addDeserializedNode(n);
-    };
-    if (parseDependencyFile(buffer, nodeCallback))
-      return None;
-  }
+  llvm::yaml::Input yamlReader(llvm::MemoryBufferRef(buffer), nullptr);
+  yamlReader >> fg;
+  if (yamlReader.error())
+    return None;
   return fg;
 }
 
-bool SourceFileDepGraph::parseDependencyFile(
-    llvm::MemoryBuffer &buffer,
-    function_ref<void(SourceFileDepGraphNode *)> nodeCallback) {
-  YAMLSourceFileDepGraphParser reader(buffer);
-  return reader.forEachSerializedNode([&]() {
-    auto n = new SourceFileDepGraphNode();
-    n->serializeOrDeserialize(
-        [&](size_t &s) { reader.parseInt(s); },
-        [&](std::string &s) { reader.parseString(s); },
-        [&](Optional<std::string> &s) { reader.parseOptionalString(s); },
-        [&](std::unordered_set<size_t> &s) { reader.parseSetofInts(s); });
-    nodeCallback(n);
-  });
-}
-
-void SourceFileDepGraphNode::serializeOrDeserialize(
-    function_ref<void(size_t &)> convertInt,
-    function_ref<void(std::string &)> convertString,
-    function_ref<void(Optional<std::string> &)> convertOptionalString,
-    function_ref<void(std::unordered_set<size_t> &)> convertSetOfInts) {
-  DepGraphNode::serializeOrDeserialize(convertInt, convertString,
-                                       convertOptionalString);
-  convertInt(sequenceNumber);
-  convertSetOfInts(usesOfMe);
-}
-
-//==============================================================================
-// MARK: Debugging
-//==============================================================================
-
-bool DepGraphNode::ensureThatTheFingerprintIsValidForSerialization() const {
-  return YAMLSourceFileDepGraphEmitter::verifyOptionalString(fingerprint);
-}
-
-bool DepGraphNode::ensureThatTheSwiftDepsIsValidForSerialization() const {
-  return YAMLSourceFileDepGraphEmitter::verifyOptionalString(swiftDeps);
-}
 
 //==============================================================================
 // MARK: Start of SourceFileDepGraph building, specific to status quo
@@ -813,13 +555,8 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
 
   const bool hadError =
       withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        if (SourceFileDepGraph::useYAMLTraits) {
-          llvm::yaml::Output yamlWriter(out);
-          yamlWriter << g;
-        } else
-          NodeByNodeSourceFileDepGraphEmitter<YAMLSourceFileDepGraphEmitter>(
-              g, out)
-              .emit();
+        llvm::yaml::Output yamlWriter(out);
+        yamlWriter << g;
         return false;
       });
 

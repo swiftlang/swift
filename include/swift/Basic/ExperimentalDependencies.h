@@ -557,21 +557,6 @@ public:
 
   std::string humanReadableName() const;
 
-  /// Convert to- or from- another format via the argument functions.
-  /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
-  /// Only used when *not* using YAMLTraits
-  void serializeOrDeserialize(function_ref<void(size_t &)> convertInt,
-                              function_ref<void(std::string &)> convertString) {
-    size_t k = size_t(kind);
-    convertInt(k);
-    kind = NodeKind(k);
-    size_t a = size_t(aspect);
-    convertInt(a);
-    aspect = DeclAspect(a);
-    convertString(name);
-    convertString(context);
-  }
-
   void dump() const { llvm::errs() << asString() << "\n"; }
 
   /// For debugging, needed for \ref TwoStageMap::verify
@@ -685,8 +670,7 @@ public:
   /// creation because this field can change if a node is moved.
   DepGraphNode(DependencyKey key, Optional<std::string> fingerprint)
       : key(key), fingerprint(fingerprint) {
-    assert(ensureThatTheFingerprintIsValidForSerialization());
-  }
+   }
   DepGraphNode(const DepGraphNode &other) = default;
 
   bool operator==(const DepGraphNode &other) const {
@@ -698,7 +682,6 @@ public:
   const DependencyKey &getKey() const { return key; }
 
   const Optional<std::string> &getFingerprint() const {
-    assert(ensureThatTheFingerprintIsValidForSerialization());
     return fingerprint;
   }
 
@@ -712,19 +695,16 @@ public:
   /// needs to set the fingerprint *after* the node has been created.
   void setFingerprint(Optional<std::string> fp) {
     fingerprint = fp;
-    assert(ensureThatTheFingerprintIsValidForSerialization());
   }
 
   const Optional<std::string> &getSwiftDeps() const {
-    ensureThatTheSwiftDepsIsValidForSerialization();
-    return swiftDeps;
+     return swiftDeps;
   }
 
   /// Nodes can move from file to file when the driver reads the result of a
   /// compilation.
   void setSwiftDeps(Optional<std::string> s) {
     swiftDeps = s;
-    ensureThatTheSwiftDepsIsValidForSerialization();
   }
 
   void dump() const;
@@ -736,21 +716,6 @@ public:
   }
 
   std::string humanReadableName() const;
-
-protected:
-  /// Convert to- or from- another format via the argument functions.
-  /// See \ref SourceFileDepGraphNode::serializeOrDeserialize.
-  /// Only used when *not* using YAMLTraits
-  void serializeOrDeserialize(
-      function_ref<void(size_t &)> convertInt,
-      function_ref<void(std::string &)> convertString,
-      function_ref<void(Optional<std::string> &)> convertOptionalString);
-
-private:
-  /// Only used when *not* using YAMLTraits
-  bool ensureThatTheFingerprintIsValidForSerialization() const;
-  /// Only used when *not* using YAMLTraits
-  bool ensureThatTheSwiftDepsIsValidForSerialization() const;
 };
 } // namespace experimental_dependencies
 } // namespace swift
@@ -829,18 +794,6 @@ public:
     if (n != getSequenceNumber())
       usesOfMe.insert(n);
   }
-
-  /// Convert to- or from- another format via the argument functions.
-  /// Used by the frontend to export nodes to a swiftdeps file, and used by the
-  /// driver to import them. The argument functions either read or write the
-  /// instance variables as required.
-  /// Only used when *not* using YAMLTraits
-  void serializeOrDeserialize(
-      function_ref<void(size_t &)> convertInt,
-      function_ref<void(std::string &)> convertString,
-      function_ref<void(Optional<std::string> &)> convertOptionalString,
-      function_ref<void(std::unordered_set<size_t> &)> convertSetOfInts);
-
   void dump() const { DepGraphNode::dump(); }
 };
 } // namespace experimental_dependencies
@@ -875,9 +828,6 @@ class SourceFileDepGraph {
   Memoizer<DependencyKey, SourceFileDepGraphNode *> memoizedNodes;
 
 public:
-  /// Experimenting with llvm::YAMLTraits for import/export; may be slower
-  constexpr static const bool useYAMLTraits = true;
-
   /// For templates such as DotFileEmitter.
   using NodeType = SourceFileDepGraphNode;
 
@@ -930,10 +880,6 @@ public:
                                 Optional<std::string> fingerprint,
                                 Optional<std::string> swiftDeps);
 
-  /// Add a node to a SourceFileDepGraph that the Driver is reading.
-  /// Only used when *not* using YAMLTraits
-  void addDeserializedNode(SourceFileDepGraphNode *);
-
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.
   void addArc(SourceFileDepGraphNode *def, SourceFileDepGraphNode *use) {
@@ -965,13 +911,6 @@ private:
            "nodes.");
     allNodes.push_back(n);
   }
-
-  /// Parse the swiftDeps file and invoke nodeCallback for each node.
-  /// \returns true if had error.
-  /// Only used when *not* using YAMLTraits
-  static bool parseDependencyFile(
-      llvm::MemoryBuffer &,
-      function_ref<void(SourceFileDepGraphNode *)> nodeCallback);
 };
 } // namespace experimental_dependencies
 } // namespace swift
