@@ -435,7 +435,8 @@ void ModuleDepGraph::verifyNodeIsUniqueWithinSubgraph(
                2> &nodesSeenInNodeMap,
     const std::string &swiftDepsString, const DependencyKey &key,
     ModuleDepGraphNode *const n, const unsigned submapIndex) const {
-  assert(submapIndex < nodesSeenInNodeMap.size());
+  assert(submapIndex < nodesSeenInNodeMap.size() &&
+         "submapIndex is out of bounds.");
   auto iterInserted = nodesSeenInNodeMap[submapIndex][n->getKey()].insert(
       std::make_pair(n->getSwiftDeps().hasValue() ? n->getSwiftDeps().getValue()
                                                   : std::string(),

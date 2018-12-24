@@ -325,7 +325,7 @@ void MappingContextTraits<SourceFileDepGraphNode, SourceFileDepGraph>::mapping(
     for (size_t u : usesOfMeVec)
       node.usesOfMe.insert(u);
   }
-  assert(g.getNode(node.sequenceNumber));
+  assert(g.getNode(node.sequenceNumber) && "Bad sequence number");
 }
 
 size_t SequenceTraits<std::vector<SourceFileDepGraphNode *>>::size(
