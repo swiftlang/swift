@@ -12,6 +12,8 @@
 // This file provides Swift language support by invoking SourceKit internally.
 //===----------------------------------------------------------------------===//
 
+import Foundation
+
 enum SourceKitdError: Error, CustomStringConvertible {
   case EditorOpenError(message: String)
   case EditorCloseError(message: String)
@@ -28,7 +30,11 @@ enum SourceKitdError: Error, CustomStringConvertible {
 
 public class SwiftLang {
 
-  fileprivate static func parse(content: String, name: String, isURL: Bool) throws -> String {
+  fileprivate static func parse<T>(
+    content: String, name: String, isURL: Bool,
+    format: SourceKitdUID,
+    getter: (SourceKitdResponse.Dictionary) -> (SourceKitdUID) -> T
+  ) throws -> T {
     let Service = SourceKitdService()
     let Request = SourceKitdRequest(uid: .request_EditorOpen)
     if isURL {
@@ -39,6 +45,8 @@ public class SwiftLang {
     Request.addParameter(.key_Name, value: name)
     Request.addParameter(.key_SyntaxTreeTransferMode,
                          value: .kind_SyntaxTreeFull)
+    Request.addParameter(.key_SyntaxTreeSerializationFormat,
+                         value: format)
     Request.addParameter(.key_EnableSyntaxMap, value: 0)
     Request.addParameter(.key_EnableStructure, value: 0)
     Request.addParameter(.key_SyntacticOnly, value: 1)
@@ -55,7 +63,7 @@ public class SwiftLang {
     if CloseResp.isError {
       throw SourceKitdError.EditorCloseError(message: CloseResp.description)
     }
-    return Resp.value.getString(.key_SerializedSyntaxTree)
+    return getter(Resp.value)(.key_SerializedSyntaxTree)
   }
 
   /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
@@ -64,7 +72,9 @@ public class SwiftLang {
   /// - Parameter url: The URL you wish to parse.
   /// - Returns: The syntax tree in Json format string.
   public static func parse(path: String) throws -> String {
-    return try parse(content: path, name: path, isURL: true)
+    return try parse(content: path, name: path, isURL: true,
+                      format: .kind_SyntaxTreeSerializationJSON,
+                      getter: SourceKitdResponse.Dictionary.getString)
   }
 
   /// Parses a given source buffer into a `Syntax` tree in Json serialization
@@ -72,6 +82,29 @@ public class SwiftLang {
   /// - Parameter source: The source buffer you wish to parse.
   /// - Returns: The syntax tree in Json format string.
   public static func parse(source: String) throws -> String {
-    return try parse(content: source, name: "foo", isURL: false)
+    return try parse(content: source, name: "foo", isURL: false,
+                      format: .kind_SyntaxTreeSerializationJSON,
+                      getter: SourceKitdResponse.Dictionary.getString)
+  }
+
+  /// Parses the Swift file at the provided URL into a `Syntax` tree in byte tree
+  /// serialization format by querying SourceKitd service. This function isn't
+  /// thread safe.
+  /// - Parameter url: The URL you wish to parse.
+  /// - Returns: The syntax tree in byte tree format.
+  public static func parseByteTree(path: String) throws -> Data {
+    return try parse(content: path, name: path, isURL: true,
+                      format: .kind_SyntaxTreeSerializationByteTree,
+                      getter: SourceKitdResponse.Dictionary.getData)
+  }
+  
+  /// Parses a given source buffer into a `Syntax` tree in byte tree serialization
+  /// format by querying SourceKitd service. This function isn't thread safe.
+  /// - Parameter source: The source buffer you wish to parse.
+  /// - Returns: The syntax tree in byte tree format.
+  public static func parse(source: String) throws -> Data {
+    return try parse(content: source, name: "foo", isURL: false,
+                      format: .kind_SyntaxTreeSerializationByteTree,
+                      getter: SourceKitdResponse.Dictionary.getData)
   }
 }
