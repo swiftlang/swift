@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/libTest.dylib -module-name Test
-// RUN: llvm-nm %t/libTest.dylib | %FileCheck %s
+// RUN: %target-build-swift -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/%target-library-name(Test) -module-name Test
+// RUN: llvm-nm %t/%target-library-name(Test) | %FileCheck %s
 
 // CHECK: $s4Test10CoolStructV10coolFactorSdvg
 
