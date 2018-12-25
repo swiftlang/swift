@@ -685,7 +685,8 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
     break;
   case KeyPathPatternComponent::Kind::TupleElement:
-    llvm_unreachable("[technicated]");
+    handleComponentCommon(KeyPathComponentKindEncoding::TupleElement);
+    ListOfValues.push_back((unsigned)component.getTupleIndex());
     break;
   }
 }

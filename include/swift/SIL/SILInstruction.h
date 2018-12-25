@@ -2439,12 +2439,17 @@ private:
   // Value is the VarDecl* for StoredProperty, the SILFunction* of the
   // Getter for computed properties, or the Kind for other kinds
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
-  
-  // Setter is the SILFunction* of the Setter for computed properties, or the
-  // tuple index for tuple elements
-  llvm::PointerIntPair<void *, 2,
+  llvm::PointerIntPair<SILFunction *, 2,
                        ComputedPropertyId::KindType> SetterAndIdKind;
-  ComputedPropertyId::ValueType IdValue;
+
+  // If this component refers to a tuple element then TupleIndex is the
+  // 1-based index of the element in the tuple, in order to allow the
+  // discrimination of the TupleElement Kind from the StoredProperty Kind
+  union {
+    unsigned TupleIndex = 0;
+    ComputedPropertyId::ValueType IdValue;
+  };
+
   ArrayRef<Index> Indices;
   struct {
     SILFunction *Equal;
@@ -2492,10 +2497,9 @@ private:
   /// Constructor for tuple element.
   KeyPathPatternComponent(unsigned tupleIndex, CanType componentType)
     : ValueAndKind((void*)((uintptr_t)Kind::TupleElement << KindPackingBits), PackedStored),
-    SetterAndIdKind((void*)((uintptr_t)tupleIndex << 2), (ComputedPropertyId::KindType)0),
+    TupleIndex(tupleIndex + 1),
     ComponentType(componentType)
   {
-    // fixme: [technicated] magic << 2 shift
   }
 
 public:
@@ -2509,7 +2513,7 @@ public:
     auto packedKind = ValueAndKind.getInt();
     switch ((PackedKind)packedKind) {
     case PackedStored:
-      return SetterAndIdKind.getPointer()
+      return TupleIndex
         ? Kind::TupleElement : Kind::StoredProperty;
     case PackedComputed:
       return SetterAndIdKind.getPointer()
@@ -2580,7 +2584,7 @@ public:
     case Kind::TupleElement:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return static_cast<SILFunction*>(SetterAndIdKind.getPointer());
+      return SetterAndIdKind.getPointer();
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2676,8 +2680,7 @@ public:
     case Kind::SettableProperty:
       llvm_unreachable("not a tuple element");
     case Kind::TupleElement:
-      // fixme: [technicated] magic >> 2 shift
-      return (uintptr_t)SetterAndIdKind.getPointer() >> 2;
+      return TupleIndex - 1;
     }
     llvm_unreachable("unhandled kind");
   }

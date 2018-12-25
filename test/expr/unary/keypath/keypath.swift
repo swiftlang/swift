@@ -220,8 +220,6 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 func testDisembodiedStringInterpolation(x: Int) {
   \(x) // expected-error{{string interpolation}} expected-error{{}}
   \(x, radix: 16) // expected-error{{string interpolation}} expected-error{{}}
-
-  _ = \(Int, Int).0 // expected-error{{cannot reference tuple elements}}
 }
 
 func testNoComponents() {
@@ -235,20 +233,19 @@ struct TupleStruct {
 }
 
 func tupleComponent() {
-  // TODO: Customized diagnostic
-  let _ = \(Int, String).0 // expected-error{{}}
-  let _ = \(Int, String).1 // expected-error{{}}
-  let _ = \TupleStruct.unlabeled.0 // expected-error{{}}
-  let _ = \TupleStruct.unlabeled.1 // expected-error{{}}
+  let _ = \(Int, String).0
+  let _ = \(Int, String).1
+  let _ = \TupleStruct.unlabeled.0
+  let _ = \TupleStruct.unlabeled.1
 
-  let _ = \(foo: Int, bar: String).0 // expected-error{{}}
-  let _ = \(foo: Int, bar: String).1 // expected-error{{}}
-  let _ = \(foo: Int, bar: String).foo // expected-error{{}}
-  let _ = \(foo: Int, bar: String).bar // expected-error{{}}
-  let _ = \TupleStruct.labeled.0 // expected-error{{}}
-  let _ = \TupleStruct.labeled.1 // expected-error{{}}
-  let _ = \TupleStruct.labeled.foo // expected-error{{}}
-  let _ = \TupleStruct.labeled.bar // expected-error{{}}
+  let _ = \(foo: Int, bar: String).0
+  let _ = \(foo: Int, bar: String).1
+  let _ = \(foo: Int, bar: String).foo
+  let _ = \(foo: Int, bar: String).bar
+  let _ = \TupleStruct.labeled.0
+  let _ = \TupleStruct.labeled.1
+  let _ = \TupleStruct.labeled.foo
+  let _ = \TupleStruct.labeled.bar
 }
 
 struct Z { }
