@@ -34,31 +34,26 @@ using namespace swift;
 // type. Otherwise, directly return the decl's type.
 static Type getParameterType(ValueDecl *decl) {
   auto &ctx = decl->getASTContext();
-  auto *paramAggProto =
-      ctx.getProtocol(KnownProtocolKind::ParameterGroup);
+  auto *paramGroupProto = ctx.getProtocol(KnownProtocolKind::ParameterGroup);
   auto conf = TypeChecker::conformsToProtocol(
-      decl->getInterfaceType(), paramAggProto, decl->getDeclContext(),
+      decl->getInterfaceType(), paramGroupProto, decl->getDeclContext(),
       ConformanceCheckFlags::InExpression);
   if (!conf)
     return decl->getInterfaceType();
   Type parameterType = ProtocolConformanceRef::getTypeWitnessByName(
-      decl->getInterfaceType(), *conf, ctx.Id_Parameter,
-      ctx.getLazyResolver());
+      decl->getInterfaceType(), *conf, ctx.Id_Parameter, ctx.getLazyResolver());
   assert(parameterType && "'Parameter' associated type not found");
   return parameterType;
 }
 
 static Type deriveParameterGroup_Parameter(NominalTypeDecl *nominal) {
-  if (nominal->getMembers().empty())
+  if (nominal->getStoredProperties().empty())
     return Type();
   // If all stored properties have the same type, return that type.
   // Otherwise, the `Parameter` type cannot be derived.
   Type sameMemberType;
-  for (auto member : nominal->getMembers()) {
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    auto parameterType = getParameterType(varDecl);
+  for (auto member : nominal->getStoredProperties()) {
+    auto parameterType = getParameterType(member);
     if (!sameMemberType) {
       sameMemberType = parameterType;
       continue;
@@ -78,7 +73,8 @@ DerivedConformance::canDeriveParameterGroup(NominalTypeDecl *nominal) {
 // necessary.
 void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
   // If nominal already has @_fixed_layout, return.
-  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>()) return;
+  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
+    return;
   auto access = nominal->getEffectiveAccess();
   // If nominal does not have at least internal access, return.
   if (access < AccessLevel::Internal)
@@ -86,12 +82,11 @@ void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
   // If nominal is internal, it should have the @usableFromInline attribute.
   if (access == AccessLevel::Internal &&
       !nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    nominal->getAttrs().add(
-      new (TC.Context) UsableFromInlineAttr(/*Implicit*/ true));
+    nominal->getAttrs().add(new (TC.Context)
+                                UsableFromInlineAttr(/*Implicit*/ true));
   }
   // Add the @_fixed_layout attribute to the nominal.
-  nominal->getAttrs().add(
-    new (TC.Context) FixedLayoutAttr(/*Implicit*/ true));
+  nominal->getAttrs().add(new (TC.Context) FixedLayoutAttr(/*Implicit*/ true));
 }
 
 static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
@@ -107,17 +102,16 @@ static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
   return parameterDecl;
 }
 
-static void
-deriveBodyParameterGroup_update(AbstractFunctionDecl *updateDecl) {
-  auto *nominal = updateDecl->getDeclContext()->getSelfNominalTypeDecl();
+static void deriveBodyParameterGroup_update(AbstractFunctionDecl *funcDecl) {
+  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-  auto *selfDecl = updateDecl->getImplicitSelfDecl();
+  auto *selfDecl = funcDecl->getImplicitSelfDecl();
   Expr *selfDRE =
       new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
 
-  auto *gradientsDecl = updateDecl->getParameters()->get(0);
-  auto *updaterDecl = updateDecl->getParameters()->get(1);
+  auto *gradientsDecl = funcDecl->getParameters()->get(0);
+  auto *updaterDecl = funcDecl->getParameters()->get(1);
   Expr *gradientsDRE =
       new (C) DeclRefExpr(gradientsDecl, DeclNameLoc(), /*Implicit*/ true);
   Expr *updaterDRE =
@@ -125,27 +119,24 @@ deriveBodyParameterGroup_update(AbstractFunctionDecl *updateDecl) {
 
   // Return the member with the same name as a target VarDecl.
   auto getMatchingMember = [&](VarDecl *target) -> VarDecl * {
-    for (auto member : nominal->getMembers()) {
-      auto *varDecl = dyn_cast<VarDecl>(member);
-      if (!varDecl)
-        continue;
-      if (varDecl->getName() == target->getName())
-        return varDecl;
+    for (auto member : nominal->getStoredProperties()) {
+      if (member->getName() == target->getName())
+        return member;
     }
     assert(false && "Could not find matching 'ParameterGroup' member");
     return nullptr;
   };
 
-  auto *paramAggProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
-  auto lookup = paramAggProto->lookupDirect(C.getIdentifier("update"));
+  auto *paramGroupProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
+  auto lookup = paramGroupProto->lookupDirect(C.getIdentifier("update"));
   assert(lookup.size() == 1 && "Broken 'ParameterGroup' protocol");
   auto updateRequirement = lookup[0];
 
   // Return an "update call" expression for a member `x`.
   auto createUpdateCallExpr = [&](VarDecl *member) -> Expr * {
     auto module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(member->getType(), paramAggProto);
-
+    auto confRef =
+        module->lookupConformance(member->getType(), paramGroupProto);
     auto *memberExpr = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
                                              DeclNameLoc(), /*Implicit*/ true);
     auto *gradientsMemberExpr = new (C) MemberRefExpr(
@@ -177,16 +168,13 @@ deriveBodyParameterGroup_update(AbstractFunctionDecl *updateDecl) {
   };
 
   SmallVector<ASTNode, 2> updateCallNodes;
-  for (auto member : nominal->getMembers()) {
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    auto *call = createUpdateCallExpr(varDecl);
+  for (auto member : nominal->getStoredProperties()) {
+    auto *call = createUpdateCallExpr(member);
     updateCallNodes.push_back(call);
   }
-  updateDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), updateCallNodes, SourceLoc(),
-                        /*Implicit*/ true));
+  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), updateCallNodes,
+                                      SourceLoc(),
+                                      /*Implicit*/ true));
 }
 
 // Synthesize the `update(withGradients:_:)` function declaration.
@@ -210,16 +198,15 @@ static ValueDecl *deriveParameterGroup_update(DerivedConformance &derived) {
   gradientsDecl->setInterfaceType(parametersInterfaceType);
 
   auto inoutFlag = ParameterTypeFlags().withInOut(true);
-  auto updaterDecl = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
-      SourceLoc(), C.getIdentifier("updater"), parentDC);
+  auto updaterDecl = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                                       SourceLoc(), Identifier(), SourceLoc(),
+                                       C.getIdentifier("updater"), parentDC);
   FunctionType::Param updaterInputTypes[] = {
-    FunctionType::Param(parameterType, Identifier(), inoutFlag),
-    FunctionType::Param(parameterType)
-  };
-  auto updaterType = FunctionType::get(updaterInputTypes,
-                                       TupleType::getEmpty(C),
-                                       FunctionType::ExtInfo().withNoEscape());
+      FunctionType::Param(parameterType, Identifier(), inoutFlag),
+      FunctionType::Param(parameterType)};
+  auto updaterType =
+      FunctionType::get(updaterInputTypes, TupleType::getEmpty(C),
+                        FunctionType::ExtInfo().withNoEscape());
   updaterDecl->setInterfaceType(updaterType);
 
   ParameterList *params =
@@ -240,7 +227,7 @@ static ValueDecl *deriveParameterGroup_update(DerivedConformance &derived) {
   updateDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   updateDecl->setValidationToChecked();
 
-  derived.addMembersToConformanceContext({ updateDecl });
+  derived.addMembersToConformanceContext({updateDecl});
   C.addSynthesizedDecl(updateDecl);
 
   return updateDecl;
@@ -252,18 +239,15 @@ DerivedConformance::deriveParameterGroup(ValueDecl *requirement) {
     addFixedLayoutAttrIfNeeded(TC, Nominal);
     return deriveParameterGroup_update(*this);
   }
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_group_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_parameter_group_requirement);
   return nullptr;
 }
 
-Type DerivedConformance::deriveParameterGroup(
-    AssociatedTypeDecl *requirement) {
+Type DerivedConformance::deriveParameterGroup(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Parameter) {
     addFixedLayoutAttrIfNeeded(TC, Nominal);
     return deriveParameterGroup_Parameter(Nominal);
   }
-  TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_group_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_parameter_group_requirement);
   return nullptr;
 }

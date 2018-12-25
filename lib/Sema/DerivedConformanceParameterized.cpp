@@ -162,7 +162,7 @@ static void derivedBody_allParametersGetter(AbstractFunctionDecl *getterDecl) {
 
   auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
   auto allParametersReq =
-    getProtocolRequirement(parameterizedProto, C.Id_allParameters);
+      getProtocolRequirement(parameterizedProto, C.Id_allParameters);
 
   auto getUnderlyingParameter = [&](Expr *expr, VarDecl *param) -> Expr * {
     auto module = nominal->getModuleContext();
@@ -220,7 +220,7 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
 
   auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
   auto allParametersReq =
-    getProtocolRequirement(parameterizedProto, C.Id_allParameters);
+      getProtocolRequirement(parameterizedProto, C.Id_allParameters);
 
   // Returns the underlying parameter of a VarDecl `x`.
   // If `x` conforms to `Parameterized`, return `x.allParameters`.
@@ -238,12 +238,8 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
 
   // Map `Parameters` struct members to their names for efficient lookup.
   llvm::DenseMap<Identifier, VarDecl *> parametersMembers;
-  for (auto member : parametersDecl->getMembers()) {
-    auto *varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    parametersMembers[varDecl->getName()] = varDecl;
-  }
+  for (auto member : parametersDecl->getStoredProperties())
+    parametersMembers[member->getName()] = member;
 
   SmallVector<ASTNode, 2> assignNodes;
   SmallVector<VarDecl *, 8> tfParamDecls;
@@ -394,12 +390,8 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   C.addSynthesizedDecl(initDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
-  for (auto member : parametersDecl->getMembers()) {
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    varDecl->setImplicit();
-  }
+  for (auto member : parametersDecl->getStoredProperties())
+    member->setImplicit();
 
   derived.addMembersToConformanceContext({parametersDecl});
   C.addSynthesizedDecl(parametersDecl);
