@@ -186,8 +186,9 @@ Running the testsuite on Windows has additional external dependencies.  You must
 
   1. coreutils
   2. diffutils
-  3. grep
-  4. sed
+  3. file
+  4. grep
+  5. sed
   
 ```cmd
 ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
