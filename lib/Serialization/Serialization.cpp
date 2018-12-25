@@ -2384,9 +2384,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     }
 
     DifferentiableDeclAttrLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, (unsigned) attr->getMode(), primalName,
-      primalRef, adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef,
-      parameters);
+      Out, ScratchRecord, abbrCode, primalName, primalRef, adjointName,
+      adjointRef, jvpName, jvpRef, vjpName, vjpRef, parameters);
     // TODO: Serialize CheckedParameterIndices.
     // TODO: Serialize trailing where clause.
     // Type-checking where clause should be done first (mimicking the

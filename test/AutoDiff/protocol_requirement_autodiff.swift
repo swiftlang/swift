@@ -13,7 +13,7 @@ func pullback<T, U, R>(
 }
 
 protocol DiffReq : Differentiable {
-  @differentiable(reverse, wrt: (self, .0))
+  @differentiable(wrt: (self, .0))
   func f(_ x: Float) -> Float
 }
 

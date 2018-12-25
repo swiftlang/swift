@@ -795,7 +795,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, wrt: (self),
+    wrt: (self),
     adjoint: _adjointReshaped(seed:originalValue:toShape:)
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
@@ -819,7 +819,7 @@ public extension Tensor {
   /// specified shape index.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, wrt: (self),
+    wrt: (self),
     adjoint: _adjointExpandingShape(seed:originalValue:at:)
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {

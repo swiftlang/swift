@@ -847,8 +847,6 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
-  AutoDiffMode mode;
-  SourceLoc modeLoc;
   SmallVector<AutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> primalSpec;
   Optional<DeclNameWithLoc> adjointSpec;
@@ -857,9 +855,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse @differentiable attribute arguments.
-  if (parseDifferentiableAttributeArguments(mode, modeLoc, params, primalSpec,
-                                            adjointSpec, jvpSpec, vjpSpec,
-                                            whereClause))
+  if (parseDifferentiableAttributeArguments(params, primalSpec, adjointSpec,
+                                            jvpSpec, vjpSpec, whereClause))
     return makeParserError();
 
   // Parse ')'.
@@ -871,12 +868,11 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
-                               mode, modeLoc, params, primalSpec, adjointSpec,
-                               jvpSpec, vjpSpec, whereClause));
+                               params, primalSpec, adjointSpec, jvpSpec,
+                               vjpSpec, whereClause));
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
-    AutoDiffMode &mode, SourceLoc &modeLoc,
     SmallVectorImpl<AutoDiffParameter> &params,
     Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
@@ -896,43 +892,23 @@ bool Parser::parseDifferentiableAttributeArguments(
     return true;
   };
 
+  // Store starting parser position.
+  auto startingLoc = Tok.getLoc();
   SyntaxParsingContext ContentContext(
       SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
 
-  // Parse differentiation mode ('forward' or 'reverse').
-  if (!Tok.is(tok::identifier)) {
-    diagnose(Tok, diag::attr_differentiable_expected_mode);
-    return errorAndSkipToEnd();
-  }
-  auto modeText = Tok.getText();
-  if (modeText == "forward")
-    mode = AutoDiffMode::Forward;
-  else if (modeText == "reverse")
-    mode = AutoDiffMode::Reverse;
-  else {
-    diagnose(Tok, diag::attr_differentiable_expected_mode);
-    return errorAndSkipToEnd();
-  }
-  modeLoc = consumeToken(tok::identifier);
-
-  // Parse optional differentiation parameters, starting with the
-  // 'wrt:' label.
+  // Parse optional differentiation parameters, starting with the 'wrt:' label.
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) &&
-      peekToken().getText() == "withRespectTo") {
-    consumeToken(tok::comma);
+  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) && peekToken().getText() == "wrt") {
+  if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
     SyntaxParsingContext DiffParamsContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
-    consumeToken(tok::comma);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -989,13 +965,13 @@ bool Parser::parseDifferentiableAttributeArguments(
 
     SyntaxContext->collectNodesInPlace(
         SyntaxKind::DifferentiableAttributeDiffParamList);
-    // Parse closing ')' of the parameter list and a comma.
+    // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
   }
 
   using FuncSpec = DifferentiableAttr::DeclNameWithLoc;
   // Function that parses a label and a function specifier,
-  // e.g. 'primal: foo(_:)'.
+  // e.g. 'vjp: foo(_:)'.
   auto parseFuncSpec = [&](StringRef label, FuncSpec &result) -> bool {
     // Parse label.
     if (parseSpecificIdentifier(label,
@@ -1013,58 +989,65 @@ bool Parser::parseDifferentiableAttributeArguments(
     return !result.Name;
   };
 
+  // Returns true if token is an identifier with the given name.
+  auto tokIsIdentifier = [&](StringRef name) -> bool {
+    // If token is a comma, check the next token.
+    if (Tok.is(tok::comma))
+      return peekToken().is(tok::identifier) && peekToken().getText() == name;
+    return Tok.is(tok::identifier) && Tok.getText() == name;
+  };
+
   // Parse 'primal: <func_name>' (optional).
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) && peekToken().getText() == "primal") {
+  if (tokIsIdentifier("primal")) {
     SyntaxParsingContext PrimalContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeToken(tok::comma);
+    consumeIf(tok::comma);
     primalSpec = FuncSpec();
     if (parseFuncSpec("primal", *primalSpec))
       return errorAndSkipToEnd();
   }
   
   // Parse 'adjoint: <func_name>' (optional).
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) && peekToken().getText() == "adjoint") {
+  if (tokIsIdentifier("adjoint")) {
     SyntaxParsingContext AdjointContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeToken(tok::comma);
+    consumeIf(tok::comma);
     adjointSpec = FuncSpec();
     if (parseFuncSpec("adjoint", *adjointSpec))
       return errorAndSkipToEnd();
   }
 
   // Parse 'jvp: <func_name>' (optional).
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) && peekToken().getText() == "jvp") {
-    SyntaxParsingContext AdjointContext(
+  if (tokIsIdentifier("jvp")) {
+    SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeToken(tok::comma);
+    consumeIf(tok::comma);
     jvpSpec = FuncSpec();
     if (parseFuncSpec("jvp", *jvpSpec))
       return errorAndSkipToEnd();
   }
 
   // Parse 'vjp: <func_name>' (optional).
-  if (Tok.is(tok::comma) &&
-      peekToken().is(tok::identifier) && peekToken().getText() == "vjp") {
-    SyntaxParsingContext AdjointContext(
+  if (tokIsIdentifier("vjp")) {
+    SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeToken(tok::comma);
+    consumeIf(tok::comma);
     vjpSpec = FuncSpec();
     if (parseFuncSpec("vjp", *vjpSpec))
       return errorAndSkipToEnd();
   }
 
-  // If the token is still a comma, whatever follows it must be wrong. Emit a
-  // diagnostic there.
-  if (Tok.is(tok::comma)) {
-    diagnose(consumeToken(tok::comma),
-             diag::attr_differentiable_expected_config_after_comma);
+  // Emit a diagnostic if:
+  // 1. The token is a comma. All valid commas should have been parsed by here.
+  // 2. The parser has not advanced and the next token is not 'where' or ')'.
+  if (Tok.is(tok::comma) ||
+      (Tok.getLoc() == startingLoc &&
+       Tok.isNot(tok::kw_where) &&
+       Tok.isNot(tok::r_paren))) {
+    diagnose(Tok, diag::attr_differentiable_expected_config);
     return errorAndSkipToEnd();
   }
-    
+
   // Parse a trailing 'where' clause if any.
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;

@@ -6,7 +6,7 @@ import StdlibUnittest
 
 var SupersetAdjointTests = TestSuite("SupersetAdjoint")
 
-@differentiable(reverse, wrt: (.0, .1), adjoint: dmulxy)
+@differentiable(wrt: (.0, .1), adjoint: dmulxy)
 func mulxy(_ x: Float, _ y: Float) -> Float {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {
@@ -41,7 +41,7 @@ SupersetAdjointTests.test("CrossModule") {
 
 // FIXME: Unbreak this one.
 //
-// @differentiable(reverse, wrt: (.0, .1), vjp: dx_T)
+// @differentiable(wrt: (.0, .1), vjp: dx_T)
 // func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
 //   if x > 1000 {
 //     return x

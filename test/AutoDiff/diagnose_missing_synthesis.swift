@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false -verify %s
 
-@differentiable(reverse, vjp: vjpMultiply)
+@differentiable(vjp: vjpMultiply)
 func multiply(_ x: Float) -> Float {
   return x * 10
 }

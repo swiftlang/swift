@@ -7,7 +7,7 @@ import Swift
 import SwiftShims
 
 protocol DiffReq {
-  @differentiable(reverse, wrt: (.0))
+  @differentiable(wrt: (.0))
   func f(_ x: Float) -> Float
 }
 

@@ -77,7 +77,7 @@ TensorADTests.testAllBackends("negate") {
 }
 
 TensorADTests.testAllBackends("SR-9345: OwnedCheckpoints") {
-  @differentiable(reverse, adjoint: adjointFoo)
+  @differentiable(adjoint: adjointFoo)
   func foo(_ x: Tensor<Float>) -> Tensor<Float> {
       return Raw.identity(x)
   }

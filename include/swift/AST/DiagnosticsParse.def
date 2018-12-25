@@ -1477,14 +1477,13 @@ ERROR(attr_differentiable_nondifferentiable_function,none,
       "function '%0' is not differentiable", (StringRef))
 ERROR(attr_differentiable_duplicate_config_option,PointsToFirstBadToken,
       "duplicated gradient configuration option '%0'", (StringRef))
-ERROR(attr_differentiable_expected_mode,PointsToFirstBadToken,
-      "expected a differentiation mode ('forward' or 'reverse')", ())
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
-ERROR(attr_differentiable_expected_config_after_comma,none,
-      "expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'", ())
+ERROR(attr_differentiable_expected_config,none,
+      "expected a configuration, e.g. 'wrt:', 'primal:', 'adjoint:', 'jvp:', "
+      "or 'vjp:'", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,

@@ -9,11 +9,11 @@
 // UN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
 // UN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
 
-@differentiable(reverse) public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable() public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (.0)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
-@differentiable(reverse) internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable() internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (.0)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
-@differentiable(reverse) private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
-@differentiable(reverse, wrt: (.0)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable() private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable(wrt: (.0)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }

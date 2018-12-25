@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo")
-@differentiable(reverse, adjoint: dfoo)
+@differentiable(adjoint: dfoo)
 public func foo(_ x: Float, _ y: Float) -> Float {
   return 1
 }
@@ -24,7 +24,7 @@ public func dfoo(_ seed: Float, partial: Float, _ x: Float, _ y: Float) -> (Floa
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo_indir_ret")
-@differentiable(reverse, adjoint: dfoo_indir_ret)
+@differentiable(adjoint: dfoo_indir_ret)
 public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
   return y
 }
@@ -45,7 +45,7 @@ public func dfoo_indir_ret<T>(_ seed: T, _ partial: T, _ x: Float, _ y: T) -> (F
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo_tuple")
-@differentiable(reverse, adjoint: dfoo_tuple)
+@differentiable(adjoint: dfoo_tuple)
 public func foo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Float) -> Float {
   return 1
 }
@@ -60,7 +60,7 @@ public func dfoo_tuple(_ seed: Float, partial: Float, _ x: ((Float, (Float, Floa
 // CHECK-LABEL: sil @dfoo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float) -> (Float, Float, Float, Float, Float, Float)
 
 @_silgen_name("no_prim_or_adj")
-@differentiable(reverse) // ok!
+@differentiable() // ok!
 public func no_prim_or_adj(_ x: Float) -> Float {
   return x * x
 }
@@ -72,7 +72,7 @@ public func no_prim_or_adj(_ x: Float) -> Float {
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("hasjvp")
-@differentiable(reverse, jvp: dhasjvp)
+@differentiable(jvp: dhasjvp)
 public func hasjvp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
@@ -91,7 +91,7 @@ public func dhasjvp(_ x: Float, _ y: Float) -> (Float, (Float, Float) -> Float) 
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("hasvjp")
-@differentiable(reverse, vjp: dhasvjp)
+@differentiable(vjp: dhasvjp)
 public func hasvjp(_ x: Float, _ y: Float) -> Float {
   return 1
 }
