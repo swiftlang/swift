@@ -108,6 +108,16 @@ struct ModelWithInvalidParameters : Parameterized {
   struct Parameters {} // expected-error {{'Parameters' struct is invalid}}
 }
 
+// Test invalid `@TFParameter` usage.
+struct InvalidTFParameterUsage : Parameterized {
+  @TFParameter var layer: DenseLayer
+  @TFParameter var float: Float
+
+  @TFParameter var computed: Float { return 1 } // expected-error {{only instance stored properties can be declared @TFParameter}}
+  @TFParameter func method() -> Float { return 1 } // expected-error {{@TFParameter may only be used on 'var' declarations}}
+  @TFParameter struct MemberStruct {} // expected-error {{@TFParameter may only be used on 'var' declarations}}
+}
+
 // Test invalid `@TFParameter` usage outside of `Parameterized` type.
 struct NonParameterized {
   @TFParameter var float: Float // expected-error {{@TFParameter is allowed only in types that conform to 'Parameterized'}}
