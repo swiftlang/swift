@@ -23,10 +23,6 @@
 
 namespace swift {
 
-enum class AutoDiffMode {
-  Forward, Reverse
-};
-
 class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };

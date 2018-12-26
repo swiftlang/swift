@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-use-vjp=false %s | %FileCheck %s
 
-@differentiable(reverse, adjoint: adjointId)
+@differentiable(adjoint: adjointId)
 func id(_ x: Float) -> Float {
   return x
 }
@@ -20,7 +20,7 @@ import func Darwin.exp
 import func Glibc.exp
 #endif
 
-@differentiable(reverse, primal: primalSigmoid, adjoint: adjointSigmoid)
+@differentiable(primal: primalSigmoid, adjoint: adjointSigmoid)
 func sigmoid(_ x: Double) -> Double {
   return 1.0 / (1.0 + exp(-x))
 }
@@ -43,7 +43,7 @@ print(x * z)
 
 // CHECK-LABEL: @{{.*}}sigmoid{{.*}}__vjp_src_0_wrt_0
 
-@differentiable(reverse)
+@differentiable()
 public func publicFunc(_ x: Float) -> Float {
   return x + x
 }

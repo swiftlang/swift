@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
 
 protocol Proto : Differentiable {
-  @differentiable(reverse)
+  @differentiable()
   func function1(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(reverse, wrt: (self, .0, .1))
+  @differentiable(wrt: (self, .0, .1))
   func function2(_ x: Float, _ y: Float) -> Float
 
-  @differentiable(reverse, wrt: (.1))
+  @differentiable(wrt: (.1))
   func function3(_ x: Float, _ y: Float) -> Float
 }
 

@@ -1321,9 +1321,6 @@ public:
     DeclNameLoc Loc;
   };
 private:
-  /// Differentiation mode (forward or reverse).
-  AutoDiffMode Mode;
-  SourceLoc ModeLoc;
   /// The number of parameters specified in 'wrt:'.
   unsigned NumParameters;
   /// The primal function.
@@ -1352,7 +1349,6 @@ private:
   AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                              AutoDiffMode mode, SourceLoc modeLoc,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> primal,
                               Optional<DeclNameWithLoc> adjoint,
@@ -1362,8 +1358,7 @@ private:
 
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
-                                    SourceRange baseRange, AutoDiffMode mode,
-                                    SourceLoc modeLoc,
+                                    SourceRange baseRange,
                                     ArrayRef<AutoDiffParameter> parameters,
                                     Optional<DeclNameWithLoc> primal,
                                     Optional<DeclNameWithLoc> adjoint,
@@ -1371,8 +1366,6 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
-  AutoDiffMode getMode() const { return Mode; }
-  SourceLoc getModeLoc() const { return ModeLoc; }
   Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
   Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }

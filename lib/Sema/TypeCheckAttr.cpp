@@ -2132,9 +2132,9 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
                 specifier.Name);
   };
 
-  // If the original function and the associated functions different parents,
-  // or if they both have no type context and are in different modules, then
-  // it's an error. Returns true on error.
+  // If the original function and the associated function have different
+  // parents, or if they both have no type context and are in different modules,
+  // then it's an error. Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both are top-level.
     if (!original->getInnermostTypeContext() &&
@@ -2190,13 +2190,6 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 }
 
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // Forward mode is unsupported.
-  if (attr->getMode() == AutoDiffMode::Forward) {
-    TC.diagnose(attr->getModeLoc(),
-                diag::differentiable_attr_forward_mode_unsupported);
-    return;
-  }
-
   // '@differentiable' attribute is OnFunc only, rejected by the early checker.
   auto *original = cast<FuncDecl>(D);
   auto isInstanceMethod = original->isInstanceMember();
