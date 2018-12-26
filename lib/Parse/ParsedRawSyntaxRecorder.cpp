@@ -30,10 +30,17 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(const Token &tok,
                                      const Trivia &leadingTrivia,
                                      const Trivia &trailingTrivia) {
+  SourceLoc tokLoc = tok.getLoc();
+  unsigned tokLength = tok.getLength();
+  if (tok.isEscapedIdentifier()) {
+    // Adjust to account for the backticks that are included in trivia.
+    tokLoc = tokLoc.getAdvancedLoc(1);
+    tokLength -= 2;
+  }
   unsigned leadingTriviaLen = leadingTrivia.getTextLength();
   unsigned trailingTriviaLen = trailingTrivia.getTextLength();
-  SourceLoc offset = tok.getLoc().getAdvancedLoc(-leadingTriviaLen);
-  unsigned length = leadingTriviaLen + tok.getLength() + trailingTriviaLen;
+  SourceLoc offset = tokLoc.getAdvancedLoc(-leadingTriviaLen);
+  unsigned length = leadingTriviaLen + tokLength + trailingTriviaLen;
   CharSourceRange range{offset, length};
   OpaqueSyntaxNode n = SPActions->recordToken(tok, leadingTrivia,
                                               trailingTrivia, range);
