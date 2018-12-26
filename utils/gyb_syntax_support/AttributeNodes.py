@@ -164,9 +164,10 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiable-attr-parameters ->
-    #     'wrt' ':' '(' differentiation-parameter-list ')'
+    #     'wrt' ':' '(' differentiation-parameter-list ')' ','?
     Node('DifferentiableAttributeDiffParams', kind='Syntax',
          description='The parameters to differentiate with respect to.',
+         traits=['WithTrailingComma'],
          children=[
              Child('WrtLabel', kind='IdentifierToken',
                    text_choices=['wrt'], description='The "wrt" label.'),
@@ -177,6 +178,7 @@ ATTRIBUTE_NODES = [
              Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # differentiable-attr-diff-param-list ->
@@ -213,15 +215,15 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiation-func-specifier ->
-    #     ','? ('primal' | 'adjoint' | 'jvp' | 'vjp') ':' decl-name
+    #     ('primal' | 'adjoint' | 'jvp' | 'vjp') ':' decl-name ','?
     # decl-name -> (identifier | operator) decl-name-arguments?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
          A function specifier, consisting of an identifier, colon, and a \
          function declaration name (e.g. `vjp: foo(_:_:)`.
          ''',
+         traits=['WithTrailingComma'],
          children=[
-             Child('LeadingComma', kind='CommaToken', is_optional=True),
              Child('Label', kind='IdentifierToken',
                    text_choices=['primal', 'adjoint', 'jvp', 'vjp']),
              Child('Colon', kind='ColonToken'),
@@ -237,6 +239,7 @@ ATTRIBUTE_NODES = [
                    The argument labels of the referenced function, optionally \
                    specified.
                    '''),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # objc-selector-piece -> identifier? ':'?

@@ -892,6 +892,26 @@ bool Parser::parseDifferentiableAttributeArguments(
     return true;
   };
 
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (consumeIf(tok::comma)) {
+      // Diagnose trailing comma before 'where' or ')'.
+      if (Tok.is(tok::kw_where) || Tok.is(tok::r_paren)) {
+        diagnose(Tok, diag::unexpected_separator, ",");
+        return true;
+      }
+      // Check that token after comma is a function specifier label.
+      if (!Tok.is(tok::identifier) || !(Tok.getText() == "primal" ||
+                                        Tok.getText() == "adjoint" ||
+                                        Tok.getText() == "jvp" ||
+                                        Tok.getText() == "vjp")) {
+        diagnose(Tok, diag::attr_differentiable_expected_label);
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Store starting parser position.
   auto startingLoc = Tok.getLoc();
   SyntaxParsingContext ContentContext(
@@ -967,12 +987,19 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxKind::DifferentiableAttributeDiffParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
+    // If no trailing comma or 'where' clause, terminate parsing arguments.
+    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+      return false;
+    if (consumeIfTrailingComma())
+      return errorAndSkipToEnd();
   }
 
   using FuncSpec = DifferentiableAttr::DeclNameWithLoc;
   // Function that parses a label and a function specifier,
   // e.g. 'vjp: foo(_:)'.
-  auto parseFuncSpec = [&](StringRef label, FuncSpec &result) -> bool {
+  // Return true on error.
+  auto parseFuncSpec = [&](StringRef label, FuncSpec &result,
+                           bool &terminateParsingArgs) -> bool {
     // Parse label.
     if (parseSpecificIdentifier(label,
             diag::attr_differentiable_missing_label, label) ||
@@ -986,65 +1013,73 @@ bool Parser::parseDifferentiableAttributeArguments(
         parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
                                  funcDiag, /*allowOperators=*/true,
                                  /*allowZeroArgCompoundNames=*/true);
+    // If no trailing comma or 'where' clause, terminate parsing arguments.
+    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+      terminateParsingArgs = true;
     return !result.Name;
   };
 
-  // Returns true if token is an identifier with the given name.
-  auto tokIsIdentifier = [&](StringRef name) -> bool {
-    // If token is a comma, check the next token.
-    if (Tok.is(tok::comma))
-      return peekToken().is(tok::identifier) && peekToken().getText() == name;
-    return Tok.is(tok::identifier) && Tok.getText() == name;
-  };
+  // Store whether to terminate parsing arguments.
+  bool terminateParsingArgs = false;
 
   // Parse 'primal: <func_name>' (optional).
-  if (tokIsIdentifier("primal")) {
+  if (Tok.is(tok::identifier) && Tok.getText() == "primal") {
     SyntaxParsingContext PrimalContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeIf(tok::comma);
     primalSpec = FuncSpec();
-    if (parseFuncSpec("primal", *primalSpec))
+    if (parseFuncSpec("primal", *primalSpec, terminateParsingArgs))
+      return errorAndSkipToEnd();
+    if (terminateParsingArgs)
+      return false;
+    if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
   }
   
   // Parse 'adjoint: <func_name>' (optional).
-  if (tokIsIdentifier("adjoint")) {
+  if (Tok.is(tok::identifier) && Tok.getText() == "adjoint") {
     SyntaxParsingContext AdjointContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeIf(tok::comma);
     adjointSpec = FuncSpec();
-    if (parseFuncSpec("adjoint", *adjointSpec))
+    if (parseFuncSpec("adjoint", *adjointSpec, terminateParsingArgs))
+      return errorAndSkipToEnd();
+    if (terminateParsingArgs)
+      return false;
+    if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
   }
 
   // Parse 'jvp: <func_name>' (optional).
-  if (tokIsIdentifier("jvp")) {
+  if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeIf(tok::comma);
     jvpSpec = FuncSpec();
-    if (parseFuncSpec("jvp", *jvpSpec))
+    if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
+      return errorAndSkipToEnd();
+    if (terminateParsingArgs)
+      return false;
+    if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
   }
 
   // Parse 'vjp: <func_name>' (optional).
-  if (tokIsIdentifier("vjp")) {
+  if (Tok.is(tok::identifier) && Tok.getText() == "vjp") {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    consumeIf(tok::comma);
     vjpSpec = FuncSpec();
-    if (parseFuncSpec("vjp", *vjpSpec))
+    if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
+      return errorAndSkipToEnd();
+    if (terminateParsingArgs)
+      return false;
+    // Note: intentionally parse trailing comma here, even though it's the last
+    // function specifier. `consumeIfTrailingComma` will emit an error.
+    if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
   }
 
-  // Emit a diagnostic if:
-  // 1. The token is a comma. All valid commas should have been parsed by here.
-  // 2. The parser has not advanced and the next token is not 'where' or ')'.
-  if (Tok.is(tok::comma) ||
-      (Tok.getLoc() == startingLoc &&
-       Tok.isNot(tok::kw_where) &&
-       Tok.isNot(tok::r_paren))) {
-    diagnose(Tok, diag::attr_differentiable_expected_config);
+  // If parser has not advanced and token is not 'where' or ')', emit error.
+  if (Tok.getLoc() == startingLoc &&
+      Tok.isNot(tok::kw_where) && Tok.isNot(tok::r_paren)) {
+    diagnose(Tok, diag::attr_differentiable_expected_label);
     return errorAndSkipToEnd();
   }
 

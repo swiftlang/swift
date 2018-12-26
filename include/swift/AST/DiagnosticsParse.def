@@ -1481,9 +1481,9 @@ ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
-ERROR(attr_differentiable_expected_config,none,
-      "expected a configuration, e.g. 'wrt:', 'primal:', 'adjoint:', 'jvp:', "
-      "or 'vjp:'", ())
+ERROR(attr_differentiable_expected_label,none,
+      "expected a function specifier label, e.g. "
+      "'wrt:', 'primal:', 'adjoint:', 'jvp:', or 'vjp:'", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
