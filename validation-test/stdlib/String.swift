@@ -1,4 +1,3 @@
-// UNSUPPORTED: CPU=powerpc64le
 // RUN: %empty-directory(%t)
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
