@@ -894,20 +894,19 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
-    if (consumeIf(tok::comma)) {
-      // Diagnose trailing comma before 'where' or ')'.
-      if (Tok.is(tok::kw_where) || Tok.is(tok::r_paren)) {
-        diagnose(Tok, diag::unexpected_separator, ",");
-        return true;
-      }
-      // Check that token after comma is a function specifier label.
-      if (!Tok.is(tok::identifier) || !(Tok.getText() == "primal" ||
-                                        Tok.getText() == "adjoint" ||
-                                        Tok.getText() == "jvp" ||
-                                        Tok.getText() == "vjp")) {
-        diagnose(Tok, diag::attr_differentiable_expected_label);
-        return true;
-      }
+    if (!consumeIf(tok::comma)) return false;
+    // Diagnose trailing comma before 'where' or ')'.
+    if (Tok.is(tok::kw_where) || Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return true;
+    }
+    // Check that token after comma is a function specifier label.
+    if (!Tok.is(tok::identifier) || !(Tok.getText() == "primal" ||
+                                      Tok.getText() == "adjoint" ||
+                                      Tok.getText() == "jvp" ||
+                                      Tok.getText() == "vjp")) {
+      diagnose(Tok, diag::attr_differentiable_expected_label);
+      return true;
     }
     return false;
   };
