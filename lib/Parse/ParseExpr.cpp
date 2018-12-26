@@ -1864,7 +1864,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                        SyntaxKind::ExpressionSegment);
 
       // Backslash is part of an expression segment.
-      Token BackSlash(tok::backslash, "\\");
+      Token BackSlash(tok::backslash,
+                      CharSourceRange(Segment.Loc.getAdvancedLoc(-1), 1).str());
       ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
@@ -2013,15 +2014,19 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // We are now sure this is a string interpolation expression.
   LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
-  StringRef Quote;
+  StringRef OpenQuoteStr, CloseQuoteStr;
   tok QuoteKind;
-  std::tie(Quote, QuoteKind) = Tok.isMultilineString() ?
-    std::make_tuple("\"\"\"", tok::multiline_string_quote) :
-    std::make_tuple("\"", tok::string_quote);
+  std::tie(OpenQuoteStr, CloseQuoteStr, QuoteKind) = Tok.isMultilineString() ?
+    std::make_tuple(Tok.getRawText().take_front(3),
+                    Tok.getRawText().take_back(3),
+                    tok::multiline_string_quote) :
+    std::make_tuple(Tok.getRawText().take_front(1),
+                    Tok.getRawText().take_back(1),
+                    tok::string_quote);
 
   // Make unknown tokens to represent the open and close quote.
-  Token OpenQuote(QuoteKind, Quote);
-  Token CloseQuote(QuoteKind, Quote);
+  Token OpenQuote(QuoteKind, OpenQuoteStr);
+  Token CloseQuote(QuoteKind, CloseQuoteStr);
   Trivia EmptyTrivia;
   Trivia EntireTrailingTrivia = TrailingTrivia;
 
