@@ -105,6 +105,32 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
     return (pre_edit_line, post_edit_line, current_reparse_start)
 
 
+def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
+                        incremental_edit_args, reparse_args):
+    with open(test_file, mode='r') as test_file_handle, \
+            open(pre_edit_file, mode='w+') as pre_edit_file_handle, \
+            open(post_edit_file, mode='w+') as post_edit_file_handle:
+
+        current_reparse_start = None
+
+        line_no = 1
+        for line in test_file_handle.readlines():
+            parseLineRes = parseLine(line, line_no, test_case,
+                                     incremental_edit_args,
+                                     reparse_args, current_reparse_start)
+            (pre_edit_line, post_edit_line, current_reparse_start) = \
+                parseLineRes
+
+            pre_edit_file_handle.write(pre_edit_line)
+            post_edit_file_handle.write(post_edit_line)
+
+            line_no += 1
+
+        if current_reparse_start:
+            raise TestFailedError('Unclosed reparse tag for test case %s' %
+                                  test_case)
+
+
 def serializeIncrParseMarkupFile(test_file, test_case, mode,
                                  serialization_mode, serialization_format,
                                  omit_node_ids, output_file, temp_dir,
@@ -124,32 +150,12 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
     # markup for testing incremental parsing
     # =========================================================================
 
-    with open(test_file, mode='r') as test_file_handle, \
-            open(pre_edit_file, mode='w+') as pre_edit_file_handle, \
-            open(post_edit_file, mode='w+') as post_edit_file_handle:
-
-        # Gather command line arguments for swift-syntax-test specifiying the
-        # performed edits in this list
-        incremental_edit_args = []
-        reparse_args = []
-        current_reparse_start = None
-
-        line_no = 1
-        for line in test_file_handle.readlines():
-            parseLineRes = parseLine(line, line_no, test_case,
-                                     incremental_edit_args,
-                                     reparse_args, current_reparse_start)
-            (pre_edit_line, post_edit_line, current_reparse_start) = \
-                parseLineRes
-
-            pre_edit_file_handle.write(pre_edit_line)
-            post_edit_file_handle.write(post_edit_line)
-
-            line_no += 1
-
-        if current_reparse_start:
-            raise TestFailedError('Unclosed reparse tag for test case %s' %
-                                  test_case)
+    # Gather command line arguments for swift-syntax-test specifiying the
+    # performed edits in this list
+    incremental_edit_args = []
+    reparse_args = []
+    prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
+                        incremental_edit_args, reparse_args)
 
     # =========================================================================
     # Now generate the requested serialized file
