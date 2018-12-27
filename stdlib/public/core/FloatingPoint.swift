@@ -1854,7 +1854,9 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
+  // FIXME: Need to make FloatingPoint refine Differentiable to make this
+  // method differentiable, but that causes stdlib compilation to crash.
+  // @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)

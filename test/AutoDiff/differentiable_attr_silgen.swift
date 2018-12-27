@@ -25,20 +25,20 @@ public func dfoo(_ seed: Float, partial: Float, _ x: Float, _ y: Float) -> (Floa
 
 @_silgen_name("foo_indir_ret")
 @differentiable(adjoint: dfoo_indir_ret)
-public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
+public func foo_indir_ret<T: Differentiable>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret primitive] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret primitive] @foo_indir_ret : $@convention(thin) <T where T : Differentiable> (Float, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T):
 
 @_silgen_name("dfoo_indir_ret")
-public func dfoo_indir_ret<T>(_ seed: T, _ partial: T, _ x: Float, _ y: T) -> (Float, T) {
-  return (x, y)
+public func dfoo_indir_ret<T: Differentiable>(_ seed: T.CotangentVector, _ partial: T, _ x: Float, _ y: T) -> (Float, T.CotangentVector) {
+  return (x, seed)
 }
 
-// CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Float, @in_guaranteed T) -> (Float, @out T) {
-// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T, %2 : @trivial $*T, %3 : @trivial $Float, %4 : @trivial $*T):
+// CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T.CotangentVector, @in_guaranteed T, Float, @in_guaranteed T) -> (Float, @out T.CotangentVector) {
+// CHECK: bb0(%0 : @trivial $*T.CotangentVector, %1 : @trivial $*T.CotangentVector, %2 : @trivial $*T, %3 : @trivial $Float, %4 : @trivial $*T):
 
 //===----------------------------------------------------------------------===//
 // Flattened types

@@ -1307,7 +1307,17 @@ public extension Tensor {
 // Normalization
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar : BinaryFloatingPoint {
+// The `Scalar : Differentiable` and `Scalar.CotangentVector == Scalar`
+// constraints make `batchNormalized` differentiable with respect to `offset`
+// and `scale`.
+// TODO: With improved support for constraints on the @differentiable attribute,
+// we could move the constraints to the @differentiable attribute so that
+// `batchNormalized` exists even for scalars not satisfying the constraints. If
+// we did that now, type checking for the adjoint would fail because it
+// doesn't see @differentiable attribute constraints.
+public extension Tensor where Scalar : BinaryFloatingPoint,
+                              Scalar : Differentiable,
+                              Scalar.CotangentVector == Scalar {
   /// Computes the batch normalized tensor along the specified axis.
   ///
   /// Specifically, returns `(self - mu)/(var + epsilon) * gamma + beta` where
