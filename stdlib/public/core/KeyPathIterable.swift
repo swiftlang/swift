@@ -52,11 +52,11 @@ public extension KeyPathIterable {
   }
 }
 
-extension KeyPathIterable {
-  public var _allKeyPathsTypeErased: [AnyKeyPath] {
+public extension KeyPathIterable {
+  var _allKeyPathsTypeErased: [AnyKeyPath] {
     return allKeyPaths.map { $0 as AnyKeyPath }
   }
-  public var _recursivelyAllKeyPathsTypeErased: [AnyKeyPath] {
+  var _recursivelyAllKeyPathsTypeErased: [AnyKeyPath] {
     return recursivelyAllKeyPaths.map { $0 as AnyKeyPath }
   }
 }
@@ -64,7 +64,6 @@ extension KeyPathIterable {
 public extension KeyPathIterable {
   /// Returns an array of all custom key paths of this value, to the specified
   /// type.
-  @inlinable
   func allKeyPaths<T>(to _: T.Type) -> [KeyPath<Self, T>] {
     return allKeyPaths.compactMap { $0 as? KeyPath<Self, T> }
   }
@@ -72,7 +71,6 @@ public extension KeyPathIterable {
   /// Returns an array of all custom key paths of this value and any custom key
   /// paths nested within each of what this value's key paths refers to, to
   /// the specified type.
-  @inlinable
   func recursivelyAllKeyPaths<T>(to _: T.Type) -> [KeyPath<Self, T>] {
     return recursivelyAllKeyPaths.compactMap { $0 as? KeyPath<Self, T> }
   }
@@ -87,7 +85,6 @@ public extension KeyPathIterable {
   /// Returns an array of all custom writable key paths of this value and any
   /// custom writable key paths nested within each of what this value's key
   /// paths refers to, to the specified type.
-  @inlinable
   func recursivelyAllWritableKeyPaths<T>(
     to _: T.Type
   ) -> [WritableKeyPath<Self, T>] {

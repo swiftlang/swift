@@ -4,6 +4,10 @@
 
 import TensorFlow
 
+// Synthesis should work for empty structs.
+// `allKeyPaths` simply returns `[]`.
+struct Empty : KeyPathIterable {}
+
 struct Parameters : KeyPathIterable {
   var w: Float
   var b: Float
