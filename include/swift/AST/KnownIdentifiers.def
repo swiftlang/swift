@@ -47,7 +47,6 @@ IDENTIFIER(decode)
 IDENTIFIER(decodeIfPresent)
 IDENTIFIER(Decoder)
 IDENTIFIER(decoder)
-// SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(dynamicCallable)
 IDENTIFIER(dynamicMember)
 IDENTIFIER(Element)
@@ -124,6 +123,7 @@ IDENTIFIER(Parameters)
 IDENTIFIER(TensorFlow)
 IDENTIFIER(CotangentVector)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

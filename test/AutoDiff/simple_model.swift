@@ -1,10 +1,6 @@
 // RUN: %target-run-simple-swift
 // RUN: %target-run-simple-no-vjp-swift
 // REQUIRES: executable_test
-// XFAIL: *
-
-// FIXME: Fix tangent vector initialization logic so that it won't try to find
-// `VectorNumeric.init(_:)`.
 
 import StdlibUnittest
 
