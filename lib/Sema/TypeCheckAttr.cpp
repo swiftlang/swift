@@ -2190,14 +2190,27 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 }
 
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
-  auto *original = cast<FuncDecl>(D);
-  auto isInstanceMethod = original->isInstanceMember();
-  auto &ctx = original->getASTContext();
-  AnyFunctionType *originalFnTy =
-      original->getInterfaceType()->castTo<AnyFunctionType>();
+  auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+
+  FuncDecl *original = nullptr;
+  if (isa<VarDecl>(D)) {
+    // When used on a storage decl, @differentiable refers to its getter.
+    original = cast<VarDecl>(D)->getGetter();
+  } else if (isa<FuncDecl>(D)) {
+    original = cast<FuncDecl>(D);
+  }
+  if (!original) {
+    // Global immutable vars, for example, have no getter, and therefore trigger
+    // this.
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+    return;
+  }
+
+  TC.resolveDeclSignature(original);
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
+  auto isInstanceMethod = original->isInstanceMember();
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
