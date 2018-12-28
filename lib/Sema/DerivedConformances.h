@@ -165,6 +165,22 @@ public:
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
+  /// Determine if a KeyPathIterable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveKeyPathIterable(NominalTypeDecl *type);
+
+  /// Derive a KeyPathIterable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveKeyPathIterable(ValueDecl *requirement);
+
+  /// Derive a KeyPathIterable type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveKeyPathIterable(AssociatedTypeDecl *assocType);
+
+  // SWIFT_ENABLE_TENSORFLOW
   /// Derive a Parameterized requirement for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.

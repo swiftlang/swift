@@ -63,6 +63,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::KeyPathIterable)
+    return canDeriveKeyPathIterable(Nominal);
+
+  // SWIFT_ENABLE_TENSORFLOW
   // The only requirement for deriving Parameterized is that there exist some
   // stored properties marked with @TFParameter. The `Parameters` struct can
   // always be derived, even if parameters have different types.
@@ -207,6 +211,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::CodingKey);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.allKeyPaths
+    if (name.isSimpleName(ctx.Id_allKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // Parameterized.allParameters
     if (name.isSimpleName(ctx.Id_allParameters))
       return getRequirement(KnownProtocolKind::Parameterized);
@@ -278,6 +287,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // CaseIterable.AllCases
     if (name.isSimpleName(ctx.Id_AllCases))
       return getRequirement(KnownProtocolKind::CaseIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.AllKeyPaths
+    if (name.isSimpleName(ctx.Id_AllKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
     // Parameterized.Parameters
