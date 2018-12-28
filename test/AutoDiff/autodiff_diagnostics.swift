@@ -27,7 +27,7 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 // expected-note @+3 {{differentiating generic functions is not supported yet}}
 // expected-error @+2 {{function is not differentiable}}
 @differentiable()
-func generic<T: FloatingPoint>(_ x: T) -> T {
+func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   return x + 1
 }
 

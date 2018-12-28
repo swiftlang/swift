@@ -38,32 +38,42 @@ struct S<T> {
   }
 }
 
-func pbaz1<T>(_ x: T, _ y: T) -> ((T, T), T) {
+extension S : Differentiable, VectorNumeric {
+  typealias TangentVector = S
+  typealias CotangentVector = S
+  typealias Scalar = Float
+  static var zero: S { fatalError("unimplemented") }
+  static func + (lhs: S, rhs: S) -> S { fatalError("unimplemented") }
+  static func - (lhs: S, rhs: S) -> S { fatalError("unimplemented") }
+  static func * (lhs: Float, rhs: S) -> S { fatalError("unimplemented") }
+}
+
+func pbaz1<T : Differentiable>(_ x: T, _ y: T) -> ((T, T), T) {
   return ((y, y), x)
 }
-func dbaz1_checkpointed<T>(_ seed: T, _ primal: (T, T), _ originalValue: T, _ x: T, _ y: T) -> (T, T) {
-  return (y, x)
+func dbaz1_checkpointed<T : Differentiable>(_ seed: T.CotangentVector, _ primal: (T, T), _ originalValue: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 // CHECK-DAG: @differentiable(primal: pbaz1, adjoint: dbaz1_checkpointed)
 // CHECK-DAG: func baz1_checkpointed<T>(_ x: T, _ y: T) -> T
 @differentiable(primal: pbaz1(_:_:), adjoint: dbaz1_checkpointed)
-func baz1_checkpointed<T>(_ x: T, _ y: T) -> T {
+func baz1_checkpointed<T : Differentiable>(_ x: T, _ y: T) -> T {
   return x
 }
 
 struct CheckpointsFP<T : FloatingPoint> {
   let meow: T
 }
-func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
+func pbaz2<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
   return (CheckpointsFP(meow: 1), x + y)
 }
-func dbaz2_checkpointed<T : FloatingPoint>(_ seed: T, _ primal: CheckpointsFP<T>, _ originalValue: T, _ x: T, _ y: T) -> (T, T) {
-  return (1, 1)
+func dbaz2_checkpointed<T : Differentiable & FloatingPoint>(_ seed: T.CotangentVector, _ primal: CheckpointsFP<T>, _ originalValue: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 // CHECK-DAG: @differentiable(primal: pbaz2, adjoint: dbaz2_checkpointed)
-// CHECK-DAG: func baz2_checkpointed<T>(_ x: T, _ y: T) -> T where T : FloatingPoint
+// CHECK-DAG: func baz2_checkpointed<T>(_ x: T, _ y: T) -> T where T : Differentiable, T : FloatingPoint
 @differentiable(primal: pbaz2(_:_:), adjoint: dbaz2_checkpointed)
-func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+func baz2_checkpointed<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
 }
 

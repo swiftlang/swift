@@ -2196,6 +2196,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = original->getASTContext();
   AnyFunctionType *originalFnTy =
       original->getInterfaceType()->castTo<AnyFunctionType>();
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
@@ -2366,17 +2368,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Predicate checking if a type conforms to Differentiable.
-  auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "could not find differentiable protocol");
-  auto conformsToDifferentiable = [&](Type type) -> bool {
-    auto *nomTy = type->getAnyNominal();
-    if (!nomTy)
-      return false;
-    SmallVector<ProtocolConformance *, 2> conformances;
-    return nomTy->lookupConformance(D->getDeclContext()->getParentModule(),
-                                    differentiableProtocol, conformances);
+  // Predicate checking if a type has associated tangent and cotangent spaces.
+  auto hasAssociatedSpaces = [&](Type type) -> bool {
+    // No need to check for cotangent space because every type with a tangent
+    // space also has a cotangent space.
+    return (bool)type->getAutoDiffAssociatedType(
+        AutoDiffAssociatedTypeKind::TangentVector, lookupConformance);
   };
 
   // Check that the user has only selected wrt params with allowed types.
@@ -2400,11 +2397,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    // We also require that all the wrt params conform to Differentiable. But
-    // only for attrs that have JVP or VJP, because there are a lot of attrs
-    // using the legacy primal/adjoint whose wrt params do not conform.
-    bool hasJVPorVJP = attr->getJVP() || attr->getVJP();
-    if (hasJVPorVJP && !conformsToDifferentiable(wrtParamType)) {
+    // We also require that all the wrt params have associated tangent/cotangent
+    // spaces.
+    if (!hasAssociatedSpaces(wrtParamType)) {
       TC.diagnose(loc, diag::differentiable_attr_wrt_not_differentiable,
                   wrtParamType);
       attr->setInvalid();
@@ -2412,17 +2407,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     }
   }
 
-  // Check that all the result types are differentiable. But only for attrs that
-  // have JVP or VJP, because there are a lot of attrs using the legacy
-  // primal/adjoint whose results do not conform.
-  if (attr->getJVP() || attr->getVJP()) {
+  // Check that all the result types have associated tangent/cotangent spaces.
+  {
     auto *unwrapped = originalFnTy;
     if (isMethod)
       unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
     Type originalResult = unwrapped->getResult();
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       for (auto &resultTupleElt : resultTuple->getElements()) {
-        if (!conformsToDifferentiable(resultTupleElt.getType())) {
+        if (!hasAssociatedSpaces(resultTupleElt.getType())) {
           TC.diagnose(attr->getLocation(),
                       diag::differentiable_attr_result_not_differentiable,
                       resultTupleElt.getType());
@@ -2431,7 +2424,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         }
       }
     } else {
-      if (!conformsToDifferentiable(originalResult)) {
+      if (!hasAssociatedSpaces(originalResult)) {
         TC.diagnose(attr->getLocation(),
                     diag::differentiable_attr_result_not_differentiable,
                     originalResult);
@@ -2487,8 +2480,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TupleType *primalResultTy =
         primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
     AnyFunctionType *expectedAdjointFnTy =
-        originalFnTy->getAutoDiffAdjointFunctionType(checkedWrtParamIndices,
-                                                     primalResultTy, isMethod);
+        originalFnTy->getAutoDiffAdjointFunctionType(
+            checkedWrtParamIndices, primalResultTy, lookupConformance,
+            isMethod);
 
     auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
       TC.validateDeclForNameLookup(adjointCandidate);
@@ -2515,7 +2509,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            lookupConformance);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -2542,7 +2536,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            lookupConformance);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);

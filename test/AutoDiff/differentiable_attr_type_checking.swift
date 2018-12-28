@@ -56,7 +56,7 @@ func dfoo2_wrong_type(_ seed: Double, _ primal: Float, _ x: Float) -> Float {
   return 2 * x
 }
 
-@differentiable(adjoint: dfoo2_wrong_type) // expected-error {{'dfoo2_wrong_type' does not have expected type '(Float, Float, Float) -> Float'}}
+@differentiable(adjoint: dfoo2_wrong_type) // expected-error {{'dfoo2_wrong_type' does not have expected type '(Float.CotangentVector, Float, Float) -> Float.CotangentVector' (aka '(Float, Float, Float) -> Float'}}
 func foo2(_ x: Float) -> Float {
   return x * x
 }
@@ -108,7 +108,21 @@ struct C {
   }
 }
 
-struct S {
+struct S : Differentiable, VectorNumeric {
+  typealias TangentVector = S
+  typealias CotangentVector = S
+  static var zero: S = S()
+  static func + (_ lhs: S, _ rhs: S) -> S {
+    return S()
+  }
+  static func - (_ lhs: S, _ rhs: S) -> S {
+    return S()
+  }
+  typealias Scalar = Float
+  static func * (_ lhs: Float, _ rhs: S) -> S {
+    return S()
+  }
+
   @differentiable(wrt: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
   func meow1(_ x: Float) -> Float {
     return x + 1
@@ -125,12 +139,12 @@ struct S {
   }
 
   @differentiable(wrt: (self, .0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
-  static func + (lhs: S, rhs: S) -> S {
+  static func plus(lhs: S, rhs: S) -> S {
     return lhs
   }
 
   @differentiable(wrt: (.0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'dPlus' is not defined in the current type context}}
-  static func - (lhs: S, rhs: S) -> S {
+  static func minus(lhs: S, rhs: S) -> S {
     return lhs
   }
 
@@ -139,17 +153,17 @@ struct S {
     return lhs
   }
 
-  static func dMul(_: S, _: S, _ lhs: Int, _ rhs: S) -> (Int, S) {
+  static func dMul(_: S, _: S, _ lhs: Float, _ rhs: S) -> (Float, S) {
     return (lhs, rhs)
   }
 
   @differentiable(wrt: (.0, .1), adjoint: dMul) // ok
-  static func * (lhs: Int, rhs: S) -> S {
+  static func mul(lhs: Float, rhs: S) -> S {
     return rhs
   }
 
-  @differentiable(wrt: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (S, S, Int, S) -> (Int, S)'}}
-  func instance_mul(lhs: Int, rhs: S) -> S {
+  @differentiable(wrt: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (S.CotangentVector, S, Float, S) -> (Float.CotangentVector, S.CotangentVector)' (aka '(S) -> (S, S, Float, S) -> (Float, S)'}}
+  func instance_mul(lhs: Float, rhs: S) -> S {
     return rhs
   }
 
@@ -261,7 +275,7 @@ extension E4 {
 struct E5<T> {}
 extension E5 {
   @differentiable(adjoint: adjoint_diff_constraint)
-  // expected-error @-1 {{'adjoint_diff_constraint' does not have expected type '<T> (E5<T>) -> (Float, Float, Float) -> Float'}}
+  // expected-error @-1 {{'adjoint_diff_constraint' does not have expected type '<T> (E5<T>) -> (Float.CotangentVector, Float, Float) -> Float.CotangentVector' (aka '<τ_0_0> (E5<τ_0_0>) -> (Float, Float, Float) -> Float'}}
   func original(x: Float) -> Float {
     return x
   }
@@ -274,7 +288,23 @@ extension E5 where T == Float {
 
 // Original function and adjoint in separate struct extensions, differentiating
 // with respect to self.
-struct E6<T> {}
+struct E6<T> : Differentiable, VectorNumeric {
+  typealias TangentVector = E6<T>
+  typealias CotangentVector = E6<T>
+  static var zero: E6<T> {
+    return E6()
+  }
+  static func + (_ lhs: E6<T>, _ rhs: E6<T>) -> E6<T> {
+    return E6()
+  }
+  static func - (_ lhs: E6<T>, _ rhs: E6<T>) -> E6<T> {
+    return E6()
+  }
+  typealias Scalar = Float
+  static func * (_ lhs: Float, _ rhs: E6<T>) -> E6<T> {
+    return E6()
+  }
+}
 extension E6 {
   @differentiable(wrt: (self), adjoint: adjoint_wrt_self)
   func original(x: Float) -> Float {
@@ -287,7 +317,7 @@ extension E6 {
   }
 
   @differentiable(wrt: (self), primal: primal, adjoint: adjoint_checkpointed_mismatch)
-  // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float, E6<T>.Checkpoints, Float, Float) -> E6<T>'}}
+  // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float.CotangentVector, E6<T>.Checkpoints, Float, Float) -> E6<T>.CotangentVector' (aka '<τ_0_0> (E6<τ_0_0>) -> (Float, E6<τ_0_0>.Checkpoints, Float, Float) -> E6<τ_0_0>')}}
   func original3(x: Float) -> Float {
     return x
   }
@@ -315,56 +345,56 @@ extension E6 {
   }
 }
 
-// Generic functions with no constraints.
-func dbaz1<T>(_ seed: T, primal: T, _ x: T, _ y: T) -> (T, T) {
-  return (y, x)
+// Generic functions with no constraints other than Differentiable.
+func dbaz1<T: Differentiable>(_ seed: T.CotangentVector, primal: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 @differentiable(adjoint: dbaz1) // ok!
-func baz1<T>(_ x: T, _ y: T) -> T {
+func baz1<T: Differentiable>(_ x: T, _ y: T) -> T {
   return x
 }
 
-func pbaz1<T>(_ x: T, _ y: T) -> ((T, T), T) {
+func pbaz1<T: Differentiable>(_ x: T, _ y: T) -> ((T, T), T) {
   return ((y, y), x)
 }
-func dbaz1_checkpointed<T>(_ seed: T, _ primal: (T, T), originalValue: T, _ x: T, _ y: T) -> (T, T) {
-  return (y, x)
+func dbaz1_checkpointed<T: Differentiable>(_ seed: T.CotangentVector, _ primal: (T, T), originalValue: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 @differentiable(primal: pbaz1, adjoint: dbaz1_checkpointed) // ok!
-func baz1_checkpointed<T>(_ x: T, _ y: T) -> T {
+func baz1_checkpointed<T: Differentiable>(_ x: T, _ y: T) -> T {
   return x
 }
 
 // Generic functions with matching constraints.
-func dbaz2<T : FloatingPoint>(_ seed: T, _ primal: T, _ x: T, _ y: T) -> (T, T) {
-  return (1, 1)
+func dbaz2<T : Differentiable & FloatingPoint>(_ seed: T.CotangentVector, _ primal: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 @differentiable(adjoint: dbaz2) // ok!
-func baz2<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+func baz2<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
 }
 
 struct CheckpointsFP<T : FloatingPoint> {
   let meow: T
 }
-func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
+func pbaz2<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
   return (CheckpointsFP(meow: 1), x + y)
 }
-func dbaz2_checkpointed<T : FloatingPoint>(_ seed: T, _ primal: CheckpointsFP<T>, _ originalValue: T, _ x: T, _ y: T) -> (T, T) {
-  return (1, 1)
+func dbaz2_checkpointed<T : Differentiable & FloatingPoint>(_ seed: T.CotangentVector, _ primal: CheckpointsFP<T>, _ originalValue: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 @differentiable(primal: pbaz2, adjoint: dbaz2_checkpointed) // ok!
-func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+func baz2_checkpointed<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
 }
 
 // Generic functions with different constraints.
-func dbaz3<T : Numeric>(_ seed: T, _ primal: T, _ x: T, _ y: T) -> (T, T) {
-  return (1, 1)
+func dbaz3<T : Differentiable & Numeric>(_ seed: T.CotangentVector, _ primal: T, _ x: T, _ y: T) -> (T.CotangentVector, T.CotangentVector) {
+  return (seed, seed)
 }
 @differentiable(adjoint: dbaz3)
-// expected-error @-1 {{'dbaz3' does not have expected type '<T where T : FloatingPoint> (T, T, T, T) -> (T, T)'}}
-func baz3<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+// expected-error @-1 {{'dbaz3' does not have expected type '<T where T : Differentiable, T : FloatingPoint> (T.CotangentVector, T, T, T) -> (T.CotangentVector, T.CotangentVector)'}}
+func baz3<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
 }
 
@@ -438,7 +468,7 @@ class ClassWithDifferentiableMethods {
 func dummyPrimal() {}
 func dummyAdjoint() {}
 
-protocol ProtoWithDiffReqs {
+protocol ProtoWithDiffReqs : Differentiable {
   // OK
   @differentiable()
   func req1(x: Float) -> Float
@@ -503,7 +533,7 @@ func jvp2ParamsJVP(x: Float, y: Float) -> (Float, (Float, Float) -> Float) {
   return (x + y, { (a, b) in a + b })
 }
 
-// expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+// expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(jvp: jvpWrongTypeJVP)
 func jvpWrongType(x: Float) -> Float {
   return x
@@ -605,7 +635,7 @@ func vjp2ParamsVJP(x: Float, y: Float) -> (Float, (Float) -> (Float, Float)) {
   return (x + y, { v in (v, v) })
 }
 
-// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float.CotangentVector) -> Float.CotangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(vjp: vjpWrongTypeVJP)
 func vjpWrongType(x: Float) -> Float {
   return x

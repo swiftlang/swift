@@ -314,6 +314,15 @@ public:
   }
 };
 
+/// The kind of an associated type.
+struct AutoDiffAssociatedTypeKind {
+  enum innerty : uint8_t { TangentVector = 0, CotangentVector = 1 } rawValue;
+
+  AutoDiffAssociatedTypeKind() = default;
+  AutoDiffAssociatedTypeKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 

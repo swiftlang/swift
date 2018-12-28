@@ -4441,6 +4441,7 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   auto &module = context.getModule();
   auto *original = getOriginal();
+  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that the calls `module.Types.getTypeLowering()` below
@@ -4478,7 +4479,8 @@ void DifferentiationTask::createEmptyAdjoint() {
   // - a primal value struct,
   // - original results, and
   // - the original parameters.
-  // Results of the adjoint have the same type as the original parameters.
+  // Results of the adjoint are in the cotangent space of the original
+  // parameters.
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
@@ -4486,7 +4488,11 @@ void DifferentiationTask::createEmptyAdjoint() {
 
   // Add adjoint parameter for the seed.
   adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[getIndices().source].getType()));
+      origTy->getResults()[getIndices().source]
+          .getType()
+          ->getAutoDiffAssociatedType(
+              AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+          ->getCanonicalType()));
 
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
@@ -4510,13 +4516,22 @@ void DifferentiationTask::createEmptyAdjoint() {
   if (origTy->hasSelfParam() &&
       getIndices().isWrtParameter(selfParamIndex))
     adjResults.push_back(getFormalResultInfo(
-        origParams[selfParamIndex].getType()));
+        origParams[selfParamIndex]
+            .getType()
+            ->getAutoDiffAssociatedType(
+                AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+            ->getCanonicalType()));
 
   // Add adjoint results for the requested non-self wrt parameters.
   for (auto i : getIndices().parameters.set_bits()) {
     if (origTy->hasSelfParam() && i == selfParamIndex)
       continue;
-    adjResults.push_back(getFormalResultInfo(origParams[i].getType()));
+    adjResults.push_back(getFormalResultInfo(
+        origParams[i]
+            .getType()
+            ->getAutoDiffAssociatedType(
+                AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+            ->getCanonicalType()));
   }
 
   auto adjName = "AD__" + original->getName().str() + "__adjoint_" +

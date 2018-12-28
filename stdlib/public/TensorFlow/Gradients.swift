@@ -265,7 +265,9 @@ extension Tensor {
 // Normalization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : BinaryFloatingPoint {
+extension Tensor where Scalar : BinaryFloatingPoint,
+                       Scalar : Differentiable,
+                       Scalar.CotangentVector == Scalar {
   // TODO: Verify that these calculations are correct.
   @inlinable
   func _adjointBatchNormalized(
