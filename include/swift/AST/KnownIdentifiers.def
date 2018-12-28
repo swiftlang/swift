@@ -128,6 +128,7 @@ IDENTIFIER(Parameters)
 IDENTIFIER(TensorFlow)
 IDENTIFIER(CotangentVector)
 IDENTIFIER(TangentVector)
+IDENTIFIER(zero)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
