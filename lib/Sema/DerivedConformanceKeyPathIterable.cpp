@@ -101,6 +101,9 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       C.Id_allKeyPaths, returnInterfaceTy, returnTy, /*isStatic*/ false,
       /*isFinal*/ true);
 
+  // Add `@inlinable` to the `allKeyPaths` declaration.
+  allKeyPathsDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
+
   // Create `allKeyPaths` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       derived.TC, allKeyPathsDecl, returnTy);
@@ -108,6 +111,7 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
   allKeyPathsDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                                 SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});
+
   return allKeyPathsDecl;
 }
 
