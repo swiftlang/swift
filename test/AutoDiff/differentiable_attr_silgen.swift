@@ -104,3 +104,87 @@ public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)
 }
 
 // CHECK-LABEL: sil @dhasvjp
+
+//===----------------------------------------------------------------------===//
+// Stored property
+//===----------------------------------------------------------------------===//
+
+struct DiffStoredProp {
+  @differentiable(wrt: (self), jvp: storedPropJVP, vjp: storedPropVJP)
+  let storedProp: Float
+
+  @_silgen_name("storedPropJVP")
+  func storedPropJVP() -> (Float, (DiffStoredProp) -> Float) {
+    fatalError("unimplemented")
+  }
+
+  @_silgen_name("storedPropVJP")
+  func storedPropVJP() -> (Float, (Float) -> DiffStoredProp) {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffStoredProp : VectorNumeric {
+  static var zero: DiffStoredProp { fatalError("unimplemented") }
+  static func + (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+  static func - (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: DiffStoredProp) -> DiffStoredProp {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffStoredProp : Differentiable {
+  typealias TangentVector = DiffStoredProp
+  typealias CotangentVector = DiffStoredProp
+}
+
+// CHECK-LABEL: DiffStoredProp.storedProp.getter
+// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @storedPropJVP vjp @storedPropVJP]
+
+//===----------------------------------------------------------------------===//
+// Computed property
+//===----------------------------------------------------------------------===//
+
+struct DiffComputedProp {
+  @differentiable(wrt: (self), jvp: computedPropJVP, vjp: computedPropVJP)
+  var computedProp: Float {
+    return 0
+  }
+
+  @_silgen_name("computedPropJVP")
+  func computedPropJVP() -> (Float, (DiffComputedProp) -> Float) {
+    fatalError("unimplemented")
+  }
+
+  @_silgen_name("computedPropVJP")
+  func computedPropVJP() -> (Float, (Float) -> DiffComputedProp) {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffComputedProp : VectorNumeric {
+  static var zero: DiffComputedProp { fatalError("unimplemented") }
+  static func + (lhs: DiffComputedProp, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+  static func - (lhs: DiffComputedProp, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+  typealias Scalar = Float
+  static func * (lhs: Float, rhs: DiffComputedProp) -> DiffComputedProp {
+    fatalError("unimplemented")
+  }
+}
+
+extension DiffComputedProp : Differentiable {
+  typealias TangentVector = DiffComputedProp
+  typealias CotangentVector = DiffComputedProp
+}
+
+// CHECK-LABEL: DiffComputedProp.computedProp.getter
+// CHECK-NEXT: sil {{.*}} [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]

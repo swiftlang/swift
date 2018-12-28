@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-@differentiable(adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
+@differentiable(adjoint: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 let x: Float = 1
 
-@differentiable(adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
+@differentiable(adjoint: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 protocol P {}
 
 func dfoo(_ seed: Float, _ primal: Float, _ x: Float) -> Float {
@@ -563,19 +563,39 @@ func jvpNonDiffResult2(x: Float) -> (Float, Int) {
 
 struct JVPStruct {
   let p: Float
+
+  @differentiable(wrt: (self), jvp: storedPropJVP)
+  let storedImmutableOk: Float
+
+  // expected-error @+1 {{'storedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
+  @differentiable(wrt: (self), jvp: storedPropJVP)
+  let storedImmutableWrongType: Double
+
+  @differentiable(wrt: (self), jvp: storedPropJVP)
+  var storedMutableOk: Float
+
+  // expected-error @+1 {{'storedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
+  @differentiable(wrt: (self), jvp: storedPropJVP)
+  var storedMutableWrongType: Double
+}
+
+extension JVPStruct {
+  func storedPropJVP() -> (Float, (JVPStruct) -> Float) {
+    fatalError("unimplemented")
+  }
 }
 
 extension JVPStruct : VectorNumeric {
-  static var zero: JVPStruct { return JVPStruct(p: 0) }
+  static var zero: JVPStruct { fatalError("unimplemented") }
   static func + (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
-    return JVPStruct(p: lhs.p + rhs.p)
+    fatalError("unimplemented")
   }
   static func - (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
-    return JVPStruct(p: lhs.p - rhs.p)
+    fatalError("unimplemented")
   }
   typealias Scalar = Float
   static func * (lhs: Float, rhs: JVPStruct) -> JVPStruct {
-    return JVPStruct(p: lhs * rhs.p)
+    fatalError("unimplemented")
   }
 }
 
@@ -603,6 +623,41 @@ extension JVPStruct {
 
   func wrtAllJVP(x: Float) -> (Float, (JVPStruct, Float) -> Float) {
     return (x + p, { (a, b) in a.p + b })
+  }
+}
+
+extension JVPStruct {
+  @differentiable(wrt: (self), jvp: computedPropJVP)
+  var computedPropOk1: Float {
+    return 0
+  }
+
+  var computedPropOk2: Float {
+    @differentiable(wrt: (self), jvp: computedPropJVP)
+    get {
+      return 0
+    }
+  }
+
+  // expected-error @+1 {{'computedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
+  @differentiable(wrt: (self), jvp: computedPropJVP)
+  var computedPropWrongType: Double {
+    return 0
+  }
+
+  var computedPropWrongAccessor: Float {
+    get {
+      return 0
+    }
+    // expected-error @+1 {{cannot differentiate void function '_'}}
+    @differentiable(wrt: (self), jvp: computedPropJVP)
+    set {
+      fatalError("unimplemented")
+    }
+  }
+
+  func computedPropJVP() -> (Float, (JVPStruct) -> Float) {
+    fatalError("unimplemented")
   }
 }
 
@@ -665,19 +720,39 @@ func vjpNonDiffResult2(x: Float) -> (Float, Int) {
 
 struct VJPStruct {
   let p: Float
+
+  @differentiable(wrt: (self), vjp: storedPropVJP)
+  let storedImmutableOk: Float
+
+  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  @differentiable(wrt: (self), vjp: storedPropVJP)
+  let storedImmutableWrongType: Double
+
+  @differentiable(wrt: (self), vjp: storedPropVJP)
+  var storedMutableOk: Float
+
+  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  @differentiable(wrt: (self), vjp: storedPropVJP)
+  var storedMutableWrongType: Double
+}
+
+extension VJPStruct {
+  func storedPropVJP() -> (Float, (Float) -> VJPStruct) {
+    fatalError("unimplemented")
+  }
 }
 
 extension VJPStruct : VectorNumeric {
-  static var zero: VJPStruct { return VJPStruct(p: 0) }
+  static var zero: VJPStruct { fatalError("unimplemented") }
   static func + (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
-    return VJPStruct(p: lhs.p + rhs.p)
+    fatalError("unimplemented")
   }
   static func - (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
-    return VJPStruct(p: lhs.p - rhs.p)
+    fatalError("unimplemented")
   }
   typealias Scalar = Float
   static func * (lhs: Float, rhs: VJPStruct) -> VJPStruct {
-    return VJPStruct(p: lhs * rhs.p)
+    fatalError("unimplemented")
   }
 }
 
@@ -704,6 +779,41 @@ extension VJPStruct {
   }
 
   func wrtAllVJP(x: Float) -> (Float, (Float) -> (VJPStruct, Float)) {
-    return (x + p, { v in (VJPStruct(p: v), v) })
+    fatalError("unimplemented")
+  }
+}
+
+extension VJPStruct {
+  @differentiable(wrt: (self), vjp: computedPropVJP)
+  var computedPropOk1: Float {
+    return 0
+  }
+
+  var computedPropOk2: Float {
+    @differentiable(wrt: (self), vjp: computedPropVJP)
+    get {
+      return 0
+    }
+  }
+
+  // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  @differentiable(wrt: (self), vjp: computedPropVJP)
+  var computedPropWrongType: Double {
+    return 0
+  }
+
+  var computedPropWrongAccessor: Float {
+    get {
+      return 0
+    }
+    // expected-error @+1 {{cannot differentiate void function '_'}}
+    @differentiable(wrt: (self), vjp: computedPropVJP)
+    set {
+      fatalError("unimplemented")
+    }
+  }
+
+  func computedPropVJP() -> (Float, (Float) -> VJPStruct) {
+    fatalError("unimplemented")
   }
 }
