@@ -3751,13 +3751,14 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
-  /// `ExpressibleByIntegerLiteral`, we use literal conversion directly.
-  /// Otherwise, we assert that `T` must be an aggregate where each element is
-  /// `ExpressibleByIntegerLiteral`. We expect to emit a zero for each element
-  /// and use the appropriate aggregate constructor instruction (in this case,
-  /// `tuple`) to produce a tuple. But currently, since we need indirect
-  /// passing for aggregate instruction, we just use `tuple_element_addr` to get
-  /// element buffers and write elements to them.
+  /// `AdditiveArithmetic`, we emit a call to `AdditiveArithmetic.zero`. When
+  /// `T` is a builtin float, we emit a `float_literal` instruction.
+  /// Otherwise, we assert that `T` must be an aggregate where each element
+  /// conforms to `AdditiveArithmetic` or is a builtin float. We expect to emit
+  /// a zero for each element and use the appropriate aggregate constructor
+  /// instruction (in this case, `tuple`) to produce a tuple. But currently,
+  /// since we need indirect passing for aggregate instruction, we just use
+  /// `tuple_element_addr` to get element buffers and write elements to them.
   case AdjointValue::Kind::Zero:
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
       SmallVector<SILValue, 8> eltVals;
