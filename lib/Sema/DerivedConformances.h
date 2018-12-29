@@ -207,6 +207,32 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveParameterGroup(AssociatedTypeDecl *assocType);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Determine if an AdditiveArithmetic requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type);
+
+  /// Derive an AdditiveArithmetic requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
+
+  /// Determine if a VectorNumeric requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveVectorNumeric(NominalTypeDecl *type);
+
+  /// Derive a VectorNumeric requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveVectorNumeric(ValueDecl *requirement);
+
+  /// Derive a VectorNumeric type witness for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveVectorNumeric(AssociatedTypeDecl *assocType);
+
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,
