@@ -220,11 +220,12 @@ static SILValue scalarizeLoad(LoadInst *LI,
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class ElementUseCollector {
   SILModule &Module;
   const PMOMemoryObjectInfo &TheMemory;
   SmallVectorImpl<PMOMemoryUse> &Uses;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<DestroyAddrInst *> &Destroys;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -234,9 +235,9 @@ class ElementUseCollector {
 public:
   ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
                       SmallVectorImpl<PMOMemoryUse> &Uses,
-                      SmallVectorImpl<SILInstruction *> &Releases)
+                      SmallVectorImpl<DestroyAddrInst *> &Destroys)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        Uses(Uses), Releases(Releases) {}
+        Uses(Uses), Destroys(Destroys) {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
@@ -257,27 +258,11 @@ private:
 bool ElementUseCollector::collectFrom() {
   bool shouldOptimize = false;
 
-  if (auto *ABI = TheMemory.getContainer()) {
-    shouldOptimize = collectContainerUses(ABI);
-  } else {
-    shouldOptimize = collectUses(TheMemory.getAddress(), 0);
+  if (auto *abi = TheMemory.getContainer()) {
+    return collectContainerUses(abi);
   }
 
-  if (!shouldOptimize)
-    return false;
-
-  // Collect information about the retain count result as well.
-  for (auto UI : TheMemory.MemoryInst->getUses()) {
-    auto *User = UI->getUser();
-
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User)) {
-      Releases.push_back(User);
-    }
-  }
-
-  return true;
+  return collectUses(TheMemory.getAddress(), 0);
 }
 
 /// addElementUses - An operation (e.g. load, store, inout use, etc) on a value
@@ -560,8 +545,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     // We model destroy_addr as a release of the entire value.
-    if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+    if (auto *dea = dyn_cast<DestroyAddrInst>(User)) {
+      Destroys.push_back(dea);
       continue;
     }
 
@@ -653,9 +638,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// and storing the information found into the Uses and Destroys lists.
 bool swift::collectPMOElementUsesFrom(
     const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses,
-    SmallVectorImpl<SILInstruction *> &Releases) {
-  return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
+    SmallVectorImpl<DestroyAddrInst *> &Destroys) {
+  return ElementUseCollector(MemoryInfo, Uses, Destroys).collectFrom();
 }

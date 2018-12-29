@@ -211,7 +211,7 @@ struct PMOMemoryUse {
 LLVM_NODISCARD bool
 collectPMOElementUsesFrom(const PMOMemoryObjectInfo &MemoryInfo,
                           SmallVectorImpl<PMOMemoryUse> &Uses,
-                          SmallVectorImpl<SILInstruction *> &Releases);
+                          SmallVectorImpl<DestroyAddrInst *> &Destroys);
 
 } // end namespace swift
 
