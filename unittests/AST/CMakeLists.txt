@@ -5,7 +5,7 @@ add_swift_unittest(SwiftASTTests
   SILAutoDiffIndices.cpp
   SourceLocTests.cpp
   # SWIFT_ENABLE_TENSORFLOW
-	TensorFlow.cpp
+  TensorFlow.cpp
   TestContext.cpp
   TypeMatchTests.cpp
   VersionRangeLattice.cpp
