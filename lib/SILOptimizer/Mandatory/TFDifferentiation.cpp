@@ -2723,8 +2723,7 @@ public:
 
 private:
   static bool isLegalAggregate(ArrayRef<AdjointValue> elements, SILType type) {
-    if (auto *structDecl =
-            dyn_cast_or_null<StructDecl>(type.getASTType()->getAnyNominal())) {
+    if (auto *structDecl = type.getASTType()->getStructOrBoundGenericStruct()) {
       // TODO: Check whether this struct is @_fixed_layout and ABI public.
       for (auto pair : llvm::zip(structDecl->getStoredProperties(), elements))
         if (!std::get<0>(pair)->getType()->getCanonicalType()
@@ -2748,8 +2747,7 @@ public:
       break;
     case Kind::Aggregate:
       s << "Aggregate<";
-      if (auto *decl = dyn_cast_or_null<StructDecl>(
-              type.getASTType()->getAnyNominal())) {
+      if (auto *decl = type.getASTType()->getStructOrBoundGenericStruct()) {
         s << "Struct>(";
         interleave(llvm::zip(decl->getStoredProperties(),
                              getAggregateElements()),
@@ -3809,8 +3807,8 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
         materializeAdjointIndirectHelper(eltAndIdx.value(), eltBuf);
       }
-    } else if (auto *structDecl = dyn_cast_or_null<StructDecl>(
-                   val.getSwiftType()->getAnyNominal())) {
+    } else if (auto *structDecl =
+                   val.getSwiftType()->getStructOrBoundGenericStruct()) {
       for (auto eltAndField : zip(val.getAggregateElements(),
                                   structDecl->getStoredProperties())) {
         auto elt = std::get<0>(eltAndField);
