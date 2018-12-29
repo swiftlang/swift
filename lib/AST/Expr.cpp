@@ -2185,27 +2185,19 @@ KeyPathExpr::Component::Component(ASTContext *ctxForCopyingLabels,
                      Expr *indexExpr,
                      ArrayRef<Identifier> subscriptLabels,
                      ArrayRef<ProtocolConformanceRef> indexHashables,
-                     unsigned tupleIndex,
                      Kind kind,
                      Type type,
                      SourceLoc loc)
     : Decl(decl), SubscriptIndexExpr(indexExpr), KindValue(kind),
       ComponentType(type), Loc(loc)
 {
+  assert(kind != Kind::TupleElement || subscriptLabels.empty());
   assert(subscriptLabels.size() == indexHashables.size()
          || indexHashables.empty());
   SubscriptLabelsData = subscriptLabels.data();
   SubscriptHashableConformancesData = indexHashables.empty()
     ? nullptr : indexHashables.data();
-  
-  if (kind == Kind::TupleElement) {
-    assert(subscriptLabels.empty()
-           && "subscript labels not empty for tuple element");
-
-    TupleIndex = tupleIndex;
-  } else {
-    SubscriptSize = subscriptLabels.size();
-  }
+  SubscriptSize = subscriptLabels.size();
 }
 
 KeyPathExpr::Component
@@ -2214,7 +2206,7 @@ KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
        Type elementType, SourceLoc loc,
        ArrayRef<ProtocolConformanceRef> indexHashables) {
   return Component(&elementType->getASTContext(),
-                   subscript, index, labels, indexHashables, 0,
+                   subscript, index, labels, indexHashables,
                    Kind::Subscript, elementType, loc);
 }
 

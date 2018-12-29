@@ -4861,14 +4861,20 @@ public:
                        Expr *indexExpr,
                        ArrayRef<Identifier> subscriptLabels,
                        ArrayRef<ProtocolConformanceRef> indexHashables,
-                       unsigned tupleIndex,
                        Kind kind,
                        Type type,
                        SourceLoc loc);
+
+    // Private constructor for tuple element kind
+    Component(unsigned tupleIndex, Type elementType, SourceLoc loc)
+      : Component(nullptr, {}, nullptr, {}, {}, Kind::TupleElement,
+        elementType, loc) {
+      TupleIndex = tupleIndex;
+    }
     
   public:
     Component()
-      : Component(nullptr, {}, nullptr, {}, {}, 0, Kind::Invalid,
+      : Component(nullptr, {}, nullptr, {}, {}, Kind::Invalid,
                   Type(), SourceLoc())
     {}
     
@@ -4876,7 +4882,7 @@ public:
     static Component forUnresolvedProperty(DeclName UnresolvedName,
                                            SourceLoc Loc) {
       return Component(nullptr,
-                       UnresolvedName, nullptr, {}, {}, 0,
+                       UnresolvedName, nullptr, {}, {},
                        Kind::UnresolvedProperty,
                        Type(),
                        Loc);
@@ -4902,14 +4908,14 @@ public:
                                          SourceLoc loc) {
       
       return Component(&context,
-                       {}, index, subscriptLabels, {}, 0,
+                       {}, index, subscriptLabels, {},
                        Kind::UnresolvedSubscript,
                        Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
     static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalForce,
                        Type(),
                        BangLoc);
@@ -4917,7 +4923,7 @@ public:
     
     /// Create an unresolved optional chain `?` component.
     static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalChain,
                        Type(),
                        QuestionLoc);
@@ -4927,7 +4933,7 @@ public:
     static Component forProperty(ConcreteDeclRef property,
                                  Type propertyType,
                                  SourceLoc loc) {
-      return Component(nullptr, property, nullptr, {}, {}, 0,
+      return Component(nullptr, property, nullptr, {}, {},
                        Kind::Property,
                        propertyType,
                        loc);
@@ -4956,7 +4962,7 @@ public:
     
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalForce, forcedType,
                        bangLoc);
     }
@@ -4964,7 +4970,7 @@ public:
     /// Create an optional-chaining `?` component.
     static Component forOptionalChain(Type unwrappedType,
                                       SourceLoc questionLoc) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalChain, unwrappedType,
                        questionLoc);
     }
@@ -4973,13 +4979,13 @@ public:
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::OptionalWrap, wrappedType,
                        SourceLoc());
     }
     
     static Component forIdentity(SourceLoc selfLoc) {
-      return Component(nullptr, {}, nullptr, {}, {}, 0,
+      return Component(nullptr, {}, nullptr, {}, {},
                        Kind::Identity, Type(),
                        selfLoc);
     }
@@ -4987,9 +4993,7 @@ public:
     static Component forTupleElement(unsigned fieldNumber,
                                      Type elementType,
                                      SourceLoc loc) {
-      return Component(nullptr, {}, nullptr, {}, {}, fieldNumber,
-                       Kind::TupleElement, elementType,
-                       loc);
+      return Component(fieldNumber, elementType, loc);
     }
       
       
