@@ -4750,7 +4750,7 @@ A ``convert_escape_to_noescape [not_guaranteed] %opd`` indicates that the
 lifetime of its operand was not guaranteed by SILGen and a mandatory pass must
 be run to ensure the lifetime of ``%opd``` for the conversion's uses.
 
-A ``convert_escape_to_noescape [escaped]`` indiciates that the result was
+A ``convert_escape_to_noescape [escaped]`` indicates that the result was
 passed to a function (materializeForSet) which escapes the closure in a way not
 expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.
