@@ -688,6 +688,15 @@ struct NonOffsetableProperties {
   var z: Int { return 0 }
 }
 
+struct TupleProperties {
+  // unlabeled
+  var a: (Int, String)
+  // labeled
+  let b: (x: String, y: Int)
+  // reference writable
+  let c: (m: C<Int>, n: C<String>)
+}
+
 func getIdentityKeyPathOfType<T>(_: T.Type) -> KeyPath<T, T> {
   return \.self
 }
@@ -710,6 +719,17 @@ keyPath.test("offsets") {
 
   expectEqual(SLayout.offset(of: \.self), 0)
   expectEqual(SLayout.offset(of: getIdentityKeyPathOfType(S<Int>.self)), 0)
+
+  let TPLayout = MemoryLayout<TupleProperties>.self
+  expectEqual(TPLayout.offset(of: \TupleProperties.a), 0)
+  expectEqual(TPLayout.offset(of: \TupleProperties.a.0), 0)
+  expectEqual(TPLayout.offset(of: \TupleProperties.a.1), 8)
+  expectEqual(TPLayout.offset(of: \TupleProperties.b), 24)
+  expectEqual(TPLayout.offset(of: \TupleProperties.b.x), 24)
+  expectEqual(TPLayout.offset(of: \TupleProperties.b.y), 40)
+  expectEqual(TPLayout.offset(of: \TupleProperties.c), 48)
+  expectEqual(TPLayout.offset(of: \TupleProperties.c.m), 48)
+  expectEqual(TPLayout.offset(of: \TupleProperties.c.n), 56)
 }
 
 keyPath.test("identity key path") {
@@ -743,6 +763,38 @@ keyPath.test("identity key path") {
 
   expectEqual(x[keyPath: valueKey2], 679)
   expectEqual(x[keyPath: valueKey3], 679)
+}
+
+keyPath.test("tuple key path") {
+  let t0 = \TupleProperties.a.0
+  expectNotNil(t0 as? KeyPath<TupleProperties, Int>)
+  expectNotNil(t0 as? WritableKeyPath<TupleProperties, Int>)
+  expectNil(t0 as? ReferenceWritableKeyPath<TupleProperties, Int>)
+
+  let t1 = \TupleProperties.a.1
+  expectNotNil(t1 as? KeyPath<TupleProperties, String>)
+  expectNotNil(t1 as? WritableKeyPath<TupleProperties, String>)
+  expectNil(t1 as? ReferenceWritableKeyPath<TupleProperties, String>)
+
+  let t2 = \TupleProperties.b.x
+  expectNotNil(t2 as? KeyPath<TupleProperties, String>)
+  expectNil(t2 as? WritableKeyPath<TupleProperties, String>)
+  expectNil(t2 as? ReferenceWritableKeyPath<TupleProperties, String>)
+
+  let t3 = \TupleProperties.b.y
+  expectNotNil(t3 as? KeyPath<TupleProperties, Int>)
+  expectNil(t3 as? WritableKeyPath<TupleProperties, Int>)
+  expectNil(t3 as? ReferenceWritableKeyPath<TupleProperties, Int>)
+
+  let t4 = \TupleProperties.c.m
+  expectNotNil(t4 as? KeyPath<TupleProperties, C<Int>>)
+  expectNil(t4 as? WritableKeyPath<TupleProperties, C<Int>>)
+  expectNil(t4 as? ReferenceWritableKeyPath<TupleProperties, C<Int>>)
+
+  let t5 = \TupleProperties.c.n.z
+  expectNotNil(t5 as? KeyPath<TupleProperties, String>)
+  expectNotNil(t5 as? WritableKeyPath<TupleProperties, String>)
+  expectNotNil(t5 as? ReferenceWritableKeyPath<TupleProperties, String>)
 }
 
 keyPath.test("let-ness") {

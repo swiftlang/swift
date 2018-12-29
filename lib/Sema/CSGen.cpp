@@ -3049,7 +3049,7 @@ namespace {
         }
 
         case KeyPathExpr::Component::Kind::TupleElement: {
-          llvm_unreachable("[technicated]");
+          llvm_unreachable("not implemented");
           break;
         }
                 

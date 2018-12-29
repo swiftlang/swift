@@ -389,9 +389,17 @@ void verifyKeyPathComponent(SILModule &M,
             "invalid baseTy, should have been a TupleType");
       
     auto tupleTy = loweredBaseTy.getAs<TupleType>();
-
-    require(component.getTupleIndex() < tupleTy->getNumElements(),
+    auto eltIdx = component.getTupleIndex();
+      
+    require(eltIdx < tupleTy->getNumElements(),
             "invalid element index, greater than # of tuple elements");
+
+    auto eltTy = tupleTy->getElementType(eltIdx)
+      ->getReferenceStorageReferent()
+      ->getCanonicalType();
+    
+    require(eltTy == componentTy,
+            "tuple element type should match the type of the component");
 
     break;
   }

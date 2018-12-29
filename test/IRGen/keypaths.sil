@@ -38,6 +38,13 @@ public class C2: C1 {
   public var reabstracted: () -> ()
 }
 
+public struct T {
+  public var a: (Int, String)
+  public let b: (String, Int)
+  public var c: (f: Int, g: String)
+  public let d: (x: String, y: Int)
+}
+
 sil_vtable C {}
 sil_vtable C1 {}
 sil_vtable C2 {}
@@ -180,6 +187,121 @@ sil_vtable C2 {}
 // looping in the compiler at one point.
 // CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
 
+// -- %t0: T.a.0
+// CHECK: [[KP_T0:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.a, mutable
+// CHECK-SAME: <i32 0x0180_0000>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.a
+// CHECK-SAME: <i32 0x0180_0000> }>
+
+// -- %t1: T.a.1
+// CHECK: [[KP_T1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.a, mutable
+// CHECK-SAME: <i32 0x0180_0000>,
+// CHECK: @"symbolic
+// -- tuple element #1 of T.a
+// CHECK-32-SAME: <i32 0x0180_0004> }>
+// CHECK-64-SAME: <i32 0x0180_0008> }>
+
+// -- %t2: T.b.0
+// CHECK: [[KP_T2:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.b
+// CHECK-32-SAME: <i32 0x0100_000c>,
+// CHECK-64-SAME: <i32 0x0100_0018>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.b
+// CHECK-SAME: <i32 0x0180_0000> }>
+
+// -- %t3: T.b.1
+// CHECK: [[KP_T3:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.b
+// CHECK-32-SAME: <i32 0x0100_000c>,
+// CHECK-64-SAME: <i32 0x0100_0018>,
+// CHECK: @"symbolic
+// -- tuple element #1 of T.b
+// CHECK-32-SAME: <i32 0x0180_0008> }>
+// CHECK-64-SAME: <i32 0x0180_0010> }>
+
+// -- %t4: T.c.f
+// CHECK: [[KP_T4:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.f, mutable
+// CHECK-32-SAME: <i32 0x0180_0018>,
+// CHECK-64-SAME: <i32 0x0180_0030>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.f
+// CHECK-SAME: <i32 0x0180_0000> }>
+
+// -- %t5: T.c.g
+// CHECK: [[KP_T5:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.f, mutable
+// CHECK-32-SAME: <i32 0x0180_0018>,
+// CHECK-64-SAME: <i32 0x0180_0030>,
+// CHECK: @"symbolic
+// -- tuple element #1 of T.f
+// CHECK-32-SAME: <i32 0x0180_0004> }>
+// CHECK-64-SAME: <i32 0x0180_0008> }>
+
+// -- %t6: T.d.x
+// CHECK: [[KP_T6:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.d
+// CHECK-32-SAME: <i32 0x0100_0024>,
+// CHECK-64-SAME: <i32 0x0100_0048>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.d
+// CHECK-32-SAME: <i32 0x0180_0000> }>
+// CHECK-64-SAME: <i32 0x0180_0000> }>
+
+// -- %t7: T.d.y
+// CHECK: [[KP_T7:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//                  -- instantiable in-line, size 12
+// CHECK-SAME: <i32 0x8000_000c>,
+// -- offset of T.d
+// CHECK-32-SAME: <i32 0x0100_0024>,
+// CHECK-64-SAME: <i32 0x0100_0048>,
+// CHECK: @"symbolic
+// -- tuple element #0 of T.d
+// CHECK-32-SAME: <i32 0x0180_0008> }>
+// CHECK-64-SAME: <i32 0x0180_0010> }>
+
 // -- %i: Gen<A>.x
 // CHECK: [[KP_I:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
@@ -235,6 +357,26 @@ entry:
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
   %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ())
   %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed () -> @out (), setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout C2) -> ())
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T0]] to i8*), i8* undef)
+  %t0 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T1]] to i8*), i8* undef)
+  %t1 = keypath $KeyPath<T, String>, (root $T; stored_property #T.a : $(Int, String); tuple_element #1 : $String)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T2]] to i8*), i8* undef)
+  %t2 = keypath $KeyPath<T, String>, (root $T; stored_property #T.b : $(String, Int); tuple_element #0 : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T3]] to i8*), i8* undef)
+  %t3 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.b : $(String, Int); tuple_element #1 : $Int)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T4]] to i8*), i8* undef)
+  %t4 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.c : $(f: Int, g: String); tuple_element #0 : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T5]] to i8*), i8* undef)
+  %t5 = keypath $KeyPath<T, String>, (root $T; stored_property #T.c : $(f: Int, g: String); tuple_element #1 : $String)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T6]] to i8*), i8* undef)
+  %t6 = keypath $KeyPath<T, String>, (root $T; stored_property #T.d : $(x: String, y: Int); tuple_element #0 : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_T7]] to i8*), i8* undef)
+  %t7 = keypath $KeyPath<T, Int>, (root $T; stored_property #T.d : $(x: String, y: Int); tuple_element #1 : $Int)
 
   return undef : $()
 }

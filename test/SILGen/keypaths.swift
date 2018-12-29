@@ -43,6 +43,12 @@ extension P {
   }
 }
 
+struct T {
+  var a: (Int, String)
+  let b: (f: String, g: Int)
+  let c: (x: C<Int>, y: C<String>)
+}
+
 /* TODO: When we support superclass requirements on protocols, we should test
  * this case as well.
 protocol PoC : C<Int> {}
@@ -396,3 +402,23 @@ func identity<T>(_: T) {
   let _: WritableKeyPath<String, String> = \String.self
 }
 
+// CHECK-LABEL: sil hidden @{{.*}}tuples
+func tuples(_: T) {
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
+  let _: WritableKeyPath<T, Int> = \T.a.0
+  // CHECK: keypath $WritableKeyPath<T, String>, (root $T; stored_property #T.a : $(Int, String); tuple_element #1 : $String)
+  let _: WritableKeyPath<T, String> = \T.a.1
+  // CHECK: keypath $KeyPath<T, String>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #0 : $String)
+  let _: KeyPath<T, String> = \T.b.f
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #1 : $Int)
+  let _: KeyPath<T, Int> = \T.b.g
+  // CHECK: keypath $KeyPath<T, C<Int>>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>)
+  let _: KeyPath<T, C<Int>> = \T.c.x
+  // CHECK: keypath $KeyPath<T, C<String>>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #1 : $C<String>)
+  let _: KeyPath<T, C<String>> = \T.c.y
+
+  // CHECK: keypath $ReferenceWritableKeyPath<T, Int>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>; stored_property #C.x : $Int)
+  let _: ReferenceWritableKeyPath<T, Int> = \T.c.x.x
+  // CHECK: keypath $KeyPath<T, String>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>; stored_property #C.y : $String)
+  let _: KeyPath<T, String> = \T.c.x.y
+}

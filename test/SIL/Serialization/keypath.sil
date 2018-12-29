@@ -89,6 +89,10 @@ entry:
   %a = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
   // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
   %b = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  %c = keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+  %d = keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
 
   return undef : $()
 }
@@ -178,8 +182,8 @@ entry:
 sil [serialized] [ossa] @serialize_all : $@convention(thin) () -> () {
 entry:
   %0 = function_ref @stored_properties : $@convention(thin) () -> ()
-  %1 = function_ref @tuple_elements : $@convention(thin) () -> ()
-  %2 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %1 = function_ref @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
+  %2 = function_ref @tuple_elements : $@convention(thin) () -> ()
   %3 = function_ref @computed_properties : $@convention(thin) () -> ()
   %4 = function_ref @computed_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> ()
   %5 = function_ref @optional : $@convention(thin) () -> ()
