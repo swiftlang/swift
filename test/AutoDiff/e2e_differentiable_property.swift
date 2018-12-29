@@ -76,9 +76,7 @@ E2EDifferentiablePropertyTests.test("computed property") {
 }
 
 // FIXME: The AD pass cannot differentiate this because it sees
-// `struct_extract`s instead of calls to getters. This problem should fix
-// itself once we move the AD pass before mandatory inlining, and we should be
-// able to enable this test.
+// `struct_extract`s instead of calls to getters.
 // E2EDifferentiablePropertyTests.test("stored property") {
 //   let actualGrad = gradient(at: Space(x: 0, y: 0)) { (point: Space) -> Float in
 //     return 3 * point.y
