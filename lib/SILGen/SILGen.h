@@ -359,9 +359,6 @@ public:
                               CanType baseTy,
                               bool forPropertyDescriptor);
 
-  KeyPathPatternComponent
-  emitKeyPathComponentForTupleElement(unsigned tupleIndex, CanType baseTy);
-    
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
