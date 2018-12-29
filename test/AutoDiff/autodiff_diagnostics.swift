@@ -32,6 +32,28 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
 }
 
 //===----------------------------------------------------------------------===//
+// Non-differentiable stored properties
+//===----------------------------------------------------------------------===//
+
+struct S {
+  let p: Float
+}
+
+extension S : Differentiable, VectorNumeric {
+  static var zero: S { return S(p: 0) }
+  typealias Scalar = Float
+  static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
+  static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
+  static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
+
+  typealias TangentVector = S
+  typealias CotangentVector = S
+}
+
+// expected-error @+1 {{property is not differentiable}}
+_ = gradient(at: S(p: 0)) { s in 2 * s.p }
+
+//===----------------------------------------------------------------------===//
 // Function composition
 //===----------------------------------------------------------------------===//
 

@@ -1582,8 +1582,22 @@ extension ${Self} {
 
 extension ${Self} {
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(adjoint: _adjointNegate)
   public static prefix func - (x: ${Self}) -> ${Self} {
     return ${Self}(Builtin.fneg_FPIEEE${bits}(x._value))
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+extension ${Self} {
+  @inlinable
+  @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  static func _adjointNegate(
+    seed: ${Self}, originalValue: ${Self}, x: ${Self}
+  ) -> ${Self} {
+    return -seed
   }
 }
 
