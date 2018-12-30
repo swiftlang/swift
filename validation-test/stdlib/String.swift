@@ -2105,6 +2105,10 @@ let comparisonTestCases = [
   ComparisonTestCase(["abcdefg", "abcdefg"], .equal),
   ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
 
+  ComparisonTestCase([String(StaticString("a")), "a"], .equal),
+  ComparisonTestCase([String(StaticString("abcdefg")), "abcdefg"], .equal),
+  ComparisonTestCase([String(StaticString("😀 \u{2f9df}")), "😀 \u{2f9df}"], .equal),
+
   ComparisonTestCase(["ábcdefg", "ábcdefgh", "ábcdefghi"], .less),
   ComparisonTestCase(["abcdefg", "abcdefgh", "abcdefghi"], .less),
 

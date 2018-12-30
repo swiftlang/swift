@@ -842,3 +842,11 @@ extension String {
     }
   }
 }
+
+extension String {
+    /// Creates a String instance from a StaticString
+    @inlinable @inline(__always)
+    public init(_ staticString: StaticString) {
+        self = staticString.withUTF8Buffer { String._uncheckedFromUTF8($0) }
+    }
+}
