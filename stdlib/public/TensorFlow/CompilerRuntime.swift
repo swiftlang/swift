@@ -107,6 +107,11 @@ private class S4TFTrace {
 
   let graph = TF_NewGraph()
 
+  // Created when "executing" the graph function -- in tracing mode we create a
+  // graph node in the trace graph function, and track its output tensor(s) in
+  // `out`, to feed via CTensorHandle to subsequent users if any.
+  var out: [TF_Output] = []
+  
   // This init allocates a new TF_Function in the current TensorFlow
   // context, which will be populated as the ops are executed in 
   // tracing mode.
@@ -679,6 +684,8 @@ public extension _ExecutionContext {
 internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
 ) {
+  assert(TFE_TensorHandleIsTensorBuffer(inputTensor) != 0)
+  
   let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
   debugLog("Rank is \(array.rank), shape is \(array.shape).")
   debugLog("""
@@ -691,6 +698,11 @@ internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
 internal func dumpCTensorHandleContent(
   _ idx: Int,
   _ inputTensorHandle: CTensorHandle) {
+  if TFE_TensorHandleIsTensorBuffer(inputTensorHandle) == 0 {
+    debugLog("Skip dumpping a tensor handle that's not a buffer.")
+    return
+  }
+  
   let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
   debugLog("Tensor \(idx) has TF data type \(dType).")
   switch dType {
@@ -721,6 +733,9 @@ private class TFEState {
   /// their side effects (e.g. sending and receiving tensors with the primary
   /// function).
   var ops: [CTFEOp] = []
+
+  var op_descs: [CTFOperationDescription] = []
+  
   init(_ programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
        helperFunctionCount: Int,
@@ -791,9 +806,7 @@ private class TFEState {
         debugLog("Creating trace for graph fn node \(opType).")
         // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
         // let opType = "trace_main.tf_0_CPU.device_partition"
-        let desc = TF_NewOperation(tracedFn.graph, opType, "nodeName");
-        _ = TF_FinishOperation(desc, status)
-        checkOk(status)    
+        op_descs.append(TF_NewOperation(tracedFn.graph, opType, opType)!);
       } else {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
@@ -838,7 +851,11 @@ private class TFEState {
 
 extension TFEState {
   func addInput(_ inputTensorHandle: CTensorHandle) {
-    TFE_OpAddInput(ops[0], inputTensorHandle, status)
+    if /*let tracedFn = */_RuntimeConfig.traceState.getFunction != nil {
+      TF_AddInput(op_descs[0], TFE_GetTFOutputFromTensorHandle(inputTensorHandle));
+    } else {
+      TFE_OpAddInput(ops[0], inputTensorHandle, status)
+    }
   }
 }
 
@@ -1206,12 +1223,25 @@ private extension _TensorComputation {
   // NOTE: This is to be called by the initializer. The computation gets
   // executed on initialization, thus this method will not be exposed to users.
   private func execute(threadIndex: Int) {
-    switch _RuntimeConfig.traceState {
-    case .notTracing:
     debugLog("Executing thread \(threadIndex).")
     if let stateTFE = stateTFE {
       internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
       internalConsistencyCheck(threadIndex <= helperFunctionCount)
+
+      if let tracedFn = _RuntimeConfig.traceState.getFunction {
+        debugLog("Bypassing normal TFE execution for thread \(threadIndex).")
+        let result = TF_FinishOperation(stateTFE.op_descs[threadIndex], status)
+        checkOk(status)
+        if threadIndex == 0 {
+          debugLog("Tracking \(returnValues.count) outputs in tracedFn.")
+          tracedFn.out.removeAll()
+          for i in 0..<returnValues.count {
+            tracedFn.out.append(TF_Output(oper: result, index: Int32(i)))
+          }
+        }
+        return
+      }
+      
       let op = stateTFE.ops[threadIndex]
       if threadIndex == 0 {
         var returnValueCount = Int32(returnValues.count)
@@ -1242,9 +1272,6 @@ private extension _TensorComputation {
                     helperFunctionCount: helperFunctionCount,
                     returnValues: &returnValues)
     debugLog("Done execution.")
-    default:
-      debugLog("Bypassing normal TFE execution for thread \(threadIndex).")
-    }
   }
 }
 
@@ -1279,9 +1306,18 @@ public extension _TensorComputation {
     pthreads.removeAll()
     debugLog("Done executing TF graph.")
 
+    if let tracedFn = _RuntimeConfig.traceState.getFunction {
+      debugLog("Setting output tensors: Expecting \(returnValues.count) return values, and gathered \(tracedFn.out.count) output tensors.")
+      assert (tracedFn.out.count == returnValues.count)
+      for i in 0..<returnValues.count {
+        returnValues[i] = TFE_NewTensorHandleFromTFOutput(tracedFn.out[i])
+      }
+    }
+    
     // Now that all the elements have been filled in, remove a level of
     // optional.
     return returnValues.map { $0! }
+
   }
 }
 
