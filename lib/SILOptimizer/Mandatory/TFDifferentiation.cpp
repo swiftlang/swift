@@ -2117,6 +2117,8 @@ public:
         SILValue origRes, clonedRes;
         std::tie(origRes, clonedRes) = resultPair;
         getPrimalInfo().addStaticPrimalValueDecl(origRes);
+        getBuilder().createRetainValue(cloned->getLoc(), clonedRes,
+                                       getBuilder().getDefaultAtomicity());
         staticPrimalValues.push_back(clonedRes);
       }
       break;
@@ -2321,6 +2323,8 @@ public:
 
     // Checkpoint the original results.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
+    getBuilder().createRetainValue(ai->getLoc(), originalDirectResult,
+                                   getBuilder().getDefaultAtomicity());
     staticPrimalValues.push_back(originalDirectResult);
 
     // Checkpoint the pullback.
@@ -2484,6 +2488,8 @@ public:
     // Checkpoint original results as a tuple.
     getPrimalInfo().addStaticPrimalValueDecl(ai);
     auto origResAggr = joinElements(origResults, builder, primalCall->getLoc());
+    getBuilder().createRetainValue(ai->getLoc(), origResAggr,
+                                   getBuilder().getDefaultAtomicity());
     staticPrimalValues.push_back(origResAggr);
 
     // Some instructions that produce the callee may have been cloned.

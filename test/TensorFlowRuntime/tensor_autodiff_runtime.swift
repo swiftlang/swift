@@ -7,10 +7,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
-// FIXME: Segfault.
-//
-// XFAIL: *
-//
 // Tensor AD runtime tests.
 
 import TensorFlow
