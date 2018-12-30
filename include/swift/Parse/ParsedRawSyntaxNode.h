@@ -14,9 +14,9 @@
 #define SWIFT_PARSE_PARSEDRAWSYNTAXNODE_H
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
-#include "swift/Syntax/Trivia.h"
 #include <vector>
 
 namespace swift {
@@ -54,8 +54,8 @@ class ParsedRawSyntaxNode {
   };
   struct DeferredTokenNode {
     Token Tok;
-    syntax::Trivia LeadingTrivia;
-    syntax::Trivia TrailingTrivia;
+    ParsedTrivia LeadingTrivia;
+    ParsedTrivia TrailingTrivia;
   };
 
   union {
@@ -78,8 +78,8 @@ class ParsedRawSyntaxNode {
   }
 
   ParsedRawSyntaxNode(Token tok,
-                      syntax::Trivia leadingTrivia,
-                      syntax::Trivia trailingTrivia)
+                      ParsedTrivia leadingTrivia,
+                      ParsedTrivia trailingTrivia)
     : DeferredToken{std::move(tok),
                     std::move(leadingTrivia),
                     std::move(trailingTrivia)},
@@ -212,11 +212,11 @@ public:
     assert(DK == DataKind::DeferredToken);
     return DeferredToken.Tok;
   }
-  const syntax::Trivia &getLeadingTrivia() const {
+  const ParsedTrivia &getLeadingTrivia() const {
     assert(DK == DataKind::DeferredToken);
     return DeferredToken.LeadingTrivia;
   }
-  const syntax::Trivia &getTrailingTrivia() const {
+  const ParsedTrivia &getTrailingTrivia() const {
     assert(DK == DataKind::DeferredToken);
     return DeferredToken.TrailingTrivia;
   }
@@ -231,8 +231,8 @@ public:
 
   /// Form a deferred token node.
   static ParsedRawSyntaxNode makeDeferred(Token tok,
-                                          syntax::Trivia leadingTrivia,
-                                          syntax::Trivia trailingTrivia) {
+                                          ParsedTrivia leadingTrivia,
+                                          ParsedTrivia trailingTrivia) {
     return ParsedRawSyntaxNode{std::move(tok), std::move(leadingTrivia),
         std::move(trailingTrivia)};
   }

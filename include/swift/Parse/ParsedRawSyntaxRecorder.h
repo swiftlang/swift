@@ -25,6 +25,7 @@
 namespace swift {
 
 class ParsedRawSyntaxNode;
+struct ParsedTrivia;
 class SyntaxParseActions;
 class SourceLoc;
 class Token;
@@ -32,7 +33,6 @@ enum class tok;
 
 namespace syntax {
   enum class SyntaxKind;
-  struct Trivia;
 }
 
 class ParsedRawSyntaxRecorder {
@@ -43,8 +43,8 @@ public:
     : SPActions(std::move(spActions)) {}
 
   ParsedRawSyntaxNode recordToken(const Token &tok,
-                                  const syntax::Trivia &leadingTrivia,
-                                  const syntax::Trivia &trailingTrivia);
+                                  const ParsedTrivia &leadingTrivia,
+                                  const ParsedTrivia &trailingTrivia);
 
   /// Record a missing token. \p loc can be invalid or an approximate location
   /// of where the token would be if not missing.

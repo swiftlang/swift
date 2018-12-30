@@ -73,7 +73,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
   }
 
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   do {
     L.lex(Tok, LeadingTrivia, TrailingTrivia);
 
@@ -83,7 +83,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
     if (F != ResetTokens.end()) {
       assert(F->isNot(tok::string_literal));
 
-      DestFunc(*F, syntax::Trivia(), syntax::Trivia());
+      DestFunc(*F, ParsedTrivia(), ParsedTrivia());
 
       auto NewState = L.getStateForBeginningOfTokenLoc(
           F->getLoc().getAdvancedLoc(F->getLength()));
@@ -95,7 +95,7 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
       std::vector<Token> StrTokens;
       getStringPartTokens(Tok, LangOpts, SM, BufferID, StrTokens);
       for (auto &StrTok : StrTokens) {
-        DestFunc(StrTok, syntax::Trivia(), syntax::Trivia());
+        DestFunc(StrTok, ParsedTrivia(), ParsedTrivia());
       }
     } else {
       DestFunc(Tok, LeadingTrivia, TrailingTrivia);
@@ -292,8 +292,8 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                         : CommentRetentionMode::AttachToNextToken,
            TriviaRetentionMode::WithoutTrivia, TokenizeInterpolatedString,
            SplitTokens,
-           [&](const Token &Tok, const Trivia &LeadingTrivia,
-               const Trivia &TrailingTrivia) { Tokens.push_back(Tok); });
+           [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
+               const ParsedTrivia &TrailingTrivia) { Tokens.push_back(Tok); });
 
   assert(Tokens.back().is(tok::eof));
   Tokens.pop_back(); // Remove EOF.
@@ -314,12 +314,22 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
       /*TokenizeInterpolatedString=*/false,
       /*SplitTokens=*/ArrayRef<Token>(),
-      [&](const Token &Tok, const Trivia &LeadingTrivia,
-          const Trivia &TrailingTrivia) {
+      [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
+          const ParsedTrivia &TrailingTrivia) {
+        CharSourceRange TokRange = Tok.getRangeWithoutBackticks();
+        SourceLoc LeadingTriviaLoc =
+          TokRange.getStart().getAdvancedLoc(-LeadingTrivia.getLength());
+        SourceLoc TrailingTriviaLoc =
+          TokRange.getStart().getAdvancedLoc(TokRange.getByteLength());
+        Trivia syntaxLeadingTrivia =
+          LeadingTrivia.convertToSyntaxTrivia(LeadingTriviaLoc, SM, BufferID);
+        Trivia syntaxTrailingTrivia =
+          TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
         auto Text = OwnedString::makeRefCounted(Tok.getText());
         auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Text, LeadingTrivia.Pieces,
-                            TrailingTrivia.Pieces, SourcePresence::Present);
+            RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
+                            syntaxTrailingTrivia.Pieces,
+                            SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
         Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
@@ -580,7 +590,7 @@ SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
 void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.emplace_back();
   SplitTokens.back().setToken(Kind, Txt);
-  Trivia EmptyTrivia;
+  ParsedTrivia EmptyTrivia;
   SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
   TokReceiver->receive(SplitTokens.back());
 }
@@ -746,7 +756,7 @@ bool Parser::loadCurrentSyntaxNodeFromCache() {
   }
   unsigned LexerOffset =
       SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
-  unsigned LeadingTriviaLen = LeadingTrivia.getTextLength();
+  unsigned LeadingTriviaLen = LeadingTrivia.getLength();
   unsigned LeadingTriviaOffset = LexerOffset - LeadingTriviaLen;
   SourceLoc LeadingTriviaLoc = Tok.getLoc().getAdvancedLoc(-LeadingTriviaLen);
   if (auto TextLength = SyntaxContext->lookupNode(LeadingTriviaOffset,

@@ -23,7 +23,6 @@
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -171,8 +170,8 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
-                                    Trivia &TrailingTrivia) {
+void SyntaxParsingContext::addToken(Token &Tok, ParsedTrivia &LeadingTrivia,
+                                    ParsedTrivia &TrailingTrivia) {
   if (!Enabled)
     return;
 

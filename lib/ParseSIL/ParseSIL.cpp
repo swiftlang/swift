@@ -123,7 +123,8 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   std::shared_ptr<SyntaxTreeCreator> STreeCreator;
   if (SF.shouldBuildSyntaxTree()) {
     STreeCreator = std::make_shared<SyntaxTreeCreator>(
-                   SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
+        SF.getASTContext().SourceMgr, BufferID,
+        SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
   }
 
   SharedTimer timer("Parsing");

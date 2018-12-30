@@ -14,6 +14,7 @@
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Syntax/Trivia.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/AST/ASTContext.h"
@@ -33,9 +34,11 @@ static RC<RawSyntax> transferOpaqueNode(OpaqueSyntaxNode opaqueN) {
   return raw;
 }
 
-SyntaxTreeCreator::SyntaxTreeCreator(SyntaxParsingCache *syntaxCache,
+SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
+                                     SyntaxParsingCache *syntaxCache,
                                      RC<syntax::SyntaxArena> arena)
-    : Arena(std::move(arena)),
+    : SM(SM), BufferID(bufferID),
+      Arena(std::move(arena)),
       SyntaxCache(syntaxCache),
       TokenCache(new RawSyntaxTokenCache()) {
 }
@@ -105,12 +108,21 @@ void SyntaxTreeCreator::acceptSyntaxRoot(OpaqueSyntaxNode rootN,
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordToken(const Token &tok,
-                               const syntax::Trivia &leadingTrivia,
-                               const syntax::Trivia &trailingTrivia,
+                               const ParsedTrivia &leadingTrivia,
+                               const ParsedTrivia &trailingTrivia,
                                CharSourceRange range) {
+  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
+  SourceLoc leadingTriviaLoc =
+    tokRange.getStart().getAdvancedLoc(-leadingTrivia.getLength());
+  SourceLoc trailingTriviaLoc =
+    tokRange.getStart().getAdvancedLoc(tokRange.getByteLength());
+  Trivia syntaxLeadingTrivia =
+    leadingTrivia.convertToSyntaxTrivia(leadingTriviaLoc, SM, BufferID);
+  Trivia syntaxTrailingTrivia =
+    trailingTrivia.convertToSyntaxTrivia(trailingTriviaLoc, SM, BufferID);
   auto ownedText = OwnedString::makeRefCounted(tok.getText());
   auto raw = TokenCache->getToken(Arena, tok.getKind(), ownedText,
-                                  leadingTrivia.Pieces, trailingTrivia.Pieces);
+                    syntaxLeadingTrivia.Pieces, syntaxTrailingTrivia.Pieces);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;

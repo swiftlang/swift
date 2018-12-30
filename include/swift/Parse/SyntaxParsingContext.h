@@ -24,6 +24,7 @@ using namespace swift::syntax;
 
 class ParsedSyntax;
 class ParsedTokenSyntax;
+struct ParsedTrivia;
 class SourceFile;
 enum class tok;
 class Token;
@@ -245,8 +246,8 @@ public:
   void addRawSyntax(ParsedRawSyntaxNode Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(Token &Tok, Trivia &LeadingTrivia,
-                Trivia &TrailingTrivia);
+  void addToken(Token &Tok, ParsedTrivia &LeadingTrivia,
+                ParsedTrivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);

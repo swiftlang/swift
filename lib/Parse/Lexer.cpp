@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Syntax/Trivia.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -284,15 +285,15 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   if (RetainComments == CommentRetentionMode::AttachToNextToken) {
     // 'CommentLength' here is the length from the *first* comment to the
     // token text (or its backtick if exist).
-    auto Iter = llvm::find_if(LeadingTrivia, [](const TriviaPiece &Piece) {
-      return Piece.isComment();
+    auto Iter = llvm::find_if(LeadingTrivia, [](const ParsedTriviaPiece &Piece) {
+      return isCommentTriviaKind(Piece.getKind());
     });
     for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
       if (Iter->getKind() == TriviaKind::Backtick)
         // Since Token::getCommentRange() doesn't take backtick into account,
         // we cannot include length of backtick.
         break;
-      CommentLength += Iter->getTextLength();
+      CommentLength += Iter->getLength();
     }
   }
 
@@ -310,9 +311,9 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
 
-  LeadingTrivia.push_back(TriviaPiece::backtick());
+  LeadingTrivia.push_back(TriviaKind::Backtick, 1);
   assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-  TrailingTrivia.push_back(TriviaPiece::backtick());
+  TrailingTrivia.push_back(TriviaKind::Backtick, 1);
 
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark
@@ -2335,8 +2336,7 @@ void Lexer::lexImpl() {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
       // Add UTF-8 BOM to LeadingTrivia.
-      auto Text = OwnedString::makeRefCounted(StringRef(CurPtr, BOMLen));
-      LeadingTrivia.push_back(TriviaPiece::garbageText(Text));
+      LeadingTrivia.push_back(TriviaKind::GarbageText, BOMLen);
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2521,7 +2521,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   return L.peekNextToken();
 }
 
-void Lexer::lexTrivia(syntax::Trivia &Pieces, bool IsForTrailingTrivia) {
+void Lexer::lexTrivia(ParsedTrivia &Pieces, bool IsForTrailingTrivia) {
 Restart:
   const char *TriviaStart = CurPtr;
 
@@ -2530,30 +2530,30 @@ Restart:
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
-    Pieces.appendOrSquash(TriviaPiece::newlines(1));
+    Pieces.appendOrSquash(TriviaKind::Newline, 1);
     goto Restart;
   case '\r':
     if (IsForTrailingTrivia)
       break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
-      Pieces.appendOrSquash(TriviaPiece::carriageReturnLineFeeds(1));
+      Pieces.appendOrSquash(TriviaKind::CarriageReturnLineFeed, 2);
       ++CurPtr;
     } else {
-      Pieces.appendOrSquash(TriviaPiece::carriageReturns(1));
+      Pieces.appendOrSquash(TriviaKind::CarriageReturn, 1);
     }
     goto Restart;
   case ' ':
-    Pieces.appendOrSquash(TriviaPiece::spaces(1));
+    Pieces.appendOrSquash(TriviaKind::Space, 1);
     goto Restart;
   case '\t':
-    Pieces.appendOrSquash(TriviaPiece::tabs(1));
+    Pieces.appendOrSquash(TriviaKind::Tab, 1);
     goto Restart;
   case '\v':
-    Pieces.appendOrSquash(TriviaPiece::verticalTabs(1));
+    Pieces.appendOrSquash(TriviaKind::VerticalTab, 1);
     goto Restart;
   case '\f':
-    Pieces.appendOrSquash(TriviaPiece::formfeeds(1));
+    Pieces.appendOrSquash(TriviaKind::Formfeed, 1);
     goto Restart;
   case '/':
     if (IsForTrailingTrivia || isKeepingComments()) {
@@ -2565,18 +2565,16 @@ Restart:
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-      Pieces.push_back(isDocComment ? TriviaPiece::docLineComment(Text)
-                                    : TriviaPiece::lineComment(Text));
+      Pieces.push_back(isDocComment ? TriviaKind::DocLineComment
+                                    : TriviaKind::LineComment, Length);
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;
-      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-      Pieces.push_back(isDocComment ? TriviaPiece::docBlockComment(Text)
-                                    : TriviaPiece::blockComment(Text));
+      Pieces.push_back(isDocComment ? TriviaKind::DocBlockComment
+                                    : TriviaKind::BlockComment, Length);
       goto Restart;
     }
     break;
@@ -2588,8 +2586,7 @@ Restart:
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
       skipHashbang(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-      Pieces.push_back(TriviaPiece::garbageText(Text));
+      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     break;
@@ -2598,8 +2595,7 @@ Restart:
     if (tryLexConflictMarker(/*EatNewline=*/false)) {
       // Conflict marker.
       size_t Length = CurPtr - TriviaStart;
-      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-      Pieces.push_back(TriviaPiece::garbageText(Text));
+      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     break;
@@ -2608,8 +2604,7 @@ Restart:
     case NulCharacterKind::Embedded: {
       diagnoseEmbeddedNul(Diags, CurPtr - 1);
       size_t Length = CurPtr - TriviaStart;
-      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-      Pieces.push_back(TriviaPiece::garbageText(Text));
+      Pieces.push_back(TriviaKind::GarbageText, Length);
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:
@@ -2655,8 +2650,7 @@ Restart:
     }
 
     size_t Length = CurPtr - TriviaStart;
-    auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
-    Pieces.push_back(TriviaPiece::garbageText(Text));
+    Pieces.push_back(TriviaKind::GarbageText, Length);
     goto Restart;
   }
   // Reset the cursor.

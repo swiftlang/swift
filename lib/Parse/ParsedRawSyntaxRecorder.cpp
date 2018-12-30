@@ -18,29 +18,24 @@
 
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
-#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(const Token &tok,
-                                     const Trivia &leadingTrivia,
-                                     const Trivia &trailingTrivia) {
-  SourceLoc tokLoc = tok.getLoc();
-  unsigned tokLength = tok.getLength();
-  if (tok.isEscapedIdentifier()) {
-    // Adjust to account for the backticks that are included in trivia.
-    tokLoc = tokLoc.getAdvancedLoc(1);
-    tokLength -= 2;
-  }
-  unsigned leadingTriviaLen = leadingTrivia.getTextLength();
-  unsigned trailingTriviaLen = trailingTrivia.getTextLength();
-  SourceLoc offset = tokLoc.getAdvancedLoc(-leadingTriviaLen);
-  unsigned length = leadingTriviaLen + tokLength + trailingTriviaLen;
+                                     const ParsedTrivia &leadingTrivia,
+                                     const ParsedTrivia &trailingTrivia) {
+  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
+  unsigned leadingTriviaLen = leadingTrivia.getLength();
+  unsigned trailingTriviaLen = trailingTrivia.getLength();
+  SourceLoc offset = tokRange.getStart().getAdvancedLoc(-leadingTriviaLen);
+  unsigned length = leadingTriviaLen + tokRange.getByteLength() +
+      trailingTriviaLen;
   CharSourceRange range{offset, length};
   OpaqueSyntaxNode n = SPActions->recordToken(tok, leadingTrivia,
                                               trailingTrivia, range);

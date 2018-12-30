@@ -88,14 +88,14 @@ private:
   }
 
   static void makeCTrivia(SmallVectorImpl<CTriviaPiece> &c_trivia,
-                          const Trivia &trivia) {
+                          const ParsedTrivia &trivia) {
     for (const auto &piece : trivia) {
       CTriviaPiece c_piece;
       auto numValue =
         WrapperTypeTraits<TriviaKind>::numericValue(piece.getKind());
       c_piece.kind = numValue;
       assert(c_piece.kind == numValue && "trivia kind value is too large");
-      c_piece.length = piece.getTextLength();
+      c_piece.length = piece.getLength();
       c_trivia.push_back(c_piece);
     }
   }
@@ -132,8 +132,8 @@ private:
   }
 
   OpaqueSyntaxNode recordToken(const Token &tok,
-                               const Trivia &leadingTrivia,
-                               const Trivia &trailingTrivia,
+                               const ParsedTrivia &leadingTrivia,
+                               const ParsedTrivia &trailingTrivia,
                                CharSourceRange range) override {
     SmallVector<CTriviaPiece, 8> c_leadingTrivia, c_trailingTrivia;
     makeCTrivia(c_leadingTrivia, leadingTrivia);
