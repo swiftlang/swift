@@ -2417,6 +2417,10 @@ ERROR(parameterized_no_parameters_struct,none,
 ERROR(parameterized_invalid_parameters_struct,none,
       "cannot automatically synthesize %0 because 'Parameters' struct is "
       "invalid", (Type))
+ERROR(broken_additive_arithmetic_requirement,none,
+      "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_numeric_requirement,none,
+      "VectorNumeric protocol is broken: unexpected requirement", ())
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
