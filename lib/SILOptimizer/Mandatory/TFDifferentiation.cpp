@@ -1001,6 +1001,7 @@ public:
   /// parameters as the function.
   StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
+private:
   /// Finds the `[differentiable]` attribute on the specified original function
   /// corresponding to the specified parameter indices. Returns nullptr if it
   /// does not exist.
@@ -1078,6 +1079,7 @@ public:
     return differentiationTasks[existing->getSecond()].get();
   }
 
+public:
   /// Register a differentiation task in the global worklist. This will ensure
   /// that a `[differentiable]` attribute will be generated for the specified
   /// indices, and that primal/adjoint synthesis will be run in the
@@ -1113,6 +1115,21 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
+    // If `original` has no differentiable attributes, it may be the case that
+    // it has not been loaded yet. Load it, check for differentiable attributes,
+    // and register the attributes as tasks so that they can be looked up.
+    if (original->getDifferentiableAttrs().empty() &&
+        original->isExternalDeclaration()) {
+      auto loaded = module.loadFunction(original);
+      assert(loaded && "Cannot load original function");
+      (void)loaded;
+      for (auto *diffAttr : original->getDifferentiableAttrs()) {
+        registerDifferentiationTask(
+            original, diffAttr->getIndices(),
+            DifferentiationInvoker(diffAttr, original));
+      }
+    }
+
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
