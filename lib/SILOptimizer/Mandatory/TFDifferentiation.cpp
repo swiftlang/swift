@@ -714,9 +714,6 @@ private:
   /// Note: This is only used when `DifferentiationUseVJP`.
   DenseMap<ApplyInst *, NestedApplyActivity> nestedApplyActivities;
 
-  DenseMap<StructExtractInst *, NestedStructExtractStrategy>
-      nestedStructExtractStrategies;
-
   /// Cache for associated functions.
   SILFunction *primal = nullptr;
   SILFunction *adjoint = nullptr;
