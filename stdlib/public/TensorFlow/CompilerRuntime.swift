@@ -95,10 +95,80 @@ public enum _ExecutionMode : Equatable {
   }
 }
 
+
+// S4TFTrace wraps a TF_Function that is either in the process of being
+// traced into, or which has been completed and is ready to go.  As ops are
+// executed in tracing mode, they add their ops to the trace instead of
+// executing them.  When the trace is fully formed and is time to be
+// executed, the TF_Function is run by the eager runtime on some
+//  parameters.
+private class S4TFTrace {
+  // var theTFFunction : CTFFunction? /*TF_Function*/ = nil
+
+  let graph = TF_NewGraph()
+
+  // This init allocates a new TF_Function in the current TensorFlow
+  // context, which will be populated as the ops are executed in 
+  // tracing mode.
+  init() {
+  }
+
+  func finalize() -> CTFFunction {
+    let funcName = "MyTraceFn"
+    let status = TF_NewStatus()
+
+    // // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
+    // let opType = "trace_main.tf_0_CPU.device_partition"
+    // let desc = TF_NewOperation(graph, opType, "nodeName");
+    // _ = TF_FinishOperation(desc, status)
+    // checkOk(status)
+
+    let theTFFunction = 
+      TF_GraphToFunction(graph, funcName,
+                         /*append_hash_to_fn_name*/ 0,
+                         /*num_opers*/ -1,
+                         /*opers*/ nil,
+                         /*numinputs*/ 0,
+                         /*inputs*/ nil,
+                         /*noutputs*/ 0,
+                         /*outputs*/ nil,
+                         /*outputnames*/ nil,
+                         /*functionoptions*/ nil, "", status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    TF_DeleteGraph(graph)
+    return theTFFunction!
+  }
+}
+
+// This enum is maintained by the TensorFlow module, to keep track of
+// whether we are building or executing a trace.  _RuntimeConfig gets
+// a static (should be thread local!) property named
+// "_RuntimeConfig.traceState".
+private enum TracingState {
+  case notTracing
+  case tracing(S4TFTrace)
+  // case runningTrace(S4TFTrace)
+
+  // assert self is 'tracing' or 'runningTrace' and return the trace.
+  var getFunction : S4TFTrace? {
+    // assert (self != .notTracing)
+    switch self {
+    case .tracing(let trace): return trace
+    // TODO: should we also assert this cannot happen?
+    // case .runningTrace(let trace): return trace
+    default: return nil
+      // fatalError("Cannot happen.")
+    }
+  }
+}
+
 /// The configuration for the compiler runtime.
 // TODO(hongm): Revisit the longer-term design.
 @_frozen
 public enum _RuntimeConfig {
+  fileprivate static var traceState: TracingState = .notTracing
+
   /// When false, tensorflow runtime will be initialized before running any
   /// tensor program in this process.
   static public var tensorFlowRuntimeInitialized = false
@@ -385,6 +455,72 @@ public final class _ExecutionContext {
   }
 }
 
+
+public func trace(_ fn: () -> ()) -> () -> () {
+  // Verify that we are not already tracing.
+  // assert(_RuntimeConfig.traceState == .notTracing)
+  // Switch to tracing mode, allocating a TF_Function.
+  _RuntimeConfig.traceState = .tracing(S4TFTrace())
+  // NOTE: Argument handling code goes here, defined in a section below.
+
+  // Run the body, this builds the trace, adding ops to currentTrace.
+  fn()
+
+  // NOTE: Result handling code goes here, defined in a section below.
+
+  // Ok, we are done tracing.
+  let tracedFn = _RuntimeConfig.traceState.getFunction!
+  // assert(_RuntimeConfig.traceState == .tracing(tracedFn))
+
+  _RuntimeConfig.traceState = .notTracing
+  // The result is a closure that captures 'fn' and captures and executes
+  // the tracedFn.
+  return { () -> () in
+    // When running the trace, we do not run any host code, so this
+    // .runningTrace enum might not be needed.
+    // _RuntimeConfig.traceState = .runningTrace(tracedFn)
+    
+    // Tell TensorFlow to execute the graph function we built, containing
+    // the trace.  Handle arguments here by passing them as wrappers
+    // around TFE_Execute normally do.
+    let graphFn = tracedFn.finalize()
+    // let graphFn = tracedFn.theTFFunction!
+    
+    let eagerContext = _TFCGetGlobalEagerContext() // _ExecutionContext.global.eagerContext
+    // guard let opts = TFE_NewContextOptions() else {
+    //   fatalError("ContextOptions object can never be nil.")
+    // }
+    let status = TF_NewStatus()
+    // let eagerContext = TFE_NewContext(opts, status)
+    // checkOk(status)
+    // TFE_DeleteContextOptions(opts)
+
+    let opType = "MyTraceFn"
+    debugLog("Adding TF func \(opType) to eager context.")
+    TFE_ContextAddFunction(eagerContext, graphFn, status)
+    checkOk(status)
+    let op = TFE_NewOp(eagerContext, opType, status)
+    checkOk(status)
+    var returnValueCount = Int32(0)
+    debugLog("Executing TF func \(opType).")
+    TFE_Execute(op, nil, &returnValueCount, status) 
+    checkOk(status)
+    TF_DeleteStatus(status)
+    // TFE_DeleteContext(eagerContext)
+   
+    // The host function can produce arbitrary side effects and can
+    // communicate with the trace, so we run it too. We don't want any of
+    // the #tfop's executed to do anything though, so we turn them off.
+    // _RuntimeConfig.tracingState = .runningTrace(tracedFn)
+    
+    // fn()
+    // assert(_RuntimeConfig.traceState == .runningTrace(tracedFn))
+    
+    // _RuntimeConfig.traceState = .notTracing
+    // Handle results here as the wrappers around TFE_execute normally do.
+  }
+}
+
 /// Returns a valid TF device string such as
 /// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
 /// closest enclosing withDevice() construct.
@@ -604,10 +740,33 @@ private class TFEState {
     }
 
     let context = _ExecutionContext.global
+
     // Make sure the program is loaded into the context.
     let graph = context.loadProgramInBytes(programByteAddress,
                                            count: programByteCount)
+    if let tracedFn = _RuntimeConfig.traceState.getFunction {
+      // Add graph functions to the trace graph
+      // TODO: merge with similar code above
+      let funcCount = TF_GraphNumFunctions(graph)
+      // Allocate an array to accept functions.
+      var funcs: [CTFFunction?] = Array(repeating: nil, count: Int(funcCount))
+      TF_GraphGetFunctions(graph, &funcs, funcCount, self.status)
+      checkOk(self.status)
 
+      // Add functions to the trace graph so that these functions can be called there.
+      debugLog("Adding \(funcCount) functions to trace graph.")
+      for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
+        // TFE_ContextAddFunction(self.eagerContext, function, self.status)
+        TF_GraphCopyFunction(tracedFn.graph,
+                             function,
+                             /*grad*/nil,
+                             status)
+        checkOk(self.status)
+        debugLog("Added func \(String(cString: TF_FunctionName(function))).")
+        TF_DeleteFunction(function)
+      }
+    }
+  
     let entryFunctionBaseName = String(cString: entryFunctionBaseNameAddress)
     debugLog("Looking up op(s) from func base name \(entryFunctionBaseName).")
     for i in 0...helperFunctionCount {
@@ -626,6 +785,16 @@ private class TFEState {
       )
 
       let opType = String(cString: TF_OperationOpType(funcNode))
+
+      // if _RuntimeConfig.traceState == .notTracing {
+      if let tracedFn = _RuntimeConfig.traceState.getFunction {
+        debugLog("Creating trace for graph fn node \(opType).")
+        // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
+        // let opType = "trace_main.tf_0_CPU.device_partition"
+        let desc = TF_NewOperation(tracedFn.graph, opType, "nodeName");
+        _ = TF_FinishOperation(desc, status)
+        checkOk(status)    
+      } else {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
       checkOk(status)
@@ -656,6 +825,7 @@ private class TFEState {
         debugLog("Not placing the op on any device.")
       }
       ops.append(op!)
+      }
     }
   }
   deinit {
@@ -1036,6 +1206,8 @@ private extension _TensorComputation {
   // NOTE: This is to be called by the initializer. The computation gets
   // executed on initialization, thus this method will not be exposed to users.
   private func execute(threadIndex: Int) {
+    switch _RuntimeConfig.traceState {
+    case .notTracing:
     debugLog("Executing thread \(threadIndex).")
     if let stateTFE = stateTFE {
       internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
@@ -1070,6 +1242,9 @@ private extension _TensorComputation {
                     helperFunctionCount: helperFunctionCount,
                     returnValues: &returnValues)
     debugLog("Done execution.")
+    default:
+      debugLog("Bypassing normal TFE execution for thread \(threadIndex).")
+    }
   }
 }
 
