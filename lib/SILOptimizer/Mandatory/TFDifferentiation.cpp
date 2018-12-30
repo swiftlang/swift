@@ -2287,8 +2287,7 @@ public:
     auto *vjpCall = getBuilder().createApply(ai->getLoc(), vjp,
                                              ai->getSubstitutionMap(), newArgs,
                                              ai->isNonThrowing());
-    LLVM_DEBUG(getADDebugStream()
-               << "Applied vjp function\n" << *vjpCall);
+    LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
 
     // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
@@ -2723,8 +2722,7 @@ public:
 
 private:
   static bool isLegalAggregate(ArrayRef<AdjointValue> elements, SILType type) {
-    if (auto *structDecl =
-            dyn_cast_or_null<StructDecl>(type.getASTType()->getAnyNominal())) {
+    if (auto *structDecl = type.getASTType()->getStructOrBoundGenericStruct()) {
       // TODO: Check whether this struct is @_fixed_layout and ABI public.
       for (auto pair : llvm::zip(structDecl->getStoredProperties(), elements))
         if (!std::get<0>(pair)->getType()->getCanonicalType()
@@ -2748,8 +2746,7 @@ public:
       break;
     case Kind::Aggregate:
       s << "Aggregate<";
-      if (auto *decl = dyn_cast_or_null<StructDecl>(
-              type.getASTType()->getAnyNominal())) {
+      if (auto *decl = type.getASTType()->getStructOrBoundGenericStruct()) {
         s << "Struct>(";
         interleave(llvm::zip(decl->getStoredProperties(),
                              getAggregateElements()),
@@ -3745,13 +3742,8 @@ SILValue AdjointEmitter::materializeZeroDirect(CanType type, SILLocation loc) {
 
 SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
                                                   SILLocation loc) {
-  auto &ctx = getContext();
-  auto *swiftMod = ctx.getModule().getSwiftModule();
   LLVM_DEBUG(getADDebugStream() <<
              "Materializing adjoints for " << val << '\n');
-  auto tangentSpace =
-      getASTContext().getTangentSpace(val.getType().getASTType(), swiftMod);
-  assert(tangentSpace && "No tangent space for this type");
   switch (val.getKind()) {
   case AdjointValue::Kind::Zero:
     return materializeZeroDirect(val.getSwiftType(), loc);
@@ -3809,8 +3801,8 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
         materializeAdjointIndirectHelper(eltAndIdx.value(), eltBuf);
       }
-    } else if (auto *structDecl = dyn_cast_or_null<StructDecl>(
-                   val.getSwiftType()->getAnyNominal())) {
+    } else if (auto *structDecl =
+                   val.getSwiftType()->getStructOrBoundGenericStruct()) {
       for (auto eltAndField : zip(val.getAggregateElements(),
                                   structDecl->getStoredProperties())) {
         auto elt = std::get<0>(eltAndField);
@@ -3918,90 +3910,89 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::BuiltinRealScalar:
+  case VectorSpace::Kind::BuiltinFloat:
     return builder.createBuiltinBinaryFunction(
         loc, "fadd", adjointTy, adjointTy, {lhs, rhs});
-    case TangentSpace::Kind::RealScalar:
-    case TangentSpace::Kind::RealVector: {
-      // Handle any nominal type value.
+  case VectorSpace::Kind::Vector: {
+    // Handle any nominal type value.
 
-      // Allocate buffers for inputs and output.
-      auto *resultBuf = builder.createAllocStack(loc, adjointTy);
-      auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
-      auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
+    // Allocate buffers for inputs and output.
+    auto *resultBuf = builder.createAllocStack(loc, adjointTy);
+    auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
+    auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
 
-      // Initialize input buffers.
-      auto *lhsBufInitAccess = builder.createBeginAccess(
-          loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *rhsBufInitAccess = builder.createBeginAccess(
-          loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      builder.createStore(loc, lhs, lhsBufInitAccess,
-                          getBufferSOQ(adjointASTTy, getAdjoint()));
-      builder.createStore(loc, rhs, rhsBufInitAccess,
-                          getBufferSOQ(adjointASTTy, getAdjoint()));
-      builder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
+    // Initialize input buffers.
+    auto *lhsBufInitAccess = builder.createBeginAccess(
+        loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    auto *rhsBufInitAccess = builder.createBeginAccess(
+        loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    builder.createStore(loc, lhs, lhsBufInitAccess,
+                        getBufferSOQ(adjointASTTy, getAdjoint()));
+    builder.createStore(loc, rhs, rhsBufInitAccess,
+                        getBufferSOQ(adjointASTTy, getAdjoint()));
+    builder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
+    builder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
 
-      // Accumulate the adjoints.
-      auto *resultBufAccess = builder.createBeginAccess(
-          loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
-          SILAccessKind::Read, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
-          SILAccessKind::Read, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      accumulateMaterializedAdjointsIndirect(lhsBufReadAccess, rhsBufReadAccess,
-                                             resultBufAccess);
-      builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
-      builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
+    // Accumulate the adjoints.
+    auto *resultBufAccess = builder.createBeginAccess(
+        loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
+        SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
+        SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    accumulateMaterializedAdjointsIndirect(lhsBufReadAccess, rhsBufReadAccess,
+                                           resultBufAccess);
+    builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+    builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
+    builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
 
-      // Deallocate input buffers.
-      builder.createDeallocStack(loc, rhsBuf);
-      builder.createDeallocStack(loc, lhsBuf);
+    // Deallocate input buffers.
+    builder.createDeallocStack(loc, rhsBuf);
+    builder.createDeallocStack(loc, lhsBuf);
 
-      // Load result.
-      resultBufAccess = builder.createBeginAccess(loc, resultBuf,
-          SILAccessKind::Read, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto val = builder.createLoad(loc, resultBufAccess,
-          getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
-      builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+    // Load result.
+    resultBufAccess = builder.createBeginAccess(loc, resultBuf,
+        SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    auto val = builder.createLoad(loc, resultBufAccess,
+        getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
+    builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
 
-      // Deallocate result buffer.
-      builder.createDeallocStack(loc, resultBuf);
+    // Deallocate result buffer.
+    builder.createDeallocStack(loc, resultBuf);
 
-      return val;
+    return val;
+  }
+  case VectorSpace::Kind::Struct: {
+    auto *structDecl = tangentSpace->getStruct();
+    SmallVector<SILValue, 8> adjElements;
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto *eltLHS = builder.createStructExtract(loc, lhs, field);
+      auto *eltRHS = builder.createStructExtract(loc, rhs, field);
+      adjElements.push_back(
+          accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
     }
-    case TangentSpace::Kind::ProductStruct: {
-      auto *structDecl = tangentSpace->getProductStruct();
-      SmallVector<SILValue, 8> adjElements;
-      for (auto *field : structDecl->getStoredProperties()) {
-        auto *eltLHS = builder.createStructExtract(loc, lhs, field);
-        auto *eltRHS = builder.createStructExtract(loc, rhs, field);
-        adjElements.push_back(
-            accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
-      }
-      return builder.createStruct(loc, adjointTy, adjElements);
+    return builder.createStruct(loc, adjointTy, adjElements);
+  }
+  case VectorSpace::Kind::Tuple: {
+    auto tupleType = tangentSpace->getTuple();
+    SmallVector<SILValue, 8> adjElements;
+    for (unsigned i : range(tupleType->getNumElements())) {
+      auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
+      auto *eltRHS = builder.createTupleExtract(loc, rhs, i);
+      adjElements.push_back(
+          accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
     }
-    case TangentSpace::Kind::ProductTuple: {
-      auto tupleType = tangentSpace->getProductTuple();
-      SmallVector<SILValue, 8> adjElements;
-      for (unsigned i : range(tupleType->getNumElements())) {
-        auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
-        auto *eltRHS = builder.createTupleExtract(loc, rhs, i);
-        adjElements.push_back(
-            accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
-      }
-      return builder.createTuple(loc, adjointTy, adjElements);
-    }
-    case TangentSpace::Kind::Sum: {
-      llvm_unreachable("Differentiating sum types is not supported yet");
-    }
+    return builder.createTuple(loc, adjointTy, adjElements);
+  }
+  case VectorSpace::Kind::Enum: {
+    llvm_unreachable("Differentiating sum types is not supported yet");
+  }
   }
 }
 
@@ -4022,7 +4013,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::BuiltinRealScalar: {
+  case VectorSpace::Kind::BuiltinFloat: {
     auto *sum = builder.createBuiltinBinaryFunction(
         loc, "fadd", lhsBufAccess->getType(), lhsBufAccess->getType(),
         {lhsBufAccess, rhsBufAccess});
@@ -4031,9 +4022,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
     return;
   }
-  case TangentSpace::Kind::RealScalar:
-  case TangentSpace::Kind::RealVector: {
-    auto *adjointTyDecl = tangentSpace->getRealScalarOrVectorSpace();
+  case VectorSpace::Kind::Vector: {
+    auto *adjointTyDecl = tangentSpace->getVector();
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
@@ -4059,8 +4049,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
                         /*isNonThrowing*/ false);
     return;
   }
-  case TangentSpace::Kind::ProductTuple: {
-    auto tupleType = tangentSpace->getProductTuple();
+  case VectorSpace::Kind::Tuple: {
+    auto tupleType = tangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
       auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsBufAccess, i);
@@ -4069,8 +4059,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     }
     return;
   }
-  case TangentSpace::Kind::ProductStruct: {
-    auto *structDecl = tangentSpace->getProductStruct();
+  case VectorSpace::Kind::Struct: {
+    auto *structDecl = tangentSpace->getStruct();
     for (auto *field : structDecl->getStoredProperties()) {
       auto *eltAddrLHS =
           builder.createStructElementAddr(loc, lhsBufAccess, field);
@@ -4082,7 +4072,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     }
     return;
   }
-  case TangentSpace::Kind::Sum: {
+  case VectorSpace::Kind::Enum: {
     llvm_unreachable("Differentiating a sum type is not supported yet");
   }
   }
