@@ -2276,7 +2276,7 @@ public:
         loc, getterVJPRef, /*substitutionMap*/ {},
         /*args*/ {getMappedValue(sei->getOperand())}, /*isNonThrowing*/ false);
 
-    // Get the VJP results (original results and pullback)
+    // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
     extractAllElements(getterVJPApply, getBuilder(), vjpDirectResults);
     ArrayRef<SILValue> originalDirectResults =
@@ -2291,6 +2291,8 @@ public:
 
     // Checkpoint the original results.
     getPrimalInfo().addStaticPrimalValueDecl(sei);
+    getBuilder().createRetainValue(loc, originalDirectResult,
+                                   getBuilder().getDefaultAtomicity());
     staticPrimalValues.push_back(originalDirectResult);
 
     // Checkpoint the pullback.
@@ -3612,27 +3614,13 @@ public:
     // Construct the pullback arguments.
     SmallVector<SILValue, 8> args;
     auto seed = getAdjointValue(sei);
-    auto *seedBuf = builder.createAllocStack(loc, seed.getType());
-    materializeAdjointIndirectHelper(seed, seedBuf);
-    if (seed.getType().isAddressOnly(getModule()))
-      args.push_back(seedBuf);
-    else {
-      auto access = builder.createBeginAccess(
-          loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      args.push_back(builder.createLoad(
-          loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
-      builder.createEndAccess(loc, access, /*aborted*/ false);
-    }
+    assert(seed.getType().isObject());
+    args.push_back(materializeAdjointDirect(seed, loc));
 
     // Call the pullback.
     auto *pullbackCall = builder.createApply(loc, pullback, SubstitutionMap(),
                                              args, /*isNonThrowing*/ false);
     assert(!pullbackCall->hasIndirectResults());
-
-    // Clean up seed allocation.
-    builder.createDeallocStack(loc, seedBuf);
 
     // Set adjoint for the `struct_extract` operand.
     addAdjointValue(sei->getOperand(),
