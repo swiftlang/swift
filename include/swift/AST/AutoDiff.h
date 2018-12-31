@@ -315,12 +315,8 @@ public:
 };
 
 /// The kind of an associated type.
-struct AutoDiffAssociatedTypeKind {
-  enum innerty : uint8_t { TangentVector = 0, CotangentVector = 1 } rawValue;
-
-  AutoDiffAssociatedTypeKind() = default;
-  AutoDiffAssociatedTypeKind(innerty rawValue) : rawValue(rawValue) {}
-  operator innerty() const { return rawValue; }
+enum class AutoDiffAssociatedVectorSpaceKind : unsigned {
+  Tangent = 0, Cotangent = 1
 };
 
 /// Automatic differentiation utility namespace.
@@ -352,10 +348,8 @@ bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
 } // end namespace autodiff
 
 class BuiltinFloatType;
-class NominalTypeDecl;
-class StructDecl;
+class NominalOrBoundGenericNominalType;
 class TupleType;
-class EnumDecl;
 
 /// A type that represents a vector space.
 class VectorSpace {
@@ -366,33 +360,23 @@ public:
     BuiltinFloat,
     /// A type that conforms to `VectorNumeric`.
     Vector,
-    /// A product of vector spaces as a struct.
-    Struct,
     /// A product of vector spaces as a tuple.
     Tuple,
-    /// A union of vector spaces.
-    Enum
   };
 
 private:
   Kind kind;
   union Value {
-    // BuiltinRealScalar
+    // Builtin float
     BuiltinFloatType *builtinFPType;
-    // RealVector
-    NominalTypeDecl *realNominalType;
-    // ProductStruct
-    StructDecl *structDecl;
-    // ProductTuple
+    // Vector
+    Type vectorType;
+    // Tuple
     TupleType *tupleType;
-    // Sum
-    EnumDecl *enumDecl;
 
     Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
-    Value(NominalTypeDecl *nominal) : realNominalType(nominal) {}
-    Value(StructDecl *structDecl) : structDecl(structDecl) {}
+    Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
-    Value(EnumDecl *enumDecl) : enumDecl(enumDecl) {}
   } value;
 
   VectorSpace(Kind kind, Value value)
@@ -401,28 +385,18 @@ private:
 public:
   VectorSpace() = delete;
 
-  static VectorSpace
-  getBuiltinRealScalarSpace(BuiltinFloatType *builtinFP) {
+  static VectorSpace getBuiltinFloat(BuiltinFloatType *builtinFP) {
     return {Kind::BuiltinFloat, builtinFP};
   }
-  static VectorSpace getRealVectorSpace(NominalTypeDecl *typeDecl) {
-    return {Kind::Vector, typeDecl};
-  }
-  static VectorSpace getStruct(StructDecl *structDecl) {
-    return {Kind::Struct, structDecl};
+  static VectorSpace getVector(Type vectorType) {
+    return {Kind::Vector, vectorType};
   }
   static VectorSpace getTuple(TupleType *tupleTy) {
     return {Kind::Tuple, tupleTy};
   }
-  static VectorSpace getEnum(EnumDecl *enumDecl) {
-    return {Kind::Enum, enumDecl};
-  }
 
-  bool isBuiltinFloat() const {
-    return kind == Kind::BuiltinFloat;
-  }
+  bool isBuiltinFloat() const { return kind == Kind::BuiltinFloat; }
   bool isVector() const { return kind == Kind::Vector; }
-  bool isStruct() const { return kind == Kind::Struct; }
   bool isTuple() const { return kind == Kind::Tuple; }
 
   Kind getKind() const { return kind; }
@@ -430,22 +404,18 @@ public:
     assert(kind == Kind::BuiltinFloat);
     return value.builtinFPType;
   }
-  NominalTypeDecl *getVector() const {
+  Type getVector() const {
     assert(kind == Kind::Vector);
-    return value.realNominalType;
-  }
-  StructDecl *getStruct() const {
-    assert(kind == Kind::Struct);
-    return value.structDecl;
+    return value.vectorType;
   }
   TupleType *getTuple() const {
     assert(kind == Kind::Tuple);
     return value.tupleType;
   }
-  EnumDecl *getEnum() const {
-    assert(kind == Kind::Enum);
-    return value.enumDecl;
-  }
+
+  Type getType() const;
+  CanType getCanonicalType() const;
+  NominalTypeDecl *getNominal() const;
 };
 
 } // end namespace swift

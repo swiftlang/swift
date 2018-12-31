@@ -282,3 +282,22 @@ void AutoDiffParameterIndicesBuilder::setParameter(unsigned paramIndex) {
   assert(paramIndex < parameters.size() && "paramIndex out of bounds");
   parameters.set(paramIndex);
 }
+
+Type VectorSpace::getType() const {
+  switch (kind) {
+  case Kind::BuiltinFloat:
+    return value.builtinFPType;
+  case Kind::Vector:
+    return value.vectorType;
+  case Kind::Tuple:
+    return value.tupleType;
+  }
+}
+
+CanType VectorSpace::getCanonicalType() const {
+  return getType()->getCanonicalType();
+}
+
+NominalTypeDecl *VectorSpace::getNominal() const {
+  return getVector()->getNominalOrBoundGenericNominal();
+}

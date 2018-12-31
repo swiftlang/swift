@@ -104,6 +104,7 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   // SWIFT_ENABLE_TENSORFLOW
+  enum class AutoDiffAssociatedVectorSpaceKind : unsigned;
   class VectorSpace;
 
   enum class KnownProtocolKind : uint8_t;
@@ -268,6 +269,10 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
+
+  /// Cache of autodiff-associated vector spaces.
+  llvm::DenseMap<std::pair<Type, unsigned>,
+                 Optional<VectorSpace>> AutoDiffVectorSpaces;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -951,11 +956,6 @@ public:
   bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Compute the tangent space of this manifold, if the given type represents a
-  /// differentiable manifold.
-  Optional<VectorSpace> getTangentSpace(CanType type, ModuleDecl *module);
 
 private:
   friend Decl;
