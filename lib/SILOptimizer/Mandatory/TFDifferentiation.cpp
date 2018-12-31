@@ -669,6 +669,24 @@ struct NestedApplyActivity {
   SILAutoDiffIndices indices;
 };
 
+/// Specifies how we should differentiate a `struct_extract` instruction.
+enum class StructExtractDifferentiationStrategy {
+  // The `struct_extract` is not active, so do not differentiate it.
+  Inactive,
+
+  // The `struct_extract` is extracting a field from a Differentiable struct
+  // with @_fieldwiseProductSpace cotangent space. Therefore, differentiate the
+  // `struct_extract` by setting the adjoint to a vector in the cotangent space
+  // that is zero except along the direction of the corresponding field.
+  //
+  // Fields correspond by matching name.
+  FieldwiseProductSpace,
+
+  // Differentiate the `struct_extract` by looking up the corresponding getter
+  // and using its VJP.
+  Getter
+};
+
 /// A differentiation task, specifying the original function and the
 /// `[differentiable]` attribute on the function. PrimalGen and AdjointGen
 /// will synthesize the primal and the adjoint for this task, filling the primal
@@ -713,6 +731,10 @@ private:
   ///
   /// Note: This is only used when `DifferentiationUseVJP`.
   DenseMap<ApplyInst *, NestedApplyActivity> nestedApplyActivities;
+
+  /// Mapping from original `struct_extract` instructions to their strategies.
+  DenseMap<StructExtractInst *, StructExtractDifferentiationStrategy>
+      structExtractDifferentiationStrategies;
 
   /// Cache for associated functions.
   SILFunction *primal = nullptr;
@@ -808,6 +830,11 @@ public:
 
   DenseMap<ApplyInst *, NestedApplyActivity> &getNestedApplyActivities() {
     return nestedApplyActivities;
+  }
+
+  DenseMap<StructExtractInst *, StructExtractDifferentiationStrategy> &
+  getStructExtractDifferentiationStrategies() {
+    return structExtractDifferentiationStrategies;
   }
 
   bool isEqual(const DifferentiationTask &other) const {
@@ -2228,16 +2255,42 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
+    auto &astCtx = getContext().getASTContext();
+    auto &structExtractDifferentiationStrategies =
+        getDifferentiationTask()->getStructExtractDifferentiationStrategies();
+
     // Special handling logic only applies when the `struct_extract` is active.
     // If not, just do standard cloning.
     if (!activityInfo.isActive(sei, synthesis.indices)) {
       LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *sei << '\n');
+      structExtractDifferentiationStrategies.insert(
+          {sei, StructExtractDifferentiationStrategy::Inactive});
       SILClonerWithScopes::visitStructExtractInst(sei);
       return;
     }
 
-    // This instruction is active. Replace it with a call to the corresponding
-    // getter's VJP.
+    // This instruction is active. Determine the appropriate differentiation
+    // strategy, and use it.
+
+    // Use the FieldwiseProductSpace strategy, if appropriate.
+    auto *structDecl = sei->getStructDecl();
+    auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
+    if (aliasLookup.size() >= 1) {
+      assert(aliasLookup.size() == 1);
+      assert(isa<TypeAliasDecl>(aliasLookup[0]));
+      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
+      if (aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>()) {
+        structExtractDifferentiationStrategies.insert(
+            {sei, StructExtractDifferentiationStrategy::FieldwiseProductSpace});
+        SILClonerWithScopes::visitStructExtractInst(sei);
+        return;
+      }
+    }
+
+    // The FieldwiseProductSpace strategy is not appropriate, so use the Getter
+    // strategy.
+    structExtractDifferentiationStrategies.insert(
+        {sei, StructExtractDifferentiationStrategy::Getter});
 
     // Find the corresponding getter and its VJP.
     auto *getterDecl = sei->getField()->getGetter();
@@ -3596,17 +3649,103 @@ public:
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
-    // Replace a `struct_extract` with a call to its pullback.
     auto loc = remapLocation(sei->getLoc());
+    auto &astCtx = getContext().getASTContext();
 
-    // Get the pullback.
-    auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(sei);
-    if (!pullbackField) {
-      // Inactive `struct_extract` instructions don't need to be cloned into the
-      // adjoint.
+    auto &differentiationStrategies =
+        getDifferentiationTask()->getStructExtractDifferentiationStrategies();
+    auto differentiationStrategyLookUp = differentiationStrategies.find(sei);
+    assert(differentiationStrategyLookUp != differentiationStrategies.end());
+    auto differentiationStrategy = differentiationStrategyLookUp->second;
+
+    if (differentiationStrategy ==
+        StructExtractDifferentiationStrategy::Inactive) {
       assert(!activityInfo.isActive(sei, synthesis.indices));
       return;
     }
+
+    if (differentiationStrategy ==
+        StructExtractDifferentiationStrategy::FieldwiseProductSpace) {
+      // Compute adjoint as follows:
+      //   y = struct_extract <key>, x
+      //   adj[x] = struct (0, ..., key': adj[y], ..., 0)
+      // where `key'` is the field in the cotangent space corresponding to
+      // `key`.
+
+      // Find the decl of the cotangent space type.
+      auto *structDecl = sei->getStructDecl();
+      auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
+      assert(aliasLookup.size() == 1);
+      assert(isa<TypeAliasDecl>(aliasLookup[0]));
+      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
+      assert(aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>());
+      auto cotangentVectorTy =
+          aliasDecl->getUnderlyingTypeLoc().getType()->getCanonicalType();
+      assert(!getModule()
+                  .Types.getTypeLowering(cotangentVectorTy)
+                  .isAddressOnly());
+      auto cotangentVectorSILTy =
+          SILType::getPrimitiveObjectType(cotangentVectorTy);
+      auto *cotangentVectorDecl =
+          cotangentVectorTy->getStructOrBoundGenericStruct();
+      assert(cotangentVectorDecl);
+
+      // Find the corresponding field in the cotangent space.
+      VarDecl *correspondingField = nullptr;
+      if (cotangentVectorDecl == structDecl)
+        correspondingField = sei->getField();
+      else {
+        auto correspondingFieldLookup =
+            cotangentVectorDecl->lookupDirect(sei->getField()->getName());
+        assert(correspondingFieldLookup.size() == 1);
+        assert(isa<VarDecl>(correspondingFieldLookup[0]));
+        correspondingField = cast<VarDecl>(correspondingFieldLookup[0]);
+      }
+      assert(correspondingField);
+
+#ifndef NDEBUG
+      unsigned numMatchingStoredProperties = 0;
+      for (auto *storedProperty : cotangentVectorDecl->getStoredProperties())
+        if (storedProperty == correspondingField)
+          numMatchingStoredProperties += 1;
+      assert(numMatchingStoredProperties == 1);
+#endif
+
+      // Compute adjoint.
+      auto av = getAdjointValue(sei);
+      switch (av.getKind()) {
+      case AdjointValue::Kind::Zero:
+        addAdjointValue(sei->getOperand(),
+                        AdjointValue::getZero(cotangentVectorSILTy));
+        break;
+      case AdjointValue::Kind::Materialized:
+      case AdjointValue::Kind::Aggregate: {
+        SmallVector<AdjointValue, 8> eltVals;
+        for (auto *field : cotangentVectorDecl->getStoredProperties()) {
+          if (field == correspondingField)
+            eltVals.push_back(av);
+          else
+            eltVals.push_back(
+                AdjointValue::getZero(SILType::getPrimitiveObjectType(
+                    field->getType()->getCanonicalType())));
+        }
+        addAdjointValue(sei->getOperand(),
+                        AdjointValue::getAggregate(cotangentVectorSILTy,
+                                                   eltVals, allocator));
+      }
+      }
+
+      return;
+    }
+
+    // The only remaining strategy is the getter strategy.
+    // Replace the `struct_extract` with a call to its pullback.
+    assert(differentiationStrategy ==
+           StructExtractDifferentiationStrategy::Getter);
+
+    // Get the pullback.
+    auto *pullbackField = getPrimalInfo().lookUpPullbackDecl(sei);
+    assert(pullbackField);
     SILValue pullback = builder.createStructExtract(loc,
                                                     primalValueAggregateInAdj,
                                                     pullbackField);
