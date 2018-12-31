@@ -4167,9 +4167,6 @@ public:
   CanType getSelfInstanceType() const;
 
   /// SWIFT_ENABLE_TENSORFLOW
-  CanSILFunctionType getGradientType(
-      const SILAutoDiffConfig &config, SILModule &M);
-
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 
