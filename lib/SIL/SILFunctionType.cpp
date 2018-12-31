@@ -269,16 +269,16 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     for (auto &param : wrtParams)
       tangentParams.push_back(
           {param.getType()
-               ->getAutoDiffAssociatedType(
-                   AutoDiffAssociatedTypeKind::TangentVector, lookupConformance)
+               ->getAutoDiffAssociatedVectorSpace(
+                   AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
                ->getCanonicalType(),
            param.getConvention()});
     SmallVector<SILResultInfo, 8> tangentResults;
     auto &result = curryLevels.back()->getResults()[resultIndex];
     tangentResults.push_back(
         {result.getType()
-             ->getAutoDiffAssociatedType(
-                 AutoDiffAssociatedTypeKind::TangentVector, lookupConformance)
+             ->getAutoDiffAssociatedVectorSpace(
+                 AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance)
              ->getCanonicalType(),
          result.getConvention()});
     closureType = SILFunctionType::get(
@@ -295,8 +295,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     auto &origRes = curryLevels.back()->getResults()[resultIndex];
     auto cotangentAssocTy =
         origRes.getType()
-            ->getAutoDiffAssociatedType(
-                AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+            ->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
             ->getCanonicalType();
     cotangentParams.push_back(
         getParameterInfoForOriginalResult(cotangentAssocTy,
@@ -305,8 +305,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     for (auto &param : wrtParams) {
       auto paramCotangentTy =
           param.getType()
-              ->getAutoDiffAssociatedType(
-                  AutoDiffAssociatedTypeKind::CotangentVector,
+              ->getAutoDiffAssociatedVectorSpace(
+                  AutoDiffAssociatedVectorSpaceKind::Cotangent,
                   lookupConformance)
               ->getCanonicalType();
       cotangentResults.push_back(

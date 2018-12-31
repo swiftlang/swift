@@ -4004,11 +4004,12 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   auto adjointTy = lhs->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
-  auto &astCtx = getContext().getASTContext();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
-  assert(tangentSpace && "No tangent space for this type");
-  switch (tangentSpace->getKind()) {
+  auto cotangentSpace = adjointASTTy->getAutoDiffAssociatedVectorSpace(
+      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+      LookUpConformanceInModule(swiftMod));
+  assert(cotangentSpace && "No tangent space for this type");
+  switch (cotangentSpace->getKind()) {
   case VectorSpace::Kind::BuiltinFloat:
     return builder.createBuiltinBinaryFunction(
         loc, "fadd", adjointTy, adjointTy, {lhs, rhs});
@@ -4067,19 +4068,8 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
 
     return val;
   }
-  case VectorSpace::Kind::Struct: {
-    auto *structDecl = tangentSpace->getStruct();
-    SmallVector<SILValue, 8> adjElements;
-    for (auto *field : structDecl->getStoredProperties()) {
-      auto *eltLHS = builder.createStructExtract(loc, lhs, field);
-      auto *eltRHS = builder.createStructExtract(loc, rhs, field);
-      adjElements.push_back(
-          accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
-    }
-    return builder.createStruct(loc, adjointTy, adjElements);
-  }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = tangentSpace->getTuple();
+    auto tupleType = cotangentSpace->getTuple();
     SmallVector<SILValue, 8> adjElements;
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
@@ -4088,9 +4078,6 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
           accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
     }
     return builder.createTuple(loc, adjointTy, adjElements);
-  }
-  case VectorSpace::Kind::Enum: {
-    llvm_unreachable("Differentiating sum types is not supported yet");
   }
   }
 }
@@ -4106,12 +4093,12 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto loc = resultBufAccess.getLoc();
   auto adjointTy = lhsBufAccess->getType();
   auto adjointASTTy = adjointTy.getASTType();
-  auto &context = getContext();
-  auto &astCtx = context.getASTContext();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
-  assert(tangentSpace && "No tangent space for this type");
-  switch (tangentSpace->getKind()) {
+  auto cotangentSpace = adjointASTTy->getAutoDiffAssociatedVectorSpace(
+      AutoDiffAssociatedVectorSpaceKind::Cotangent,
+      LookUpConformanceInModule(swiftMod));
+  assert(cotangentSpace && "No tangent space for this type");
+  switch (cotangentSpace->getKind()) {
   case VectorSpace::Kind::BuiltinFloat: {
     auto *sum = builder.createBuiltinBinaryFunction(
         loc, "fadd", lhsBufAccess->getType(), lhsBufAccess->getType(),
@@ -4122,11 +4109,11 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     return;
   }
   case VectorSpace::Kind::Vector: {
-    auto *adjointTyDecl = tangentSpace->getVector();
+    auto *adjointDecl = cotangentSpace->getNominal();
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
-    auto adjointParentModule = adjointTyDecl->getModuleContext();
+    auto adjointParentModule = adjointDecl->getModuleContext();
     auto confRef = *adjointParentModule->lookupConformance(adjointASTTy, proto);
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
@@ -4149,7 +4136,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     return;
   }
   case VectorSpace::Kind::Tuple: {
-    auto tupleType = tangentSpace->getTuple();
+    auto tupleType = cotangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
       auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsBufAccess, i);
@@ -4157,22 +4144,6 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
       accumulateMaterializedAdjointsIndirect(eltAddrLHS, eltAddrRHS, destAddr);
     }
     return;
-  }
-  case VectorSpace::Kind::Struct: {
-    auto *structDecl = tangentSpace->getStruct();
-    for (auto *field : structDecl->getStoredProperties()) {
-      auto *eltAddrLHS =
-          builder.createStructElementAddr(loc, lhsBufAccess, field);
-      auto *eltAddrRHS =
-          builder.createStructElementAddr(loc, rhsBufAccess, field);
-      auto *destAddr =
-          builder.createStructElementAddr(loc, resultBufAccess, field);
-      accumulateMaterializedAdjointsIndirect(eltAddrLHS, eltAddrRHS, destAddr);
-    }
-    return;
-  }
-  case VectorSpace::Kind::Enum: {
-    llvm_unreachable("Differentiating a sum type is not supported yet");
   }
   }
 }
@@ -4250,7 +4221,8 @@ void DifferentiationTask::createEmptyPrimal() {
                                        "__primal_" + indices.mangle())
                         .str();
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(this);
-  primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(primalValueStructDecl, module));
+  primalInfo = std::unique_ptr<PrimalInfo>(
+      new PrimalInfo(primalValueStructDecl, module));
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
   auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
@@ -4339,8 +4311,8 @@ void DifferentiationTask::createEmptyAdjoint() {
   adjParams.push_back(getFormalParameterInfo(
       origTy->getResults()[getIndices().source]
           .getType()
-          ->getAutoDiffAssociatedType(
-              AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+          ->getAutoDiffAssociatedVectorSpace(
+              AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
           ->getCanonicalType()));
 
   // If there's a generated primal, accept a primal value struct in the adjoint
@@ -4367,8 +4339,8 @@ void DifferentiationTask::createEmptyAdjoint() {
     adjResults.push_back(getFormalResultInfo(
         origParams[selfParamIndex]
             .getType()
-            ->getAutoDiffAssociatedType(
-                AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+            ->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
             ->getCanonicalType()));
 
   // Add adjoint results for the requested non-self wrt parameters.
@@ -4378,8 +4350,8 @@ void DifferentiationTask::createEmptyAdjoint() {
     adjResults.push_back(getFormalResultInfo(
         origParams[i]
             .getType()
-            ->getAutoDiffAssociatedType(
-                AutoDiffAssociatedTypeKind::CotangentVector, lookupConformance)
+            ->getAutoDiffAssociatedVectorSpace(
+                AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance)
             ->getCanonicalType()));
   }
 

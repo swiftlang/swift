@@ -1079,7 +1079,7 @@ public:
   TypeTraitResult canBeClass();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Returns the associated tangent or cotangent type. Returns the null type if
+  /// Return the associated tangent or cotangent type. Return the null type if
   /// there is no associated tangent/cotangent type.
   ///
   /// `kind` specifies whether to return the tangent or cotangent type.
@@ -1090,8 +1090,9 @@ public:
   /// associated tangent/cotangent type is the elementwise tangent/cotangent
   /// type of its elements. If the type is a builtin float, then the associated
   /// tangent/cotangent type is itself. Otherwise, there is no associated type.
-  Type getAutoDiffAssociatedType(AutoDiffAssociatedTypeKind kind,
-                                 LookupConformanceFn lookupConformance);
+  Optional<VectorSpace>
+  getAutoDiffAssociatedVectorSpace(AutoDiffAssociatedVectorSpaceKind kind,
+                                   LookupConformanceFn lookupConformance);
 
 private:
   // Make vanilla new/delete illegal for Types.
