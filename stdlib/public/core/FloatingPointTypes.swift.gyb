@@ -1591,7 +1591,7 @@ extension ${Self} {
 
 // SWIFT_ENABLE_TENSORFLOW
 extension ${Self} {
-  @inlinable
+  @usableFromInline
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
   static func _adjointNegate(
