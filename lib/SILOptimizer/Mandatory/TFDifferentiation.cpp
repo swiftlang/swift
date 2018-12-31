@@ -3681,7 +3681,9 @@ public:
       assert(aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>());
       auto cotangentVectorTy =
           aliasDecl->getUnderlyingTypeLoc().getType()->getCanonicalType();
-      assert(!getModule().Types.getTypeLowering(cotangentVectorTy).isAddressOnly());
+      assert(!getModule()
+                  .Types.getTypeLowering(cotangentVectorTy)
+                  .isAddressOnly());
       auto cotangentVectorSILTy =
           SILType::getPrimitiveObjectType(cotangentVectorTy);
       auto *cotangentVectorDecl =
@@ -3693,8 +3695,8 @@ public:
       if (cotangentVectorDecl == structDecl)
         correspondingField = sei->getField();
       else {
-        auto correspondingFieldLookup = cotangentVectorDecl->lookupDirect(
-            sei->getField()->getName());
+        auto correspondingFieldLookup =
+            cotangentVectorDecl->lookupDirect(sei->getField()->getName());
         assert(correspondingFieldLookup.size() == 1);
         assert(isa<VarDecl>(correspondingFieldLookup[0]));
         correspondingField = cast<VarDecl>(correspondingFieldLookup[0]);
@@ -3723,13 +3725,13 @@ public:
           if (field == correspondingField)
             eltVals.push_back(av);
           else
-            eltVals.push_back(AdjointValue::getZero(
-                SILType::getPrimitiveObjectType(
+            eltVals.push_back(
+                AdjointValue::getZero(SILType::getPrimitiveObjectType(
                     field->getType()->getCanonicalType())));
         }
         addAdjointValue(sei->getOperand(),
-            AdjointValue::getAggregate(cotangentVectorSILTy, eltVals,
-                                       allocator));
+                        AdjointValue::getAggregate(cotangentVectorSILTy,
+                                                   eltVals, allocator));
       }
       }
 
