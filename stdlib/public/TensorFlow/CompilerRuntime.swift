@@ -111,7 +111,10 @@ private class S4TFTrace {
   // graph node in the trace graph function, and track its output tensor(s) in
   // `out`, to feed via CTensorHandle to subsequent users if any.
   var out: [TF_Output] = []
-  
+
+  // Used to create unique graph node names.
+  var uniqueCounter = 0
+
   // This init allocates a new TF_Function in the current TensorFlow
   // context, which will be populated as the ops are executed in 
   // tracing mode.
@@ -803,10 +806,12 @@ private class TFEState {
 
       // if _RuntimeConfig.traceState == .notTracing {
       if let tracedFn = _RuntimeConfig.traceState.getFunction {
-        debugLog("Creating trace for graph fn node \(opType).")
         // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
         // let opType = "trace_main.tf_0_CPU.device_partition"
-        op_descs.append(TF_NewOperation(tracedFn.graph, opType, opType)!);
+        let opName = "\(opType)_\(tracedFn.uniqueCounter)"
+        debugLog("Creating trace graph node \(opName) for graph fn \(opType).")
+        op_descs.append(TF_NewOperation(tracedFn.graph, opType, opName)!)
+        tracedFn.uniqueCounter += 1
       } else {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)

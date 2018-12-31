@@ -17,26 +17,72 @@ public func test2() {
   _ = test2Helper(x, y)
 }
 
-// let b = true
+/////////////////////////
+// Test 3: conditional control flow 
+////////////////////////
+let b = false
 
-// @inline(never)
-// func readBool() -> Bool {
-//   return b
-// }
+@inline(never)
+func readBool() -> Bool {
+  return b
+}
 
-// public func test2() {
-//   let x = Tensor<Float>(1.0)
-//   if readBool() {
-//     _ = x + x
-//   } else {
-//     _ = x - x
-//   }
-// }
+// These helpers are to help control the tensor program regions.
+@inline(never)
+func test3HelperX() -> Tensor<Float> {
+  return Tensor<Float>(1.0)
+}
+
+@inline(never)
+func test3HelperAdd(_ x: Tensor<Float>) -> Tensor<Float> {
+  return x + x
+}
+
+@inline(never)
+func test3HelperSub(_ x: Tensor<Float>) -> Tensor<Float> {
+  return x - x
+}
+
+public func test3() {
+  let x = test3HelperX()
+  if readBool() {
+    _ = test3HelperAdd(x)
+  } else {
+    _ = test3HelperSub(x)
+  }
+}
+
+/////////////////////////
+// Test 4: parameterize # layers
+////////////////////////
+
+let intGlobal = 3
+
+@inline(never)
+func readInt() -> Int {
+  return intGlobal
+}
+
+@inline(never)
+func test4HelperLayer(_ x: Tensor<Float>) -> Tensor<Float> {
+  return x + x
+}
+
+public func test4() {
+  var x = test3HelperX()
+  let layerCount = readInt()
+  for i in 0..<layerCount {
+    x = test4HelperLayer(x)
+  }
+}
+
 
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
   // let tracedFn = trace(test1)
-  let tracedFn = trace(test2)
+  // let tracedFn = trace(test2)
+  // let tracedFn = trace(test3)
+  let tracedFn = trace(test4)
   tracedFn()
 }
 
