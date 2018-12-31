@@ -27,7 +27,24 @@ struct Quadratic : DiffReq, Equatable {
   typealias TangentVector = Quadratic
   typealias CotangentVector = Quadratic
 
-  let a, b, c: Float
+  @differentiable(wrt: (self), vjp: vjpA)
+  let a: Float
+  func vjpA() -> (Float, (Float) -> Quadratic) {
+    return (a, { da in Quadratic(da, 0, 0) } )
+  }
+
+  @differentiable(wrt: (self), vjp: vjpB)
+  let b: Float
+  func vjpB() -> (Float, (Float) -> Quadratic) {
+    return (b, { db in Quadratic(0, db, 0) } )
+  }
+
+  @differentiable(wrt: (self), vjp: vjpC)
+  let c: Float
+  func vjpC() -> (Float, (Float) -> Quadratic) {
+    return (c, { dc in Quadratic(0, 0, dc) } )
+  }
+
   init(_ a: Float, _ b: Float, _ c: Float) {
     self.a = a
     self.b = b

@@ -21,7 +21,11 @@ struct S : Proto, VectorNumeric {
   typealias TangentVector = S
   typealias CotangentVector = S
 
+  @differentiable(wrt: (self), vjp: vjpP)
   let p: Float
+  func vjpP() -> (Float, (Float) -> S) {
+    return (p, { dp in S(p: dp) })
+  }
 
   func function1(_ x: Float, _ y: Float) -> Float {
     return x + y + p

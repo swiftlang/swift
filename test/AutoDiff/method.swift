@@ -9,7 +9,12 @@ var MethodTests = TestSuite("Method")
 // ==== Tests with generated adjoint ====
 
 struct Parameter : Equatable {
+  @differentiable(wrt: (self), vjp: vjpX)
   let x: Float
+
+  func vjpX() -> (Float, (Float) -> Parameter) {
+    return (x, { dx in Parameter(x: dx) } )
+  }
 }
 
 extension Parameter {
@@ -132,7 +137,12 @@ MethodTests.test("static method with generated adjoint, wrt all params") {
 // ==== Tests with custom adjoint ====
 
 struct CustomParameter : Equatable {
+  @differentiable(wrt: (self), vjp: vjpX)
   let x: Float
+
+  func vjpX() -> (Float, (Float) -> CustomParameter) {
+    return (x, { dx in CustomParameter(x: dx) })
+  }
 }
 
 extension CustomParameter : Differentiable, VectorNumeric {
