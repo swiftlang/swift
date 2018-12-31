@@ -8,26 +8,13 @@ import StdlibUnittest
 
 var E2EDifferentiablePropertyTests = TestSuite("E2EDifferentiableProperty")
 
-struct TangentSpace {
+struct TangentSpace : VectorNumeric {
   let dx, dy: Float
 }
 
-extension TangentSpace : Differentiable, VectorNumeric {
+extension TangentSpace : Differentiable {
   typealias TangentVector = TangentSpace
   typealias CotangentVector = TangentSpace
-  typealias Scalar = Float
-  static var zero: TangentSpace {
-    return TangentSpace(dx: 0, dy: 0)
-  }
-  static func + (lhs: TangentSpace, rhs: TangentSpace) -> TangentSpace {
-    return TangentSpace(dx: lhs.dx + rhs.dx, dy: lhs.dy + rhs.dy)
-  }
-  static func - (lhs: TangentSpace, rhs: TangentSpace) -> TangentSpace {
-    return TangentSpace(dx: lhs.dx - rhs.dx, dy: lhs.dy - rhs.dy)
-  }
-  static func * (lhs: Float, rhs: TangentSpace) -> TangentSpace {
-    return TangentSpace(dx: lhs * rhs.dx, dy: lhs * rhs.dy)
-  }
 }
 
 struct Space {
@@ -80,6 +67,56 @@ E2EDifferentiablePropertyTests.test("stored property") {
     return 3 * point.y
   }
   let expectedGrad = TangentSpace(dx: 0, dy: 3)
+  expectEqual(expectedGrad, actualGrad)
+}
+
+struct ProductSpaceSelfTangent : VectorNumeric {
+  let x, y: Float
+}
+
+extension ProductSpaceSelfTangent : Differentiable {
+  @_fieldwiseProductSpace
+  typealias TangentVector = ProductSpaceSelfTangent
+  @_fieldwiseProductSpace
+  typealias CotangentVector = ProductSpaceSelfTangent
+}
+
+E2EDifferentiablePropertyTests.test("fieldwise product space, self tangent") {
+  let actualGrad = gradient(at: ProductSpaceSelfTangent(x: 0, y: 0)) { (point: ProductSpaceSelfTangent) -> Float in
+    return 5 * point.y
+  }
+  let expectedGrad = ProductSpaceSelfTangent(x: 0, y: 5)
+  expectEqual(expectedGrad, actualGrad)
+}
+
+struct ProductSpaceOtherTangentTangentSpace : VectorNumeric {
+  let x, y: Float
+}
+
+extension ProductSpaceOtherTangentTangentSpace : Differentiable {
+  typealias TangentVector = ProductSpaceOtherTangentTangentSpace
+  typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
+}
+
+struct ProductSpaceOtherTangent {
+  let x, y: Float
+}
+
+extension ProductSpaceOtherTangent : Differentiable {
+  @_fieldwiseProductSpace
+  typealias TangentVector = ProductSpaceOtherTangentTangentSpace
+  @_fieldwiseProductSpace
+  typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
+  func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
+    return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)
+  }
+}
+
+E2EDifferentiablePropertyTests.test("fieldwise product space, other tangent") {
+  let actualGrad = gradient(at: ProductSpaceOtherTangent(x: 0, y: 0)) { (point: ProductSpaceOtherTangent) -> Float in
+    return 7 * point.y
+  }
+  let expectedGrad = ProductSpaceOtherTangentTangentSpace(x: 0, y: 7)
   expectEqual(expectedGrad, actualGrad)
 }
 

@@ -394,6 +394,8 @@ SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
                  OnFunc, 82)
 SIMPLE_DECL_ATTR(TFParameter, TFParameter,
                  OnVar, 83)
+SIMPLE_DECL_ATTR(_fieldwiseProductSpace, FieldwiseProductSpace,
+                OnTypeAlias | UserInaccessible, 84)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

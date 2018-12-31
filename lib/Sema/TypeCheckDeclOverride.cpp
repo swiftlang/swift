@@ -1218,6 +1218,7 @@ namespace  {
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(TensorFlowGraph)
     UNINTERESTING_ATTR(TFParameter)
+    UNINTERESTING_ATTR(FieldwiseProductSpace)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)

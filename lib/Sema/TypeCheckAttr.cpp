@@ -126,6 +126,7 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(TFParameter)
+  IGNORED_ATTR(FieldwiseProductSpace)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -884,6 +885,7 @@ public:
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitTFParameterAttr(TFParameterAttr *attr);
+  void visitFieldwiseProductSpaceAttr(FieldwiseProductSpaceAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2703,6 +2705,19 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_not_in_parameterized,
                           attr->getAttrName());
   }
+}
+
+void AttributeChecker::visitFieldwiseProductSpaceAttr(
+    FieldwiseProductSpaceAttr *attr) {
+  // If we make this attribute user-facing, we'll need to do various checks.
+  //   - check that this attribute is on a Tangent/Cotangent type alias
+  //   - check that we can access the raw fields of the Tangent/Cotangent from
+  //     this module (e.g. the Tangent can't be a public resilient struct
+  //     defined in a different module).
+  //   - check that the stored properties of the Tangent/Cotangent match
+  //
+  // If we don't make this attribute user-facing, we can avoid doing checks
+  // here: the assertions in TFDifferentiation suffice.
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
