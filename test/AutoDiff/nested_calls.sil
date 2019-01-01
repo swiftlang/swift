@@ -66,11 +66,11 @@ bb0(%0 : @trivial $Float):
 // CHECK-VJP:   return %0 : $Float
 // CHECK-VJP: }
 
-// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj jvp @AD__foo__jvp_src_0_wrt_0 vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
 
-// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 jvp @AD__nested_func_without_diffattr__jvp_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
 
-// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
+// CHECK-VJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 jvp @AD__func_to_diff__jvp_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
 
 // CHECK-VJP-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
 // CHECK-VJP: bb0(%0 : $Float):
@@ -137,11 +137,11 @@ bb0(%0 : @trivial $Float):
 // CHECK-NOVJP:   return %0 : $Float
 // CHECK-NOVJP: }
 
-// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @foo_prim adjoint @foo_adj jvp @AD__foo__jvp_src_0_wrt_0 vjp @AD__foo__vjp_src_0_wrt_0] @foo : $@convention(thin) (Float) -> Float
 
-// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__nested_func_without_diffattr__primal_src_0_wrt_0 adjoint @AD__nested_func_without_diffattr__adjoint_src_0_wrt_0 jvp @AD__nested_func_without_diffattr__jvp_src_0_wrt_0 vjp @AD__nested_func_without_diffattr__vjp_src_0_wrt_0] @nested_func_without_diffattr : $@convention(thin) (Float) -> Float
 
-// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
+// CHECK-NOVJP-LABEL: [differentiable source 0 wrt 0 primal @AD__func_to_diff__primal_src_0_wrt_0 adjoint @AD__func_to_diff__adjoint_src_0_wrt_0 jvp @AD__func_to_diff__jvp_src_0_wrt_0 vjp @AD__func_to_diff__vjp_src_0_wrt_0] @func_to_diff : $@convention(thin) (Float) -> Float
 
 // CHECK-NOVJP-LABEL: @AD__func_to_diff__primal_src_0_wrt_0 : $@convention(thin) (Float) -> (@owned AD__func_to_diff__Type__src_0_wrt_0, Float) {
 // CHECK-NOVJP: bb0(%0 : $Float):

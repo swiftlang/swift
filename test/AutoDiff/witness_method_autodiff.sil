@@ -22,8 +22,9 @@ bb0(%0 : $*T):
 
 // CHECK-LABEL: sil @differentiateWitnessMethod
 // CHECK:   [[ORIG_REF:%.*]] = witness_method $T, #DiffReq.f!1
+// CHECK:   [[JVP_REF:%.*]] = witness_method $T, #DiffReq.f!1.jvp.1.SU
 // CHECK:   [[VJP_REF:%.*]] = witness_method $T, #DiffReq.f!1.vjp.1.SU
-// CHECK:   autodiff_function [wrt 0] [order 1] [[ORIG_REF]] : {{.*}} with {undef : {{.*}}, %2 : {{.*}}}
+// CHECK:   autodiff_function [wrt 0] [order 1] [[ORIG_REF]] : {{.*}} with {[[JVP_REF]] : {{.*}}, [[VJP_REF]] : {{.*}}}
 // CHECK: } // end sil function 'differentiateWitnessMethod'
 
 sil @differentiatePartiallyAppliedWitnessMethod : $@convention(thin) <T where T : DiffReq> (@in_guaranteed T) -> () {
@@ -39,7 +40,9 @@ bb0(%0 : $*T):
 // CHECK-LABEL: sil @differentiatePartiallyAppliedWitnessMethod
 // CHECK:  [[ORIG_REF:%.*]] = witness_method $T, #DiffReq.f!1
 // CHECK:  [[ORIG_REF_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[ORIG_REF]]<T>(%0)
+// CHECK:  [[JVP_REF:%.*]] = witness_method $T, #DiffReq.f!1.jvp.1.SU
+// CHECK:  [[JVP_REF_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[JVP_REF]]<T>(%0)
 // CHECK:  [[VJP_REF:%.*]] = witness_method $T, #DiffReq.f!1.vjp.1.SU
 // CHECK:  [[VJP_REF_PARTIALLY_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[VJP_REF]]<T>(%0)
-// CHECK:  = autodiff_function [wrt 0] [order 1] [[ORIG_REF_PARTIALLY_APPLIED]] : {{.*}} with {undef : {{.*}}, [[VJP_REF_PARTIALLY_APPLIED]] : {{.*}}}
+// CHECK:  = autodiff_function [wrt 0] [order 1] [[ORIG_REF_PARTIALLY_APPLIED]] : {{.*}} with {[[JVP_REF_PARTIALLY_APPLIED]] : {{.*}}, [[VJP_REF_PARTIALLY_APPLIED]] : {{.*}}}
 // CHECK: } // end sil function 'differentiatePartiallyAppliedWitnessMethod'
