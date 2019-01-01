@@ -2421,6 +2421,14 @@ ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
 ERROR(broken_vector_numeric_requirement,none,
       "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_differentiable_requirement,none,
+      "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(differentiable_no_vector_space_struct,none,
+      "cannot automatically synthesize %0 because '%1' struct does not exist",
+      (Type, Identifier))
+ERROR(differentiable_invalid_vector_space_struct,none,
+      "cannot automatically synthesize %0 because '%1' struct is invalid",
+      (Type, Identifier))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
