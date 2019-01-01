@@ -52,6 +52,9 @@ extension Space : Differentiable {
   func moved(along: TangentSpace) -> Space {
     return Space(x: x + along.dx, y: y + along.dy)
   }
+  func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    return cotangent
+  }
 }
 
 E2EDifferentiablePropertyTests.test("computed property") {
@@ -109,6 +112,9 @@ extension ProductSpaceOtherTangent : Differentiable {
   typealias CotangentVector = ProductSpaceOtherTangentTangentSpace
   func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
     return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)
+  }
+  func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    return cotangent
   }
 }
 

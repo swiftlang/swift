@@ -17,11 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO:
-// - Support synthesis when non-synthesized `TangentVector` or `CotangentVector`
-//   struct does not have implicit memberwise initializer. Currently,
-//   user-defined memberwise initializers do not work.
-
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "swift/AST/AutoDiff.h"
@@ -36,14 +31,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-
-// Represents the possible outcomes of checking whether the `TangentVector` or
-// `CotangentVector` struct exists.
-enum VectorSpaceStructStatus {
-  Valid,
-  Invalid,
-  DoesNotExist
-};
 
 static Identifier
 getVectorSpaceIdentifier(AutoDiffAssociatedVectorSpaceKind kind,
@@ -62,38 +49,49 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   auto lookup = proto->lookupDirect(name);
   // Erase declarations that are not protocol requirements.
   // This is important for removing default implementations of the same name.
-  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
-                              [](ValueDecl *v) {
-                                return !isa<ProtocolDecl>(
-                                           v->getDeclContext()) ||
-                                       !v->isProtocolRequirement();
-                              }),
-               lookup.end());
+  llvm::erase_if(lookup, [](ValueDecl *v) {
+    return !isa<ProtocolDecl>(v->getDeclContext()) ||
+           !v->isProtocolRequirement();
+  });
   assert(lookup.size() == 1 && "Ambiguous protocol requirement");
-  return lookup[0];
+  return lookup.front();
 }
 
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal) {
-  // Nominal type must be a struct with at least one stored property.
+  // Nominal type must be a struct. (Zero stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
-  if (!structDecl || structDecl->getStoredProperties().empty())
+  if (!structDecl)
     return false;
   auto &C = nominal->getASTContext();
   auto *lazyResolver = C.getLazyResolver();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
 
   // Nominal type must conform to `VectorNumeric`.
-  // TODO: Lift this restriction.
+  // TODO(dan-zheng): Lift this restriction.
   auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
   if (!TypeChecker::conformsToProtocol(
           nominal->getDeclaredInterfaceType(), vectorNumericProto,
           nominal->getDeclContext(), ConformanceCheckFlags::Used))
     return false;
 
+  // Nominal type must not customize `TangentVector` or `CotangentVector` to
+  // anything other than `Self`.
+  // Otherwise, synthesis is semantically unsupported.
+  auto tangentDecls = nominal->lookupDirect(C.Id_TangentVector);
+  auto cotangentDecls = nominal->lookupDirect(C.Id_CotangentVector);
+  auto isValidVectorSpaceDecl = [&](ValueDecl *v) {
+    return v->isImplicit() ||
+           v->getInterfaceType()->isEqual(nominal->getInterfaceType());
+  };
+  llvm::erase_if(tangentDecls, isValidVectorSpaceDecl);
+  llvm::erase_if(cotangentDecls, isValidVectorSpaceDecl);
+  if (!tangentDecls.empty() || !cotangentDecls.empty())
+    return false;
+
   // All stored properties must conform to `Differentiable`.
   // Currently, all stored properties must also have
   // `Self == TangentVector == CotangentVector`.
-  // TODO: Lift this restriction.
+  // TODO(dan-zheng): Lift this restriction.
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
     if (!v->hasType())
       lazyResolver->resolveDeclSignature(v);
@@ -136,90 +134,43 @@ static Type getVectorSpaceType(ValueDecl *decl,
   return vectorSpaceType->mapTypeOutOfContext();
 }
 
-// Return true if `vectorSpaceDecl` is a valid vector space struct for the given
-// nominal type.
-static bool isValidVectorSpaceStruct(NominalTypeDecl *nominal,
-                                     StructDecl *vectorSpaceDecl) {
-  // Add all stored properties of the vector space struct to a map.
-  // Also, check that vector space struct has a memberwise initializer.
-  llvm::DenseMap<Identifier, VarDecl *> members;
-  ConstructorDecl *memberwiseInitDecl = nullptr;
-  for (auto member : vectorSpaceDecl->getMembers()) {
-    // Find memberwise initializer.
-    if (!memberwiseInitDecl) {
-      auto initDecl = dyn_cast<ConstructorDecl>(member);
-      if (initDecl && initDecl->isMemberwiseInitializer())
-        memberwiseInitDecl = initDecl;
-    }
-    // Add `members` struct stored properties to map.
-    auto varDecl = dyn_cast<VarDecl>(member);
-    if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
-      continue;
-    members[varDecl->getName()] = varDecl;
-  }
-  if (!memberwiseInitDecl)
-    return false;
-
-  // Check that each member of the nominal type maps to a stored property in
-  // the vector space struct.
-  for (auto member : nominal->getStoredProperties()) {
-    auto it = members.find(member->getName());
-    if (it == members.end() ||
-        !it->second->getType()->isEqual(member->getType())) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // Attempt to find a vector space associated type for the given nominal type.
-static std::pair<StructDecl *, VectorSpaceStructStatus>
+static StructDecl *
 getVectorSpaceStructDecl(NominalTypeDecl *nominal,
                          AutoDiffAssociatedVectorSpaceKind kind) {
-  auto &ctx = nominal->getASTContext();
-  auto vectorSpaceId = getVectorSpaceIdentifier(kind, ctx);
-
-  VectorSpaceStructStatus status = DoesNotExist;
-  StructDecl *vectorSpaceStructDecl = nullptr;
-
-  for (auto member : nominal->getMembers()) {
-    // If member is a typealias declaration with matching name and underlying
-    // struct type, use the struct type.
-    if (auto aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
-      if (aliasDecl->getName() != vectorSpaceId)
-        continue;
-      auto underlyingType = aliasDecl->getUnderlyingTypeLoc().getType();
-      vectorSpaceStructDecl =
-          dyn_cast<StructDecl>(underlyingType->getAnyNominal());
-    }
-    // If member is a struct declaration with matching name, use it.
-    else if (auto structDecl = dyn_cast<StructDecl>(member)) {
-      if (structDecl->getName() != vectorSpaceId)
-        continue;
-      vectorSpaceStructDecl = structDecl;
-    }
-    if (!vectorSpaceStructDecl)
-      continue;
-    if (isValidVectorSpaceStruct(nominal, vectorSpaceStructDecl))
-      return std::make_pair(vectorSpaceStructDecl, Valid);
-    else
-      status = Invalid;
-  }
-  return std::make_pair(vectorSpaceStructDecl, status);
+  auto module = nominal->getModuleContext();
+  auto lookupConformance = LookUpConformanceInModule(module);
+  auto vectorSpace =
+      nominal->getDeclaredInterfaceType()->getAutoDiffAssociatedVectorSpace(
+          kind, lookupConformance);
+  if (!vectorSpace)
+    return nullptr;
+  auto vectorSpaceStructDecl =
+      dyn_cast<StructDecl>(vectorSpace->getType()->getAnyNominal());
+  if (!vectorSpaceStructDecl)
+    return nullptr;
+  return vectorSpaceStructDecl;
 }
 
 // Get memberwise initializer for a nominal type.
 static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
   ConstructorDecl *memberwiseInitDecl = nullptr;
-  for (auto member : nominal->getMembers()) {
-    // Find memberwise initializer.
-    if (!memberwiseInitDecl) {
-      auto initDecl = dyn_cast<ConstructorDecl>(member);
-      if (!initDecl || !initDecl->isMemberwiseInitializer())
-        continue;
-      assert(!memberwiseInitDecl && "Memberwise initializer already found");
-      memberwiseInitDecl = initDecl;
-    }
+  auto ctorDecls = nominal->lookupDirect(DeclBaseName::createConstructor());
+  for (auto decl : ctorDecls) {
+    auto ctorDecl = dyn_cast<ConstructorDecl>(decl);
+    if (!ctorDecl)
+      continue;
+    // Contine if:
+    // - Constructor is not a memberwise initializer.
+    // - Constructor is implicit and takes no arguments, and nominal has no
+    //   stored properties. This is ad-hoc and accepts empt struct
+    //   constructors generated via `TypeChecker::defineDefaultConstructor`.
+    if (!ctorDecl->isMemberwiseInitializer() &&
+        !(nominal->getStoredProperties().empty() && ctorDecl->isImplicit() &&
+          ctorDecl->getParameters()->size() == 0))
+      continue;
+    assert(!memberwiseInitDecl && "Memberwise initializer already found");
+    memberwiseInitDecl = ctorDecl;
   }
   return memberwiseInitDecl;
 }
@@ -228,7 +179,6 @@ static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
 static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
                                             Identifier methodName,
                                             Identifier methodParamLabel) {
-  // NominalTypeDecl *returnedNominal) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -240,6 +190,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto retNominalType = funcDecl->mapTypeIntoContext(retNominalInterfaceType);
   auto *retNominalTypeExpr = TypeExpr::createImplicit(retNominalType, C);
   auto *memberwiseInitDecl = getMemberwiseInitializer(retNominal);
+  assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
@@ -337,49 +288,30 @@ deriveBodyDifferentiable_tangentVector(AbstractFunctionDecl *funcDecl) {
                                   C.getIdentifier("from"));
 }
 
-// Synthesize the `moved(along:)` function declaration.
-static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
+// Synthesize function declaration for a `Differentiable` method requirement.
+static ValueDecl *deriveDifferentiable_method(
+    DerivedConformance &derived, Identifier methodName, Identifier argumentName,
+    Identifier parameterName, Type parameterType, Type returnType,
+    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
   auto &TC = derived.TC;
   auto &C = derived.TC.Context;
   auto parentDC = derived.getConformanceContext();
-  auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
-
-  StructDecl *tangentDecl;
-  VectorSpaceStructStatus tangentStatus;
-  std::tie(tangentDecl, tangentStatus) = getVectorSpaceStructDecl(
-      nominal, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  switch (tangentStatus) {
-  case DoesNotExist:
-    TC.diagnose(derived.ConformanceDecl->getLoc(),
-                diag::differentiable_no_vector_space_struct,
-                derived.getProtocolType(), C.Id_TangentVector);
-    return nullptr;
-  case Invalid:
-    TC.diagnose(tangentDecl, diag::differentiable_invalid_vector_space_struct,
-                derived.getProtocolType(), C.Id_TangentVector);
-    return nullptr;
-  case Valid:
-    break;
-  }
-  auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
   auto *param =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        C.getIdentifier("along"), SourceLoc(),
-                        C.getIdentifier("direction"), parentDC);
-  param->setInterfaceType(tangentType);
+                        argumentName, SourceLoc(), parameterName, parentDC);
+  param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
-  DeclName declName(C, C.Id_moved, params);
-  auto funcDecl =
-      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       declName, SourceLoc(),
-                       /*Throws*/ false, SourceLoc(),
-                       /*GenericParams=*/nullptr, params,
-                       TypeLoc::withoutLoc(selfInterfaceType), parentDC);
+  DeclName declName(C, methodName, params);
+  auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                   SourceLoc(), declName, SourceLoc(),
+                                   /*Throws*/ false, SourceLoc(),
+                                   /*GenericParams=*/nullptr, params,
+                                   TypeLoc::withoutLoc(returnType), parentDC);
   funcDecl->setImplicit();
-  funcDecl->setBodySynthesizer(deriveBodyDifferentiable_moved);
+  funcDecl->setBodySynthesizer(bodySynthesizer);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     funcDecl->setGenericEnvironment(env);
@@ -390,81 +322,61 @@ static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
   derived.addMembersToConformanceContext({funcDecl});
   C.addSynthesizedDecl(funcDecl);
 
+  // Returned nominal type must define a memberwise initializer.
+  // Add memberwise initializer if necessary.
+  auto returnNominal = returnType->getAnyNominal();
+  assert(returnNominal && "Return type must be a nominal type");
+  if (!getMemberwiseInitializer(returnNominal)) {
+    // The implicit memberwise constructor must be explicitly created so that
+    // it can called in `Differentiable` methods. Normally, the memberwise
+    // constructor is synthesized during SILGen, which is too late.
+    auto *initDecl = createImplicitConstructor(
+        TC, returnNominal, ImplicitConstructorKind::Memberwise);
+    returnNominal->addMember(initDecl);
+    C.addSynthesizedDecl(initDecl);
+  }
+
   return funcDecl;
+}
+
+// Synthesize the `moved(along:)` function declaration.
+static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
+  auto nominal = derived.Nominal;
+  auto &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+  auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
+
+  StructDecl *tangentDecl = getVectorSpaceStructDecl(
+      nominal, AutoDiffAssociatedVectorSpaceKind::Tangent);
+  assert(tangentDecl && "'TangentVector' struct must exist");
+  auto tangentType = tangentDecl->getDeclaredInterfaceType();
+
+  return deriveDifferentiable_method(
+      derived, C.Id_moved, C.getIdentifier("along"),
+      C.getIdentifier("direction"), tangentType, selfInterfaceType,
+      deriveBodyDifferentiable_moved);
 }
 
 // Synthesize the `tangentVector(from:)` function declaration.
 static ValueDecl *
 deriveDifferentiable_tangentVector(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
   auto &C = derived.TC.Context;
-  auto parentDC = derived.getConformanceContext();
 
-  StructDecl *tangentDecl;
-  VectorSpaceStructStatus tangentStatus;
-  std::tie(tangentDecl, tangentStatus) = getVectorSpaceStructDecl(
+  StructDecl *tangentDecl = getVectorSpaceStructDecl(
       nominal, AutoDiffAssociatedVectorSpaceKind::Tangent);
-  switch (tangentStatus) {
-  case DoesNotExist:
-    TC.diagnose(derived.ConformanceDecl->getLoc(),
-                diag::differentiable_no_vector_space_struct,
-                derived.getProtocolType(), C.Id_TangentVector);
-    return nullptr;
-  case Invalid:
-    TC.diagnose(tangentDecl, diag::differentiable_invalid_vector_space_struct,
-                derived.getProtocolType(), C.Id_TangentVector);
-    return nullptr;
-  case Valid:
-    break;
-  }
+  assert(tangentDecl && "'TangentVector' struct must exist");
   auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
-  StructDecl *cotangentDecl;
-  VectorSpaceStructStatus cotangentStatus;
-  std::tie(cotangentDecl, cotangentStatus) = getVectorSpaceStructDecl(
+  StructDecl *cotangentDecl = getVectorSpaceStructDecl(
       nominal, AutoDiffAssociatedVectorSpaceKind::Cotangent);
-  switch (cotangentStatus) {
-  case DoesNotExist:
-    TC.diagnose(derived.ConformanceDecl->getLoc(),
-                diag::differentiable_no_vector_space_struct,
-                derived.getProtocolType(), C.Id_CotangentVector);
-    return nullptr;
-  case Invalid:
-    TC.diagnose(cotangentDecl, diag::differentiable_invalid_vector_space_struct,
-                derived.getProtocolType(), C.Id_CotangentVector);
-    return nullptr;
-  case Valid:
-    break;
-  }
+  assert(cotangentDecl && "'CotangentVector' struct must exist");
   auto cotangentType = cotangentDecl->getDeclaredInterfaceType();
 
-  auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        C.getIdentifier("from"), SourceLoc(),
-                        C.getIdentifier("cotangent"), parentDC);
-  param->setInterfaceType(cotangentType);
-  ParameterList *params = ParameterList::create(C, {param});
-
-  DeclName declName(C, C.Id_tangentVector, params);
-  auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                   SourceLoc(), declName, SourceLoc(),
-                                   /*Throws*/ false, SourceLoc(),
-                                   /*GenericParams=*/nullptr, params,
-                                   TypeLoc::withoutLoc(tangentType), parentDC);
-  funcDecl->setImplicit();
-  funcDecl->setBodySynthesizer(deriveBodyDifferentiable_tangentVector);
-
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
-  funcDecl->computeType();
-  funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
-
-  derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
-
-  return funcDecl;
+  return deriveDifferentiable_method(
+      derived, C.Id_tangentVector, C.getIdentifier("from"),
+      C.getIdentifier("cotangent"), cotangentType, tangentType,
+      deriveBodyDifferentiable_tangentVector);
 }
 
 // Synthesize a vector space associated type (either 'TangentVector' or

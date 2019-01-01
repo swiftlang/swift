@@ -33,6 +33,14 @@ var generic = Generic<Double>(w: 1, b: 1)
 assert(generic.moved(along: generic) == generic + generic)
 assert(generic.tangentVector(from: generic) == generic)
 
+// Test type with manual definition of vector space types to `Self`.
+struct VectorSpacesEqualSelf : VectorNumeric, Differentiable {
+  var w: Float
+  var b: Float
+  typealias TangentVector = VectorSpacesEqualSelf
+  typealias CotangentVector = VectorSpacesEqualSelf
+}
+
 // TODO: Support the cases below after `Differentiable` derived conformances
 // limitations are lifted.
 
@@ -58,3 +66,24 @@ struct NotVectorNumeric : Differentiable {
   var b: Float
 }
 */
+
+// Test errors.
+
+// Test manually customizing vector space types.
+// Thees should fail. Synthesis is semantically unsupported if vector space
+// types are customized.
+struct VectorSpaceTypeAlias : VectorNumeric, Differentiable { // expected-error {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+  var w: Float
+  var b: Float
+  typealias TangentVector = Simple
+}
+struct VectorSpaceCustomStruct : VectorNumeric, Differentiable { // expected-error {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
+  var w: Float
+  var b: Float
+  struct CotangentVector : VectorNumeric, Differentiable {
+    var w: Float.CotangentVector
+    var b: Float.CotangentVector
+    typealias TangentVector = VectorSpaceCustomStruct.CotangentVector
+    typealias CotangentVector = VectorSpaceCustomStruct.CotangentVector
+  }
+}
