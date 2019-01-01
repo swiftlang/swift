@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+// SWIFT_ENABLE_TENSORFLOW
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"

@@ -5664,9 +5664,12 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context(s) trivial.
+  // SWIFT_ENABLE_TENSORFLOW
+  // This instruction makes the context(s) trivial. A function contains multiple
+  // function pointers and contexts when it's differentiable.
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
+  // SWIFT_ENABLE_TENSORFLOW
   for (unsigned index : range(in.size() / 2)) {
     (void)index;
     llvm::Value *fn = in.claimNext();

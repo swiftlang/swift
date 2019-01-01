@@ -863,6 +863,7 @@ namespace {
     }
   };
 
+  // SWIFT_ENABLE_TENSORFLOW
   using DifferentiableSILFunctionTypeIndex =
       std::pair<AutoDiffFunctionExtractee, unsigned>;
   class DifferentiableSILFuncionTypeLowering final
