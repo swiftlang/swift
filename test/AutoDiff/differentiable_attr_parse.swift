@@ -22,13 +22,13 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable() // okay
+@differentiable // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
 @_transparent
-@differentiable() // okay
+@differentiable // okay
 @inlinable
 func playWellWithOtherAttrs(_ x: Float, _: Float) -> Float {
   return 1 + x
