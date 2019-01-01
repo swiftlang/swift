@@ -91,10 +91,10 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK:   @sil_stored var v_1: Builtin.FPIEEE32
 // CHECK: }
 
-// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__simple_mul__primal_src_0_wrt_0_1 adjoint @AD__simple_mul__adjoint_src_0_wrt_0_1 vjp @AD__simple_mul__vjp_src_0_wrt_0_1] @simple_mul
-// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__chain_rule__primal_src_0_wrt_0_1 adjoint @AD__chain_rule__adjoint_src_0_wrt_0_1 vjp @AD__chain_rule__vjp_src_0_wrt_0_1] @chain_rule
-// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__add_literals__primal_src_0_wrt_0_1 adjoint @AD__add_literals__adjoint_src_0_wrt_0_1 vjp @AD__add_literals__vjp_src_0_wrt_0_1] @add_literals
-// CHECK-LABEL [differentiable source 0 wrt 0, 1 primal @AD__fanout__primal_src_0_wrt_0_1 adjoint @AD__fanout__adjoint_src_0_wrt_0_1 vjp @AD__fanout__vjp_src_0_wrt_0_1] @fanout
+// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__simple_mul__primal_src_0_wrt_0_1 adjoint @AD__simple_mul__adjoint_src_0_wrt_0_1 jvp @AD__simple_mul__jvp_src_0_wrt_0_1 vjp @AD__simple_mul__vjp_src_0_wrt_0_1] @simple_mul
+// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__chain_rule__primal_src_0_wrt_0_1 adjoint @AD__chain_rule__adjoint_src_0_wrt_0_1 jvp @AD__chain_rule__jvp_src_0_wrt_0_1 vjp @AD__chain_rule__vjp_src_0_wrt_0_1] @chain_rule
+// CHECK-LABEL: [differentiable source 0 wrt 0, 1 primal @AD__add_literals__primal_src_0_wrt_0_1 adjoint @AD__add_literals__adjoint_src_0_wrt_0_1 jvp @AD__add_literals__jvp_src_0_wrt_0_1 vjp @AD__add_literals__vjp_src_0_wrt_0_1] @add_literals
+// CHECK-LABEL [differentiable source 0 wrt 0, 1 primal @AD__fanout__primal_src_0_wrt_0_1 adjoint @AD__fanout__adjoint_src_0_wrt_0_1 jvp @AD__fanout__jvp_src_0_wrt_0_1 vjp @AD__fanout__vjp_src_0_wrt_0_1] @fanout
 
 // CHECK-LABEL: @AD__simple_mul__adjoint_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $AD__simple_mul__Type__src_0_wrt_0_1, %2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32):

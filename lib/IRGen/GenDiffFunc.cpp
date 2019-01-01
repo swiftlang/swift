@@ -50,9 +50,9 @@ public:
     case AutoDiffFunctionExtractInst::Extractee::Original:
       return "original";
     case AutoDiffFunctionExtractInst::Extractee::JVP:
-      return "jvp_" + differentiationOrder;
+      return "jvp_" + llvm::itostr(differentiationOrder);
     case AutoDiffFunctionExtractInst::Extractee::VJP:
-      return "vjp_" + differentiationOrder;
+      return "vjp_" + llvm::itostr(differentiationOrder);
     }
   }
 

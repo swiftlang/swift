@@ -214,6 +214,15 @@ public func valueWithGradient<T, U, V, R>(
 }
 
 @inlinable
+public func valueWithGradient<T, R>(
+  of f: @escaping @autodiff (T) -> R
+) -> (T) -> (value: R, gradient: T.CotangentVector)
+  where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x in valueWithGradient(at: x, in: f) }
+}
+
+@inlinable
 public func gradient<T, R>(
   at x: T, in f: @autodiff (T) -> R
 ) -> T.CotangentVector
@@ -240,7 +249,6 @@ public func gradient<T, U, V, R>(
   return pullback(at: x, y, z, in: f)(1)
 }
 
-/* FIXME(rxwei): Make @autodiff functions ref-countable.
 @inlinable
 public func gradient<T, R>(
   of f: @escaping @autodiff (T) -> R
@@ -249,7 +257,26 @@ public func gradient<T, R>(
         R.CotangentVector == R {
   return { x in gradient(at: x, in: f) }
 }
- */
+
+@inlinable
+public func gradient<T, U, R>(
+  of f: @escaping @autodiff (T, U) -> R
+) -> (T, U) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y in gradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  of f: @escaping @autodiff (T, U, V) -> R
+) -> (T, U, V) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y, z in gradient(at: x, y, z, in: f) }
+}
 
 //===----------------------------------------------------------------------===//
 // Builtins

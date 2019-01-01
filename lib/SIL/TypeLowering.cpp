@@ -864,7 +864,7 @@ namespace {
   };
 
   using DifferentiableSILFunctionTypeIndex =
-      std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
+      std::pair<AutoDiffFunctionExtractee, unsigned>;
   class DifferentiableSILFuncionTypeLowering final
       : public LoadableAggTypeLowering<DifferentiableSILFuncionTypeLowering,
                                        DifferentiableSILFunctionTypeIndex> {
@@ -876,18 +876,51 @@ namespace {
                                SILValue tupleValue,
                                DifferentiableSILFunctionTypeIndex index,
                                const TypeLowering &eltLowering) const {
-      llvm_unreachable("unimplemented");
+      return B.createAutoDiffFunctionExtract(loc, index.first, index.second,
+                                             tupleValue);
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                               ArrayRef<SILValue> values) const override {
-      llvm_unreachable("unimplemented");
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      // TODO: Retrieve the differentiation order when that is properly stored
+      // in the function type.
+      unsigned maxOrder = 1;
+      return B.createAutoDiffFunction(loc, paramIndices, maxOrder,
+                                      values.front(), values.drop_front());
     }
 
-  private:
     void lowerChildren(SILModule &M,
                        SmallVectorImpl<Child> &children) const override {
-      llvm_unreachable("unimplemented");
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      // TODO: Retrieve the differentiation order when that is properly stored
+      // in the function type.
+      auto maxOrder = 1;
+      auto numAssocFns = autodiff::getNumAutoDiffAssociatedFunctions(maxOrder);
+      children.reserve(numAssocFns + 1);
+      auto origFnTy = fnTy->getWithExtInfo(
+          fnTy->getExtInfo().withDifferentiable(false));
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      children.push_back(Child{
+        {AutoDiffFunctionExtractee::Original, 0},
+        M.Types.getTypeLowering(origFnTy)
+      });
+      for (auto order : range(1, maxOrder + 1)) {
+        for (AutoDiffAssociatedFunctionKind kind
+                 : {AutoDiffAssociatedFunctionKind::JVP,
+                    AutoDiffAssociatedFunctionKind::VJP}) {
+          auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+              paramIndices, 0, order, kind, M,
+              LookUpConformanceInModule(M.getSwiftModule()));
+          auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
+          children.push_back(Child{
+            {AutoDiffFunctionExtractee(kind), order},
+            M.Types.getTypeLowering(silTy)
+          });
+        }
+      }
+      assert(children.size() == numAssocFns + 1);
     }
   };
 
