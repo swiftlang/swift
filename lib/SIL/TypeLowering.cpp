@@ -148,6 +148,31 @@ namespace {
                        ResilienceExpansion Expansion)
       : M(M), Sig(Sig), Expansion(Expansion) {}
 
+    // SWIFT_ENABLE_TENSORFLOW
+    RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto extInfo = type->getExtInfo();
+      auto nondiffExtInfo = extInfo.withDifferentiable(false);
+      auto origTy = type->getWithExtInfo(nondiffExtInfo);
+      // TODO: Use the parameter indices and diff order in the @autodiff
+      // function type.
+      auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
+          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP, M,
+          LookUpConformanceInModule(M.getSwiftModule()));
+      auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
+          SmallBitVector(type->getNumParameters(), true), /*resultIndex*/ 0,
+          /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP, M,
+          LookUpConformanceInModule(M.getSwiftModule()));
+
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, M, Sig, Expansion));
+      props.addSubobject(classifyType(jvpTy, M, Sig, Expansion));
+      props.addSubobject(classifyType(vjpTy, M, Sig, Expansion));
+      return props;
+    }
+
   public:
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
@@ -212,6 +237,9 @@ namespace {
       switch (type->getRepresentation()) {
       case AnyFunctionType::Representation::Swift:
       case AnyFunctionType::Representation::Block:
+        // SWIFT_ENABLE_TENSORFLOW
+        // TODO: Are there cases where we have to lower this differently when it
+        // is @autodiff?
         return asImpl().handleReference(type);
 
       // SWIFT_ENABLE_TENSORFLOW
@@ -224,6 +252,10 @@ namespace {
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (type->isDifferentiable())
+        return asImpl().visitDifferentiableSILFunctionType(type);
+
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
                              type->getExtInfo().getRepresentation() ==
@@ -232,6 +264,13 @@ namespace {
         return asImpl().handleReference(type);
       // No escaping closures are trivial types.
       return asImpl().handleTrivial(type);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    RetTy visitDifferentiableSILFunctionType(CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
+      return asImpl().handleAggregateByProperties(type, props);
     }
 
     RetTy visitLValueType(CanLValueType type) {
@@ -824,6 +863,34 @@ namespace {
     }
   };
 
+  using DifferentiableSILFunctionTypeIndex =
+      std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
+  class DifferentiableSILFuncionTypeLowering final
+      : public LoadableAggTypeLowering<DifferentiableSILFuncionTypeLowering,
+                                       DifferentiableSILFunctionTypeIndex> {
+  public:
+    DifferentiableSILFuncionTypeLowering(CanType type)
+        : LoadableAggTypeLowering(type) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue tupleValue,
+                               DifferentiableSILFunctionTypeIndex index,
+                               const TypeLowering &eltLowering) const {
+      llvm_unreachable("unimplemented");
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      llvm_unreachable("unimplemented");
+    }
+
+  private:
+    void lowerChildren(SILModule &M,
+                       SmallVectorImpl<Child> &children) const override {
+      llvm_unreachable("unimplemented");
+    }
+  };
+
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1256,6 +1323,15 @@ namespace {
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
                                                                    properties);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    const TypeLowering *
+    visitDifferentiableSILFunctionType(CanSILFunctionType type) {
+      assert(type->isDifferentiable());
+      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
+      return handleAggregateByProperties<DifferentiableSILFuncionTypeLowering>(
+          type, props);
     }
 
     template <class LoadableLoweringClass>
