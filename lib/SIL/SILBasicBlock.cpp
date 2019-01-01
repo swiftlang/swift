@@ -264,8 +264,7 @@ void SILBasicBlock::moveTo(SILBasicBlock::iterator To, SILInstruction *I) {
   assert(I->getParent() != this && "Must move from different basic block");
   InstList.splice(To, I->getParent()->InstList, I);
   ScopeCloner ScopeCloner(*Parent);
-  SILBuilder B(*Parent);
-  I->setDebugScope(B, ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
+  I->setDebugScope(ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
 }
 
 void
@@ -281,14 +280,12 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     return;
 
   ScopeCloner ScopeCloner(*Parent);
-  SILBuilder B(*Parent);
 
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
     for (auto &II : *First)
-      II.setDebugScope(B,
-                       ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+      II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
   }
 }
 
