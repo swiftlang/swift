@@ -22,6 +22,7 @@
 namespace swift {
 
 typedef void *OpaqueSyntaxNode;
+class SyntaxParsingContext;
 
 /// Represents a raw syntax node formed by the parser.
 ///
@@ -50,12 +51,14 @@ class ParsedRawSyntaxNode {
     CharSourceRange Range;
   };
   struct DeferredLayoutNode {
-    std::vector<ParsedRawSyntaxNode> Children;
+    ArrayRef<ParsedRawSyntaxNode> Children;
   };
   struct DeferredTokenNode {
-    Token Tok;
-    ParsedTrivia LeadingTrivia;
-    ParsedTrivia TrailingTrivia;
+    const ParsedTriviaPiece *TriviaPieces;
+    SourceLoc TokLoc;
+    unsigned TokLength;
+    uint16_t NumLeadingTrivia;
+    uint16_t NumTrailingTrivia;
   };
 
   union {
@@ -77,16 +80,22 @@ class ParsedRawSyntaxNode {
     assert(getKind() == k && "Syntax kind with too large value!");
   }
 
-  ParsedRawSyntaxNode(Token tok,
-                      ParsedTrivia leadingTrivia,
-                      ParsedTrivia trailingTrivia)
-    : DeferredToken{std::move(tok),
-                    std::move(leadingTrivia),
-                    std::move(trailingTrivia)},
+  ParsedRawSyntaxNode(tok tokKind, SourceLoc tokLoc, unsigned tokLength,
+                      const ParsedTriviaPiece *triviaPieces,
+                      unsigned numLeadingTrivia,
+                      unsigned numTrailingTrivia)
+    : DeferredToken{triviaPieces,
+                    tokLoc, tokLength,
+                    uint16_t(numLeadingTrivia),
+                    uint16_t(numTrailingTrivia)},
       SynKind(uint16_t(syntax::SyntaxKind::Token)),
-      TokKind(uint16_t(tok.getKind())),
+      TokKind(uint16_t(tokKind)),
       DK(DataKind::DeferredToken) {
-    assert(getTokenKind() == tok.getKind() && "Token kind is too large value!");
+    assert(getTokenKind() == tokKind && "Token kind is too large value!");
+    assert(DeferredToken.NumLeadingTrivia == numLeadingTrivia &&
+           "numLeadingTrivia is too large value!");
+    assert(DeferredToken.NumTrailingTrivia == numTrailingTrivia &&
+           "numLeadingTrivia is too large value!");
   }
 
 public:
@@ -104,63 +113,6 @@ public:
       DK(DataKind::Recorded) {
     assert(getKind() == k && "Syntax kind with too large value!");
     assert(getTokenKind() == tokKind && "Token kind with too large value!");
-  }
-
-  ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) {
-    switch (other.DK) {
-    case DataKind::Null:
-      break;
-    case DataKind::Recorded:
-      new(&this->RecordedData)RecordedSyntaxNode(other.RecordedData);
-      break;
-    case DataKind::DeferredLayout:
-      new(&this->DeferredLayout)DeferredLayoutNode(other.DeferredLayout);
-      break;
-    case DataKind::DeferredToken:
-      new(&this->DeferredToken)DeferredTokenNode(other.DeferredToken);
-      break;
-    }
-    this->SynKind = other.SynKind;
-    this->TokKind = other.TokKind;
-    this->DK = other.DK;
-  }
-
-  ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other) {
-    switch (other.DK) {
-    case DataKind::Null:
-      break;
-    case DataKind::Recorded:
-      new(&this->RecordedData)RecordedSyntaxNode(
-          std::move(other.RecordedData));
-      break;
-    case DataKind::DeferredLayout:
-      new(&this->DeferredLayout)DeferredLayoutNode(
-          std::move(other.DeferredLayout));
-      break;
-    case DataKind::DeferredToken:
-      new(&this->DeferredToken)DeferredTokenNode(
-          std::move(other.DeferredToken));
-      break;
-    }
-    this->SynKind = other.SynKind;
-    this->TokKind = other.TokKind;
-    this->DK = other.DK;
-  }
-
-  ~ParsedRawSyntaxNode() {
-    releaseMemory();
-  }
-
-  ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) {
-    releaseMemory();
-    new (this)ParsedRawSyntaxNode(other);
-    return *this;
-  }
-
-  ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
-    releaseMemory();
-    new (this)ParsedRawSyntaxNode(std::move(other));
-    return *this;
   }
 
   syntax::SyntaxKind getKind() const { return syntax::SyntaxKind(SynKind); }
@@ -201,44 +153,44 @@ public:
     assert(DK == DataKind::DeferredLayout);
     return DeferredLayout.Children;
   }
-  void addDeferredChild(ParsedRawSyntaxNode subnode) {
-    assert(DK == DataKind::DeferredLayout);
-    DeferredLayout.Children.push_back(std::move(subnode));
-  }
 
   // Deferred Token Data =====================================================//
 
-  const Token &getToken() const {
+  CharSourceRange getDeferredTokenRangeWithoutBackticks() const {
     assert(DK == DataKind::DeferredToken);
-    return DeferredToken.Tok;
+    return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};
   }
-  const ParsedTrivia &getLeadingTrivia() const {
+  ArrayRef<ParsedTriviaPiece> getDeferredLeadingTriviaPieces() const {
     assert(DK == DataKind::DeferredToken);
-    return DeferredToken.LeadingTrivia;
+    return ArrayRef<ParsedTriviaPiece>(DeferredToken.TriviaPieces,
+                                       DeferredToken.NumLeadingTrivia);
   }
-  const ParsedTrivia &getTrailingTrivia() const {
+  ArrayRef<ParsedTriviaPiece> getDeferredTrailingTriviaPieces() const {
     assert(DK == DataKind::DeferredToken);
-    return DeferredToken.TrailingTrivia;
+    return ArrayRef<ParsedTriviaPiece>(
+      DeferredToken.TriviaPieces + DeferredToken.NumLeadingTrivia,
+      DeferredToken.NumTrailingTrivia);
   }
 
   //==========================================================================//
 
   /// Form a deferred syntax layout node.
   static ParsedRawSyntaxNode makeDeferred(syntax::SyntaxKind k,
-                        ArrayRef<ParsedRawSyntaxNode> deferredNodes) {
-    return ParsedRawSyntaxNode{k, deferredNodes};
-  }
+                        ArrayRef<ParsedRawSyntaxNode> deferredNodes,
+                                          SyntaxParsingContext &ctx);
 
   /// Form a deferred token node.
   static ParsedRawSyntaxNode makeDeferred(Token tok,
-                                          ParsedTrivia leadingTrivia,
-                                          ParsedTrivia trailingTrivia) {
-    return ParsedRawSyntaxNode{std::move(tok), std::move(leadingTrivia),
-        std::move(trailingTrivia)};
-  }
+                                          const ParsedTrivia &leadingTrivia,
+                                          const ParsedTrivia &trailingTrivia,
+                                          SyntaxParsingContext &ctx);
 
   /// Form a deferred missing token node.
-  static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc);
+  static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc) {
+    auto raw = ParsedRawSyntaxNode(tokKind, loc, 0, nullptr, 0, 0);
+    raw.IsMissing = true;
+    return raw;
+  }
 
   /// Dump this piece of syntax recursively for debugging or testing.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -250,20 +202,6 @@ public:
 
   static ParsedRawSyntaxNode null() {
     return ParsedRawSyntaxNode{};
-  }
-
-private:
-  void releaseMemory() {
-    switch (DK) {
-    case DataKind::Null:
-      break;
-    case DataKind::Recorded:
-      RecordedData.~RecordedSyntaxNode(); break;
-    case DataKind::DeferredLayout:
-      DeferredLayout.~DeferredLayoutNode(); break;
-    case DataKind::DeferredToken:
-      DeferredToken.~DeferredTokenNode(); break;
-    }
   }
 };
 

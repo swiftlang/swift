@@ -24,8 +24,10 @@
 
 namespace swift {
 
+class CharSourceRange;
 class ParsedRawSyntaxNode;
 struct ParsedTrivia;
+class ParsedTriviaPiece;
 class SyntaxParseActions;
 class SourceLoc;
 class Token;
@@ -45,6 +47,10 @@ public:
   ParsedRawSyntaxNode recordToken(const Token &tok,
                                   const ParsedTrivia &leadingTrivia,
                                   const ParsedTrivia &trailingTrivia);
+
+  ParsedRawSyntaxNode recordToken(tok tokenKind, CharSourceRange tokenRange,
+                                  ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                                  ArrayRef<ParsedTriviaPiece> trailingTrivia);
 
   /// Record a missing token. \p loc can be invalid or an approximate location
   /// of where the token would be if not missing.

@@ -11,18 +11,43 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 
 using namespace swift;
 using namespace swift::syntax;
+using namespace llvm;
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferredMissing(tok kind, SourceLoc loc) {
-  // Pass appropriate text for the missing token to have the provided location
-  // but zero length.
-  StringRef tokText = CharSourceRange{loc, 0}.str();
-  auto raw = ParsedRawSyntaxNode::makeDeferred(Token{kind, tokText}, {}, {});
-  raw.IsMissing = true;
-  return raw;
+ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
+                                  ArrayRef<ParsedRawSyntaxNode> deferredNodes,
+                                  SyntaxParsingContext &ctx) {
+  if (deferredNodes.empty()) {
+    return ParsedRawSyntaxNode(k, {});
+  }
+  ParsedRawSyntaxNode *newPtr =
+    ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
+  std::uninitialized_copy(deferredNodes.begin(), deferredNodes.end(), newPtr);
+  return ParsedRawSyntaxNode(k, makeArrayRef(newPtr, deferredNodes.size()));
+}
+
+ParsedRawSyntaxNode
+ParsedRawSyntaxNode::makeDeferred(Token tok,
+                                  const ParsedTrivia &leadingTrivia,
+                                  const ParsedTrivia &trailingTrivia,
+                                  SyntaxParsingContext &ctx) {
+  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
+  size_t piecesCount = leadingTrivia.size() + trailingTrivia.size();
+  ParsedTriviaPiece *piecesPtr = nullptr;
+  if (piecesCount > 0) {
+    piecesPtr = ctx.getScratchAlloc().Allocate<ParsedTriviaPiece>(piecesCount);
+    std::uninitialized_copy(leadingTrivia.begin(), leadingTrivia.end(),
+                            piecesPtr);
+    std::uninitialized_copy(trailingTrivia.begin(), trailingTrivia.end(),
+                            piecesPtr + leadingTrivia.size());
+  }
+  return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
+                             tokRange.getByteLength(), piecesPtr,
+                             leadingTrivia.size(), trailingTrivia.size());
 }
 
 void ParsedRawSyntaxNode::dump() const {

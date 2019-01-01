@@ -14,6 +14,7 @@
 #define SWIFT_PARSE_PARSEDTRIVIA_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -41,6 +42,17 @@ public:
   void extendLength(unsigned len) {
     Length += len;
   }
+
+  static size_t getTotalLength(ArrayRef<ParsedTriviaPiece> pieces) {
+    size_t Len = 0;
+    for (auto &p : pieces)
+      Len += p.getLength();
+    return Len;
+  }
+
+  static syntax::Trivia
+  convertToSyntaxTrivia(ArrayRef<ParsedTriviaPiece> pieces, SourceLoc loc,
+                        const SourceManager &SM, unsigned bufferID);
 };
 
 using ParsedTriviaList = SmallVector<ParsedTriviaPiece, 3>;
@@ -68,11 +80,13 @@ struct ParsedTrivia {
     return Pieces.empty();
   }
 
+  /// Return the number of pieces in this Trivia collection.
+  size_t size() const {
+    return Pieces.size();
+  }
+
   size_t getLength() const {
-    size_t Len = 0;
-    for (auto &P : Pieces)
-      Len += P.getLength();
-    return Len;
+    return ParsedTriviaPiece::getTotalLength(Pieces);
   }
 
   void push_back(syntax::TriviaKind kind, unsigned length) {

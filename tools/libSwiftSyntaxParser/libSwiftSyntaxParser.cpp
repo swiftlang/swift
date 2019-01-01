@@ -88,7 +88,7 @@ private:
   }
 
   static void makeCTrivia(SmallVectorImpl<CTriviaPiece> &c_trivia,
-                          const ParsedTrivia &trivia) {
+                          ArrayRef<ParsedTriviaPiece> trivia) {
     for (const auto &piece : trivia) {
       CTriviaPiece c_piece;
       auto numValue =
@@ -131,15 +131,15 @@ private:
     node.present = true;
   }
 
-  OpaqueSyntaxNode recordToken(const Token &tok,
-                               const ParsedTrivia &leadingTrivia,
-                               const ParsedTrivia &trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
                                CharSourceRange range) override {
     SmallVector<CTriviaPiece, 8> c_leadingTrivia, c_trailingTrivia;
     makeCTrivia(c_leadingTrivia, leadingTrivia);
     makeCTrivia(c_trailingTrivia, trailingTrivia);
     CRawSyntaxNode node;
-    makeCRawToken(node, tok.getKind(), c_leadingTrivia, c_trailingTrivia,
+    makeCRawToken(node, tokenKind, c_leadingTrivia, c_trailingTrivia,
                   range);
     return getNodeHandler()(&node);
   }

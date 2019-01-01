@@ -107,21 +107,29 @@ void SyntaxTreeCreator::acceptSyntaxRoot(OpaqueSyntaxNode rootN,
 }
 
 OpaqueSyntaxNode
-SyntaxTreeCreator::recordToken(const Token &tok,
-                               const ParsedTrivia &leadingTrivia,
-                               const ParsedTrivia &trailingTrivia,
+SyntaxTreeCreator::recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTriviaPieces,
+                               ArrayRef<ParsedTriviaPiece> trailingTriviaPieces,
                                CharSourceRange range) {
-  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
-  SourceLoc leadingTriviaLoc =
-    tokRange.getStart().getAdvancedLoc(-leadingTrivia.getLength());
-  SourceLoc trailingTriviaLoc =
-    tokRange.getStart().getAdvancedLoc(tokRange.getByteLength());
+  size_t leadingTriviaLen =
+    ParsedTriviaPiece::getTotalLength(leadingTriviaPieces);
+  size_t trailingTriviaLen =
+    ParsedTriviaPiece::getTotalLength(trailingTriviaPieces);
+  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTriviaLen);
+  unsigned tokLength = range.getByteLength() -
+      leadingTriviaLen - trailingTriviaLen;
+  CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
+  SourceLoc leadingTriviaLoc = range.getStart();
+  SourceLoc trailingTriviaLoc = tokLoc.getAdvancedLoc(tokLength);
   Trivia syntaxLeadingTrivia =
-    leadingTrivia.convertToSyntaxTrivia(leadingTriviaLoc, SM, BufferID);
+    ParsedTriviaPiece::convertToSyntaxTrivia(leadingTriviaPieces,
+                                             leadingTriviaLoc, SM, BufferID);
   Trivia syntaxTrailingTrivia =
-    trailingTrivia.convertToSyntaxTrivia(trailingTriviaLoc, SM, BufferID);
-  auto ownedText = OwnedString::makeRefCounted(tok.getText());
-  auto raw = TokenCache->getToken(Arena, tok.getKind(), ownedText,
+    ParsedTriviaPiece::convertToSyntaxTrivia(trailingTriviaPieces,
+                                             trailingTriviaLoc, SM, BufferID);
+  StringRef tokenText = SM.extractText(tokRange, BufferID);
+  auto ownedText = OwnedString::makeRefCounted(tokenText);
+  auto raw = TokenCache->getToken(Arena, tokenKind, ownedText,
                     syntaxLeadingTrivia.Pieces, syntaxTrailingTrivia.Pieces);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();

@@ -66,7 +66,7 @@ SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<ParsedRawSyntaxNode> Parts) {
   assert(isUnknownKind(Kind));
   if (IsBacktracking)
-    return ParsedRawSyntaxNode::makeDeferred(Kind, Parts);
+    return ParsedRawSyntaxNode::makeDeferred(Kind, Parts, *this);
   else
     return getRecorder().recordRawSyntax(Kind, Parts);
 }
@@ -80,7 +80,7 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
   auto &rec = getRecorder();
   auto formNode = [&](SyntaxKind kind, ArrayRef<ParsedRawSyntaxNode> layout) {
     if (nodeCreateK == SyntaxNodeCreationKind::Deferred || IsBacktracking) {
-      rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout);
+      rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout, *this);
     } else {
       rawNode = rec.recordRawSyntax(kind, layout);
     }
@@ -170,14 +170,16 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok, ParsedTrivia &LeadingTrivia,
-                                    ParsedTrivia &TrailingTrivia) {
+void SyntaxParsingContext::addToken(Token &Tok,
+                                    const ParsedTrivia &LeadingTrivia,
+                                    const ParsedTrivia &TrailingTrivia) {
   if (!Enabled)
     return;
 
   ParsedRawSyntaxNode raw;
   if (IsBacktracking)
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia);
+    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
+                                            *this);
   else
     raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
   addRawSyntax(std::move(raw));

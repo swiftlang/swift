@@ -17,16 +17,24 @@
 using namespace swift;
 using namespace swift::syntax;
 
-Trivia ParsedTrivia::convertToSyntaxTrivia(SourceLoc loc,
-                                           const SourceManager &SM,
-                                           unsigned bufferID) const {
+Trivia
+ParsedTriviaPiece::convertToSyntaxTrivia(ArrayRef<ParsedTriviaPiece> pieces,
+                                         SourceLoc loc,
+                                         const SourceManager &SM,
+                                         unsigned bufferID) {
   Trivia trivia;
   SourceLoc curLoc = loc;
-  for (const auto &piece : Pieces) {
+  for (const auto &piece : pieces) {
     CharSourceRange range{curLoc, piece.getLength()};
     StringRef text = SM.extractText(range, bufferID);
     trivia.push_back(TriviaPiece::fromText(piece.getKind(), text));
     curLoc = curLoc.getAdvancedLoc(piece.getLength());
   }
   return trivia;
+}
+
+Trivia
+ParsedTrivia::convertToSyntaxTrivia(SourceLoc loc, const SourceManager &SM,
+                                    unsigned bufferID) const {
+  return ParsedTriviaPiece::convertToSyntaxTrivia(Pieces, loc, SM, bufferID);
 }

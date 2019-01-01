@@ -30,16 +30,23 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(const Token &tok,
                                      const ParsedTrivia &leadingTrivia,
                                      const ParsedTrivia &trailingTrivia) {
-  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
-  unsigned leadingTriviaLen = leadingTrivia.getLength();
-  unsigned trailingTriviaLen = trailingTrivia.getLength();
+  return recordToken(tok.getKind(), tok.getRangeWithoutBackticks(),
+                     leadingTrivia.Pieces, trailingTrivia.Pieces);
+}
+
+ParsedRawSyntaxNode
+ParsedRawSyntaxRecorder::recordToken(tok tokKind, CharSourceRange tokRange,
+                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                                ArrayRef<ParsedTriviaPiece> trailingTrivia) {
+  size_t leadingTriviaLen = ParsedTriviaPiece::getTotalLength(leadingTrivia);
+  size_t trailingTriviaLen = ParsedTriviaPiece::getTotalLength(trailingTrivia);
   SourceLoc offset = tokRange.getStart().getAdvancedLoc(-leadingTriviaLen);
   unsigned length = leadingTriviaLen + tokRange.getByteLength() +
       trailingTriviaLen;
   CharSourceRange range{offset, length};
-  OpaqueSyntaxNode n = SPActions->recordToken(tok, leadingTrivia,
+  OpaqueSyntaxNode n = SPActions->recordToken(tokKind, leadingTrivia,
                                               trailingTrivia, range);
-  return ParsedRawSyntaxNode{SyntaxKind::Token, tok.getKind(), range, n};
+  return ParsedRawSyntaxNode{SyntaxKind::Token, tokKind, range, n};
 }
 
 ParsedRawSyntaxNode
@@ -56,11 +63,13 @@ getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
   if (node.isDeferredLayout())
     return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
   assert(node.isDeferredToken());
-  const Token &tok = node.getToken();
+  CharSourceRange tokRange = node.getDeferredTokenRangeWithoutBackticks();
+  tok tokKind = node.getTokenKind();
   if (node.isMissing())
-    return rec.recordMissingToken(tok.getKind(), tok.getLoc());
-  return rec.recordToken(tok, node.getLeadingTrivia(),
-                         node.getTrailingTrivia());
+    return rec.recordMissingToken(tokKind, tokRange.getStart());
+  return rec.recordToken(tokKind,tokRange,
+                         node.getDeferredLeadingTriviaPieces(),
+                         node.getDeferredTrailingTriviaPieces());
 }
 
 ParsedRawSyntaxNode

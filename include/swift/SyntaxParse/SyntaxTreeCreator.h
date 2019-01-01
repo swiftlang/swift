@@ -54,9 +54,9 @@ public:
   void acceptSyntaxRoot(OpaqueSyntaxNode root, SourceFile &SF);
 
 private:
-  OpaqueSyntaxNode recordToken(const Token &tok,
-                               const ParsedTrivia &leadingTrivia,
-                               const ParsedTrivia &trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind,
+                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
+                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
                                CharSourceRange range) override;
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;

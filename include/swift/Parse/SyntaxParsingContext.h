@@ -94,6 +94,8 @@ public:
 
     ParsedRawSyntaxRecorder Recorder;
 
+    llvm::BumpPtrAllocator ScratchAlloc;
+
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
                     std::shared_ptr<SyntaxParseActions> spActions)
@@ -242,12 +244,16 @@ public:
 
   ParsedRawSyntaxRecorder &getRecorder() { return getRootData()->Recorder; }
 
+  llvm::BumpPtrAllocator &getScratchAlloc() {
+    return getRootData()->ScratchAlloc;
+  }
+
   /// Add RawSyntax to the parts.
   void addRawSyntax(ParsedRawSyntaxNode Raw);
 
   /// Add Token with Trivia to the parts.
-  void addToken(Token &Tok, ParsedTrivia &LeadingTrivia,
-                ParsedTrivia &TrailingTrivia);
+  void addToken(Token &Tok, const ParsedTrivia &LeadingTrivia,
+                const ParsedTrivia &TrailingTrivia);
 
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
