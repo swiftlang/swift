@@ -2017,7 +2017,8 @@ function(add_swift_target_library name)
 
       swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
           FILES "${UNIVERSAL_LIBRARY_NAME}"
-          DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+          RUNTIME DESTINATION bin
+          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
           PERMISSIONS ${file_permissions})
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
