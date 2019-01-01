@@ -5,25 +5,25 @@ struct Simple : VectorNumeric, Differentiable {
   var w: Float
   var b: Float
 }
-var x = Simple(w: 1, b: 1)
-assert(x.moved(along: x) == x + x)
-assert(x.tangentVector(from: x) == x)
+var simple = Simple(w: 1, b: 1)
+assert(simple.moved(along: simple) == simple + simple)
+assert(simple.tangentVector(from: simple) == simple)
 
 // Test type with mixed members.
 struct Mixed : VectorNumeric, Differentiable {
-  var tensor: Tensor<Float>
+  var simple: Simple
   var float: Float
 }
-var mixed = Mixed(tensor: Tensor(1), float: 1)
+var mixed = Mixed(simple: simple, float: 1)
 assert(mixed.moved(along: mixed) == mixed + mixed)
 assert(mixed.tangentVector(from: mixed) == mixed)
 
 // Test type with generic members that conform to `Differentiable`.
-// Since `Member == Member.TangentVector == Member.CotangentVector`,
+// Since `T == T.TangentVector == T.CotangentVector`,
 // it's only necessary to synthesis typealiases:
 // `typealias TangentVector = Generic`
 // `typealias CotangentVector = Generic`
-struct Generic<Member> : VectorNumeric, Differentiable
+struct Generic<T> : VectorNumeric, Differentiable
   where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
 {
   var w: T
@@ -39,7 +39,7 @@ assert(generic.tangentVector(from: generic) == generic)
 /*
 // Test type with generic members that conform to `Differentiable`.
 // Since it's not the case that
-// `Member == Member.TangentVector == Member.CotangentVector`,
+// `T == T.TangentVector == T.CotangentVector`,
 // it's necessary to synthesize new vector space struct types.
 struct GenericNeedsVectorSpaceStructs<T> : VectorNumeric, Differentiable
   where T : VectorNumeric, T : Differentiable
