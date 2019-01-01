@@ -833,18 +833,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
-  SourceLoc lParenLoc, rParenLoc;
-
-  // Parse '('.
-  if (!consumeIf(tok::l_paren, lParenLoc)) {
-    diagnose(Tok, diag::attr_expected_lparen, AttrName,
-             /*DeclModifier=*/false);
-    skipUntil(tok::r_paren);
-    if (!consumeIf(tok::r_paren, rParenLoc))
-      diagnose(Tok, diag::attr_expected_rparen, AttrName,
-               /*DeclModifier=*/false);
-    return makeParserError();
-  }
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
 
   using DeclNameWithLoc = DifferentiableAttr::DeclNameWithLoc;
   SmallVector<AutoDiffParameter, 8> params;
@@ -854,16 +843,18 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
 
-  // Parse @differentiable attribute arguments.
-  if (parseDifferentiableAttributeArguments(params, primalSpec, adjointSpec,
-                                            jvpSpec, vjpSpec, whereClause))
-    return makeParserError();
-
-  // Parse ')'.
-  if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
-             /*DeclModifier=*/false);
-    return makeParserError();
+  // Parse '('.
+  if (consumeIf(tok::l_paren, lParenLoc)) {
+    // Parse @differentiable attribute arguments.
+    if (parseDifferentiableAttributeArguments(params, primalSpec, adjointSpec,
+                                              jvpSpec, vjpSpec, whereClause))
+      return makeParserError();
+    // Parse ')'.
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
+      diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+               /*DeclModifier=*/false);
+      return makeParserError();
+    }
   }
 
   return ParserResult<DifferentiableAttr>(

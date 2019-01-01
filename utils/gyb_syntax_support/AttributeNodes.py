@@ -43,6 +43,7 @@ ATTRIBUTE_NODES = [
                        Child('ObjCName', kind='ObjCSelector'),
                        Child('ImplementsArguments', 
                              kind='ImplementsAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
                    ], description='''
