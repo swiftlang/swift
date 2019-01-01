@@ -29,11 +29,19 @@ typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
 // This selects the signed equivalent of the unsigned type chosen for size_t.
+#if defined(_MSC_VER)
+#if defined(_M_X86) || defined(_M_ARM)
+typedef int ssize_t;
+#elif defined(_M_AMD64) || defined(_M_ARM64)
+typedef __int64 ssize_t;
+#endif
+#else
 typedef __typeof__(_Generic((__swift_size_t)0,                                 \
                             unsigned long long int : (long long int)0,         \
                             unsigned long int : (long int)0,                   \
                             unsigned int : (int)0,                             \
                             unsigned short : (short)0,                         \
                             unsigned char : (signed char)0)) __swift_ssize_t;
+#endif
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H

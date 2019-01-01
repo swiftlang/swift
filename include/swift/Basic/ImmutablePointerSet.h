@@ -349,7 +349,7 @@ ImmutablePointerSet<T> ImmutablePointerSetFactory<T>::EmptyPtrSet =
     ImmutablePointerSet<T>(nullptr, {});
 
 template <typename T>
-constexpr unsigned ImmutablePointerSetFactory<T>::AllocAlignment =
+const unsigned ImmutablePointerSetFactory<T>::AllocAlignment =
     (alignof(PtrSet) > alignof(PtrTy)) ? alignof(PtrSet) : alignof(PtrTy);
 
 } // end swift namespace
