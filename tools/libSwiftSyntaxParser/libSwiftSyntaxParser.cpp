@@ -187,6 +187,8 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
   langOpts.CollectParsedToken = false;
+  // Disable name lookups during parsing.
+  langOpts.EnableASTScopeLookup = true;
 
   auto parseActions =
     std::make_shared<CLibParseActions>(*this, SM, bufID);

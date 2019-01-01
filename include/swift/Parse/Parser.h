@@ -637,6 +637,9 @@ public:
 
   /// Add the given Decl to the current scope.
   void addToScope(ValueDecl *D) {
+    if (Context.LangOpts.EnableASTScopeLookup)
+      return;
+
     getScopeInfo().addToScope(D, *this);
   }
 
