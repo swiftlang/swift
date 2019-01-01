@@ -48,7 +48,7 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   dumpSyntaxKind(OS, getKind());
 
   if (isToken()) {
-    OS << ' ' << getTokenText(getTokenKind());
+    dumpTokenKind(OS, getTokenKind());
 
   } else {
     if (isRecorded()) {
