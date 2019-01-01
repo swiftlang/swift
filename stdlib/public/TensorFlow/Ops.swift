@@ -104,6 +104,9 @@ extension Tensor : ShapedVectorNumeric where Scalar : Numeric {}
 extension Tensor : Differentiable where Scalar : FloatingPoint {
   public typealias TangentVector = Tensor
   public typealias CotangentVector = Tensor
+  public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
+    return cotangent
+  }
 }
 
 //===----------------------------------------------------------------------===//

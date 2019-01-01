@@ -87,11 +87,16 @@ public extension Differentiable
   }
 }
 
+// FIXME: This is currently commented because the where clause leads to
+// associated type inference which conflicts with `Differentiable` derived
+// conformances.
+/*
 public extension Differentiable where TangentVector == CotangentVector {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }
 }
+*/
 
 //===----------------------------------------------------------------------===//
 // Differential Operators

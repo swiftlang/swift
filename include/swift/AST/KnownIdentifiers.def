@@ -134,6 +134,8 @@ IDENTIFIER(Parameters)
 // Differentiable
 IDENTIFIER(CotangentVector)
 IDENTIFIER(TangentVector)
+IDENTIFIER(moved)
+IDENTIFIER(tangentVector)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")
