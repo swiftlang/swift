@@ -39,6 +39,7 @@ typedef void *OpaqueSyntaxNode;
 /// in the current parsing context.
 class ParsedRawSyntaxNode {
   enum class DataKind: uint8_t {
+    Null,
     Recorded,
     DeferredLayout,
     DeferredToken,
@@ -90,8 +91,11 @@ class ParsedRawSyntaxNode {
 
 public:
   ParsedRawSyntaxNode()
-    : ParsedRawSyntaxNode(syntax::SyntaxKind::Unknown, tok::unknown,
-                          {}, nullptr) {}
+    : RecordedData{},
+      SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
+      TokKind(uint16_t(tok::unknown)),
+      DK(DataKind::Null) {
+  }
 
   ParsedRawSyntaxNode(syntax::SyntaxKind k, tok tokKind,
                       CharSourceRange r, OpaqueSyntaxNode n)
@@ -104,6 +108,8 @@ public:
 
   ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) {
     switch (other.DK) {
+    case DataKind::Null:
+      break;
     case DataKind::Recorded:
       new(&this->RecordedData)RecordedSyntaxNode(other.RecordedData);
       break;
@@ -121,6 +127,8 @@ public:
 
   ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other) {
     switch (other.DK) {
+    case DataKind::Null:
+      break;
     case DataKind::Recorded:
       new(&this->RecordedData)RecordedSyntaxNode(
           std::move(other.RecordedData));
@@ -166,7 +174,7 @@ public:
   }
 
   bool isNull() const {
-    return isRecorded() && RecordedData.OpaqueNode == nullptr;
+    return DK == DataKind::Null;
   }
 
   bool isRecorded() const { return DK == DataKind::Recorded; }
@@ -247,6 +255,8 @@ public:
 private:
   void releaseMemory() {
     switch (DK) {
+    case DataKind::Null:
+      break;
     case DataKind::Recorded:
       RecordedData.~RecordedSyntaxNode(); break;
     case DataKind::DeferredLayout:

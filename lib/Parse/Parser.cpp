@@ -1123,6 +1123,9 @@ OpaqueSyntaxNode ParserUnit::parse() {
     Done = P.Tok.is(tok::eof);
   }
   auto rawNode = P.finalizeSyntaxTree();
+  if (rawNode.isNull()) {
+    return nullptr;
+  }
   return rawNode.getOpaqueNode();
 }
 

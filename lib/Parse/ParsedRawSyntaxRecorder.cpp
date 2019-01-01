@@ -56,7 +56,7 @@ ParsedRawSyntaxRecorder::recordMissingToken(tok tokenKind, SourceLoc loc) {
 
 static ParsedRawSyntaxNode
 getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
-  if (node.isRecorded())
+  if (node.isNull() || node.isRecorded())
     return node;
   if (node.isDeferredLayout())
     return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
@@ -78,8 +78,10 @@ ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
     unsigned length = 0;
     for (const auto &elem : elements) {
       auto subnode = getRecordedNode(elem, *this);
-      subnodes.push_back(subnode.getOpaqueNode());
-      if (!subnode.isNull()) {
+      if (subnode.isNull()) {
+        subnodes.push_back(nullptr);
+      } else {
+        subnodes.push_back(subnode.getOpaqueNode());
         auto range = subnode.getRange();
         if (range.isValid()) {
           if (offset.isInvalid())
@@ -108,6 +110,9 @@ ParsedRawSyntaxRecorder::lookupNode(size_t lexerOffset, SourceLoc loc,
   size_t length;
   OpaqueSyntaxNode n;
   std::tie(length, n) = SPActions->lookupNode(lexerOffset, kind);
+  if (length == 0) {
+    return ParsedRawSyntaxNode::null();
+  }
   CharSourceRange range{loc, unsigned(length)};
   return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
 }
