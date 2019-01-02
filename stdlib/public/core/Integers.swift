@@ -27,12 +27,45 @@ extension ExpressibleByIntegerLiteral
 //===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-// FIXME: Add doc comment.
+/// A type with values that support addition and subtraction.
+///
+/// The `AdditiveArithmetic` protocol provides a suitable basis for additive
+/// arithmetic on scalar values, such as integers and floating-point numbers,
+/// or vectors. You can write generic methods that operate on any numeric type
+/// in the standard library by using the `AdditiveArithmetic` protocol as a
+/// generic constraint.
+///
+/// The following code declares a method that calculates the total of any
+/// sequence with `Numeric` elements.
+///
+///     extension Sequence where Element: AdditiveArithmetic {
+///         func sum() -> Element {
+///             return reduce(.zero, +)
+///         }
+///     }
+///
+/// The `sum()` method is now available on any sequence with values that
+/// conform to `AdditiveArithmetic`, whether it is an array of `Double` or a
+/// range of `Int`.
+///
+///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
+///     // arraySum == 16.5
+///
+///     let rangeSum = (1..<10).sum()
+///     // rangeSum == 45
+///
+/// Conforming to the AdditiveArithmetic Protocol
+/// =============================================
+///
+/// To add `AdditiveArithmetic` protocol conformance to your own custom type,
+/// implement the required operators, and provide a static `zero` property
+/// using a type that can represent the magnitude of any value of your custom
+/// type.
 public protocol AdditiveArithmetic : Equatable {
   /// The zero value.
   ///
-  /// - Note: Zero is the identity element for addition; for any value,
-  ///   `x + .zero == x` and `.zero + x == x`.
+  /// Zero is the identity element for addition. For any value,
+  /// `x + .zero == x` and `.zero + x == x`.
   static var zero: Self { get }
 
   /// Adds two values and produces their sum.
@@ -96,6 +129,10 @@ public protocol AdditiveArithmetic : Equatable {
 }
 
 public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
+  /// The zero value.
+  ///
+  /// Zero is the identity element for addition. For any value,
+  /// `x + .zero == x` and `.zero + x == x`.
   static var zero: Self {
     return 0
   }
@@ -105,41 +142,41 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 //===--- Numeric ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-// FIXME: Update comment based on the `AdditiveArithmetic` change.
-/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
-/// `*`--and their mutating counterparts.
+/// A type with values that support multiplication.
 ///
 /// The `Numeric` protocol provides a suitable basis for arithmetic on
 /// scalar values, such as integers and floating-point numbers. You can write
 /// generic methods that operate on any numeric type in the standard library
 /// by using the `Numeric` protocol as a generic constraint.
 ///
-/// The following example declares a method that calculates the total of any
-/// sequence with `Numeric` elements.
+/// The following example extends `Seqeunce` with a method that returns an
+/// array with the sequence's values multiplied by two.
 ///
 ///     extension Sequence where Element: Numeric {
-///         func sum() -> Element {
-///             return reduce(0, +)
+///         func doublingAll() -> [Element] {
+///             return map { $0 * 2 }
 ///         }
 ///     }
 ///
-/// The `sum()` method is now available on any sequence or collection with
-/// numeric values, whether it is an array of `Double` or a countable range of
-/// `Int`.
+/// With this extension, any sequence with elements that conform to `Numeric`
+/// has the `doublingAll()` method. For example, you can double the elements of
+/// an array of doubles or a range of integers:
 ///
-///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
-///     // arraySum == 16.5
+///     let observations = [1.5, 2.0, 3.25, 4.875, 5.5]
+///     let doubledObservations = observations.doublingAll()
+///     // doubledObservations == [3.0, 4.0, 6.5, 9.75, 11.0]
 ///
-///     let rangeSum = (1..<10).sum()
-///     // rangeSum == 45
+///     let integers = 0..<8
+///     let doubledIntegers = integers.doublingAll()
+///     // doubledIntegers == [0, 2, 4, 6, 8, 10, 12, 14]
 ///
 /// Conforming to the Numeric Protocol
-/// =====================================
+/// ==================================
 ///
 /// To add `Numeric` protocol conformance to your own custom type, implement
-/// the required mutating methods. Extensions to `Numeric` provide default
-/// implementations for the protocol's nonmutating methods based on the
-/// mutating variants.
+/// the required initializer and operators, and provide a `magnitude` property
+/// using a type that can represent the magnitude of any value of your custom
+/// type.
 public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
@@ -216,7 +253,7 @@ public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
 /// `Numeric` protocol to include a value's additive inverse.
 ///
 /// Conforming to the SignedNumeric Protocol
-/// ===========================================
+/// ========================================
 ///
 /// Because the `SignedNumeric` protocol provides default implementations of
 /// both of its required methods, you don't need to do anything beyond
