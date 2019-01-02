@@ -155,13 +155,6 @@ enum PMOUseKind {
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
-
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
-  SelfInit
 };
 
 /// This struct represents a single classified access to the memory object

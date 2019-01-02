@@ -371,6 +371,47 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   return nptr + pos;
 }
 
+#if defined(_WIN32)
+template <>
+static const char *
+_swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<float>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  *result = std::strtof(str, &end);
+  return end;
+}
+
+template <>
+static const char *
+_swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<double>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  *result = std::strtod(str, &end);
+  return end;
+}
+
+template <>
+static const char *
+_swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<long double>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  *result = std::strtold(str, &end);
+  return end;
+}
+#endif
+
 const char *swift::_swift_stdlib_strtold_clocale(
     const char *nptr, void *outResult) {
   return _swift_stdlib_strtoX_clocale_impl(

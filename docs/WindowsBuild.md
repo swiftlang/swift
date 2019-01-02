@@ -30,6 +30,7 @@ it provides some of the needed headers and libraries.
   installation.
 
 ### 2. Clone the repositories
+1. Configure git to work with Unix file endings
 1. Create a folder to contain all the Swift repositories
 1. Clone `apple/swift-cmark` into a folder named `cmark`
 1. Clone `apple/swift-clang` into a folder named `clang`
@@ -37,8 +38,22 @@ it provides some of the needed headers and libraries.
 1. Clone `apple/swift-compiler-rt` into a folder named `compiler-rt`
 1. Clone `apple/swift` into a folder named `swift`
 1. Clone `apple/swift-corelibs-libdispatch` into a folder named `swift-corelibs-libdispatch`
+1. Clone `apple/swift-corelibs-foundation` into a folder name `swift-corelibs-foundation`
+
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
+
+```cmd
+git config --global core.autocrlf input
+S:
+git clone https://github.com/apple/swift-cmark cmark
+git clone https://github.com/apple/swift-clang clang
+git clone https://github.com/apple/swift-llvm llvm
+git clone https://github.com/apple/swift-compiler-rt compiler-rt
+git clone https://github.com/apple/swift
+git clone https://github.com/apple/swift-corelibs-libdispatch
+git clone https://github.com/apple/swift-corelibs-foundation
+```
 
 ### 3. Acquire ICU
 1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the binaries.
@@ -186,8 +201,9 @@ Running the testsuite on Windows has additional external dependencies.  You must
 
   1. coreutils
   2. diffutils
-  3. grep
-  4. sed
+  3. file
+  4. grep
+  5. sed
   
 ```cmd
 ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" check-swift
