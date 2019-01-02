@@ -36,12 +36,12 @@ extension Unicode.Scalar {
   /// Properties of this scalar defined by the Unicode standard.
   ///
   /// Use this property to access the Unicode properties of a Unicode scalar
-  /// value. The following code tests whether the string contains any math
+  /// value. The following code tests whether a string contains any math
   /// symbols:
   ///
   ///     let question = "Which is larger, 3 * 3 * 3 or 10 + 10 + 10?"
   ///     let hasMathSymbols = question.unicodeScalars.contains(where: {
-  ///         $0.isMath
+  ///         $0.properties.isMath
   ///     })
   ///     // hasMathSymbols == true
   public var properties: Properties {
@@ -612,7 +612,6 @@ extension Unicode.Scalar.Properties {
   ///     // $ --> false
   ///     // 0 --> true
   ///
-  ///
   /// The final result is true because the ASCII digits have non-default emoji
   /// presentations; some platforms render these with an alternate appearance.
   ///
@@ -635,7 +634,7 @@ extension Unicode.Scalar.Properties {
   /// rendered with an emoji presentation, rather than a text presentation, by
   /// default.
   ///
-  /// Scalars that have emoji presentation by default can be followed by
+  /// Scalars that have default to emoji presentation can be followed by
   /// U+FE0E VARIATION SELECTOR-15 to request the text presentation of the
   /// scalar instead. Likewise, scalars that default to text presentation can
   /// be followed by U+FE0F VARIATION SELECTOR-16 to request the emoji
@@ -766,7 +765,7 @@ extension Unicode.Scalar.Properties {
 
 extension Unicode {
 
-  /// A version of the Unicode Standard represented by its `major.minor`
+  /// A version of the Unicode Standard represented by its major and minor
   /// components.
   public typealias Version = (major: Int, minor: Int)
 }
@@ -776,7 +775,7 @@ extension Unicode.Scalar.Properties {
   /// The earliest version of the Unicode Standard in which the scalar was
   /// assigned.
   ///
-  /// This value will be nil for code points that have not yet been assigned.
+  /// This value is `nil` for code points that have not yet been assigned.
   ///
   /// This property corresponds to the "Age" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1119,7 +1118,8 @@ extension Unicode.Scalar.Properties {
   /// The published name of the scalar.
   ///
   /// Some scalars, such as control characters, do not have a value for this
-  /// property in the UCD. For such scalars, this property will be nil.
+  /// property in the Unicode Character Database. For such scalars, this
+  /// property is `nil`.
   ///
   /// This property corresponds to the "Name" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1127,7 +1127,7 @@ extension Unicode.Scalar.Properties {
     return _scalarName(__swift_stdlib_U_UNICODE_CHAR_NAME)
   }
 
-  /// The normative formal alias of the scalar, or nil if it has no alias.
+  /// The normative formal alias of the scalar.
   ///
   /// The name of a scalar is immutable and never changed in future versions of
   /// the Unicode Standard. The `nameAlias` property is provided to issue
@@ -1135,6 +1135,8 @@ extension Unicode.Scalar.Properties {
   /// U+FE18 is "PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRAKCET"
   /// (note that "BRACKET" is misspelled). The `nameAlias` property then
   /// contains the corrected name.
+  ///
+  /// If a scalar has no alias, this property is `nil`.
   ///
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1161,10 +1163,10 @@ extension Unicode {
   /// `"\u{0041}\u{0316}\u{0301}"`, so two strings that differ only by the
   /// ordering of those scalars would compare as equal:
   ///
-  /// ```
-  /// print("\u{0041}\u{0316}\u{0301}" == "\u{0041}\u{0301}\u{0316}")
-  /// // Prints "true"
-  /// ```
+  ///     let aboveBeforeBelow = "\u{0041}\u{0301}\u{0316}"
+  ///     let belowBeforeAbove = "\u{0041}\u{0316}\u{0301}"
+  ///     print(aboveBeforeBelow == belowBeforeAbove)
+  ///     // Prints "true"
   ///
   /// Named and Unnamed Combining Classes
   /// ===================================
@@ -1174,15 +1176,13 @@ extension Unicode {
   /// symbolic names to a subset of these combining classes.
   ///
   /// The `CanonicalCombiningClass` type conforms to `RawRepresentable` with a
-  /// raw value of type `UInt8`. Instances of the type can be created from the
-  /// actual numeric value using the `init(rawValue:)` initializer, and
-  /// combining classes with symbolic names can also be referenced using the
-  /// static members that share those names.
+  /// raw value of type `UInt8`. You can create instances of the type by using
+  /// the static members named after the symbolic names, or by using the
+  /// `init(rawValue:)` initializer.
   ///
-  /// ```
-  /// print(Unicode.CanonicalCombiningClass(rawValue: 1) == .overlay)
-  /// // Prints "true"
-  /// ```
+  ///     let overlayClass = Unicode.CanonicalCombiningClass(rawValue: 1)
+  ///     let overlayClassIsOverlay = overlayClass == .overlay
+  ///     // overlayClassIsOverlay == true
   public struct CanonicalCombiningClass:
     Comparable, Hashable, RawRepresentable
   {

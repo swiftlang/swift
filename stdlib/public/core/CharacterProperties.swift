@@ -190,7 +190,7 @@ extension Character {
   ///     // 1 --> 1
   public func uppercased() -> String { return String(self).uppercased() }
 
-  /// Returns an lowercased version of this character.
+  /// Returns a lowercased version of this character.
   ///
   /// Because case conversion can result in multiple characters, the result
   /// of `lowercased()` is a string.
