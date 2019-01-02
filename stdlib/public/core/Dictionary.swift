@@ -921,10 +921,10 @@ extension Dictionary {
   }
 
   /// Returns a new dictionary containing only the key-value pairs that have
-  /// non-`nil` values as the result from the transform by the given closure.
+  /// non-`nil` values as the result of transformation by the given closure.
   ///
-  /// Use this method to receive a dictionary of non-optional values when your
-  /// transformation can produce an optional value.
+  /// Use this method to receive a dictionary with non-optional values when
+  /// your transformation produces optional values.
   ///
   /// In this example, note the difference in the result of using `mapValues`
   /// and `compactMapValues` with a transformation that returns an optional
