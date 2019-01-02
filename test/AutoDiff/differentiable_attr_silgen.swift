@@ -60,7 +60,7 @@ public func dfoo_tuple(_ seed: Float, partial: Float, _ x: ((Float, (Float, Floa
 // CHECK-LABEL: sil @dfoo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float) -> (Float, Float, Float, Float, Float, Float)
 
 @_silgen_name("no_prim_or_adj")
-@differentiable() // ok!
+@differentiable // ok!
 public func no_prim_or_adj(_ x: Float) -> Float {
   return x * x
 }

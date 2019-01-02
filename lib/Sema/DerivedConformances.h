@@ -233,6 +233,22 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveVectorNumeric(AssociatedTypeDecl *assocType);
 
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveDifferentiable(NominalTypeDecl *type);
+
+  /// Derive a Differentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDifferentiable(ValueDecl *requirement);
+
+  /// Derive a Differentiable type witness for a nominal type, if it has
+  /// parameters (stored properties marked with @TFParameter).
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,

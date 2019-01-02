@@ -21,6 +21,8 @@ add_swift_host_library(swiftIRGen STATIC
   GenControl.cpp
   GenCoverage.cpp
   GenDecl.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  GenDiffFunc.cpp
   GenEnum.cpp
   GenExistential.cpp
   GenFunc.cpp

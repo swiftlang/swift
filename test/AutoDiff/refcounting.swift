@@ -12,6 +12,8 @@ public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equata
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()
   public typealias TangentVector = Vector
+  public typealias CotangentVector = Vector
+  public func tangentVector(from cotangent: CotangentVector) -> TangentVector { return cotangent }
   public typealias Scalar = Float
   public static var zero: Vector { return Vector(0) }
   public init(_ scalar: Float) { self.x = scalar; self.y = scalar }

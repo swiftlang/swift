@@ -171,15 +171,16 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The AutoDiff pass creates an order-1 VJP for every function with a
+  // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
   // @differentiable attribute.
   if (auto *DA = AFD->getAttrs().getAttribute<DifferentiableAttr>()) {
-    auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::VJP,
-        /*differentiationOrder*/ 1,
-        DA->getCheckedParameterIndices(),
-        AFD->getASTContext());
-    addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
+    for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
+                      AutoDiffAssociatedFunctionKind::VJP}) {
+      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+          kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+          AFD->getASTContext());
+      addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
+    }
   }
 
   auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled();

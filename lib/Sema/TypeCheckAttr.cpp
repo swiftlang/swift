@@ -2385,10 +2385,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Predicate checking if a type has associated tangent and cotangent spaces.
   auto hasAssociatedSpaces = [&](Type type) -> bool {
-    // No need to check for cotangent space because every type with a tangent
-    // space also has a cotangent space.
     return (bool)type->getAutoDiffAssociatedVectorSpace(
-        AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance);
+               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
+           (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
   };
 
   // Check that the user has only selected wrt params with allowed types.

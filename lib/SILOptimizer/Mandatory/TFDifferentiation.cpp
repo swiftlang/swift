@@ -739,6 +739,7 @@ private:
   /// Cache for associated functions.
   SILFunction *primal = nullptr;
   SILFunction *adjoint = nullptr;
+  SILFunction *jvp = nullptr;
   SILFunction *vjp = nullptr;
 
   /// Tracks the progress of primal synthesis for this task.
@@ -770,6 +771,10 @@ private:
   void createEmptyPrimal();
   /// Creates an empty adjoint for this task.
   void createEmptyAdjoint();
+
+  /// Creates a JVP for this task.
+  /// Currently, the JVP simply returns undef.
+  void createJVP();
 
   /// Creates a VJP for this task. Primal and adjoint (possibly empty) must
   /// exist.
@@ -822,6 +827,7 @@ public:
 
   SILFunction *getPrimal() const { return primal; }
   SILFunction *getAdjoint() const { return adjoint; }
+  SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }
 
   DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
@@ -1728,9 +1734,11 @@ static WitnessMethodInst *findWitnessMethod(SILValue value) {
 /// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
 /// `taskCallback` for already-existing tasks), so that the caller can make sure
 /// that the task actually gets executed.
-static Optional<std::pair<SILValue, SILAutoDiffIndices>> emitVJPReference(
+static Optional<std::pair<SILValue, SILAutoDiffIndices>>
+emitAssociatedFunctionReference(
     ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
-    SILValue original, DifferentiationInvoker invoker,
+    AutoDiffAssociatedFunctionKind kind, SILValue original,
+    DifferentiationInvoker invoker,
     std::function<void(DifferentiationTask *)> taskCallback) {
 
   // TODO: Refactor this function to recursively handle function conversions,
@@ -1744,10 +1752,19 @@ static Optional<std::pair<SILValue, SILAutoDiffIndices>> emitVJPReference(
                                                              desiredIndices,
                                                              invoker);
     taskCallback(task);
-    auto *vjpRef = builder.createFunctionRef(loc, task->getVJP());
-    auto convertedVJPRef = reapplyFunctionConversion(vjpRef, originalFRI,
-                                                     original, builder, loc);
-    return std::make_pair(convertedVJPRef, task->getIndices());
+    SILFunction *assocFn = nullptr;
+    switch (kind) {
+    case AutoDiffAssociatedFunctionKind::JVP:
+      assocFn = task->getJVP();
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
+      assocFn = task->getVJP();
+      break;
+    }
+    auto *ref = builder.createFunctionRef(loc, assocFn);
+    auto convertedRef =
+        reapplyFunctionConversion(ref, originalFRI, original, builder, loc);
+    return std::make_pair(convertedRef, task->getIndices());
   }
   if (auto *witnessMethod = findWitnessMethod(original)) {
     auto loc = witnessMethod->getLoc();
@@ -1778,23 +1795,22 @@ static Optional<std::pair<SILValue, SILAutoDiffIndices>> emitVJPReference(
     }
 
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
-    auto vjpType = originalType->getAutoDiffAssociatedFunctionType(
+    auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         requirementIndices.parameters, requirementIndices.source,
-        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-        builder.getModule(),
+        /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
-    // Emit a witness_method instruction pointing at the VJP.
+    // Emit a witness_method instruction pointing at the associated function.
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-        requirementParameterIndices, context.getASTContext());
-    auto *vjpRef = builder.createWitnessMethod(
+        kind, /*differentiationOrder*/ 1, requirementParameterIndices,
+        context.getASTContext());
+    auto *ref = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirement.asAutoDiffAssociatedFunction(autoDiffFuncId),
-        SILType::getPrimitiveObjectType(vjpType));
-    auto convertedVJPRef = reapplyFunctionConversion(vjpRef, witnessMethod,
-                                                     original, builder, loc);
-    return std::make_pair(convertedVJPRef, requirementIndices);
+        SILType::getPrimitiveObjectType(assocType));
+    auto convertedRef =
+        reapplyFunctionConversion(ref, witnessMethod, original, builder, loc);
+    return std::make_pair(convertedRef, requirementIndices);
   }
 
   // TODO: If we move diagnostics into this function, then we can tell the
@@ -2400,11 +2416,11 @@ public:
     SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
 
     // Emit the VJP.
-    auto vjpAndVJPIndices = emitVJPReference(
-        context, getBuilder(), indices, getMappedValue(ai->getCallee()),
-        /*invoker*/ {ai, synthesis.task},
-        [&](DifferentiationTask *newTask) {
-           primalGen.schedulePrimalSynthesisIfNeeded(newTask);
+    auto vjpAndVJPIndices = emitAssociatedFunctionReference(
+        context, getBuilder(), indices, AutoDiffAssociatedFunctionKind::VJP,
+        getMappedValue(ai->getCallee()),
+        /*invoker*/ {ai, synthesis.task}, [&](DifferentiationTask *newTask) {
+          primalGen.schedulePrimalSynthesisIfNeeded(newTask);
         });
     if (!vjpAndVJPIndices) {
       context.emitNondifferentiabilityError(ai, synthesis.task);
@@ -4318,8 +4334,13 @@ DifferentiationTask::DifferentiationTask(ADContext &context,
     primal = lookUpOrLinkFunction(attr->getPrimalName(), context.getModule());
   if (attr->hasAdjoint())
     adjoint = lookUpOrLinkFunction(attr->getAdjointName(), context.getModule());
+  if (attr->hasJVP())
+    jvp = lookUpOrLinkFunction(attr->getJVPName(), context.getModule());
   if (attr->hasVJP())
     vjp = lookUpOrLinkFunction(attr->getVJPName(), context.getModule());
+
+  if (!jvp)
+    createJVP();
 
   if (vjp) {
     // If we already have the vjp, then we don't need to synthesize anything.
@@ -4519,6 +4540,48 @@ void DifferentiationTask::createEmptyAdjoint() {
                              SILDebugScope(original->getLocation(), adjoint));
 
   attr->setAdjointName(adjName, /*primitive*/ false);
+}
+
+void DifferentiationTask::createJVP() {
+  auto &module = context.getModule();
+  auto originalTy = original->getLoweredFunctionType();
+
+  // === Create an empty JVP. ===
+  auto jvpName =
+      "AD__" + original->getName().str() + "__jvp_" + getIndices().mangle();
+  auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
+      getIndices().parameters, getIndices().source, 1,
+      AutoDiffAssociatedFunctionKind::JVP, module,
+      LookUpConformanceInModule(module.getSwiftModule()));
+
+  SILOptFunctionBuilder fb(context.getTransform());
+  jvp = fb.createFunction(original->getLinkage(), jvpName, jvpType,
+                          original->getGenericEnvironment(),
+                          original->getLocation(), original->isBare(),
+                          original->isTransparent(), original->isSerialized());
+  jvp->setUnqualifiedOwnership();
+  jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
+  attr->setJVPName(jvp->getName());
+
+  // Entry block arguments
+  auto jvpConv = jvp->getConventions();
+  auto *entry = jvp->createBasicBlock();
+  unsigned argumentIndex = 0;
+  for (auto indResultTy : jvpConv.getIndirectSILResultTypes())
+    entry->createFunctionArgument(
+        jvp->mapTypeIntoContext(indResultTy).getAddressType(),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+  for (auto paramTy : jvpConv.getParameterSILTypes())
+    entry->createFunctionArgument(
+        jvp->mapTypeIntoContext(paramTy),
+        original->getEntryBlock()->getArgument(argumentIndex++)->getDecl());
+
+  // Return undef
+  SILBuilder builder(entry);
+  auto loc = jvp->getLocation();
+  builder.createReturn(
+      loc, SILUndef::get(jvp->mapTypeIntoContext(jvpConv.getSILResultType()),
+                         module));
 }
 
 void DifferentiationTask::createVJP() {
@@ -4801,44 +4864,34 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
   auto origFnOperand = adfi->getOriginalFunction();
   SILBuilder builder(adfi);
 
-  SILValue finalJVP;
-  // TODO: Implement "forward-mode differentiation" to get JVP. Currently it's
-  // just an undef because we won't use it.
-  {
-    auto origFnTy = origFnOperand->getType().getAs<SILFunctionType>();
-    auto jvpType = origFnTy->getAutoDiffAssociatedFunctionType(
-        adfi->getParameterIndices(), /*resultIndex*/ 0,
-        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-        *getModule(),
-        /*lookupConformance*/
-            LookUpConformanceInModule(getModule()->getSwiftModule()));
-    finalJVP = SILUndef::get(SILType::getPrimitiveObjectType(jvpType),
-                           getModule());
+  SmallVector<SILValue, 2> assocFns;
+  for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
+                           AutoDiffAssociatedFunctionKind::VJP}) {
+    SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
+    auto assocFnAndIndices = emitAssociatedFunctionReference(
+        context, builder, desiredIndices, assocFnKind, origFnOperand,
+        DifferentiationInvoker(adfi), [](DifferentiationTask *newTask) {});
+    if (!assocFnAndIndices) {
+      // Find the original differential operator expression. Show an error at
+      // the operator, highlight the argument, and show a note at the definition
+      // site of the argument.
+      if (auto *expr = findDifferentialOperator(adfi))
+        context
+            .diagnose(expr->getSubExpr()->getLoc(),
+                      diag::autodiff_function_not_differentiable)
+            .highlight(expr->getSubExpr()->getSourceRange());
+      return true;
+    }
+    assert(assocFnAndIndices->second == desiredIndices &&
+           "FIXME: We could emit a thunk that converts the VJP to have the "
+           "desired indices.");
+    assocFns.push_back(assocFnAndIndices->first);
   }
-
-  SILAutoDiffIndices desiredIndices(0, adfi->getParameterIndices());
-  auto finalVJPAndVJPIndices = emitVJPReference(
-      context, builder, desiredIndices, origFnOperand,
-      DifferentiationInvoker(adfi), [](DifferentiationTask *newTask) {});
-  if (!finalVJPAndVJPIndices) {
-    // Find the original differential operator expression. Show an error at the
-    // operator, highlight the argument, and show a note at the definition site
-    // of the argument.
-    if (auto *expr = findDifferentialOperator(adfi))
-      context.diagnose(expr->getSubExpr()->getLoc(),
-                       diag::autodiff_function_not_differentiable)
-          .highlight(expr->getSubExpr()->getSourceRange());
-    return true;
-  }
-  assert(finalVJPAndVJPIndices->second == desiredIndices &&
-         "FIXME: We could emit a thunk that converts the VJP to have the "
-         "desired indices.");
-  auto finalVJP = finalVJPAndVJPIndices->first;
 
   auto loc = parent->getLocation();
   auto *newADFI = builder.createAutoDiffFunction(
       loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
-      origFnOperand, {finalJVP, finalVJP});
+      origFnOperand, assocFns);
   adfi->replaceAllUsesWith(newADFI);
   adfi->eraseFromParent();
   PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
