@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil -Xllvm \
 // RUN:   -sil-print-after=raw-sil-inst-lowering -Xllvm \
 // RUN:   -sil-print-only-functions=$s3del1MC4fromAcA12WithDelegate_p_tKcfc \
-// RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -Xllvm -sil-print-debuginfo -o /dev/null -module-name del 2>&1 | %FileCheck %s
 
 public protocol DelegateA {}
 public protocol DelegateB {}

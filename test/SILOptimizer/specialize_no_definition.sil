@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -save-optimization-record-path=%t.yaml -o /dev/null %s
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -save-optimization-record-path=%t.yaml -o /dev/null %/s
 // RUN: %FileCheck %s < %t.yaml
 
 import Builtin
