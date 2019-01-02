@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollectorOwnership.h"
+#include "DIMemoryUseCollector.h"
 #include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -32,10 +32,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-
-#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOR_H
-#error "Included non ownership header?!"
-#endif
 
 using namespace swift;
 using namespace ownership;
