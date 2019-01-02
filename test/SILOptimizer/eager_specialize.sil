@@ -40,7 +40,7 @@ public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T.Elt : AnElt
 
 enum ArithmeticError : Error {
   case DivByZero
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   var _code: Int { get }
 }
 

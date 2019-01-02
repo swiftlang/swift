@@ -17,8 +17,9 @@ func array_downcast(array: [Any]) -> [S]? {
 }
 
 extension S : Hashable {
-  var hashValue : Int {
-    return x + y
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+    hasher.combine(y)
   }
 }
 func ==(lhs: S, rhs: S) -> Bool {

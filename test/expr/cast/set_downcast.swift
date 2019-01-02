@@ -3,8 +3,8 @@
 class C : Hashable {
 	var x = 0
 
-  var hashValue: Int {
-    return x
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
   }
 }
 
@@ -15,9 +15,7 @@ class D : C {}
 
 // Unrelated to the classes above.
 class U : Hashable { 
-  var hashValue: Int {
-    return 0
-  }
+  func hash(into hasher: inout Hasher) {}
 }
 
 func == (x: U, y: U) -> Bool { return true }

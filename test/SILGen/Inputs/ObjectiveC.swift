@@ -35,7 +35,7 @@ public struct Selector : ExpressibleByStringLiteral {
 }
 
 extension NSObject : Hashable {
-  public var hashValue: Int { return 0 }
+  public func hash(into hasher: inout Hasher) {}
   public static func == (x: NSObject, y: NSObject) -> Bool { return true }
 }
 
