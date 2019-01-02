@@ -344,6 +344,9 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
       C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto keyPathIterableType =
       TypeLoc::withoutLoc(keyPathIterableProto->getDeclaredType());
+  auto *parameterGroupProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
+  auto parameterGroupType =
+      TypeLoc::withoutLoc(parameterGroupProto->getDeclaredType());
   auto *parametersDecl =
       new (C) StructDecl(SourceLoc(), C.Id_Parameters, SourceLoc(),
                          /*Inherited*/ {}, /*GenericParams*/ {}, parentDC);
@@ -383,32 +386,50 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   parametersDecl->setValidationToChecked();
 
   // Declare conformance to `VectorNumeric` (if possible), `Differentiable`
-  // and `KeyPathIterable` protocols. Conformances will be derived.
-  SmallVector<TypeLoc, 3> inherited {differentiableType, keyPathIterableType};
-  // If all parameters conform to `VectorNumeric`, also declare a
-  // `VectorNumeric` conformance and make `TangentVector` and `CotangentVector`
-  // be `Self`.
+  // `KeyPathIterable`, and `ParameterGroup` (if possible) protocols.
+  // Conformances will be derived.
+  // Note: `ParameterGroup` will eventually be deprecated in favor of
+  // `KeyPathIterable`, which is more general.
+  SmallVector<TypeLoc, 3> inherited{differentiableType, keyPathIterableType};
+
+  // Add vector space typealias declaration to the given nominal type with the
+  // given underlying type.
+  auto addVectorSpaceAliasDecl = [&](Identifier vectorSpaceId,
+                                     NominalTypeDecl *parent,
+                                     Type vectorSpaceType) {
+    auto aliasDecl = new (C) TypeAliasDecl(
+        SourceLoc(), SourceLoc(), vectorSpaceId, SourceLoc(), {}, parent);
+    aliasDecl->setImplicit();
+    aliasDecl->setUnderlyingType(vectorSpaceType);
+    if (auto env = parent->getGenericEnvironmentOfContext())
+      aliasDecl->setGenericEnvironment(env);
+    parent->addMember(aliasDecl);
+    aliasDecl->copyFormalAccessFrom(parent, /*sourceIsParentContext*/ true);
+    aliasDecl->setValidationToChecked();
+    // Add `@_fieldwiseProductSpace` attribute to typealias declaration.
+    // This enables differentiation wrt member accesses of the `Parameterized`
+    // struct.
+    aliasDecl->getAttrs().add(new (C)
+                                  FieldwiseProductSpaceAttr(/*Implicit*/ true));
+    TC.validateDecl(aliasDecl);
+    C.addSynthesizedDecl(aliasDecl);
+  };
+
+  auto parametersType =
+      parentDC->mapTypeIntoContext(parametersDecl->getDeclaredInterfaceType());
+  // If `Parameters` can derive `VectorNumeric`, then declare conformance to
+  // `VectorNumeric`. Also, add vector space typealiases for both `Parameters`
+  // and the parent nominal type.
   if (DerivedConformance::canDeriveVectorNumeric(parametersDecl)) {
     inherited.push_back(vectorNumericType);
-    auto tangentAlias = new (C) TypeAliasDecl(SourceLoc(), SourceLoc(),
-                                              C.Id_TangentVector, SourceLoc(),
-                                              /*GenericParams*/ nullptr,
-                                              parametersDecl);
-    tangentAlias->setUnderlyingType(parametersDecl->getDeclaredType());
-    tangentAlias->copyFormalAccessFrom(parametersDecl);
-    tangentAlias->setImplicit();
-    parametersDecl->addMember(tangentAlias);
-    C.addSynthesizedDecl(tangentAlias);
-    auto cotangentAlias = new (C) TypeAliasDecl(SourceLoc(), SourceLoc(),
-                                                C.Id_CotangentVector,
-                                                SourceLoc(),
-                                                /*GenericParams*/ nullptr,
-                                                parametersDecl);
-    cotangentAlias->setUnderlyingType(parametersDecl->getDeclaredType());
-    cotangentAlias->copyFormalAccessFrom(parametersDecl);
-    cotangentAlias->setImplicit();
-    parametersDecl->addMember(cotangentAlias);
-    C.addSynthesizedDecl(cotangentAlias);
+    addVectorSpaceAliasDecl(C.Id_TangentVector, parametersDecl, parametersType);
+    addVectorSpaceAliasDecl(C.Id_CotangentVector, parametersDecl,
+                            parametersType);
+    addVectorSpaceAliasDecl(C.Id_TangentVector, nominal, parametersType);
+    addVectorSpaceAliasDecl(C.Id_CotangentVector, nominal, parametersType);
+  }
+  if (DerivedConformance::canDeriveParameterGroup(parametersDecl)) {
+    inherited.push_back(parameterGroupType);
   }
   parametersDecl->setInherited(C.AllocateCopy(inherited));
 
@@ -427,38 +448,12 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   derived.addMembersToConformanceContext({parametersDecl});
   C.addSynthesizedDecl(parametersDecl);
 
-  auto parametersType = parametersDecl->getDeclaredInterfaceType();
-  return derived.getConformanceContext()->mapTypeIntoContext(parametersType);
-}
-
-static Type deriveParameterized_VectorSpace(Identifier id,
-                                            DerivedConformance &derived) {
-  auto &TC = derived.TC;
-  auto parentDC = derived.getConformanceContext();
-  auto nominal = derived.Nominal;
-  auto &C = nominal->getASTContext();
-
-  auto parametersType = getParametersStructDecl(nominal).first
-      ->getDeclaredInterfaceType();
-  auto vectorSpaceType = DependentMemberType::get(parametersType, id);
-//  vectorSpaceAlias->setUnderlyingType(vectorSpaceType);
-//  vectorSpaceAlias->copyFormalAccessFrom(nominal);
-//  vectorSpaceAlias->setImplicit();
-//  C.addSynthesizedDecl(vectorSpaceAlias);
-//  auto typealiasType = vectorSpaceAlias->getDeclaredInterfaceType();
-  llvm::outs() << "!!!!!!!! DERIVED " << vectorSpaceType << '\n';
-  llvm::outs().flush();
-  return derived.getConformanceContext()->mapTypeIntoContext(vectorSpaceType);
+  return parametersType;
 }
 
 Type DerivedConformance::deriveParameterized(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Parameters)
     return deriveParameterized_Parameters(*this);
-  if (requirement->getBaseName() == TC.Context.Id_TangentVector)
-    return deriveParameterized_VectorSpace(TC.Context.Id_TangentVector, *this);
-  if (requirement->getBaseName() == TC.Context.Id_CotangentVector)
-    return deriveParameterized_VectorSpace(TC.Context.Id_CotangentVector,
-                                           *this);
   TC.diagnose(requirement->getLoc(), diag::broken_parameterized_requirement);
   return nullptr;
 }

@@ -363,13 +363,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::Parameterized);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Parameterized.TangentVector and Parameterized.CotangentVector
-    if (name.isSimpleName(ctx.Id_TangentVector) ||
-        name.isSimpleName(ctx.Id_CotangentVector))
-      // TOOD: Also `getRequirement(KnownProtocolKind::Differentiable)`?
-      return getRequirement(KnownProtocolKind::Parameterized);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // ParameterGroup.Parameter
     if (name.isSimpleName(ctx.Id_Parameter))
       return getRequirement(KnownProtocolKind::ParameterGroup);
