@@ -695,8 +695,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   if (auto *OEA = dyn_cast<OpenExistentialAddrInst>(OAI.OpenedArchetypeValue)) {
     // Bail if ConcreteSILType is not the same SILType as the type stored in the
     // existential after maximal reabstraction.
-    auto archetype = OpenedArchetypeType::getAny(SoleCEI.ExistentialType);
-    Lowering::AbstractionPattern abstractionPattern(archetype);
+    auto abstractionPattern = Lowering::AbstractionPattern::getOpaque();
     auto abstractTy = M.Types.getLoweredType(abstractionPattern, ConcreteType);
     if (abstractTy != concreteSILType)
        return None;
