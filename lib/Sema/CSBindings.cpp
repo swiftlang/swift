@@ -511,7 +511,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
-      auto defaultType = tc.getDefaultType(constraint->getProtocol(), DC);
+      Expr *anchor = constraint->getLocator()->anchor;
+      auto defaultType = tc.getDefaultType(constraint->getProtocol(), DC,
+                           StringLiteralExpr::isCharacterLiteralExpr(anchor));
       if (!defaultType)
         continue;
 

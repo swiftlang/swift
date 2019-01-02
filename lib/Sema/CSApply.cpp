@@ -2026,6 +2026,8 @@ namespace {
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
+      bool isCharacter = StringLiteralExpr::isCharacterLiteralExpr(expr);
+      bool notCharacter = stringLiteral && !isCharacter;
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
@@ -2051,7 +2053,7 @@ namespace {
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+      if (auto defaultType = tc.getDefaultType(protocol, dc, isCharacter)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -2062,10 +2064,8 @@ namespace {
       DeclName builtinLiteralFuncName;
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
-      bool notCharacter = stringLiteral && !stringLiteral->isCharacterLiteral();
 
-      if (stringLiteral && stringLiteral->isCharacterLiteral() &&
-          !stringLiteral->isSingleExtendedGraphemeCluster())
+      if (isCharacter && !stringLiteral->isSingleExtendedGraphemeCluster())
         tc.diagnose(expr->getLoc(), diag::character_literal_not_cluster);
 
       auto migrateQuotes = [&]() {

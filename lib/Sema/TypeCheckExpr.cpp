@@ -671,7 +671,13 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
   return None;
 }
 
-Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
+Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc,
+                                 bool isCharacterLiteral);
+) {
+  if (isCharacterLiteral) {
+    TypeChecker &tc = getTypeChecker();
+    return lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), "Character");
+  }
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
     Type t = evaluateOrDefault(
         Context.evaluator,
