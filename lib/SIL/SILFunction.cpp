@@ -477,10 +477,16 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   if (hasValidLinkageForFragileInline())
     return true;
 
-  // If the containing module has been serialized
-  if (getModule().isSerialized()) {
+  // If the containing module has been serialized already, we no longer
+  // enforce any invariants.
+  if (getModule().isSerialized())
     return true;
-  }
+
+  // If the function has a subclass scope that limits its visibility outside
+  // the module despite its linkage, we cannot reference it.
+  if (getClassSubclassScope() == SubclassScope::Resilient &&
+      isAvailableExternally())
+    return false;
 
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(getLinkage());
