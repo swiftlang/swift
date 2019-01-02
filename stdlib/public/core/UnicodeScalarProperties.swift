@@ -19,7 +19,6 @@ extension Unicode.Scalar {
 
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
-
   public struct Properties {
     @usableFromInline
     internal var _scalar: Unicode.Scalar
@@ -1365,19 +1364,17 @@ extension Unicode.Scalar.Properties {
 
   /// The numeric type of the scalar.
   ///
-  /// The value of this property is nil for scalars that do not represent a
-  /// number.
+  /// For scalars that represent a number, `numericType` is the numeric type
+  /// of the scalar. For all other scalars, this property is `nil`.
   ///
-  /// ```
-  /// print("X", ("X" as Unicode.Scalar).properties.numericType ?? "nil")
-  /// // Prints "X nil"
-  /// print("4", ("4" as Unicode.Scalar).properties.numericType ?? "nil")
-  /// // Prints "4 decimal"
-  /// print("\u{2463}", ("\u{2463}" as Unicode.Scalar).properties.numericType ?? "nil")
-  /// // Prints "④ digit"
-  /// print("\u{2155}", ("\u{2155}" as Unicode.Scalar).properties.numericType ?? "nil")
-  /// // Prints "⅕ numeric"
-  /// ```
+  ///     let scalars: [Unicode.Scalar] = ["4", "④", "⅕", "X"]
+  ///     for scalar in scalars {
+  ///         print(scalar, "--->", scalar.properties.numericType)
+  ///     }
+  ///     // 4 ---> decimal
+  ///     // ④ ---> digit
+  ///     // ⅕ ---> numeric
+  ///     // X ---> nil
   ///
   /// This property corresponds to the "Numeric_Type" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
