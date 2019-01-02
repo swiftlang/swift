@@ -136,7 +136,7 @@ public enum Result<Success, Failure: Error> {
   ///     }
   ///     // Prints "The value is 5."
   ///
-  /// - Returns: The success value, if the instance represent a success.
+  /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
   public func get() throws -> Success {
     switch self {
