@@ -71,7 +71,7 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is an ASCII character
   /// commonly used for the representation of hexadecimal numbers.
   ///
-  /// The only scalars for which this property is true are:
+  /// The only scalars for which this property is `true` are:
   ///
   /// * U+0030...U+0039: DIGIT ZERO...DIGIT NINE
   /// * U+0041...U+0046: LATIN CAPITAL LETTER A...LATIN CAPITAL LETTER F
@@ -140,7 +140,7 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is a diacritic.
   ///
   /// Diacritics are scalars that linguistically modify the meaning of another
-  /// scalar to which they apply. Scalars for which this property is true are
+  /// scalar to which they apply. Scalars for which this property is `true` are
   /// frequently, but not always, combining marks or modifiers.
   ///
   /// This property corresponds to the "Diacritic" property in the
@@ -173,12 +173,12 @@ extension Unicode.Scalar.Properties {
   ///
   /// A grapheme base can be thought of as a space-occupying glyph above or
   /// below which other non-spacing modifying glyphs can be applied. For
-  /// example, when the character `é` is represented in NFD form, the grapheme
-  /// base is "e" (U+0065 LATIN SMALL LETTER E) and it is followed by a single
-  /// grapheme extender, U+0301 COMBINING ACUTE ACCENT.
+  /// example, when the character `é` is represented in its decomposed form,
+  /// the grapheme base is "e" (U+0065 LATIN SMALL LETTER E) and it is followed
+  /// by a single grapheme extender, U+0301 COMBINING ACUTE ACCENT.
   ///
-  /// The set of scalars for which `isGraphemeBase` is true is disjoint by
-  /// definition from the set for which `isGraphemeExtend` is true.
+  /// The set of scalars for which `isGraphemeBase` is `true` is disjoint by
+  /// definition from the set for which `isGraphemeExtend` is `true`.
   ///
   /// This property corresponds to the "Grapheme_Base" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -189,10 +189,13 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is a grapheme extender.
   ///
   /// A grapheme extender can be thought of primarily as a non-spacing glyph
-  /// that is applied above or below another glyph.
+  /// that is applied above or below another glyph. For example, when the
+  /// character `é` is represented in its decomposed form, the grapheme base is
+  /// "e" (U+0065 LATIN SMALL LETTER E) and it is followed by a single grapheme
+  /// extender, U+0301 COMBINING ACUTE ACCENT.
   ///
-  /// The set of scalars for which `isGraphemeExtend` is true is disjoint by
-  /// definition from the set for which `isGraphemeBase` is true.
+  /// The set of scalars for which `isGraphemeExtend` is `true` is disjoint by
+  /// definition from the set for which `isGraphemeBase` is `true`.
   ///
   /// This property corresponds to the "Grapheme_Extend" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -204,8 +207,8 @@ extension Unicode.Scalar.Properties {
   /// used for the representation of hexadecimal numbers or a compatibility
   /// equivalent.
   ///
-  /// This property is true for all scalars for which `isASCIIHexDigit` is true
-  /// as well as for their CJK halfwidth and fullwidth variants.
+  /// This property is `true` for all scalars for which `isASCIIHexDigit` is
+  /// `true` as well as for their CJK halfwidth and fullwidth variants.
   ///
   /// This property corresponds to the "Hex_Digit" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -289,7 +292,7 @@ extension Unicode.Scalar.Properties {
   /// character that has a specific function in controlling cursive joining and
   /// ligation.
   ///
-  /// There are two scalars for which this property is true:
+  /// There are two scalars for which this property is `true`:
   ///
   /// * When U+200C ZERO WIDTH NON-JOINER is inserted between two characters, it
   ///   directs the rendering engine to render them separately/disconnected when
@@ -337,7 +340,7 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is one that naturally
   /// appears in mathematical contexts.
   ///
-  /// The set of scalars for which this property is true includes mathematical
+  /// The set of scalars for which this property is `true` includes mathematical
   /// operators and symbols as well as specific Greek and Hebrew letter
   /// variants that are categorized as symbols. Notably, it does _not_ contain
   /// the standard digits or Latin/Greek letter blocks; instead, it contains the
@@ -427,7 +430,7 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is a whitespace
   /// character.
   ///
-  /// This property is true for scalars that are spaces, separator characters,
+  /// This property is `true` for scalars that are spaces, separator characters,
   /// and other control characters that should be treated as whitespace for the
   /// purposes of parsing text elements.
   ///
@@ -508,12 +511,12 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar is considered to be
   /// either lowercase, uppercase, or titlecase.
   ///
-  /// Though similar in name, this property is _not_ equivalent to
-  /// `changesWhenCaseMapped`. The set of scalars for which `isCased` is true is
-  /// a superset of those for which `changesWhenCaseMapped` is true. An example
-  /// of scalars that only have `isCased` as true are the Latin small capitals
-  /// that are used by the International Phonetic Alphabet. These letters have a
-  /// case but do not change when they are mapped to any of the other cases.
+  /// Though similar in name, this property is *not* equivalent to
+  /// `changesWhenCaseMapped`. The set of scalars for which `isCased` is `true`
+  /// is a superset of those for which `changesWhenCaseMapped` is `true`. For
+  /// example, the Latin small capitals that are used by the International
+  /// Phonetic Alphabet have a case, but do not change when they are mapped to
+  /// any of the other cases.
   ///
   /// This property corresponds to the "Cased" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -569,13 +572,8 @@ extension Unicode.Scalar.Properties {
   /// A Boolean value indicating whether the scalar may change when it
   /// undergoes case mapping.
   ///
-  /// For any scalar `s`, it holds by definition that
-  ///
-  /// ```
-  /// s.changesWhenCaseMapped = s.changesWhenLowercased ||
-  ///                           s.changesWhenUppercased ||
-  ///                           s.changesWhenTitlecased
-  /// ```
+  /// This property is `true` whenever one or more of `changesWhenLowercased`,
+  /// `changesWhenUppercased`, or `changesWhenTitlecased` are `true`.
   ///
   /// This property corresponds to the "Changes_When_Casemapped" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -606,18 +604,14 @@ extension Unicode.Scalar.Properties {
   /// by U+FE0F VARIATION SELECTOR-16. This includes some scalars that are not
   /// typically considered to be emoji:
   ///
-  /// ```
-  /// let sunglasses: Unicode.Scalar = "😎"
-  /// let dollar: Unicode.Scalar = "$"
-  /// let zero: Unicode.Scalar = "0"
+  ///     let scalars: [Unicode.Scalar] = ["😎", "$", "0"]
+  ///     for s in scalars {
+  ///         print(s, "-->", s.isEmoji)
+  ///     }
+  ///     // 😎 --> true
+  ///     // $ --> false
+  ///     // 0 --> true
   ///
-  /// print(sunglasses.isEmoji)
-  /// // Prints "true"
-  /// print(dollar.isEmoji)
-  /// // Prints "false"
-  /// print(zero.isEmoji)
-  /// // Prints "true"
-  /// ```
   ///
   /// The final result is true because the ASCII digits have non-default emoji
   /// presentations; some platforms render these with an alternate appearance.
@@ -1369,12 +1363,12 @@ extension Unicode.Scalar.Properties {
   ///
   ///     let scalars: [Unicode.Scalar] = ["4", "④", "⅕", "X"]
   ///     for scalar in scalars {
-  ///         print(scalar, "--->", scalar.properties.numericType)
+  ///         print(scalar, "-->", scalar.properties.numericType)
   ///     }
-  ///     // 4 ---> decimal
-  ///     // ④ ---> digit
-  ///     // ⅕ ---> numeric
-  ///     // X ---> nil
+  ///     // 4 --> decimal
+  ///     // ④ --> digit
+  ///     // ⅕ --> numeric
+  ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Type" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1393,12 +1387,12 @@ extension Unicode.Scalar.Properties {
   ///
   ///     let scalars: [Unicode.Scalar] = ["4", "④", "⅕", "X"]
   ///     for scalar in scalars {
-  ///         print(scalar, "--->", scalar.properties.numericValue)
+  ///         print(scalar, "-->", scalar.properties.numericValue)
   ///     }
-  ///     // 4 ---> 4.0
-  ///     // ④ ---> 4.0
-  ///     // ⅕ ---> 0.2
-  ///     // X ---> nil
+  ///     // 4 --> 4.0
+  ///     // ④ --> 4.0
+  ///     // ⅕ --> 0.2
+  ///     // X --> nil
   ///
   /// This property corresponds to the "Numeric_Value" property in the [Unicode
   /// Standard](http://www.unicode.org/versions/latest/).

@@ -30,7 +30,8 @@ extension Character {
 
   /// The ASCII encoding value of this character, if it is an ASCII character.
   ///
-  /// The "\r\n" (CR-LF) is normalized to "\n" (LF), which will return 0x0A
+  /// A character with the value "\r\n" (CR-LF) is normalized to "\n" (LF) and
+  /// has an `asciiValue` property equal to `0x0A`.
   @inlinable
   public var asciiValue: UInt8? {
     if _slowPath(self == "\r\n") { return 0x000A /* LINE FEED (LF) */ }
@@ -59,7 +60,7 @@ extension Character {
   /// - U+000B: LINE TABULATION (VT)
   /// - U+000C: FORM FEED (FF)
   /// - "\r" (U+000D): CARRIAGE RETURN (CR)
-  /// - "\r\n" (U+000A U+000D): CR-LF
+  /// - "\r\n" (U+000D U+000A): CR-LF
   /// - U+0085: NEXT LINE (NEL)
   /// - U+2028: LINE SEPARATOR
   /// - U+2029: PARAGRAPH SEPARATOR
@@ -87,42 +88,56 @@ extension Character {
     return _firstScalar.properties.numericType != nil
   }
 
-  /// A Boolean value indicating whether this character represents a whole number.
+  /// A Boolean value indicating whether this character represents a whole
+  /// number.
+  ///
+  /// For example, the following characters all represent whole numbers:
+  ///
+  /// - "1" (U+0031 DIGIT ONE) => 1
+  /// - "५" (U+096B DEVANAGARI DIGIT FIVE) => 5
+  /// - "๙" (U+0E59 THAI DIGIT NINE) => 9
+  /// - "万" (U+4E07 CJK UNIFIED IDEOGRAPH-4E07) => 10_000
   @inlinable
   public var isWholeNumber: Bool {
     return wholeNumberValue != nil
   }
 
-  /// If this Character is a whole number, return the value it represents, else
-  /// nil.
+  /// The numeric value this character represents, if it represents a whole
+  /// number.
   ///
-  /// A Boolean value indicating whether this character represents a newline.
+  /// If this character does not represent a whole number, or the value is too
+  /// large to represent as an `Int`, the value of this property is `nil`.
   ///
-  /// For example, the following characters all represent newlines:
-  ///   * "1" (U+0031 DIGIT ONE) => 1
-  ///   * "५" (U+096B DEVANAGARI DIGIT FIVE) => 5
-  ///   * "๙" (U+0E59 THAI DIGIT NINE) => 9
-  ///   * "万" (U+4E07 CJK UNIFIED IDEOGRAPH-4E07) => 10_000
-  ///
-  /// Note: Returns nil on 32-bit platforms if the result would overflow `Int`.
+  ///     let chars: [Character] = ["4", "④", "万", "a"]
+  ///     for ch in chars {
+  ///         print(ch, "-->", ch.properties.numericValue)
+  ///     }
+  ///     // 4 --> 4
+  ///     // ④ --> 4
+  ///     // 万 --> 10000
+  ///     // a --> nil
   public var wholeNumberValue: Int? {
     guard _isSingleScalar else { return nil }
     guard let value = _firstScalar.properties.numericValue else { return nil }
     return Int(exactly: value)
   }
 
-  /// Whether this Character represents a hexadecimal digit.
+  /// A Boolean value indicating whether this character represents a
+  /// hexadecimal digit.
   ///
   /// Hexadecimal digits include 0-9, Latin letters a-f and A-F, and their
-  /// fullwidth compatibility forms. To get their value, see
-  /// `Character.hexDigitValue`
+  /// fullwidth compatibility forms. To get the character's value, use the
+  /// `hexDigitValue` property.
   @inlinable
   public var isHexDigit: Bool {
     return hexDigitValue != nil
   }
 
-  /// If this Character is a hexadecimal digit, returns the value it represents,
-  /// else nil.
+  /// The numeric value this character represents, if it is a hexadecimal digit.
+  ///
+  /// Hexadecimal digits include 0-9, Latin letters a-f and A-F, and their
+  /// fullwidth compatibility forms. If the character does not represent a
+  /// hexadecimal digit, the value of this property is `nil`.
   public var hexDigitValue: Int? {
     guard _isSingleScalar else { return nil }
     let value = _firstScalar.value
@@ -144,48 +159,51 @@ extension Character {
     }
   }
 
-  /// Whether this Character is a letter.
+  /// A Boolean value indicating whether this character is a letter.
   ///
-  /// Examples:
-  ///   * "A" (U+0041 LATIN CAPITAL LETTER A)
-  ///   * "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///   * "ϴ" (U+03F4 GREEK CAPITAL THETA SYMBOL)
-  ///   * "ڈ" (U+0688 ARABIC LETTER DDAL)
-  ///   * "日" (U+65E5 CJK UNIFIED IDEOGRAPH-65E5)
-  ///   * "ᚨ" (U+16A8 RUNIC LETTER ANSUZ A)
+  /// For example, the following characters are all letters:
   ///
+  /// - "A" (U+0041 LATIN CAPITAL LETTER A)
+  /// - "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
+  /// - "ϴ" (U+03F4 GREEK CAPITAL THETA SYMBOL)
+  /// - "ڈ" (U+0688 ARABIC LETTER DDAL)
+  /// - "日" (U+65E5 CJK UNIFIED IDEOGRAPH-65E5)
+  /// - "ᚨ" (U+16A8 RUNIC LETTER ANSUZ A)
   public var isLetter: Bool {
     return _firstScalar.properties.isAlphabetic
   }
 
-  /// Perform case conversion to uppercase
+  /// Returns an uppercased version of this character.
   ///
-  /// Examples:
-  ///   * "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///     => "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///   * "и" (U+0438 CYRILLIC SMALL LETTER I)
-  ///     => "И" (U+0418 CYRILLIC CAPITAL LETTER I)
-  ///   * "π" (U+03C0 GREEK SMALL LETTER PI)
-  ///     => "Π" (U+03A0 GREEK CAPITAL LETTER PI)
-  ///   * "ß" (U+00DF LATIN SMALL LETTER SHARP S)
-  ///     => "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL LETTER S)
+  /// Because case conversion can result in multiple characters, the result
+  /// of `uppercased()` is a string.
   ///
-  /// Note: Returns a String as case conversion can result in multiple
-  /// Characters.
+  ///     let chars: [Character] = ["e", "é", "и", "π", "ß", "1"]
+  ///     for ch in chars {
+  ///         print(ch, "-->", ch.uppercased())
+  ///     }
+  ///     // e --> E
+  ///     // é --> É
+  ///     // и --> И
+  ///     // π --> Π
+  ///     // ß --> SS
+  ///     // 1 --> 1
   public func uppercased() -> String { return String(self).uppercased() }
 
-  /// Perform case conversion to lowercase
+  /// Returns an lowercased version of this character.
   ///
-  /// Examples:
-  ///   * "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///     => "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///   * "И" (U+0418 CYRILLIC CAPITAL LETTER I)
-  ///     => "и" (U+0438 CYRILLIC SMALL LETTER I)
-  ///   * "Π" (U+03A0 GREEK CAPITAL LETTER PI)
-  ///     => "π" (U+03C0 GREEK SMALL LETTER PI)
+  /// Because case conversion can result in multiple characters, the result
+  /// of `lowercased()` is a string.
   ///
-  /// Note: Returns a String as case conversion can result in multiple
-  /// Characters.
+  ///     let chars: [Character] = ["E", "É", "И", "Π", "1"]
+  ///     for ch in chars {
+  ///         print(ch, "-->", ch.lowercased())
+  ///     }
+  ///     // E --> e
+  ///     // É --> é
+  ///     // И --> и
+  ///     // Π --> π
+  ///     // 1 --> 1
   public func lowercased() -> String { return String(self).lowercased() }
 
   @usableFromInline
@@ -193,16 +211,14 @@ extension Character {
   @usableFromInline
   internal var _isLowercased: Bool { return String(self) == self.lowercased() }
 
-  /// Whether this Character is considered uppercase.
+  /// A Boolean value indicating whether this character is considered uppercase.
   ///
-  /// Uppercase Characters vary under case-conversion to lowercase, but not when
-  /// converted to uppercase.
+  /// Uppercase characters vary under case-conversion to lowercase, but not when
+  /// converted to uppercase. The following characters are all uppercase:
   ///
-  /// Examples:
-  ///   * "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///   * "И" (U+0418 CYRILLIC CAPITAL LETTER I)
-  ///   * "Π" (U+03A0 GREEK CAPITAL LETTER PI)
-  ///
+  /// - "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
+  /// - "И" (U+0418 CYRILLIC CAPITAL LETTER I)
+  /// - "Π" (U+03A0 GREEK CAPITAL LETTER PI)
   @inlinable
   public var isUppercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isUppercase) {
@@ -211,16 +227,14 @@ extension Character {
     return _isUppercased && isCased
   }
 
-  /// Whether this Character is considered lowercase.
+  /// A Boolean value indicating whether this character is considered lowercase.
   ///
-  /// Lowercase Characters vary under case-conversion to uppercase, but not when
-  /// converted to lowercase.
+  /// Lowercase characters change when converted to uppercase, but not when
+  /// converted to lowercase. The following characters are all lowercase:
   ///
-  /// Examples:
-  ///   * "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
-  ///   * "и" (U+0438 CYRILLIC SMALL LETTER I)
-  ///   * "π" (U+03C0 GREEK SMALL LETTER PI)
-  ///
+  /// - "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
+  /// - "и" (U+0438 CYRILLIC SMALL LETTER I)
+  /// - "π" (U+03C0 GREEK SMALL LETTER PI)
   @inlinable
   public var isLowercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isLowercase) {
@@ -229,7 +243,10 @@ extension Character {
     return _isLowercased && isCased
   }
 
-  /// Whether this Character changes under any form of case conversion.
+  /// A Boolean value indicating whether this character changes under any form
+  /// of case conversion.
+  ///
+  /// This property is `true` for characters
   @inlinable
   public var isCased: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isCased) {
@@ -255,7 +272,7 @@ extension Character {
   }
 
   /// A Boolean value indicating whether this character represents a symbol
-  /// that naturally appearx in mathematical contexts.
+  /// that naturally appears in mathematical contexts.
   ///
   /// For example, the following characters all represent math symbols:
   ///
@@ -278,27 +295,27 @@ extension Character {
     return _firstScalar.properties.isMath
   }
 
-  /// A Boolean value indicating whether this Character represents a currency
+  /// A Boolean value indicating whether this character represents a currency
   /// symbol.
   ///
-  /// Examples:
-  ///   * "$" (U+0024 DOLLAR SIGN)
-  ///   * "¥" (U+00A5 YEN SIGN)
-  ///   * "€" (U+20AC EURO SIGN)
+  /// For example, the following characters all represent currency symbols:
   ///
+  /// - "$" (U+0024 DOLLAR SIGN)
+  /// - "¥" (U+00A5 YEN SIGN)
+  /// - "€" (U+20AC EURO SIGN)
   public var isCurrencySymbol: Bool {
     return _firstScalar.properties.generalCategory == .currencySymbol
   }
 
   /// A Boolean value indicating whether this character represents punctuation.
   ///
-  /// Examples:
-  ///   * "!" (U+0021 EXCLAMATION MARK)
-  ///   * "؟" (U+061F ARABIC QUESTION MARK)
-  ///   * "…" (U+2026 HORIZONTAL ELLIPSIS)
-  ///   * "—" (U+2014 EM DASH)
-  ///   * "“" (U+201C LEFT DOUBLE QUOTATION MARK)
+  /// For example, the following characters all represent punctuation:
   ///
+  /// - "!" (U+0021 EXCLAMATION MARK)
+  /// - "؟" (U+061F ARABIC QUESTION MARK)
+  /// - "…" (U+2026 HORIZONTAL ELLIPSIS)
+  /// - "—" (U+2014 EM DASH)
+  /// - "“" (U+201C LEFT DOUBLE QUOTATION MARK)
   public var isPunctuation: Bool {
     return _firstScalar.properties.generalCategory._isPunctuation
   }
