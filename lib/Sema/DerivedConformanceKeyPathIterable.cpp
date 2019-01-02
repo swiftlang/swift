@@ -102,7 +102,8 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       /*isFinal*/ true);
 
   // Add `@inlinable` to the `allKeyPaths` declaration.
-  allKeyPathsDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
+  if (nominal->getEffectiveAccess() > AccessLevel::Internal)
+    allKeyPathsDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `allKeyPaths` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(

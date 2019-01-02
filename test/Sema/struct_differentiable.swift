@@ -67,6 +67,15 @@ struct NotVectorNumeric : Differentiable {
 }
 */
 
+// Test type that doesn't conform to `VectorNumeric`.
+// Currently, vector space type synthesis is not possible.
+// TODO: Replace this test with above commented test once the vector space
+// synthesis restriction is lifted.
+struct NotVectorNumeric : Differentiable { // expected-error {{type 'NotVectorNumeric' does not conform to protocol 'Differentiable'}}
+  var w: Float
+  var b: Float
+}
+
 // Test errors.
 
 // Test manually customizing vector space types.

@@ -36,6 +36,13 @@ struct Model : Parameterized {
   @TFParameter var layer1: DenseLayer
   @TFParameter var layer2: DenseLayer
   @TFParameter var float: Float
+  // TODO: Remove when `moved(along:)` and `tangentVector(from:)` are reliably synthesized.
+  func moved(along direction: Parameters) -> Model {
+    return self // incorrect dummy implementation to pass type checking
+  }
+  func tangentVector(from cotangent: Parameters) -> Parameters {
+    return cotangent
+  }
 }
 
 var model = Model(layer1: layer, layer2: layer, float: 1)
@@ -57,6 +64,13 @@ struct A<T> {
     struct GenericContextModel : Parameterized {
       @TFParameter var layer: DenseLayer
       @TFParameter var float: Float
+      // TODO: Remove when `moved(along:)` and `tangentVector(from:)` are reliably synthesized.
+      func moved(along direction: Parameters) -> GenericContextModel {
+        return self // incorrect dummy implementation to pass type checking
+      }
+      func tangentVector(from cotangent: Parameters) -> Parameters {
+        return cotangent
+      }
     }
   }
 }
@@ -65,16 +79,29 @@ func foo() {
   struct NestedInFunction : Parameterized {
     @TFParameter var layer: DenseLayer
     @TFParameter var float: Float
+    // TODO: Remove when `moved(along:)` and `tangentVector(from:)` are reliably synthesized.
+    func moved(along direction: Parameters) -> NestedInFunction {
+      return self // incorrect dummy implementation to pass type checking
+    }
+    func tangentVector(from cotangent: Parameters) -> Parameters {
+      return cotangent
+    }
   }
 }
 
 // Test heterogenous parameter types.
 struct MixedParameterized : Parameterized {
-  @TFParameter var int: Int
   @TFParameter var float: Float
-  @TFParameter var string: String
+  @TFParameter var tensor: Tensor<Float>
+  // TODO: Remove when `moved(along:)` and `tangentVector(from:)` are reliably synthesized.
+  func moved(along direction: Parameters) -> MixedParameterized {
+    return self // incorrect dummy implementation to pass type checking
+  }
+  func tangentVector(from cotangent: Parameters) -> Parameters {
+    return cotangent
+  }
 }
-var mixed = MixedParameterized(int: 1, float: 3.14, string: "foo")
+var mixed = MixedParameterized(float: .pi, tensor: Tensor(1))
 _ = mixed.allParameters
 
 extension MixedParameterized.Parameters : ParameterGroup {
@@ -88,6 +115,8 @@ extension MixedParameterized.Parameters : ParameterGroup {
 }
 mixed.updateParameters(withGradients: mixed.allParameters, -=)
 
+/*
+// TODO: Remove support for "reordered `Parameters` struct" functionality.
 // Test user-specified `Parameters` struct with reordered parameters.
 struct ModelWithReorderedParameters : Parameterized {
   @TFParameter var layer: DenseLayer
@@ -96,20 +125,32 @@ struct ModelWithReorderedParameters : Parameterized {
     var float: Float
     var layer: DenseLayer.Parameters
   }
+  // TODO: Remove when `moved(along:)` and `tangentVector(from:)` are reliably synthesized.
+  func moved(along direction: Parameters) -> ModelWithReorderedParameters {
+    return self // incorrect dummy implementation to pass type checking
+  }
+  func tangentVector(from cotangent: Parameters) -> Parameters {
+    return cotangent
+  }
 }
 var reorderedModel = ModelWithReorderedParameters(layer: layer, float: 1)
 _ = reorderedModel.allParameters
 reorderedModel.updateParameters(withGradients: reorderedModel.allParameters, -=)
+*/
 
+// TODO: Change `Parameterized` synthesis condition to not derive conformances
+// when `Parameters` is customized. This will simplify diagnostics.
 // Test invalid `Parameters` struct.
+// expected-error @+2 {{type 'ModelWithInvalidParameters' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{type 'ModelWithInvalidParameters' does not conform to protocol 'Parameterized'}}
 struct ModelWithInvalidParameters : Parameterized {
   @TFParameter var layer: DenseLayer
   @TFParameter var float: Float
-  struct Parameters {} // expected-error {{'Parameters' struct is invalid}}
+  struct Parameters {} // expected-note {{possibly intended match 'ModelWithInvalidParameters.Parameters' does not conform to 'Differentiable'}}
 }
 
 // Test invalid `@TFParameter` usage.
-struct InvalidTFParameterUsage : Parameterized {
+struct InvalidTFParameterUsage : Parameterized { // expected-error {{type 'InvalidTFParameterUsage' does not conform to protocol 'Differentiable'}}
   @TFParameter var layer: DenseLayer
   @TFParameter var float: Float
 
