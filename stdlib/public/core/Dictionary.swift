@@ -340,7 +340,7 @@
 ///
 ///     let glyphIndex = imagePaths.firstIndex(where: { $0.value.hasPrefix("/glyphs") })
 ///     if let index = glyphIndex {
-///         print("The '\(imagesPaths[index].key)' image is a glyph.")
+///         print("The '\(imagePaths[index].key)' image is a glyph.")
 ///     } else {
 ///         print("No glyphs found!")
 ///     }
