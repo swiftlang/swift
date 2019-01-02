@@ -337,16 +337,10 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   auto *differentiableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto differentiableType =
       TypeLoc::withoutLoc(differentiableProto->getDeclaredType());
-  auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  auto vectorNumericType =
-      TypeLoc::withoutLoc(vectorNumericProto->getDeclaredType());
   auto *keyPathIterableProto =
       C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto keyPathIterableType =
       TypeLoc::withoutLoc(keyPathIterableProto->getDeclaredType());
-  auto *parameterGroupProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
-  auto parameterGroupType =
-      TypeLoc::withoutLoc(parameterGroupProto->getDeclaredType());
   auto *parametersDecl =
       new (C) StructDecl(SourceLoc(), C.Id_Parameters, SourceLoc(),
                          /*Inherited*/ {}, /*GenericParams*/ {}, parentDC);
@@ -421,6 +415,9 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   // `VectorNumeric`. Also, add vector space typealiases for both `Parameters`
   // and the parent nominal type.
   if (DerivedConformance::canDeriveVectorNumeric(parametersDecl)) {
+    auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
+    auto vectorNumericType =
+        TypeLoc::withoutLoc(vectorNumericProto->getDeclaredType());
     inherited.push_back(vectorNumericType);
     addVectorSpaceAliasDecl(C.Id_TangentVector, parametersDecl, parametersType);
     addVectorSpaceAliasDecl(C.Id_CotangentVector, parametersDecl,
@@ -429,6 +426,10 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
     addVectorSpaceAliasDecl(C.Id_CotangentVector, nominal, parametersType);
   }
   if (DerivedConformance::canDeriveParameterGroup(parametersDecl)) {
+    auto *parameterGroupProto =
+        C.getProtocol(KnownProtocolKind::ParameterGroup);
+    auto parameterGroupType =
+        TypeLoc::withoutLoc(parameterGroupProto->getDeclaredType());
     inherited.push_back(parameterGroupType);
   }
   parametersDecl->setInherited(C.AllocateCopy(inherited));

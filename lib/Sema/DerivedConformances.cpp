@@ -236,6 +236,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // Parameterized.allParameters
     if (name.isSimpleName(ctx.Id_allParameters))
       return getRequirement(KnownProtocolKind::Parameterized);
+    
     return nullptr;
   }
 
