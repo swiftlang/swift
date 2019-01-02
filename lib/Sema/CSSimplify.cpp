@@ -3541,9 +3541,9 @@ retry_after_fail:
     LookupResult &bridgedLookup = lookupMember(bridgedType, memberName);
 
     ModuleDecl *foundationModule = nullptr;
-    ModuleDecl *foundationSoilModule = nullptr;
+    ModuleDecl *FoundationBaseModule = nullptr;
     ModuleDecl *swiftFoundationModule = nullptr;
-    ModuleDecl *swiftFoundationSoilModule = nullptr;
+    ModuleDecl *swiftFoundationBaseModule = nullptr;
 
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
@@ -3561,14 +3561,14 @@ retry_after_fail:
         continue;
       }
       
-      if (foundationSoilModule) {
-        if (module == foundationSoilModule)
+      if (FoundationBaseModule) {
+        if (module == FoundationBaseModule)
           continue;
       } else if (ClangModuleUnit::hasClangModule(module) &&
-                 module->getName().str() == "FoundationSoil") {
+                 module->getName().str() == "FoundationBase") {
         // Cache the foundation module name so we don't need to look
         // for it again.
-        foundationSoilModule = module;
+        FoundationBaseModule = module;
         continue;
       }
       
@@ -3583,14 +3583,14 @@ retry_after_fail:
         continue;
       }
       
-      if (swiftFoundationSoilModule) {
-        if (module == swiftFoundationSoilModule)
+      if (swiftFoundationBaseModule) {
+        if (module == swiftFoundationBaseModule)
           continue;
       } else if (ClangModuleUnit::hasClangModule(module) &&
-                 module->getName().str() == "SwiftFoundationSoil") {
+                 module->getName().str() == "SwiftFoundationBase") {
         // Cache the foundation module name so we don't need to look
         // for it again.
-        swiftFoundationSoilModule = module;
+        swiftFoundationBaseModule = module;
         continue;
       }
       
