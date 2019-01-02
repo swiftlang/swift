@@ -35,7 +35,7 @@ private func _hasGraphemeBreakBetween(
     switch x.value {
     // Unified CJK Han ideographs, common and some supplemental, amongst
     // others:
-    //   0x3400-0xA4CF
+    //   U+3400 ~ U+A4CF
     case 0x3400...0xa4cf: return true
 
     // Repeat sub-300 check, this is beneficial for common cases of Latin
@@ -46,30 +46,34 @@ private func _hasGraphemeBreakBetween(
     case 0x0000...0x02ff: return true
 
     // Non-combining kana:
-    //   0x3041-0x3096
-    //   0x30A1-0x30FA
+    //   U+3041 ~ U+3096
+    //   U+30A1 ~ U+30FC
     case 0x3041...0x3096: return true
-    case 0x30a1...0x30fa: return true
+    case 0x30a1...0x30fc: return true
 
     // Non-combining modern (and some archaic) Cyrillic:
-    //   0x0400-0x0482 (first half of Cyrillic block)
+    //   U+0400 ~ U+0482 (first half of Cyrillic block)
     case 0x0400...0x0482: return true
 
     // Modern Arabic, excluding extenders and prependers:
-    //   0x061D-0x064A
+    //   U+061D ~ U+064A
     case 0x061d...0x064a: return true
 
     // Precomposed Hangul syllables:
-    //   0xAC00–0xD7AF
+    //   U+AC00 ~ U+D7AF
     case 0xac00...0xd7af: return true
 
     // Common general use punctuation, excluding extenders:
-    //   0x2010-0x2029
+    //   U+2010 ~ U+2029
     case 0x2010...0x2029: return true
 
     // CJK punctuation characters, excluding extenders:
-    //   0x3000-0x3029
+    //   U+3000 ~ U+3029
     case 0x3000...0x3029: return true
+
+    // Full-width forms:
+    //   U+FF01 ~ U+FF9D
+    case 0xFF01...0xFF9D: return true
 
     default: return false
     }
