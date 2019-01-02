@@ -837,6 +837,21 @@ emitKeyPathComponent(IRGenModule &IGM,
     // ObjC-ness and resilience of the class hierarchy, there might be a few
     // different ways we need to go about this.
     if (loweredBaseTy.getClassOrBoundGenericClass()) {
+
+      // Walk up the class hierarchy to find the class decl that matches the
+      // property's class decl and use this type to determin the field access.
+      auto propertyBaseDecl = property->getDeclContext()->getSelfClassDecl();
+      auto currentBaseTy = loweredBaseTy.getASTType();
+      while (currentBaseTy->getClassOrBoundGenericClass() != propertyBaseDecl &&
+             currentBaseTy->getClassOrBoundGenericClass()->hasSuperclass()) {
+        currentBaseTy = currentBaseTy->getClassOrBoundGenericClass()
+                            ->getSuperclass()
+                            ->getCanonicalType();
+      }
+      assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
+      loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                     currentBaseTy->getWithoutSpecifierType());
+
       switch (getClassFieldAccess(IGM, loweredBaseTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.

@@ -87,6 +87,17 @@ sil_vtable C2 {}
 // CHECK-32-SAME: <i32 0x0380_0008> }>
 // CHECK-64-SAME: <i32 0x0380_0010> }>
 
+// -- %d1: C1.x
+// CHECK: [[KP_D1:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]]* @keypath_once
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
+//               -- instantiable in-line, size 4
+// CHECK-SAME: <i32 0x8000_0004>,
+// -- 0x0300_0000 (class) + mutable + offset of C.x
+// CHECK-32-SAME: <i32 0x0380_0008> }>
+// CHECK-64-SAME: <i32 0x0380_0010> }>
+
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
@@ -218,9 +229,10 @@ entry:
   %b = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_C]] to i8*), i8* undef)
   %c = keypath $KeyPath<S, C>, (root $S; stored_property #S.z : $C)
-
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D]] to i8*), i8* undef)
   %d = keypath $KeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D1]] to i8*), i8* undef)
+  %d1 = keypath $KeyPath<C1, Int>, (root $C1; stored_property #C.x : $Int)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_E]] to i8*), i8* undef)
   %e = keypath $KeyPath<C, String>, (root $C; stored_property #C.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_F]] to i8*), i8* undef)
