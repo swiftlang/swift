@@ -1250,9 +1250,6 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case PMOUseKind::SelfInit:
-    case PMOUseKind::SuperInit:
-      llvm_unreachable("Can't happen on allocations");
     case PMOUseKind::Assign:
     case PMOUseKind::PartialStore:
     case PMOUseKind::InitOrAssign:
