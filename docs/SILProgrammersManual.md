@@ -172,7 +172,7 @@ TBD: Possibly link to a separate document explaining the architecture of IRGen.
 ## SILAnalysis and the PassManager
 
 TBD: describe the mechanism by which passes invalidate and update the
-PassManager and its avaiable analyses.
+PassManager and its available analyses.
 
 ## High Level SIL Optimizations
 
