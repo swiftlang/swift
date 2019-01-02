@@ -2818,7 +2818,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static bool processMemoryObject(MarkUninitializedInst *I) {
+static void processMemoryObject(MarkUninitializedInst *I) {
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -2830,7 +2830,6 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
                            /*TreatAddressToPointerAsInout*/ true);
 
   LifetimeChecker(MemInfo, UseInfo).doIt();
-  return true;
 }
 
 /// Check that all memory objects that require initialization before use are
@@ -2846,10 +2845,13 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
       SILInstruction *Inst = &*I;
 
       auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
-      if (!MUI || !processMemoryObject(MUI)) {
+      if (!MUI) {
         ++I;
         continue;
       }
+
+      // Then process the memory object.
+      processMemoryObject(MUI);
 
       // Move off of the MUI only after we have processed memory objects. The
       // lifetime checker may rewrite instructions, so it is important to not
