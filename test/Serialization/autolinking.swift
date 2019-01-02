@@ -29,19 +29,19 @@
 import someModule
 
 // CHECK: !llvm.linker.options = !{
-// CHECK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
-// CHECK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
+// CHECK-DAG: !{{[0-9]+}} = !{!{{"-lmagic"|"/DEFAULTLIB:magic.lib"}}}
+// CHECK-DAG: !{{[0-9]+}} = !{!{{"-lmodule"|"/DEFAULTLIB:module.lib"}}}
 
 // FRAMEWORK: !llvm.linker.options = !{
-// FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmagic"}
-// FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-lmodule"}
+// FRAMEWORK-DAG: !{{[0-9]+}} = !{!{{"-lmagic"|"/DEFAULTLIB:magic.lib"}}}
+// FRAMEWORK-DAG: !{{[0-9]+}} = !{!{{"-lmodule"|"/DEFAULTLIB:module.lib"}}}
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
-// FORCE-LOAD: define void @"_swift_FORCE_LOAD_$_module"() {
+// FORCE-LOAD: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$_module"() {
 // FORCE-LOAD:   ret void
 // FORCE-LOAD: }
-// FORCE-LOAD-HEX: define void @"_swift_FORCE_LOAD_$306d6f64756c65"() {
+// FORCE-LOAD-HEX: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$306d6f64756c65"() {
 // FORCE-LOAD-HEX:   ret void
 // FORCE-LOAD-HEX: }
 
@@ -49,5 +49,5 @@ import someModule
 // FORCE-LOAD-CLIENT: @llvm.used = appending global [{{[0-9]+}} x i8*] [
 // FORCE-LOAD-CLIENT: i8* bitcast (void ()** @"_swift_FORCE_LOAD_$_module_$_autolinking" to i8*)
 // FORCE-LOAD-CLIENT: ], section "llvm.metadata"
-// FORCE-LOAD-CLIENT: declare void @"_swift_FORCE_LOAD_$_module"()
+// FORCE-LOAD-CLIENT: declare {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
 
