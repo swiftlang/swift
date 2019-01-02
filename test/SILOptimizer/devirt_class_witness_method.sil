@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -sil-combine -enable-resilience -save-optimization-record-path=%t.opt.yaml | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %/s -devirtualizer -sil-combine -enable-resilience -save-optimization-record-path=%t.opt.yaml | %FileCheck %s
 sil_stage canonical
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
 

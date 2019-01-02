@@ -1,7 +1,8 @@
 // RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
 
-// Linux doesn't have the same symbol name for _ArrayBuffer.
-// XFAIL: linux
+// Linux doesn't have the same symbol name for _ArrayBuffer, which is part of
+// the ObjC runtime interop.  Use `_ContiguousArrayBuffer instead.
+// REQUIRES: objc_interop
 
 import Swift
 import Builtin

@@ -1,6 +1,6 @@
 // Make sure project_box gets assigned the correct lexical scope when we create it.
 // RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil -Xllvm -sil-print-after=capture-promotion -Xllvm \
-// RUN:   -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -sil-print-debuginfo -o /dev/null -module-name null 2>&1 | %FileCheck %s
 
 // CHECK: sil hidden [ossa] @$s4null19captureStackPromoteSiycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> Int {
 // CHECK: bb0:
