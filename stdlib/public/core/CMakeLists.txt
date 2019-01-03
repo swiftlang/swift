@@ -213,7 +213,7 @@ set(SWIFTLIB_SOURCES
   Tuple.swift.gyb
   UnfoldSequence.swift
   VarArgs.swift
-  Zip.swift
+  Zip.swift.gyb
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")

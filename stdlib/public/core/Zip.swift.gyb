@@ -1,0 +1,630 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+upper_arity_bound = 6
+arities = range(2, upper_arity_bound + 1)
+ordinal = { 1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth" }
+}%
+% for arity in arities:
+%{ positions = range(1, arity + 1) }%
+/// A position of an element in a `Zip${ arity }Sequence` or `ZipLongest${ arity }Sequence`.
+@_fixed_layout // generic-performance
+public struct Zip${ arity }Index <
+${ ",\n".join([ "  Collection{0}: Collection".format(position) for position in positions ]) }
+> {
+%   for position in positions:
+  /// The index of the ${ ordinal[position] } collection.
+  public let index${ position }: Collection${ position }.Index
+%   end
+
+  @inlinable // generic-performance
+  internal init (
+${ ",\n".join([ "    _ index{0}: Collection{0}.Index".format(position) for position in positions ]) }
+  ) {
+%   for position in positions:
+    self.index${ position } = index${ position }
+%   end
+  }
+}
+
+extension Zip${ arity }Index: Comparable {
+  @inlinable // generic-performance
+  public static func < (lhs: Zip${ arity }Index, rhs: Zip${ arity }Index) -> Bool {
+    precondition(
+${ " &&\n".join([ "      lhs.index{0} <= rhs.index{0}".format(position) for position in positions ]) } ||
+${ " &&\n".join([ "      lhs.index{0} >= rhs.index{0}".format(position) for position in positions ]) },
+      "Indices failed to hold their asymmetric property when compared"
+    )
+
+    return (
+${ ",\n".join([ "      lhs.index{0}".format(position) for position in positions ]) }
+    ) < (
+${ ",\n".join([ "      rhs.index{0}".format(position) for position in positions ]) }
+    )
+  }
+}
+
+/// A sequence of ${ arity }-tuples created from a ${ arity }-tuple of sequences by zipping their
+/// respective elements until the *shortest* sequence is exhausted, truncating
+/// the latter elements of the *longe${ "st" if arity == 2 else "r" }* sequence${ "" if arity == 2 else "s" }.
+///
+/// - Note: Instances of `Zip${ arity }Sequence` can be created with the global
+///   `zip(${ "_:" * arity })` function.
+@_fixed_layout // generic-performance
+public struct Zip${ arity }Sequence <
+${ ",\n".join([ "  Sequence{0}: Sequence".format(position) for position in positions ]) }
+> {
+%   for position in positions:
+  @usableFromInline // generic-performance
+  internal let _sequence${ position }: Sequence${ position }
+%   end
+
+  @inlinable // generic-performance
+  internal init (
+${ ",\n".join([ "    _ sequence{0}: Sequence{0}".format(position) for position in positions ]) }
+  ) {
+%   for position in positions:
+    _sequence${ position } = sequence${ position }
+%   end
+  }
+}
+
+extension Zip${ arity }Sequence {
+  @_fixed_layout // generic-performance
+  public struct Iterator {
+%   for position in positions:
+    @usableFromInline // generic-performance
+    internal var _baseStream${ position }: Sequence${ position }.Iterator
+%   end
+    @usableFromInline // generic-performance
+    internal var _reachedEnd: Bool = false
+
+    @inlinable // generic-performance
+    internal init (
+${ ",\n".join([ "      _ iterator{0}: Sequence{0}.Iterator".format(position) for position in positions ]) }
+    ) {
+%   for position in positions:
+      _baseStream${ position } = iterator${ position }
+%   end
+    }
+  }
+}
+
+extension Zip${ arity }Sequence.Iterator: IteratorProtocol {
+  public typealias Element = (
+${ ",\n".join([ "    Sequence{0}.Element".format(position) for position in positions ]) }
+  )
+
+  @inlinable // generic-performance
+  public mutating func next () -> Element? {
+    // Here, `next()` needs to track if it has reached the end. If the
+    // underlying sequences are unequal in length, then every subsequent call to
+    // `next()` would simultaneously consume and discard the next element from
+    // the longest sequence, even when `next()` has already returned `nil`.
+    guard !_reachedEnd else {
+      return nil
+    }
+
+    guard ${ ",\n          ".join([ "let element{0} = _baseStream{0}.next()".format(position) for position in positions ]) } else {
+      _reachedEnd.toggle()
+
+      return nil
+    }
+
+    return (
+${ ",\n".join([ "      element{0}".format(position) for position in positions ]) }
+    )
+  }
+}
+
+extension Zip${ arity }Sequence: Sequence {
+  public typealias Element = (
+${ ",\n".join([ "    Sequence{0}.Element".format(position) for position in positions ]) }
+  )
+
+  @inlinable // generic-performance
+  public __consuming func makeIterator () -> Iterator {
+    return Iterator(
+${ ",\n".join([ "      _sequence{0}.makeIterator()".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public var underestimatedCount: Int {
+    return Swift.min(
+${ ",\n".join([ "      _sequence{0}.underestimatedCount".format(position) for position in positions ]) }
+    )
+  }
+}
+
+extension Zip${ arity }Sequence: Collection where
+${ ",\n".join([ "    Sequence{0}: Collection".format(position) for position in positions ]) } {
+  public typealias Index = Zip${ arity }Index<
+${ ",\n".join([ "    Sequence{0}".format(position) for position in positions ]) }
+  >
+
+  @inlinable // generic-performance
+  public var startIndex: Index {
+    return ${ " ||\n           ".join([ "_sequence{0}.isEmpty".format(position) for position in positions ]) } ?
+      endIndex :
+      Index(
+${ ",\n".join([ "        _sequence{0}.startIndex".format(position) for position in positions ]) }
+      )
+  }
+
+  @inlinable // generic-performance
+  public var endIndex: Index {
+    return Index(
+${ ",\n".join([ "      _sequence{0}.endIndex".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public subscript (position: Index) -> Element {
+    precondition(position != endIndex, "Index out of range")
+
+    return (
+${ ",\n".join([ "      _sequence{0}[position.index{0}]".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public func index (after i: Index) -> Index {
+    precondition(i != endIndex, "Cannot increment beyond endIndex")
+
+%   for position in positions:
+    let index${ position } = _sequence${ position }.index(after: i.index${ position })
+%   end
+
+    return ${ " ||\n           ".join([ "index{0} == _sequence{0}.endIndex".format(position) for position in positions ]) } ?
+      endIndex :
+      Index(
+${ ",\n".join([ "        index{0}".format(position) for position in positions ]) }
+      )
+  }
+}
+
+extension Zip${ arity }Sequence: BidirectionalCollection where
+${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {
+  @inlinable // generic-performance
+  public func index (before i: Index) -> Index {
+    precondition(i != startIndex, "Cannot decrement beyond startIndex")
+
+    return index(i, offsetBy: -1)
+  }
+}
+
+extension Zip${ arity }Sequence: RandomAccessCollection where
+${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {}
+
+extension Zip${ arity }Sequence: LazySequenceProtocol where
+${ ",\n".join([ "    Sequence{0}: LazySequenceProtocol".format(position) for position in positions ]) } {}
+
+extension Zip${ arity }Sequence where
+${ ",\n".join([ "    Sequence{0}: Collection".format(position) for position in positions ]) } {
+  @inlinable // generic-performance
+  public func distance (from start: Index, to end: Index) -> Int {
+    guard start != end else {
+      return 0
+    }
+
+%   for position in positions:
+    let distance${ position } = _sequence${ position }.distance(from: start.index${ position }, to: end.index${ position })
+%   end
+
+    return start < end ?
+      Swift.min(
+${ ",\n".join([ "        distance{0}".format(position) for position in positions ]) }
+      ) :
+      Swift.max(
+${ ",\n".join([ "        distance{0}".format(position) for position in positions ]) }
+      )
+  }
+
+  @inlinable // generic-performance
+  public func index (_ i: Index, offsetBy distance: Int) -> Index {
+    let limit = distance < 0 ? startIndex : endIndex
+    let offsetIndex = index(i, offsetBy: distance, limitedBy: limit)
+
+    precondition(offsetIndex != nil, "Index out of range")
+
+    return offsetIndex!
+  }
+
+  @inlinable // generic-performance
+  public func index (_ i: Index, offsetBy distance: Int,
+      limitedBy limit: Index) -> Index? {
+    precondition(startIndex <= i && i <= endIndex, "Index out of range")
+
+    guard distance != 0 else {
+      return i
+    }
+
+%   for position in positions:
+    let distanceFromStartIndexToIndex${ position } =
+      _sequence${ position }.distance(from: _sequence${ position }.startIndex, to: i.index${ position })
+%   end
+    let distanceFromStartIndexToOffsetIndex = Swift.min(
+${ ",\n".join([ "      distanceFromStartIndexToIndex{0}".format(position) for position in positions ]) }
+    ) + distance
+%   for position in positions:
+    let count${ position } = _sequence${ position }.count
+%   end
+    let count = Swift.min(
+${ ",\n".join([ "      count{0}".format(position) for position in positions ]) }
+    )
+
+    precondition(
+      0 <= distanceFromStartIndexToOffsetIndex &&
+        distanceFromStartIndexToOffsetIndex <= count,
+      "Index out of range"
+    )
+
+    guard ${
+",\n          ".join([ """\
+let offsetIndex{0} = _sequence{0}.index(
+            i.index{0},
+            offsetBy:
+              (distanceFromStartIndexToOffsetIndex == count ?
+                count{0} :
+                distanceFromStartIndexToOffsetIndex) -
+              distanceFromStartIndexToIndex{0},
+            limitedBy: limit.index{0}
+          )\
+""".format(position) for position in positions ])
+} else {
+      return nil
+    }
+
+    return Index(
+${ ",\n".join([ "      offsetIndex{0}".format(position) for position in positions ]) }
+    )
+  }
+}
+
+/// A sequence of ${ arity }-tuples created from a ${ arity }-tuple of sequences by zipping their
+/// respective elements until the *longest* sequence is exhausted, padding the
+/// latter elements of the *shorte${ "st" if arity == 2 else "r" }* sequence${ "" if arity == 2 else "s" } with `nil`.
+///
+/// - Note: Instances of `ZipLongest${ arity }Sequence` can be created with the global
+///   `zipLongest(${ "_:" * arity })` function.
+@_fixed_layout // generic-performance
+public struct ZipLongest${ arity }Sequence <
+${ ",\n".join([ "  Sequence{0}: Sequence".format(position) for position in positions ]) }
+> {
+%   for position in positions:
+  @usableFromInline // generic-performance
+  internal let _sequence${ position }: Sequence${ position }
+%   end
+
+  @inlinable // generic-performance
+  internal init (
+${ ",\n".join([ "    _ sequence{0}: Sequence{0}".format(position) for position in positions ]) }
+  ) {
+%   for position in positions:
+    _sequence${ position } = sequence${ position }
+%   end
+  }
+}
+
+extension ZipLongest${ arity }Sequence {
+  @_fixed_layout // generic-performance
+  public struct Iterator {
+%   for position in positions:
+    @usableFromInline // generic-performance
+    internal var _baseStream${ position }: Sequence${ position }.Iterator
+%   end
+
+    @inlinable // generic-performance
+    internal init (
+${ ",\n".join([ "      _ iterator{0}: Sequence{0}.Iterator".format(position) for position in positions ]) }
+    ) {
+%   for position in positions:
+      _baseStream${ position } = iterator${ position }
+%   end
+    }
+  }
+}
+
+extension ZipLongest${ arity }Sequence.Iterator: IteratorProtocol {
+  public typealias Element = (
+${ ",\n".join([ "    Sequence{0}.Element?".format(position) for position in positions ]) }
+  )
+
+  @inlinable // generic-performance
+  public mutating func next () -> Element? {
+%   for position in positions:
+    let element${ position } = _baseStream${ position }.next()
+%   end
+
+    return ${ " &&\n           ".join([ "element{0} == nil".format(position) for position in positions ]) } ?
+      nil :
+      (
+${ ",\n".join([ "        element{0}".format(position) for position in positions ]) }
+      )
+  }
+}
+
+extension ZipLongest${ arity }Sequence: Sequence {
+  public typealias Element = (
+${ ",\n".join([ "    Sequence{0}.Element?".format(position) for position in positions ]) }
+  )
+
+  @inlinable // generic-performance
+  public __consuming func makeIterator () -> Iterator {
+    return Iterator(
+${ ",\n".join([ "      _sequence{0}.makeIterator()".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public var underestimatedCount: Int {
+    return Swift.max(
+${ ",\n".join([ "      _sequence{0}.underestimatedCount".format(position) for position in positions ]) }
+    )
+  }
+}
+
+extension ZipLongest${ arity }Sequence: Collection where
+${ ",\n".join([ "    Sequence{0}: Collection".format(position) for position in positions ]) } {
+  public typealias Index = Zip${ arity }Index<
+${ ",\n".join([ "    Sequence{0}".format(position) for position in positions ]) }
+  >
+
+  @inlinable // generic-performance
+  public var startIndex: Index {
+    return Index(
+${ ",\n".join([ "      _sequence{0}.startIndex".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public var endIndex: Index {
+    return Index(
+${ ",\n".join([ "      _sequence{0}.endIndex".format(position) for position in positions ]) }
+    )
+  }
+
+  @inlinable // generic-performance
+  public subscript (position: Index) -> Element {
+    precondition(position != endIndex, "Index out of range")
+
+    return (
+${
+",\n".join([ """\
+      position.index{0} == _sequence{0}.endIndex ?
+        nil :
+        _sequence{0}[position.index{0}]\
+""".format(position) for position in positions ])
+}
+    )
+  }
+
+  @inlinable // generic-performance
+  public func index (after i: Index) -> Index {
+    precondition(i != endIndex, "Cannot increment beyond endIndex")
+
+    return Index(
+${
+",\n".join([ """\
+      i.index{0} == _sequence{0}.endIndex ?
+        _sequence{0}.endIndex :
+        _sequence{0}.index(after: i.index{0})\
+""".format(position) for position in positions ])
+}
+    )
+  }
+}
+
+extension ZipLongest${ arity }Sequence: BidirectionalCollection where
+${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {
+  @inlinable // generic-performance
+  public func index (before i: Index) -> Index {
+    precondition(i != startIndex, "Cannot decrement beyond startIndex")
+
+    return index(i, offsetBy: -1)
+  }
+}
+
+extension ZipLongest${ arity }Sequence: RandomAccessCollection where
+${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {}
+
+extension ZipLongest${ arity }Sequence: LazySequenceProtocol where
+${ ",\n".join([ "    Sequence{0}: LazySequenceProtocol".format(position) for position in positions ]) } {}
+
+extension ZipLongest${ arity }Sequence where
+${ ",\n".join([ "    Sequence{0}: Collection".format(position) for position in positions ]) } {
+  @inlinable // generic-performance
+  public func distance (from start: Index, to end: Index) -> Int {
+    guard start != end else {
+      return 0
+    }
+
+%   for position in positions:
+    let distance${ position } = _sequence${ position }.distance(from: start.index${ position }, to: end.index${ position })
+%   end
+
+    return start < end ?
+      Swift.max(
+${ ",\n".join([ "        distance{0}".format(position) for position in positions ]) }
+      ) :
+      Swift.min(
+${ ",\n".join([ "        distance{0}".format(position) for position in positions ]) }
+      )
+  }
+
+  @inlinable // generic-performance
+  public func index (_ i: Index, offsetBy distance: Int) -> Index {
+    let limit = distance < 0 ? startIndex : endIndex
+    let offsetIndex = index(i, offsetBy: distance, limitedBy: limit)
+
+    precondition(offsetIndex != nil, "Index out of range")
+
+    return offsetIndex!
+  }
+
+  @inlinable // generic-performance
+  public func index (_ i: Index, offsetBy distance: Int,
+      limitedBy limit: Index) -> Index? {
+    precondition(startIndex <= i && i <= endIndex, "i is not a valid index")
+
+    guard distance != 0 else {
+      return i
+    }
+
+%   for position in positions:
+    let distanceFromStartIndexToIndex${ position } =
+      _sequence${ position }.distance(from: _sequence${ position }.startIndex, to: i.index${ position })
+%   end
+    let distanceFromStartIndexToOffsetIndex =
+      Swift.max(
+${ ",\n".join([ "        distanceFromStartIndexToIndex{0}".format(position) for position in positions ]) }
+      ) + distance
+%   for position in positions:
+    let count${ position } = _sequence${ position }.count
+%   end
+    let count = Swift.max(
+${ ",\n".join([ "      count{0}".format(position) for position in positions ]) }
+    )
+
+    precondition(
+      0 <= distanceFromStartIndexToOffsetIndex &&
+        distanceFromStartIndexToOffsetIndex <= count,
+      "Index out of range"
+    )
+
+    let offsetIndex = Index(
+${
+",\n".join([ """\
+      _sequence{0}.index(
+        i.index{0},
+        offsetBy:
+          (distanceFromStartIndexToOffsetIndex >= count{0} ?
+            count{0} :
+            distanceFromStartIndexToOffsetIndex) -
+          distanceFromStartIndexToIndex{0}
+      )\
+""".format(position) for position in positions ])
+}
+    )
+
+    guard distance < 0 ?
+            !(offsetIndex < limit && limit <= i) :
+            !(i <= limit && limit < offsetIndex) else {
+      return nil
+    }
+
+    return offsetIndex
+  }
+}
+
+/// Creates a sequence of ${ arity }-tuples from a ${ arity }-tuple of sequences by zipping their
+/// respective elements until the *shortest* sequence is exhausted, truncating
+/// the latter elements of the *longe${ "st" if arity == 2 else "r" }* sequence${ "" if arity == 2 else "s" }.
+///
+/// - Note: Use `zipLongest(${ "_:" * arity })` if you require the latter elements of
+///   the longe${ "st" if arity == 2 else "r" } sequence${ "" if arity == 2 else "s" }.
+/// - Parameters:
+%   for position in positions:
+///   - sequence${ position }: The ${ ordinal[position] } sequence to zip.
+%   end
+/// - Returns: An instance of `Zip${ arity }Sequence`.
+@inlinable // generic-performance
+public func zip <
+${ ",\n".join([ "  Sequence{0}: Sequence".format(position) for position in positions ]) }
+> (
+${ ",\n".join([ "  _ sequence{0}: Sequence{0}".format(position) for position in positions ]) }
+) -> Zip${ arity }Sequence<
+${ ",\n".join([ "  Sequence{0}".format(position) for position in positions ]) }
+> {
+  return Zip${ arity }Sequence(
+${",\n".join([ "    sequence{0}".format(position) for position in positions ]) }
+  )
+}
+
+/// Creates a sequence of ${ arity }-tuples from a ${ arity }-tuple of sequences by zipping their
+/// respective elements until the *longest* sequence is exhausted, padding the
+/// latter elements of the *longe${ "st" if arity == 2 else "r" }* sequence${ "" if arity == 2 else "s" } with `nil`.
+///
+/// - Note: Use `zip(${ "_:" * arity })` if you don't require the latter elements of
+///   the longe${ "st" if arity == 2 else "r" } sequence${ "" if arity == 2 else "s" } or if the lengths of ${ "both" if arity == 2 else "all" } sequences are equal.
+/// - Parameters:
+%   for position in positions:
+///   - sequence${ position }: The ${ ordinal[position] } sequence to zip.
+%   end
+/// - Returns: An instance of `Zip${ arity }Sequence`.
+@inlinable // generic-performance
+public func zipLongest <
+${ ",\n".join([ "  Sequence{0}: Sequence".format(position) for position in positions ]) }
+> (
+${ ",\n".join([ "  _ sequence{0}: Sequence{0}".format(position) for position in positions ]) }
+) -> ZipLongest${ arity }Sequence<
+${ ",\n".join([ "  Sequence{0}".format(position) for position in positions ]) }
+> {
+  return ZipLongest${ arity }Sequence(
+${ ",\n".join([ "    sequence{0}".format(position) for position in positions ]) }
+  )
+}
+
+extension Sequence {
+  /// Creates a ${ arity }-tuple of arrays from a sequence of ${ arity }-tuples by eagerly
+  /// unzipping its elements until it's exhausted.
+  ///
+  /// - Returns: A ${ arity }-tuple of arrays.
+  @inlinable // generic-performance
+  public func unzip <
+${ ",\n".join([ "    Element{0}".format(position) for position in positions ]) }
+  > () -> (
+${ ",\n".join([ "    [Element{0}]".format(position) for position in positions ]) }
+  ) where Element == (
+${ ",\n".join([ "    Element{0}".format(position) for position in positions ]) }
+  ) {
+%   for position in positions:
+    var result${ position } = [Element${ position }]()
+%   end
+
+%   for position in positions:
+    result${ position }.reserveCapacity(underestimatedCount)
+%   end
+
+    for element in self {
+%   for position in positions:
+      result${ position }.append(element.${ position - 1 })
+%   end
+    }
+
+    return (
+${ ",\n".join([ "      result{0}".format(position) for position in positions ]) }
+    )
+  }
+}
+
+extension LazyCollectionProtocol {
+  /// Creates a ${ arity }-tuple of lazy map collections from a lazy collection of
+  /// ${ arity }-tuples by lazily unzipping its elements until it's exhausted.
+  ///
+  /// - Returns: A ${ arity }-tuple of lazy map collections.
+  @inlinable // generic-performance
+  public func unzip <
+${ ",\n".join([ "    Element{0}".format(position) for position in positions ]) }
+  > () -> (
+${ ",\n".join([ "    LazyMapCollection<Elements, Element{0}>".format(position) for position in positions ]) }
+  ) where Elements.Element == (
+${ ",\n".join([ "    Element{0}".format(position) for position in positions ]) }
+  ) {
+    return (
+${ ",\n".join([ "      map({{ $0.{0} }})".format(position - 1) for position in positions ]) }
+    )
+  }
+}${ "\n" if arity < upper_arity_bound else "" }
+% end
