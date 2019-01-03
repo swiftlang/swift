@@ -2015,10 +2015,19 @@ function(add_swift_target_library name)
             WORLD_READ)
       endif()
 
-      swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
-          FILES "${UNIVERSAL_LIBRARY_NAME}"
-          DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+      if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+          TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
+          RUNTIME DESTINATION "bin"
+          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
           PERMISSIONS ${file_permissions})
+      else()
+        swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
+            FILES "${UNIVERSAL_LIBRARY_NAME}"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+            PERMISSIONS ${file_permissions})
+      endif()
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
           if(TARGET ${name}-windows-${arch}_IMPLIB)
