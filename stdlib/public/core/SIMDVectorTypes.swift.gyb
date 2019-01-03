@@ -3,10 +3,15 @@ from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
+spelledNumbers = {
+  2: 'two', 4: 'four', 8: 'eight', 16: '16', 32: '32', 64: '64',
+  3: 'three'
+}
 }%
 
 %for n in vectorscalarCounts:
 % storageN = 4 if n == 3 else n
+/// A vector of ${spelledNumbers[n]} scalar values.
 @_fixed_layout
 public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 
@@ -14,16 +19,19 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 
   public typealias MaskStorage = SIMD${n}<Scalar.SIMDMaskScalar>
 
+  /// The number of scalars in the vector.
   @_transparent
   public var scalarCount: Int {
     return ${n}
   }
 
+  /// Creates a zero vector.
   @_transparent
   public init() {
     _storage = Scalar.SIMD${storageN}Storage()
   }
 
+  /// Accesses the scalar at the specified position.
   public subscript(index: Int) -> Scalar {
     @_transparent get {
       _precondition(indices.contains(index))
@@ -59,6 +67,7 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 %  end
 % end
 % if n >= 4:
+  /// Creates a new vector from two half-length vectors.
   @_transparent
   public init(lowHalf: SIMD${n/2}<Scalar>, highHalf: SIMD${n/2}<Scalar>) {
     self.init()
