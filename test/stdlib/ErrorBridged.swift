@@ -722,4 +722,49 @@ ErrorBridgingTests.test("Error archetype identity") {
     === nsError)
 }
 
+// SR-9389
+class ParentA: NSObject {
+  @objc(ParentAError) enum Error: Int, Swift.Error {
+    case failed
+  }
+}
+class ParentB: NSObject {
+  @objc(ParentBError) enum Error: Int, Swift.Error {
+    case failed
+  }
+}
+private class NonPrintAsObjCClass: NSObject {
+  @objc enum Error: Int, Swift.Error {
+    case foo
+  }
+}
+@objc private enum NonPrintAsObjCError: Int, Error {
+  case bar
+}
+
+ErrorBridgingTests.test("@objc error domains for nested types") {
+  // Domain strings should correspond to Swift types, including parent types.
+  expectEqual(ParentA.Error.failed._domain, "main.ParentA.Error")
+  expectEqual(ParentB.Error.failed._domain, "main.ParentB.Error")
+
+  func makeNSError(like error: Error) -> NSError {
+    return NSError(domain: error._domain, code: error._code)
+  }
+
+  // NSErrors corresponding to Error types with the same name but nested in
+  // different enclosing types should not be castable to the wrong error type.
+  expectTrue(makeNSError(like: ParentA.Error.failed) is ParentA.Error)
+  expectFalse(makeNSError(like: ParentA.Error.failed) is ParentB.Error)
+  expectFalse(makeNSError(like: ParentB.Error.failed) is ParentA.Error)
+  expectTrue(makeNSError(like: ParentB.Error.failed) is ParentB.Error)
+
+  // If an @objc enum error is not eligible for PrintAsObjC, we should treat it
+  // as though it inherited the default implementation, which calls
+  // String(reflecting:).
+  expectEqual(NonPrintAsObjCClass.Error.foo._domain,
+              String(reflecting: NonPrintAsObjCClass.Error.self))
+  expectEqual(NonPrintAsObjCError.bar._domain,
+              String(reflecting: NonPrintAsObjCError.self))
+}
+
 runAllTests()

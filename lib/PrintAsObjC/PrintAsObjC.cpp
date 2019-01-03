@@ -2511,7 +2511,7 @@ public:
       });
       if (!hasDomainCase) {
         os << "static NSString * _Nonnull const " << getNameForObjC(ED)
-           << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
+           << "Domain = @\"" << getErrorDomainStringForObjC(ED) << "\";\n";
       }
     }
 
