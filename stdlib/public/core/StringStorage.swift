@@ -76,9 +76,8 @@ extension _AbstractStringStorage {
       fallthrough
     case (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
-      let buffer =
-        UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
-      buffer.initialize(from: UnsafeBufferPointer(start: start, count: count))
+      let buffer = UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
+      _ = buffer.initialize(from: UnsafeBufferPointer(start: start, count: count))
       buffer[count] = 0
       return 1
     default:
