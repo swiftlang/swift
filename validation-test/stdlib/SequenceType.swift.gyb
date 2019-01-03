@@ -944,62 +944,6 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
 }
 
 //===----------------------------------------------------------------------===//
-// zip()
-//===----------------------------------------------------------------------===//
-
-// Check generic parameter names.
-extension Zip2Sequence.Iterator
-  where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
-
-  var _generator1IsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-// Check generic parameter names.
-extension Zip2Sequence
-  where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
-
-  var _sequence1IsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
-SequenceTypeTests.test("zip") {
-  typealias Element = (OpaqueValue<Int>, OpaqueValue<Int32>)
-  func compareElements(_ lhs: Element, rhs: Element) -> Bool {
-    return lhs.0.value == rhs.0.value && lhs.1.value == rhs.1.value
-  }
-
-  for test in zipTests {
-    let s = MinimalSequence<OpaqueValue<Int>>(
-      elements: test.sequence.map(OpaqueValue.init))
-    let other = MinimalSequence<OpaqueValue<Int32>>(
-      elements: test.other.map(OpaqueValue.init))
-    var result = zip(s, other)
-    expectType(
-      Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
-      &result)
-
-    // Check for expected result and check the Zip2Sequence's Sequence
-    // conformance.
-    checkSequence(
-      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
-      stackTrace: SourceLocStack().with(test.loc), sameValue: compareElements)
-
-    // Check leftovers *after* doing checkSequence(), not before, to ensure
-    // that checkSequence() didn't force us to consume more elements than
-    // needed.
-    expectEqual(
-      test.expectedLeftoverSequence, s.map { $0.value },
-      stackTrace: SourceLocStack().with(test.loc))
-    expectEqual(
-      test.expectedLeftoverOther, other.map { $0.value },
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // underestimatedCount
 //===----------------------------------------------------------------------===//
 

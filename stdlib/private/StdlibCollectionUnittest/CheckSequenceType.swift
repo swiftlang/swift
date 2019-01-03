@@ -86,7 +86,7 @@ public struct ElementsEqualWithPredicateTest {
     public let expectedLeftoverSequence: [Int]
     public let expectedLeftoverOther: [String]
     public let loc: SourceLoc
-    
+
     public init(
         _ expected: Bool, _ sequence: [Int], _ other: [String],
         _ predicate: @escaping (Int, String) -> Bool,
@@ -174,7 +174,7 @@ public struct FindTest {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
     self.sequence = sequence.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
       MinimalEquatableValue.init)
@@ -193,13 +193,13 @@ public struct CollectionBinaryOperationTest {
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.lhs = lhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.rhs = rhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }
@@ -217,10 +217,10 @@ public struct CollectionPredicateTest {
   ) {
     self.expected = expected
     self.lhs = lhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.rhs = rhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }
@@ -457,31 +457,6 @@ public struct StartsWithTest {
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
-public struct ZipTest {
-  public let expected: [(Int, Int32)]
-  public let sequence: [Int]
-  public let other: [Int32]
-  public let expectedLeftoverSequence: [Int]
-  public let expectedLeftoverOther: [Int32]
-  public let loc: SourceLoc
-
-  public init(
-    _ expected: [(Int, Int32)],
-    sequences sequence: [Int],
-    _ other: [Int32],
-    leftovers expectedLeftoverSequence: [Int],
-    _ expectedLeftoverOther: [Int32],
-    file: String = #file, line: UInt = #line
-  ) {
-    self.expected = expected
-    self.sequence = sequence
-    self.other = other
-    self.expectedLeftoverSequence = expectedLeftoverSequence
-    self.expectedLeftoverOther = expectedLeftoverOther
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
 
 public let elementsEqualTests: [ElementsEqualTest] = [
   ElementsEqualTest(true, [], [], [], []),
@@ -506,16 +481,16 @@ func elementsEqualPredicate(_ x: Int, y: String) -> Bool {
 
 public let elementsEqualWithPredicateTests: [ElementsEqualWithPredicateTest] = [
     ElementsEqualWithPredicateTest(true, [], [], elementsEqualPredicate, [], []),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1 ], [], elementsEqualPredicate, [ 1 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1" ], elementsEqualPredicate, [], [ "1" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [], elementsEqualPredicate, [ 1, 2 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1", "2" ], elementsEqualPredicate, [], [ "1", "2" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2, 3, 4 ], [ "1", "2" ], elementsEqualPredicate, [ 3, 4 ], []),
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], [ "3", "4" ]),
-    
+
     ElementsEqualWithPredicateTest(true, [ 1, 2, 3, 4 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], []),
     ElementsEqualWithPredicateTest(true, [ 1, 2 ], [ "1", "2" ], elementsEqualPredicate, [], []),
 ]
@@ -1553,52 +1528,6 @@ public let suffixTests = [
     maxLength: 0,
     expected: []
   ),
-]
-
-public let zipTests = [
-  ZipTest([], sequences: [], [], leftovers: [], []),
-  ZipTest([], sequences: [], [ 1 ], leftovers: [], [ 1 ]),
-  ZipTest([], sequences: [], [ 1, 2 ], leftovers: [], [ 1, 2 ]),
-  ZipTest([], sequences: [], [ 1, 2, 3 ], leftovers: [], [ 1, 2, 3 ]),
-
-  ZipTest([], sequences: [ 10 ], [], leftovers: [], []),
-  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1 ], leftovers: [], []),
-  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1, 2 ], leftovers: [], [ 2 ]),
-  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1, 2, 3 ], leftovers: [], [ 2, 3 ]),
-
-  ZipTest(
-    [],
-    sequences: [ 10, 20 ], [],
-    leftovers: [ 20 ], []),
-  ZipTest(
-    [ (10, 1) ],
-    sequences: [ 10, 20 ], [ 1 ],
-    leftovers: [], []),
-  ZipTest(
-    [ (10, 1), (20, 2) ],
-    sequences: [ 10, 20 ], [ 1, 2 ],
-    leftovers: [], []),
-  ZipTest(
-    [ (10, 1), (20, 2) ],
-    sequences: [ 10, 20 ], [ 1, 2, 3 ],
-    leftovers: [], [ 3 ]),
-
-  ZipTest(
-    [],
-    sequences: [ 10, 20, 30 ], [],
-    leftovers: [ 20, 30 ], []),
-  ZipTest(
-    [ (10, 1) ],
-    sequences: [ 10, 20, 30 ], [ 1 ],
-    leftovers: [ 30 ], []),
-  ZipTest(
-    [ (10, 1), (20, 2) ],
-    sequences: [ 10, 20, 30 ], [ 1, 2 ],
-    leftovers: [], []),
-  ZipTest(
-    [ (10, 1), (20, 2), (30, 3) ],
-    sequences: [ 10, 20, 30 ], [ 1, 2, 3 ],
-    leftovers: [], []),
 ]
 
 public func callGenericUnderestimatedCount<S : Sequence>(_ s: S) -> Int {

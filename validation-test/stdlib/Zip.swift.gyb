@@ -1,0 +1,305 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/Zip.swift
+// RUN: %line-directive %t/Zip.swift -- %target-build-swift %t/Zip.swift -Xfrontend -disable-access-control -o %t/Zip
+// RUN: %line-directive %t/Zip.swift -- %target-run %t/Zip
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+%{
+upper_arity_bound = 6
+
+class ZipIndex (str):
+  def __new__ (cls, indices):
+    return str.__new__(cls, "Zip{0}Index<{1}>({2})".format(
+      len(indices),
+      ", ".join(["[Int]"] * len(indices)),
+      ", ".join(map(str, indices))
+    ))
+
+class ZipSequence (str):
+  def __new__ (cls, counts, longest = False, forward_only_collection = False, is_lazy = False):
+    return str.__new__(cls, "Zip{0}{1}Sequence({2})".format(
+      "Longest" if longest else "",
+      len(counts),
+      ", ".join(map(
+        lambda count:
+          "{0}{1}{2}{3}".format(
+            "Set(" if forward_only_collection else "",
+            "[Int]()" if count == 0 else str(range(count)),
+            ")" if forward_only_collection else "",
+            ".lazy" if is_lazy else ""
+          ),
+        counts
+      ))
+    ))
+
+class ZipLongestSequence (str):
+  def __new__ (cls, counts, forward_only_collection = False, is_lazy = False):
+    return str.__new__(
+      cls,
+      ZipSequence(
+        counts,
+        longest = True,
+        forward_only_collection = forward_only_collection,
+        is_lazy = is_lazy
+      )
+    )
+}%
+% for arity in range(2, upper_arity_bound + 1):
+let Zip${ arity }IndexTests = TestSuite("Zip${ arity }Index")
+
+Zip${ arity }IndexTests.test("<(_:_:).shouldReturnCorrectValueGivenValidIndices") {
+  expectFalse(${ ZipIndex([0] * arity) } < ${ ZipIndex([0] * arity) })
+  expectTrue(${ ZipIndex([0] * arity) } < ${ ZipIndex([0] * (arity - 2) + [0, 1]) })
+  expectFalse(${ ZipIndex([0] * (arity - 2) + [0, 1]) } < ${ ZipIndex([0] * arity) })
+}
+
+Zip${ arity }IndexTests.test("<(_:_:).shouldTrapGivenInvalidIndices") {
+  expectCrashLater(withMessage: "Precondition failed: Indices failed to hold their asymmetric property when compared")
+  _blackHole(${ ZipIndex([0] * (arity - 2) + [0, 1]) } < ${ ZipIndex([0] * (arity - 2) + [1, 0]) })
+}
+
+let Zip${ arity }Tests = TestSuite("Zip${ arity }")
+
+Zip${ arity }Tests.test("Iterator.next().shouldReturnCorrectValue") {
+  var iterator = ${ ZipSequence([2] + [1] * (arity - 1)) }.makeIterator()
+
+  expectTrue(iterator.next()! == (${ ", ".join(["0"] * arity) }))
+  expectNil(iterator.next())
+}
+
+Zip${ arity }Tests.test("Iterator._reachedEnd.shouldReturnCorrectValue") {
+  var iterator = ${ ZipSequence([2] + [1] * (arity - 1)) }.makeIterator()
+
+  _blackHole(iterator.next())
+  expectFalse(iterator._reachedEnd)
+  _blackHole(iterator.next())
+  expectTrue(iterator._reachedEnd)
+}
+
+Zip${ arity }Tests.test("underestimatedCount.shouldReturnCorrectValue") {
+  expectEqual(${ ZipSequence([2] + [1] * (arity - 1)) }.underestimatedCount, 1)
+}
+
+Zip${ arity }Tests.test("startIndex.shouldReturnCorrectValue") {
+  expectEqual(${ ZipSequence([1] + [0] * (arity - 1)) }.startIndex, ${ ZipIndex([1] + [0] * (arity - 1)) })
+  expectEqual(${ ZipSequence([0] * arity) }.startIndex, ${ ZipIndex([0] * arity) })
+}
+
+Zip${ arity }Tests.test("endIndex.shouldReturnCorrectValue") {
+  expectEqual(${ ZipSequence([1] + [0] * (arity - 1)) }.endIndex, ${ ZipIndex([1] + [0] * (arity - 1)) })
+}
+
+Zip${ arity }Tests.test("subscript(_:).shouldReturnCorrectValueGivenValidIndex") {
+  expectTrue(${ ZipSequence([1] * arity) }[${ ZipIndex([0] * arity) }] == (${ ", ".join(["0"] * arity) }))
+}
+
+Zip${ arity }Tests.test("subscript(_:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Index out of range")
+  _blackHole(${ ZipSequence([0] * arity) }[${ ZipIndex([0] * arity) }])
+}
+
+Zip${ arity }Tests.test("index(after:).shouldReturnCorrectValueGivenValidIndex") {
+  expectEqual(${ ZipSequence([2] + [1] * (arity - 1)) }.index(after: ${ ZipIndex([0] * arity) }), ${ ZipIndex([2] + [1] * (arity - 1)) })
+  expectEqual(${ ZipSequence([2] * arity) }.index(after: ${ ZipIndex([0] * arity) }), ${ ZipIndex([1] * arity) })
+}
+
+Zip${ arity }Tests.test("index(after:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Cannot increment beyond endIndex")
+  _blackHole(${ ZipSequence([0] * arity) }.index(after: ${ ZipIndex([0] * arity) }))
+}
+
+Zip${ arity }Tests.test("index(before:).shouldReturnCorrectValueGivenValidIndex") {
+  expectEqual(${ ZipSequence([1] * arity) }.index(before: ${ ZipIndex([1] * arity) }), ${ ZipIndex([0] * arity) })
+}
+
+Zip${ arity }Tests.test("index(before:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Cannot decrement beyond startIndex")
+  _blackHole(${ ZipSequence([0] * arity) }.index(before: ${ ZipIndex([0] * arity) }))
+}
+
+Zip${ arity }Tests.test("distance(from:to:).shouldReturnCorrectValueGivenValidIndices") {
+  expectEqual(${ ZipSequence([0] * arity) }.distance(from: ${ ZipIndex([0] * arity) }, to: ${ ZipIndex([0] * arity) }), 0)
+  expectEqual(${ ZipSequence([2] + [1] * (arity - 1)) }.distance(from: ${ ZipIndex([0] * arity) }, to: ${ ZipIndex([2] + [1] * (arity - 1)) }), 1)
+  expectEqual(${ ZipSequence([2] + [1] * (arity - 1)) }.distance(from: ${ ZipIndex([2] + [1] * (arity - 1)) }, to: ${ ZipIndex([0] * arity) }), -1)
+}
+
+Zip${ arity }Tests.test("distance(from:to:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidIndices") {
+  let collection = ${ ZipSequence([1] * arity, forward_only_collection = True) }
+
+  expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can have end come before start")
+  _blackHole(collection.distance(from: collection.endIndex, to: collection.startIndex))
+}
+
+Zip${ arity }Tests.test("index(_:offsetBy:).shouldReturnCorrectValueGivenValidDistance") {
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: -1), ${ ZipIndex([0] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 0), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 1), ${ ZipIndex([3] + [2] * (arity - 1)) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([3] + [2] * (arity - 1)) }, offsetBy: -1), ${ ZipIndex([1] * arity) })
+}
+
+Zip${ arity }Tests.test("index(_:offsetBy:).shouldTrapGivenInvalidDistance") {
+  expectCrashLater(withMessage: "Precondition failed: Index out of range")
+  _blackHole(${ ZipSequence([0] * arity) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1))
+}
+
+Zip${ arity }Tests.test("index(_:offsetBy:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidDistance") {
+  do {
+    let collection = ${ ZipSequence([0] * arity, forward_only_collection = True) }
+
+    expectCrashLater(withMessage: "Precondition failed: Index out of range")
+    _blackHole(collection.index(collection.endIndex, offsetBy: -1))
+  }
+
+  do {
+    let collection = ${ ZipSequence([1] * arity, forward_only_collection = True) }
+
+    expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can be advanced by a negative amount")
+    _blackHole(collection.index(collection.endIndex, offsetBy: -1))
+  }
+}
+
+Zip${ arity }Tests.test("index(_:offsetBy:limitedBy:).shouldReturnCorrectValueGivenValidDistance") {
+  expectNil(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([0] * arity) }))
+  expectNil(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 2, limitedBy: ${ ZipIndex([1] * arity) }))
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([3] + [2] * (arity - 1)) }), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: -1, limitedBy: ${ ZipIndex([0] * arity) }), ${ ZipIndex([0] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 0, limitedBy: ${ ZipIndex([1] * arity) }), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([3] + [2] * (arity - 1)) }), ${ ZipIndex([3] + [2] * (arity - 1)) })
+  expectEqual(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([3] + [2] * (arity - 1)) }, offsetBy: -1, limitedBy: ${ ZipIndex([0] * arity) }), ${ ZipIndex([1] * arity) })
+  expectNil(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([3] + [2] * (arity - 1)) }, offsetBy: -1, limitedBy: ${ ZipIndex([3] + [2] * (arity - 1)) }))
+  expectNil(${ ZipSequence([3] + [2] * (arity - 1)) }.index(${ ZipIndex([3] + [2] * (arity - 1)) }, offsetBy: -2, limitedBy: ${ ZipIndex([1] * arity) }))
+}
+
+Zip${ arity }Tests.test("index(_:offsetBy:limitedBy:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidDistance") {
+  let collection = ${ ZipSequence([3] + [2] * (arity - 1), forward_only_collection = True) }
+
+  expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can be advanced by a negative amount")
+  _blackHole(collection.index(collection.endIndex, offsetBy: -1, limitedBy: collection.startIndex))
+}
+
+let Zip${ arity }LongestTests = TestSuite("Zip${ arity }Longest")
+
+Zip${ arity }LongestTests.test("Iterator.next().shouldReturnCorrectValue") {
+  var iterator = ${ ZipLongestSequence([1] + [0] * (arity - 1)) }.makeIterator()
+
+  expectTrue(iterator.next()! == (.some(0)${ ", nil" * (arity - 1) }))
+  expectNil(iterator.next())
+}
+
+Zip${ arity }LongestTests.test("underestimatedCount.shouldReturnCorrectValue") {
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.underestimatedCount, 1)
+}
+
+Zip${ arity }LongestTests.test("startIndex.shouldReturnCorrectValue") {
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.startIndex, ${ ZipIndex([0] * arity) })
+}
+
+Zip${ arity }LongestTests.test("endIndex.shouldReturnCorrectValue") {
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.endIndex, ${ ZipIndex([1] + [0] * (arity - 1)) })
+}
+
+Zip${ arity }LongestTests.test("subscript(_:).shouldReturnCorrectValueGivenValidIndex") {
+  expectTrue(${ ZipLongestSequence([1] + [0] * (arity - 1)) }[${ ZipIndex([0] * arity) }] == (.some(0)${ ", nil" * (arity - 1) }))
+}
+
+Zip${ arity }LongestTests.test("subscript(_:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Index out of range")
+  _blackHole(${ ZipLongestSequence([0] * arity) }[${ ZipIndex([0] * arity) }])
+}
+
+Zip${ arity }LongestTests.test("index(after:).shouldReturnCorrectValueGivenValidIndex") {
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.index(after: ${ ZipIndex([0] * arity) }), ${ ZipIndex([1] + [0] * (arity - 1)) })
+}
+
+Zip${ arity }LongestTests.test("index(after:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Cannot increment beyond endIndex")
+  _blackHole(${ ZipLongestSequence([0] * arity) }.index(after: ${ ZipIndex([0] * arity) }))
+}
+
+Zip${ arity }LongestTests.test("index(before:).shouldReturnCorrectValueGivenValidIndex") {
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.index(before: ${ ZipIndex([1] + [0] * (arity - 1)) }), ${ ZipIndex([0] * arity) })
+}
+
+Zip${ arity }LongestTests.test("index(before:).shouldTrapGivenInvalidIndex") {
+  expectCrashLater(withMessage: "Precondition failed: Cannot decrement beyond startIndex")
+  _blackHole(${ ZipLongestSequence([0] * arity) }.index(before: ${ ZipIndex([0] * arity) }))
+}
+
+Zip${ arity }LongestTests.test("distance(from:to:).shouldReturnCorrectValueGivenValidIndices") {
+  expectEqual(${ ZipLongestSequence([0] * arity) }.distance(from: ${ ZipIndex([0] * arity) }, to: ${ ZipIndex([0] * arity) }), 0)
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.distance(from: ${ ZipIndex([0] * arity) }, to: ${ ZipIndex([1] + [0] * (arity - 1)) }), 1)
+  expectEqual(${ ZipLongestSequence([1] + [0] * (arity - 1)) }.distance(from: ${ ZipIndex([1] + [0] * (arity - 1)) }, to: ${ ZipIndex([0] * arity) }), -1)
+}
+
+Zip${ arity }LongestTests.test("distance(from:to:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidIndices") {
+  let collection = ${ ZipLongestSequence([1] * arity, forward_only_collection = True) }
+
+  expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can have end come before start")
+  _blackHole(collection.distance(from: collection.endIndex, to: collection.startIndex))
+}
+
+Zip${ arity }LongestTests.test("index(_:offsetBy:).shouldReturnCorrectValueGivenValidDistance") {
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: -1), ${ ZipIndex([0] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 0), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 1), ${ ZipIndex([2] + [1] * (arity - 1)) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([2] + [1] * (arity - 1)) }, offsetBy: -1), ${ ZipIndex([1] * arity) })
+}
+
+Zip${ arity }LongestTests.test("index(_:offsetBy:).shouldTrapGivenInvalidDistance") {
+  expectCrashLater(withMessage: "Precondition failed: Index out of range")
+  _blackHole(${ ZipLongestSequence([0] * arity) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1))
+}
+
+Zip${ arity }LongestTests.test("index(_:offsetBy:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidDistance") {
+  do {
+    let collection = ${ ZipLongestSequence([0] * arity, forward_only_collection = True) }
+
+    expectCrashLater(withMessage: "Precondition failed: Index out of range")
+    _blackHole(collection.index(collection.endIndex, offsetBy: -1))
+  }
+
+  do {
+    let collection = ${ ZipLongestSequence([1] * arity, forward_only_collection = True) }
+
+    expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can be advanced by a negative amount")
+    _blackHole(collection.index(collection.endIndex, offsetBy: -1))
+  }
+}
+
+Zip${ arity }LongestTests.test("index(_:offsetBy:limitedBy:).shouldReturnCorrectValueGivenValidDistance") {
+  expectNil(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([0] * arity) }))
+  expectNil(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 2, limitedBy: ${ ZipIndex([1] * arity) }))
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([0] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([2] + [1] * (arity - 1)) }), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: -1, limitedBy: ${ ZipIndex([0] * arity) }), ${ ZipIndex([0] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 0, limitedBy: ${ ZipIndex([1] * arity) }), ${ ZipIndex([1] * arity) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([1] * arity) }, offsetBy: 1, limitedBy: ${ ZipIndex([2] + [1] * (arity - 1)) }), ${ ZipIndex([2] + [1] * (arity - 1)) })
+  expectEqual(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([2] + [1] * (arity - 1)) }, offsetBy: -1, limitedBy: ${ ZipIndex([0] * arity) }), ${ ZipIndex([1] * arity) })
+  expectNil(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([2] + [1] * (arity - 1)) }, offsetBy: -1, limitedBy: ${ ZipIndex([2] + [1] * (arity - 1)) }))
+  expectNil(${ ZipLongestSequence([2] + [1] * (arity - 1)) }.index(${ ZipIndex([2] + [1] * (arity - 1)) }, offsetBy: -2, limitedBy: ${ ZipIndex([1] * arity) }))
+}
+
+Zip${ arity }LongestTests.test("index(_:offsetBy:limitedBy:).shouldTrapGivenForwardOnlyCollectionConformanceAndInvalidDistance") {
+  let collection = ${ ZipLongestSequence([1] * arity, forward_only_collection = True) }
+
+  expectCrashLater(withMessage: "Fatal error: Only BidirectionalCollections can be advanced by a negative amount")
+  _blackHole(collection.index(collection.endIndex, offsetBy: -1, limitedBy: collection.startIndex))
+}
+
+let Unzip${ arity }Tests = TestSuite("Unzip${ arity }")
+
+Unzip${ arity }Tests.test("shouldReturnCorrectValueGivenEagerCollection") {
+  expectTrue(${ ZipSequence([3] + [2] * (arity - 1)) }.unzip() == (${ ", ".join(["[0, 1]"] * arity) }))
+}
+
+Unzip${ arity }Tests.test("shouldReturnCorrectValueGivenLazyCollection") {
+  let collection = ${ ZipSequence([3] + [2] * (arity - 1), is_lazy = True) }.unzip()
+
+  expectTrue((${ ", ".join(map(lambda arity: "Array(collection.{0})".format(arity), range(arity))) }) == (${ ", ".join(["[0, 1]"] * arity) }))
+}${ "\n" if arity < upper_arity_bound else "" }
+% end
+
+runAllTests()
