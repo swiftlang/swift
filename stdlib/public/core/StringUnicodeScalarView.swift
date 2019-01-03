@@ -185,6 +185,7 @@ extension String.UnicodeScalarView {
     }
 
     @inlinable
+    @inline(__always)
     public mutating func next() -> Unicode.Scalar? {
       guard _fastPath(_position < _end) else { return nil }
 
