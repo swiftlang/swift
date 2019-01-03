@@ -561,14 +561,14 @@ class TestDriverArgumentParser(unittest.TestCase):
         with self.assertNotRaises(ParserError):
             namespace = self.parse_default_args(['--debug'])
 
-            self.assertEquals(namespace.cmark_build_variant, 'Debug')
-            self.assertEquals(namespace.foundation_build_variant, 'Debug')
-            self.assertEquals(namespace.libdispatch_build_variant, 'Debug')
-            self.assertEquals(namespace.libicu_build_variant, 'Debug')
-            self.assertEquals(namespace.lldb_build_variant, 'Debug')
-            self.assertEquals(namespace.llvm_build_variant, 'Debug')
-            self.assertEquals(namespace.swift_build_variant, 'Debug')
-            self.assertEquals(namespace.swift_stdlib_build_variant, 'Debug')
+            self.assertEqual(namespace.cmark_build_variant, 'Debug')
+            self.assertEqual(namespace.foundation_build_variant, 'Debug')
+            self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
+            self.assertEqual(namespace.libicu_build_variant, 'Debug')
+            self.assertEqual(namespace.lldb_build_variant, 'Debug')
+            self.assertEqual(namespace.llvm_build_variant, 'Debug')
+            self.assertEqual(namespace.swift_build_variant, 'Debug')
+            self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
 
     def test_implied_defaults_skip_build(self):
         with self.assertNotRaises(ParserError):

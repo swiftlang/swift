@@ -57,13 +57,13 @@ class Test_parse_args(unittest.TestCase):
 
     def test_run_benchmarks_by_name_or_ordinal(self):
         benchmarks = ['AngryPhonebook', '42']
-        self.assertEquals(
+        self.assertEqual(
             parse_args(['run'] + benchmarks).benchmarks, benchmarks)
 
     def test_run_benchmarks_matching_pattern(self):
         regexes = ['Prefix', '.*Suffix.*']
         filters = ['-f', regexes[0], '-f', regexes[1]]
-        self.assertEquals(parse_args(['run'] + filters).filters, regexes)
+        self.assertEqual(parse_args(['run'] + filters).filters, regexes)
 
     def test_run_benchmarks_and_filters_are_exclusive(self):
         with captured_output() as (_, err):
@@ -76,17 +76,17 @@ class Test_parse_args(unittest.TestCase):
 
     def test_tests_location(self):
         here = os.path.dirname(os.path.abspath(__file__))
-        self.assertEquals(parse_args(['run']).tests, here)
+        self.assertEqual(parse_args(['run']).tests, here)
         tests = '/benchmarks/are/here'
-        self.assertEquals(parse_args(['run', '-t', tests]).tests, tests)
+        self.assertEqual(parse_args(['run', '-t', tests]).tests, tests)
 
     def test_optimization_argument(self):
-        self.assertEquals(parse_args(['run']).optimization, 'O')
-        self.assertEquals(
+        self.assertEqual(parse_args(['run']).optimization, 'O')
+        self.assertEqual(
             parse_args(['run', '-o', 'O']).optimization, 'O')
-        self.assertEquals(
+        self.assertEqual(
             parse_args(['run', '-o', 'Onone']).optimization, 'Onone')
-        self.assertEquals(
+        self.assertEqual(
             parse_args(['run', '-o', 'Osize']).optimization, 'Osize')
 
         with captured_output() as (_, err):
@@ -99,8 +99,8 @@ class Test_parse_args(unittest.TestCase):
             err.getvalue())
 
     def test_independent_samples(self):
-        self.assertEquals(parse_args(['run']).independent_samples, 1)
-        self.assertEquals(parse_args(['run', '-i', '3']).independent_samples,
+        self.assertEqual(parse_args(['run']).independent_samples, 1)
+        self.assertEqual(parse_args(['run', '-i', '3']).independent_samples,
                           3)
         with captured_output() as (out, err):
             self.assertRaises(SystemExit,
@@ -112,7 +112,7 @@ class Test_parse_args(unittest.TestCase):
 
     def test_output_dir(self):
         self.assertIsNone(parse_args(['run']).output_dir)
-        self.assertEquals(
+        self.assertEqual(
             parse_args(['run', '--output-dir', '/log']).output_dir, '/log')
 
     def test_check_supports_vebose_output(self):
@@ -169,12 +169,12 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.subprocess_mock = SubprocessMock()
 
     def test_test_harness(self):
-        self.assertEquals(
+        self.assertEqual(
             BenchmarkDriver(self.args, tests=['ignored']).test_harness,
             '/benchmarks/Benchmark_O')
         self.args.tests = '/path'
         self.args.optimization = 'Suffix'
-        self.assertEquals(
+        self.assertEqual(
             BenchmarkDriver(self.args, tests=['ignored']).test_harness,
             '/path/Benchmark_Suffix')
 
@@ -185,9 +185,9 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
-        self.assertEquals(driver.tests,
+        self.assertEqual(driver.tests,
                           ['Benchmark1', 'Benchmark2'])
-        self.assertEquals(driver.all_tests,
+        self.assertEqual(driver.all_tests,
                           ['Benchmark1', 'Benchmark2'])
         self.assertEquals(driver.test_number['Benchmark1'], "1")
         self.assertEquals(driver.test_number['Benchmark2'], "2")
@@ -207,8 +207,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
-        self.assertEquals(driver.tests, ['Benchmark1', 'Benchmark3'])
-        self.assertEquals(driver.all_tests,
+        self.assertEqual(driver.tests, ['Benchmark1', 'Benchmark3'])
+        self.assertEqual(driver.all_tests,
                           ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
     def test_filters_benchmarks_by_pattern(self):
@@ -217,8 +217,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
-        self.assertEquals(driver.tests, ['Benchmark3'])
-        self.assertEquals(driver.all_tests,
+        self.assertEqual(driver.tests, ['Benchmark3'])
+        self.assertEqual(driver.all_tests,
                           ['Benchmark1', 'Benchmark2', 'Benchmark3'])
 
     def test_log_file(self):
@@ -230,7 +230,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         driver = BenchmarkDriver(
             Stub(output_dir='/path', tests='/bin/', optimization='Suffix',
                  swift_repo=None,), tests=['ignored'])
-        self.assertEquals(driver.log_file,
+        self.assertEqual(driver.log_file,
                           '/path/Benchmark_Suffix-' + now + '.log')
 
         r = '/repo/'
@@ -243,7 +243,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         driver = BenchmarkDriver(
             Stub(output_dir='/log/', tests='', optimization='S', swift_repo=r),
             tests=['ignored'], _subprocess=subprocess_mock)
-        self.assertEquals(driver.log_file,
+        self.assertEqual(driver.log_file,
                           '/log/branch/Benchmark_S-' + now + '-short_hash.log')
         subprocess_mock.assert_called_all_expected()
 
@@ -332,14 +332,14 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         """Extract up to 20 measurements from an independent run."""
         self.driver.args.independent_samples = 3
         r = self.driver.run_independent_samples('b1')
-        self.assertEquals(self.subprocess_mock.calls.count(
+        self.assertEqual(self.subprocess_mock.calls.count(
             ('/benchmarks/Benchmark_O', 'b1', '--num-iters=1', '--memory',
              '--quantile=20', '--delta')), 3)
-        self.assertEquals(r.num_samples, 3)  # results are merged
+        self.assertEqual(r.num_samples, 3)  # results are merged
 
     def test_run_and_log(self):
         def mock_run(test):
-            self.assertEquals(test, 'b1')
+            self.assertEqual(test, 'b1')
             return PerformanceTestResult(
                 '3,b1,5,101,1,1,1,1,888'.split(','),
                 quantiles=True, delta=True, memory=True)
@@ -352,8 +352,8 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         header = '#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs),' +\
             'MAX_RSS(B)\n'
         csv_log = '3,b1,5,101,102,103,104,105,888\n'
-        self.assertEquals(log, None)
-        self.assertEquals(
+        self.assertEqual(log, None)
+        self.assertEqual(
             out.getvalue(),
             header +
             csv_log +
@@ -363,8 +363,8 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         with captured_output() as (out, _):
             log = driver.run_and_log(csv_console=False)
 
-        self.assertEquals(log, header + csv_log)
-        self.assertEquals(
+        self.assertEqual(log, header + csv_log)
+        self.assertEqual(
             out.getvalue(),
             '  # TEST                      SAMPLES MIN(μs) Q1(μs)' +
             ' MEDIAN(μs) Q3(μs) MAX(μs) MAX_RSS(B)\n' +
@@ -376,11 +376,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_log_results(self):
         """Create log directory if it doesn't exist and write the log file."""
         def assert_log_written(out, log_file, content):
-            self.assertEquals(out.getvalue(),
+            self.assertEqual(out.getvalue(),
                               'Logging results to: ' + log_file + '\n')
             with open(log_file, 'rU') as f:
                 text = f.read()
-            self.assertEquals(text, "formatted output")
+            self.assertEqual(text, "formatted output")
 
         try:
             import tempfile  # setUp
@@ -408,7 +408,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
     def test_deterministing_hashing(self):
         cmd = ['printenv', 'SWIFT_DETERMINISTIC_HASHING']
         driver = BenchmarkDriver(['no args'], tests=['ignored'])
-        self.assertEquals(driver._invoke(cmd).strip(), '1')
+        self.assertEqual(driver._invoke(cmd).strip(), '1')
 
 
 class BenchmarkDriverMock(Mock):
@@ -437,7 +437,7 @@ class TestLoggingReportFormatter(unittest.TestCase):
             'name': 'Base.category', 'level': logging.DEBUG,
             'levelname': 'DEBUG', 'msg': 'Hi!'})
         f = LoggingReportFormatter()
-        self.assertEquals(f.format(lr), 'DEBUG category: Hi!')
+        self.assertEqual(f.format(lr), 'DEBUG category: Hi!')
 
     def test_colored_log_format(self):
         def record(level, level_name):
@@ -445,15 +445,15 @@ class TestLoggingReportFormatter(unittest.TestCase):
                 'name': 'Base.category', 'levelno': level,
                 'levelname': level_name, 'msg': 'Hi!'})
         f = LoggingReportFormatter(use_color=True)
-        self.assertEquals(f.format(record(logging.DEBUG, 'DEBUG')),
+        self.assertEqual(f.format(record(logging.DEBUG, 'DEBUG')),
                           '\x1b[1;39mcategory: Hi!\x1b[1;0m')
-        self.assertEquals(f.format(record(logging.INFO, 'INFO')),
+        self.assertEqual(f.format(record(logging.INFO, 'INFO')),
                           '\x1b[1;32mcategory: Hi!\x1b[1;0m')
-        self.assertEquals(f.format(record(logging.WARNING, 'WARNING')),
+        self.assertEqual(f.format(record(logging.WARNING, 'WARNING')),
                           '\x1b[1;33mcategory: Hi!\x1b[1;0m')
-        self.assertEquals(f.format(record(logging.ERROR, 'ERROR')),
+        self.assertEqual(f.format(record(logging.ERROR, 'ERROR')),
                           '\x1b[1;31mcategory: Hi!\x1b[1;0m')
-        self.assertEquals(f.format(record(logging.CRITICAL, 'CRITICAL')),
+        self.assertEqual(f.format(record(logging.CRITICAL, 'CRITICAL')),
                           '\x1b[1;35mcategory: Hi!\x1b[1;0m')
 
     def test_no_prefix_for_base_logging(self):
@@ -461,7 +461,7 @@ class TestLoggingReportFormatter(unittest.TestCase):
             'name': 'Base', 'level': logging.INFO,
             'levelname': 'INFO', 'msg': 'Hi!'})
         f = LoggingReportFormatter()
-        self.assertEquals(f.format(lr), 'INFO Hi!')
+        self.assertEqual(f.format(lr), 'INFO Hi!')
 
 
 class TestMarkdownReportHandler(unittest.TestCase):
@@ -481,7 +481,7 @@ class TestMarkdownReportHandler(unittest.TestCase):
             'levelno': level, 'msg': msg})
 
     def test_init_writes_table_header(self):
-        self.assertEquals(self.handler.level, logging.INFO)
+        self.assertEqual(self.handler.level, logging.INFO)
         self.assert_contains(['Benchmark Check Report\n', '---|---'])
 
     def test_close_writes_final_newlines(self):
@@ -552,7 +552,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         with captured_output() as (out, _):
             BenchmarkDoctor(self.args, driver)
         self.assert_contains(['Checking tests: B1, B2'], self.logs['debug'])
-        self.assertEquals(out.getvalue(), '')
+        self.assertEqual(out.getvalue(), '')
 
     def test_supports_verbose_output(self):
         driver = BenchmarkDriverMock(tests=['B1', 'B2'])
@@ -607,7 +607,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
              'B1 O i1a', 'B1 O i1b', 'B1 O i1c', 'B1 O i1d', 'B1 O i1e',
              'B1 O i2a', 'B1 O i2b', 'B1 O i2c', 'B1 O i2d', 'B1 O i2e'],
             measurements.keys())
-        self.assertEquals(measurements['name'], 'B1')
+        self.assertEqual(measurements['name'], 'B1')
         self.assert_contains(
             ['Calibrating num-samples for B1:',
              'Runtime 300 μs yields 4096 adjusted samples per second.',
