@@ -680,8 +680,8 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
     // Note that we don't push break/continue locations since they aren't valid
     // in this statement.
     SILGenSavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
-    SGF.emitProfilerIncrement(S->getBody());
     SGF.emitStmt(S->getBody());
+    SGF.emitProfilerIncrement(S->getBody());
 
     // The body block must end in a noreturn call, return, break etc.  It
     // isn't valid to fall off into the normal flow.  To model this, we emit
