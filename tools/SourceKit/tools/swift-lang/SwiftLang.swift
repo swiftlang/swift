@@ -29,78 +29,90 @@ enum SourceKitdError: Error, CustomStringConvertible {
 }
 
 public class SwiftLang {
-  /// Represents a file of Swift source code. A SwiftSourceFile may point to a
-  /// file on disk or it may directly contain the code to be parsed.
-  public enum SourceFile {
-    /// Creates a SwiftSourceFile instance representing a file on disk.
-    case path(String)
+  private static let syntaxTreeKey = SourceKitdUID.key_SerializedSyntaxTree
 
-    /// Creates a SwiftSourceFile instance directly containing the code to be
-    /// parsed.
-    case source(String)
+  fileprivate struct SourceFile {
+    let name: String
+    let contentKey: SourceKitdUID
+    let contentValue: String
 
-    /// The filename to be used for EditorOpen and EditorClose commands.
-    var name: String {
-      switch self {
-      case .path(let name):
-        return name
-      case .source:
-        return "untitled.swift"
-      }
+    static func path(_ path: String) -> SourceFile {
+      return SourceFile(
+        name: path,
+        contentKey: .key_SourceFile,
+        contentValue: path
+      )
+    }
+
+    static func source(_ source: String) -> SourceFile {
+      return SourceFile(
+        name: "foo",
+        contentKey: .key_SourceText,
+        contentValue: source
+      )
     }
   }
 
   /// The format to serialize the syntax tree in.
-  public enum SyntaxSerializationFormat {
-    /// Return the syntax tree as JSON. The JSON serialization is more
-    /// human-readable but less efficient to deserialize.
-    case json
-
-    /// Return the syntax tree as ByteTree. The ByteTree serialization is fast
-    /// and compact but difficult to inspect.
-    case byteTree
-
-    /// Returns the corresponding kind_SyntaxTreeSerialization* UID.
-    var kind: SourceKitdUID {
-      switch self {
-      case .json:
-        return .kind_SyntaxTreeSerializationJSON
-      case .byteTree:
-        return .kind_SyntaxTreeSerializationByteTree
+  public struct SyntaxTreeFormat<Tree> {
+    /// Serialize the syntax tree into a JSON string. For backwards
+    /// compatibility only.
+    fileprivate static var jsonString: SyntaxTreeFormat<String> {
+      return .init(kind: .kind_SyntaxTreeSerializationJSON) { dict in
+        dict.getString(syntaxTreeKey)
       }
     }
 
-    /// Fetches the key_SerializedSyntaxTree entry from the response dictionary,
-    /// converting it if necessary.
-    func value(from dictionary: SourceKitdResponse.Dictionary) -> Data {
-      let key = SourceKitdUID.key_SerializedSyntaxTree
-      switch self {
-      case .json:
-        let string = dictionary.getString(key)
-        return string.data(using: .utf8)!
-      case .byteTree:
-        return dictionary.getData(key)
+    /// Return the syntax tree as JSON. The JSON serialization is more
+    /// human-readable but less efficient to deserialize.
+    public static var json: SyntaxTreeFormat<Data> {
+      return jsonString.withTreeMapped { $0.data(using: .utf8)! }
+    }
+
+    /// Return the syntax tree as ByteTree. The ByteTree serialization is fast
+    /// and compact but difficult to inspect.
+    public static var byteTree: SyntaxTreeFormat<Data> {
+      return .init(kind: .kind_SyntaxTreeSerializationByteTree) { dict in
+        dict.getData(syntaxTreeKey)
+      }
+    }
+
+    /// Value for EditorOpen's key_SyntaxTreeSerializationFormat key.
+    let kind: SourceKitdUID
+
+    /// Extracts the syntax tree from the response dictionary and converts it
+    /// into a value of type Tree.
+    let makeTree: (SourceKitdResponse.Dictionary) throws -> Tree
+
+    /// Creates a new `SyntaxTreeFormat` instance which converts the tree of an
+    /// existing format.
+    ///
+    /// You can use this method to add new `SyntaxTreeFormat`s; simply declare a
+    /// new static constant in an extension of `SyntaxTreeFormat` which maps one
+    /// of the existing formats.
+    ///
+    /// - Parameter transform: A function which converts `self`'s Tree type to
+    ///             the result type's Tree type.
+    /// - Returns: A new format which creates a tree in `self`'s format, then
+    ///            applies `transform` to the tree to convert it.
+    public func withTreeMapped<NewTree>(
+      by transform: @escaping (Tree) throws -> NewTree
+    ) -> SyntaxTreeFormat<NewTree> {
+      return .init(kind: kind) { [makeTree] dict in
+        try transform(makeTree(dict))
       }
     }
   }
 
-  /// Parses the SourceFile in question using the provided serialization format,
-  /// but does not extract the result from the dictionary.
-  fileprivate static func parseRaw(
+  /// Parses the SourceFile in question using the provided serialization format.
+  fileprivate static func parse<Tree>(
     _ content: SourceFile,
-    into serialization: SyntaxSerializationFormat
-  ) throws -> SourceKitdResponse.Dictionary {
+    into serialization: SyntaxTreeFormat<Tree>
+  ) throws -> Tree {
     let Service = SourceKitdService()
     let Request = SourceKitdRequest(uid: .request_EditorOpen)
 
-    switch content {
-    case .path(let path):
-      Request.addParameter(.key_SourceFile, value: path)
-
-    case .source(let content):
-      Request.addParameter(.key_SourceText, value: content)
-    }
-
+    Request.addParameter(content.contentKey, value: content.contentValue)
     Request.addParameter(.key_Name, value: content.name)
 
     Request.addParameter(.key_SyntaxTreeTransferMode,
@@ -123,22 +135,25 @@ public class SwiftLang {
     if CloseResp.isError {
       throw SourceKitdError.EditorCloseError(message: CloseResp.description)
     }
-    return Resp.value
+    return try serialization.makeTree(Resp.value)
   }
 
   /// Synchronously parses Swift source code into a syntax tree serialized in
   /// the indicated format.
   ///
-  /// - Parameter content: The source code to parse.
+  /// - Parameter url: A file URL pointing to a Swift source file.
   /// - Parameter serialization: The serialization format to use for the syntax
   ///   tree.
   /// - Returns: The syntax tree in the indicated serialization format.
-  /// - Throws: If an error occurs when opening or closing the file.
-  public static func parse(
-    _ content: SourceFile,
-    into serialization: SyntaxSerializationFormat
-  ) throws -> Data {
-    return serialization.value(from: try parseRaw(content, into: serialization))
+  /// - Throws: If SourceKit responds to the request with an error. This is
+  ///           usually a communication or configuration error, not a
+  ///           syntax error in the code being parsed.
+  /// - Precondition: `url` must be a file URL.
+  public static func parse<Tree>(
+    contentsOf url: URL, into serialization: SyntaxTreeFormat<Tree>
+  ) throws -> Tree {
+    precondition(url.isFileURL, "Can only parse files at file URLs")
+    return try parse(.path(url.path), into: serialization)
   }
 }
 
@@ -146,21 +161,19 @@ extension SwiftLang {
   /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
   /// serialization format by querying SourceKitd service. This function isn't
   /// thread safe.
-  /// - Parameter url: The URL you wish to parse.
+  /// - Parameter path: The URL you wish to parse.
   /// - Returns: The syntax tree in Json format string.
   @available(swift, deprecated: 5.0, renamed: "parse(_:into:)")
   public static func parse(path: String) throws -> String {
-    return try parseRaw(.path(path), into: .json)
-      .getString(.key_SerializedSyntaxTree)
+    return try parse(.path(path), into: .jsonString)
   }
 
   /// Parses a given source buffer into a `Syntax` tree in Json serialization
   /// format by querying SourceKitd service. This function isn't thread safe.
   /// - Parameter source: The source buffer you wish to parse.
   /// - Returns: The syntax tree in Json format string.
-  @available(swift, deprecated: 5.0, renamed: "parse(_:into:)")
+  @available(swift, deprecated: 5.0, message: "Use parse(_:into:) with a file instead")
   public static func parse(source: String) throws -> String {
-    return try parseRaw(.source(source), into: .json)
-      .getString(.key_SerializedSyntaxTree)
+    return try parse(.source(source), into: .jsonString)
   }
 }
