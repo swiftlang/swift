@@ -29,24 +29,84 @@ enum SourceKitdError: Error, CustomStringConvertible {
 }
 
 public class SwiftLang {
+  /// Represents a file of Swift source code. A SwiftSourceFile may point to a
+  /// file on disk or it may directly contain the code to be parsed.
+  public enum SourceFile {
+    /// Creates a SwiftSourceFile instance representing a file on disk.
+    case path(String)
 
-  fileprivate static func parse<T>(
-    content: String, name: String, isURL: Bool,
-    format: SourceKitdUID,
-    getter: (SourceKitdResponse.Dictionary) -> (SourceKitdUID) -> T
-  ) throws -> T {
+    /// Creates a SwiftSourceFile instance directly containing the code to be
+    /// parsed.
+    case source(String)
+
+    /// The filename to be used for EditorOpen and EditorClose commands.
+    var name: String {
+      switch self {
+      case .path(let name):
+        return name
+      case .source:
+        return "untitled.swift"
+      }
+    }
+  }
+
+  /// The format to serialize the syntax tree in.
+  public enum SyntaxSerializationFormat {
+    /// Return the syntax tree as JSON. The JSON serialization is more
+    /// human-readable but less efficient to deserialize.
+    case json
+
+    /// Return the syntax tree as ByteTree. The ByteTree serialization is fast
+    /// and compact but difficult to inspect.
+    case byteTree
+
+    /// Returns the corresponding kind_SyntaxTreeSerialization* UID.
+    var kind: SourceKitdUID {
+      switch self {
+      case .json:
+        return .kind_SyntaxTreeSerializationJSON
+      case .byteTree:
+        return .kind_SyntaxTreeSerializationByteTree
+      }
+    }
+
+    /// Fetches the key_SerializedSyntaxTree entry from the response dictionary,
+    /// converting it if necessary.
+    func value(from dictionary: SourceKitdResponse.Dictionary) -> Data {
+      let key = SourceKitdUID.key_SerializedSyntaxTree
+      switch self {
+      case .json:
+        let string = dictionary.getString(key)
+        return string.data(using: .utf8)!
+      case .byteTree:
+        return dictionary.getData(key)
+      }
+    }
+  }
+
+  /// Parses the SourceFile in question using the provided serialization format,
+  /// but does not extract the result from the dictionary.
+  fileprivate static func parseRaw(
+    _ content: SourceFile,
+    into serialization: SyntaxSerializationFormat
+  ) throws -> SourceKitdResponse.Dictionary {
     let Service = SourceKitdService()
     let Request = SourceKitdRequest(uid: .request_EditorOpen)
-    if isURL {
-      Request.addParameter(.key_SourceFile, value: content)
-    } else {
+
+    switch content {
+    case .path(let path):
+      Request.addParameter(.key_SourceFile, value: path)
+
+    case .source(let content):
       Request.addParameter(.key_SourceText, value: content)
     }
-    Request.addParameter(.key_Name, value: name)
+
+    Request.addParameter(.key_Name, value: content.name)
+
     Request.addParameter(.key_SyntaxTreeTransferMode,
                          value: .kind_SyntaxTreeFull)
     Request.addParameter(.key_SyntaxTreeSerializationFormat,
-                         value: format)
+                         value: serialization.kind)
     Request.addParameter(.key_EnableSyntaxMap, value: 0)
     Request.addParameter(.key_EnableStructure, value: 0)
     Request.addParameter(.key_SyntacticOnly, value: 1)
@@ -58,53 +118,49 @@ public class SwiftLang {
     }
 
     let CloseReq = SourceKitdRequest(uid: .request_EditorClose)
-    CloseReq.addParameter(.key_Name, value: name)
+    CloseReq.addParameter(.key_Name, value: content.name)
     let CloseResp = Service.sendSyn(request: CloseReq)
     if CloseResp.isError {
       throw SourceKitdError.EditorCloseError(message: CloseResp.description)
     }
-    return getter(Resp.value)(.key_SerializedSyntaxTree)
+    return Resp.value
   }
 
+  /// Synchronously parses Swift source code into a syntax tree serialized in
+  /// the indicated format.
+  ///
+  /// - Parameter content: The source code to parse.
+  /// - Parameter serialization: The serialization format to use for the syntax
+  ///   tree.
+  /// - Returns: The syntax tree in the indicated serialization format.
+  /// - Throws: If an error occurs when opening or closing the file.
+  public static func parse(
+    _ content: SourceFile,
+    into serialization: SyntaxSerializationFormat
+  ) throws -> Data {
+    return serialization.value(from: try parseRaw(content, into: serialization))
+  }
+}
+
+extension SwiftLang {
   /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
   /// serialization format by querying SourceKitd service. This function isn't
   /// thread safe.
   /// - Parameter url: The URL you wish to parse.
   /// - Returns: The syntax tree in Json format string.
+  @available(swift, deprecated: 5.0, renamed: "parse(_:into:)")
   public static func parse(path: String) throws -> String {
-    return try parse(content: path, name: path, isURL: true,
-                      format: .kind_SyntaxTreeSerializationJSON,
-                      getter: SourceKitdResponse.Dictionary.getString)
+    return try parseRaw(.path(path), into: .json)
+      .getString(.key_SerializedSyntaxTree)
   }
 
   /// Parses a given source buffer into a `Syntax` tree in Json serialization
   /// format by querying SourceKitd service. This function isn't thread safe.
   /// - Parameter source: The source buffer you wish to parse.
   /// - Returns: The syntax tree in Json format string.
+  @available(swift, deprecated: 5.0, renamed: "parse(_:into:)")
   public static func parse(source: String) throws -> String {
-    return try parse(content: source, name: "foo", isURL: false,
-                      format: .kind_SyntaxTreeSerializationJSON,
-                      getter: SourceKitdResponse.Dictionary.getString)
-  }
-
-  /// Parses the Swift file at the provided URL into a `Syntax` tree in byte tree
-  /// serialization format by querying SourceKitd service. This function isn't
-  /// thread safe.
-  /// - Parameter url: The URL you wish to parse.
-  /// - Returns: The syntax tree in byte tree format.
-  public static func parseByteTree(path: String) throws -> Data {
-    return try parse(content: path, name: path, isURL: true,
-                      format: .kind_SyntaxTreeSerializationByteTree,
-                      getter: SourceKitdResponse.Dictionary.getData)
-  }
-  
-  /// Parses a given source buffer into a `Syntax` tree in byte tree serialization
-  /// format by querying SourceKitd service. This function isn't thread safe.
-  /// - Parameter source: The source buffer you wish to parse.
-  /// - Returns: The syntax tree in byte tree format.
-  public static func parse(source: String) throws -> Data {
-    return try parse(content: source, name: "foo", isURL: false,
-                      format: .kind_SyntaxTreeSerializationByteTree,
-                      getter: SourceKitdResponse.Dictionary.getData)
+    return try parseRaw(.source(source), into: .json)
+      .getString(.key_SerializedSyntaxTree)
   }
 }
