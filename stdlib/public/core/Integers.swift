@@ -149,7 +149,7 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 /// generic methods that operate on any numeric type in the standard library
 /// by using the `Numeric` protocol as a generic constraint.
 ///
-/// The following example extends `Seqeunce` with a method that returns an
+/// The following example extends `Sequence` with a method that returns an
 /// array with the sequence's values multiplied by two.
 ///
 ///     extension Sequence where Element: Numeric {
