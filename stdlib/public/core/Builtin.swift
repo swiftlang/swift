@@ -242,8 +242,6 @@ public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.T
   return Builtin.castReference(x)
 }
 
-import SwiftShims
-
 @inlinable
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
@@ -253,6 +251,18 @@ public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
     toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
   return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
+}
+
+/// Get the minimum alignment for manually allocated memory.
+///
+/// Memory allocated via UnsafeMutable[Raw][Buffer]Pointer must never pass
+/// an alignment less than this value to Builtin.allocRaw. This
+/// ensures that the memory can be deallocated without specifying the
+/// alignment.
+@inlinable
+@inline(__always)
+internal func _minAllocationAlignment() -> Int {
+  return _swift_MinAllocationAlignment
 }
 
 //===----------------------------------------------------------------------===//
