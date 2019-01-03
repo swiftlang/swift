@@ -30,8 +30,23 @@ extension Character {
 
   /// The ASCII encoding value of this character, if it is an ASCII character.
   ///
+  ///     let chars: [Character] = ["a", " ", "™"]
+  ///     for ch in chars {
+  ///         print(ch, "-->", ch.properties.numericValue)
+  ///     }
+  ///     // a --> 97
+  ///     //   --> 32
+  ///     // ™ --> nil
+  ///
   /// A character with the value "\r\n" (CR-LF) is normalized to "\n" (LF) and
-  /// has an `asciiValue` property equal to `0x0A`.
+  /// has an `asciiValue` property equal to 10.
+  ///
+  ///     let cr = "\r" as Character
+  ///     // cr.asciiValue == 13
+  ///     let lf = "\n" as Character
+  ///     // lf.asciiValue == 10
+  ///     let crlf = "\r\n" as Character
+  ///     // crlf.asciiValue == 10
   @inlinable
   public var asciiValue: UInt8? {
     if _slowPath(self == "\r\n") { return 0x000A /* LINE FEED (LF) */ }
@@ -138,6 +153,15 @@ extension Character {
   /// Hexadecimal digits include 0-9, Latin letters a-f and A-F, and their
   /// fullwidth compatibility forms. If the character does not represent a
   /// hexadecimal digit, the value of this property is `nil`.
+  ///
+  ///     let chars: [Character] = ["1", "a", "Ｆ", "g"]
+  ///     for ch in chars {
+  ///         print(ch, "-->", ch.hexDigitValue)
+  ///     }
+  ///     // 1 --> 1
+  ///     // a --> 10
+  ///     // Ｆ --> 15
+  ///     // g --> nil
   public var hexDigitValue: Int? {
     guard _isSingleScalar else { return nil }
     let value = _firstScalar.value
@@ -245,8 +269,6 @@ extension Character {
 
   /// A Boolean value indicating whether this character changes under any form
   /// of case conversion.
-  ///
-  /// This property is `true` for characters
   @inlinable
   public var isCased: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isCased) {
@@ -280,17 +302,14 @@ extension Character {
   /// - "∫" (U+222B INTEGRAL)
   /// - "ϰ" (U+03F0 GREEK KAPPA SYMBOL)
   ///
+  /// The set of characters that have an `isMathSymbol` value of `true` is not
+  /// a strict subset of those for which `isSymbol` is `true`. This includes
+  /// characters used both as letters and commonly in mathematical formulas.
+  /// For example, "ϰ" (U+03F0 GREEK KAPPA SYMBOL) is considered both a
+  /// mathematical symbol and a letter.
+  ///
   /// This property corresponds to the "Math" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  ///
-  /// - Note: A character might
-  ///
-  ///
-  /// is not a strict subset of `isSymbol`. This includes characters
-  /// used both as letters and commonly in mathematical formulas. For example,
-  /// "ϰ" (U+03F0 GREEK KAPPA SYMBOL) is considered a both mathematical symbol
-  /// and a letter.
-  ///
   public var isMathSymbol: Bool {
     return _firstScalar.properties.isMath
   }
