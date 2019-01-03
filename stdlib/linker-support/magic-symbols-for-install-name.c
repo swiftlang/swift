@@ -19,6 +19,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+#include <Availability.h>
 #include <TargetConditionals.h>
 #include "../public/SwiftShims/Visibility.h"
 
@@ -77,7 +78,13 @@
   RPATH_INSTALL_NAME_DIRECTIVE(10, 11)
   RPATH_INSTALL_NAME_DIRECTIVE(10, 12)
   RPATH_INSTALL_NAME_DIRECTIVE(10, 13)
+
+  // When building with a deployment target of < macOS 10.14,
+  // treat macOS 10.14 as an "older OS."
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_14
   RPATH_INSTALL_NAME_DIRECTIVE(10, 14)
+#endif
+
 #else
   #error Unknown target.
 #endif
