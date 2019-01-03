@@ -57,6 +57,22 @@ extension UnsafeMutableBufferPointer: _HasContiguousBytes {
     return try body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
+extension UnsafeRawBufferPointer: _HasContiguousBytes {
+  @inlinable @inline(__always)
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try body(self)
+  }
+}
+extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
+  @inlinable @inline(__always)
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try body(UnsafeRawBufferPointer(self))
+  }
+}
 extension String: _HasContiguousBytes {
   @inlinable
   internal var _providesContiguousBytesNoCopy: Bool {
