@@ -56,23 +56,23 @@ development cycle. To invoke LLVM's `lit.py` script directly, it must be
 configured to use your local build directory. For example:
 
 ```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/Parse/
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-x86_64/Parse/
 ```
 
-This runs the tests in the 'test/Parse/' directory targeting the 32-bit iOS
-Simulator. The ``-sv`` options give you a nice progress bar and only show you
+This runs the tests in the 'test/Parse/' directory targeting 64-bit macOS. 
+The ``-sv`` options give you a nice progress bar and only show you
 output from the tests that fail.
 
 One downside of using this form is that you're appending relative paths from
 the source directory to the test directory in your build directory. (That is,
 there may not actually be a directory named 'Parse' in
-'test-iphonesimulator-i386/'; the invocation works because there is one in the
+'test-macosx-x86_64/'; the invocation works because there is one in the
 source 'test/' directory.) There is a more verbose form that specifies the
 testing configuration explicitly, which then allows you to test files
 regardless of location.
 
 ```
-    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
+    % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_DIR}/test-macosx-x86_64/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 ```
 
 For more complicated configuration, copy the invocation from one of the build
