@@ -32,7 +32,7 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
-  //     return _typeName(self, qualified: true)
+  //     return String(reflecting: self)
   //   }
   // }
 
