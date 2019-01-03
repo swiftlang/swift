@@ -58,24 +58,14 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 }
 
 // Get the stored properties of a nominal type that are relevant for
-// differentiation.
-// - If the nominal conforms to `Parameterized`, return only the stored
-//   properties marked with `@TFParameter`.
-// - Otherwise, return all stored properties.
-static SmallVector<VarDecl *, 4>
-getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
-  auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
-  SmallVector<VarDecl *, 4> storedProperties;
-  if (TypeChecker::conformsToProtocol(
-          nominal->getDeclaredInterfaceType(), parameterizedProto,
-          nominal->getDeclContext(), ConformanceCheckFlags::Used)) {
-    nominal->getAllTFParameters(storedProperties);
-  } else {
-    storedProperties.append(nominal->getStoredProperties().begin(),
-                            nominal->getStoredProperties().end());
+// differentiation, except the ones tagged `@noDerivative`.
+static void getStoredPropertiesForDifferentiation(
+    NominalTypeDecl *nominal, SmallVectorImpl<VarDecl *> &result) {
+  for (auto *vd : nominal->getStoredProperties()) {
+    if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
+      continue;
+    result.push_back(vd);
   }
-  return storedProperties;
 }
 
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal) {
@@ -122,17 +112,11 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal) {
 
   // If there are no valid vector space types, `Self` must conform to either:
   // - `VectorNumeric`. Vector space types will be set to `Self`.
-  // - `Parameterized`. Vector space types will be set to `Parameters` member
-  //   struct type.
   // TODO(dan-zheng): Lift this restriction.
   if (validTangentDeclCount == 0 || validCotangentDeclCount == 0) {
     auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-    auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
     if (!TypeChecker::conformsToProtocol(
             nominal->getDeclaredInterfaceType(), vectorNumericProto,
-            nominal->getDeclContext(), ConformanceCheckFlags::Used) &&
-        !TypeChecker::conformsToProtocol(
-            nominal->getDeclaredInterfaceType(), parameterizedProto,
             nominal->getDeclContext(), ConformanceCheckFlags::Used))
       return false;
   }
@@ -141,8 +125,9 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal) {
   // Currently, all stored properties must also have
   // `Self == TangentVector == CotangentVector`.
   // TODO(dan-zheng): Lift this restriction.
-  return llvm::all_of(
-      getStoredPropertiesForDifferentiation(structDecl), [&](VarDecl *v) {
+  SmallVector<VarDecl *, 16> diffProperties;
+  getStoredPropertiesForDifferentiation(structDecl, diffProperties);
+  return llvm::all_of(diffProperties, [&](VarDecl *v) {
         if (!v->hasType())
           lazyResolver->resolveDeclSignature(v);
         if (!v->hasType())
@@ -273,21 +258,9 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   // Create call expression applying a member method to a parameter member.
   // Format: `<member>.method(<parameter>.<member>)`.
   // Example: `x.moved(along: direction.x)`.
-  auto parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
-  auto retNominalIsParameterized = TypeChecker::conformsToProtocol(
-      retNominal->getDeclaredInterfaceType(), parameterizedProto,
-      retNominal->getDeclContext(), ConformanceCheckFlags::Used);
-
   auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
     auto module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(member->getType(), diffProto);
-    // If the returned nominal is `Parameterized` and the member does not have
-    // `@TFParameter`, create direct reference to member.
-    if (retNominalIsParameterized &&
-        !member->getAttrs().hasAttribute<TFParameterAttr>()) {
-      return new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
-                                   /*Implicit*/ true);
-    }
     assert(confRef && "Member does not conform to 'Differentiable'");
 
     // Get member type's method, e.g. `Member.moved(along:)`.
@@ -463,12 +436,11 @@ deriveDifferentiable_VectorSpace(DerivedConformance &derived,
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  // TODO: Check if nominal type conforms to `Parameterized` in addition to
-  // `Differentiable`. If so, return the associated `Parameters` struct.
-
   // Check if all members have vector space associated types equal to `Self`.
+  SmallVector<VarDecl *, 16> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, diffProperties);
   bool allMembersVectorSpaceEqualsSelf = llvm::all_of(
-      getStoredPropertiesForDifferentiation(nominal), [&](VarDecl *member) {
+      diffProperties, [&](VarDecl *member) {
         auto memberAssocType =
             nominal->mapTypeIntoContext(getVectorSpaceType(member, kind));
         return member->getType()->isEqual(memberAssocType);

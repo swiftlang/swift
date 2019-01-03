@@ -2290,12 +2290,15 @@ public:
 
     // Use the FieldwiseProductSpace strategy, if appropriate.
     auto *structDecl = sei->getStructDecl();
-    auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
-    if (aliasLookup.size() >= 1) {
-      assert(aliasLookup.size() == 1);
-      assert(isa<TypeAliasDecl>(aliasLookup[0]));
-      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
-      if (aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>()) {
+    auto cotangentDeclLookup =
+        structDecl->lookupDirect(astCtx.Id_CotangentVector);
+    if (cotangentDeclLookup.size() >= 1) {
+      assert(cotangentDeclLookup.size() == 1);
+      auto cotangentTypeDecl = cotangentDeclLookup.front();
+      assert(isa<TypeAliasDecl>(cotangentTypeDecl) ||
+             isa<StructDecl>(cotangentTypeDecl));
+      if (cotangentTypeDecl->getAttrs()
+              .hasAttribute<FieldwiseProductSpaceAttr>()) {
         structExtractDifferentiationStrategies.insert(
             {sei, StructExtractDifferentiationStrategy::FieldwiseProductSpace});
         SILClonerWithScopes::visitStructExtractInst(sei);
@@ -3666,8 +3669,6 @@ public:
 
   void visitStructExtractInst(StructExtractInst *sei) {
     auto loc = remapLocation(sei->getLoc());
-    auto &astCtx = getContext().getASTContext();
-
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();
     auto differentiationStrategyLookUp = differentiationStrategies.find(sei);
@@ -3689,14 +3690,11 @@ public:
       // `key`.
 
       // Find the decl of the cotangent space type.
-      auto *structDecl = sei->getStructDecl();
-      auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
-      assert(aliasLookup.size() == 1);
-      assert(isa<TypeAliasDecl>(aliasLookup[0]));
-      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
-      assert(aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>());
-      auto cotangentVectorTy =
-          aliasDecl->getUnderlyingTypeLoc().getType()->getCanonicalType();
+      auto structTy = sei->getOperand()->getType().getASTType();
+      auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Cotangent,
+          LookUpConformanceInModule(getModule().getSwiftModule()))
+          ->getType()->getCanonicalType();
       assert(!getModule()
                   .Types.getTypeLowering(cotangentVectorTy)
                   .isAddressOnly());
@@ -3708,7 +3706,7 @@ public:
 
       // Find the corresponding field in the cotangent space.
       VarDecl *correspondingField = nullptr;
-      if (cotangentVectorDecl == structDecl)
+      if (cotangentVectorDecl == sei->getStructDecl())
         correspondingField = sei->getField();
       else {
         auto correspondingFieldLookup =

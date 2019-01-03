@@ -96,3 +96,30 @@ struct VectorSpaceCustomStruct : VectorNumeric, Differentiable { // expected-err
     typealias CotangentVector = VectorSpaceCustomStruct.CotangentVector
   }
 }
+
+
+// Test type whose properties are not all differentiable.
+struct DifferentiableSubset : Differentiable {
+  @differentiable(wrt: (self))
+  var w: Float
+  @differentiable(wrt: (self))
+  var b: Float
+  @noDerivative var flag: Bool
+ 
+  @_fieldwiseProductSpace
+  struct TangentVector : Differentiable, VectorNumeric {
+    var w: Float
+    var b: Float
+  }
+  @_fieldwiseProductSpace
+  struct CotangentVector : Differentiable, VectorNumeric {
+    var w: Float
+    var b: Float
+  }
+  func tangentVector(from cotan: CotangentVector) -> TangentVector {
+    return TangentVector(w: cotan.w, b: cotan.b)
+  }
+  func moved(along v: TangentVector) -> DifferentiableSubset {
+    return DifferentiableSubset(w: w.moved(along: v.w), b: b.moved(along: v.b), flag: flag)
+  }
+}

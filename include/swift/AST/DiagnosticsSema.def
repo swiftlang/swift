@@ -2735,6 +2735,11 @@ ERROR(tfparameter_attr_instance_stored_property_only,none,
 ERROR(tfparameter_attr_not_in_parameterized,none,
       "@%0 is allowed only in types that conform to 'Parameterized'", (StringRef))
 
+// @noDerivative attribute
+ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
+      "@noDerivative is only allowed on stored properties in structure types "
+      "that declare a conformance to 'Differentiable'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
