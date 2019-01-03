@@ -94,6 +94,8 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_mul)
   public static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) * rhs
   }
@@ -116,12 +118,16 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
 public extension Tensor where Scalar : Numeric {
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_add)
   static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) + rhs
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_add)
   static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs + Tensor(rhs)
   }
@@ -129,6 +135,8 @@ public extension Tensor where Scalar : Numeric {
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_sub)
   static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) - rhs
   }
@@ -136,6 +144,8 @@ public extension Tensor where Scalar : Numeric {
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_sub)
   static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs - Tensor(rhs)
   }
@@ -172,7 +182,8 @@ public extension Tensor where Scalar : Numeric {
   /// Multiplies two tensors and produces their product.
   /// - Note: `*` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(adjoint: _adjointMultiply(_:_:_:_:))
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(adjoint: _adjointMultiply(_:_:_:_:))
   static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.mul(lhs, rhs)
   }
@@ -180,6 +191,8 @@ public extension Tensor where Scalar : Numeric {
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_mul)
   static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs * Tensor(rhs)
   }
@@ -200,7 +213,8 @@ public extension Tensor where Scalar : Numeric {
   /// Returns the quotient of dividing the first tensor by the second.
   /// - Note: `/` supports broadcasting.
   @inlinable @inline(__always)
-  @differentiable(adjoint: _adjointDivide(_:_:_:_:))
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(adjoint: _adjointDivide(_:_:_:_:))
   static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.div(lhs, rhs)
   }
@@ -208,6 +222,8 @@ public extension Tensor where Scalar : Numeric {
   /// Returns the quotient of dividing the scalar by the tensor, broadcasting
   /// the scalar.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_div)
   static func / (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) / rhs
   }
@@ -215,6 +231,8 @@ public extension Tensor where Scalar : Numeric {
   /// Returns the quotient of dividing the tensor by the scalar, broadcasting
   /// the scalar.
   @inlinable @inline(__always)
+  // FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+  // @differentiable(vjp: _vjp_div)
   static func / (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs / Tensor(rhs)
   }
@@ -1319,7 +1337,6 @@ public extension Tensor {
 // we did that now, type checking for the adjoint would fail because it
 // doesn't see @differentiable attribute constraints.
 public extension Tensor where Scalar : BinaryFloatingPoint,
-                              Scalar : Differentiable,
                               Scalar.CotangentVector == Scalar {
   /// Computes the batch normalized tensor along the specified axis.
   ///

@@ -1842,16 +1842,13 @@ extension ${Self} : Strideable {
 
 // SWIFT_ENABLE_TENSORFLOW
 //===----------------------------------------------------------------------===//
-// VectorNumeric Conformance
+// Differentiable Conformance
 //===----------------------------------------------------------------------===//
-
-extension ${Self} : VectorNumeric {
-  public typealias Scalar = ${Self}
-}
 
 extension ${Self} : Differentiable {
   public typealias TangentVector = ${Self}
   public typealias CotangentVector = ${Self}
+  public typealias Scalar = ${Self}
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }

@@ -393,7 +393,7 @@ func dbaz3<T : Differentiable & Numeric>(_ seed: T.CotangentVector, _ primal: T,
   return (seed, seed)
 }
 @differentiable(adjoint: dbaz3)
-// expected-error @-1 {{'dbaz3' does not have expected type '<T where T : Differentiable, T : FloatingPoint> (T.CotangentVector, T, T, T) -> (T.CotangentVector, T.CotangentVector)'}}
+// expected-error @-1 {{'dbaz3' does not have expected type '<T where T : FloatingPoint> (T.CotangentVector, T, T, T) -> (T.CotangentVector, T.CotangentVector)'}}
 func baz3<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
 }

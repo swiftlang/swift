@@ -77,6 +77,8 @@ extension CGFloat : BinaryFloatingPoint {
 
   public typealias RawSignificand = UInt
   public typealias Exponent = Int
+  // SWIFT_ENABLE_TENSORFLOW
+  public typealias Scalar = CGFloat
 
   @_transparent
   public static var exponentBitCount: Int {

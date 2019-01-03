@@ -147,7 +147,8 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 /// implementations for the protocol's nonmutating methods based on the
 /// mutating variants.
 // SWIFT_ENABLE_TENSORFLOW
-public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
+public protocol Numeric : VectorNumeric, ExpressibleByIntegerLiteral
+  where Scalar == Self {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
   ///
@@ -206,7 +207,7 @@ public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  override static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -214,7 +215,7 @@ public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  override static func *=(lhs: inout Self, rhs: Self)
 }
 
 /// A type that can represent both positive and negative values.

@@ -83,6 +83,70 @@ extension Tensor where Scalar : Numeric {
   }
 }
 
+/* FIXME(SR-9596): Uncomment when @differentiable 'where' clause is supported.
+extension Tensor where Scalar : Numeric & Differentiable {
+  @inlinable
+  static func _vjp_add(
+    lhs: Tensor, rhs: Scalar
+  ) -> (value: Tensor, pullback: (Tensor) -> (Tensor, Scalar)) {
+    return (value: lhs + rhs, pullback: { v in (v, v.sum()) })
+  }
+
+  @inlinable
+  static func _vjp_add(
+    lhs: Scalar, rhs: Tensor
+  ) -> (value: Tensor, pullback: (Tensor) -> (Scalar, Tensor)) {
+    return (value: lhs + rhs, pullback: { v in (v.sum(), v) })
+  }
+
+  @inlinable
+  static func _vjp_sub(
+    lhs: Tensor, rhs: Scalar
+  ) -> (value: Tensor, pullback: (Tensor) -> (Tensor, Scalar)) {
+    return (value: lhs - rhs, pullback: { v in (v, 0 - v.sum()) })
+  }
+
+  @inlinable
+  static func _vjp_sub(
+    lhs: Scalar, rhs: Tensor
+  ) -> (value: Tensor, pullback: (Tensor) -> (Scalar, Tensor)) {
+    return (value: lhs - rhs, pullback: { v in (v.sum(), 0 - v) })
+  }
+
+  @inlinable
+  static func _vjp_mul(
+    lhs: Tensor, rhs: Scalar
+  ) -> (value: Tensor, pullback: (Tensor) -> (Tensor, Scalar)) {
+    return (value: lhs + rhs, pullback: { v in (v * rhs, (v * lhs).sum()) })
+  }
+
+  @inlinable
+  static func _vjp_mul(
+    lhs: Scalar, rhs: Tensor
+  ) -> (value: Tensor, pullback: (Tensor) -> (Scalar, Tensor)) {
+    return (value: lhs + rhs, pullback: { v in ((v * rhs).sum(), v * lhs) })
+  }
+
+  @inlinable
+  static func _vjp_div(
+    lhs: Tensor, rhs: Scalar
+  ) -> (value: Tensor, pullback: (Tensor) -> (Tensor, Scalar)) {
+    return (value: lhs + rhs, pullback: { v in
+      (v / rhs, (v * (0 - lhs) / rhs.squared()).sum())
+    })
+  }
+
+  @inlinable
+  static func _vjp_div(
+    lhs: Scalar, rhs: Tensor
+  ) -> (value: Tensor, pullback: (Tensor) -> (Scalar, Tensor)) {
+    return (value: lhs + rhs, pullback: { v in
+      ((v / rhs).sum(), v * (0 - lhs) / rhs.squared())
+    })
+  }
+}
+ */
+
 @inlinable
 func _adjointMinMax<T : Numeric & Comparable>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>, _ y: Tensor<T>
@@ -266,7 +330,6 @@ extension Tensor {
 //===----------------------------------------------------------------------===//
 
 extension Tensor where Scalar : BinaryFloatingPoint,
-                       Scalar : Differentiable,
                        Scalar.CotangentVector == Scalar {
   // TODO: Verify that these calculations are correct.
   @inlinable

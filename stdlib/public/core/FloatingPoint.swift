@@ -158,7 +158,9 @@
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
+// SWIFT_ENABLE_TENSORFLOW
+public protocol FloatingPoint : SignedNumeric, Strideable, Hashable,
+                                Differentiable
                                 where Magnitude == Self {
 
   /// A type that can represent any written exponent.

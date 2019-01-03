@@ -18,6 +18,8 @@ import _SwiftCoreFoundationOverlayShims
 extension Decimal {
     public typealias RoundingMode = NSDecimalNumber.RoundingMode
     public typealias CalculationError = NSDecimalNumber.CalculationError
+    // SWIFT_ENABLE_TENSORFLOW
+    public typealias Scalar = Decimal
 
     public static let leastFiniteMagnitude = Decimal(_exponent: 127, _length: 8, _isNegative: 1, _isCompact: 1, _reserved: 0, _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff))
     public static let greatestFiniteMagnitude = Decimal(_exponent: 127, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff))
