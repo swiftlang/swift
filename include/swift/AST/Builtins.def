@@ -572,6 +572,7 @@ BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
+BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
 
 #undef BUILTIN_TYPE_CHECKER_OPERATION
 
