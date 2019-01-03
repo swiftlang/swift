@@ -163,7 +163,7 @@ class TypeDecoder {
     case NodeKind::BoundGenericClass:
     {
 #if SWIFT_OBJC_INTEROP
-      if (Node->getNumChildren() == 2) {
+      if (Node->getNumChildren() >= 2) {
         auto ChildNode = Node->getChild(0);
         if (ChildNode->getKind() == NodeKind::Type &&
             ChildNode->getNumChildren() > 0)
