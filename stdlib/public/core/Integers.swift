@@ -1200,19 +1200,20 @@ public protocol BinaryInteger :
   func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self)
 
-  /// Returns true if this value is a multiple of `other`, and false otherwise.
+  /// Returns `true` if this value is a multiple of the given value, and `false`
+  /// otherwise.
   ///
-  /// For two integers a and b, a is a multiple of b if there exists a third
-  /// integer q such that a = q*b. For example, 6 is a multiple of 3, because
-  /// 6 = 2*3, and zero is a multiple of everything, because 0 = 0*x, for any
-  /// integer x.
+  /// For two integers *a* and *b*, *a* is a multiple of *b* if there exists a
+  /// third integer *q* such that _a = q*b_. For example, *6* is a multiple of
+  /// *3* because _6 = 2*3_. Zero is a multiple of everything because _0 = 0*x_
+  /// for any integer *x*.
   ///
   /// Two edge cases are worth particular attention:
   /// - `x.isMultiple(of: 0)` is `true` if `x` is zero and `false` otherwise.
   /// - `T.min.isMultiple(of: -1)` is `true` for signed integer `T`, even
-  ///   though the quotient `T.min / -1` is not representable in type `T`.
+  ///   though the quotient `T.min / -1` isn't representable in type `T`.
   ///
-  /// - Parameter other: the value to test.
+  /// - Parameter other: The value to test.
   func isMultiple(of other: Self) -> Bool
 
   /// Returns `-1` if this value is negative and `1` if it's positive;
