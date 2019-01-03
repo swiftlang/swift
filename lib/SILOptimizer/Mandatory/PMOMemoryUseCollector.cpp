@@ -260,13 +260,12 @@ bool ElementUseCollector::collectFrom() {
     return false;
 
   // Collect information about the retain count result as well.
-  for (auto UI : TheMemory.MemoryInst->getUses()) {
-    auto *User = UI->getUser();
+  for (auto *op : TheMemory.MemoryInst->getUses()) {
+    auto *user = op->getUser();
 
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User)) {
-      Releases.push_back(User);
+    // If this is a strong_release, stash it.
+    if (isa<StrongReleaseInst>(user)) {
+      Releases.push_back(user);
     }
   }
 
