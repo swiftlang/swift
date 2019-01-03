@@ -92,7 +92,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/HashQuadratic
     single-source/Histogram
-    single-source/InsertCharacter  
+    single-source/InsertCharacter
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -173,6 +173,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Walsh
     single-source/WordCount
     single-source/XorLoop
+    single-source/Zip
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES

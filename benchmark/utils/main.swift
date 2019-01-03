@@ -166,6 +166,7 @@ import UTF8Decode
 import Walsh
 import WordCount
 import XorLoop
+import Zip
 
 @inline(__always)
 private func registerBenchmark(_ bench: BenchmarkInfo) {
@@ -344,5 +345,6 @@ registerBenchmark(UTF8Decode)
 registerBenchmark(Walsh)
 registerBenchmark(WordCount)
 registerBenchmark(XorLoop)
+registerBenchmark(Zip)
 
 main()

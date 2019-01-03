@@ -1,0 +1,78 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to Zip.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+import TestsUtils
+
+fileprivate let collectionCount = 4096
+fileprivate let sumCount = collectionCount * (collectionCount - 1) / 2
+
+%{
+upper_arity_bound = 6
+arities = range(2, upper_arity_bound + 1)
+}%
+public let Zip = [
+% for arity in arities:
+  BenchmarkInfo(name: "Zip${ arity }Iteration", runFunction: run_Zip${ arity }Iteration, tags: [.validation, .api]),
+  BenchmarkInfo(name: "ZipLongest${ arity }Iteration", runFunction: run_ZipLongest${ arity }Iteration, tags: [.validation, .api])${ "," if arity < upper_arity_bound else "" }
+% end
+]
+
+% for arity in arities:
+@inline(never)
+public func run_Zip${ arity }Iteration (n: Int) {
+  let collection = zip(
+${ ",\n".join(["    0..<collectionCount"] * arity) }
+  )
+
+  for _ in 1...n {
+    var sums = (${ ", ".join(["0"] * arity) })
+
+    for element in collection {
+%   for element in range(0, arity):
+      sums.${ element } += element.${ element }
+%   end
+    }
+
+%   for element in range(0, arity):
+    CheckResults(sums.${ element } == sumCount)
+%   end
+  }
+}
+
+@inline(never)
+public func run_ZipLongest${ arity }Iteration (n: Int) {
+  let collection = zipLongest(
+${ ",\n".join(["    0..<collectionCount"] * arity) }
+  )
+
+  for _ in 1...n {
+    var sums = (${ ", ".join(["0"] * arity) })
+
+    for element in collection {
+%   for element in range(0, arity):
+      sums.${ element } += element.${ element }!
+%   end
+    }
+
+%   for element in range(0, arity):
+    CheckResults(sums.${ element } == sumCount)
+%   end
+  }
+}${ "\n" if arity < upper_arity_bound else "" }
+% end
