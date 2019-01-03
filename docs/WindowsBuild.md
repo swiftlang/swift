@@ -43,6 +43,12 @@ it provides some of the needed headers and libraries.
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
 
+If your sources live else where, you can create a substitution for this:
+
+```cmd
+subst S: <path to sources>
+```
+
 ```cmd
 git config --global core.autocrlf input
 S:
@@ -60,20 +66,17 @@ git clone https://github.com/apple/swift-corelibs-foundation
 1. Add the `bin64` folder to your `Path` environment variable.
 
 ### 4. Get ready
-- From within a **developer** command prompt (not PowerShell nor cmd, but [the
-  Visual Studio Developer Command
-  Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the
-  following command if you have an x64 PC.
+- From within a **developer** command prompt (not PowerShell nor cmd, but the [Visual Studio Developer Command Prompt](https://msdn.microsoft.com/en-us/library/f35ctcxw.aspx)), execute the following command if you have an x64 PC.
+
 ```cmd
 VsDevCmd -arch=amd64
 ```
-If instead you're compiling for a 32-bit Windows target, adapt the `arch`
-argument to `x86` and run
+
+If instead you're compiling for a 32-bit Windows target, adapt the `arch` argument to `x86` and run
+
 ```cmd
 VsDevCmd -arch=x86
 ```
-
-- We will use the assumption that the sources are on the `S` drive.  Replace it with the path to the checkout.  Make sure to use forward slashes (`/`) instead of backslashes (`\`) as the path separators. `clang` breaks with backslashed paths.
 
 - Decide whether you want to build a release or debug version of Swift on Windows and 
   replace the `CMAKE_BUILD_TYPE` parameter in the build steps below with the correct value 
@@ -85,23 +88,25 @@ VsDevCmd -arch=x86
   `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um` and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
 ```cmd
-cd %UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt
-mklink module.modulemap S:\swift\stdlib\public\Platform\ucrt.modulemap
-cd %VCToolsInstallDir%\include
-mklink module.modulemap S:\swift\stdlib\public\Platform\visualc.modulemap
-mklink visualc.apinotes S:\swift\stdlib\public\Platform\visualc.apinotes
-cd %UniversalCRTSdkDir\Include\%UCRTVersion%\um
-mklink module.modulemap S:\swift\stdlib\public\Platform\winsdk.modulemap
+mklink %UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap S:\swift\stdlib\public\Platform\ucrt.modulemap
+mklink %VCToolsInstallDir%\include\module.modulemap S:\swift\stdlib\public\Platform\visualc.modulemap
+mklink %VCToolsInstallDir%\include\visualc.apinotes S:\swift\stdlib\public\Platform\visualc.apinotes
+mklink %UniversalCRTSdkDir\Include\%UCRTVersion%\um\module.modulemap S:\swift\stdlib\public\Platform\winsdk.modulemap
 ```
 
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
-mkdir S:/build/Ninja-DebugAssert/cmark-windows-amd64"
-pushd S:/build/Ninja-DebugAssert/cmark-windows-amd64" "S:/%swift_source_dir%/cmark"
+mkdir S:\build\Ninja-DebugAssert\cmark-windows-amd64"
+pushd S:\build\Ninja-DebugAssert\cmark-windows-amd64" "S:\cmark"
+cmake -G Ninja^
+  -DCMAKE_BUILD_TYPE=Debug^
+  -DCMAKE_C_COMPILER=cl^
+  -DCMAKE_CXX_COMPIELR=cl^
+  S:\cmark
 popd
-cmake --build "S:/build/Ninja-DebugAssert/cmark-windows-amd64/"
+cmake --build "S:\build\Ninja-DebugAssert\cmark-windows-amd64"
 ```
 
 ### 6. Build LLVM/Clang
@@ -110,20 +115,23 @@ cmake --build "S:/build/Ninja-DebugAssert/cmark-windows-amd64/"
   type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
   build type for Swift.
 ```cmd
-mkdir "S:/build/Ninja-DebugAssert/llvm-windows-amd64"
-pushd "S:/build/Ninja-DebugAssert/llvm-windows-amd64"
+mkdir "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
+pushd "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 cmake -G "Ninja"^
- -DLLVM_ENABLE_ASSERTIONS=TRUE^
  -DCMAKE_BUILD_TYPE=Debug^
+ -DCMAKE_C_COMPILER=cl^
+ -DCMAKE_CXX_COMPILER=cl^
+ -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
+ -DLLVM_ENABLE_ASSERTIONS=TRUE^
  -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_TARGETS_TO_BUILD=X86^
- -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
- "S:/llvm"
+ "S:\llvm"
 popd
-cmake --build "S:/build/Ninja-DebugAssert/llvm-windows-amd64"
+cmake --build "S:\build\Ninja-DebugAssert\llvm-windows-amd64"
 ```
 
-- If you intend to build any libraries, update your path to include the LLVM tools.
+- Update your path to include the LLVM tools.
+
 ```cmd
 set PATH=%PATH%;S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin
 ```
@@ -134,31 +142,31 @@ set PATH=%PATH%;S:\build\Ninja-DebugAssert\llvm-windows-amd64\bin
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
-mkdir "S:/build/Ninja-DebugAssert/swift-windows-amd64"
-pushd "S:/build/Ninja-DebugAssert/swift-windows-amd64"
+mkdir "S:\build\Ninja-DebugAssert\swift-windows-amd64"
+pushd "S:\build\inja-DebugAssert\swift-windows-amd64"
 cmake -G "Ninja"^
  -DCMAKE_BUILD_TYPE=Debug^
- -DCMAKE_C_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/clang-cl.exe"^
- -DCMAKE_CXX_COMPILER="S:/build/Ninja-DebugAssert/llvm-windows-amd64/clang-cl.exe"^
- -DSWIFT_PATH_TO_CMARK_SOURCE="S:/cmark"^
+ -DCMAKE_C_COMPILER=clang-cl^
+ -DCMAKE_CXX_COMPILER=clang-cl^
+ -DSWIFT_PATH_TO_CMARK_SOURCE="S:\cmark"^
  -DCMAKE_CXX_FLAGS="-Wno-c++98-compat -Wno-c++98-compat-pedantic"^
  -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
  -DCMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO"^
  -DSWIFT_INCLUDE_DOCS=NO^
- -DSWIFT_PATH_TO_LLVM_SOURCE="S:/llvm"^
- -DSWIFT_PATH_TO_CLANG_SOURCE="S:/clang"^
- -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:/swift-corelibs-libdispatch"^
- -DSWIFT_PATH_TO_LLVM_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
- -DSWIFT_PATH_TO_CLANG_BUILD="S:/build/Ninja-DebugAssert/llvm-windows-amd64"^
- -DSWIFT_PATH_TO_CMARK_BUILD="S:/build/Ninja-DebugAssert/cmark-windows-amd64"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/icu/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/icu/lib64/icuuc.lib"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/icu/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/icu/lib64/icuin.lib"^
- -DCMAKE_INSTALL_PREFIX="C:/Program Files (x86)/Swift"^
- "S:/swift"
+ -DSWIFT_PATH_TO_LLVM_SOURCE="S:\llvm"^
+ -DSWIFT_PATH_TO_CLANG_SOURCE="S:\clang"^
+ -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
+ -DSWIFT_PATH_TO_LLVM_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_CLANG_BUILD="S:\build\Ninja-DebugAssert\llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_CMARK_BUILD="S:\build\Ninja-DebugAssert\cmark-windows-amd64"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:\icu\include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC="S:\icu\lib64\icuuc.lib"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:\icu\include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:\icu\lib64\icuin.lib"^
+ -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
+ "S:\swift"
 popd
-cmake --build "S:/build/Ninja-DebugAssert/swift-windows-amd64"
+cmake --build "S:\build\Ninja-DebugAssert\swift-windows-amd64"
 ```
 
 - To create a Visual Studio project, you'll need to change the generator and,
@@ -169,9 +177,7 @@ cmake --build "S:/build/Ninja-DebugAssert/swift-windows-amd64"
   a file.
 
 ```cmd
-cmake -G "Visual Studio 2017" "%swift_source_dir%/swift"^
- -DCMAKE_GENERATOR_PLATFORM="x64"^
- ...
+cmake -G "Visual Studio 2017" "S:\swift" -DCMAKE_GENERATOR_PLATFORM="x64"^ ...
 ```
 
 ### 8. Build lldb
