@@ -844,6 +844,7 @@ extension String {
 }
 
 extension _StringGutsSlice {
+  @_effects(readonly)
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     var output = _FixedArray16<UInt8>(allZeros: ())
     var icuInput = _FixedArray16<UInt16>(allZeros: ())

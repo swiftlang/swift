@@ -207,6 +207,8 @@ internal struct NormalizationResult {
 }
 
 //If this returns nil, it means the outputBuffer ran out of space
+@inline(__always)
+@_effects(releasenone)
 private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
   _ outputBuffer: UnsafeMutableBufferPointer<UInt8>
@@ -235,7 +237,7 @@ private func fastFill(
     inputCount &+= len
 
     for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
-      outputBuffer[outputCount] = cu
+      outputBuffer[_unchecked: outputCount] = cu
       outputCount &+= 1
     }
 
