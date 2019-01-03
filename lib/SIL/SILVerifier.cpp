@@ -1534,7 +1534,7 @@ public:
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
-                || LI->getType().isLoadable(LI->getModule()),
+                || LI->getType().isLoadable(LI->getFunction()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1573,7 +1573,7 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
-            || LBI->getType().isLoadable(LBI->getModule()),
+            || LBI->getType().isLoadable(LBI->getFunction()),
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -1691,7 +1691,7 @@ public:
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
     require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(SI->getModule()),
+                || SI->getSrc()->getType().isLoadable(SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
