@@ -93,32 +93,34 @@ static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
 }
 
 // Return the `Scalar` associated type for a ValueDecl if it conforms to
-// `VectorNumeric`.
+// `VectorNumeric` in the given context.
 // If the decl does not conform to `VectorNumeric`, return a null `Type`.
-static Type getVectorNumericScalarAssocType(ValueDecl *decl) {
+static Type getVectorNumericScalarAssocType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  auto declType =
-      decl->getDeclContext()->mapTypeIntoContext(decl->getInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(declType, vectorNumericProto,
-                                              decl->getDeclContext(),
+  if (!decl->hasType())
+    C.getLazyResolver()->resolveDeclSignature(decl);
+  if (!decl->hasType())
+    return Type();
+  auto declType = decl->getType()->hasArchetype()
+                      ? decl->getType()
+                      : DC->mapTypeIntoContext(decl->getType());
+  auto conf = TypeChecker::conformsToProtocol(declType, vectorNumericProto, DC,
                                               ConformanceCheckFlags::Used);
   if (!conf)
     return Type();
   Type scalarType = ProtocolConformanceRef::getTypeWitnessByName(
-      decl->getInterfaceType(), *conf, C.Id_Scalar, C.getLazyResolver());
+      declType, *conf, C.Id_Scalar, C.getLazyResolver());
   assert(scalarType && "'Scalar' associated type not found");
   return scalarType;
 }
 
-static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal) {
-  // Must be a struct type.
+static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
+                                       DeclContext *DC) {
+  // Nominal type must be a struct. (Zero stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
   auto &C = nominal->getASTContext();
   if (!structDecl)
-    return Type();
-  // Struct must have at least one stored property.
-  if (structDecl->getStoredProperties().empty())
     return Type();
   // If all stored properties conform to `VectorNumeric` and have the same
   // `Scalar` associated type, return that `Scalar` associated type.
@@ -129,7 +131,7 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal) {
       C.getLazyResolver()->resolveDeclSignature(member);
     if (!member->hasInterfaceType())
       return Type();
-    auto scalarType = getVectorNumericScalarAssocType(member);
+    auto scalarType = getVectorNumericScalarAssocType(member, DC);
     // If stored property does not conform to `VectorNumeric`, return null
     // `Type`.
     if (!scalarType)
@@ -146,31 +148,31 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal) {
   return sameScalarType;
 }
 
-bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal) {
-  // Must be a struct type.
+bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
+                                                     DeclContext *DC) {
+  // Nominal type must be a struct. (Zero stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
   if (!structDecl)
-    return false;
-  // Struct must have at least one stored property.
-  if (structDecl->getStoredProperties().empty())
     return false;
   // All stored properties must conform to `AdditiveArithmetic`.
   auto &C = nominal->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
+    if (!v->getType())
       C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (!v->getType())
       return false;
-    auto conf = TypeChecker::conformsToProtocol(v->getType(), addArithProto,
-                                                v->getDeclContext(),
-                                                ConformanceCheckFlags::Used);
-    return (bool)conf;
+    auto declType = v->getType()->hasArchetype()
+                        ? v->getType()
+                        : DC->mapTypeIntoContext(v->getType());
+    return (bool)TypeChecker::conformsToProtocol(declType, addArithProto, DC,
+                                                 ConformanceCheckFlags::Used);
   });
 }
 
-bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal) {
-  return bool(deriveVectorNumeric_Scalar(nominal));
+bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
+                                                DeclContext *DC) {
+  return bool(deriveVectorNumeric_Scalar(nominal, DC));
 }
 
 // Synthesize body for the given math operator.
@@ -203,7 +205,11 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
     auto module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(member->getType(), proto);
+    auto memberType = member->getType()->hasArchetype()
+                          ? member->getType()
+                          : nominal->mapTypeIntoContext(
+                                member->getType()->mapTypeOutOfContext());
+    auto confRef = module->lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
     // Get member type's math operator, e.g. `Member.+`.
@@ -213,8 +219,10 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      memberOpDecl =
-          confRef->getConcrete()->getWitnessDecl(operatorReq, nullptr);
+      if (auto opDecl =
+              confRef->getConcrete()->getWitnessDecl(operatorReq, nullptr))
+        memberOpDecl = opDecl;
+    assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
         new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
     auto *memberTypeExpr = TypeExpr::createImplicit(member->getType(), C);
@@ -296,8 +304,9 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     case Subtract:
       return std::make_pair(selfInterfaceType, selfInterfaceType);
     case ScalarMultiply:
-      return std::make_pair(deriveVectorNumeric_Scalar(nominal),
-                            selfInterfaceType);
+      return std::make_pair(
+          deriveVectorNumeric_Scalar(nominal, parentDC)->mapTypeOutOfContext(),
+          selfInterfaceType);
     }
   };
 
@@ -376,7 +385,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl) {
       return new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), zeroReq,
                                    DeclNameLoc(), /*Implicit*/ true);
     }
-    // Otherwise,return reference to concrete witness declaration for `zero`.
+    // Otherwise, return reference to concrete witness declaration for `zero`.
     auto conf = confRef->getConcrete();
     auto zeroDecl = conf->getWitnessDecl(zeroReq, nullptr);
     return new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), zeroDecl,
@@ -462,8 +471,7 @@ ValueDecl *DerivedConformance::deriveVectorNumeric(ValueDecl *requirement) {
 
 Type DerivedConformance::deriveVectorNumeric(AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Scalar) {
-    auto rawType = deriveVectorNumeric_Scalar(Nominal);
-    return getConformanceContext()->mapTypeIntoContext(rawType);
+    return deriveVectorNumeric_Scalar(Nominal, getConformanceContext());
   }
   TC.diagnose(requirement->getLoc(), diag::broken_vector_numeric_requirement);
   return nullptr;

@@ -211,7 +211,8 @@ public:
   /// Determine if an AdditiveArithmetic requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type);
+  static bool canDeriveAdditiveArithmetic(NominalTypeDecl *type,
+                                          DeclContext *DC);
 
   /// Derive an AdditiveArithmetic requirement for a nominal type.
   ///
@@ -221,7 +222,8 @@ public:
   /// Determine if a VectorNumeric requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveVectorNumeric(NominalTypeDecl *type);
+  static bool canDeriveVectorNumeric(NominalTypeDecl *type,
+                                     DeclContext *DC);
 
   /// Derive a VectorNumeric requirement for a nominal type.
   ///
@@ -236,7 +238,8 @@ public:
   /// Determine if a Differentiable requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveDifferentiable(NominalTypeDecl *type);
+  static bool canDeriveDifferentiable(NominalTypeDecl *type,
+                                      DeclContext *DC);
 
   /// Derive a Differentiable requirement for a nominal type.
   ///
