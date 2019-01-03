@@ -438,14 +438,18 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Args.push_back(Impl.RuntimeResourcePath.c_str());
   Args.append(OrigArgs.begin(), OrigArgs.end());
 
+  SmallString<32> ErrStr;
+  llvm::raw_svector_ostream ErrOS(ErrStr);
+  StreamDiagConsumer DiagConsumer(ErrOS);
+  Diags.addConsumer(DiagConsumer);
+
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
     return Invocation.parseArgs(FrontendArgs, Diags);
   });
 
   if (HadError) {
-    // FIXME: Get the actual diagnostic.
-    Error = "error when parsing the compiler arguments";
+    Error = ErrOS.str();
     return true;
   }
 
@@ -493,20 +497,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
                                              ArrayRef<const char *> OrigArgs,
                                              StringRef PrimaryFile,
                                              std::string &Error) {
-
-  SmallString<32> ErrStr;
-  llvm::raw_svector_ostream ErrOS(ErrStr);
   DiagnosticEngine Diagnostics(Impl.SourceMgr);
-  StreamDiagConsumer DiagConsumer(ErrOS);
-  Diagnostics.addConsumer(DiagConsumer);
-
-  if (initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
-                             Error)) {
-    if (!ErrOS.str().empty())
-      Error = ErrOS.str();
-    return true;
-  }
-  return false;
+  return initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
+                                Error);
 }
 
 bool SwiftASTManager::initCompilerInvocationNoInputs(
