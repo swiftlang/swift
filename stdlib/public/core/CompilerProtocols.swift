@@ -827,25 +827,26 @@ extension ExpressibleByStringInterpolation
 /// `StringInterpolationProtocol.appendInterpolation(...)` method, with the
 /// contents of the interpolation's parentheses treated as the call's argument
 /// list. That argument list can include multiple arguments and argument labels.
-/// For example:
-/// 
-/// | If you write... | Swift calls...                    |
-/// |---------------- | --------------------------------- |
-/// | `\(x)`          | `appendInterpolation(x)`          |
-/// | `\(x, y)`       | `appendInterpolation(x, y)`       |
-/// | `\(foo: x)`     | `appendInterpolation(foo: x)`     |
-/// | `\(x, foo: y)`  | `appendInterpolation(x, foo: y)`  |
-/// 
-/// `appendInterpolation` methods should return `Void` and shouldn't be
-/// `static`. They otherwise support virtually all features of methods: they can
-/// have any number of parameters, can specify labels for any or all of them,
-/// can provide default values for parameters, can have variadic parameters, and
-/// can have parameters with generic types. Most importantly, they can be
-/// overloaded, so a type that conforms to `StringInterpolationProtocol` can
-/// provide several different `appendInterpolation` methods with different
-/// behaviors. The `appendInterpolation` methods can also throw; when a user
-/// calls one of these methods using string interpolation, they must mark the
-/// string literal with `try` or one of its variants.
+///
+/// The following examples show how string interpolations are translated into
+/// calls to `appendInterpolation`:
+///
+/// - `\(x)` translates to `appendInterpolation(x)`
+/// - `\(x, y)` translates to `appendInterpolation(x, y)`
+/// - `\(foo: x)` translates to `appendInterpolation(foo: x)`
+/// - `\(x, foo: y)` translates to `appendInterpolation(x, foo: y)`
+///
+/// The `appendInterpolation` methods you write should return `Void` and
+/// shouldn't be `static`. They otherwise support virtually all features of
+/// methods: they can have any number of parameters, can specify labels for any
+/// or all of them, can provide default values for parameters, can have variadic
+/// parameters, and can have parameters with generic types. Most importantly,
+/// they can be overloaded, so a type that conforms to
+/// `StringInterpolationProtocol` can provide several different
+/// `appendInterpolation` methods with different behaviors. The
+/// `appendInterpolation` methods can also throw; when a user calls one of these
+/// methods using string interpolation, they must mark the string literal with
+/// `try` or one of its variants.
 public protocol StringInterpolationProtocol {
   /// The type that should be used for literal segments.
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
