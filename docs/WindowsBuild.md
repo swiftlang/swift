@@ -91,7 +91,7 @@ VsDevCmd -arch=x86
 mklink %UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap S:\swift\stdlib\public\Platform\ucrt.modulemap
 mklink %VCToolsInstallDir%\include\module.modulemap S:\swift\stdlib\public\Platform\visualc.modulemap
 mklink %VCToolsInstallDir%\include\visualc.apinotes S:\swift\stdlib\public\Platform\visualc.apinotes
-mklink %UniversalCRTSdkDir\Include\%UCRTVersion%\um\module.modulemap S:\swift\stdlib\public\Platform\winsdk.modulemap
+mklink %UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap S:\swift\stdlib\public\Platform\winsdk.modulemap
 ```
 
 ### 5. Build CMark
@@ -257,14 +257,13 @@ cmake -G "Ninja"^
 ### 12. Install Swift on Windows
 
 - Run ninja install:
+
 ```cmd 
 ninja -C "S:/build/Ninja-DebugAssert/swift-windows-amd64" install
 ```
-- Add the Swift on Windows binaries path (`C:\Program Files (x86)\Swift\bin`)  to the 
-  `Path` environment variable.
-- Add the Swift on Windows library path (`C:\Program Files (x86)\Swift\lib\swift\windows`) 
-  to the `Path` environment variable.
+
+- Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
 
 ## MSVC
 
-To use `cl` instead, just remove the `-DCMAKE_C_COMPILER` and `-DCMAKE_CXX_COMPILER` parameters to the `cmake` invocations.
+To use `cl` instead, just replace the `-DCMAKE_C_COMPILER` and `-DCMAKE_CXX_COMPILER` parameters to the `cmake` invocations.
