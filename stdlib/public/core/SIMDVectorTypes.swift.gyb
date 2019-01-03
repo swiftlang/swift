@@ -85,7 +85,7 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
   }
 
 %  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
-  /// A half-length vector covering the ${half} elements of the vector.
+  /// A half-length vector made up of the ${half} elements of the vector.
   public var ${half}Half: SIMD${n/2}<Scalar> {
     @inlinable get {
       var result = SIMD${n/2}<Scalar>()
