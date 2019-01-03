@@ -1282,7 +1282,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
   if (!MemoryType.isTrivial(Module)) {
     for (auto P : llvm::enumerate(Releases)) {
       auto *R = P.value();
-      if (R == nullptr || isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
+      if (R == nullptr)
         continue;
 
       // We stash all of the destroy_addr that we see.
