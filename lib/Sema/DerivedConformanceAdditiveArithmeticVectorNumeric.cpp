@@ -98,6 +98,8 @@ static ConstructorDecl *getMemberwiseInitializer(NominalTypeDecl *nominal) {
 static Type getVectorNumericScalarAssocType(ValueDecl *decl) {
   auto &C = decl->getASTContext();
   auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
+  if (!decl->hasInterfaceType())
+    return Type();
   auto declType =
       decl->getDeclContext()->mapTypeIntoContext(decl->getInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(declType, vectorNumericProto,
@@ -153,6 +155,8 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+    if (!v->hasInterfaceType())
+      return false;
     auto conf = TypeChecker::conformsToProtocol(v->getType(), addArithProto,
                                                 v->getDeclContext(),
                                                 ConformanceCheckFlags::Used);
