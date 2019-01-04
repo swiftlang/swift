@@ -49,6 +49,18 @@ const IRLinkage IRLinkage::Internal = {
   llvm::GlobalValue::DefaultStorageClass,
 };
 
+const IRLinkage IRLinkage::ExternalImport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLImportStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalExport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLExportStorageClass,
+};
+
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
 }

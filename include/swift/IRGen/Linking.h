@@ -1045,6 +1045,9 @@ struct IRLinkage {
   static const IRLinkage InternalLinkOnceODR;
   static const IRLinkage InternalWeakODR;
   static const IRLinkage Internal;
+
+  static const IRLinkage ExternalImport;
+  static const IRLinkage ExternalExport;
 };
 
 class ApplyIRLinkage {

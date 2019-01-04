@@ -960,9 +960,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
-    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                    llvm::GlobalValue::DefaultVisibility,
-                    llvm::GlobalValue::DLLImportStorageClass})
+    ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";
@@ -1084,10 +1082,7 @@ void IRGenModule::emitAutolinkInfo() {
         llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
-    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                    llvm::GlobalValue::DefaultVisibility,
-                    llvm::GlobalValue::DLLExportStorageClass})
-        .to(ForceImportThunk);
+    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
