@@ -581,7 +581,7 @@ extension Sequence {
   /// predicate.
   ///
   /// You can use this method to count the number of elements that pass a test.
-  /// For example, this code finds the number of names that are fewer than
+  /// The following example finds the number of names that are fewer than
   /// five characters long:
   ///
   ///     let names = ["Jacqueline", "Ian", "Amy", "Juan", "Soroush", "Tiffany"]
@@ -589,7 +589,7 @@ extension Sequence {
   ///     // shortNameCount == 3
   ///
   /// To find the number of times a specific element appears in the sequence,
-  /// use the equal-to operator (`==`) in the closure to test for a match.
+  /// use the equal to operator (`==`) in the closure to test for a match.
   ///
   ///     let birds = ["duck", "duck", "duck", "duck", "goose"]
   ///     let duckCount = birds.count(where: { $0 == "duck" })
