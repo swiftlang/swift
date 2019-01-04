@@ -358,6 +358,42 @@ func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
   return wrap_gcp_arch(a, k, &b)
 }
 
+protocol Foo {
+  var myName: String { get }
+}
+
+struct MyURL {
+}
+
+extension MyURL : Foo {
+  var myName : String { return "MyURL" }
+}
+
+struct MyStruct : Foo {
+  var myName : String { return "MyStruct" }
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform7getNameySSAA3Foo_pFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> @owned String {
+// CHECK: bb0(%0 : $*τ_0_0):
+// CHECK:   alloc_stack
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   debug_value_addr 
+// CHECK:   open_existential_addr
+// CHECK:   witness_method 
+// CHECK:   apply
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK-LABEL: } // end sil function '$s21existential_transform7getNameySSAA3Foo_pFTf4e_n'
+@inline(never) func getName(_ f: Foo) -> String {
+  return f.myName
+}
+
+@inline(never) func getName_wrapper() -> Int32{
+  let u = MyURL()
+  return getName(u) == "MyStruct" ? 0 : 1
+}
+
 @_optimize(none) public func foo() -> Int {
 cp()
 ncp()
@@ -371,5 +407,6 @@ struct_inout_ncp()
 let y:Int = gcp(GC())
 var a:Array<GC> = [GC()]
 let z:Int = gcp_arch(GC(), &a) 
-return x + y + z
+let zz:Int32 = getName_wrapper()
+return x + y + z + Int(zz)
 }
