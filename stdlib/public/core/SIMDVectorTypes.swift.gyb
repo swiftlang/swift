@@ -3,10 +3,16 @@ from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
+spelledNumbers = {
+  2: 'two', 4: 'four', 8: 'eight', 16: '16', 32: '32', 64: '64',
+  3: 'three'
+}
+ordinalPositions = ['first', 'second', 'third', 'fourth']
 }%
 
 %for n in vectorscalarCounts:
 % storageN = 4 if n == 3 else n
+/// A vector of ${spelledNumbers[n]} scalar values.
 @_fixed_layout
 public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 
@@ -14,16 +20,19 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 
   public typealias MaskStorage = SIMD${n}<Scalar.SIMDMaskScalar>
 
+  /// The number of scalars in the vector.
   @_transparent
   public var scalarCount: Int {
     return ${n}
   }
 
+  /// Creates a vector with zero in all lanes.
   @_transparent
   public init() {
     _storage = Scalar.SIMD${storageN}Storage()
   }
 
+  /// Accesses the scalar at the specified position.
   public subscript(index: Int) -> Scalar {
     @_transparent get {
       _precondition(indices.contains(index))
@@ -35,6 +44,7 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
     }
   }
 
+  /// Creates a new vector from the given elements.
   @_transparent
   public init(${', '.join(['_ v' + str(i) + ': Scalar' for i in range(n)])}) {
     self.init()
@@ -44,12 +54,19 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
   }
 
 % if n <= 4:
+  /// Creates a new vector from the given elements.
+  ///
+  /// - Parameters:
+  %  for i in range(n):
+  ///   - ${'xyzw'[i]}: The ${ordinalPositions[i]} element of the vector.
+  %  end
   @_transparent
   public init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
     self.init(${', '.join('xyzw'[:n])})
   }
 
 %  for i in range(n):
+  /// The ${ordinalPositions[i]} element of the vector.
   @_transparent
   public var ${'xyzw'[i]}: Scalar {
     @_transparent get { return self[${i}]}
@@ -59,6 +76,7 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 %  end
 % end
 % if n >= 4:
+  /// Creates a new vector from two half-length vectors.
   @_transparent
   public init(lowHalf: SIMD${n/2}<Scalar>, highHalf: SIMD${n/2}<Scalar>) {
     self.init()
@@ -67,6 +85,7 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
   }
 
 %  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
+  /// A half-length vector made up of the ${half} elements of the vector.
   public var ${half}Half: SIMD${n/2}<Scalar> {
     @inlinable get {
       var result = SIMD${n/2}<Scalar>()
@@ -83,6 +102,10 @@ public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 }
 
 public extension SIMD${n} where Scalar : FixedWidthInteger {
+  /// Creates a new vector from the given vector, truncating the bit patterns
+  /// of the given vector's elements if necessary.
+  ///
+  /// - Parameter other: The vector to convert.
   @inlinable
   init<Other>(truncatingIfNeeded other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
@@ -90,6 +113,10 @@ public extension SIMD${n} where Scalar : FixedWidthInteger {
     for i in indices { self[i] = Scalar(truncatingIfNeeded: other[i]) }
   }
 
+  /// Creates a new vector from the given vector, clamping the values of the
+  /// given vector's elements if necessary.
+  ///
+  /// - Parameter other: The vector to convert.
   @inlinable
   init<Other>(clamping other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
@@ -97,6 +124,13 @@ public extension SIMD${n} where Scalar : FixedWidthInteger {
     for i in indices { self[i] = Scalar(clamping: other[i]) }
   }
 
+  /// Creates a new vector from the given vector, rounding the given vector's
+  /// of elements using the specified rounding rule.
+  ///
+  /// - Parameters:
+  ///   - other: The vector to convert.
+  ///   - rule: The round rule to use when converting elements of `other.` The
+  ///     default is `.towardZero`.
   @inlinable
   init<Other>(
     _ other: SIMD${n}<Other>,
@@ -118,6 +152,9 @@ extension SIMD${n} : CustomDebugStringConvertible {
 }
 
 public extension SIMD${n} where Scalar : BinaryFloatingPoint {
+  /// Creates a new vector from the given vector of integers.
+  ///
+  /// - Parameter other: The vector to convert.
   @inlinable
   init<Other>(_ other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
@@ -125,6 +162,9 @@ public extension SIMD${n} where Scalar : BinaryFloatingPoint {
     for i in indices { self[i] = Scalar(other[i]) }
   }
 
+  /// Creates a new vector from the given vector of floating-point values.
+  ///
+  /// - Parameter other: The vector to convert.
   @inlinable
   init<Other>(_ other: SIMD${n}<Other>)
   where Other : BinaryFloatingPoint {
@@ -145,6 +185,7 @@ extension ${Self} : SIMDScalar {
 
 % for n in storagescalarCounts:
 %  bytes = n * self_type.bits / 8
+  /// Storage for a vector of ${spelledNumbers[n]} integers.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})
   public struct SIMD${n}Storage : SIMDStorage {
@@ -189,6 +230,7 @@ extension ${Self} : SIMDScalar {
 
 % for n in storagescalarCounts:
 %  bytes = n * bits / 8
+  /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @_fixed_layout
   @_alignment(${bytes if bytes <= 16 else 16})
   public struct SIMD${n}Storage : SIMDStorage {
