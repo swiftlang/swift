@@ -2260,8 +2260,11 @@ public:
 
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
-                isa<AllocStackInst>(DI->getOperand()),
-            "Operand of dealloc_stack must be an alloc_stack");
+                isa<AllocStackInst>(DI->getOperand()) ||
+                (isa<PartialApplyInst>(DI->getOperand()) &&
+                 cast<PartialApplyInst>(DI->getOperand())->isOnStack()),
+            "Operand of dealloc_stack must be an alloc_stack or partial_apply "
+            "[stack]");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),

@@ -3348,11 +3348,12 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' callee-ownership-attr? sil-value
+  sil-instruction ::= 'partial_apply' callee-ownership-attr? on-stack-attr? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
   callee-ownership-attr ::= '[callee_guaranteed]'
+  on-stack-attr ::= '[on_stack]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -3370,12 +3371,18 @@ partial_apply
 Creates a closure by partially applying the function ``%0`` to a partial
 sequence of its arguments. In the instruction syntax, the type of the callee is
 specified after the argument list; the types of the argument and of the defined
-value are derived from the function type of the callee. The closure context will
-be allocated with retain count 1 and initialized to contain the values ``%1``,
+value are derived from the function type of the callee. If the ``partial_apply``
+has an escaping function type (not ``[on_stack]``) the closure context will be
+allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
-separately before the ``partial_apply``. The closure does however take
-ownership of the partially applied arguments; when the closure reference
-count reaches zero, the contained values will be destroyed.
+separately before the ``partial_apply``. The closure does however take ownership
+of the partially applied arguments; when the closure reference count reaches
+zero, the contained values will be destroyed. If the ``partial_apply`` has a
+``@noescape`` function type (``partial_apply [on_stack]``) the closure context
+is allocated on the stack and intialized to contain the closed-over values. The
+closed-over values are not retained, lifetime of the closed-over values must be
+managed separately. The lifetime of the stack context of a ``partial_apply
+[stack]`` must be terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic

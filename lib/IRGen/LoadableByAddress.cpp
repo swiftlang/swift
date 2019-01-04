@@ -2481,10 +2481,9 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
                                       .getAs<SILFunctionType>()
                                       ->getCalleeConvention();
 
-    auto newApply =
-      applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      applySite.getSubstitutionMap(), callArgs,
-                                      partialApplyConvention);
+    auto newApply = applyBuilder.createPartialApply(
+        castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
+        partialApplyConvention, castedApply->isOnStack());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }

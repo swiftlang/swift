@@ -52,7 +52,8 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
                                         SubstitutionMap subs,
-                                        ParameterConvention calleeConvention) {
+                                        ParameterConvention calleeConvention,
+                                        PartialApplyInst::OnStackKind onStack) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
     FTI = FTI->substGenericArgs(M, subs);
@@ -65,6 +66,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto extInfo = FTI->getExtInfo()
     .withRepresentation(SILFunctionType::Representation::Thick)
     .withIsPseudogeneric(false);
+  if (onStack)
+    extInfo = extInfo.withNoEscape();
 
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us, converting the
