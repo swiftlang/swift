@@ -108,15 +108,27 @@ struct DifferentiableSubset : Differentiable {
  
   @_fieldwiseProductSpace
   struct TangentVector : Differentiable, VectorNumeric {
+    @_fieldwiseProductSpace
+    typealias TangentVector = DifferentiableSubset.TangentVector
+    @_fieldwiseProductSpace
     typealias CotangentVector = DifferentiableSubset.CotangentVector
     var w: Float
     var b: Float
+    func tangentVector(from cotan: CotangentVector) -> TangentVector {
+      return TangentVector(w: cotan.w, b: cotan.b)
+    }
   }
   @_fieldwiseProductSpace
   struct CotangentVector : Differentiable, VectorNumeric {
+    @_fieldwiseProductSpace
+    typealias TangentVector = DifferentiableSubset.CotangentVector
+    @_fieldwiseProductSpace
     typealias CotangentVector = DifferentiableSubset.TangentVector
     var w: Float
     var b: Float
+    func tangentVector(from cotan: CotangentVector) -> TangentVector {
+      return TangentVector(w: cotan.w, b: cotan.b)
+    }
   }
   func tangentVector(from cotan: CotangentVector) -> TangentVector {
     return TangentVector(w: cotan.w, b: cotan.b)
