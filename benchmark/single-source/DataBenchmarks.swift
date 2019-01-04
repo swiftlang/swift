@@ -139,6 +139,10 @@ public let DataBenchmarks = [
     runFunction: run_StringToDataMedium, tags: d, legacyFactor: 50),
 ]
 
+let small = sampleData(.small)
+let medium = sampleData(.medium)
+let large = sampleData(.large)
+
 enum SampleKind {
   case small
   case medium
