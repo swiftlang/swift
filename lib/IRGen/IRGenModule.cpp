@@ -975,10 +975,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
                                           /*isConstant=*/true,
                                           llvm::GlobalValue::WeakODRLinkage,
                                           ForceImportThunk, buf.str());
-      ApplyIRLinkage({llvm::GlobalValue::WeakODRLinkage,
-                      llvm::GlobalValue::HiddenVisibility,
-                      llvm::GlobalValue::DefaultStorageClass})
-          .to(ref);
+      ApplyIRLinkage(IRLinkage::InternalWeakODR).to(ref);
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
     }

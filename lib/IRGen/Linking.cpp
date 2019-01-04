@@ -37,6 +37,12 @@ const IRLinkage IRLinkage::InternalLinkOnceODR = {
   llvm::GlobalValue::DefaultStorageClass,
 };
 
+const IRLinkage IRLinkage::InternalWeakODR = {
+  llvm::GlobalValue::WeakODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
 const IRLinkage IRLinkage::Internal = {
   llvm::GlobalValue::InternalLinkage,
   llvm::GlobalValue::DefaultVisibility,

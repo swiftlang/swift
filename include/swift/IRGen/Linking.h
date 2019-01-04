@@ -1043,6 +1043,7 @@ struct IRLinkage {
   llvm::GlobalValue::DLLStorageClassTypes DLLStorage;
 
   static const IRLinkage InternalLinkOnceODR;
+  static const IRLinkage InternalWeakODR;
   static const IRLinkage Internal;
 };
 
