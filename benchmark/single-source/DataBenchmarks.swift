@@ -46,9 +46,11 @@ public let DataBenchmarks = [
     ])) } }, tags: d, legacyFactor: 20),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
-    runFunction: { for _ in 0..<$0*M { blackHole(small[1]) } }, tags: d),
+    runFunction: { let data = small
+      for _ in 0..<$0*M { blackHole(data[1]) } }, tags: d),
   BenchmarkInfo(name: "DataSubscriptMedium",
-    runFunction: { for _ in 0..<$0*M { blackHole(medium[521]) } }, tags: d),
+    runFunction: { let data = medium
+      for _ in 0..<$0*M { blackHole(data[521]) } }, tags: d),
 
   BenchmarkInfo(name: "DataCountSmall",
     runFunction: { count($0*M, data: small) }, tags: d),
