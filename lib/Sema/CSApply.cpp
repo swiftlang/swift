@@ -2528,7 +2528,7 @@ namespace {
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             structOrEnumMember = EED;
             memberName = EED->getNameStr();
-            isOptional = EED->getParentEnum()->isOptionalDecl();
+            isOptional = EED->getParentEnum()->isOptionalDecl() && !EED->getParentEnum()->getElement(EED->getName())->hasAssociatedValues();
           } else if (auto VD = dyn_cast<VarDecl>(calledValue)) {
             if (VD->isStatic()) {
               structOrEnumMember = VD;
