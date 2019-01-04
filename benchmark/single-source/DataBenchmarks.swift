@@ -47,9 +47,9 @@ public let DataBenchmarks = [
     runFunction: { setCount($0, data: medium, extra: 100) }, tags: d),
 
   BenchmarkInfo(name: "DataAccessBytesSmall",
-    runFunction: run_AccessBytesSmall, tags: d),
+    runFunction: { withUnsafeBytes($0, data: small) }, tags: d),
   BenchmarkInfo(name: "DataAccessBytesMedium",
-    runFunction: run_AccessBytesMedium, tags: d),
+    runFunction: { withUnsafeBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataMutateBytesSmall",
     runFunction: run_MutateBytesSmall, tags: d),
@@ -174,10 +174,10 @@ func sampleData(_ type: SampleKind) -> Data {
 
 }
 
-func benchmark_AccessBytes(_ N: Int, _ data: Data) {
+@inline(never)
+func withUnsafeBytes(_ N: Int, data: Data) {
   for _ in 0..<10000*N {
     data.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
-      // Ensure that the compiler does not optimize away this call
       blackHole(ptr.pointee)
     }
   }
@@ -275,19 +275,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_AccessBytesSmall(_ N: Int) {
-  let data = sampleData(.small)
-  benchmark_AccessBytes(N, data)
-}
-
-
-@inline(never)
-public func run_AccessBytesMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_AccessBytes(N, data)
 }
 
 @inline(never)
