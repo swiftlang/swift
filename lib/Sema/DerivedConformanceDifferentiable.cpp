@@ -116,10 +116,8 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
       validTangentDeclCount > 1 || validCotangentDeclCount > 1)
     return false;
 
-  // All stored properties must conform to `Differentiable`.
-  // Currently, all stored properties must also have
-  // `Self == TangentVector == CotangentVector`.
-  // TODO(dan-zheng): Lift this restriction.
+  // All stored properties not marked with `@noDerivative` must conform to
+  // `Differentiable`.
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(structDecl, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
