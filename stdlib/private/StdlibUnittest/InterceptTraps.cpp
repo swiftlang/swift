@@ -71,7 +71,7 @@ void installTrapInterceptor() {
   setbuf(stdout, 0);
 
 #if defined(_WIN32)
-  _set_abort_behavior(1, _WRITE_ABORT_MSG);
+  _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
   signal(SIGILL,  CrashCatcher);
