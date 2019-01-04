@@ -15,23 +15,28 @@ import Foundation
 
 let d: [BenchmarkCategory] =  [.validation, .api, .Data]
 
+/// Workload scaling: Inner loop multipliers
+let M = 10_000  /// default
+let I = 100_000 /// Data initialization
+let S = 200     /// String conversions
+
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
-    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data()) } }, tags: d),
+    runFunction: { for _ in 0..<$0*I { blackHole(Data()) } }, tags: d),
   BenchmarkInfo(name: "DataCreateSmall",
-    runFunction: { for _ in 0..<$0*100_000 { blackHole(sampleData(.small)) } },
+    runFunction: { for _ in 0..<$0*I { blackHole(sampleData(.small)) } },
     tags: d),
   BenchmarkInfo(name: "DataCreateMedium",
-    runFunction: { for _ in 0..<$0*10_000 { blackHole(sampleData(.medium)) } },
+    runFunction: { for _ in 0..<$0*M { blackHole(sampleData(.medium)) } },
     tags: d),
 
   BenchmarkInfo(name: "DataCreateEmptyArray",
-    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data([])) } }, tags: d),
+    runFunction: { for _ in 0..<$0*I { blackHole(Data([])) } }, tags: d),
   BenchmarkInfo(name: "DataCreateSmallArray",
-    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data(
+    runFunction: { for _ in 0..<$0*I { blackHole(Data(
       [0, 1, 2, 3, 4, 5, 6])) } }, tags: d),
   BenchmarkInfo(name: "DataCreateMediumArray",
-    runFunction: { for _ in 0..<$0*10_000 { blackHole(Data([
+    runFunction: { for _ in 0..<$0*M { blackHole(Data([
       0, 1, 2, 3, 4, 5, 6,
       0, 1, 2, 3, 4, 5, 6,
       0, 1, 2, 3, 4, 5, 6,
@@ -39,98 +44,98 @@ public let DataBenchmarks = [
     ])) } }, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
-    runFunction: { for _ in 0..<$0*10_000 { blackHole(small[1]) } }, tags: d),
+    runFunction: { for _ in 0..<$0*M { blackHole(small[1]) } }, tags: d),
   BenchmarkInfo(name: "DataSubscriptMedium",
-    runFunction: { for _ in 0..<$0*10_000 { blackHole(medium[521]) } }, tags: d),
+    runFunction: { for _ in 0..<$0*M { blackHole(medium[521]) } }, tags: d),
 
   BenchmarkInfo(name: "DataCountSmall",
-    runFunction: { count($0, data: small) }, tags: d),
+    runFunction: { count($0*M, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCountMedium",
-    runFunction: { count($0, data: medium) }, tags: d),
+    runFunction: { count($0*M, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataSetCountSmall",
-    runFunction: { setCount($0, data: small, extra: 3) }, tags: d),
+    runFunction: { setCount($0*M, data: small, extra: 3) }, tags: d),
   BenchmarkInfo(name: "DataSetCountMedium",
-    runFunction: { setCount($0, data: medium, extra: 100) }, tags: d),
+    runFunction: { setCount($0*M, data: medium, extra: 100) }, tags: d),
 
   BenchmarkInfo(name: "DataAccessBytesSmall",
-    runFunction: { withUnsafeBytes($0, data: small) }, tags: d),
+    runFunction: { withUnsafeBytes($0*M, data: small) }, tags: d),
   BenchmarkInfo(name: "DataAccessBytesMedium",
-    runFunction: { withUnsafeBytes($0, data: medium) }, tags: d),
+    runFunction: { withUnsafeBytes($0*M, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataMutateBytesSmall",
-    runFunction: { withUnsafeMutableBytes($0, data: small) }, tags: d),
+    runFunction: { withUnsafeMutableBytes($0*M, data: small) }, tags: d),
   BenchmarkInfo(name: "DataMutateBytesMedium",
-    runFunction: { withUnsafeMutableBytes($0, data: medium) }, tags: d),
+    runFunction: { withUnsafeMutableBytes($0*M, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataCopyBytesSmall",
-    runFunction: { copyBytes($0, data: small) }, tags: d),
+    runFunction: { copyBytes($0*M, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCopyBytesMedium",
-    runFunction: { copyBytes($0, data: medium) }, tags: d),
+    runFunction: { copyBytes($0*M, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendBytesSmall",
-    runFunction: { append($0, bytes: 3, to: small) }, tags: d),
+    runFunction: { append($0*M, bytes: 3, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendBytesMedium",
-    runFunction: { append($0, bytes: 809, to: medium) }, tags: d),
+    runFunction: { append($0*M, bytes: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendArray",
-    runFunction: { append($0, arraySize: 809, to: medium) }, tags: d),
+    runFunction: { append($0*M, arraySize: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataReset",
-    runFunction: { resetBytes($0, in: 431..<809, data: medium) }, tags: d),
+    runFunction: { resetBytes($0*M, in: 431..<809, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataReplaceSmall", runFunction: {
-    replace($0, data: medium, subrange:431..<809, with: small) }, tags: d),
+    replace($0*M, data: medium, subrange:431..<809, with: small) }, tags: d),
   BenchmarkInfo(name: "DataReplaceMedium", runFunction: {
-    replace($0, data: medium, subrange:431..<809, with: medium) }, tags: d),
+    replace($0*M, data: medium, subrange:431..<809, with: medium) }, tags: d),
   BenchmarkInfo(name: "DataReplaceLarge", runFunction: {
-    replace($0, data: medium, subrange:431..<809, with: large) }, tags: d),
+    replace($0*M, data: medium, subrange:431..<809, with: large) }, tags: d),
 
   BenchmarkInfo(name: "DataReplaceSmallBuffer", runFunction: {
-    replaceBuffer($0, data: medium, subrange:431..<809, with: small) },
+    replaceBuffer($0*M, data: medium, subrange:431..<809, with: small) },
     tags: d),
   BenchmarkInfo(name: "DataReplaceMediumBuffer", runFunction: {
-    replaceBuffer($0, data: medium, subrange:431..<809, with: medium) },
+    replaceBuffer($0*M, data: medium, subrange:431..<809, with: medium) },
     tags: d),
   BenchmarkInfo(name: "DataReplaceLargeBuffer", runFunction: {
-    replaceBuffer($0, data: medium, subrange:431..<809, with: large) },
+    replaceBuffer($0*M, data: medium, subrange:431..<809, with: large) },
     tags: d),
 
   BenchmarkInfo(name: "DataAppendSequence",
-    runFunction: { append($0, sequenceLength: 809, to: medium) }, tags: d),
+    runFunction: { append($0*M, sequenceLength: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
-    runFunction: { append($0, data: small, to: small) }, tags: d),
+    runFunction: { append($0*M, data: small, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataSmallToMedium",
-    runFunction: { append($0, data: small, to: medium) }, tags: d),
+    runFunction: { append($0*M, data: small, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataSmallToLarge",
-    runFunction: { append($0, data: small, to: large) }, tags: d),
+    runFunction: { append($0*M, data: small, to: large) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToSmall",
-    runFunction: { append($0, data: medium, to: small) }, tags: d),
+    runFunction: { append($0*M, data: medium, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToMedium",
-    runFunction: { append($0, data: medium, to: medium) }, tags: d),
+    runFunction: { append($0*M, data: medium, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToLarge",
-    runFunction: { append($0, data: medium, to: large) }, tags: d),
+    runFunction: { append($0*M, data: medium, to: large) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToSmall",
-    runFunction: { append($0, data: large, to: small) }, tags: d),
+    runFunction: { append($0*M, data: large, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToMedium",
-    runFunction: { append($0, data: large, to: medium) }, tags: d),
+    runFunction: { append($0*M, data: large, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToLarge",
-    runFunction: { append($0, data: large, to: large) }, tags: d),
+    runFunction: { append($0*M, data: large, to: large) }, tags: d),
 
   BenchmarkInfo(name: "DataToStringEmpty",
-    runFunction: { string($0, from: emptyData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*S, from: emptyData) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringSmall",
-    runFunction: { string($0, from: smallData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*S, from: smallData) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringMedium",
-    runFunction: { string($0, from: mediumData) }, tags: d, legacyFactor: 50),
+    runFunction: { string($0*S, from: mediumData) }, tags: d, legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
-    runFunction: { data($0, from: emptyString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*S, from: emptyString) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataSmall",
-    runFunction: { data($0, from: smallString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*S, from: smallString) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
-    runFunction: { data($0, from: mediumString) }, tags: d, legacyFactor: 50),
+    runFunction: { data($0*S, from: mediumString) }, tags: d, legacyFactor: 50),
 ]
 
 let emptyString = ""
@@ -191,7 +196,7 @@ func sampleData(_ type: SampleKind) -> Data {
 
 @inline(never)
 func withUnsafeBytes(_ N: Int, data: Data) {
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     data.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
       blackHole(ptr.pointee)
     }
@@ -200,7 +205,7 @@ func withUnsafeBytes(_ N: Int, data: Data) {
 
 @inline(never)
 func withUnsafeMutableBytes(_ N: Int, data: Data) {
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
       // Mutate a byte
@@ -214,7 +219,7 @@ func copyBytes(_ N: Int, data: Data) {
   let amount = data.count
   var buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: amount)
   defer { buffer.deallocate() }
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     data.copyBytes(to: buffer, from: 0..<amount)
   }
 }
@@ -223,7 +228,7 @@ func copyBytes(_ N: Int, data: Data) {
 func append(_ N: Int, bytes count: Int, to data: Data) {
   let bytes = malloc(count).assumingMemoryBound(to: UInt8.self)
   defer { free(bytes) }
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.append(bytes, count: count)
   }
@@ -235,7 +240,7 @@ func append(_ N: Int, arraySize: Int, to data: Data) {
   bytes.withUnsafeMutableBufferPointer {
     fillBuffer($0)
   }
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.append(contentsOf: bytes)
   }
@@ -244,7 +249,7 @@ func append(_ N: Int, arraySize: Int, to data: Data) {
 @inline(never)
 func append(_ N: Int, sequenceLength: Int, to data: Data) {
   let bytes = repeatElement(UInt8(0xA0), count: sequenceLength)
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.append(contentsOf: bytes)
   }
@@ -252,7 +257,7 @@ func append(_ N: Int, sequenceLength: Int, to data: Data) {
 
 @inline(never)
 func resetBytes(_ N: Int, in range: Range<Data.Index>, data: Data) {
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.resetBytes(in: range)
   }
@@ -265,7 +270,7 @@ func replace(
   subrange range: Range<Data.Index>,
   with replacement: Data
 ) {
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     var copy = data
     copy.replaceSubrange(range, with: replacement)
   }
@@ -281,7 +286,7 @@ func replaceBuffer(
   replacement.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
     let buffer = UnsafeBufferPointer(start: bytes, count: replacement.count)
 
-    for _ in 0..<10000*N {
+    for _ in 1...N {
       var copy = data
       copy.replaceSubrange(range, with: buffer)
     }
@@ -291,7 +296,7 @@ func replaceBuffer(
 @inline(never)
 func append(_ N: Int, data: Data, to target: Data) {
   var copy: Data
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     copy = target
     copy.append(data)
   }
@@ -299,7 +304,7 @@ func append(_ N: Int, data: Data, to target: Data) {
 
 @inline(never)
 public func count(_ N: Int, data: Data) {
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     blackHole(data.count)
   }
 }
@@ -309,7 +314,7 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
   var copy = data
   let count = data.count + extra
   let orig = data.count
-  for _ in 0..<10000*N {
+  for _ in 1...N {
     copy.count = count
     copy.count = orig
   }
@@ -317,14 +322,14 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
 
 @inline(never)
 public func string(_ N: Int, from data: Data) {
-  for _ in 0..<200 * N {
+  for _ in 1...N {
     blackHole(String(decoding: data, as: UTF8.self))
   }
 }
 
 @inline(never)
 public func data(_ N: Int, from string: String) {
-  for _ in 0..<200 * N {
+  for _ in 1...N {
     blackHole(Data(string.utf8))
   }
 }
