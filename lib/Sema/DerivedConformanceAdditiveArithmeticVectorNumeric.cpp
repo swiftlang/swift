@@ -114,6 +114,7 @@ static Type getVectorNumericScalarAssocType(ValueDecl *decl) {
 static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal) {
   // Must be a struct type.
   auto *structDecl = dyn_cast<StructDecl>(nominal);
+  auto &C = nominal->getASTContext();
   if (!structDecl)
     return Type();
   // Struct must have at least one stored property.
@@ -124,6 +125,10 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal) {
   // Otherwise, the `Scalar` type cannot be derived.
   Type sameScalarType;
   for (auto member : structDecl->getStoredProperties()) {
+    if (!member->hasInterfaceType())
+      C.getLazyResolver()->resolveDeclSignature(member);
+    if (!member->hasInterfaceType())
+      return Type();
     auto scalarType = getVectorNumericScalarAssocType(member);
     // If stored property does not conform to `VectorNumeric`, return null
     // `Type`.
@@ -153,6 +158,10 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+    if (!v->hasInterfaceType())
+      C.getLazyResolver()->resolveDeclSignature(v);
+    if (!v->hasInterfaceType())
+      return false;
     auto conf = TypeChecker::conformsToProtocol(v->getType(), addArithProto,
                                                 v->getDeclContext(),
                                                 ConformanceCheckFlags::Used);
