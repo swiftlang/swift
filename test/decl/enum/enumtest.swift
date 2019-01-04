@@ -339,3 +339,7 @@ let _: Foo = .none // ok
 let _: Foo = .bar // ok
 let _: Foo? = .bar // ok
 let _: Foo?? = .bar // ok
+let _: Foo = Foo.bar // ok
+let _: Foo = Foo.none // ok
+let _: Foo? = Foo.none // ok
+let _: Foo?? = Foo.none // ok
