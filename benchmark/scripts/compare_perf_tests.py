@@ -30,12 +30,15 @@ class `ReportFormatter` creates the test comparison report in specified format.
 from __future__ import print_function
 
 import argparse
+import functools
 import re
 import sys
 from bisect import bisect, bisect_left, bisect_right
 from collections import namedtuple
 from math import ceil, sqrt
 
+if not hasattr(sys.modules['__builtin__'], 'reduce'):
+    reduce = functools.reduce
 
 class Sample(namedtuple('Sample', 'i num_iters runtime')):
     u"""Single benchmark measurement.
@@ -185,13 +188,14 @@ class PerformanceTestSamples(object):
                 sqrt(self.S_runtime / (self.count - 1)))
 
     @staticmethod
-    def running_mean_variance((k, M_, S_), x):
+    def running_mean_variance(kMS, x):
         """Compute running variance, B. P. Welford's method.
 
         See Knuth TAOCP vol 2, 3rd edition, page 232, or
         https://www.johndcook.com/blog/standard_deviation/
         M is mean, Standard Deviation is defined as sqrt(S/k-1)
         """
+        k, M_, S_ = kMS
         k = float(k + 1)
         M = M_ + (x - M_) / k
         S = S_ + (x - M_) * (x - M)

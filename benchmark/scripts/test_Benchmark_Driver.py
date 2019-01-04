@@ -18,7 +18,11 @@ import os
 import time
 import unittest
 
-from StringIO import StringIO
+try:
+    from StringIO import StringIO # py2
+except ModuleNotFoundError:
+    from io import StringIO # py3
+
 from imp import load_source
 
 from compare_perf_tests import PerformanceTestResult

@@ -26,6 +26,7 @@ class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
 """
 
 import argparse
+import functools
 import glob
 import logging
 import math
@@ -36,6 +37,9 @@ import sys
 import time
 
 from compare_perf_tests import LogParser
+
+if not hasattr(sys.modules['__builtin__'], 'reduce'):
+    reduce = functools.reduce
 
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -178,14 +182,10 @@ class BenchmarkDriver(object):
 
         Returns the aggregated result of independent benchmark invocations.
         """
-        def merge_results(a, b):
-            a.merge(b)
-            return a
-
-        return reduce(merge_results,
-                      [self.run(test, measure_memory=True,
+        result_sets = [self.run(test, measure_memory=True,
                                 num_iters=1, quantile=20)
-                       for _ in range(self.args.independent_samples)])
+                       for _ in range(self.args.independent_samples)]
+        return reduce(lambda m, res: (m.merge(res), m)[1], result_sets)
 
     def log_results(self, output, log_file=None):
         """Log output to `log_file`.
@@ -303,8 +303,12 @@ class MarkdownReportHandler(logging.StreamHandler):
         msg = self.format(record)
         stream = self.stream
         try:
-            if (isinstance(msg, unicode) and
-                    getattr(stream, 'encoding', None)):
+            is_text = isinstance(msg, unicode)
+        except NameError:
+            is_text = isinstance(msg, bytes)
+
+        try:
+            if is_text and getattr(stream, 'encoding', None):
                 stream.write(msg.encode(stream.encoding))
             else:
                 stream.write(msg)
@@ -414,6 +418,7 @@ class BenchmarkDoctor(object):
         name = measurements['name']
         setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
         setup = 0 if ratio < 0.05 else setup
+
         runtime = min(
             [(result.samples.min - correction) for i_series in
              [BenchmarkDoctor._select(measurements, num_iters=i)
