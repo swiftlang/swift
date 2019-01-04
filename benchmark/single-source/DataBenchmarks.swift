@@ -25,11 +25,17 @@ public let DataBenchmarks = [
     runFunction: run_createMedium, tags: d),
 
   BenchmarkInfo(name: "DataCreateEmptyArray",
-    runFunction: run_createEmptyArray, tags: d),
+    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data([])) } }, tags: d),
   BenchmarkInfo(name: "DataCreateSmallArray",
-    runFunction: run_createSmallArray, tags: d),
+    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data(
+      [0, 1, 2, 3, 4, 5, 6])) } }, tags: d),
   BenchmarkInfo(name: "DataCreateMediumArray",
-    runFunction: run_createMediumArray, tags: d),
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(Data([
+      0, 1, 2, 3, 4, 5, 6,
+      0, 1, 2, 3, 4, 5, 6,
+      0, 1, 2, 3, 4, 5, 6,
+      0, 1, 2, 3, 4, 5, 6,
+    ])) } }, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
     runFunction: { for _ in 0..<$0*10_000 { blackHole(small[1]) } }, tags: d),
@@ -428,27 +434,6 @@ public func run_createSmall(_ N: Int) {
 public func run_createMedium(_ N: Int) {
   for _ in 0..<10000 * N {
     blackHole(sampleData(.medium))
-  }
-}
-
-@inline(never)
-public func run_createEmptyArray(_ N: Int) {
-  for _ in 0..<100000 * N {
-    blackHole(Data([]))
-  }
-}
-
-@inline(never)
-public func run_createSmallArray(_ N: Int) {
-  for _ in 0..<100000 * N {
-    blackHole(Data([0, 1, 2, 3, 4, 5, 6]))
-  }
-}
-
-@inline(never)
-public func run_createMediumArray(_ N: Int) {
-  for _ in 0..<10000 * N {
-    blackHole(Data([0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]))
   }
 }
 
