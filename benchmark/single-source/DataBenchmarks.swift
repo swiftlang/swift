@@ -52,9 +52,9 @@ public let DataBenchmarks = [
     runFunction: { withUnsafeBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataMutateBytesSmall",
-    runFunction: run_MutateBytesSmall, tags: d),
+    runFunction: { withUnsafeMutableBytes($0, data: small) }, tags: d),
   BenchmarkInfo(name: "DataMutateBytesMedium",
-    runFunction: run_MutateBytesMedium, tags: d),
+    runFunction: { withUnsafeMutableBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataCopyBytesSmall",
     runFunction: run_CopyBytesSmall, tags: d),
@@ -183,10 +183,11 @@ func withUnsafeBytes(_ N: Int, data: Data) {
   }
 }
 
-func benchmark_MutateBytes(_ N: Int, _ data_: Data) {
+@inline(never)
+func withUnsafeMutableBytes(_ N: Int, data: Data) {
   for _ in 0..<10000*N {
-    var data = data_
-    data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
+    var copy = data
+    copy.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) in
       // Mutate a byte
       ptr.pointee = 42
     }
@@ -275,18 +276,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_MutateBytesSmall(_ N: Int) {
-  let data = sampleData(.small)
-  benchmark_MutateBytes(N, data)
-}
-
-@inline(never)
-public func run_MutateBytesMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_MutateBytes(N, data)
 }
 
 @inline(never)
