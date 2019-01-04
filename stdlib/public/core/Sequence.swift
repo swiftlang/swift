@@ -427,6 +427,11 @@ extension DropFirstSequence: Sequence {
     // [1,2,3,4].dropFirst(2).
     return DropFirstSequence(_base, dropping: _limit + k)
   }
+
+  @inlinable
+  public var underestimatedCount: Int {
+    return Swift.max(0, _base.underestimatedCount - _limit)
+  }
 }
 
 /// A sequence that only consumes up to `n` elements from an underlying
