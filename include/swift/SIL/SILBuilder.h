@@ -927,10 +927,10 @@ public:
 
   ConvertEscapeToNoEscapeInst *
   createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
-                                bool isEscapedByUser, bool lifetimeGuaranteed) {
+                                bool lifetimeGuaranteed) {
     return insert(ConvertEscapeToNoEscapeInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes,
-        isEscapedByUser, lifetimeGuaranteed));
+        lifetimeGuaranteed));
   }
 
   ThinFunctionToPointerInst *
