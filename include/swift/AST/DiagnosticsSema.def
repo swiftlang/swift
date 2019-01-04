@@ -1391,9 +1391,13 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
-WARNING(ambiguous_enum_case,none,
+WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean 'Optional<%0>.%1'; did you mean '%0.%1' instead?",
         (StringRef, StringRef))
+NOTE(optional_fixit_for_optional_ambiguous_case_ref,none,
+     "explicitly specify 'Optional' to silence this warning", ())
+NOTE(type_fixit_for_optional_ambiguous_case_ref,none,
+     "use '%0.%1' instead", (StringRef, StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
