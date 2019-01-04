@@ -2522,32 +2522,32 @@ namespace {
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 			
-			// If the base type is optional and we're referring to an enum case via the dot syntax
-			// and the enum case matches the Optional<T>.none case then emit a diagnostic
-			if (auto baseType = baseTy->lookThroughAllOptionalTypes()) {
-				if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
-					if (auto EED = dyn_cast<EnumElementDecl>(DSCE->getCalledValue())) {
-						if (EED->getParentEnum()->isOptionalDecl()) {
-							// Lookup the case in the original enum decl
-							auto baseTypeEnum = baseType->getEnumOrBoundGenericEnum();
-							auto results = tc.lookupMember(baseTypeEnum->getModuleContext(), baseType, EED->getName(), defaultMemberLookupOptions);
-							bool caseExistsInBase = false;
-							
-							for (LookupResultEntry result : results) {
-								if (auto *eed = dyn_cast<EnumElementDecl>(result.getValueDecl())) {
-									caseExistsInBase = true;
-									break;
-								}
-							}
-							
-							// Emit a warning dignostic
-							if (caseExistsInBase) {
-								tc.diagnose(DSCE->getLoc(), swift::diag::ambiguous_enum_case, EED->getNameStr(), baseTypeEnum->getNameStr());
-							}
-						}
-					}
-				}
-			}
+      // If the base type is optional and we're referring to an enum case via the dot syntax
+      // and the enum case matches the Optional<T>.none case then emit a diagnostic
+      if (auto baseType = baseTy->lookThroughAllOptionalTypes()) {
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
+          if (auto EED = dyn_cast<EnumElementDecl>(DSCE->getCalledValue())) {
+            if (EED->getParentEnum()->isOptionalDecl()) {
+              // Lookup the case in the original enum decl
+              auto baseTypeEnum = baseType->getEnumOrBoundGenericEnum();
+              auto results = tc.lookupMember(baseTypeEnum->getModuleContext(), baseType, EED->getName(), defaultMemberLookupOptions);
+              bool caseExistsInBase = false;
+              
+              for (LookupResultEntry result : results) {
+                if (auto *eed = dyn_cast<EnumElementDecl>(result.getValueDecl())) {
+                  caseExistsInBase = true;
+                  break;
+                }
+              }
+              
+              // Emit a warning dignostic
+              if (caseExistsInBase) {
+                tc.diagnose(DSCE->getLoc(), swift::diag::ambiguous_enum_case, EED->getNameStr(), baseTypeEnum->getNameStr());
+              }
+            }
+          }
+        }
+      }
 
       return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
