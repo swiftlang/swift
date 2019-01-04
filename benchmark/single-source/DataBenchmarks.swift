@@ -98,23 +98,23 @@ public let DataBenchmarks = [
     runFunction: run_AppendSequence, tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
-    runFunction: run_AppendDataSmallToSmall, tags: d),
+    runFunction: { append($0, data: small, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataSmallToMedium",
-    runFunction: run_AppendDataSmallToMedium, tags: d),
+    runFunction: { append($0, data: small, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataSmallToLarge",
-    runFunction: run_AppendDataSmallToLarge, tags: d),
+    runFunction: { append($0, data: small, to: large) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToSmall",
-    runFunction: run_AppendDataMediumToSmall, tags: d),
+    runFunction: { append($0, data: medium, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToMedium",
-    runFunction: run_AppendDataMediumToMedium, tags: d),
+    runFunction: { append($0, data: medium, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataMediumToLarge",
-    runFunction: run_AppendDataMediumToLarge, tags: skip),
+    runFunction: { append($0, data: medium, to: large) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToSmall",
-    runFunction: run_AppendDataLargeToSmall, tags: d),
+    runFunction: { append($0, data: large, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToMedium",
-    runFunction: run_AppendDataLargeToMedium, tags: d),
+    runFunction: { append($0, data: large, to: medium) }, tags: d),
   BenchmarkInfo(name: "DataAppendDataLargeToLarge",
-    runFunction: run_AppendDataLargeToLarge, tags: skip),
+    runFunction: { append($0, data: large, to: large) }, tags: d),
 
   BenchmarkInfo(name: "DataToStringEmpty",
     runFunction: run_DataToStringEmpty, tags: d, legacyFactor: 50),
@@ -260,11 +260,12 @@ func benchmark_ReplaceBuffer(_ N: Int, _ range: Range<Data.Index>, _ data_: Data
   }
 }
 
-func benchmark_AppendData(_ N: Int, _ lhs: Data, _ rhs: Data) {
-  var data = lhs
+@inline(never)
+func append(_ N: Int, data: Data, to target: Data) {
+  var copy: Data
   for _ in 0..<10000*N {
-    data = lhs
-    data.append(rhs)
+    copy = target
+    copy.append(data)
   }
 }
 
@@ -353,69 +354,6 @@ public func run_ReplaceLargeBuffer(_ N: Int) {
 public func run_AppendSequence(_ N: Int) {
   let data = sampleData(.medium)
   benchmark_AppendSequence(N, 809, data)
-}
-
-@inline(never)
-public func run_AppendDataSmallToSmall(_ N: Int) {
-  let data = sampleData(.small)
-  let other = sampleData(.small)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataSmallToMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  let other = sampleData(.small)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataSmallToLarge(_ N: Int) {
-  let data = sampleData(.large)
-  let other = sampleData(.small)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataMediumToSmall(_ N: Int) {
-  let data = sampleData(.small)
-  let other = sampleData(.medium)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataMediumToMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  let other = sampleData(.medium)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataMediumToLarge(_ N: Int) {
-  let data = sampleData(.large)
-  let other = sampleData(.medium)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataLargeToSmall(_ N: Int) {
-  let data = sampleData(.small)
-  let other = sampleData(.large)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataLargeToMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  let other = sampleData(.large)
-  benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_AppendDataLargeToLarge(_ N: Int) {
-  let data = sampleData(.large)
-  let other = sampleData(.large)
-  benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
