@@ -32,9 +32,9 @@ public let DataBenchmarks = [
     runFunction: run_createMediumArray, tags: d),
 
   BenchmarkInfo(name: "DataSubscriptSmall",
-    runFunction: run_SubscriptSmall, tags: d),
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(small[1]) } }, tags: d),
   BenchmarkInfo(name: "DataSubscriptMedium",
-    runFunction: run_SubscriptMedium, tags: d),
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(medium[521]) } }, tags: d),
 
   BenchmarkInfo(name: "DataCountSmall",
     runFunction: { count($0, data: small) }, tags: d),
@@ -258,26 +258,6 @@ func benchmark_AppendData(_ N: Int, _ lhs: Data, _ rhs: Data) {
   for _ in 0..<10000*N {
     data = lhs
     data.append(rhs)
-  }
-}
-
-@inline(never)
-public func run_SubscriptSmall(_ N: Int) {
-  let data = sampleData(.small)
-  let index = 1
-  for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
-    blackHole(data[index])
-  }
-}
-
-@inline(never)
-public func run_SubscriptMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  let index = 521
-  for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
-    blackHole(data[index])
   }
 }
 
