@@ -23,8 +23,6 @@ public let DataBenchmarks = [
     runFunction: run_createSmall, tags: d),
   BenchmarkInfo(name: "DataCreateMedium",
     runFunction: run_createMedium, tags: d),
-  BenchmarkInfo(name: "DataCreateLarge",
-    runFunction: run_createLarge, tags: skip),
 
   BenchmarkInfo(name: "DataCreateEmptyArray",
     runFunction: run_createEmptyArray, tags: d),
@@ -37,15 +35,11 @@ public let DataBenchmarks = [
     runFunction: run_SubscriptSmall, tags: d),
   BenchmarkInfo(name: "DataSubscriptMedium",
     runFunction: run_SubscriptMedium, tags: d),
-  BenchmarkInfo(name: "DataSubscriptLarge",
-    runFunction: run_SubscriptLarge, tags: skip),
 
   BenchmarkInfo(name: "DataCountSmall",
     runFunction: run_CountSmall, tags: d),
   BenchmarkInfo(name: "DataCountMedium",
     runFunction: run_CountMedium, tags: d),
-  BenchmarkInfo(name: "DataCountLarge",
-    runFunction: run_CountLarge, tags: skip),
 
   BenchmarkInfo(name: "DataSetCountSmall",
     runFunction: run_SetCountSmall, tags: d),
@@ -58,15 +52,11 @@ public let DataBenchmarks = [
     runFunction: run_AccessBytesSmall, tags: d),
   BenchmarkInfo(name: "DataAccessBytesMedium",
     runFunction: run_AccessBytesMedium, tags: d),
-  BenchmarkInfo(name: "DataAccessBytesLarge",
-    runFunction: run_AccessBytesLarge, tags: skip),
 
   BenchmarkInfo(name: "DataMutateBytesSmall",
     runFunction: run_MutateBytesSmall, tags: d),
   BenchmarkInfo(name: "DataMutateBytesMedium",
     runFunction: run_MutateBytesMedium, tags: d),
-  BenchmarkInfo(name: "DataMutateBytesLarge",
-    runFunction: run_MutateBytesLarge, tags: skip),
 
   BenchmarkInfo(name: "DataCopyBytesSmall",
     runFunction: run_CopyBytesSmall, tags: d),
@@ -79,8 +69,6 @@ public let DataBenchmarks = [
     runFunction: run_AppendBytesSmall, tags: d),
   BenchmarkInfo(name: "DataAppendBytesMedium",
     runFunction: run_AppendBytesMedium, tags: d),
-  BenchmarkInfo(name: "DataAppendBytesLarge",
-    runFunction: run_AppendBytesLarge, tags: skip),
 
   BenchmarkInfo(name: "DataAppendArray",
     runFunction: run_AppendArray, tags: d),
@@ -294,16 +282,6 @@ public func run_SubscriptMedium(_ N: Int) {
 }
 
 @inline(never)
-public func run_SubscriptLarge(_ N: Int) {
-  let data = sampleData(.veryLarge)
-  let index = 521
-  for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
-    blackHole(data[index])
-  }
-}
-
-@inline(never)
 public func run_CountSmall(_ N: Int) {
   let data = sampleData(.small)
   for _ in 0..<10000*N {
@@ -315,15 +293,6 @@ public func run_CountSmall(_ N: Int) {
 @inline(never)
 public func run_CountMedium(_ N: Int) {
   let data = sampleData(.medium)
-  for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
-    blackHole(data.count)
-  }
-}
-
-@inline(never)
-public func run_CountLarge(_ N: Int) {
-  let data = sampleData(.veryLarge)
   for _ in 0..<10000*N {
     // Ensure that the compiler does not optimize away this call
     blackHole(data.count)
@@ -377,12 +346,6 @@ public func run_AccessBytesMedium(_ N: Int) {
 }
 
 @inline(never)
-public func run_AccessBytesLarge(_ N: Int) {
-  let data = sampleData(.veryLarge)
-  benchmark_AccessBytes(N, data)
-}
-
-@inline(never)
 public func run_MutateBytesSmall(_ N: Int) {
   let data = sampleData(.small)
   benchmark_MutateBytes(N, data)
@@ -391,12 +354,6 @@ public func run_MutateBytesSmall(_ N: Int) {
 @inline(never)
 public func run_MutateBytesMedium(_ N: Int) {
   let data = sampleData(.medium)
-  benchmark_MutateBytes(N, data)
-}
-
-@inline(never)
-public func run_MutateBytesLarge(_ N: Int) {
-  let data = sampleData(.veryLarge)
   benchmark_MutateBytes(N, data)
 }
 
@@ -427,12 +384,6 @@ public func run_AppendBytesSmall(_ N: Int) {
 @inline(never)
 public func run_AppendBytesMedium(_ N: Int) {
   let data = sampleData(.medium)
-  benchmark_AppendBytes(N, 809, data)
-}
-
-@inline(never)
-public func run_AppendBytesLarge(_ N: Int) {
-  let data = sampleData(.veryLarge)
   benchmark_AppendBytes(N, 809, data)
 }
 
@@ -587,11 +538,6 @@ public func run_createMedium(_ N: Int) {
   for _ in 0..<10000 * N {
     blackHole(sampleData(.medium))
   }
-}
-
-@inline(never)
-public func run_createLarge(_ N: Int) {
-  blackHole(sampleData(.veryLarge))
 }
 
 @inline(never)
