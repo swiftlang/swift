@@ -62,9 +62,9 @@ public let DataBenchmarks = [
     runFunction: { copyBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendBytesSmall",
-    runFunction: run_AppendBytesSmall, tags: d),
+    runFunction: { append($0, bytes: 3, to: small) }, tags: d),
   BenchmarkInfo(name: "DataAppendBytesMedium",
-    runFunction: run_AppendBytesMedium, tags: d),
+    runFunction: { append($0, bytes: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendArray",
     runFunction: run_AppendArray, tags: d),
@@ -202,12 +202,13 @@ func copyBytes(_ N: Int, data: Data) {
   }
 }
 
-func benchmark_AppendBytes(_ N: Int, _ count: Int, _ data_: Data) {
+@inline(never)
+func append(_ N: Int, bytes count: Int, to data: Data) {
   let bytes = malloc(count).assumingMemoryBound(to: UInt8.self)
   defer { free(bytes) }
   for _ in 0..<10000*N {
-    var data = data_
-    data.append(bytes, count: count)
+    var copy = data
+    copy.append(bytes, count: count)
   }
 }
 
@@ -275,18 +276,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_AppendBytesSmall(_ N: Int) {
-  let data = sampleData(.small)
-  benchmark_AppendBytes(N, 3, data)
-}
-
-@inline(never)
-public func run_AppendBytesMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_AppendBytes(N, 809, data)
 }
 
 @inline(never)
