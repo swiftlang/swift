@@ -1410,9 +1410,8 @@ void IRGenModule::emitVTableStubs() {
 
     if (F.getEffectiveSymbolLinkage() == SILLinkage::Hidden)
       alias->setVisibility(llvm::GlobalValue::HiddenVisibility);
-
-    if (useDllStorage())
-      alias->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+    else
+      ApplyIRLinkage(IRLinkage::ExternalExport).to(alias);
   }
 }
 

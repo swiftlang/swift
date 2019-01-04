@@ -659,8 +659,8 @@ IRGenModule::createStringConstant(StringRef Str,
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullTypeMetadataStructTy);            \
     if (useDllStorage() && !isStandardLibrary())                               \
-      cast<llvm::GlobalVariable>(NAME)->setDLLStorageClass(                    \
-          llvm::GlobalValue::DLLImportStorageClass);                           \
+      ApplyIRLinkage(IRLinkage::ExternalImport)                                \
+          .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \
   }
 
@@ -681,9 +681,8 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
                                                  OpaquePtrTy->getElementType());
-    if (useDllStorage())
-      cast<llvm::GlobalVariable>(ObjCEmptyCachePtr)
-          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {
     // FIXME: Remove even the null value per rdar://problem/18801263
     ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
@@ -714,9 +713,8 @@ Address IRGenModule::getAddrOfObjCISAMask() {
   assert(TargetInfo.hasISAMasking());
   if (!ObjCISAMaskPtr) {
     ObjCISAMaskPtr = Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
-    if (useDllStorage())
-      cast<llvm::GlobalVariable>(ObjCISAMaskPtr)
-          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
   return Address(ObjCISAMaskPtr, getPointerAlignment());
 }
