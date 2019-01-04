@@ -119,19 +119,26 @@ public let DataBenchmarks = [
     runFunction: { append($0, data: large, to: large) }, tags: d),
 
   BenchmarkInfo(name: "DataToStringEmpty",
-    runFunction: run_DataToStringEmpty, tags: d, legacyFactor: 50),
+    runFunction: { string($0, from: emptyData) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringSmall",
-    runFunction: run_DataToStringSmall, tags: d, legacyFactor: 50),
+    runFunction: { string($0, from: smallData) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "DataToStringMedium",
-    runFunction: run_DataToStringMedium, tags: d, legacyFactor: 50),
+    runFunction: { string($0, from: mediumData) }, tags: d, legacyFactor: 50),
 
   BenchmarkInfo(name: "StringToDataEmpty",
-    runFunction: run_StringToDataEmpty, tags: d, legacyFactor: 50),
+    runFunction: { data($0, from: emptyString) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataSmall",
-    runFunction: run_StringToDataSmall, tags: d, legacyFactor: 50),
+    runFunction: { data($0, from: smallString) }, tags: d, legacyFactor: 50),
   BenchmarkInfo(name: "StringToDataMedium",
-    runFunction: run_StringToDataMedium, tags: d, legacyFactor: 50),
+    runFunction: { data($0, from: mediumString) }, tags: d, legacyFactor: 50),
 ]
+
+let emptyString = ""
+let smallString = "\r\n"
+let mediumString = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
+let emptyData = Data()
+let smallData = Data(smallString.utf8)
+let mediumData = Data(mediumString.utf8)
 
 let small = sampleData(.small)
 let medium = sampleData(.medium)
@@ -309,55 +316,15 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
 }
 
 @inline(never)
-public func run_DataToStringEmpty(_ N: Int) {
-  let d = Data()
+public func string(_ N: Int, from data: Data) {
   for _ in 0..<200 * N {
-    let s = String(decoding: d, as: UTF8.self)
-    blackHole(s)
+    blackHole(String(decoding: data, as: UTF8.self))
   }
 }
 
 @inline(never)
-public func run_DataToStringSmall(_ N: Int) {
-  let d = Data([0x0D, 0x0A])
+public func data(_ N: Int, from string: String) {
   for _ in 0..<200 * N {
-    let s = String(decoding: d, as: UTF8.self)
-    blackHole(s)
-  }
-}
-
-@inline(never)
-public func run_DataToStringMedium(_ N: Int) {
-  let d = Data([0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A, 0x0D, 0x0A])
-  for _ in 0..<200 * N {
-    let s = String(decoding: d, as: UTF8.self)
-    blackHole(s)
-  }
-}
-
-@inline(never)
-public func run_StringToDataEmpty(_ N: Int) {
-  let s = ""
-  for _ in 0..<200 * N {
-    let d = Data(s.utf8)
-    blackHole(d)
-  }
-}
-
-@inline(never)
-public func run_StringToDataSmall(_ N: Int) {
-  let s = "\r\n"
-  for _ in 0..<200 * N {
-    let d = Data(s.utf8)
-    blackHole(d)
-  }
-}
-
-@inline(never)
-public func run_StringToDataMedium(_ N: Int) {
-  let s = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
-  for _ in 0..<200 * N {
-    let d = Data(s.utf8)
-    blackHole(d)
+    blackHole(Data(string.utf8))
   }
 }
