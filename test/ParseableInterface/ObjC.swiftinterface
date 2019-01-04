@@ -29,10 +29,9 @@ public class SomeClassInlinable {
     @inlinable get { return 0 }
     @inlinable set {}
   }
-  @objc @inlinable deinit {
-    print("bye")
-  }
+  @objc deinit
 }
+
 public class SomeNSObject : NSObject {
   @objc init?(_: Any)
   @objc func foo()
@@ -53,7 +52,5 @@ public class SomeNSObjectInlinable : NSObject {
     @inlinable get { return 0 }
     @inlinable set {}
   }
-  @objc @inlinable deinit {
-    print("bye")
-  }
+  @objc deinit
 }

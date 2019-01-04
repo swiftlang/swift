@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -parse-stdlib -primary-file %s -emit-ir | %FileCheck %s
 
 import Builtin
 

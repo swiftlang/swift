@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

@@ -120,6 +120,20 @@ class Test_parse_args(unittest.TestCase):
         self.assertTrue(parse_args(['check', '-v']).verbose)
         self.assertTrue(parse_args(['check', '--verbose']).verbose)
 
+    def test_check_supports_mardown_output(self):
+        self.assertFalse(parse_args(['check']).markdown)
+        self.assertTrue(parse_args(['check', '-md']).markdown)
+        self.assertTrue(parse_args(['check', '--markdown']).markdown)
+
+    def test_check_flags_are_mutually_exclusive(self):
+        with captured_output() as (out, err):
+            self.assertRaises(SystemExit,
+                              parse_args, ['check', '-md', '-v'])
+        self.assert_contains(
+            ['error:', 'argument -v/--verbose: ' +
+             'not allowed with argument -md/--markdown'],
+            err.getvalue())
+
 
 class ArgsStub(object):
     def __init__(self):
@@ -497,7 +511,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
     def setUp(self):
         super(TestBenchmarkDoctor, self).setUp()
-        self.args = Stub(verbose=False)
+        self.args = Stub(verbose=False, markdown=False)
         self._doctor_log_handler.reset()
         self.logs = self._doctor_log_handler.messages
 
@@ -516,8 +530,9 @@ class TestBenchmarkDoctor(unittest.TestCase):
     def test_supports_verbose_output(self):
         driver = BenchmarkDriverMock(tests=['B1', 'B2'])
         driver.verbose = True
+        self.args.verbose = True
         with captured_output() as (out, _):
-            BenchmarkDoctor(Stub(verbose=True), driver)
+            BenchmarkDoctor(self.args, driver)
         self.assert_contains(['Checking tests: B1, B2'], out.getvalue())
 
     def test_uses_report_formatter(self):
@@ -527,6 +542,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertTrue(isinstance(console_handler, logging.StreamHandler))
         self.assertTrue(isinstance(console_handler.formatter,
                                    LoggingReportFormatter))
+
+    def test_uses_optional_markdown_report_formatter(self):
+        self.args.markdown = True
+        with captured_output() as (_, _):
+            doc = BenchmarkDoctor(self.args, BenchmarkDriverMock(tests=['B1']))
+        self.assertTrue(doc)
+        console_handler = logging.getLogger('BenchmarkDoctor').handlers[1]
+        self.assertTrue(isinstance(console_handler, MarkdownReportHandler))
 
     def test_measure_10_independent_1s_benchmark_series(self):
         """Measurement strategy takes 5 i2 and 5 i1 series.
@@ -564,10 +587,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
              'Measuring B1, 5 x i1 (200 samples), 5 x i2 (200 samples)'],
             self.logs['debug'])
 
-    def test_benchmark_name_matches_capital_words_conventions(self):
+    def test_benchmark_name_matches_naming_conventions(self):
         driver = BenchmarkDriverMock(tests=[
             'BenchmarkName', 'CapitalWordsConvention', 'ABBRName',
-            'wrongCase', 'Wrong_convention'])
+            'TooManyCamelCaseHumps',
+            'Existential.Array.method.1x.Val4',
+            'Flatten.Array.Array.Str.for-in.reserved',
+            'Flatten.Array.String?.as!.NSArray',
+            'wrongCase', 'Wrong_convention', 'Illegal._$%[]<>{}@^()'])
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, driver)
             doctor.check()
@@ -577,12 +604,22 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertNotIn('BenchmarkName', output)
         self.assertNotIn('CapitalWordsConvention', output)
         self.assertNotIn('ABBRName', output)
+        self.assertNotIn('Existential.Array.method.1x.Val4', output)
+        self.assertNotIn('Flatten.Array.Array.Str.for-in.reserved', output)
+        self.assertNotIn('Flatten.Array.String?.as!.NSArray', output)
+        err_msg = " name doesn't conform to benchmark naming convention."
         self.assert_contains(
-            ["'wrongCase' name doesn't conform to UpperCamelCase convention.",
-             "'Wrong_convention' name doesn't conform to UpperCamelCase "
-             "convention."], self.logs['error'])
+            ["'wrongCase'" + err_msg, "'Wrong_convention'" + err_msg,
+             "'Illegal._$%[]<>{}@^()'" + err_msg], self.logs['error'])
         self.assert_contains(
-            ['See http://bit.ly/UpperCamelCase'], self.logs['info'])
+            ["'TooManyCamelCaseHumps' name is composed of 5 words."],
+            self.logs['warning'])
+        self.assert_contains(
+            ['See http://bit.ly/BenchmarkNaming'], self.logs['info'])
+        self.assert_contains(
+            ["Split 'TooManyCamelCaseHumps' name into dot-separated groups "
+             "and variants. See http://bit.ly/BenchmarkNaming"],
+            self.logs['info'])
 
     def test_benchmark_name_is_at_most_40_chars_long(self):
         driver = BenchmarkDriverMock(tests=[

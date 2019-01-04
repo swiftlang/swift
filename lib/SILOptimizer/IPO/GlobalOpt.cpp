@@ -303,8 +303,8 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
                                           varDecl);
 
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
-  if (!Store->getFunction()->hasQualifiedOwnership())
-    GetterF->setUnqualifiedOwnership();
+  if (!Store->getFunction()->hasOwnership())
+    GetterF->setOwnershipEliminated();
   auto *EntryBB = GetterF->createBasicBlock();
 
   // Copy instructions into GetterF
@@ -545,8 +545,8 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
                                           InitF->getModule(),
                                           InitF->getLocation(),
                                           varDecl);
-  if (!InitF->hasQualifiedOwnership())
-    GetterF->setUnqualifiedOwnership();
+  if (!InitF->hasOwnership())
+    GetterF->setOwnershipEliminated();
 
   // Copy InitF into GetterF, including the entry arguments.
   SILFunctionCloner Cloner(GetterF);

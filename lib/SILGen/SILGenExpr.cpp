@@ -1750,7 +1750,7 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
-  auto archetype = ArchetypeType::getAnyOpened(E->getType());
+  auto archetype = OpenedArchetypeType::getAny(E->getType());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
                                          concreteFormalType);
@@ -2553,7 +2553,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     // new one (which we'll upcast immediately below) for a class member.
     ArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
-      opened = ArchetypeType::getOpened(baseType);
+      opened = OpenedArchetypeType::get(baseType);
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
     }
@@ -3329,6 +3329,48 @@ lowerKeyPathSubscriptIndexTypes(
   }
 };
 
+/// Map the given protocol conformance out of context, replacing archetypes
+/// with their corresponding interface types.
+static ProtocolConformance *mapConformanceOutOfContext(
+                                         ProtocolConformance *conformance) {
+  if (!conformance->getType()->hasArchetype())
+    return conformance;
+
+  ASTContext &ctx = conformance->getProtocol()->getASTContext();
+  switch (conformance->getKind()) {
+  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Self:
+    llvm_unreachable("Normal and self conformances never have archetypes");
+
+  case ProtocolConformanceKind::Inherited: {
+    auto inherited = cast<InheritedProtocolConformance>(conformance);
+    return ctx.getInheritedConformance(
+             inherited->getType()->mapTypeOutOfContext(),
+             mapConformanceOutOfContext(inherited->getInheritedConformance()));
+  }
+
+  case ProtocolConformanceKind::Specialized: {
+    auto specialized = cast<SpecializedProtocolConformance>(conformance);
+    return ctx.getSpecializedConformance(
+             specialized->getType()->mapTypeOutOfContext(),
+             mapConformanceOutOfContext(specialized->getGenericConformance()),
+             specialized->getSubstitutionMap()
+               .mapReplacementTypesOutOfContext());
+  }
+  }
+}
+
+/// Map the given protocol conformance out of context, replacing archetypes
+/// with their corresponding interface types.
+static ProtocolConformanceRef mapConformanceOutOfContext(
+                                          ProtocolConformanceRef conformance) {
+  if (conformance.isAbstract())
+    return conformance;
+
+  return ProtocolConformanceRef(
+                        mapConformanceOutOfContext(conformance.getConcrete()));
+}
+
 static void
 lowerKeyPathSubscriptIndexPatterns(
                  SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
@@ -3339,10 +3381,9 @@ lowerKeyPathSubscriptIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = indexHashables[i];
+    auto hashable = mapConformanceOutOfContext(indexHashables[i]);
     assert(hashable.isAbstract() ||
-           hashable.getConcrete()->getType()->mapTypeOutOfContext()
-                                 ->isEqual(formalTy));
+           hashable.getConcrete()->getType()->isEqual(formalTy));
 
     indexPatterns.push_back({baseOperand++, formalTy, loweredTy, hashable});
   }
@@ -4242,9 +4283,6 @@ namespace {
 
     // If the destination is a tuple, recursively destructure.
     void visitTupleExpr(TupleExpr *E) {
-      auto *TTy = E->getType()->castTo<TupleType>();
-      assert(TTy->hasLValueType() || TTy->isVoid());
-      (void)TTy;
       for (auto &elt : E->getElements()) {
         visit(elt);
       }
@@ -4357,7 +4395,6 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
 
   // Handle tuple destinations by destructuring them if present.
   CanType destType = dest->getType()->getCanonicalType();
-  assert(!destType->isMaterializable() || destType->isVoid());
 
   // But avoid this in the common case.
   if (!isa<TupleType>(destType)) {

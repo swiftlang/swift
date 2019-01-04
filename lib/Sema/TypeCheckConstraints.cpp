@@ -100,13 +100,11 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 
 bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
                                       ArrayRef<TupleTypeElt> toTuple,
-                                      SmallVectorImpl<int> &sources,
-                                      SmallVectorImpl<unsigned> &variadicArgs) {
-  const int unassigned = -3;
+                                      SmallVectorImpl<unsigned> &sources) {
+  const unsigned unassigned = -1;
   
   SmallVector<bool, 4> consumed(fromTuple.size(), false);
   sources.clear();
-  variadicArgs.clear();
   sources.assign(toTuple.size(), unassigned);
 
   // Match up any named elements.
@@ -150,35 +148,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     if (sources[i] != unassigned)
       continue;
 
-    const auto &elt2 = toTuple[i];
-
-    // Variadic tuple elements match the rest of the input elements.
-    if (elt2.isVararg()) {
-      // Collect the remaining (unnamed) inputs.
-      while (fromNext != fromLast) {
-        // Labeled elements can't be adopted into varargs even if
-        // they're non-mandatory.  There isn't a really strong reason
-        // for this, though.
-        if (fromTuple[fromNext].hasName())
-          return true;
-
-        variadicArgs.push_back(fromNext);
-        consumed[fromNext] = true;
-        skipToNextAvailableInput();
-      }
-      sources[i] = TupleShuffleExpr::Variadic;
-      
-      // Keep looking at subsequent arguments.  Non-variadic arguments may
-      // follow the variadic one.
-      continue;
-    }
-
     // If there aren't any more inputs, we are done.
     if (fromNext == fromLast) {
       return true;
     }
 
     // Otherwise, assign this input to the next output element.
+    const auto &elt2 = toTuple[i];
+    assert(!elt2.isVararg());
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
@@ -2379,31 +2356,29 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     ConstraintLocator *Locator;
 
     /// The type of the initializer.
-    llvm::PointerIntPair<Type, 1, bool> InitTypeAndInOut;
+    Type initType;
 
   public:
     explicit BindingListener(Pattern *&pattern, Expr *&initializer)
       : pattern(pattern), initializer(initializer),
-        Locator(nullptr), InitTypeAndInOut(Type(), false) { }
+        Locator(nullptr) { }
 
-    Type getInitType() const { return InitTypeAndInOut.getPointer(); }
-    bool isInOut() const { return InitTypeAndInOut.getInt(); }
+    Type getInitType() const { return initType; }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+      assert(!expr->isSemanticallyInOutExpr());
+
       // Save the locator we're using for the expression.
       Locator = cs.getConstraintLocator(expr);
 
       // Collect constraints from the pattern.
-      InitTypeAndInOut.setPointer(cs.generateConstraints(pattern, Locator));
-      InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
-      if (!InitTypeAndInOut.getPointer())
+      initType = cs.generateConstraints(pattern, Locator);
+      if (!initType)
         return true;
 
-      assert(!InitTypeAndInOut.getPointer()->is<InOutType>());
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       InitTypeAndInOut.getPointer(), Locator,
-                       /*isFavored*/true);
+                       initType, Locator, /*isFavored*/true);
 
       // The expression has been pre-checked; save it in case we fail later.
       initializer = expr;
@@ -2412,10 +2387,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *foundSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      auto ty = solution.simplifyType(InitTypeAndInOut.getPointer());
-      InitTypeAndInOut.setPointer(
-          ty->getRValueType()->reconstituteSugar(/*recursive =*/false));
-      InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
+      auto ty = solution.simplifyType(initType);
+      initType = ty->getRValueType()->reconstituteSugar(/*recursive =*/false);
 
       // Just keep going.
       return expr;
@@ -2423,14 +2396,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Convert the initializer to the type of the pattern.
-      // ignoreTopLevelInjection = Binding->isConditional()
-      expr = solution.coerceToType(expr, InitTypeAndInOut.getPointer(), Locator,
+      expr = solution.coerceToType(expr, initType, Locator,
                                    false /* ignoreTopLevelInjection */);
-      if (!expr) {
+      if (!expr)
         return nullptr;
-      }
 
-      assert(solution.getConstraintSystem().getType(expr)->isEqual(InitTypeAndInOut.getPointer()));
+      assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
       initializer = expr;
       return expr;
@@ -2465,7 +2436,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // Type-check the initializer.
   auto resultTy = typeCheckExpression(initializer, DC, contextualType,
                                       contextualPurpose, flags, &listener);
-  assert(!listener.isInOut());
 
   if (resultTy) {
     TypeResolutionOptions options =
@@ -2514,7 +2484,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber) {
-  auto &ctx = PBD->getASTContext();
   const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
@@ -2537,30 +2506,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  // Add the attribute that preserves the "has an initializer" value across
-  // module generation, as required for TBDGen.
-  PBD->getPattern(patternNumber)->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasInitialValueAttr>())
-      VD->getAttrs().add(new (ctx) HasInitialValueAttr(/*IsImplicit=*/true));
-  });
-
-  if (!hadError) {
-    // If we're performing an binding to a weak or unowned variable from a
-    // constructor call, emit a warning that the instance will be immediately
-    // deallocated.
-    diagnoseUnownedImmediateDeallocation(*this, pattern, pbe.getEqualLoc(),
-                                         init);
-
-    // If we entered an initializer context, contextualize any
-    // auto-closures we might have created.
-    if (initContext) {
-      // Check safety of error-handling in the declaration, too.
-      checkInitializerErrorHandling(initContext, init);
-      (void)contextualizeInitializer(initContext, init);
-    }
-  } else {
+  if (hadError)
     PBD->setInvalid();
-  }
 
   PBD->setInitializerChecked(patternNumber);
   return hadError;
@@ -2722,10 +2669,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has an i1 type, then it has
-  // already got its conversion from Boolean back to i1.  Just re-typecheck
-  // it.
-  if (expr->getType() && expr->getType()->isBuiltinIntegerType(1)) {
+  // If this expression is already typechecked and has type Bool, then just
+  // re-typecheck it.
+  if (expr->getType() && expr->getType()->isBool()) {
     auto resultTy = typeCheckExpression(expr, dc);
     return !resultTy;
   }
@@ -2751,19 +2697,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
                        cs.getConstraintLocator(expr));
       return false;
     }
-
-    // Convert the result to a Builtin.i1.
-    Expr *appliedSolution(constraints::Solution &solution,
-                          Expr *expr) override {
-      auto &cs = solution.getConstraintSystem();
-
-      auto converted =
-        solution.convertBooleanTypeToBuiltinI1(expr,
-                                             cs.getConstraintLocator(OrigExpr));
-      cs.setExprTypes(converted);
-      return converted;
-    }
-    
   };
 
   ConditionListener listener;
@@ -2919,10 +2852,9 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       if (found != types.end())
         return found->second;
 
-      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
-        if (archetypeType->getParent())
-          return Type();
-
+      if (isa<NestedArchetypeType>(origType))
+        return Type();
+      else if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
         auto locator = cs.getConstraintLocator(nullptr);
         auto replacement = cs.createTypeVariable(locator);
 

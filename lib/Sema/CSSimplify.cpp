@@ -997,29 +997,12 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   }
 
   // Compute the element shuffles for conversions.
-  SmallVector<int, 16> sources;
-  SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments))
+  SmallVector<unsigned, 16> sources;
+  if (computeTupleShuffle(tuple1, tuple2, sources))
     return getTypeMatchFailure(locator);
 
   // Check each of the elements.
-  bool hasVariadic = false;
-  unsigned variadicIdx = sources.size();
   for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
-    // Default-initialization always allowed for conversions.
-    if (sources[idx2] == TupleShuffleExpr::DefaultInitialize) {
-      continue;
-    }
-
-    // Variadic arguments handled below.
-    if (sources[idx2] == TupleShuffleExpr::Variadic) {
-      assert(!hasVariadic && "Multiple variadic parameters");
-      hasVariadic = true;
-      variadicIdx = idx2;
-      continue;
-    }
-
-    assert(sources[idx2] >= 0);
     unsigned idx1 = sources[idx2];
 
     // Match up the types.
@@ -1030,21 +1013,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                         LocatorPathElt::getTupleElement(idx1)));
     if (result.isFailure())
       return result;
-  }
-
-  // If we have variadic arguments to check, do so now.
-  if (hasVariadic) {
-    const auto &elt2 = tuple2->getElements()[variadicIdx];
-    auto eltType2 = elt2.getVarargBaseTy();
-
-    for (unsigned idx1 : variadicArguments) {
-      auto result = matchTypes(tuple1->getElementType(idx1), eltType2, subKind,
-                         subflags,
-                         locator.withPathElement(
-                                        LocatorPathElt::getTupleElement(idx1)));
-      if (result.isFailure())
-        return result;
-    }
   }
 
   return getTypeMatchSuccess();
@@ -1173,6 +1141,17 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             !params[0].isVariadic());
   };
 
+  auto canImplodeParams = [&](ArrayRef<AnyFunctionType::Param> params) {
+    if (params.size() == 1)
+      return false;
+
+    for (auto param : params)
+      if (param.isVariadic() || param.isInOut())
+        return false;
+
+    return true;
+  };
+
   auto implodeParams = [&](SmallVectorImpl<AnyFunctionType::Param> &params) {
     auto input = AnyFunctionType::composeInput(getASTContext(), params,
                                                /*canonicalVararg=*/false);
@@ -1193,21 +1172,18 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
-        if (isSingleParam(func2Params)) {
-          if (!isSingleParam(func1Params)) {
-            implodeParams(func1Params);
-          }
-        } else if (getASTContext().isSwiftVersionAtLeast(4)
-                   && !getASTContext().isSwiftVersionAtLeast(5)
-                   && !isSingleParam(func2Params)) {
+        if (isSingleParam(func2Params) &&
+            canImplodeParams(func1Params)) {
+          implodeParams(func1Params);
+        } else if (!getASTContext().isSwiftVersionAtLeast(5) &&
+                   isSingleParam(func1Params) &&
+                   canImplodeParams(func2Params)) {
           auto *simplified = locator.trySimplifyToExpr();
           // We somehow let tuple unsplatting function conversions
           // through in some cases in Swift 4, so let's let that
           // continue to work, but only for Swift 4.
           if (simplified && isa<DeclRefExpr>(simplified)) {
-            if (isSingleParam(func1Params)) {
-              implodeParams(func2Params);
-            }
+            implodeParams(func2Params);
           }
         }
       }
@@ -1896,7 +1872,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return formUnsolvedResult();
 
     case TypeKind::TypeVariable:
-    case TypeKind::Archetype:
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype:
       // Nothing to do here; handle type variables and archetypes below.
       break;
 
@@ -2608,7 +2586,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
   case TypeKind::DynamicSelf:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
@@ -3734,49 +3714,72 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
-  if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
-    // If the base type was an optional, look through it.
+  if (shouldAttemptFixes()) {
+    if (baseObjTy->getOptionalObjectType()) {
+      // If the base type was an optional, look through it.
 
-    // If the base type is optional because we haven't chosen to force an
-    // implicit optional, don't try to fix it. The IUO will be forced instead.
-    if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
-      auto baseExpr = dotExpr->getBase();
-      auto resolvedOverload = getResolvedOverloadSets();
-      while (resolvedOverload) {
-        if (resolvedOverload->Locator->getAnchor() == baseExpr) {
-          if (resolvedOverload->Choice.isImplicitlyUnwrappedValueOrReturnValue())
-            return SolutionKind::Error;
-          break;
+      // If the base type is optional because we haven't chosen to force an
+      // implicit optional, don't try to fix it. The IUO will be forced instead.
+      if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
+        auto baseExpr = dotExpr->getBase();
+        auto resolvedOverload = getResolvedOverloadSets();
+        while (resolvedOverload) {
+          if (resolvedOverload->Locator->getAnchor() == baseExpr) {
+            if (resolvedOverload->Choice
+                    .isImplicitlyUnwrappedValueOrReturnValue())
+              return SolutionKind::Error;
+            break;
+          }
+          resolvedOverload = resolvedOverload->Previous;
         }
-        resolvedOverload = resolvedOverload->Previous;
       }
+
+      // The result of the member access can either be the expected member type
+      // (for '!' or optional members with '?'), or the original member type
+      // with one extra level of optionality ('?' with non-optional members).
+      auto innerTV = createTypeVariable(locator, TVO_CanBindToLValue);
+      Type optTy = getTypeChecker().getOptionalType(
+          locator->getAnchor()->getSourceRange().Start, innerTV);
+      SmallVector<Constraint *, 2> optionalities;
+      auto nonoptionalResult = Constraint::createFixed(
+          *this, ConstraintKind::Bind,
+          UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
+          locator);
+      auto optionalResult = Constraint::createFixed(
+          *this, ConstraintKind::Bind,
+          UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
+          optTy, memberTy, locator);
+      optionalities.push_back(nonoptionalResult);
+      optionalities.push_back(optionalResult);
+      addDisjunctionConstraint(optionalities, locator);
+
+      // Look through one level of optional.
+      addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
+                               innerTV, useDC, functionRefKind,
+                               outerAlternatives, locator);
+      return SolutionKind::Solved;
     }
 
-    // The result of the member access can either be the expected member type
-    // (for '!' or optional members with '?'), or the original member type with
-    // one extra level of optionality ('?' with non-optional members).
-    auto innerTV =
-        createTypeVariable(locator, TVO_CanBindToLValue);
-    Type optTy = getTypeChecker().getOptionalType(
-        locator->getAnchor()->getSourceRange().Start, innerTV);
-    SmallVector<Constraint *, 2> optionalities;
-    auto nonoptionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind,
-        UnwrapOptionalBase::create(*this, member, locator), innerTV, memberTy,
-        locator);
-    auto optionalResult = Constraint::createFixed(
-        *this, ConstraintKind::Bind,
-        UnwrapOptionalBase::createWithOptionalResult(*this, member, locator),
-        optTy, memberTy, locator);
-    optionalities.push_back(nonoptionalResult);
-    optionalities.push_back(optionalResult);
-    addDisjunctionConstraint(optionalities, locator);
+    if (auto *funcType = baseTy->getAs<FunctionType>()) {
+      // We can't really suggest anything useful unless
+      // function takes no arguments, otherwise it
+      // would make sense to report this a missing member.
+      if (funcType->getNumParams() == 0) {
+        auto *fix = InsertExplicitCall::create(*this, locator);
+        if (recordFix(fix))
+          return SolutionKind::Error;
 
-    // Look through one level of optional.
-    addValueMemberConstraint(baseObjTy->getOptionalObjectType(), member,
-                             innerTV, useDC, functionRefKind, outerAlternatives,
-                             locator);
-    return SolutionKind::Solved;
+        auto result = simplifyMemberConstraint(
+            kind, funcType->getResult(), member, memberTy, useDC,
+            functionRefKind, outerAlternatives, flags, locatorB);
+
+        // If there is indeed a member with given name in result type
+        // let's return, otherwise let's fall-through and report
+        // this problem as a missing member.
+        if (result == SolutionKind::Solved)
+          return result;
+      }
+    }
   }
   return SolutionKind::Error;
 }
@@ -4135,7 +4138,7 @@ ConstraintSystem::simplifyOpenedExistentialOfConstraint(
       instanceTy = metaTy->getInstanceType();
     }
     assert(instanceTy->isExistentialType());
-    Type openedTy = ArchetypeType::getOpened(instanceTy);
+    Type openedTy = OpenedArchetypeType::get(instanceTy);
     if (isMetatype)
       openedTy = MetatypeType::get(openedTy, TC.Context);
     return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
@@ -5439,6 +5442,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
+  case FixKind::InsertCall:
   case FixKind::ExplicitlyEscaping:
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:

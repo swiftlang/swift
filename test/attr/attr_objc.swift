@@ -839,7 +839,7 @@ class infer_instanceVar1 {
   }
 
   var observingAccessorsVar1: Int {
-  // CHECK: @_hasStorage @objc var observingAccessorsVar1: Int {
+  // CHECK: @objc @_hasStorage var observingAccessorsVar1: Int {
     willSet {}
     // CHECK-NEXT: {{^}} @objc get
     didSet {}
@@ -1709,7 +1709,7 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @objc @NSManaged @_hasStorage dynamic var goodManaged: Class_ObjC1 {
+  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1 {
   // CHECK-NEXT: {{^}} @objc get
   // CHECK-NEXT: {{^}} @objc set
   // CHECK-NEXT: {{^}} }
@@ -1719,7 +1719,7 @@ class HasNSManaged {
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
-  // CHECK-LABEL: {{^}}  @NSManaged @_hasStorage var badManaged: PlainStruct {
+  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct {
   // CHECK-NEXT: {{^}} get
   // CHECK-NEXT: {{^}} set
   // CHECK-NEXT: {{^}} }

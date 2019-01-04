@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -11,7 +11,7 @@ import Foundation
   func c(_: String) {}
 }
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$s{{.*}}1P{{.*}}1p{{.*}} : $@convention(method) <Self where Self : P> (@guaranteed String, @guaranteed Self) -> ()
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$s{{.*}}1P{{.*}}1p{{.*}} : $@convention(method) <Self where Self : P> (@guaranteed String, @guaranteed Self) -> ()
 func foo(x: Bool, y: C & P) -> (String) -> () {
   return x ? y.c : y.p
 }

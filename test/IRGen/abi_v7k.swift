@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -module-name test_v7k | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -S -primary-file %s -module-name test_v7k | %FileCheck -check-prefix=V7K %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -module-name test_v7k | %FileCheck %s
+// RUN: %target-swift-frontend -S -primary-file %s -module-name test_v7k | %FileCheck -check-prefix=V7K %s
 
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos

@@ -17,6 +17,9 @@ roots:
       - name: wtypesbase.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/WTypesbase.h"
+      - name: ConcurrencySal.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/concurrencysal.h"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um"
     type: directory
     contents:

@@ -20,10 +20,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 
-#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_PMOMEMORYUSECOLLECTOROWNERSHIP_H
-#error "Included ownership header?!"
-#endif
-
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -43,24 +39,21 @@ static unsigned getElementCountRec(SILModule &Module, SILType T) {
   return 1;
 }
 
-PMOMemoryObjectInfo::PMOMemoryObjectInfo(SingleValueInstruction *MI) {
-  auto &Module = MI->getModule();
+PMOMemoryObjectInfo::PMOMemoryObjectInfo(AllocationInst *allocation)
+    : MemoryInst(allocation) {
+  auto &module = MemoryInst->getModule();
 
-  MemoryInst = MI;
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
+  if (auto *abi = dyn_cast<AllocBoxInst>(MemoryInst)) {
+    assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
            "analyzing multi-field boxes not implemented");
-    MemorySILType = ABI->getBoxType()->getFieldType(Module, 0);
-  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    MemorySILType = ASI->getElementType();
+    MemorySILType = abi->getBoxType()->getFieldType(module, 0);
   } else {
-    llvm_unreachable(
-        "Predictable Mem Opts should only be analyzing alloc_box/alloc_stack");
+    MemorySILType = cast<AllocStackInst>(MemoryInst)->getElementType();
   }
 
   // Break down the initializer.
-  NumElements = getElementCountRec(Module, MemorySILType);
+  NumElements = getElementCountRec(module, MemorySILType);
 }
 
 SILInstruction *PMOMemoryObjectInfo::getFunctionEntryPoint() const {
@@ -267,13 +260,12 @@ bool ElementUseCollector::collectFrom() {
     return false;
 
   // Collect information about the retain count result as well.
-  for (auto UI : TheMemory.MemoryInst->getUses()) {
-    auto *User = UI->getUser();
+  for (auto *op : TheMemory.MemoryInst->getUses()) {
+    auto *user = op->getUser();
 
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User)) {
-      Releases.push_back(User);
+    // If this is a strong_release, stash it.
+    if (isa<StrongReleaseInst>(user)) {
+      Releases.push_back(user);
     }
   }
 

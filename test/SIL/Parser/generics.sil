@@ -3,12 +3,12 @@
 sil_stage raw
 import Builtin
 
-// CHECK-LABEL: sil @foo : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil [ossa] @foo : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK:   return undef : $()
 // CHECK: }
-sil @foo : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @foo : $@convention(thin) <T> (@in T) -> @out T {
 entry(%o : $*T, %i : $*T):
   copy_addr [take] %i to [initialization] %o : $*T
   return undef : $()
@@ -17,10 +17,10 @@ entry(%o : $*T, %i : $*T):
 struct Bar {}
 struct Bas {}
 
-// CHECK-LABEL: sil @ref_foo_1 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @ref_foo_1 : $@convention(thin) () -> () {
 // CHECK:   %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:   %3 = apply %2<Bar>(%1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-sil @ref_foo_1 : $@convention(thin) () -> () {
+sil [ossa] @ref_foo_1 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bar
   %o = alloc_stack $Bar
@@ -31,10 +31,10 @@ entry:
   return %z : $()
 }
 
-// CHECK-LABEL: sil @ref_foo_2 : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @ref_foo_2 : $@convention(thin) () -> () {
 // CHECK:  %2 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:  %3 = apply %2<Bas>(%1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-sil @ref_foo_2 : $@convention(thin) () -> () {
+sil [ossa] @ref_foo_2 : $@convention(thin) () -> () {
 entry:
   %i = alloc_stack $Bas
   %o = alloc_stack $Bas
@@ -45,11 +45,11 @@ entry:
   return %z : $()
 }
 
-// CHECK-LABEL: sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
+// CHECK-LABEL: sil [ossa] @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
 // CHECK:  %1 = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:  %2 = partial_apply %1<Bas>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
 // CHECK:  return %2 : $@callee_owned () -> @out Bas
-sil @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
+sil [ossa] @ref_foo_partial_apply : $@convention(thin) () -> @owned @callee_owned () -> @out Bas {
 entry:
   %i = alloc_stack $Bas
   %f = function_ref @foo : $@convention(thin) <Z> (@in Z) -> @out Z
@@ -61,8 +61,8 @@ entry:
 sil_global @zero: $Builtin.Int64
 sil_global @f: $@callee_owned (Builtin.Int32) -> ()
 
-// CHECK-LABEL: sil @test_apply
-sil @test_apply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @test_apply
+sil [ossa] @test_apply : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @zero : $*Builtin.Int64
   %1 = mark_uninitialized [var] %0 : $*Builtin.Int64
@@ -96,7 +96,7 @@ protocol FooProto {
 }
 
 // These generic parameters used to crash the compiler.
-sil @protocol_extension_with_constrained_associated_type : $@convention(method) <Self where Self : FooProto, Self.Assoc : FooProtoHelper><I where I : FooProto, I.Assoc == Self.Assoc> (@in I, @in_guaranteed Self) -> () {
+sil [ossa] @protocol_extension_with_constrained_associated_type : $@convention(method) <Self where Self : FooProto, Self.Assoc : FooProtoHelper><I where I : FooProto, I.Assoc == Self.Assoc> (@in I, @in_guaranteed Self) -> () {
 bb0(%0 : $*I, %1 : $*Self):
   %2 = alloc_stack $I                             // users: %3, %6, %7, %9
   copy_addr %0 to [initialization] %2 : $*I     // id: %3

@@ -10,14 +10,14 @@ class C {
   init(i: Builtin.Int64) { self.i = i }
 }
 
-sil [transparent] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64 {
+sil [transparent] [ossa] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64 {
 bb(%0 : @guaranteed $C):
   %1 = ref_element_addr %0 : $C, #C.i
   %2 = load [trivial] %1 : $*Builtin.Int64
   return %2 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
+// CHECK-LABEL: sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
@@ -26,7 +26,7 @@ bb(%0 : @guaranteed $C):
 // CHECK:   destroy_value %0 : $C
 // CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithOwned'
-sil @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
+sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64
   %call = apply %fn(%0) : $@convention(thin) (@guaranteed C) -> Builtin.Int64
@@ -36,7 +36,7 @@ bb(%0 : @owned $C):
 
 struct MyError : Error {}
 
-sil [transparent] @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error) {
+sil [transparent] [ossa] @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error) {
 bb(%0 : @guaranteed $C):
   %1 = ref_element_addr %0 : $C, #C.i
   %2 = load [trivial] %1 : $*Builtin.Int64
@@ -52,7 +52,7 @@ bb2:
   return %2 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
+// CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
@@ -67,7 +67,7 @@ bb2:
 // CHECK:   destroy_value %0 : $C
 // CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithThrow'
-sil @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
+sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error)
   try_apply %fn(%0) : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error), normal bb1, error bb2

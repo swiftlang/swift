@@ -1707,11 +1707,11 @@ ERROR(type_witness_not_accessible_type,none,
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
 ERROR(witness_not_usable_from_inline,none,
-      "%0 %1 must be declared '@usableFromInline' because "
+      "%0 %1 must be declared '@usableFromInline' "
       "because it matches a requirement in protocol %2",
       (DescriptiveDeclKind, DeclName, DeclName))
 WARNING(witness_not_usable_from_inline_warn,none,
-        "%0 %1 should be declared '@usableFromInline' because "
+        "%0 %1 should be declared '@usableFromInline' "
         "because it matches a requirement in protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
@@ -3446,6 +3446,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(enum_element_ellipsis,none,
+      "variadic enum cases are not supported", ())
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
@@ -3888,6 +3890,10 @@ ERROR(dynamic_replacement_function_not_found, none,
      "replaced function %0 could not be found", (DeclName))
 ERROR(dynamic_replacement_accessor_not_found, none,
       "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_ambiguous, none,
+      "replaced accessor for %0 occurs in multiple places", (DeclName))
+NOTE(dynamic_replacement_accessor_ambiguous_candidate, none,
+      "candidate accessor found in module %0", (DeclName))
 ERROR(dynamic_replacement_function_of_type_not_found, none,
       "replaced function %0 of type %1 could not be found", (DeclName, Type))
 NOTE(dynamic_replacement_found_function_of_type, none,
@@ -4101,6 +4107,9 @@ ERROR(inlinable_decl_not_public,
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
+ERROR(inlinable_resilient_deinit,
+      none, "deinitializer can only be '@inlinable' if the class is '@_fixed_layout'", ())
+
 //------------------------------------------------------------------------------
 // MARK: @_specialize diagnostics
 //------------------------------------------------------------------------------
@@ -4222,6 +4231,10 @@ WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 WARNING(override_nsobject_hashvalue,none,
         "override of 'NSObject.hashValue' is deprecated; "
         "override 'NSObject.hash' to get consistent hashing behavior", ())
+WARNING(hashvalue_implementation,none,
+        "'Hashable.hashValue' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
+        (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

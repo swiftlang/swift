@@ -323,7 +323,7 @@ public:
           return AnyFunctionType::equalParams(lParams, rParams) &&
                  lf.getResult() == rf.getResult() &&
                  lf->getExtInfo().withNoEscape(false) ==
-                     lf->getExtInfo().withNoEscape(false);
+                     rf->getExtInfo().withNoEscape(false);
         }
       }
       return false;

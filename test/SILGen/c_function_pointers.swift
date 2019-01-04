@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
 
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
-// CHECK-LABEL: sil hidden @$s19c_function_pointers6valuesyS2iXCS2iXCF
+// CHECK-LABEL: sil hidden [ossa] @$s19c_function_pointers6valuesyS2iXCS2iXCF
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
@@ -11,7 +11,7 @@ func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int
 func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
-// CHECK-LABEL: sil hidden @$s19c_function_pointers5callsyS3iXC_SitF
+// CHECK-LABEL: sil hidden [ossa] @$s19c_function_pointers5callsyS3iXC_SitF
 // CHECK:       bb0(%0 : $@convention(c) @noescape (Int) -> Int, %1 : $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
@@ -25,7 +25,7 @@ func global(_ x: Int) -> Int { return x }
 
 func no_args() -> Int { return 42 }
 
-// CHECK-LABEL: sil hidden @$s19c_function_pointers0B19_to_swift_functionsyySiF
+// CHECK-LABEL: sil hidden [ossa] @$s19c_function_pointers0B19_to_swift_functionsyySiF
 func pointers_to_swift_functions(_ x: Int) {
 // CHECK: bb0([[X:%.*]] : $Int):
 
@@ -58,8 +58,8 @@ func pointers_to_bad_swift_functions(_ x: Int) {
   calls(unsupported, x) // expected-error{{C function pointer signature '(Any) -> Int' is not compatible with expected type '@convention(c) (Int) -> Int'}}
 }
 
-// CHECK-LABEL: sil private @$s19c_function_pointers22StructWithInitializersV3fn1yyXCvpfiyycfU_ : $@convention(thin) () -> () {
-// CHECK-LABEL: sil private [thunk] @$s19c_function_pointers22StructWithInitializersV3fn1yyXCvpfiyycfU_To : $@convention(c) () -> () {
+// CHECK-LABEL: sil private [ossa] @$s19c_function_pointers22StructWithInitializersV3fn1yyXCvpfiyycfU_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s19c_function_pointers22StructWithInitializersV3fn1yyXCvpfiyycfU_To : $@convention(c) () -> () {
 
 struct StructWithInitializers {
   let fn1: @convention(c) () -> () = {}

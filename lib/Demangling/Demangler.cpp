@@ -610,6 +610,12 @@ NodePointer Demangler::demangleOperator() {
       case 'C': return demangleConcreteProtocolConformance();
       case 'D': return demangleDependentProtocolConformanceRoot();
       case 'I': return demangleDependentProtocolConformanceInherited();
+      case 'P':
+        return createWithChild(
+            Node::Kind::ProtocolConformanceRefInTypeModule, popProtocol());
+      case 'p':
+        return createWithChild(
+            Node::Kind::ProtocolConformanceRefInProtocolModule, popProtocol());
       default:
         pushBack();
         pushBack();
@@ -1294,22 +1300,27 @@ NodePointer Demangler::popAnyProtocolConformance() {
   });
 }
 
-NodePointer Demangler::popProtocolConformanceRef() {
+NodePointer Demangler::demangleRetroactiveProtocolConformanceRef() {
   NodePointer module = popModule();
   NodePointer proto = popProtocol();
   auto protocolConformanceRef =
-    createWithChild(Node::Kind::ProtocolConformanceRef, proto);
-
-  // The module is optional, present only for retroactive conformances. Add it
-  // as the second child.
-  if (protocolConformanceRef && module)
-    protocolConformanceRef->addChild(module, *this);
+      createWithChildren(Node::Kind::ProtocolConformanceRefInOtherModule,
+                         proto, module);
   return protocolConformanceRef;
 }
 
 NodePointer Demangler::demangleConcreteProtocolConformance() {
   NodePointer conditionalConformanceList = popAnyProtocolConformanceList();
-  NodePointer conformanceRef = popProtocolConformanceRef();
+
+  NodePointer conformanceRef =
+      popNode(Node::Kind::ProtocolConformanceRefInTypeModule);
+  if (!conformanceRef) {
+    conformanceRef =
+        popNode(Node::Kind::ProtocolConformanceRefInProtocolModule);
+  }
+  if (!conformanceRef)
+    conformanceRef = demangleRetroactiveProtocolConformanceRef();
+
   NodePointer type = popNode(Node::Kind::Type);
   return createWithChildren(Node::Kind::ConcreteProtocolConformance,
                             type, conformanceRef, conditionalConformanceList);

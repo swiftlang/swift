@@ -122,6 +122,8 @@ const char DeclDeserializationError::ID = '\0';
 void DeclDeserializationError::anchor() {}
 const char XRefError::ID = '\0';
 void XRefError::anchor() {}
+const char XRefNonLoadedModuleError::ID = '\0';
+void XRefNonLoadedModuleError::anchor() {}
 const char OverrideError::ID = '\0';
 void OverrideError::anchor() {}
 const char TypeError::ID = '\0';
@@ -557,6 +559,11 @@ ProtocolConformanceRef ModuleFile::readConformance(
     PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
 
+    // FIXME: If the module hasn't been loaded, we probably don't want to fall
+    // back to the current module like this.
+    if (!module)
+      module = getAssociatedModule();
+
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(module, proto, conformances);
     PrettyStackTraceModuleFile traceMsg(
@@ -643,8 +650,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   return conformance;
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
-                                               GenericParamList *outerParams) {
+GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -676,13 +682,9 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   if (params.empty())
     return nullptr;
 
-  auto paramList = GenericParamList::create(getContext(), SourceLoc(),
-                                            params, SourceLoc(), { },
-                                            SourceLoc());
-  paramList->setOuterParameters(outerParams ? outerParams :
-                                DC->getGenericParamsOfContext());
-
-  return paramList;
+  return GenericParamList::create(getContext(), SourceLoc(),
+                                  params, SourceLoc(), { },
+                                  SourceLoc());
 }
 
 void ModuleFile::readGenericRequirements(
@@ -1234,8 +1236,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 }
 
 Expected<Decl *>
-ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
+ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
+
+  ModuleDecl *baseModule = getModule(MID);
+  if (!baseModule) {
+    return llvm::make_error<XRefNonLoadedModuleError>(getIdentifier(MID));
+  }
+
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
 
@@ -1555,6 +1563,10 @@ giveUpFastPath:
       GenericSignatureID rawGenericSig;
       XRefExtensionPathPieceLayout::readRecord(scratch, ownerID, rawGenericSig);
       M = getModule(ownerID);
+      if (!M) {
+        return llvm::make_error<XRefError>("module is not loaded",
+                                           pathTrace, getIdentifier(ownerID));
+      }
       pathTrace.addExtension(M);
 
       // Read the generic signature, if we have one.
@@ -1615,8 +1627,8 @@ giveUpFastPath:
       pathTrace.addGenericParam(paramIndex);
 
       ValueDecl *base = values.front();
-      GenericParamList *paramList = nullptr;
 
+      GenericSignature *currentSig = nullptr;
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -1625,49 +1637,46 @@ giveUpFastPath:
             if (ext->getModuleContext() == M &&
                 ext->getGenericSignature()->getCanonicalSignature()
                   == genericSig) {
-              paramList = ext->getGenericParams();
+              currentSig = ext->getGenericSignature();
               break;
             }
           }
-          assert(paramList && "Couldn't find constrained extension");
+          assert(currentSig && "Couldn't find constrained extension");
         } else {
           // Simple case: use the nominal type's generic parameters.
-          paramList = nominal->getGenericParamsOfContext();
+          currentSig = nominal->getGenericSignature();
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
-        paramList = alias->getGenericParams();
+        currentSig = alias->getGenericSignature();
       } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
-        paramList = fn->getGenericParams();
+        currentSig = fn->getGenericSignature();
       } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
-        paramList = subscript->getGenericParams();
+        currentSig = subscript->getGenericSignature();
       }
 
-      if (!paramList) {
+      if (!currentSig) {
         return llvm::make_error<XRefError>(
             "cross-reference to generic param for non-generic type",
             pathTrace, getXRefDeclNameForError());
       }
 
-      unsigned currentDepth = paramList->getDepth();
-      if (currentDepth < depth) {
-        return llvm::make_error<XRefError>(
-            "a containing type has been made non-generic",
-            pathTrace, getXRefDeclNameForError());
-      }
-      while (currentDepth > depth) {
-        paramList = paramList->getOuterParameters();
-        --currentDepth;
-      }
-
-      if (paramIndex >= paramList->size()) {
-        return llvm::make_error<XRefError>(
-            "generic argument index out of bounds",
-            pathTrace, getXRefDeclNameForError());
+      bool found = false;
+      for (auto paramTy : currentSig->getGenericParams()) {
+        if (paramTy->getIndex() == paramIndex &&
+            paramTy->getDepth() == depth) {
+          values.clear();
+          values.push_back(paramTy->getDecl());
+          found = true;
+          break;
+        }
       }
 
-      values.clear();
-      values.push_back(paramList->getParams()[paramIndex]);
-      assert(values.back());
+      if (!found) {
+        return llvm::make_error<XRefError>(
+            "invalid generic argument index or depth",
+            pathTrace, getXRefDeclNameForError());
+      }
+
       break;
     }
 
@@ -1941,14 +1950,15 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
   return getModule(getIdentifier(MID));
 }
 
-ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name) {
+ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
+                                  bool allowLoading) {
   if (name.empty() || name.front().empty())
     return getContext().TheBuiltinModule;
 
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
-    if (!ShadowedModule) {
+    if (!ShadowedModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
@@ -1961,7 +1971,10 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name) {
   SmallVector<ImportDecl::AccessPathElement, 4> importPath;
   for (auto pathElem : name)
     importPath.push_back({ pathElem, SourceLoc() });
-  return getContext().getModule(importPath);
+
+  if (allowLoading)
+    return getContext().getModule(importPath);
+  return getContext().getLoadedModule(importPath);
 }
 
 
@@ -3957,10 +3970,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+    while (auto *genericParams = maybeReadGenericParams(DC)) {
+      genericParams->setOuterParameters(outerParams);
+
       // We do this repeatedly to set up the correct DeclContexts for the
       // GenericTypeParamDecls in the list.
       extension->setGenericParams(genericParams);
+
       outerParams = genericParams;
     }
 
@@ -4043,7 +4059,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
-    auto resolved = resolveCrossReference(getModule(baseModuleID), pathLen);
+    auto resolved = resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)
       return resolved;
     declOrOffset = resolved.get();
@@ -4652,7 +4668,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
                                                          existentialID);
 
-    typeOrOffset = ArchetypeType::getOpened(getType(existentialID));
+    typeOrOffset = OpenedArchetypeType::get(getType(existentialID));
     break;
   }
 

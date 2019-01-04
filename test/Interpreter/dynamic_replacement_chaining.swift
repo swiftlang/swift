@@ -1,20 +1,20 @@
 // First build without chaining.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libA.%target-dylib-extension) -module-name A -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_A.swift
-// RUN: %target-build-swift-dylib(%t/libB.%target-dylib-extension) -I%t -L%t -lA -Xlinker -rpath -Xlinker %t -module-name B -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift
-// RUN: %target-build-swift-dylib(%t/libC.%target-dylib-extension) -I%t -L%t -lA -Xlinker -rpath -Xlinker %t -module-name C -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift
-// RUN: %target-build-swift -I%t -L%t -lA -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
-// RUN: %target-run %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(A)) -module-name A -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_A.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(B)) -I%t -L%t -lA %target-rpath(%t) -module-name B -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(C)) -I%t -L%t -lA %target-rpath(%t) -module-name C -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift
+// RUN: %target-build-swift -I%t -L%t -lA -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(A) %t/%target-library-name(B) %t/%target-library-name(C)
+// RUN: %target-run %t/main %t/%target-library-name(A) %t/%target-library-name(B) %t/%target-library-name(C)
 
 // Now build with chaining enabled.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/libA.%target-dylib-extension) -module-name A -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_A.swift
-// RUN: %target-build-swift-dylib(%t/libB.%target-dylib-extension) -I%t -L%t -lA -Xlinker -rpath -Xlinker %t -module-name B -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift -Xfrontend -enable-dynamic-replacement-chaining
-// RUN: %target-build-swift-dylib(%t/libC.%target-dylib-extension) -I%t -L%t -lA -Xlinker -rpath -Xlinker %t -module-name C -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift -Xfrontend -enable-dynamic-replacement-chaining
-// RUN: %target-build-swift -I%t -L%t -lA -DCHAINING -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
-// RUN: %target-codesign %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
-// RUN: %target-run %t/main %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(A)) -module-name A -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_A.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(B)) -I%t -L%t -lA %target-rpath(%t) -module-name B -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift -Xfrontend -enable-dynamic-replacement-chaining
+// RUN: %target-build-swift-dylib(%t/%target-library-name(C)) -I%t -L%t -lA %target-rpath(%t) -module-name C -emit-module -emit-module-path %t -swift-version 5 %S/Inputs/dynamic_replacement_chaining_B.swift -Xfrontend -enable-dynamic-replacement-chaining
+// RUN: %target-build-swift -I%t -L%t -lA -DCHAINING -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-codesign %t/main %t/%target-library-name(A) %t/%target-library-name(B) %t/%target-library-name(C)
+// RUN: %target-run %t/main %t/%target-library-name(A) %t/%target-library-name(B) %t/%target-library-name(C)
 
 // REQUIRES: executable_test
 

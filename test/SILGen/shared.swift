@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: owned_parameters
 

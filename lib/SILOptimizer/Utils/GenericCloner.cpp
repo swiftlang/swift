@@ -50,8 +50,8 @@ SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
-  if (!Orig->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!Orig->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
   return NewF;
 }

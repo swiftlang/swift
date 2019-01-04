@@ -212,7 +212,6 @@
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
-          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {

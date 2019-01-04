@@ -43,6 +43,9 @@ import SwiftPrivateThreadExtras
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
 #endif
 
 #if _runtime(_ObjC)
@@ -395,7 +398,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var stopNow = _stdlib_AtomicInt(0)
 
   var trialBarrier: _stdlib_Barrier
-  var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
+  var trialSpinBarrier = _stdlib_AtomicInt()
 
   var raceData: [RT.RaceData] = []
   var workerStates: [_RaceTestWorkerState<RT>] = []
@@ -508,6 +511,36 @@ func _workerThreadOneTrial<RT>(
 }
 
 /// One-shot sleep in one thread, allowing interrupt by another.
+#if os(Windows)
+class _InterruptibleSleep {
+  let event: HANDLE?
+  var completed: Bool = false
+
+  init() {
+    self.event = CreateEventW(nil, TRUE, FALSE, nil)
+    precondition(self.event != nil)
+  }
+
+  deinit {
+    CloseHandle(self.event)
+  }
+
+  func sleep(durationInSeconds duration: Int) {
+    guard completed == false else { return }
+
+    let result: DWORD = WaitForSingleObject(event, DWORD(duration * 1000))
+    precondition(result == WAIT_OBJECT_0)
+
+    completed = true
+  }
+
+  func wake() {
+    guard completed == false else { return }
+    let result: BOOL = SetEvent(self.event)
+    precondition(result == TRUE)
+  }
+}
+#else
 class _InterruptibleSleep {
   let writeEnd: CInt
   let readEnd: CInt
@@ -550,6 +583,13 @@ class _InterruptibleSleep {
     precondition(ret >= 0)
   }
 }
+#endif
+
+#if os(Windows)
+typealias ThreadHandle = HANDLE
+#else
+typealias ThreadHandle = pthread_t
+#endif
 
 public func runRaceTest<RT : RaceTestWithPerTrialData>(
   _: RT.Type,
@@ -600,8 +640,8 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
     _ = timeoutReached.fetchAndAdd(1)
   }
 
-  var testTids = [pthread_t]()
-  var alarmTid: pthread_t
+  var testTids = [ThreadHandle]()
+  var alarmTid: ThreadHandle
 
   // Create the master thread.
   do {

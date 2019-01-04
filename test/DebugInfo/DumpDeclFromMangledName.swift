@@ -16,12 +16,12 @@
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   --decl-from-mangled=patatino 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=INVALID-DECL
-// INVALID-DECL: patatino does not exists, exiting.
+// INVALID-DECL: patatino does not exist, exiting.
 
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   --type-from-mangled=patatino 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=INVALID-TYPE
-// INVALID-TYPE: patatino does not exists, exiting.
+// INVALID-TYPE: patatino does not exist, exiting.
 
 // RUN: %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   -decl-from-mangled=%t.input > %t.output 2>&1

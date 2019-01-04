@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -assume-parsing-unqualified-ownership-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -233,10 +233,14 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_METADATA_BASE:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} [[T_METADATA_BASE]], [[WORD:i[0-9]+]] -1
 // CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
-// CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 9
-// CHECK:         [[T_FLAGS_PTR:%.*]] = load {{.*}} [[T_FLAGS_ADDR]]
-// CHECK:         [[T_FLAGS:%.*]] = ptrtoint {{.*}} [[T_FLAGS_PTR]] to [[WORD]]
-// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 255
+// CHECK:         [[T_VWTABLE_CAST:%.*]] = bitcast i8** [[T_VWTABLE]] to %swift.vwtable*
+// CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T_VWTABLE_CAST]], i32 0, i32 10
+// CHECK:         [[T_FLAGS:%.*]] = load i32, i32* [[T_FLAGS_ADDR]]
+// CHECK-64:      [[T0:%.*]] = zext i32 [[T_FLAGS]] to i64
+// CHECK-64:      [[T_ALIGN_MASK:%.*]] = and i64 [[T0]], 255
+// CHECK-32:      [[T_ALIGN_MASK:%.*]] = and i32 [[T_FLAGS]], 255
+// CHECK-16:      [[T0:%.*]] = trunc i32 [[T_FLAGS]] to i16
+// CHECK-16:      [[T_ALIGN_MASK:%.*]] = and i16 [[T0]], 255
 // CHECK:         [[T_ALIGN_MASK_NOT:%.*]] = xor [[WORD]] [[T_ALIGN_MASK]], -1
 // -- 32 is 64-bit offset of 'T' field, 16 for obj header + 8 for T metadata + 8 for SwiftClass field
 // CHECK-64:      [[T_UP_TO_ALIGN_1:%.*]] = add i64 32, [[T_ALIGN_MASK]]
@@ -245,9 +249,9 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_OFFSET:%.*]] = and [[WORD]] [[T_UP_TO_ALIGN_1]], [[T_ALIGN_MASK_NOT]]
 
 // -- Add the size of T to start the Int field.
-// CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 8
-// CHECK:         [[T_SIZE_PTR:%.*]] = load {{.*}} [[T_SIZE_ADDR]]
-// CHECK:         [[T_SIZE:%.*]] = ptrtoint {{.*}} [[T_SIZE_PTR]] to [[WORD]]
+// CHECK:         [[T_VWTABLE_CAST:%.*]] = bitcast i8** [[T_VWTABLE]] to %swift.vwtable*
+// CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T_VWTABLE_CAST]], i32 0, i32 8
+// CHECK:         [[T_SIZE:%.*]] = load [[WORD]], [[WORD]]* [[T_SIZE_ADDR]]
 // CHECK:         [[T_END:%.*]] = add [[WORD]] [[T_OFFSET]], [[T_SIZE]]
 
 // -- Accumulate total alignment.

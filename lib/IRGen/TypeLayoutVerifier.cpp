@@ -96,17 +96,12 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
              "is-bitwise-takable bit");
       unsigned xiCount = fixedTI->getFixedExtraInhabitantCount(IGM);
       verifyValues(metadata,
-             emitLoadOfHasExtraInhabitants(*this, layoutType),
-             getBoolConstant(xiCount != 0),
-             "has-extra-inhabitants bit");
+             emitLoadOfExtraInhabitantCount(*this, layoutType),
+             IGM.getInt32(xiCount),
+             "extra inhabitant count");
 
       // Check extra inhabitants.
       if (xiCount > 0) {
-        verifyValues(metadata,
-               emitLoadOfExtraInhabitantCount(*this, layoutType),
-               getSizeConstant(Size(xiCount)),
-               "extra inhabitant count");
-        
         // Verify that the extra inhabitant representations are consistent.
         
         // TODO: Update for EnumPayload implementation changes.
@@ -122,10 +117,12 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
         auto xiMask = fixedTI->getFixedExtraInhabitantMask(IGM);
         auto xiSchema = EnumPayloadSchema::withBitSize(xiMask.getBitWidth());
 
+        auto maxXiCount = std::min(xiCount, 256u);
+        auto numCases = llvm::ConstantInt::get(IGM.Int32Ty, maxXiCount);
+
         // TODO: Randomize the set of extra inhabitants we check.
         unsigned bits = fixedTI->getFixedSize().getValueInBits();
-        for (unsigned i = 0, e = std::min(xiCount, 256u);
-             i < e; ++i) {
+        for (unsigned i = 0, e = maxXiCount; i < e; ++i) {
           // Initialize the buffer with junk, to help ensure we're insensitive to
           // insignificant bits.
           // TODO: Randomize the filler.
@@ -135,8 +132,9 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
                                    fixedTI->getFixedAlignment().getValue());
           
           // Ask the runtime to store an extra inhabitant.
-          auto index = llvm::ConstantInt::get(IGM.Int32Ty, i);
-          emitStoreExtraInhabitantCall(*this, layoutType, index, xiOpaque);
+          auto tag = llvm::ConstantInt::get(IGM.Int32Ty, i+1);
+          emitStoreEnumTagSinglePayloadCall(*this, layoutType, tag,
+                                            numCases, xiOpaque);
           
           // Compare the stored extra inhabitant against the fixed extra
           // inhabitant pattern.
@@ -171,11 +169,12 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
             fixedXIValue, xiSchema);
           maskedXIPayload.store(*this, fixedXIBuf);
           
-          auto runtimeIndex = emitGetExtraInhabitantIndexCall(*this, layoutType,
-                                                              fixedXIOpaque);
+          auto runtimeTag =
+            emitGetEnumTagSinglePayloadCall(*this, layoutType, numCases,
+                                            fixedXIOpaque);
           verifyValues(metadata,
-                       runtimeIndex, index,
-                       llvm::Twine("extra inhabitant index calculation ")
+                       runtimeTag, tag,
+                       llvm::Twine("extra inhabitant tag calculation ")
                          + numberBuf.str());
         }
       }

@@ -92,6 +92,7 @@ DemangleToMetadataTests.test("synthesized declarations") {
 }
 
 DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
+  expectNotNil(_typeByName("So17OS_dispatch_queueC8DispatchE10AttributesV"))
   expectEqual(DispatchQueue.Attributes.self,
     _typeByName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
 }
@@ -105,6 +106,10 @@ class F<T: P1> { }
 
 DemangleToMetadataTests.test("runtime conformance check for @objc protocol inheritance") {
   expectEqual(F<P3>.self, _typeByName("4main1FCyAA2P3PG")!)
+}
+
+DemangleToMetadataTests.test("Objective-C generics") {
+  expectEqual(NSArray.self, _typeByName("So7NSArrayCySo8NSStringCG")!)
 }
 
 runAllTests()

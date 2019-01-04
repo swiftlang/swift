@@ -1345,9 +1345,15 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
 void Serializer::writeInlinableBodyTextIfNeeded(
   const AbstractFunctionDecl *AFD) {
   using namespace decls_block;
+  // Only serialize the text for an inlinable function body if we're emitting
+  // a partial module. It's not needed in the final module file, but it's
+  // needed in partial modules so you can emit a parseable interface after
+  // merging them.
+  if (!SF) return;
 
   if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
     return;
+
   if (!AFD->hasInlinableBodyText()) return;
   SmallString<128> scratch;
   auto body = AFD->getInlinableBodyText(scratch);
@@ -3791,18 +3797,11 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::Archetype: {
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::NestedArchetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
 
-    // Opened existential types use a separate layout.
-    if (auto existentialTy = archetypeTy->getOpenedExistentialType()) {
-      unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
-      OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                              addTypeRef(existentialTy));
-      break;
-    }
-
-    auto env = archetypeTy->getGenericEnvironment();
+    auto env = archetypeTy->getPrimary()->getGenericEnvironment();
     assert(env && "Primary archetype without generic environment?");
 
     GenericEnvironmentID envID = addGenericEnvironmentRef(env);
@@ -3811,6 +3810,14 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
     ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     envID, addTypeRef(interfaceType));
+    break;
+  }
+
+  case TypeKind::OpenedArchetype: {
+    auto archetypeTy = cast<OpenedArchetypeType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
+    OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                           addTypeRef(archetypeTy->getOpenedExistentialType()));
     break;
   }
 

@@ -41,7 +41,7 @@ const SILDebugScope *SILInstruction::getDebugScope() const {
   return Location.getScope();
 }
 
-void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
+void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
 
@@ -1182,6 +1182,11 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // begin_apply creates a token that has to be directly used by the
   // corresponding end_apply and abort_apply.
   if (isa<BeginApplyInst>(this))
+    return false;
+
+  // dynamic_method_br is not duplicatable because IRGen does not support phi
+  // nodes of objc_method type.
+  if (isa<DynamicMethodBranchInst>(this))
     return false;
 
   // If you add more cases here, you should also update SILLoop:canDuplicate.

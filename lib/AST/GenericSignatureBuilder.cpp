@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1856,96 +1857,6 @@ void EquivalenceClass::addMember(PotentialArchetype *pa) {
   }
 }
 
-class GenericSignatureBuilder::ResolvedType {
-  llvm::PointerUnion<PotentialArchetype *, Type> type;
-  EquivalenceClass *equivClass;
-
-  /// For a type that could not be resolved further unless the given
-  /// equivalence class changes.
-  ResolvedType(EquivalenceClass *equivClass)
-    : type(), equivClass(equivClass) { }
-
-public:
-  /// A specific resolved potential archetype.
-  ResolvedType(PotentialArchetype *pa)
-    : type(pa), equivClass(pa->getEquivalenceClassIfPresent()) { }
-
-  /// A resolved type within the given equivalence class.
-  ResolvedType(Type type, EquivalenceClass *equivClass)
-      : type(type), equivClass(equivClass) {
-    assert(type->isTypeParameter() == static_cast<bool>(equivClass) &&
-           "type parameters must have equivalence classes");
-  }
-
-  /// Return an unresolved result, which could be resolved when we
-  /// learn more information about the given equivalence class.
-  static ResolvedType forUnresolved(EquivalenceClass *equivClass) {
-    return ResolvedType(equivClass);
-  }
-
-  /// Return a result for a concrete type.
-  static ResolvedType forConcrete(Type concreteType) {
-    return ResolvedType(concreteType, nullptr);
-  }
-
-  /// Determine whether this result was resolved.
-  explicit operator bool() const { return !type.isNull(); }
-
-  /// Retrieve the dependent type.
-  Type getDependentType(GenericSignatureBuilder &builder) const;
-
-  /// Retrieve the concrete type, or a null type if this result doesn't store
-  /// a concrete type.
-  Type getAsConcreteType() const {
-    assert(*this && "Doesn't contain any result");
-    if (equivClass) return Type();
-    return type.dyn_cast<Type>();
-  }
-
-  /// Realize a potential archetype for this type parameter.
-  PotentialArchetype *realizePotentialArchetype(
-                                            GenericSignatureBuilder &builder);
-
-  /// Retrieve the potential archetype, if already known.
-  PotentialArchetype *getPotentialArchetypeIfKnown() const {
-    return type.dyn_cast<PotentialArchetype *>();
-  }
-
-  /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClass(
-                     GenericSignatureBuilder &builder) const {
-    assert(*this && "Only for resolved types");
-    if (equivClass) return equivClass;
-
-    // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()
-             ->getOrCreateEquivalenceClass(builder);
-  }
-
-  /// Retrieve the equivalence class into which a resolved type refers.
-  EquivalenceClass *getEquivalenceClassIfPresent() const {
-    assert(*this && "Only for resolved types");
-    if (equivClass) return equivClass;
-
-    // Create the equivalence class now.
-    return type.get<PotentialArchetype *>()->getEquivalenceClassIfPresent();
-  }
-
-  /// Retrieve the unresolved result.
-  EquivalenceClass *getUnresolvedEquivClass() const {
-    assert(!*this);
-    return equivClass;
-  }
-
-  /// Return an unresolved type.
-  ///
-  /// This loses equivalence-class information that could be useful, which
-  /// is unfortunate.
-  UnresolvedType getUnresolvedType() const {
-    return type;
-  }
-};
-
 bool EquivalenceClass::recordConformanceConstraint(
                                  GenericSignatureBuilder &builder,
                                  ResolvedType type,
@@ -2405,16 +2316,16 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   if (parentArchetype) {
     // Create a nested archetype.
     auto *depMemTy = anchor->castTo<DependentMemberType>();
-    archetype = ArchetypeType::getNew(ctx, parentArchetype, depMemTy, protos,
-                                      superclass, layout);
+    archetype = NestedArchetypeType::getNew(ctx, parentArchetype, depMemTy,
+                                            protos, superclass, layout);
 
     // Register this archetype with its parent.
     parentArchetype->registerNestedType(assocType->getName(), archetype);
   } else {
     // Create a top-level archetype.
     auto genericParam = anchor->castTo<GenericTypeParamType>();
-    archetype = ArchetypeType::getNew(ctx, genericEnv, genericParam, protos,
-                                      superclass, layout);
+    archetype = PrimaryArchetypeType::getNew(ctx, genericEnv, genericParam,
+                                             protos, superclass, layout);
 
     // Register the archetype with the generic environment.
     genericEnv->addMapping(genericParam, archetype);
@@ -2989,7 +2900,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
 void ArchetypeType::resolveNestedType(
                                     std::pair<Identifier, Type> &nested) const {
-  auto genericEnv = getGenericEnvironment();
+  auto genericEnv = getPrimary()->getGenericEnvironment();
   auto &builder = *genericEnv->getGenericSignatureBuilder();
 
   Type interfaceType = getInterfaceType();
@@ -4888,8 +4799,12 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   auto T1 = OrigT1->getRepresentative();
   auto T2 = OrigT2->getRepresentative();
 
-  // Pick representative based on the canonical ordering of the type parameters.
-  if (compareDependentTypes(depType2, depType1) < 0) {
+  // Decide which potential archetype is to be considered the representative.
+  // We prefer potential archetypes with lower nesting depths, because it
+  // prevents us from unnecessarily building deeply nested potential archetypes.
+  unsigned nestingDepth1 = T1->getNestingDepth();
+  unsigned nestingDepth2 = T2->getNestingDepth();
+  if (nestingDepth2 < nestingDepth1) {
     std::swap(T1, T2);
     std::swap(OrigT1, OrigT2);
     std::swap(equivClass, equivClass2);
@@ -7490,29 +7405,14 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
-/// Add all of the generic parameters from the given parameter list (and it's
-/// outer generic parameter lists) to the given generic signature builder.
-static void addAllGenericParams(GenericSignatureBuilder &builder,
-                                GenericParamList *genericParams) {
-  if (!genericParams) return;
-
-  addAllGenericParams(builder, genericParams->getOuterParameters());
-  for (auto gp : *genericParams)
-    builder.addGenericParameter(gp);
-}
-
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
 
-  if (!proto->hasInterfaceType()) {
-    // FIXME: Overkill.
-    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
-      lazyResolver->resolveDeclSignature(proto);
-  }
-
   // Add all of the generic parameters.
-  addAllGenericParams(builder, proto->getGenericParams());
+  proto->createGenericParamsIfMissing();
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
 
   // Add the conformance of 'self' to the protocol.
   auto selfType =

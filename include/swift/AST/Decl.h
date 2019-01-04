@@ -529,7 +529,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -552,6 +552,10 @@ protected:
 
     /// Whether the class has @objc ancestry.
     ObjCKind : 3,
+
+    /// Whether this class has @objc members.
+    HasObjCMembersComputed : 1,
+    HasObjCMembers : 1,
 
     HasMissingDesignatedInitializers : 1,
     HasMissingVTableEntries : 1
@@ -1377,22 +1381,11 @@ public:
   void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
   
-  /// Retrieve the outer generic parameter list, which provides the
-  /// generic parameters of the context in which this generic parameter list
-  /// exists.
+  /// Retrieve the outer generic parameter list.
   ///
-  /// Consider the following generic class:
-  ///
-  /// \code
-  /// class Vector<T> {
-  ///   init<R : Range where R.Element == T>(range : R) { }
-  /// }
-  /// \endcode
-  ///
-  /// The generic parameter list <T> has no outer parameters, because it is
-  /// the outermost generic parameter list. The generic parameter list
-  /// <R : Range...> for the constructor has the generic parameter list <T> as
-  /// its outer generic parameter list.
+  /// This is used for extensions of nested types, and in SIL mode, where a
+  /// single lexical context can have multiple logical generic parameter
+  /// lists.
   GenericParamList *getOuterParameters() const { return OuterParameters; }
 
   /// Set the outer generic parameter list. See \c getOuterParameters
@@ -1422,13 +1415,8 @@ public:
                        Requirements.back().getSourceRange().End);
   }
 
-  /// Retrieve the depth of this generic parameter list.
-  unsigned getDepth() const {
-    unsigned depth = 0;
-    for (auto gp = getOuterParameters(); gp; gp = gp->getOuterParameters())
-      ++depth;
-    return depth;
-  }
+  /// Configure the depth of the generic parameters in this list.
+  void setDepth(unsigned depth);
 
   /// Create a copy of the generic parameter list and all of its generic
   /// parameter declarations. The copied generic parameters are re-parented
@@ -1763,6 +1751,8 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
+
+  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -3576,6 +3566,8 @@ class ClassDecl final : public NominalTypeDecl {
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
+  bool hasObjCMembersSlow();
+
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
@@ -3734,10 +3726,19 @@ public:
     Bits.ClassDecl.InheritsSuperclassInits = true;
   }
 
-  /// Figure out if this class has any @objc ancestors, in which case it should
-  /// have implicitly @objc members. Note that a class with generic ancestry
-  /// might have implicitly @objc members, but will never itself be @objc.
+  /// Returns if this class has any @objc ancestors, or if it is directly
+  /// visible to Objective-C. The latter is a stronger condition which is only
+  /// true if the class does not have any generic ancestry.
   ObjCClassKind checkObjCAncestry() const;
+
+  /// Returns if the class has implicitly @objc members. This is true if any
+  /// ancestor class has the @objcMembers attribute.
+  bool hasObjCMembers() const {
+    if (Bits.ClassDecl.HasObjCMembersComputed)
+      return Bits.ClassDecl.HasObjCMembers;
+
+    return const_cast<ClassDecl *>(this)->hasObjCMembersSlow();
+  }
 
   /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
@@ -4107,10 +4108,6 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Create the implicit generic parameter list for a protocol or
-  /// extension thereof.
-  GenericParamList *createGenericParams(DeclContext *dc);
 
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.

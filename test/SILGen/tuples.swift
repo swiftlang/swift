@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name tuples -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name tuples %s | %FileCheck %s
 class C {}
 
 enum Foo {
@@ -7,7 +7,7 @@ enum Foo {
 }
 
 // <rdar://problem/16020428>
-// CHECK-LABEL: sil hidden @$s6tuples8matchFoo1xyAA0C0O_tF
+// CHECK-LABEL: sil hidden [ossa] @$s6tuples8matchFoo1xyAA0C0O_tF
 func matchFoo(x x: Foo) {
   switch x {
   case .X(let x):
@@ -22,7 +22,7 @@ func make_int() -> Int { return 0 }
 func make_p() -> P { return A() }
 func make_xy() -> (x: Int, y: P) { return (make_int(), make_p()) }
 
-// CHECK-LABEL: sil hidden @$s6tuples17testShuffleOpaqueyyF
+// CHECK-LABEL: sil hidden [ossa] @$s6tuples17testShuffleOpaqueyyF
 func testShuffleOpaque() {
   // CHECK: [[X:%.*]] = alloc_box ${ var P }
   // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
@@ -131,7 +131,7 @@ func testTupleUnsplat() {
 // Make sure that we use a load_borrow instead of a load [take] when RValues are
 // formed with isGuaranteed set.
 extension P {
-  // CHECK-LABEL: sil hidden @$s6tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
+  // CHECK-LABEL: sil hidden [ossa] @$s6tuples1PPAAE12immutableUse5tupleyAA1CC5index_x5valuet_tFZ
   // CHECK: bb0([[TUP0:%.*]] : @guaranteed $C, [[TUP1:%.*]] : $*Self
   // Allocate space for the RValue.
   // CHECK:   [[RVALUE:%.*]] = alloc_stack $(index: C, value: Self), let, name "tuple"
@@ -157,7 +157,7 @@ extension P {
   }
 }
 
-// CHECK-LABEL: sil @$s6tuples15testTupleAssign1xySaySiGz_tF : $@convention(thin) (@inout Array<Int>) -> () {
+// CHECK-LABEL: sil [ossa] @$s6tuples15testTupleAssign1xySaySiGz_tF : $@convention(thin) (@inout Array<Int>) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*Array<Int>
 // function_ref Array.subscript.modify
 // CHECK: [[ACCESSOR:%.*]] = function_ref @$sSayxSiciM : $@yield_once @convention(method) <τ_0_0> (Int, @inout Array<τ_0_0>) -> @yields @inout τ_0_0

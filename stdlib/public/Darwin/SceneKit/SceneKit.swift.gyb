@@ -164,6 +164,8 @@ extension SCNGeometryElement {
       primitiveCount = indexCount
     case .polygon:
       fatalError("Expected constant number of indices per primitive")
+    @unknown default:
+      fatalError("Unexpected primitive type")
     }
     self.init(
       data: Data(bytes: indices, count: indexCount * MemoryLayout<IndexType>.stride),

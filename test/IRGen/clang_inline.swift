@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -O -disable-sil-perf-optzns -disable-llvm-optzns -emit-ir -Xcc -fstack-protector -I %t | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -sdk %S/Inputs -primary-file %s -O -disable-sil-perf-optzns -disable-llvm-optzns -emit-ir -Xcc -fstack-protector -I %t | %FileCheck %s
 
 // RUN: %empty-directory(%t/Empty.framework/Modules/Empty.swiftmodule)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty -I %t
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -I %t -F %t -DIMPORT_EMPTY -O -disable-sil-perf-optzns -disable-llvm-optzns -emit-ir -Xcc -fstack-protector -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module-path %t/Empty.framework/Modules/Empty.swiftmodule/%target-swiftmodule-name %S/../Inputs/empty.swift -module-name Empty -I %t
+// RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -I %t -F %t -DIMPORT_EMPTY -O -disable-sil-perf-optzns -disable-llvm-optzns -emit-ir -Xcc -fstack-protector -enable-objc-interop | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 // REQUIRES: objc_interop

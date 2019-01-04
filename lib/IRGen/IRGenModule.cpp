@@ -769,7 +769,7 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  if (SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf)) {
+  if (auto *wt = SIL.lookUpWitnessTable(Conf, /*deserializeLazily=*/false)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
@@ -858,6 +858,10 @@ llvm::AttributeList IRGenModule::constructInitialAttributes() {
   constructInitialFnAttributes(b);
   return llvm::AttributeList::get(LLVMContext,
                                   llvm::AttributeList::FunctionIndex, b);
+}
+
+llvm::Constant *IRGenModule::getInt32(uint32_t value) {
+  return llvm::ConstantInt::get(Int32Ty, value);
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {
@@ -956,9 +960,12 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
-    if (useDllStorage())
-      cast<llvm::GlobalValue>(ForceImportThunk)
-          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                    llvm::GlobalValue::DefaultVisibility,
+                    useDllStorage()
+                        ? llvm::GlobalValue::DLLImportStorageClass
+                        : llvm::GlobalValue::DefaultStorageClass})
+        .to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";
     appendEncodedName(buf, IRGen.Opts.ModuleName);
@@ -966,9 +973,12 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     if (!Module.getGlobalVariable(buf.str())) {
       auto ref = new llvm::GlobalVariable(Module, ForceImportThunk->getType(),
                                           /*isConstant=*/true,
-                                          llvm::GlobalValue::WeakAnyLinkage,
+                                          llvm::GlobalValue::WeakODRLinkage,
                                           ForceImportThunk, buf.str());
-      ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      ApplyIRLinkage({llvm::GlobalValue::WeakODRLinkage,
+                      llvm::GlobalValue::HiddenVisibility,
+                      llvm::GlobalValue::DefaultStorageClass})
+          .to(ref);
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
     }
@@ -1079,9 +1089,12 @@ void IRGenModule::emitAutolinkInfo() {
         llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
-    if (useDllStorage())
-      ForceImportThunk
-          ->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                    llvm::GlobalValue::DefaultVisibility,
+                    useDllStorage()
+                        ? llvm::GlobalValue::DLLExportStorageClass
+                        : llvm::GlobalValue::DefaultStorageClass})
+        .to(ForceImportThunk);
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);

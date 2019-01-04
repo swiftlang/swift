@@ -382,6 +382,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func remove(at index: Index) -> Element {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
@@ -412,6 +413,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
+  @_semantics("optimize.sil.specialize.generic.size.never")
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     if !keepCapacity {
       self = .init(native: _NativeDictionary())

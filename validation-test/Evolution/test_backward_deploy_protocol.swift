@@ -16,14 +16,8 @@ struct ConformsToOldWithNonDefault : OldProtocol {
 
 BackwardDeployProtocolTest.test("OldProtocol") {
   if getVersion() == 1 {
-    // FIXME: IRGen inserts the metadata load outside the version check
-    // apparently. Work around that here. <rdar://problem/46438608>
-    @inline(never) func helper() {
-      _ = ConformsToOldWithDefault().newMethod()
-      _ = ConformsToOldWithNonDefault().newMethod()
-    }
-
-    helper()
+    _ = ConformsToOldWithDefault().newMethod()
+    _ = ConformsToOldWithNonDefault().newMethod()
   }
 }
 
@@ -76,17 +70,13 @@ BackwardDeployProtocolTest.test("RefinedProtocol") {
 // Witness tables that are weak-linked for various reasons
 BackwardDeployProtocolTest.test("WeakWitnessTables") {
   if getVersion() == 1 {
-    // FIXME: IRGen inserts the metadata load outside the version check
-    // apparently. Work around that here. <rdar://problem/46438608>
-    @inline(never) func helper() {
-      func f1<T : OtherProtocol>(_: T) {}
-      func f2<T : NewProtocol>(_: T) {}
-      func f3<T : NewConformanceProtocol>(_: T) {}
+    func f1<T : OtherProtocol>(_: T) {}
+    func f2<T : NewProtocol>(_: T) {}
+    func f3<T : NewConformanceProtocol>(_: T) {}
 
-      f1(OtherConforms())
-      f2(NewConforms())
-      f3(NewConformanceConforms())
-    }
+    f1(OtherConforms())
+    f2(NewConforms())
+    f3(NewConformanceConforms())
   }
 }
 

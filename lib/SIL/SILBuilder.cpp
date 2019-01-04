@@ -24,7 +24,7 @@ using namespace swift;
 SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
                        SmallVectorImpl<SILInstruction *> *InsertedInstrs)
     : TempContext(GlobVar->getModule(), InsertedInstrs), C(TempContext),
-      F(nullptr), hasOwnership(false) {
+      F(nullptr) {
   setInsertionPoint(&GlobVar->StaticInitializerBlock);
 }
 
@@ -514,7 +514,7 @@ void SILBuilder::emitShallowDestructureValueOperation(
   }
 
   // Otherwise, we want to destructure add the destructure and return.
-  if (getFunction().hasQualifiedOwnership()) {
+  if (getFunction().hasOwnership()) {
     auto *DI = emitDestructureValueOperation(Loc, V);
     copy(DI->getResults(), std::back_inserter(Results));
     return;

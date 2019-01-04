@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership -profile-generate %s | %FileCheck %s
 
-// CHECK: sil hidden @[[F_OPERATORS:.*operators.*]] :
+// CHECK: sil hidden [ossa] @[[F_OPERATORS:.*operators.*]] :
 // CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_operators.swift:[[F_OPERATORS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
 // CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 2

@@ -2098,11 +2098,11 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
-  return type->castTo<ArchetypeType>();
+  return type->castTo<OpenedArchetypeType>();
 }
 
 KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,

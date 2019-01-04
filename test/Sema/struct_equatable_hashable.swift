@@ -261,6 +261,60 @@ protocol ImplierMain: Equatable {}
 struct ImpliedMain: ImplierMain {}
 extension ImpliedOther: ImplierMain {}
 
+
+// Hashable conformances that rely on a manual implementation of `hashValue`
+// should produce a deprecation warning.
+struct OldSchoolStruct: Hashable {
+  static func ==(left: OldSchoolStruct, right: OldSchoolStruct) -> Bool {
+    return true
+  }
+  var hashValue: Int { return 42 }
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolStruct' to 'Hashable' by implementing 'hash(into:)' instead}}
+}
+enum OldSchoolEnum: Hashable {
+  case foo
+  case bar
+
+  static func ==(left: OldSchoolEnum, right: OldSchoolEnum) -> Bool {
+    return true
+  }
+  var hashValue: Int { return 23 }
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolEnum' to 'Hashable' by implementing 'hash(into:)' instead}}
+}
+class OldSchoolClass: Hashable {
+  static func ==(left: OldSchoolClass, right: OldSchoolClass) -> Bool {
+    return true
+  }
+  var hashValue: Int { return -9000 }
+  // expected-warning@-1{{'Hashable.hashValue' is deprecated as a protocol requirement; conform type 'OldSchoolClass' to 'Hashable' by implementing 'hash(into:)' instead}}
+}
+
+// However, it's okay to implement `hashValue` as long as `hash(into:)` is also
+// provided.
+struct MixedStruct: Hashable {
+  static func ==(left: MixedStruct, right: MixedStruct) -> Bool {
+    return true
+  }
+  func hash(into hasher: inout Hasher) {}
+  var hashValue: Int { return 42 }
+}
+enum MixedEnum: Hashable {
+  case foo
+  case bar
+  static func ==(left: MixedEnum, right: MixedEnum) -> Bool {
+    return true
+  }
+  func hash(into hasher: inout Hasher) {}
+  var hashValue: Int { return 23 }
+}
+class MixedClass: Hashable {
+  static func ==(left: MixedClass, right: MixedClass) -> Bool {
+    return true
+  }
+  func hash(into hasher: inout Hasher) {}
+  var hashValue: Int { return -9000 }
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'

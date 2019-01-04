@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -61,5 +61,5 @@ extension Foo: NativeIntProperty {}
 // TODO: We can't emit a vtable entry for modify for ObjC types.
 // CHECK-NOT: class_method {{.*}}Foo{{.*}}intProperty{{.*}}modify
 
-// CHECK-LABEL: sil shared [serializable] @$sSo3FooC11intPropertys5Int32VvM
+// CHECK-LABEL: sil shared [serializable] [ossa] @$sSo3FooC11intPropertys5Int32VvM
 

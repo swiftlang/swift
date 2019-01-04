@@ -602,7 +602,7 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
+  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -635,19 +635,6 @@ public:
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
-
-  /// Convert the given expression to a logic value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must conform to the LogicValue protocol.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns the expression converted to a logic value (Builtin i1).
-  Expr *convertBooleanTypeToBuiltinI1(Expr *expr,
-                                      ConstraintLocator *locator) const;
 
   /// Convert the given optional-producing expression to a Bool
   /// indicating whether the optional has a value.
@@ -1075,7 +1062,7 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
+  SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
   SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
@@ -1994,6 +1981,28 @@ public:
 
     if (solverState)
       solverState->retireConstraint(constraint);
+  }
+
+  /// Transfer given constraint from to active list
+  /// for solver to attempt its simplification.
+  void activateConstraint(Constraint *constraint) {
+    assert(!constraint->isActive() && "Constraint is already active");
+    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
+                             constraint);
+    constraint->setActive(true);
+  }
+
+  void deactivateConstraint(Constraint *constraint) {
+    assert(constraint->isActive() && "Constraint is already inactive");
+    InactiveConstraints.splice(InactiveConstraints.end(),
+                               ActiveConstraints, constraint);
+    constraint->setActive(false);
+  }
+
+  void retireConstraint(Constraint *constraint) {
+    if (constraint->isActive())
+      deactivateConstraint(constraint);
+    removeInactiveConstraint(constraint);
   }
 
   /// Retrieve the list of inactive constraints.
@@ -3309,25 +3318,17 @@ public:
 /// \param sources Will be populated with information about the source of each
 /// of the elements for the result tuple. The indices into this array are the
 /// indices of the tuple type we're converting to, while the values are
-/// either one of the \c TupleShuffleExpr constants or are an index into the
-/// source tuple.
-///
-/// \param variadicArgs Will be populated with all of the variadic arguments
-/// that will be placed into the variadic tuple element (i.e., at the index
-/// \c where \c consumed[i] is \c TupleShuffleExpr::Variadic). The values
-/// are indices into the source tuple.
+/// an index into the source tuple.
 ///
 /// \returns true if no tuple conversion is possible, false otherwise.
 bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
                          ArrayRef<TupleTypeElt> toTuple,
-                         SmallVectorImpl<int> &sources,
-                         SmallVectorImpl<unsigned> &variadicArgs);
+                         SmallVectorImpl<unsigned> &sources);
 static inline bool computeTupleShuffle(TupleType *fromTuple,
                                        TupleType *toTuple,
-                                       SmallVectorImpl<int> &sources,
-                                       SmallVectorImpl<unsigned> &variadicArgs){
+                                       SmallVectorImpl<unsigned> &sources){
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
-                             sources, variadicArgs);
+                             sources);
 }
 
 /// Describes the arguments to which a parameter binds.
@@ -3828,6 +3829,9 @@ bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
 bool exprNeedsParensOutsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
     PrecedenceGroupDecl *followingPG);
+
+/// Determine whether this is a SIMD operator.
+bool isSIMDOperator(ValueDecl *value);
 
 } // end namespace swift
 

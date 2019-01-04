@@ -1,7 +1,7 @@
 
 // This file makes sure that we do not explode dead parameters.
 
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical

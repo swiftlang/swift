@@ -1,6 +1,6 @@
-// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=use_before_init | %FileCheck %s
+// RUN: %target-sil-func-extractor %s -func=use_before_init | %FileCheck %s
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-func-extractor -assume-parsing-unqualified-ownership-sil %s -func=use_before_init -emit-sib -o %t/out.sib -module-name main && %target-sil-opt %t/out.sib -module-name main | %FileCheck %s
+// RUN: %target-sil-func-extractor %s -func=use_before_init -emit-sib -o %t/out.sib -module-name main && %target-sil-opt %t/out.sib -module-name main | %FileCheck %s
 
 import Builtin
 import Swift

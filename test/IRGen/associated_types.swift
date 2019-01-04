@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -92,6 +92,17 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
 // CHECK-NEXT: [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
 // CHECK-NEXT: [[T1:%.*]] = bitcast i8* [[T0]] to void (%swift.type*, %swift.type*, i8**)*
 // CHECK-NEXT: call swiftcc void [[T1]](%swift.type* swiftself %T.RuncerType.Runcee, %swift.type* %T.RuncerType.Runcee, i8** %T.RuncerType.Runcee.Speedy)
+
+public protocol P0 {
+  associatedtype ErrorType : Swift.Error
+}
+
+public struct P0Impl : P0 {
+  public typealias ErrorType = Swift.Error
+}
+
+// CHECK: define{{.*}} swiftcc i8** @"$s16associated_types6P0ImplVAA0C0AA9ErrorTypeAaDP_s0E0PWT"(%swift.type* %P0Impl.ErrorType, %swift.type* %P0Impl, i8** %P0Impl.P0)
+// CHECK:  ret i8** @"$ss5ErrorWS"
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 

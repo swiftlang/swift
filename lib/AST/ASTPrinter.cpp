@@ -104,6 +104,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.OmitNameOfInaccessibleProperties = true;
   result.FunctionDefinitions = true;
   result.CollapseSingleGetterProperty = false;
+  result.VarInitializers = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -888,8 +889,8 @@ void PrintAST::printAttributes(const Decl *D) {
 
     if (auto vd = dyn_cast<VarDecl>(D)) {
       // Don't print @_hasInitialValue if we're printing an initializer
-      // expression.
-      if (vd->isInitExposedToClients())
+      // expression or if the storage is resilient.
+      if (vd->isInitExposedToClients() || vd->isResilient())
         Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
 
       if (!Options.PrintForSIL) {
@@ -2099,20 +2100,19 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     }
 
     if (Options.VarInitializers) {
-      // FIXME: Implement once we can pretty-print expressions.
+      auto vd = entry.getAnchoringVarDecl();
+      if (entry.hasInitStringRepresentation() &&
+          vd->isInitExposedToClients()) {
+        SmallString<128> scratch;
+        Printer << " = " << entry.getInitStringRepresentation(scratch);
+      }
     }
 
-    auto vd = entry.getAnchoringVarDecl();
-    if (entry.hasInitStringRepresentation() &&
-        vd->isInitExposedToClients()) {
-      SmallString<128> scratch;
-      Printer << " = " << entry.getInitStringRepresentation(scratch);
-    }
-
-    // HACK: If we're just printing a single pattern and it has accessors,
-    //       print the accessors here.
-    if (decl->getNumPatternEntries() == 1) {
-      printAccessors(vd);
+    // If we're just printing a single pattern and it has accessors,
+    // print the accessors here. It is an error to add accessors to a
+    // pattern binding with multiple entries.
+    if (auto var = decl->getSingleVar()) {
+      printAccessors(var);
     }
   }
 }
@@ -3230,7 +3230,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (auto *VD = dyn_cast<VarDecl>(this)) {
-      if (!VD->hasClangNode() && VD->getImplInfo().isSimpleStored())
+      if (!VD->hasClangNode() && VD->hasStorage())
         return false;
     }
 
@@ -3241,7 +3241,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
         auto pattern =
           pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
-          if (!named->getDecl()->getImplInfo().isSimpleStored())
+          if (!named->getDecl()->hasStorage())
             return false;
         }
       }
@@ -4005,35 +4005,40 @@ public:
     visit(T->getObjectType());
   }
 
-  void visitArchetypeType(ArchetypeType *T) {
-    if (auto existentialTy = T->getOpenedExistentialType()) {
-      if (Options.PrintForSIL)
-        Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
-      visit(existentialTy);
-    } else {
-      if (auto parent = T->getParent()) {
-        visit(parent);
-        Printer << ".";
-      }
-
-      if (Options.AlternativeTypeNames) {
-        auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
-        if (found != Options.AlternativeTypeNames->end()) {
-          Printer << found->second.str();
-          return;
-        }
-      }
-
-      auto Name = T->getName();
-      if (Name.empty())
-        Printer << "<anonymous>";
-      else {
-        PrintNameContext context = PrintNameContext::Normal;
-        if (Name == T->getASTContext().Id_Self)
-          context = PrintNameContext::GenericParameter;
-        Printer.printName(Name, context);
+  void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+    if (Options.PrintForSIL)
+      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
+    visit(T->getOpenedExistentialType());
+  }
+  
+  void printArchetypeCommon(ArchetypeType *T) {
+    if (Options.AlternativeTypeNames) {
+      auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
+      if (found != Options.AlternativeTypeNames->end()) {
+        Printer << found->second.str();
+        return;
       }
     }
+
+    auto Name = T->getName();
+    if (Name.empty())
+      Printer << "<anonymous>";
+    else {
+      PrintNameContext context = PrintNameContext::Normal;
+      if (Name == T->getASTContext().Id_Self)
+        context = PrintNameContext::GenericParameter;
+      Printer.printName(Name, context);
+    }
+  }
+  
+  void visitNestedArchetypeType(NestedArchetypeType *T) {
+    visit(T->getParent());
+    Printer << ".";
+    printArchetypeCommon(T);
+  }
+  
+  void visitPrimaryArchetypeType(PrimaryArchetypeType *T) {
+    printArchetypeCommon(T);
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {

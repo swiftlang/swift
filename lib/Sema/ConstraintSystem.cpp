@@ -227,11 +227,8 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
       [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
-  for (auto constraint : inactiveConstraints) {
-    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints,
-                             constraint);
-    constraint->setActive(true);
-  }
+  for (auto *constraint : inactiveConstraints)
+    activateConstraint(constraint);
 }
 
 /// Retrieve a dynamic result signature for the given declaration.
@@ -1020,7 +1017,7 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
+  auto bindPrimaryArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
 
@@ -1044,7 +1041,7 @@ static void bindArchetypesFromContext(
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
-        bindContextArchetype(selfTy, contextTy);
+        bindPrimaryArchetype(selfTy, contextTy);
       }
       continue;
     }
@@ -1056,7 +1053,7 @@ static void bindArchetypesFromContext(
 
     for (auto *paramTy : genericSig->getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
-      bindContextArchetype(paramTy, contextTy);
+      bindPrimaryArchetype(paramTy, contextTy);
     }
 
     break;
@@ -1322,7 +1319,7 @@ ConstraintSystem::getTypeOfMemberReference(
   Type baseOpenedTy = baseObjTy;
 
   if (baseObjTy->isExistentialType()) {
-    ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
+    auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
                                        openedArchetype });
     baseOpenedTy = openedArchetype;
@@ -1443,6 +1440,40 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
   }
 }
 
+/// If there are any SIMD operators in the overload set, partition the set so
+/// that the SIMD operators come at the end.
+static ArrayRef<OverloadChoice> partitionSIMDOperators(
+                                  ArrayRef<OverloadChoice> choices,
+                                  SmallVectorImpl<OverloadChoice> &scratch) {
+  // If the first element isn't an operator, none of them are.
+  if (!choices[0].isDecl() ||
+      !isa<FuncDecl>(choices[0].getDecl()) ||
+      !cast<FuncDecl>(choices[0].getDecl())->isOperator() ||
+      choices[0].getDecl()->getASTContext().LangOpts
+        .SolverEnableOperatorDesignatedTypes)
+    return choices;
+
+  // Check whether we have any SIMD operators.
+  bool foundSIMDOperator = false;
+  for (const auto &choice : choices) {
+    if (isSIMDOperator(choice.getDecl())) {
+      foundSIMDOperator = true;
+      break;
+    }
+  }
+
+  if (!foundSIMDOperator)
+    return choices;
+
+  scratch.assign(choices.begin(), choices.end());
+  std::stable_partition(scratch.begin(), scratch.end(),
+                        [](const OverloadChoice &choice) {
+                          return !isSIMDOperator(choice.getDecl());
+                        });
+
+  return scratch;
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1458,6 +1489,9 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
+
+  SmallVector<OverloadChoice, 4> scratchChoices;
+  choices = partitionSIMDOperators(choices, scratchChoices);
 
   SmallVector<Constraint *, 4> overloads;
   

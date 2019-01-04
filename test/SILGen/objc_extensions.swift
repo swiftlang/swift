@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_extensions -enable-sil-ownership -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_extensions -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -16,7 +16,7 @@ extension Sub {
 
     // Make sure that we are generating the @objc thunk and are calling the actual method.
     //
-    // CHECK-LABEL: sil hidden [thunk] @$s15objc_extensions3SubC4propSSSgvgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
+    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvgTo : $@convention(objc_method) (Sub) -> @autoreleased Optional<NSString> {
     // CHECK: bb0([[SELF:%.*]] : @unowned $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -27,7 +27,7 @@ extension Sub {
     // CHECK: } // end sil function '$s15objc_extensions3SubC4propSSSgvgTo'
 
     // Then check the body of the getter calls the super_method.
-    // CHECK-LABEL: sil hidden @$s15objc_extensions3SubC4propSSSgvg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String> {
+    // CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions3SubC4propSSSgvg : $@convention(method) (@guaranteed Sub) -> @owned Optional<String> {
     // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
     // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK: [[SELF_COPY_CAST:%.*]] = upcast [[SELF_COPY]] : $Sub to $Base
@@ -42,7 +42,7 @@ extension Sub {
 
     // Then check the setter @objc thunk.
     //
-    // CHECK-LABEL: sil hidden [thunk] @$s15objc_extensions3SubC4propSSSgvsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
+    // CHECK-LABEL: sil hidden [thunk] [ossa] @$s15objc_extensions3SubC4propSSSgvsTo : $@convention(objc_method) (Optional<NSString>, Sub) -> () {
     // CHECK: bb0([[NEW_VALUE:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Sub):
     // CHECK:   [[NEW_VALUE_COPY:%.*]] = copy_value [[NEW_VALUE]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Sub
@@ -59,7 +59,7 @@ extension Sub {
 
     // Then check the body of the actually setter value and make sure that we
     // call the didSet function.
-    // CHECK-LABEL: sil hidden @$s15objc_extensions3SubC4propSSSgvs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> () {
+    // CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions3SubC4propSSSgvs : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> () {
 
     // First we get the old value.
     // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $Optional<String>, [[SELF:%.*]] : @guaranteed $Sub):
@@ -105,7 +105,7 @@ extension Sub {
   @objc override func objCBaseMethod() {}
 }
 
-// CHECK-LABEL: sil hidden @$s15objc_extensions20testOverridePropertyyyAA3SubCF
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions20testOverridePropertyyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Sub):
   // CHECK: = objc_method [[ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String?) -> ()
@@ -114,10 +114,10 @@ func testOverrideProperty(_ obj: Sub) {
 
 testOverrideProperty(Sub())
 
-// CHECK-LABEL: sil shared [thunk] @$s15objc_extensions3SubC3fooyyFTc
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s15objc_extensions3SubC3fooyyFTc
 // CHECK:         function_ref @$s15objc_extensions3SubC3fooyyFTD
 // CHECK: } // end sil function '$s15objc_extensions3SubC3fooyyFTc'
-// CHECK:       sil shared [transparent] [serializable] [thunk] @$s15objc_extensions3SubC3fooyyFTD
+// CHECK:       sil shared [transparent] [serializable] [thunk] [ossa] @$s15objc_extensions3SubC3fooyyFTD
 // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Sub):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:         objc_method [[SELF_COPY]] : $Sub, #Sub.foo!1.foreign
@@ -134,7 +134,7 @@ extension Sub {
 }
 
 class SubSub : Sub {
-  // CHECK-LABEL: sil hidden @$s15objc_extensions03SubC0C14objCBaseMethodyyF :
+  // CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions03SubC0C14objCBaseMethodyyF :
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $SubSub):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[UPCAST_SELF_COPY:%.*]] = upcast [[SELF_COPY]] : $SubSub to $Sub
@@ -149,7 +149,7 @@ class SubSub : Sub {
 }
 
 extension SubSub {
-  // CHECK-LABEL: sil hidden @$s15objc_extensions03SubC0C9otherPropSSvs
+  // CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions03SubC0C9otherPropSSvs
   // CHECK: bb0([[NEW_VALUE:%.*]] : @owned $String, [[SELF:%.*]] : @guaranteed $SubSub):
   // CHECK:   [[SELF_COPY_1:%.*]] = copy_value [[SELF]]
   // CHECK:   [[UPCAST_SELF_COPY_1:%.*]] = upcast [[SELF_COPY_1]] : $SubSub to $Sub
@@ -177,7 +177,7 @@ extension Base {
   fileprivate static var x = 1
 }
 
-// CHECK-LABEL: sil hidden @$s15objc_extensions19testStaticVarAccessyyF
+// CHECK-LABEL: sil hidden [ossa] @$s15objc_extensions19testStaticVarAccessyyF
 func testStaticVarAccess() {
   // CHECK: [[F:%.*]] = function_ref @$sSo4BaseC15objc_extensionsE1x33_1F05E59585E0BB585FCA206FBFF1A92DLLSivau
   // CHECK: [[PTR:%.*]] = apply [[F]]()

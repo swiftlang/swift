@@ -330,15 +330,19 @@ class BenchmarkDoctor(object):
         super(BenchmarkDoctor, self).__init__()
         self.driver = driver or BenchmarkDriver(args)
         self.results = {}
-        self.console_handler = logging.StreamHandler(sys.stdout)
-        self.console_handler.setLevel(logging.DEBUG if args.verbose else
-                                      logging.INFO)
-        self.console_handler.setFormatter(
-            LoggingReportFormatter(use_color=sys.stdout.isatty()))
+
+        if hasattr(args, 'markdown') and args.markdown:
+            self.console_handler = MarkdownReportHandler(sys.stdout)
+        else:
+            self.console_handler = logging.StreamHandler(sys.stdout)
+            self.console_handler.setFormatter(
+                LoggingReportFormatter(use_color=sys.stdout.isatty()))
+            self.console_handler.setLevel(logging.DEBUG if args.verbose else
+                                          logging.INFO)
         self.log.addHandler(self.console_handler)
         self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
         self.requirements = [
-            self._name_matches_capital_words_convention,
+            self._name_matches_benchmark_naming_convention,
             self._name_is_at_most_40_chars_long,
             self._no_setup_overhead,
             self._reasonable_setup_time,
@@ -350,21 +354,31 @@ class BenchmarkDoctor(object):
         """Close log handlers on exit."""
         for handler in list(self.log.handlers):
             handler.close()
+        self.log.removeHandler(self.console_handler)
 
-    capital_words_re = re.compile('[A-Z][a-zA-Z0-9]+')
+    benchmark_naming_convention_re = re.compile(r'[A-Z][a-zA-Z0-9\-.!?]+')
+    camel_humps_re = re.compile(r'[a-z][A-Z]')
 
     @staticmethod
-    def _name_matches_capital_words_convention(measurements):
+    def _name_matches_benchmark_naming_convention(measurements):
         name = measurements['name']
-        match = BenchmarkDoctor.capital_words_re.match(name)
+        match = BenchmarkDoctor.benchmark_naming_convention_re.match(name)
         matched = match.group(0) if match else ''
+        composite_words = len(BenchmarkDoctor.camel_humps_re.findall(name)) + 1
 
         if name != matched:
             BenchmarkDoctor.log_naming.error(
-                "'%s' name doesn't conform to UpperCamelCase convention.",
+                "'%s' name doesn't conform to benchmark naming convention.",
                 name)
             BenchmarkDoctor.log_naming.info(
-                'See http://bit.ly/UpperCamelCase')
+                'See http://bit.ly/BenchmarkNaming')
+
+        if composite_words > 4:
+            BenchmarkDoctor.log_naming.warning(
+                "'%s' name is composed of %d words.", name, composite_words)
+            BenchmarkDoctor.log_naming.info(
+                "Split '%s' name into dot-separated groups and variants. "
+                "See http://bit.ly/BenchmarkNaming", name)
 
     @staticmethod
     def _name_is_at_most_40_chars_long(measurements):
@@ -694,9 +708,13 @@ def parse_args(args):
         'check',
         help='',
         parents=[shared_benchmarks_parser])
-    check_parser.add_argument(
+    check_group = check_parser.add_mutually_exclusive_group()
+    check_group.add_argument(
         '-v', '--verbose', action='store_true',
-        help='show more details during benchmark analysis',)
+        help='show more details during benchmark analysis')
+    check_group.add_argument(
+        '-md', '--markdown', action='store_true',
+        help='format report as Markdown table')
     check_parser.set_defaults(func=BenchmarkDoctor.run_check)
 
     compare_parser = subparsers.add_parser(

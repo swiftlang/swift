@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_dictionary_bridging -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_dictionary_bridging %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -11,7 +11,7 @@ import gizmo
 
 @objc class Foo : NSObject {
   // Bridging dictionary parameters
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
   @objc func bridge_Dictionary_param(_ dict: Dictionary<Foo, Foo>) {
     // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
@@ -31,7 +31,7 @@ import gizmo
   // CHECK: } // end sil function '$s24objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}FTo'
 
   // Bridging dictionary results
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   @objc func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -53,7 +53,7 @@ import gizmo
   @objc var property: Dictionary<Foo, Foo> = [:]
 
   // Property getter
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   //                                 @$s24objc_dictionary_bridging3FooC8propertySDyA2CSo8NSObjectCSH10Foundationg_Gvpfi
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -71,7 +71,7 @@ import gizmo
   // CHECK: } // end sil function
 
   // Property setter
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
   // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -87,9 +87,9 @@ import gizmo
   // CHECK:   destroy_value [[SELF_COPY]]
   // CHECK:   return [[RESULT]] : $()
 
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
 
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] [ossa] @$s24objc_dictionary_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
   @objc var nonVerbatimProperty: Dictionary<String, Int> = [:]
 }
 

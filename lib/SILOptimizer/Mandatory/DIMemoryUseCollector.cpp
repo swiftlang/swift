@@ -1,8 +1,8 @@
-//===--- DIMemoryUseCollectorOwnership.cpp - Memory use analysis for DI ---===//
+//===--- DIMemoryUseCollector.cpp -----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollectorOwnership.h"
+#include "DIMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -20,10 +20,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
-
-#ifdef SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
-#error "Included non ownership header?!"
-#endif
 
 using namespace swift;
 using namespace ownership;

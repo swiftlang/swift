@@ -458,7 +458,7 @@ protected:
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
-  NodePointer popProtocolConformanceRef();
+  NodePointer demangleRetroactiveProtocolConformanceRef();
   NodePointer popAnyProtocolConformance();
   NodePointer demangleConcreteProtocolConformance();
   NodePointer popDependentProtocolConformance();

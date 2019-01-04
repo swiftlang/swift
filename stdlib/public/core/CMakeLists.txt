@@ -30,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
+  AtomicInt.swift.gyb
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
@@ -116,6 +117,7 @@ set(SWIFTLIB_ESSENTIAL
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
+  Result.swift
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
@@ -218,7 +220,7 @@ set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
@@ -236,24 +238,21 @@ else()
   #set(LINK_FLAGS
   #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
   if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-    list(APPEND swift_core_private_link_libraries
-      ICU_UC ICU_I18N)
+    list(APPEND swift_core_private_link_libraries ICU_UC ICU_I18N)
   else()
     list(APPEND swift_core_private_link_libraries -licui18nswift -licuucswift -licudataswift)
   endif()
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
-      OUTPUT_VARIABLE ENV_SYSTEMROOT)
-
-  list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
+  # TODO(compnerd) cache this variable to permit re-configuration
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}" OUTPUT_VARIABLE ENV_SYSTEMROOT)
+  list(APPEND swift_core_private_link_libraries "${ENV_SYSTEMROOT}/system32/psapi.dll")
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
   find_library(EXECINFO_LIBRARY execinfo)
-  list(APPEND swift_core_private_link_libraries
-      ${EXECINFO_LIBRARY})
+  list(APPEND swift_core_private_link_libraries ${EXECINFO_LIBRARY})
 endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
@@ -278,8 +277,12 @@ endif()
 
 
 set(shared_only_libs)
-if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
+if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
+endif()
+
+if(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
+  list(APPEND swift_core_private_link_libraries shell32)
 endif()
 
 add_swift_target_library(swiftCore

@@ -561,7 +561,7 @@ public:
 
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
-    if (BB->getParent()->hasQualifiedOwnership()) {
+    if (BB->getParent()->hasOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
@@ -2344,6 +2344,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // this attribute.
   if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
     OS << "[canonical] ";
+
+  // If this function is not an external declaration /and/ is in ownership ssa
+  // form, print [ossa].
+  if (!isExternalDeclaration() && hasOwnership())
+    OS << "[ossa] ";
 
   printName(OS);
   OS << " : $";

@@ -1294,7 +1294,9 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   // FIXME: we should really have stronger invariants than this.  Leaving it
   // unwrapped may expose both expressions to naive walkers
   if (wasInitializerChecked) {
+    auto initType = InitValue->getType();
     InitValue = new (Ctx) LazyInitializerExpr(InitValue);
+    InitValue->setType(initType);
   }
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
@@ -1811,7 +1813,6 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
                                              SourceLoc(),
                                              ArrayRef<RequirementRepr>(),
                                              SourceLoc());
-    genericParams->setOuterParameters(classDecl->getGenericParamsOfContext());
 
     // Build a generic signature for the derived class initializer.
     GenericSignatureBuilder builder(ctx);

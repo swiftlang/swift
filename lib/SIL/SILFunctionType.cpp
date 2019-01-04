@@ -865,15 +865,17 @@ static void destructureYieldsForCoroutine(SILModule &M,
                          .getReferenceStorageReferentType();
 
   auto storage = accessor->getStorage();
-  auto valueType = storage->getValueInterfaceType()
-                          ->getReferenceStorageReferent();
+  auto valueType = storage->getValueInterfaceType();
   if (reqtSubs) {
     valueType = valueType.subst(*reqtSubs);
   }
 
+  auto canValueType = valueType->getCanonicalType(
+    accessor->getGenericSignature());
+
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
-    auto loweredValueTy = M.Types.getLoweredType(origType, valueType);
+    auto loweredValueTy = M.Types.getLoweredType(origType, canValueType);
     yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
                                   ParameterConvention::Indirect_Inout));
     return;
@@ -882,8 +884,7 @@ static void destructureYieldsForCoroutine(SILModule &M,
   // 'read' yields a borrowed value of the target type, destructuring
   // tuples as necessary.
   assert(accessor->getAccessorKind() == AccessorKind::Read);
-  destructureYieldsForReadAccessor(M, origType, valueType->getCanonicalType(),
-                                   yields);
+  destructureYieldsForReadAccessor(M, origType, canValueType, yields);
 }
 
 /// Create the appropriate SIL function type for the given formal type
@@ -2713,7 +2714,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   // Build the curried function type.
   auto inner =
     CanFunctionType::get(llvm::makeArrayRef(bridgedParams),
-                         bridgedResultType);
+                         bridgedResultType, innerExtInfo);
 
   auto curried =
     CanAnyFunctionType::get(genericSig, {selfParam}, inner, extInfo);

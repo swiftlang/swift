@@ -206,9 +206,10 @@ namespace driver {
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
 
-    /// Jobs in the initial set with Condition::Always, or lacking existing
+    /// Jobs in the initial set with Condition::Always, and having an existing
     /// .swiftdeps files.
-    SmallVector<const Job *, 16> InitialOutOfDateCommands;
+    /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
+    SmallVector<const Job *, 16> InitialCascadingCommands;
 
     /// Dependency graph for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
@@ -382,7 +383,7 @@ namespace driver {
       DeferredCommands.clear();
     }
 
-    /// Helper that attmepts to reload a job's .swiftdeps file after the job
+    /// Helper that attempts to reload a job's .swiftdeps file after the job
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
@@ -406,6 +407,13 @@ namespace driver {
         // If we have a dependency file /and/ the frontend task exited normally,
         // we can be discerning about what downstream files to rebuild.
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
+          // "Marked" means that everything provided by this node (i.e. Job) is
+          // dirty. Thus any file using any of these provides must be
+          // recompiled. (Only non-private entities are output as provides.) In
+          // other words, this Job "cascades"; the need to recompile it causes
+          // other recompilations. It is possible that the current code marks
+          // things that do not need to be marked. Unecessary compilation would
+          // result if that were the case.
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
           switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
@@ -715,7 +723,15 @@ namespace driver {
         switch (Condition) {
         case Job::Condition::Always:
           if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
-            InitialOutOfDateCommands.push_back(Cmd);
+            // Ensure dependents will get recompiled.
+            InitialCascadingCommands.push_back(Cmd);
+            // Mark this job as cascading.
+            //
+            // It would probably be safe and simpler to markTransitive on the
+            // start nodes in the "Always" condition from the start instead of
+            // using markIntransitive and having later functions call
+            // markTransitive. That way markIntransitive would be an
+            // implementation detail of DependencyGraph.
             DepGraph.markIntransitive(Cmd);
           }
           LLVM_FALLTHROUGH;
@@ -740,7 +756,7 @@ namespace driver {
         // We scheduled all of the files that have actually changed. Now add the
         // files that haven't changed, so that they'll get built in parallel if
         // possible and after the first set of files if it's not.
-        for (auto *Cmd : InitialOutOfDateCommands) {
+        for (auto *Cmd : InitialCascadingCommands) {
           DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
                                   IncrementalTracer);
         }

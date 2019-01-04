@@ -65,10 +65,7 @@ public:
                                 BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
-    auto &P = Parser->getParser();
-    for (bool Done = false; !Done; Done = P.Tok.is(tok::eof)) {
-      P.parseTopLevel();
-    }
+    Parser->parse();
   }
 
   std::pair<LineRange, std::string> reformat(LineRange Range,

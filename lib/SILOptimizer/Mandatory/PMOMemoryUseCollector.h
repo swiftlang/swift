@@ -70,9 +70,9 @@ class SILBuilder;
 /// not super.init() has been called or not.
 class PMOMemoryObjectInfo {
 public:
-  /// This is the instruction that represents the memory.  It is either an
-  /// allocation (alloc_box, alloc_stack) or a mark_uninitialized.
-  SingleValueInstruction *MemoryInst;
+  /// This is the instruction that represents the memory. It is either an
+  /// alloc_box or alloc_stack.
+  AllocationInst *MemoryInst;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
@@ -87,7 +87,7 @@ public:
   unsigned NumElements;
 
 public:
-  PMOMemoryObjectInfo(SingleValueInstruction *MemoryInst);
+  PMOMemoryObjectInfo(AllocationInst *MemoryInst);
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
@@ -155,13 +155,6 @@ enum PMOUseKind {
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
-
-  /// This instruction is a call to 'super.init' in a 'self' initializer of a
-  /// derived class.
-  SuperInit,
-
-  /// This instruction is a call to 'self.init' in a delegating initializer.
-  SelfInit
 };
 
 /// This struct represents a single classified access to the memory object

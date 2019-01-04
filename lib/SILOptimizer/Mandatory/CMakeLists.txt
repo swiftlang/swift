@@ -4,7 +4,7 @@ silopt_register_sources(
   AddressLowering.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
-  DIMemoryUseCollectorOwnership.cpp
+  DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
   DiagnoseStaticExclusivity.cpp

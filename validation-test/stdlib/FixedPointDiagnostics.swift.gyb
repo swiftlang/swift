@@ -36,7 +36,7 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   _ = UInt16(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   _ = UInt32(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   UInt64(truncatingBitPattern: UInt(0)) // expected-error {{incorrect argument label in call (have 'truncatingBitPattern:', expected '_truncatingBits:')}}
-  UInt(truncatingBitPattern: UInt(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt)'}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: (truncatingBitPattern: UInt64), (truncatingBitPattern: Int64)}}
+  UInt(truncatingBitPattern: UInt(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt)'}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: (truncatingBitPattern: Int64), (truncatingBitPattern: UInt64)}}
 
   _ = Int8(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   _ = Int16(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}

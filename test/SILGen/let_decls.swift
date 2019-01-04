@@ -1,11 +1,11 @@
 
-// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
 // Let decls don't get boxes for trivial types.
 //
-// CHECK-LABEL: sil hidden @{{.*}}test1
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test1
 func test1(_ a : Int) -> Int {
   // CHECK-NOT: alloc_box
   let (b,c) = (a, 32)
@@ -24,7 +24,7 @@ func let_destructuring() -> Int {
 
 // Let decls being closed over.
 //
-// CHECK-LABEL: sil hidden @{{.*}}test2
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test2
 func test2() {
   // No allocations.
   // CHECK-NOT: alloc_box
@@ -40,7 +40,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil private @$s9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
+// CHECK: sil private [ossa] @$s9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : $Int):
 // CHECK:  return %0 : $Int
 
@@ -62,7 +62,7 @@ func useAString(_ a : String) {}
 // rdar://15689514 - Verify that the cleanup for the let decl runs at the end of
 // the 'let' lifetime, not at the end of the initializing expression.
 //
-// CHECK-LABEL: sil hidden @{{.*}}test3
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test3
 func test3() {
   // CHECK: [[GETFN:%[0-9]+]] = function_ref{{.*}}getAString
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
@@ -89,7 +89,7 @@ struct AddressOnlyStruct<T> {
 
 func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 
-// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyStructString
 // CHECK: bb0([[FUNC_ARG:%.*]] : $*T):
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
@@ -104,7 +104,7 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
   // CHECK: return [[STRVAL]]
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructElt
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyStructElt
 func testAddressOnlyStructElt<T>(_ a : T) -> T {
   return produceAddressOnlyStruct(a).elt
   // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
@@ -120,7 +120,7 @@ func testAddressOnlyStructElt<T>(_ a : T) -> T {
 
 // rdar://15717123 - let decls of address-only type.
 
-// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyLet
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyLet
 func testAddressOnlyLet<T>(_ a : T) {
   let x = produceAddressOnlyStruct(a)
 }
@@ -128,7 +128,7 @@ func testAddressOnlyLet<T>(_ a : T) {
 
 func produceSubscriptableRValue() -> [String] {}
 
-// CHECK-LABEL: sil hidden @{{.*}}subscriptRValue
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}subscriptRValue
 func subscriptRValue() {
   var a = produceSubscriptableRValue()[0]
 }
@@ -140,7 +140,7 @@ struct GetOnlySubscriptStruct {
 }
 
 
-// CHECK-LABEL: sil hidden @{{.*}}testGetOnlySubscript
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testGetOnlySubscript
 func testGetOnlySubscript(_ x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
   
@@ -161,7 +161,7 @@ struct CloseOverAddressOnlyConstant<T> {
   
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}callThroughLet
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}callThroughLet
 func callThroughLet(_ predicate: @escaping (Int, Int) -> Bool) {
   let p = predicate
   if p(1, 2) {
@@ -181,7 +181,7 @@ struct GenericTestStruct<T> {
    }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}pass_address_only_rvalue_result
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}pass_address_only_rvalue_result
 // CHECK: bb0(%0 : $*T,
 // CHECK: [[FN:%[0-9]+]] = function_ref @{{.*}}GenericTestStructV{{.*}}ig
 // CHECK: apply [[FN]]<T>(%0,
@@ -198,7 +198,7 @@ struct NonMutableSubscriptable {
 func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 
 
-// CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_get
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test_nm_subscript_get
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
@@ -209,7 +209,7 @@ func test_nm_subscript_get(_ a : Int) -> Int {
   return produceNMSubscriptableRValue()[a]
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}test_nm_subscript_set
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test_nm_subscript_set
 // CHECK: bb0(%0 : $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
@@ -229,7 +229,7 @@ struct WeirdPropertyTest {
   }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}test_weird_property
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test_weird_property
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
@@ -252,7 +252,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 }
 
 
-// CHECK-LABEL: sil hidden @{{.*}}generic_identity
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}generic_identity
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
 // CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
@@ -267,7 +267,7 @@ struct StaticLetMember {
   static let x = 5
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testStaticLetMember
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testStaticLetMember
 func testStaticLetMember() -> Int {
 
   // CHECK: function_ref @{{.*}}StaticLetMemberV1xSi
@@ -283,7 +283,7 @@ protocol SimpleProtocol {
 // Verify that no temporaries+copies are produced when calling non-@mutable
 // methods on protocol and archetypes calls.
 
-// CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetProtocolBases
 // CHECK: bb0(%0 : $*SimpleProtocol):
 func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
@@ -302,7 +302,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetArchetypeBases
 // CHECK: bb0(%0 : $*T):
 func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   // CHECK-NEXT: debug_value_addr
@@ -318,7 +318,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   // CHECK-NEXT: return
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testDebugValue
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testDebugValue
 // CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int, let, name "a"
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol, let, name "b"
@@ -337,7 +337,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 }
 
 
-// CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
@@ -359,14 +359,14 @@ struct GenericFunctionStruct<T, U> {
 }
 
 
-// CHECK-LABEL: sil hidden @{{.*}}member_ref_abstraction_change
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}member_ref_abstraction_change
 // CHECK: function_ref reabstraction thunk helper
 // CHECK: return
 func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int) -> Int {
   return x.f
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}call_auto_closure
 // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
 // CHECK:   apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> Bool
 // CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
@@ -393,7 +393,7 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden [ossa] @$s9let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
   // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
@@ -405,7 +405,7 @@ struct StructMemberTest {
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden [ossa] @$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
@@ -416,7 +416,7 @@ struct StructMemberTest {
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
-  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden [ossa] @$s9let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -433,7 +433,7 @@ struct GenericStruct<T> {
   func getA() -> T {
     return a
   }
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}GenericStructV4getA{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> @out T
   // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
@@ -445,7 +445,7 @@ struct GenericStruct<T> {
     return b
   }
   
-  // CHECK-LABEL: sil hidden @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
+  // CHECK-LABEL: sil hidden [ossa] @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self"
   // CHECK-NEXT: [[PROJ_ADDR:%.*]] = struct_element_addr [[SELF_ADDR]] : $*GenericStruct<T>, #GenericStruct.b
@@ -460,7 +460,7 @@ struct LetPropertyStruct {
   let lp : Int
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}testLetPropertyAccessOnLValueBase
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
@@ -478,7 +478,7 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
-// CHECK-LABEL: sil hidden @$s9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
+// CHECK-LABEL: sil hidden [ossa] @$s9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
 // CHECK: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @$s9let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg

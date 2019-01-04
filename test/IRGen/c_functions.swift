@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix %target-cpu
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix %target-cpu
 
 // This is deliberately not a SIL test so that we can test SILGen too.
 

@@ -1,4 +1,4 @@
-// RUN: %swift -assume-parsing-unqualified-ownership-sil -module-name bridge_object -emit-ir -target arm64-apple-ios8.0 %s | %FileCheck %s
+// RUN: %swift -module-name bridge_object -emit-ir -target arm64-apple-ios8.0 %s | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=AArch64
 

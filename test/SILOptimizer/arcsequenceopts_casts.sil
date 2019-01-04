@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | %FileCheck %s
 
 import Builtin
 

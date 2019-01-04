@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
+// RUN: %target-sil-opt -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
 
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)

@@ -121,24 +121,27 @@ public:
   // flags of the field types can be mostly bitwise-or'ed together to derive the
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
-  enum : int_type {
+  enum : uint32_t {
     AlignmentMask =       0x000000FF,
+    // unused             0x0000FF00,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
-    HasExtraInhabitants = 0x00040000,
+    // unused             0x00040000,
     HasSpareBits =        0x00080000,
     IsNonBitwiseTakable = 0x00100000,
     HasEnumWitnesses =    0x00200000,
     Incomplete =          0x00400000,
-
-    // Everything else is reserved.
+    // unused             0xFF800000,
   };
 
+  static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
+
 private:
-  int_type Data;
+  uint32_t Data;
+
+  explicit constexpr TargetValueWitnessFlags(uint32_t data) : Data(data) {}
 
 public:
-  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this
@@ -192,21 +195,11 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+
   /// True if this type's binary representation is that of an enum, and the
   /// enum value witness table entries are available in this type's value
   /// witness table.
   bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr TargetValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return TargetValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
   constexpr TargetValueWitnessFlags
   withEnumWitnesses(bool hasEnumWitnesses) const {
     return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
@@ -223,43 +216,11 @@ public:
                                    (isIncomplete ? Incomplete : 0));
   }
 
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetValueWitnessFlags getFromOpaqueValue(int_type data) {
-    return TargetValueWitnessFlags(data);
+  constexpr uint32_t getOpaqueValue() const {
+    return Data;
   }
 };
 using ValueWitnessFlags = TargetValueWitnessFlags<size_t>;
-
-/// Flags stored in a value-witness table with extra inhabitants.
-template <typename int_type>
-class TargetExtraInhabitantFlags {
-public:
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-    ExtraInhabitantFlags
-  };
-  int_type Data;
-
-  constexpr TargetExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr TargetExtraInhabitantFlags() : Data(0) {}
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-
-  constexpr TargetExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return TargetExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                      numExtraInhabitants);
-  }
-
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetExtraInhabitantFlags getFromOpaqueValue(int_type data){
-    return TargetExtraInhabitantFlags(data);
-  }
-};
-using ExtraInhabitantFlags =
-  TargetExtraInhabitantFlags<size_t>;
 
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {

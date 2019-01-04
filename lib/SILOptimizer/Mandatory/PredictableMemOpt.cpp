@@ -1250,9 +1250,6 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case PMOUseKind::SelfInit:
-    case PMOUseKind::SuperInit:
-      llvm_unreachable("Can't happen on allocations");
     case PMOUseKind::Assign:
     case PMOUseKind::PartialStore:
     case PMOUseKind::InitOrAssign:
@@ -1285,7 +1282,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
   if (!MemoryType.isTrivial(Module)) {
     for (auto P : llvm::enumerate(Releases)) {
       auto *R = P.value();
-      if (R == nullptr || isa<DeallocStackInst>(R) || isa<DeallocBoxInst>(R))
+      if (R == nullptr)
         continue;
 
       // We stash all of the destroy_addr that we see.

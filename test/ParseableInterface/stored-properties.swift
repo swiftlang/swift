@@ -52,6 +52,15 @@ public struct HasStoredProperties {
   // CHECK: private var _: [[BOOL]]
   private var privateVar: Bool
 
+  // CHECK: @_hasStorage @_hasInitialValue public var storedWithObserversInitialValue: [[INT]] {
+  // RESILIENT: {{^}}  public var storedWithObserversInitialValue: [[INT]] {
+  // COMMON-NEXT: get
+  // COMMON-NEXT: set
+  // COMMON-NEXT: }
+  public var storedWithObserversInitialValue: Int = 0 {
+    didSet {}
+  }
+
   // COMMON: public init(){{$}}
   public init() {
     self.simpleStoredImmutable = 0

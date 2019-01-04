@@ -7,10 +7,10 @@ case b(Any)
 case c(Any)
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only8takesAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only8takesAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> ()
 func takesAny(_ x: Any) {}
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only0B9LabelsLet1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only0B9LabelsLet1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func multipleLabelsLet(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
@@ -62,7 +62,7 @@ func multipleLabelsLet(e: E) {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only0B9LabelsVar1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only0B9LabelsVar1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func multipleLabelsVar(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
@@ -123,7 +123,7 @@ func multipleLabelsVar(e: E) {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only20fallthroughWithValue1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only20fallthroughWithValue1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func fallthroughWithValue(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any

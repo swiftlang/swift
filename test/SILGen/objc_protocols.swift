@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -25,7 +25,7 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : @guaranteed $T):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : {{\$.*}},  #NSRuncing.runce!1.foreign
@@ -41,7 +41,7 @@ func objc_generic<T : NSRuncing>(_ x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> () {
 func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
   // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1:\$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTcTO]] :
@@ -63,7 +63,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 }
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
 
-// CHECK: sil shared [serializable] [thunk] @[[THUNK1]] :
+// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK1]] :
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1_THUNK:\$s14objc_protocols9NSRuncingP5runceSo8NSObjectCyFTO]] :
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -71,7 +71,7 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK1]]'
 
-// CHECK: sil shared [serializable] [thunk] @[[THUNK1_THUNK]]
+// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK1_THUNK]]
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $Self):
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[FN:%.*]] = objc_method [[SELF_COPY]] : $Self, #NSRuncing.runce!1.foreign
@@ -80,20 +80,20 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK1_THUNK]]'
 
-// CHECK: sil shared [serializable] [thunk] @[[THUNK2]] :
+// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK2]] :
 // CHECK:   [[FN:%.*]] = function_ref @[[THUNK2_THUNK:\$s14objc_protocols9NSRuncingP5minceSo8NSObjectCyFZTO]]
 // CHECK:   [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]]<Self>(%0)
 // CHECK:   return [[METHOD]]
 // CHECK: } // end sil function '[[THUNK2]]'
 
-// CHECK: sil shared [serializable] [thunk] @[[THUNK2_THUNK]] :
+// CHECK: sil shared [serializable] [thunk] [ossa] @[[THUNK2_THUNK]] :
 // CHECK:      [[METATYPE:%.*]] = thick_to_objc_metatype %0
 // CHECK:      [[FN:%.*]] = objc_method [[METATYPE]] : $@objc_metatype Self.Type, #NSRuncing.mince!1.foreign
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Self>([[METATYPE]])
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function '[[THUNK2_THUNK]]'
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A9_protocol{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : @guaranteed $NSRuncing):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[THIS1:%.*]] = open_existential_ref [[THIS]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
@@ -111,7 +111,7 @@ func objc_protocol(_ x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
 }
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@guaranteed NSRuncing) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF : $@convention(thin) (@guaranteed NSRuncing) -> () {
 func objc_protocol_partial_apply(_ x: NSRuncing) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NSRuncing):
   // CHECK:   [[OPENED_ARG:%.*]] = open_existential_ref [[ARG]] : $NSRuncing to $[[OPENED:@opened(.*) NSRuncing]]
@@ -126,7 +126,7 @@ func objc_protocol_partial_apply(_ x: NSRuncing) {
 }
 // CHECK : } // end sil function '$s14objc_protocols0A23_protocol_partial_applyyyAA9NSRuncing_pF'
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols0A21_protocol_composition{{[_0-9a-zA-Z]*}}F
 func objc_protocol_composition(_ x: NSRuncing & NSFunging) {
   // CHECK: [[THIS:%.*]] = open_existential_ref [[THIS_ORIG:%.*]] : $NSFunging & NSRuncing to $[[OPENED:@opened(.*) NSFunging & NSRuncing]]
   // CHECK: [[METHOD:%.*]] = objc_method [[THIS]] : $[[OPENED]], #NSRuncing.runce!1.foreign
@@ -157,11 +157,11 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
-// CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3FooC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-NOT: sil hidden [ossa] @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
 
@@ -172,9 +172,9 @@ extension Bar : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC5runce{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3BarC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -184,8 +184,8 @@ extension Bas : NSRuncing {
   @objc static func mince() -> NSObject { return NSObject() }
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E11copyRuncing{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas0C0C0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- Inherited objc protocols
 
@@ -196,8 +196,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3ZimC5funge{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols3ZimC3foo{{[_0-9a-zA-Z]*}}FTo
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -205,7 +205,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @$s18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s18objc_protocols_Bas4ZangC0a1_B0E3foo{{[_0-9a-zA-Z]*}}FTo
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -219,14 +219,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] [thunk] @$s14objc_protocols19StoredPropertyCountC5countSivgTo
+// CHECK-LABEL: sil hidden [transparent] [thunk] [ossa] @$s14objc_protocols19StoredPropertyCountC5countSivgTo
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols21ComputedPropertyCountC5countSivgTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols21ComputedPropertyCountC5countSivgTo
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -247,7 +247,7 @@ extension InformallyFunging: NSFunging { }
   init(int: Int)
 }
 
-// CHECK-LABEL: sil hidden @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
+// CHECK-LABEL: sil hidden [ossa] @$s14objc_protocols28testInitializableExistential_1iAA0D0_pAaD_pXp_SitF : $@convention(thin) (@thick Initializable.Type, Int) -> @owned Initializable {
 func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializable {
   // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var Initializable }
@@ -271,7 +271,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols22InitializableConformerC{{[_0-9a-zA-Z]*}}fcTo
 
 final class InitializableConformerByExtension {
   init() {}
@@ -282,7 +282,7 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden [thunk] @$s14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
+// CHECK-LABEL: sil hidden [thunk] [ossa] @$s14objc_protocols33InitializableConformerByExtensionC{{[_0-9a-zA-Z]*}}fcTo
 
 // Make sure we're crashing from trying to use materializeForSet here.
 @objc protocol SelectionItem {
@@ -301,7 +301,7 @@ public protocol DangerousEscaper {
 
 // Make sure we emit an withoutActuallyEscaping sentinel.
 
-// CHECK-LABEL: sil @$s14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
+// CHECK-LABEL: sil [ossa] @$s14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
 // CHECK: bb0([[CLOSURE_ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (), [[SELF:%.*]] : @guaranteed $DangerousEscaper):
 // CHECK:  [[OE:%.*]] = open_existential_ref [[SELF]]
 // CHECK:  [[CLOSURE_COPY1:%.*]]  = copy_value [[CLOSURE_ARG]]

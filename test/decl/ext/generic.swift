@@ -18,11 +18,19 @@ extension Double : P2 {
   typealias AssocType = Double
 }
 
-extension X<Int, Double, String> { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+extension X<Int, Double, String> {
+// expected-error@-1{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+  let x = 0
+  // expected-error@-1 {{extensions must not contain stored properties}}
+  static let x = 0
+  // expected-error@-1 {{static stored properties not supported in generic types}}
+  func f() -> Int {}
+  class C<T> {}
+}
 
 typealias GGG = X<Int, Double, String>
 
-extension GGG { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+extension GGG { } // okay through a typealias
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
@@ -202,3 +210,16 @@ extension A.B.D {
   func g() { }
 }
 
+// rdar://problem/43955962
+struct OldGeneric<T> {}
+typealias NewGeneric<T> = OldGeneric<T>
+
+extension NewGeneric {
+  static func oldMember() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember() -> NewGeneric {
+    return NewGeneric()
+  }
+}

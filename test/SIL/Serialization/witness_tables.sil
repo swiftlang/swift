@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -module-name witness_tables -emit-module -o - %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name witness_tables | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -module-name witness_tables -emit-module -o - %s | %target-sil-opt -module-name witness_tables | %FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()

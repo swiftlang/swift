@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %S/../IDE/Inputs/custom-modules %s -enable-objc-interop -sdk %S/Inputs 2>&1 | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-emit-silgen -I %S/../IDE/Inputs/custom-modules %s -enable-objc-interop -sdk %S/Inputs 2>&1 | %FileCheck --check-prefix=SIL %s
 
 import ImportAsMember.C
 

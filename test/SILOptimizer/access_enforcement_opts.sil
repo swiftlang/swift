@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 

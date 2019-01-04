@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenericSignatureBuilderImpl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -667,11 +668,17 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
         !isa<DependentMemberType>(component))
       return None;
 
-    // Find the equivalence class for this dependent member type.
-    auto equivClass =
-      builder.resolveEquivalenceClass(
-                               Type(component),
-                               ArchetypeResolutionKind::CompleteWellFormed);
+    // Find the equivalence class for this dependent type.
+    auto resolved = builder.maybeResolveEquivalenceClass(
+                      Type(component),
+                      ArchetypeResolutionKind::CompleteWellFormed,
+                      /*wantExactPotentialArchetype=*/false);
+    if (!resolved) return None;
+
+    if (auto concrete = resolved.getAsConcreteType())
+      return getCanonicalTypeInContext(concrete, builder);
+
+    auto equivClass = resolved.getEquivalenceClass(builder);
     if (!equivClass) return None;
 
     if (equivClass->concreteType) {

@@ -988,7 +988,7 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
-  return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
+  return classDecl->hasObjCMembers();
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has

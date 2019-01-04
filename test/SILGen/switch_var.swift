@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name switch_var %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -42,7 +42,7 @@ func aa(x x: (Int, Int)) {}
 func bb(x x: (Int, Int)) {}
 func cc(x x: (Int, Int)) {}
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B2_1yyF
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_1yyF
 func test_var_1() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch foo() {
@@ -60,7 +60,7 @@ func test_var_1() {
   b()
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B2_2yyF
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_2yyF
 func test_var_2() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch foo() {
@@ -110,7 +110,7 @@ func test_var_2() {
   d()
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B2_3yyF
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_3yyF
 func test_var_3() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   // CHECK:   function_ref @$s10switch_var3barSiyF
@@ -189,7 +189,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B2_41pyAA1P_p_tF
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_41pyAA1P_p_tF
 func test_var_4(p p: P) {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   switch (p, foo()) {
@@ -297,7 +297,7 @@ func test_var_4(p p: P) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B2_5yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B2_5yyF : $@convention(thin) () -> () {
 func test_var_5() {
   // CHECK:   function_ref @$s10switch_var3fooSiyF
   // CHECK:   function_ref @$s10switch_var3barSiyF
@@ -338,7 +338,7 @@ func test_var_5() {
   e()
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var05test_B7_returnyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var05test_B7_returnyyF : $@convention(thin) () -> () {
 func test_var_return() {
   switch (foo(), bar()) {
   case var x where runced():
@@ -385,7 +385,7 @@ func test_var_return() {
 
 // When all of the bindings in a column are immutable, don't emit a mutable
 // box. <rdar://problem/15873365>
-// CHECK-LABEL: sil hidden @$s10switch_var8test_letyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var8test_letyyF : $@convention(thin) () -> () {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
@@ -450,7 +450,7 @@ func test_let() {
 // CHECK: } // end sil function '$s10switch_var8test_letyyF'
 
 // If one of the bindings is a "var", allocate a box for the column.
-// CHECK-LABEL: sil hidden @$s10switch_var015test_mixed_let_B0yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var015test_mixed_let_B0yyF : $@convention(thin) () -> () {
 func test_mixed_let_var() {
   // CHECK: bb0:
   // CHECK:   [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
@@ -526,7 +526,7 @@ func test_mixed_let_var() {
 }
 // CHECK: } // end sil function '$s10switch_var015test_mixed_let_B0yyF'
 
-// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns1yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns1yyF : $@convention(thin) () -> () {
 func test_multiple_patterns1() {
   // CHECK:   function_ref @$s10switch_var6foobarSi_SityF
   switch foobar() {
@@ -552,7 +552,7 @@ func test_multiple_patterns1() {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
 func test_multiple_patterns2() {
   let t1 = 2
   let t2 = 4
@@ -588,7 +588,7 @@ enum Foo {
   case C(Int, Int, Double)
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns3yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns3yyF : $@convention(thin) () -> () {
 func test_multiple_patterns3() {
   let f = Foo.C(0, 1, 2.0)
   switch f {
@@ -618,7 +618,7 @@ enum Bar {
   case Z(Int, Foo)
 }
 
-// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns4yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns4yyF : $@convention(thin) () -> () {
 func test_multiple_patterns4() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
@@ -652,7 +652,7 @@ func test_multiple_patterns4() {
 
 func aaa(x x: inout Int) {}
 
-// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns5yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s10switch_var23test_multiple_patterns5yyF : $@convention(thin) () -> () {
 func test_multiple_patterns5() {
   let b = Bar.Y(.C(0, 1, 2.0), 3)
   switch b {
@@ -698,7 +698,7 @@ class C    {}
 class D: C {}
 func f(_: D) -> Bool { return true }
 
-// CHECK-LABEL: sil hidden @{{.*}}test_multiple_patterns_value_semantics
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test_multiple_patterns_value_semantics
 func test_multiple_patterns_value_semantics(_ y: C) {
   switch y {
     // CHECK:   checked_cast_br {{%.*}} : $C to $D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]

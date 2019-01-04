@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -Onone -Xllvm \
 // RUN:   -sil-print-after=allocbox-to-stack -Xllvm \
 // RUN:   -sil-print-only-functions=$s3red19ThrowAddrOnlyStructV016throwsOptionalToG0ACyxGSgSi_tcfC \
-// RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -Xllvm -sil-print-debuginfo -o %t -module-name red 2>&1 | %FileCheck %s
 
 // CHECK: bb5(%33 : @owned $Error):
 // CHECK:   dealloc_stack %6 : $*ThrowAddrOnlyStruct<T>, loc {{.*}}:27:68, scope 2

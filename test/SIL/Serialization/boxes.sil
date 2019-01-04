@@ -1,7 +1,7 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name boxes
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name boxes
+// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name boxes
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name boxes | %FileCheck %s
 
 sil_stage canonical
@@ -15,8 +15,8 @@ struct Q: P {}
 
 // TODO: Transform boxes by transforming their arguments, not as single-field,
 // so that they work as parameters in generic SIL functions.
-// CHECK-LABEL: sil hidden [serialized] @box_type_parsing : $@convention(thin) (
-sil hidden [serialized] @box_type_parsing : $@convention(thin) (
+// CHECK-LABEL: sil hidden [serialized] [ossa] @box_type_parsing : $@convention(thin) (
+sil hidden [serialized] [ossa] @box_type_parsing : $@convention(thin) (
   // CHECK: <τ_0_0> { var τ_0_0 } <F>,
   <B>{ var B }<F>,
   // CHECK: <τ_0_0 where τ_0_0 : P> { let τ_0_0 } <G>,
@@ -37,8 +37,8 @@ entry(%0 : @unowned $<E>{ var E }<F>, %1 : @unowned $<F: P>{ let F }<G>, %2 : @u
   unreachable
 }
 
-// CHECK-LABEL: sil hidden [serialized] @box_type_parsing_in_generic_function : $@convention(thin) <F, G where G : P> (
-sil hidden [serialized] @box_type_parsing_in_generic_function : $@convention(thin) <F, G: P> (
+// CHECK-LABEL: sil hidden [serialized] [ossa] @box_type_parsing_in_generic_function : $@convention(thin) <F, G where G : P> (
+sil hidden [serialized] [ossa] @box_type_parsing_in_generic_function : $@convention(thin) <F, G: P> (
   // CHECK: <τ_0_0> { var τ_0_0 } <F>,
   <B>{ var B }<F>,
   // CHECK: <τ_0_0 where τ_0_0 : P> { let τ_0_0 } <G>,
@@ -59,8 +59,8 @@ entry(%0 : @unowned $<E>{ var E }<F>, %1 : @unowned $<F: P>{ let F }<G>, %2 : @u
   unreachable
 }
 
-// CHECK-LABEL: sil hidden [serialized] @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
-sil hidden [serialized] @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
+// CHECK-LABEL: sil hidden [serialized] [ossa] @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
+sil hidden [serialized] [ossa] @same_generic_param_name_in_multiple_box_signatures : $@convention(thin) (
   // CHECK: <τ_0_0> { var τ_0_0 } <Int>,
   <A> { var A } <Int>,
   // CHECK: <τ_0_0> { var τ_0_0 } <String>
@@ -71,8 +71,8 @@ entry(%0 : @unowned $<A> { var A } <Int>, %1 : @unowned $<A> { var A } <String>)
   unreachable
 }
 
-// CHECK-LABEL: sil hidden [serialized] @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
-sil hidden [serialized] @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
+// CHECK-LABEL: sil hidden [serialized] [ossa] @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
+sil hidden [serialized] [ossa] @same_generic_param_name_in_outer_scope : $@convention(thin) <A> (
   // CHECK: <τ_0_0> { var τ_0_0 } <A>
   <A> { var A } <A>
 // CHECK: ) -> ()
@@ -81,14 +81,14 @@ entry(%0 : @unowned $<B> { var B } <A>):
   unreachable
 }
 
-// CHECK-LABEL: sil hidden [serialized] @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <τ_0_0> { let τ_0_0 } <Int>) -> ()
-sil hidden [serialized ]@box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> () {
+// CHECK-LABEL: sil hidden [serialized] [ossa] @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <τ_0_0> { let τ_0_0 } <Int>) -> ()
+sil hidden [serialized ] [ossa] @box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> () {
 entry(%0 : @owned ${ var Int }, %1 : @guaranteed $<T> { let T } <Int>):
   unreachable
 }
 
-// CHECK-LABEL: sil hidden [serialized] @address_of_box
-sil hidden [serialized] @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> () {
+// CHECK-LABEL: sil hidden [serialized] [ossa] @address_of_box
+sil hidden [serialized] [ossa] @address_of_box : $@convention(thin) (@in { var Int }, @in <T> { let T } <Int>) -> () {
 // CHECK: %0 : $*{ var Int }, %1 : $*<τ_0_0> { let τ_0_0 } <Int>
 entry(%0 : $*{ var Int }, %1 : $*<T> { let T } <Int>):
   unreachable

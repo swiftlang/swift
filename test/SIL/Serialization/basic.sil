@@ -6,17 +6,17 @@
 
 import Builtin
 
-// CHECK-LABEL: sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [serialized] [ossa] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: unchecked_ownership_conversion {{%.*}} : $Builtin.NativeObject, @guaranteed to @owned
-sil [serialized] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+sil [serialized] [ossa] @test_unchecked_ownership_conversion : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   unchecked_ownership_conversion %0 : $Builtin.NativeObject, @guaranteed to @owned
   return undef : $()
 }
 
-// CHECK-LABEL: sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [serialized] [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: end_lifetime {{%.*}} : $Builtin.NativeObject
-sil [serialized] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [serialized] [ossa] @test_end_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   end_lifetime %0 : $Builtin.NativeObject
   return undef : $()
@@ -37,7 +37,7 @@ struct Int32 {
   var x: Builtin.Int32
 }
 
-sil @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
+sil [ossa] @test_destructure_struct_tuple : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.Int32), @owned TestArray2) -> @owned (Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage) {
 bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2):
   (%2, %3) = destructure_tuple %0 : $(Builtin.NativeObject, Builtin.Int32)
   (%4, %5, %6) = destructure_struct %1 : $TestArray2

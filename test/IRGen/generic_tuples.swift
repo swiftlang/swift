@@ -1,8 +1,8 @@
 
-// RUN: %target-swift-frontend -module-name generic_tuples -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name generic_tuples -emit-ir -primary-file %s | %FileCheck %s
 
 // Make sure that optimization passes don't choke on storage types for generic tuples
-// RUN: %target-swift-frontend -module-name generic_tuples -assume-parsing-unqualified-ownership-sil -emit-ir -O %s
+// RUN: %target-swift-frontend -module-name generic_tuples -emit-ir -O %s
 
 // REQUIRES: CPU=x86_64
 
@@ -18,9 +18,9 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-// CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
-// CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
+// CHECK: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+// CHECK: [[SIZE:%.*]] = load i64, i64* [[SIZE_ADDR]]
 // CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // CHECK: [[X_TMP:%.*]] = bitcast i8* [[X_ALLOCA]] to %swift.opaque*
 // Debug info shadow copy.

@@ -77,16 +77,16 @@ static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
 /// Returns true if A is an opened existential type or is equal to an
 /// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, const SILFunction *F) {
-  if (!A->getOpenedExistentialType().isNull())
+  if (isa<OpenedArchetypeType>(A))
     return true;
 
   // Find the primary archetype.
-  A = A->getPrimary();
+  auto P = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
   // environment of our caller.
   if (auto *genericEnv = F->getGenericEnvironment())
-    if (A->getGenericEnvironment() == genericEnv)
+    if (P->getGenericEnvironment() == genericEnv)
       return true;
 
   return false;
@@ -119,6 +119,7 @@ namespace {
 
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
+                            ResilienceExpansion expansion,
                             llvm::function_ref<void(bool, StringRef)> require,
                             CanType &baseTy,
                             CanType leafTy,
@@ -211,6 +212,12 @@ void verifyKeyPathComponent(SILModule &M,
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
+    if (expansion == ResilienceExpansion::Minimal) {
+      require(property->getEffectiveAccess() >= AccessLevel::Public,
+              "Key path in serialized function cannot reference non-public "
+              "property");
+    }
+
     auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
                          ->getReferenceStorageReferent()
                          ->getCanonicalType();
@@ -218,6 +225,8 @@ void verifyKeyPathComponent(SILModule &M,
             "property decl should be a member of the base with the same type "
             "as the component");
     require(property->hasStorage(), "property must be stored");
+    require(!property->isResilient(M.getSwiftModule(), expansion),
+            "cannot access storage of resilient property");
     auto propertyTy = loweredBaseTy.getFieldType(property, M);
     require(propertyTy.getObjectType()
               == loweredComponentTy.getObjectType(),
@@ -247,6 +256,12 @@ void verifyKeyPathComponent(SILModule &M,
     // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
     {
       auto getter = component.getComputedPropertyGetter();
+      if (expansion == ResilienceExpansion::Minimal) {
+        require(getter->hasValidLinkageForFragileRef(),
+                "Key path in serialized function should not reference "
+                "less visible getters");
+      }
+
       auto substGetterType = getter->getLoweredFunctionType()
         ->substGenericArgs(M, patternSubs);
       require(substGetterType->getRepresentation() ==
@@ -286,6 +301,12 @@ void verifyKeyPathComponent(SILModule &M,
       // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
       
       auto setter = component.getComputedPropertySetter();
+      if (expansion == ResilienceExpansion::Minimal) {
+        require(setter->hasValidLinkageForFragileRef(),
+                "Key path in serialized function should not reference "
+                "less visible setters");
+      }
+
       auto substSetterType = setter->getLoweredFunctionType()
         ->substGenericArgs(M, patternSubs);
       
@@ -703,7 +724,7 @@ public:
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
     // ownership.
-    if (!F->hasQualifiedOwnership())
+    if (!F->hasOwnership())
       return;
     SILValue(V).verifyOwnership(F->getModule(), &DEBlocks);
   }
@@ -1456,8 +1477,13 @@ public:
   }
 
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
+    SILGlobalVariable *RefG = AGI->getReferencedGlobal();
+    if (auto *VD = RefG->getDecl()) {
+      require(!VD->isResilient(F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
+              "cannot access storage of resilient global");
+    }
     if (F.isSerialized()) {
-      SILGlobalVariable *RefG = AGI->getReferencedGlobal();
       require(RefG->isSerialized()
                 || hasPublicVisibility(RefG->getLinkage()),
               "alloc_global inside fragile function cannot "
@@ -1469,6 +1495,11 @@ public:
     SILGlobalVariable *RefG = GAI->getReferencedGlobal();
     require(GAI->getType().getObjectType() == RefG->getLoweredType(),
             "global_addr/value must be the type of the variable it references");
+    if (auto *VD = RefG->getDecl()) {
+      require(!VD->isResilient(F.getModule().getSwiftModule(),
+                               F.getResilienceExpansion()),
+              "cannot access storage of resilient global");
+    }
     if (F.isSerialized()) {
       require(RefG->isSerialized()
               || hasPublicVisibility(RefG->getLinkage()),
@@ -1515,12 +1546,12 @@ public:
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!F.hasQualifiedOwnership(),
+      require(!F.hasOwnership(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
     case LoadOwnershipQualifier::Take:
-      require(F.hasQualifiedOwnership(),
+      require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
       // TODO: Could probably make this a bit stricter.
       require(!LI->getType().isTrivial(LI->getModule()),
@@ -1528,7 +1559,7 @@ public:
               "types");
       break;
     case LoadOwnershipQualifier::Trivial:
-      require(F.hasQualifiedOwnership(),
+      require(F.hasOwnership(),
               "Load with qualified ownership in an unqualified function");
       require(LI->getType().isTrivial(LI->getModule()),
               "A load with trivial ownership must load a trivial type");
@@ -1538,7 +1569,7 @@ public:
 
   void checkLoadBorrowInst(LoadBorrowInst *LBI) {
     require(
-        F.hasQualifiedOwnership(),
+        F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(!fnConv.useLoweredAddresses()
@@ -1552,7 +1583,7 @@ public:
 
   void checkEndBorrowInst(EndBorrowInst *EBI) {
     require(
-        F.hasQualifiedOwnership(),
+        F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
   }
 
@@ -1672,13 +1703,13 @@ public:
     case StoreOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
       // enabled.
-      require(!F.hasQualifiedOwnership(),
+      require(!F.hasOwnership(),
               "Qualified store in function with unqualified ownership?!");
       break;
     case StoreOwnershipQualifier::Init:
     case StoreOwnershipQualifier::Assign:
       require(
-          F.hasQualifiedOwnership(),
+          F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       // TODO: Could probably make this a bit stricter.
       require(!SI->getSrc()->getType().isTrivial(SI->getModule()),
@@ -1687,7 +1718,7 @@ public:
       break;
     case StoreOwnershipQualifier::Trivial: {
       require(
-          F.hasQualifiedOwnership(),
+          F.hasOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(SI->getModule()) ||
@@ -1771,26 +1802,26 @@ public:
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of strong_retain_" #name); \
-    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
   } \
   void check##Name##RetainInst(Name##RetainInst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of " #name "_retain"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
     requireObjectType(Name##StorageType, RI->getOperand(), \
                       "Operand of " #name "_release"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
     requireObjectType(Name##StorageType, I->getOperand(), \
                       "Operand of " #name "_retain"); \
-    require(F.hasQualifiedOwnership(), \
+    require(F.hasOwnership(), \
             "copy_" #name "_value is only valid in functions with qualified " \
             "ownership"); \
   }
@@ -1802,7 +1833,7 @@ public:
                                 "Operand of strong_retain_" #name); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
           "strong_retain_" #name " requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
                                         "functions with unqualified " \
                                         "ownership"); \
   } \
@@ -1811,7 +1842,7 @@ public:
                                 "Operand of " #name "_retain"); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             #name "_retain requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_retain is only in functions with unqualified ownership"); \
   } \
   void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
@@ -1819,7 +1850,7 @@ public:
                                 "Operand of " #name "_release"); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             #name "_release requires '" #name "' type to be loadable"); \
-    require(!F.hasQualifiedOwnership(), \
+    require(!F.hasOwnership(), \
             #name "_release is only in functions with unqualified ownership"); \
   } \
   void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
@@ -1891,21 +1922,21 @@ public:
   void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkRetainValueAddrInst(RetainValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "retain_value is only in functions with unqualified ownership");
   }
 
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1913,7 +1944,7 @@ public:
   void checkDestroyValueInst(DestroyValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -1921,14 +1952,14 @@ public:
   void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
   void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Source value should be an address value");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "release_value is only in functions with unqualified ownership");
   }
 
@@ -2015,7 +2046,7 @@ public:
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
       // The lowered type must be the properly-abstracted form of the AST type.
       SILType exType = AEBI->getExistentialType();
-      auto archetype = ArchetypeType::getOpened(exType.getASTType());
+      auto archetype = OpenedArchetypeType::get(exType.getASTType());
 
       auto loweredTy = F.getModule().Types.getLoweredType(
                                       Lowering::AbstractionPattern(archetype),
@@ -2041,6 +2072,9 @@ public:
     require(!structDecl->hasUnreferenceableStorage(),
             "Cannot build a struct with unreferenceable storage from elements "
             "using StructInst");
+    require(!structDecl->isResilient(F.getModule().getSwiftModule(),
+                                     F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(SI->getType().isObject(),
             "StructInst must produce an object");
 
@@ -2215,12 +2249,12 @@ public:
 
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "strong_retain is only in functions with unqualified ownership");
   }
   void checkStrongReleaseInst(StrongReleaseInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of release");
-    require(!F.hasQualifiedOwnership(),
+    require(!F.hasOwnership(),
             "strong_release is only in functions with unqualified ownership");
   }
 
@@ -2232,8 +2266,14 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(DI->getOperand()->getType().isObject(),
             "Operand of dealloc_ref must be object");
-    require(DI->getOperand()->getType().getClassOrBoundGenericClass(),
-            "Operand of dealloc_ref must be of class type");
+    auto *cd = DI->getOperand()->getType().getClassOrBoundGenericClass();
+    require(cd, "Operand of dealloc_ref must be of class type");
+
+    if (!DI->canAllocOnStack()) {
+      require(!cd->isResilient(F.getModule().getSwiftModule(),
+                              F.getResilienceExpansion()),
+              "cannot directly deallocate resilient class");
+    }
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -2247,6 +2287,9 @@ public:
         ->getInstanceType()->getClassOrBoundGenericClass();
     require(class2,
             "Second operand of dealloc_partial_ref must be a class metatype");
+    require(!class2->isResilient(F.getModule().getSwiftModule(),
+                                 F.getResilienceExpansion()),
+            "cannot directly deallocate resilient class");
     while (class1 != class2) {
       class1 = class1->getSuperclassDecl();
       require(class1, "First operand not superclass of second instance type");
@@ -2343,6 +2386,9 @@ public:
             "result of struct_extract cannot be address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "must struct_extract from struct");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(!EI->getField()->isStatic(),
             "cannot get address of static property with struct_element_addr");
     require(EI->getField()->hasStorage(),
@@ -2384,6 +2430,9 @@ public:
             "must derive struct_element_addr from address");
     StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
     require(sd, "struct_element_addr operand must be struct address");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
     require(EI->getType().isAddress(),
             "result of struct_element_addr must be address");
     require(!EI->getField()->isStatic(),
@@ -2413,6 +2462,9 @@ public:
     SILType operandTy = EI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
+    require(!cd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient class");
 
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
@@ -2433,8 +2485,21 @@ public:
     SILType operandTy = RTAI->getOperand()->getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_tail_addr operand must be a class instance");
+    require(!cd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient class");
+    require(cd, "ref_tail_addr operand must be a class instance");
   }
-  
+
+  void checkDestructureStructInst(DestructureStructInst *DSI) {
+    SILType operandTy = DSI->getOperand()->getType();
+    StructDecl *sd = operandTy.getStructOrBoundGenericStruct();
+    require(sd, "must struct_extract from struct");
+    require(!sd->isResilient(F.getModule().getSwiftModule(),
+                             F.getResilienceExpansion()),
+            "cannot access storage of resilient struct");
+  }
+
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return fnConv.getSILType(ft->getParameters().back());
   }
@@ -2493,8 +2558,6 @@ public:
       auto conformance = AMI->getConformance().getConcrete();
       require(conformance->getType()->isEqual(AMI->getLookupType()),
               "concrete type lookup requires conformance that matches type");
-      require(AMI->getModule().lookUpWitnessTable(conformance, false),
-              "Could not find witness table for conformance");
     }
 
     require(AMI->getMember().requiresNewWitnessTableEntry(),
@@ -3035,7 +3098,7 @@ public:
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     
     auto loweredTy = F.getModule().Types.getLoweredType(
                                 Lowering::AbstractionPattern(archetype),
@@ -3065,7 +3128,7 @@ public:
             "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
         Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
     requireSameType(
@@ -3097,7 +3160,7 @@ public:
     
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getASTType());
+    auto archetype = OpenedArchetypeType::get(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
                                        Lowering::AbstractionPattern(archetype),
                                        IEI->getFormalConcreteType());
@@ -3204,13 +3267,6 @@ public:
       require(conformances[i].getRequirement() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
-
-      if (conformances[i].isConcrete()) {
-        auto conformance = conformances[i].getConcrete();
-        require(F.getModule().lookUpWitnessTable(conformance, false),
-                "Could not find witness table for conformance.");
-
-      }
     }
   }
 
@@ -3322,7 +3378,7 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_br must match type of "
             "cast");
-    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_br in unqualified ownership sil must "
             "take no arguments");
 #if 0
@@ -3349,7 +3405,7 @@ public:
                 CBI->getCastType(),
             "success dest block argument of checked_cast_value_br must match "
             "type of cast");
-    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+    require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
             "failure dest of checked_cast_value_br in unqualified ownership "
             "sil must take no arguments");
   }
@@ -3876,8 +3932,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
 
@@ -3897,7 +3951,7 @@ public:
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->hasAssociatedValues()) {
-        if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+        if (isSILOwnershipEnabled() && F.hasOwnership()) {
           require(dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
@@ -3939,14 +3993,14 @@ public:
       // an @owned original version of the enum.
       //
       // When SIL ownership is disabled, we no longer support this.
-      if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+      if (isSILOwnershipEnabled() && F.hasOwnership()) {
         require(SOI->getDefaultBB()->getNumArguments() == 1,
                 "Switch enum default block should have one argument");
         require(SOI->getDefaultBB()->getArgument(0)->getType() ==
                     SOI->getOperand()->getType(),
                 "Switch enum default block should have one argument that is "
                 "the same as the input type");
-      } else if (!F.hasQualifiedOwnership()) {
+      } else if (!F.hasOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
       }
@@ -3963,8 +4017,6 @@ public:
 
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the enum is resilient, in which case
-    // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
 
@@ -3988,9 +4040,12 @@ public:
     }
 
     // If the switch is non-exhaustive, we require a default.
-    require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive switch_enum_addr must have a default "
-            "destination");
+    bool isExhaustive =
+        uDecl->isEffectivelyExhaustive(F.getModule().getSwiftModule(),
+                                       F.getResilienceExpansion());
+    require((isExhaustive && unswitchedElts.empty()) || SOI->hasDefault(),
+            "nonexhaustive switch_enum_addr must have a default destination");
+
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->args_empty(),
               "switch_enum_addr default destination must take "
@@ -4004,6 +4059,13 @@ public:
     require(!(isa<MethodInst>(branchArg) &&
               cast<MethodInst>(branchArg)->getMember().isForeign),
         "branch argument cannot be a witness_method or an objc method_inst");
+    require(!(branchArg->getType().is<SILFunctionType>() &&
+              branchArg->getType()
+                      .castTo<SILFunctionType>()
+                      ->getExtInfo()
+                      .getRepresentation() ==
+                  SILFunctionTypeRepresentation::ObjCMethod),
+            "branch argument cannot be a objective-c method");
     return branchArg->getType() == bbArg->getType();
   }
 
@@ -4244,7 +4306,7 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(),
+        verifyKeyPathComponent(F.getModule(), F.getResilienceExpansion(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
           baseTy,
           leafTy,
@@ -4315,7 +4377,7 @@ public:
       }
 
       // If we do not have qualified ownership, do not check ownership.
-      if (!F.hasQualifiedOwnership()) {
+      if (!F.hasOwnership()) {
         return;
       }
 
@@ -4606,7 +4668,7 @@ public:
       // have non-trivial arguments.
       //
       // FIXME: it would be far simpler to ban all critical edges in general.
-      if (!F->hasQualifiedOwnership())
+      if (!F->hasOwnership())
         continue;
 
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
@@ -4881,15 +4943,16 @@ void SILProperty::verify(const SILModule &M) const {
 
   if (auto &component = getComponent()) {
     verifyKeyPathComponent(const_cast<SILModule&>(M),
-      require,
-      baseTy,
-      leafTy,
-      *component,
-      {},
-      canSig,
-      subs,
-      /*property descriptor*/true,
-      hasIndices);
+                           ResilienceExpansion::Maximal,
+                           require,
+                           baseTy,
+                           leafTy,
+                           *component,
+                           {},
+                           canSig,
+                           subs,
+                           /*property descriptor*/true,
+                           hasIndices);
     // verifyKeyPathComponent updates baseTy to be the projected type of the
     // component, which should be the same as the type of the declared storage
     require(baseTy == leafTy,

@@ -104,11 +104,11 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(start: rp, count: 1)
   _ = UnsafeMutableRawBufferPointer(mrbp)
   _ = UnsafeRawBufferPointer(mrbp)
-  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeRawBufferPointer)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableRawBufferPointer), (UnsafeMutableBufferPointer<T>)}}
+  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeRawBufferPointer)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableBufferPointer<T>), (UnsafeMutableRawBufferPointer)}}
   _ = UnsafeRawBufferPointer(rbp)
   _ = UnsafeMutableRawBufferPointer(mbpi)
   _ = UnsafeRawBufferPointer(mbpi)
-  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeBufferPointer<Int>)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableRawBufferPointer), (UnsafeMutableBufferPointer<T>)}}
+  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeBufferPointer<Int>)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableBufferPointer<T>), (UnsafeMutableRawBufferPointer)}}
   _ = UnsafeRawBufferPointer(bpi)
   _ = UnsafeMutableRawBufferPointer(start: omrp, count: 1)
   _ = UnsafeRawBufferPointer(start: omrp, count: 1)

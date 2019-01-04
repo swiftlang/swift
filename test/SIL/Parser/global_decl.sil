@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s
 
 // Check that sil_globals and their corresponding decls are
 // parsed. There is no direct way to verify that the declarations are

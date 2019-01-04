@@ -15,8 +15,8 @@ struct A {
   init(a1: A, a2: A)
 }
 
-// CHECK-LABEL: sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_
-sil @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
+// CHECK-LABEL: sil [ossa] @_TFCSo1XcfMS_FT1aV11peer_method1A_S_
+sil [ossa] @_TFCSo1XcfMS_FT1aV11peer_method1A_S_ : $@convention(method) (A, @owned X) -> @owned X {
 bb0(%0 : $A, %1 : @owned $X):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <X>
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <X>, 0
@@ -36,4 +36,27 @@ bb0(%0 : $A, %1 : @owned $X):
   %15 = load [copy] %2a : $*X
   destroy_value %2 : $<τ_0_0> { var τ_0_0 } <X>
   return %15 : $X
+}
+
+// rdar://46650834
+//   Don't complain that the first lookup result lacks an accessor when a
+//   later lookup result provides it.
+class B {
+  typealias Index = Int
+  typealias Element = String
+
+  subscript(owned index: Index) -> Element { get }
+
+  @_borrowed
+  subscript(borrowed index: Index) -> Element { get }
+}
+
+sil [ossa] @test_overloaded_subscript : $@convention(thin) (@guaranteed B, B.Index) -> () {
+bb0(%0 : $B, %1 : $B.Index):
+  %reader = class_method %0 : $B, #B.subscript!read.1 : (B) -> (B.Index) -> (), $@convention(method) @yield_once (B.Index, @guaranteed B) -> @yields @guaranteed B.Element
+  (%element, %token) = begin_apply %reader(%1, %0) : $@convention(method) @yield_once (B.Index, @guaranteed B) -> @yields @guaranteed B.Element
+  end_apply %token
+
+  %result = tuple ()
+  return %result : $()
 }

@@ -340,7 +340,7 @@
 ///
 ///     let glyphIndex = imagePaths.firstIndex(where: { $0.value.hasPrefix("/glyphs") })
 ///     if let index = glyphIndex {
-///         print("The '\(imagesPaths[index].key)' image is a glyph.")
+///         print("The '\(imagePaths[index].key)' image is a glyph.")
 ///     } else {
 ///         print("No glyphs found!")
 ///     }
@@ -782,7 +782,6 @@ extension Dictionary {
   ///   otherwise, `nil`.
   @inlinable
   public subscript(key: Key) -> Value? {
-    @inline(__always)
     get {
       return _variant.lookup(key)
     }
@@ -819,6 +818,7 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   ///   dictionary. Each key in `elements` must be unique.
   @inlinable
   @_effects(readonly)
+  @_semantics("optimize.sil.specialize.generic.size.never")
   public init(dictionaryLiteral elements: (Key, Value)...) {
     let native = _NativeDictionary<Key, Value>(capacity: elements.count)
     for (key, value) in elements {
@@ -921,10 +921,10 @@ extension Dictionary {
   }
 
   /// Returns a new dictionary containing only the key-value pairs that have
-  /// non-`nil` values as the result from the transform by the given closure.
+  /// non-`nil` values as the result of transformation by the given closure.
   ///
-  /// Use this method to receive a dictionary of non-optional values when your
-  /// transformation can produce an optional value.
+  /// Use this method to receive a dictionary with non-optional values when
+  /// your transformation produces optional values.
   ///
   /// In this example, note the difference in the result of using `mapValues`
   /// and `compactMapValues` with a transformation that returns an optional

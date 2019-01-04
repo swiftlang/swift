@@ -225,7 +225,11 @@ public struct UnsafePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.
@@ -568,8 +572,22 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
-    let rawPtr =
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
+    // For any alignment <= _minAllocationAlignment, force alignment = 0.
+    // This forces the runtime's "aligned" allocation path so that
+    // deallocation does not require the original alignment.
+    //
+    // The runtime guarantees:
+    //
+    // align == 0 || align > _minAllocationAlignment:
+    //   Runtime uses "aligned allocation".
+    //
+    // 0 < align <= _minAllocationAlignment:
+    //   Runtime may use either malloc or "aligned allocation".
+    var align = Builtin.alignof(Pointee.self)
+    if Int(align) <= _minAllocationAlignment() {
+      align = (0)._builtinWordValue
+    }
+    let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
@@ -580,8 +598,11 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   /// block. The memory must not be initialized or `Pointee` must be a trivial type.
   @inlinable
   public func deallocate() {
-    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue,
-                       Builtin.alignof(Pointee.self))
+    // Passing zero alignment to the runtime forces "aligned
+    // deallocation". Since allocation via `UnsafeMutable[Raw][Buffer]Pointer`
+    // always uses the "aligned allocation" path, this ensures that the
+    // runtime's allocation and deallocation paths are compatible.
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (0)._builtinWordValue)
   }
 
   /// Accesses the instance referenced by this pointer.

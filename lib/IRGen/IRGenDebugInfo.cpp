@@ -1193,9 +1193,14 @@ private:
     case TypeKind::InOut:
       break;
 
-    case TypeKind::Archetype: {
+    case TypeKind::PrimaryArchetype:
+    case TypeKind::OpenedArchetype:
+    case TypeKind::NestedArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
-      auto L = getDebugLoc(*this, Archetype->getAssocType());
+      AssociatedTypeDecl *assocType = nullptr;
+      if (auto nested = dyn_cast<NestedArchetypeType>(Archetype))
+        assocType = nested->getAssocType();
+      auto L = getDebugLoc(*this, assocType);
       auto Superclass = Archetype->getSuperclass();
       auto DerivedFrom = Superclass.isNull()
                              ? nullptr

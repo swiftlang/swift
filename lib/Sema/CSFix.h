@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -92,6 +93,9 @@ enum class FixKind : uint8_t {
 
   /// Remove `!` or `?` because base is not an optional type.
   RemoveUnwrap,
+
+  /// Add explicit `()` at the end of function or member to call it.
+  InsertCall,
 };
 
 class ConstraintFix {
@@ -426,6 +430,21 @@ public:
 
   static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
                               ConstraintLocator *locator);
+};
+
+class InsertExplicitCall final : public ConstraintFix {
+public:
+  InsertExplicitCall(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertCall, locator) {}
+
+  std::string getName() const override {
+    return "insert explicit `()` to make a call";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static InsertExplicitCall *create(ConstraintSystem &cs,
+                                    ConstraintLocator *locator);
 };
 
 } // end namespace constraints

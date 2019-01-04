@@ -29,21 +29,30 @@ extension String {
     return self.split(separator: "\n").map { String($0) }
   }
 }
+%{
+AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal",
+                "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo",
+                "longSharedPrefix"]
+ComparisonWorkloads = AllWorkloads
+HashingWorkloads = AllWorkloads[:-1]
+NormalizedIteratorWorkloads = AllWorkloads[:-1]
 
-% AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo", "longSharedPrefix"]
-% ComparisonWorkloads = AllWorkloads
-% HashingWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+LegacyFactor = dict(abnormal=20, emoji=4, latin1=2, fastPrenormal=10,
+                    slowerPrenormal=10, nonBMPSlowestPrenormal=10, zalgo=25)
 
-
-% NormalizedIteratorWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
-
+def legacyFactor(name):
+  lf = LegacyFactor.get(name)
+  return (
+    ',\n\t\tlegacyFactor: {0}'.format(lf) if lf else
+    '')
+}%
 public let StringComparison: [BenchmarkInfo] = [
 % for Name in ComparisonWorkloads:
   BenchmarkInfo(
     name: "StringComparison_${Name}",
     runFunction: run_StringComparison_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }
+    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # ComparisonWorkloads
 ]
@@ -54,7 +63,7 @@ public let StringHashing: [BenchmarkInfo] = [
     name: "StringHashing_${Name}",
     runFunction: run_StringHashing_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }
+    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # HashingWorkloads
 ]
@@ -65,7 +74,7 @@ public let NormalizedIterator: [BenchmarkInfo] = [
     name: "NormalizedIterator_${Name}",
     runFunction: run_NormalizedIterator_${Name},
     tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }
+    setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
   ),
 % end # NormalizedIteratorWorkloads
 ]
@@ -212,7 +221,8 @@ struct Workload {
       óôõö÷øùúûüýþÿ
       123.456£=>¥
       123.456
-      """.lines()
+      """.lines(),
+      scaleMultiplier: 1/2
   )
   static let fastPrenormal = Workload(
     name: "FastPrenormal",
@@ -233,7 +243,8 @@ struct Workload {
       ʅʆʇʈʉʊʋʌʍʎʏʐʑʒʓʔʕʖʗʘʙʚʛʜʝʞʟʠʡʢʣʤʥʦʧʨʩʪʫʬʭʮʯʰ
       ʱʲʳʴʵʶʷʸʹʺʻʼʽʾʿˀˁ˂˃˄˅ˆˇˈˉˊˋˌˍˎˏːˑ˒˓˔˕˖˗˘˙˚˛˜˝˞˟ˠˡˢˣˤ˥˦
       ˧˨˩˪˫ˬ˭ˮ˯˰˱˲˳˴˵˶˷˸˹˺˻˼˽˾
-      """.lines()
+      """.lines(),
+      scaleMultiplier: 1/10
   )
   static let slowerPrenormal = Workload(
     name: "SlowerPrenormal",
@@ -250,7 +261,8 @@ struct Workload {
       в чащах юга жил-был цитрус
       \u{300c}\u{300e}今日は\u{3001}世界\u{3002}\u{300f}\u{300d}
       но фальшивый экземпляр
-      """.lines()
+      """.lines(),
+      scaleMultiplier: 1/10
   )
   // static let slowestPrenormal = """
   //   """.lines()
@@ -268,7 +280,8 @@ struct Workload {
       𓃘𓃙𓃚𓃛𓃠𓃡𓃢𓃣𓃦𓃧𓃨𓃩𓃬𓃭𓃮𓃯𓃰𓃲𓃳𓃴𓃵𓃶𓃷
       𓀀𓀁𓀂𓀃𓀄𓆇𓆈𓆉𓆊𓆋𓆌𓆍𓆎𓆏𓆐𓆑𓆒𓆓𓆔𓆗𓆘𓆙𓆚𓆛𓆝𓆞𓆟𓆠𓆡𓆢𓆣𓆤
       𓆥𓆦𓆧𓆨𓆩𓆪𓆫𓆬𓆭𓆮𓆯𓆰𓆱𓆲𓆳𓆴𓆵𓆶𓆷𓆸𓆹𓆺𓆻
-      """.lines()
+      """.lines(),
+      scaleMultiplier: 1/10
   )
   static let emoji = Workload(
     name: "Emoji",
@@ -281,7 +294,8 @@ struct Workload {
       😋🤑🤗🤓😎😒😏🤠🤡😞😔😟😕😖😣☹️🙁😫😩😤😠😑😐😶😡😯
       😦😧😮😱😳😵😲😨😰😢😥
       😪😓😭🤤😴🙄🤔🤥🤧🤢🤐😬😷🤒🤕😈💩👺👹👿👻💀☠️👽
-      """.lines()
+      """.lines(),
+      scaleMultiplier: 1/4
   )
 
   static let abnormal = Workload(
@@ -292,7 +306,8 @@ struct Workload {
     \u{f900}\u{f901}\u{f902}\u{f903}\u{f904}\u{f905}\u{f906}\u{f907}\u{f908}\u{f909}\u{f90a}
     \u{f90b}\u{f90c}\u{f90d}\u{f90e}\u{f90f}\u{f910}\u{f911}\u{f912}\u{f913}\u{f914}\u{f915}\u{f916}\u{f917}\u{f918}\u{f919}
     \u{f900}\u{f91a}\u{f91b}\u{f91c}\u{f91d}\u{f91e}\u{f91f}\u{f920}\u{f921}\u{f922}
-    """.lines()
+    """.lines(),
+    scaleMultiplier: 1/20
   )
   // static let pathological = """
   //   """.lines()
@@ -316,9 +331,9 @@ struct Workload {
     ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘
     xͣͤͥͦͧͨͩͪͫͬͭͮ
     """.lines(),
-    scaleMultiplier: 0.25
+    scaleMultiplier: 1/100
   )
-  
+
   static let longSharedPrefix = Workload(
     name: "LongSharedPrefix",
     payload: """
@@ -333,7 +348,7 @@ struct Workload {
     🤔Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.🤔
     """.lines()
   )
-  
+
 }
 
 // ${'Local Variables'}:

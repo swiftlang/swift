@@ -1037,7 +1037,7 @@ static AllocStackInst *allocate(StructLoweringState &pass,
 
 static StoreOwnershipQualifier
 getStoreInitOwnership(StructLoweringState &pass, SILType type) {
-  if (!pass.F->hasQualifiedOwnership()) {
+  if (!pass.F->hasOwnership()) {
     return StoreOwnershipQualifier::Unqualified;
   } else if (type.isTrivial(pass.F->getModule())) {
     return StoreOwnershipQualifier::Trivial;
@@ -1517,7 +1517,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
       ++II;
       loadBuilder.setInsertionPoint(II);
     }
-    if (!pass.F->hasQualifiedOwnership()) {
+    if (!pass.F->hasOwnership()) {
       load = loadBuilder.createLoad(applyInst->getLoc(), value,
                                     LoadOwnershipQualifier::Unqualified);
     } else {
@@ -1552,7 +1552,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
   auto *applyOutlinedCopy =
       createOutlinedCopyCall(allocBuilder, value, allocInstr, pass);
 
-  if (!pass.F->hasQualifiedOwnership()) {
+  if (!pass.F->hasOwnership()) {
     loadCopy = allocBuilder.createLoad(applyOutlinedCopy->getLoc(), allocInstr,
                                        LoadOwnershipQualifier::Unqualified);
   } else {
@@ -1858,7 +1858,7 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
       currStructExtractInst->getType().getAddressType());
   // Load the struct element then see if we can get rid of the load:
   LoadInst *loadArg = nullptr;
-  if (!pass.F->hasQualifiedOwnership()) {
+  if (!pass.F->hasOwnership()) {
     loadArg = builder.createLoad(newInstr->getLoc(), newInstr,
                                  LoadOwnershipQualifier::Unqualified);
   } else {
@@ -1914,7 +1914,7 @@ static void rewriteFunction(StructLoweringState &pass,
 
           // Load the enum addr then see if we can get rid of the load:
           LoadInst *loadArg = nullptr;
-          if (!pass.F->hasQualifiedOwnership()) {
+          if (!pass.F->hasOwnership()) {
             loadArg = argBuilder.createLoad(
                 newArg->getLoc(), newArg, LoadOwnershipQualifier::Unqualified);
           } else {
@@ -2458,7 +2458,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
       if (oldValue->getType() != newValue->getType() &&
           !oldValue->getType().isAddress()) {
         LoadOwnershipQualifier ownership;
-        if (!F->hasQualifiedOwnership()) {
+        if (!F->hasOwnership()) {
           ownership = LoadOwnershipQualifier::Unqualified;
         } else if (newValue->getType().isTrivial(*getModule())) {
           ownership = LoadOwnershipQualifier::Trivial;

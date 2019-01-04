@@ -29,13 +29,13 @@
 //
 // Actual test: Change a byte in LeafModule.swiftinterface, check both cached modules get rebuilt.
 //
-// RUN: %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
-// RUN: %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
+// RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: sed -e 's/LeafFunc2/LoafFunc2/' -i.prev %t/LeafModule.swiftinterface
 // RUN: %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
-// RUN: %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
+// RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 
 import OtherModule
 
