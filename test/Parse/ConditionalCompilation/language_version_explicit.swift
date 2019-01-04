@@ -22,7 +22,7 @@
 #endif
 
 // NOTE: Please modify this condition...
-#if swift(>=4.2.1)
+#if swift(>=4.2.2)
   let b = 1
 #else
   // This shouldn't emit any diagnostics.
@@ -30,7 +30,7 @@
 #endif
 
 // NOTE: ...and modify this condition...
-#if swift(>=4.2.2)
+#if swift(>=4.2.3)
   // This shouldn't emit any diagnostics.
   asdf asdf asdf asdf
 #else
