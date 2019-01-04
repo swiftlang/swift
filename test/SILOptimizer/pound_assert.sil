@@ -263,3 +263,70 @@ bb0(%arg : $Int64):
   %ret = tuple ()
   return %ret : $()
 }
+
+// Helper function to force const-evaluation of an array.
+sil @forceArrayConstEval : $@convention(thin) (Array<Int64>) -> (Int64) {
+bb0(%arr : $Array<Int64>):
+  %builtinInt = integer_literal $Builtin.Int64, 42
+  %int = struct $Int64 (%builtinInt : $Builtin.Int64)
+  return %int : $Int64
+}
+
+// TODO: The constant evaluator does not implement any array access operations,
+// so theses tests cannot test that the implemented array operations produce
+// correct values in the arrays. These tests only test that the implemented
+// array operations do not crash or produce unknown values. As soon as we have
+// array access operations, modify these tests to check the values in the
+// arrays.
+
+// Tests the "apply", "store", and "copy_addr" cases in
+// "decodeAllocUninitializedArray".
+sil @testDecodeAllocUninitializedArray : $@convention(thin) () -> () {
+bb0:
+  // Allocate the uninitialized array.
+  %0 = metatype $@thin Int64.Type
+  %1 = metatype $@thin Array<Int64>.Type
+  %arraySize = integer_literal $Builtin.Word, 3
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<Int64>(%arraySize) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %array = tuple_extract %4 : $(Array<Int64>, Builtin.RawPointer), 0
+  %arrayPtr = tuple_extract %4 : $(Array<Int64>, Builtin.RawPointer), 1
+  %arrayAddr = pointer_to_address %arrayPtr : $Builtin.RawPointer to [strict] $*Int64
+
+  // Use "apply" to initialize the first element of the array to 1.
+  %setInt64To1 = function_ref @setInt64To1: $@convention(thin) () -> (@out Int64)
+  %setInt64To1Result = apply %setInt64To1(%arrayAddr) : $@convention(thin) () -> (@out Int64)
+
+  // Use "store" to initialize the second element of the array to 2.
+  %secondElementIndex = integer_literal $Builtin.Word, 1
+  %secondElementAddr = index_addr %arrayAddr : $*Int64, %secondElementIndex : $Builtin.Word
+  %builtin_2 = integer_literal $Builtin.Int64, 2
+  %int64_2 = struct $Int64 (%builtin_2 : $Builtin.Int64)
+  store %int64_2 to %secondElementAddr : $*Int64
+
+  // Use "copy_addr" to initialize the third element of the array to 3.
+  %stackAddr = alloc_stack $Int64
+  %builtin_3 = integer_literal $Builtin.Int64, 3
+  %int64_3 = struct $Int64 (%builtin_3 : $Builtin.Int64)
+  store %int64_3 to %stackAddr : $*Int64
+  %thirdElementIndex = integer_literal $Builtin.Word, 2
+  %thirdElementAddr = index_addr %arrayAddr : $*Int64, %thirdElementIndex : $Builtin.Word
+  copy_addr %stackAddr to %thirdElementAddr : $*Int64
+  dealloc_stack %stackAddr : $*Int64
+
+  // Use the helper function to force const evaluation of the array.
+  %forceArrayConstEval = function_ref @forceArrayConstEval : $@convention(thin) (Array<Int64>) -> (Int64)
+  %forceArrayConstEvalResult = apply %forceArrayConstEval(%array) : $@convention(thin) (Array<Int64>) -> (Int64)
+  %expectedResult = integer_literal $Builtin.Int64, 42
+  %extracted = struct_extract %forceArrayConstEvalResult : $Int64, #Int64._value
+  %cmpResult = builtin "cmp_eq_Int64"(%extracted : $Builtin.Int64, %expectedResult : $Builtin.Int64) : $Builtin.Int1
+  %message = string_literal utf8 ""
+  %assertResult = builtin "poundAssert"(%cmpResult : $Builtin.Int1, %message : $Builtin.RawPointer) : $()
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// _allocateUninitializedArray<A>(_:)
+sil [serialized] [_semantics "array.allocate_uninitialized"] [always_inline] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)

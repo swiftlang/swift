@@ -803,6 +803,7 @@ extension Array: RangeReplaceableCollection {
   ///     // Prints "true"
   @inlinable
   @_semantics("array.init")
+  @_semantics("array.init_empty")
   public init() {
     _buffer = _Buffer()
   }

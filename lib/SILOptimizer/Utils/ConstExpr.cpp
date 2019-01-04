@@ -37,6 +37,25 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
 // general framework.
 
+// We have a list of functions that we hackily special case.  In order to keep
+// this localized, we use this classifier function.  This should be replaced
+// with an attribute put on the standard library that captures this info.
+enum class WellKnownFunction {
+  Unknown,
+  // Array._allocateUninitializedArray
+  AllocateUninitializedArray,
+  // Array.init()
+  ArrayInitEmpty,
+};
+
+static WellKnownFunction classifyFunction(SILFunction *fn) {
+  if (fn->hasSemanticsAttr("array.init_empty"))
+    return WellKnownFunction::ArrayInitEmpty;
+  if (fn->hasSemanticsAttr("array.allocate_uninitialized"))
+    return WellKnownFunction::AllocateUninitializedArray;
+  return WellKnownFunction::Unknown;
+}
+
 //===----------------------------------------------------------------------===//
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
@@ -523,6 +542,15 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
   return evaluator.getUnknown((SILInstruction *)apply, UnknownReason::Default);
 }
 
+/// If the specified type is a Swift.Array of some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
 /// Given a call to a function, determine whether it is a call to a constexpr
 /// function.  If so, collect its arguments as constants, fold it and return
 /// None.  If not, mark the results as Unknown, and return an Unknown with
@@ -538,6 +566,102 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                 UnknownReason::Default);
 
   SILFunction *callee = calleeFn.getFunctionValue();
+
+  // If this is a well-known function, do not step into it.
+  //
+  // FIXME: This should be based on the SILFunction carrying a
+  // @constexprSemantics sort of attribute that indicates it is well known,
+  // just like the existing SemanticsAttr thing.
+  switch (classifyFunction(callee)) {
+  default:
+    break;
+  case WellKnownFunction::ArrayInitEmpty: { // Array.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array.init() signature");
+
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::Metatype)
+      break;
+
+    auto literalType = literal.getMetatypeValue();
+
+    auto arrayVal = SymbolicValue::getArray(
+        {}, getArrayElementType(literalType)->getCanonicalType(),
+        evaluator.getASTContext());
+    setValue(apply, arrayVal);
+    return None;
+  }
+  case WellKnownFunction::AllocateUninitializedArray: {
+    // This function has this signature:
+    //   func _allocateUninitializedArray<Element>(_ builtinCount: Builtin.Word)
+    //     -> (Array<Element>, Builtin.RawPointer)
+
+    // Figure out the allocation size.
+    auto numElementsSV = getConstantValue(apply->getOperand(1));
+    if (!numElementsSV.isConstant())
+      return numElementsSV;
+
+    unsigned numElements = numElementsSV.getIntegerValue().getLimitedValue();
+
+    SmallVector<SymbolicValue, 8> elementConstants;
+    if (fn) {
+      // In the flow sensitive case, we can analyze this as an allocation of
+      // uninitialized array memory, and allow the stores to the pointer result
+      // to initialize the elements in a normal flow sensitive way.
+      elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
+    } else {
+      // We handle the flow-insensitive case specially in order to find the
+      // stores/apply's to initialize the array elements.  Collect them here
+      // and pretend that the array was initialized atomically.
+      SmallVector<Operand*, 8> elementsAtInit;
+      if (ConstExprEvaluator::decodeAllocUninitializedArray(
+              apply, numElements, elementsAtInit,
+              /*removableArrayInsts*/ nullptr))
+        return evaluator.getUnknown((SILInstruction *)apply,
+                                    UnknownReason::Default);
+
+      // Okay, we were able to decode the array.  See if we can fold all of the
+      // elements we found.
+      for (auto *use : elementsAtInit) {
+        auto addr = use->get();
+        assert(addr->getType().isAddress());
+        SymbolicValue addrVal = getSingleWriterAddressValue(addr);
+        if (!addrVal.isConstant())
+          return addrVal;
+        SymbolicValue eltCst = loadAddrValue(addr, addrVal);
+        if (!eltCst.isConstant())
+          return eltCst;
+        elementConstants.push_back(eltCst);
+      }
+    }
+
+    auto arrayType = apply->getType().castTo<TupleType>()->getElementType(0);
+    auto arrayEltType = getArrayElementType(arrayType);
+    assert(arrayEltType && "Couldn't understand Swift.Array type?");
+
+    // Build this value as an array of elements.  Wrap it up into a memory
+    // object with an address refering to it.
+    auto arrayVal = SymbolicValue::getArray(elementConstants,
+                                            arrayEltType->getCanonicalType(),
+                                            evaluator.getASTContext());
+
+    auto *memObject = SymbolicValueMemoryObject::create(
+        arrayType, arrayVal, evaluator.getASTContext());
+
+    // Okay, now we have the array memory object, return the indirect array
+    // value and the pointer object we need for the tuple result.
+    auto indirectArr = SymbolicValue::getArrayAddress(memObject);
+
+    // The address notationally points to the first element of the array.
+    auto address =
+        SymbolicValue::getAddress(memObject, {0}, evaluator.getASTContext());
+
+    setValue(apply, SymbolicValue::getAggregate({indirectArr, address},
+                                                 evaluator.getASTContext()));
+    return None;
+  }
+  }
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;
@@ -1222,4 +1346,227 @@ void ConstExprEvaluator::computeConstantValues(
     // at.  We don't want lots of constants folded to trigger a limit.
     numInstEvaluated = 0;
   }
+}
+
+/// Analyze the array users of an _allocateUninitialized call, to see if they
+/// are all simple things we can remove.  If so, add them all to
+/// `removableArrayInsts` and return false.  If not, return true.
+static bool getRemovableArrayInitUses(SILValue v,
+                                      SmallPtrSet<SILInstruction *, 8>
+                                          *removableArrayInsts) {
+  for (auto *use : v->getUses()) {
+    auto *user = use->getUser();
+
+    // We can always remove retain/release instructions and debug_value.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<RetainValueInst>(user) || isa<ReleaseValueInst>(user) ||
+        isa<DebugValueInst>(user)) {
+      if (removableArrayInsts)
+        removableArrayInsts->insert(user);
+      continue;
+    }
+
+    // We can look through unpacking and repacking of structs that eventually
+    // turn into a retain or release.
+    if (isa<StructExtractInst>(user) || isa<StructInst>(user)) {
+      if (removableArrayInsts)
+        removableArrayInsts->insert(user);
+      if (getRemovableArrayInitUses(user->getResults()[0], removableArrayInsts))
+        return true;
+      continue;
+    }
+
+    // Oops we found an unknown use!
+    return true;
+  }
+  return false;
+}
+
+/// Try to decode the specified apply of the _allocateUninitializedArray
+/// function in the standard library.  This attempts to figure out how the
+/// resulting elements will be initialized.  This fills in the result with a
+/// lists of insts used to pass element addresses for initialization, and
+/// returns false on success.
+///
+/// Specifically, `elementsAtInit[i]` is an operand, where the associated
+/// instruction returns the address for array element `i`, and the user of that
+/// operand is a writer for that array element. For example, the user can be a
+/// store inst into that array element.
+///
+/// If `removableArrayInsts` is non-null, if decoding succeeds, and if all uses
+/// of `apply` are involved in initializing the array, then
+/// `removableArrayInsts` gets all the instructions involved in initializing
+/// the array.  If `removableArrayInsts` is non-null and decoding succeeds, but
+/// there are other uses of `apply`, then `removableArrayInsts` gets emptied.
+/// If decoding fails, then the contents of `removableArrayInsts` is undefined.
+///
+/// Some example array element initializers that we can handle:
+/// 1. %78 below
+///   %78 = index_addr %73 : $*Int32, %77 : $Builtin.Word // user: %86
+///   function_ref SignedInteger<>.init<A>(_:)
+///   %85 = function_ref @... // user: %86
+///   // Here the func call writes to %78.
+///   %86 = apply %85<Int32, Int>(%78, %83, %80) : $@convention(method)
+///
+/// 2. %132 below, and similar insts that initialize other tuple elts of %131.
+///   %132 = tuple_element_addr %131 : $*(Int32, Int32, Int32, Int32), 0
+///
+bool ConstExprEvaluator::decodeAllocUninitializedArray(
+    ApplyInst *apply, uint64_t numElements,
+    SmallVectorImpl<Operand*> &elementsAtInit,
+    SmallPtrSet<SILInstruction *, 8> *removableArrayInsts) {
+  elementsAtInit.resize(numElements);
+
+  // The apply is part of the call.
+  if (removableArrayInsts)
+    removableArrayInsts->insert(apply);
+
+  // Keep track of whether we have any unknown users.  If so, the caller cannot
+  // remove the initializer.
+  bool hadNonRemovableUsers = false;
+
+  // The call has a tuple return type, see if we can walk all uses of them to
+  // analyze them and find the stores/apply's to the elements.
+  for (auto *use : apply->getUses()) {
+    auto *user = use->getUser();
+
+    // Ignore these users.
+    if (isa<RetainValueInst>(user) || isa<ReleaseValueInst>(user) ||
+        isa<DebugValueInst>(user)) {
+      if (removableArrayInsts)
+        removableArrayInsts->insert(user);
+      continue;
+    }
+
+    auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
+    if (!tupleExtract)
+      return true;
+    if (removableArrayInsts)
+      removableArrayInsts->insert(tupleExtract);
+
+    // If this is the array result of _allocateUninitialized, try to determine
+    // whether there is anything that would prevent removing the allocation.
+    if (tupleExtract->getFieldNo() == 0) {
+      hadNonRemovableUsers |= getRemovableArrayInitUses(tupleExtract,
+                                                        removableArrayInsts);
+      continue;
+    }
+
+    // Otherwise, it must be the pointer result.
+    assert(tupleExtract->getFieldNo() == 1 && "allocUninit has two results");
+
+    // Look through pointer_to_address
+    auto pointer2addr =
+        tupleExtract->getSingleUserOfType<PointerToAddressInst>();
+    if (!pointer2addr)
+      return true;
+    if (removableArrayInsts)
+      removableArrayInsts->insert(pointer2addr);
+
+    // Okay, process the use list of the pointer_to_address, each user of
+    // interest is either an index_addr inst that specifies an array element
+    // (see `index` below), or a writer to a specific array element. When we
+    // find such a use/user pair, set `elementsAtInit[index]` to it.
+    for (auto *use : pointer2addr->getUses()) {
+      auto *user = use->getUser();
+
+      uint64_t index = 0;
+      if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+        if (removableArrayInsts)
+          removableArrayInsts->insert(iai);
+
+        auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
+        if (!ili)
+          return true;
+
+        index = ili->getValue().getLimitedValue();
+        use = iai->getSingleUse();
+        if (!use)
+          return true;
+        user = use->getUser();
+      }
+
+      // We handle the cases that the element is either set by a store or
+      // filled via an apply.
+      if (auto *store = dyn_cast<StoreInst>(user)) {
+        if (store->getDest() != use->get())
+          return true;
+        if (removableArrayInsts)
+          removableArrayInsts->insert(store);
+      } else if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
+        // In this case, the element's address is passed to an apply where
+        // the initialization happens in-place.  For example, the SIL snippet
+        // may look like below:
+        //
+        //   %input_value_addr = something $*Int
+        //   %elt_ty = metatype $@thick Int32.Type
+        //   %elt_addr = something $*Int32
+        //   %func = function_ref SignedInteger<>.init<A>(_:)
+        //   %user = apply %func<Int32, Int>(%elt_addr, %input_value_addr, %elt_ty) : $@convention(method) <U, V> (@in V, @thick U.Type) -> @out U
+        //
+        // Here, %elt_addr is used as a @out parameter by the apply, and gets
+        // filled with the value in %input_value_addr.
+
+        // Check to see if this is an out-parameter (i.e., like a store).
+        auto conventions = applyInst->getSubstCalleeConv();
+        unsigned numIndirectResults = conventions.getNumIndirectSILResults();
+        unsigned argIndex = use->getOperandNumber() - 1;
+        if (argIndex >= numIndirectResults)
+          return true;
+        // An apply can have arbitrary side effects, so let's be conservative.
+        hadNonRemovableUsers = true;
+      } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+        // In this case, the element's address is passed to a copy_addr, which
+        // sets the value. For example, let %178 be the index_addr inst, the SIL
+        // snippet that initializes the value given by index_addr might look
+        // like the following, where we set `elementsAtInit[index]` to
+        // %178. Caller will then const-evaluate %191 (the user of %178), which
+        // const-evaluates %179, which involves const-evaluating %183, where the
+        // writer to that tuple elt address is "copy_addr %114". Eventually it
+        // const-evaluates %101 to fill in the value for %183. The continues
+        // until the writer insts of all the other tuple elements of %179 are
+        // const-evaluated, yielding a const tuple for %179. This finally gives
+        // us the const value at address %178.
+        //
+        //   %101 = tuple_extract %96 : $(Int32, Int32, Int32, Int32), 3
+        //   %108 = alloc_stack $Int32
+        //   store %101 to %108 : $*Int32
+        //   %114 = tuple_element_addr %110 : $*(Int32, Int32, Int32, Int32), 3
+        //   %121 = tuple_element_addr %110 : $*(Int32, Int32, Int32, Int32), 3
+        //   copy_addr [take] %108 to [initialization] %121 : $*Int32
+        //   copy_addr %114 to [initialization] %183 : $*Int32
+        //   %177 = integer_literal $Builtin.Word, 3
+        //   %178 = index_addr %130 : $*Int32, %177
+        //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
+        //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+        //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+        //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+
+        if (cai->getOperand(1) != use->get())
+          return true;
+        if (removableArrayInsts)
+          removableArrayInsts->insert(cai);
+      } else
+        return true;
+
+      // Check to see if we have a valid index that hasn't been recorded yet.
+      if (index >= elementsAtInit.size() || elementsAtInit[index])
+        return true;
+
+      // If we got a store/apply to a valid index, it must be our element.
+      elementsAtInit[index] = use;
+
+      // Track how many elements we see so we can know if we got them all.
+      --numElements;
+    }
+  }
+
+  // Make sure that all of the elements were found.
+  if (numElements != 0)
+    return true;
+
+  if (hadNonRemovableUsers && removableArrayInsts)
+    removableArrayInsts->clear();
+
+  return false;
 }

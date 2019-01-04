@@ -27,6 +27,7 @@ public struct _DependenceToken {
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
 @inlinable // FIXME(inline-always)
 @inline(__always)
+@_semantics("array.allocate_uninitialized")
 public // COMPILER_INTRINSIC
 func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
     -> (Array<Element>, Builtin.RawPointer) {

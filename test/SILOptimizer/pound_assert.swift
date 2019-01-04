@@ -455,3 +455,59 @@ func testStructPassedAsProtocols() {
   #assert(callProtoSimpleMethod(s) == 0) // expected-error {{#assert condition not constant}}
     // expected-note@-1 {{could not fold operation}}
 }
+
+//===----------------------------------------------------------------------===//
+// Arrays
+//
+// TODO: The constant evaluator does not implement any array access operations,
+// so theses tests cannot test that the implemented array operations produce
+// correct values in the arrays. These tests only test that the implemented
+// array operations do not crash or produce unknown values. As soon as we have
+// array access operations, modify these tests to check the values in the
+// arrays.
+//===----------------------------------------------------------------------===//
+
+struct ContainsArray {
+  let x: Int
+  let arr: [Int]
+}
+
+func arrayInitEmptyTopLevel() {
+  let c = ContainsArray(x: 1, arr: [])
+  #assert(c.x == 1)
+}
+
+func arrayInitNonEmptyTopLevel() {
+  let c = ContainsArray(x: 1, arr: [2, 3, 4])
+  #assert(c.x == 1)
+}
+
+func arrayInitNonConstantElementTopLevel(x: Int) {
+  // expected-note @+1 {{could not fold operation}}
+  let c = ContainsArray(x: 1, arr: [x])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+// TODO: More work necessary for flow-sensitive array initialization to work.
+// expected-note @+1 {{could not fold operation}}
+func arrayInitEmptyFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: [])
+}
+
+func invokeArrayInitEmptyFlowSensitive() {
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{when called from here}}
+  #assert(arrayInitEmptyFlowSensitive().x == 1)
+}
+
+func arrayInitNonEmptyFlowSensitive() -> ContainsArray {
+  // expected-note @+1 {{could not fold operation}}
+  return ContainsArray(x: 1, arr: [2, 3, 4])
+}
+
+func invokeArrayInitFlowSensitive() {
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{when called from here}}
+  #assert(arrayInitNonEmptyFlowSensitive().x == 1)
+}

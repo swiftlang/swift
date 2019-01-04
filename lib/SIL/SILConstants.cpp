@@ -89,6 +89,27 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "\n";
     break;
   }
+  case RK_Array:
+  case RK_ArrayAddress: {
+    CanType elementType;
+    ArrayRef<SymbolicValue> elements = getArrayValue(elementType);
+    os << "array<" << elementType << ">: " << elements.size();
+    switch (elements.size()) {
+    case 0:
+      os << " elements []\n";
+      return;
+    case 1:
+      os << " elt: ";
+      elements[0].print(os, indent + 2);
+      return;
+    default:
+      os << " elements [\n";
+      for (auto elt : elements)
+        elt.print(os, indent + 2);
+      os.indent(indent) << "]\n";
+      return;
+    }
+  }
   }
 }
 
@@ -114,6 +135,9 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DirectAddress:
   case RK_DerivedAddress:
     return Address;
+  case RK_Array:
+  case RK_ArrayAddress:
+    return Array;
   }
 }
 
@@ -146,6 +170,16 @@ SymbolicValue::cloneInto(ASTContext &astContext) const {
     auto *newMemObject = SymbolicValueMemoryObject::create(
         memObject->getType(), memObject->getValue(), astContext);
     return getAddress(newMemObject, accessPath, astContext);
+  }
+  case RK_Array:
+  case RK_ArrayAddress: {
+    CanType elementType;
+    auto elts = getArrayValue(elementType);
+    SmallVector<SymbolicValue, 4> results;
+    results.reserve(elts.size());
+    for (auto elt : elts)
+      results.push_back(elt.cloneInto(astContext));
+    return getArray(results, elementType, astContext);
   }
   }
 }
@@ -413,6 +447,82 @@ SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// This is the representation of a derived address.  A derived address refers
+/// to a memory object along with an access path that drills into it.
+struct ArraySymbolicValue final
+    : private llvm::TrailingObjects<ArraySymbolicValue, SymbolicValue> {
+  friend class llvm::TrailingObjects<ArraySymbolicValue, SymbolicValue>;
+
+  const CanType elementType;
+
+  /// This is the number of indices in the derived address.
+  const unsigned numElements;
+
+  static ArraySymbolicValue *create(ArrayRef<SymbolicValue> elements,
+                                    CanType elementType,
+                                    ASTContext &astContext) {
+    auto byteSize =
+        ArraySymbolicValue::totalSizeToAlloc<SymbolicValue>(elements.size());
+    auto rawMem = astContext.Allocate(byteSize, alignof(ArraySymbolicValue));
+
+    //  Placement initialize the object.
+    auto asv = ::new (rawMem) ArraySymbolicValue(elementType, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            asv->getTrailingObjects<SymbolicValue>());
+    return asv;
+  }
+
+  /// Return the element constants for this aggregate constant.  These are
+  /// known to all be constants.
+  ArrayRef<SymbolicValue> getElements() const {
+    return {getTrailingObjects<SymbolicValue>(), numElements};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
+    return numElements;
+  }
+
+private:
+  ArraySymbolicValue() = delete;
+  ArraySymbolicValue(const ArraySymbolicValue &) = delete;
+  ArraySymbolicValue(CanType elementType, unsigned numElements)
+      : elementType(elementType), numElements(numElements) {}
+};
+} // end namespace swift
+
+/// Produce an array of elements.
+SymbolicValue SymbolicValue::getArray(ArrayRef<SymbolicValue> elements,
+                                      CanType elementType,
+                                      ASTContext &astContext) {
+  // TODO: Could compress the empty array representation if there were a reason
+  // to.
+  auto asv = ArraySymbolicValue::create(elements, elementType, astContext);
+  SymbolicValue result;
+  result.representationKind = RK_Array;
+  result.value.array = asv;
+  return result;
+}
+
+ArrayRef<SymbolicValue>
+SymbolicValue::getArrayValue(CanType &elementType) const {
+  assert(getKind() == Array);
+  auto val = *this;
+  if (representationKind == RK_ArrayAddress)
+    val = value.arrayAddress->getValue();
+
+  assert(val.representationKind == RK_Array);
+
+  elementType = val.value.array->elementType;
+  return val.value.array->getElements();
+}
+
+//===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
 
@@ -545,22 +655,32 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   if (aggregate.getKind() == SymbolicValue::UninitMemory)
     return SymbolicValue::getUninitMemory();
 
-  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::Array) &&
          "the accessPath is invalid for this type");
 
   unsigned elementNo = accessPath.front();
 
-  SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
+  SymbolicValue elt;
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
-  } else if (auto tuple = type->getAs<TupleType>()) {
-    assert(elementNo < tuple->getNumElements() && "invalid index");
-    eltType = tuple->getElement(elementNo).getType();
+
+  // We need to have an array, struct or a tuple type.
+  if (aggregate.getKind() == SymbolicValue::Array) {
+    CanType arrayEltTy;
+    elt = aggregate.getArrayValue(arrayEltTy)[elementNo];
+    eltType = arrayEltTy;
   } else {
-    llvm_unreachable("the accessPath is invalid for this type");
+    elt = aggregate.getAggregateValue()[elementNo];
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      auto it = decl->getStoredProperties().begin();
+      std::advance(it, elementNo);
+      eltType = (*it)->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
   }
 
   return getIndexedElement(elt, accessPath.drop_front(), eltType);
@@ -610,22 +730,33 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     aggregate = SymbolicValue::getAggregate(newElts, astCtx);
   }
 
-  assert(aggregate.getKind() == SymbolicValue::Aggregate &&
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::Array) &&
          "the accessPath is invalid for this type");
 
   unsigned elementNo = accessPath.front();
 
-  ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
+  ArrayRef<SymbolicValue> oldElts;
   Type eltType;
-  if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
-  } else if (auto tuple = type->getAs<TupleType>()) {
-    assert(elementNo < tuple->getNumElements() && "invalid index");
-    eltType = tuple->getElement(elementNo).getType();
+
+  // We need to have an array, struct or a tuple type.
+  if (aggregate.getKind() == SymbolicValue::Array) {
+    CanType arrayEltTy;
+    oldElts = aggregate.getArrayValue(arrayEltTy);
+    eltType = arrayEltTy;
   } else {
-    llvm_unreachable("the accessPath is invalid for this type");
+    oldElts = aggregate.getAggregateValue();
+
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      auto it = decl->getStoredProperties().begin();
+      std::advance(it, elementNo);
+      eltType = (*it)->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
   }
 
   // Update the indexed element of the aggregate.
@@ -634,7 +765,11 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
                                          accessPath.drop_front(), newElement,
                                          eltType, astCtx);
 
-  aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+  if (aggregate.getKind() == SymbolicValue::Aggregate)
+    aggregate = SymbolicValue::getAggregate(newElts, astCtx);
+  else
+    aggregate = SymbolicValue::getArray(newElts, eltType->getCanonicalType(),
+                                        astCtx);
 
   return aggregate;
 }
