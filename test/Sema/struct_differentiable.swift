@@ -108,11 +108,13 @@ struct DifferentiableSubset : Differentiable {
  
   @_fieldwiseProductSpace
   struct TangentVector : Differentiable, VectorNumeric {
+    typealias CotangentVector = DifferentiableSubset.CotangentVector
     var w: Float
     var b: Float
   }
   @_fieldwiseProductSpace
   struct CotangentVector : Differentiable, VectorNumeric {
+    typealias CotangentVector = DifferentiableSubset.TangentVector
     var w: Float
     var b: Float
   }
