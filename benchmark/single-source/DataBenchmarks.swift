@@ -18,11 +18,13 @@ let skip: [BenchmarkCategory] = [.validation, .api, .Data, .skip]
 
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
-    runFunction: run_createEmpty, tags: d),
+    runFunction: { for _ in 0..<$0*100_000 { blackHole(Data()) } }, tags: d),
   BenchmarkInfo(name: "DataCreateSmall",
-    runFunction: run_createSmall, tags: d),
+    runFunction: { for _ in 0..<$0*100_000 { blackHole(sampleData(.small)) } },
+    tags: d),
   BenchmarkInfo(name: "DataCreateMedium",
-    runFunction: run_createMedium, tags: d),
+    runFunction: { for _ in 0..<$0*10_000 { blackHole(sampleData(.medium)) } },
+    tags: d),
 
   BenchmarkInfo(name: "DataCreateEmptyArray",
     runFunction: { for _ in 0..<$0*100_000 { blackHole(Data([])) } }, tags: d),
@@ -414,27 +416,6 @@ public func run_AppendDataLargeToLarge(_ N: Int) {
   let data = sampleData(.large)
   let other = sampleData(.large)
   benchmark_AppendData(N, data, other)
-}
-
-@inline(never)
-public func run_createEmpty(_ N: Int) {
-  for _ in 0..<100000 * N {
-    blackHole(Data())
-  }
-}
-
-@inline(never)
-public func run_createSmall(_ N: Int) {
-  for _ in 0..<100000 * N {
-    blackHole(sampleData(.small))
-  }
-}
-
-@inline(never)
-public func run_createMedium(_ N: Int) {
-  for _ in 0..<10000 * N {
-    blackHole(sampleData(.medium))
-  }
 }
 
 @inline(never)
