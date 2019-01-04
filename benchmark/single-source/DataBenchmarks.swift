@@ -37,9 +37,9 @@ public let DataBenchmarks = [
     runFunction: run_SubscriptMedium, tags: d),
 
   BenchmarkInfo(name: "DataCountSmall",
-    runFunction: run_CountSmall, tags: d),
+    runFunction: { count($0, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCountMedium",
-    runFunction: run_CountMedium, tags: d),
+    runFunction: { count($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataSetCountSmall",
     runFunction: run_SetCountSmall, tags: d),
@@ -282,19 +282,8 @@ public func run_SubscriptMedium(_ N: Int) {
 }
 
 @inline(never)
-public func run_CountSmall(_ N: Int) {
-  let data = sampleData(.small)
+public func count(_ N: Int, data: Data) {
   for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
-    blackHole(data.count)
-  }
-}
-
-@inline(never)
-public func run_CountMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  for _ in 0..<10000*N {
-    // Ensure that the compiler does not optimize away this call
     blackHole(data.count)
   }
 }
