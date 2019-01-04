@@ -14,7 +14,6 @@ import TestsUtils
 import Foundation
 
 let d: [BenchmarkCategory] =  [.validation, .api, .Data]
-let skip: [BenchmarkCategory] = [.validation, .api, .Data, .skip]
 
 public let DataBenchmarks = [
   BenchmarkInfo(name: "DataCreateEmpty",
@@ -87,12 +86,15 @@ public let DataBenchmarks = [
   BenchmarkInfo(name: "DataReplaceLarge", runFunction: {
     replace($0, data: medium, subrange:431..<809, with: large) }, tags: d),
 
-  BenchmarkInfo(name: "DataReplaceSmallBuffer",
-    runFunction: run_ReplaceSmallBuffer, tags: d),
-  BenchmarkInfo(name: "DataReplaceMediumBuffer",
-    runFunction: run_ReplaceMediumBuffer, tags: d),
-  BenchmarkInfo(name: "DataReplaceLargeBuffer",
-    runFunction: run_ReplaceLargeBuffer, tags: skip),
+  BenchmarkInfo(name: "DataReplaceSmallBuffer", runFunction: {
+    replaceBuffer($0, data: medium, subrange:431..<809, with: small) },
+    tags: d),
+  BenchmarkInfo(name: "DataReplaceMediumBuffer", runFunction: {
+    replaceBuffer($0, data: medium, subrange:431..<809, with: medium) },
+    tags: d),
+  BenchmarkInfo(name: "DataReplaceLargeBuffer", runFunction: {
+    replaceBuffer($0, data: medium, subrange:431..<809, with: large) },
+    tags: d),
 
   BenchmarkInfo(name: "DataAppendSequence",
     runFunction: { append($0, sequenceLength: 809, to: medium) }, tags: d),
@@ -262,10 +264,20 @@ func replace(
   }
 }
 
-func benchmark_ReplaceBuffer(_ N: Int, _ range: Range<Data.Index>, _ data_: Data, _ replacement: UnsafeBufferPointer<UInt8>) {
-  for _ in 0..<10000*N {
-    var data = data_
-    data.replaceSubrange(range, with: replacement)
+@inline(never)
+func replaceBuffer(
+  _ N: Int,
+  data: Data,
+  subrange range: Range<Data.Index>,
+  with replacement: Data
+) {
+  replacement.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
+    let buffer = UnsafeBufferPointer(start: bytes, count: replacement.count)
+
+    for _ in 0..<10000*N {
+      var copy = data
+      copy.replaceSubrange(range, with: buffer)
+    }
   }
 }
 
@@ -293,36 +305,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
   for _ in 0..<10000*N {
     copy.count = count
     copy.count = orig
-  }
-}
-
-@inline(never)
-public func run_ReplaceSmallBuffer(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.small)
-  let sz = replacement.count
-  replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
-    benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
-  }
-}
-
-@inline(never)
-public func run_ReplaceMediumBuffer(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.medium)
-  let sz = replacement.count
-  replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
-    benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
-  }
-}
-
-@inline(never)
-public func run_ReplaceLargeBuffer(_ N: Int) {
-  let data = sampleData(.medium)
-  let replacement = sampleData(.large)
-  let sz = replacement.count
-  replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
-    benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
   }
 }
 
