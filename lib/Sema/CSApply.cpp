@@ -2546,7 +2546,17 @@ namespace {
               auto resultValue = result.getValueDecl();
               
               if (isa<EnumElementDecl>(resultValue) || isa<VarDecl>(resultValue)) {
-                tc.diagnose(DSCE->getLoc(), swift::diag::ambiguous_enum_case, baseTypeNominal->getDeclaredType()->getString(), memberName);
+                auto baseTypeName = baseTypeNominal->getDeclaredType()->getString();
+                auto loc = DSCE->getLoc();
+                auto startLoc = DSCE->getStartLoc();
+                
+                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref, baseTypeName, memberName);
+                
+                tc.diagnose(loc, swift::diag::optional_fixit_for_optional_ambiguous_case_ref)
+                .fixItInsert(startLoc, "Optional");
+                tc.diagnose(loc, swift::diag::type_fixit_for_optional_ambiguous_case_ref, baseTypeName, memberName)
+                .fixItInsert(startLoc, baseTypeName);
+                
                 break;
               }
             }
