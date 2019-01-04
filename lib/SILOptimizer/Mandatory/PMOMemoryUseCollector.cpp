@@ -23,21 +23,8 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                  PMOMemoryObjectInfo Implementation
+//                     PMOMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
-
-static unsigned getElementCountRec(SILModule &Module, SILType T) {
-  // If this is a tuple, it is always recursively flattened.
-  if (CanTupleType TT = T.getAs<TupleType>()) {
-    unsigned NumElements = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++)
-      NumElements += getElementCountRec(Module, T.getTupleElementType(i));
-    return NumElements;
-  }
-
-  // Otherwise, it is a single element.
-  return 1;
-}
 
 PMOMemoryObjectInfo::PMOMemoryObjectInfo(AllocationInst *allocation)
     : MemoryInst(allocation) {
@@ -55,81 +42,6 @@ PMOMemoryObjectInfo::PMOMemoryObjectInfo(AllocationInst *allocation)
 
 SILInstruction *PMOMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
-}
-
-/// Given a symbolic element number, return the type of the element.
-static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo) {
-  // If this is a tuple type, walk into it.
-  if (CanTupleType TT = T.getAs<TupleType>()) {
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
-      auto FieldType = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldType);
-      if (EltNo < NumFieldElements)
-        return getElementTypeRec(Module, FieldType, EltNo);
-      EltNo -= NumFieldElements;
-    }
-    // This can only happen if we look at a symbolic element number of an empty
-    // tuple.
-    llvm::report_fatal_error("invalid element number");
-  }
-
-  // Otherwise, it is a leaf element.
-  assert(EltNo == 0);
-  return T;
-}
-
-/// getElementTypeRec - Return the swift type of the specified element.
-SILType PMOMemoryObjectInfo::getElementType(unsigned EltNo) const {
-  auto &Module = MemoryInst->getModule();
-  return getElementTypeRec(Module, MemorySILType, EltNo);
-}
-
-/// Push the symbolic path name to the specified element number onto the
-/// specified std::string.
-static void getPathStringToElementRec(SILModule &Module, SILType T,
-                                      unsigned EltNo, std::string &Result) {
-  if (CanTupleType TT = T.getAs<TupleType>()) {
-    unsigned FieldNo = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
-      auto Field = TT->getElement(i);
-      SILType FieldTy = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldTy);
-
-      if (EltNo < NumFieldElements) {
-        Result += '.';
-        if (Field.hasName())
-          Result += Field.getName().str();
-        else
-          Result += llvm::utostr(FieldNo);
-        return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
-      }
-
-      EltNo -= NumFieldElements;
-
-      ++FieldNo;
-    }
-    llvm_unreachable("Element number is out of range for this type!");
-  }
-
-  // Otherwise, there are no subelements.
-  assert(EltNo == 0 && "Element count problem");
-}
-
-ValueDecl *
-PMOMemoryObjectInfo::getPathStringToElement(unsigned Element,
-                                            std::string &Result) const {
-  auto &Module = MemoryInst->getModule();
-
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
-    Result = VD->getBaseName().userFacingName();
-  else
-    Result = "<unknown>";
-
-  // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(Module, MemorySILType, Element, Result);
-
-  // Otherwise, we can't.
-  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

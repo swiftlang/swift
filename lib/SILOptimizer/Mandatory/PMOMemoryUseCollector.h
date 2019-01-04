@@ -98,15 +98,6 @@ public:
   AllocBoxInst *getContainer() const {
     return dyn_cast<AllocBoxInst>(MemoryInst);
   }
-
-  /// getElementType - Return the swift type of the specified element.
-  SILType getElementType(unsigned EltNo) const;
-
-  /// Push the symbolic path name to the specified element number onto the
-  /// specified std::string.  If the actual decl (or a subelement thereof) can
-  /// be determined, return it.  Otherwise, return null.
-  ValueDecl *getPathStringToElement(unsigned Element,
-                                    std::string &Result) const;
 };
 
 enum PMOUseKind {
