@@ -42,11 +42,9 @@ public let DataBenchmarks = [
     runFunction: { count($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataSetCountSmall",
-    runFunction: run_SetCountSmall, tags: d),
+    runFunction: { setCount($0, data: small, extra: 3) }, tags: d),
   BenchmarkInfo(name: "DataSetCountMedium",
-    runFunction: run_SetCountMedium, tags: d),
-  BenchmarkInfo(name: "DataSetCountLarge",
-    runFunction: run_SetCountLarge, tags: skip),
+    runFunction: { setCount($0, data: medium, extra: 100) }, tags: d),
 
   BenchmarkInfo(name: "DataAccessBytesSmall",
     runFunction: run_AccessBytesSmall, tags: d),
@@ -269,35 +267,13 @@ public func count(_ N: Int, data: Data) {
 }
 
 @inline(never)
-public func run_SetCountSmall(_ N: Int) {
-  var data = sampleData(.small)
-  let count = data.count + 3
+public func setCount(_ N: Int, data: Data, extra: Int) {
+  var copy = data
+  let count = data.count + extra
   let orig = data.count
   for _ in 0..<10000*N {
-    data.count = count
-    data.count = orig
-  }
-}
-
-@inline(never)
-public func run_SetCountMedium(_ N: Int) {
-  var data = sampleData(.medium)
-  let count = data.count + 100
-  let orig = data.count
-  for _ in 0..<10000*N {
-    data.count = count
-    data.count = orig
-  }
-}
-
-@inline(never)
-public func run_SetCountLarge(_ N: Int) {
-  var data = sampleData(.large)
-  let count = data.count + 100
-  let orig = data.count
-  for _ in 0..<10000*N {
-    data.count = count
-    data.count = orig
+    copy.count = count
+    copy.count = orig
   }
 }
 
