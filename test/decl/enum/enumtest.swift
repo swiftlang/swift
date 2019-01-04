@@ -384,10 +384,10 @@ let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<Foo
 let _: FooStruct = .none // ok
 
 struct NestedBazEnum {
-	enum Baz {
-		case one
-		case none
-	}
+  enum Baz {
+    case one
+    case none
+  }
 }
 
 let _: NestedBazEnum.Baz? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnum.Baz>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}} {{28-28=Optional}} {{28-28=NestedBazEnum.Baz}}
@@ -398,10 +398,10 @@ let _: NestedBazEnum.Baz? = .one // ok
 let _: NestedBazEnum.Baz?? = .one // ok
 
 struct NestedBazEnumGeneric {
-	enum Baz<T> {
-		case one
-		case none
-	}
+  enum Baz<T> {
+    case one
+    case none
+  }
 }
 
 let _: NestedBazEnumGeneric.Baz<Int>? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnumGeneric.Baz<Int>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}} {{40-40=Optional}} {{40-40=NestedBazEnumGeneric.Baz<Int>}}
