@@ -328,12 +328,17 @@ enum Lens<T> {
 }
 
 enum Foo {
-	case bar
-	case none
+  case bar
+  case none
 }
 
+<<<<<<< HEAD
 let _: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
 let _: Foo?? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+=======
+let _: Foo? = .none // expected-warning {{the enum case is ambiguous}}
+let _: Foo?? = .none // expected-warning {{the enum case is ambiguous}}
+>>>>>>> 07fb819e37c89901a10c7bf58679def5c8e544be
 
 let _: Foo = .none // ok
 let _: Foo = .bar // ok
@@ -343,9 +348,12 @@ let _: Foo = Foo.bar // ok
 let _: Foo = Foo.none // ok
 let _: Foo? = Foo.none // ok
 let _: Foo?? = Foo.none // ok
+<<<<<<< HEAD
 
 func baz(_: Foo?) {}
 baz(.none) // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
 
 let test: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
 let answer = test == .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+=======
+>>>>>>> 07fb819e37c89901a10c7bf58679def5c8e544be
