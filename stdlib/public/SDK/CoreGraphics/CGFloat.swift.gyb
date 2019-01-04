@@ -78,6 +78,10 @@ extension CGFloat : BinaryFloatingPoint {
   public typealias RawSignificand = UInt
   public typealias Exponent = Int
 
+  // SWIFT_ENABLE_TENSORFLOW
+  public typealias TangentVector = CGFloat
+  public typealias CotangentVector = CGFloat
+
   @_transparent
   public static var exponentBitCount: Int {
     return NativeType.exponentBitCount

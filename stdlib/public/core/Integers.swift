@@ -205,7 +205,7 @@ public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  override static func *(lhs: Self, rhs: Self) -> Self
+  static func *(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
@@ -213,7 +213,7 @@ public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  override static func *=(lhs: inout Self, rhs: Self)
+  static func *=(lhs: inout Self, rhs: Self)
 }
 
 /// A type that can represent both positive and negative values.
