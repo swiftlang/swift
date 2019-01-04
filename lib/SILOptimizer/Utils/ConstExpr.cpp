@@ -38,6 +38,12 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // general framework.
 
 enum class WellKnownFunction {
+  // Array.init()
+  ArrayInitEmpty,
+  // Array._allocateUninitializedArray
+  AllocateUninitializedArray,
+  // Array.append(_:)
+  ArrayAppendElement,
   // String.init()
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
@@ -53,6 +59,12 @@ enum class WellKnownFunction {
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
+  if (fn->hasSemanticsAttr("array.init.empty"))
+    return WellKnownFunction::ArrayInitEmpty;
+  if (fn->hasSemanticsAttr("array.uninitialized_intrinsic"))
+    return WellKnownFunction::AllocateUninitializedArray;
+  if (fn->hasSemanticsAttr("array.append_element"))
+    return WellKnownFunction::ArrayAppendElement;
   if (fn->hasSemanticsAttr("string.init_empty"))
     return WellKnownFunction::StringInitEmpty;
   // There are two string initializers in the standard library with the
@@ -430,6 +442,29 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value))
     return getConstantValue(cast<SingleValueInstruction>(value)->getOperand(0));
 
+  // Builtin.RawPointer and addresses have the same representation.
+  if (auto *p2ai = dyn_cast<PointerToAddressInst>(value))
+    return getConstantValue(p2ai->getOperand());
+
+  // Indexing a pointer moves the deepest index of the access path it represents
+  // within a memory object. For example, if a pointer p represents the access
+  // path [1, 2] within a memory object, p + 1 represents [1, 3]
+  if (auto *ia = dyn_cast<IndexAddrInst>(value)) {
+    auto index = getConstantValue(ia->getOperand(1));
+    if (!index.isConstant())
+      return index;
+    auto basePtr = getConstantValue(ia->getOperand(0));
+    if (basePtr.getKind() != SymbolicValue::Address)
+      return basePtr;
+
+    SmallVector<unsigned, 4> accessPath;
+    auto *memObject = basePtr.getAddressValue(accessPath);
+    assert(!accessPath.empty() && "Can't index a non-indexed address");
+    accessPath.back() += index.getIntegerValue().getLimitedValue();
+    return SymbolicValue::getAddress(memObject, accessPath,
+                                     evaluator.getAllocator());
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -732,6 +767,15 @@ extractStaticStringValue(SymbolicValue staticString) {
   return staticStringProps[0].getStringValue();
 }
 
+/// If the specified type is a Swift.Array of some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static Type getArrayElementType(Type ty) {
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+}
+
 /// Given a call to a well known function, collect its arguments as constants,
 /// fold it, and return None.  If any of the arguments are not constants, marks
 /// the call's results as Unknown, and return an Unknown with information about
@@ -768,6 +812,134 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     return evaluator.getUnknown(
         (SILInstruction *)apply,
         UnknownReason::createTrap(message, evaluator.getAllocator()));
+  }
+  case WellKnownFunction::ArrayInitEmpty: { // Array.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array.init() signature");
+
+    auto typeValue = getConstantValue(apply->getOperand(1));
+    if (typeValue.getKind() != SymbolicValue::Metatype) {
+      return typeValue.isConstant()
+                 ? getUnknown(evaluator, (SILInstruction *)apply,
+                              UnknownReason::InvalidOperandValue)
+                 : typeValue;
+    }
+    Type arrayType = typeValue.getMetatypeValue();
+
+    // Create an empty SymbolicArrayStorage and then create a SymbolicArray
+    // using it.
+    SymbolicValue arrayStorage = SymbolicValue::getSymbolicArrayStorage(
+        {}, getArrayElementType(arrayType)->getCanonicalType(),
+        evaluator.getAllocator());
+    auto arrayVal = SymbolicValue::getArray(arrayType, arrayStorage,
+                                            evaluator.getAllocator());
+    setValue(apply, arrayVal);
+    return None;
+  }
+  case WellKnownFunction::AllocateUninitializedArray: {
+    // This function has this signature:
+    //   func _allocateUninitializedArray<Element>(_ builtinCount: Builtin.Word)
+    //     -> (Array<Element>, Builtin.RawPointer)
+    assert(conventions.getNumParameters() == 1 &&
+           conventions.getNumDirectSILResults() == 2 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected _allocateUninitializedArray signature");
+
+    // Figure out the allocation size.
+    auto numElementsSV = getConstantValue(apply->getOperand(1));
+    if (!numElementsSV.isConstant())
+      return numElementsSV;
+
+    unsigned numElements = numElementsSV.getIntegerValue().getLimitedValue();
+
+    // Allocating uninitialized arrays is supported only in flow-sensitive mode.
+    // TODO: the top-level mode in the interpreter should be phased out.
+    if (!fn)
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::Default);
+
+    SmallVector<SymbolicValue, 8> elementConstants;
+    // Set array elements to uninitialized state. Subsequent stores through
+    // their addresses will initialize the elements.
+    elementConstants.assign(numElements, SymbolicValue::getUninitMemory());
+
+    Type arrayType = apply->getType().castTo<TupleType>()->getElementType(0);
+    Type arrayEltType = getArrayElementType(arrayType);
+    assert(arrayEltType && "Couldn't understand Swift.Array type?");
+
+    // Create a SymbolicArrayStorage with \c elements and then create a
+    // SymbolicArray using it.
+    SymbolicValueAllocator &allocator = evaluator.getAllocator();
+    SymbolicValue arrayStorage = SymbolicValue::getSymbolicArrayStorage(
+        elementConstants, arrayEltType->getCanonicalType(), allocator);
+    SymbolicValue array =
+        SymbolicValue::getArray(arrayType, arrayStorage, allocator);
+
+    // Construct return value for this call, which is a pair consisting of the
+    // address of the first element of the array and the array.
+    SymbolicValue storageAddress = array.getAddressOfArrayElement(allocator, 0);
+    setValue(apply,
+             SymbolicValue::getAggregate({array, storageAddress}, allocator));
+    return None;
+  }
+  case WellKnownFunction::ArrayAppendElement: {
+    // This function has the following signature in SIL:
+    //    (@in Element, @inout Array<Element>) -> ()
+    assert(conventions.getNumParameters() == 2 &&
+           conventions.getNumDirectSILResults() == 0 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected Array.append(_:) signature");
+    // Get the element to be appended which is passed indirectly (@in).
+    SymbolicValue elementAddress = getConstantValue(apply->getOperand(1));
+    if (!elementAddress.isConstant())
+      return elementAddress;
+
+    auto invalidOperand = [&]() {
+      return getUnknown(evaluator, (SILInstruction *)apply,
+                        UnknownReason::InvalidOperandValue);
+    };
+    if (elementAddress.getKind() != SymbolicValue::Address) {
+      // TODO: store the operand number in the error message here.
+      return invalidOperand();
+    }
+
+    SmallVector<unsigned, 4> elementAP;
+    SymbolicValue element =
+        elementAddress.getAddressValue(elementAP)->getValue();
+
+    // Get the array value. The array is passed @inout.
+    SymbolicValue arrayAddress = getConstantValue(apply->getOperand(2));
+    if (!arrayAddress.isConstant())
+      return arrayAddress;
+    if (arrayAddress.getKind() != SymbolicValue::Address)
+      return invalidOperand();
+
+    SmallVector<unsigned, 4> arrayAP;
+    SymbolicValueMemoryObject *arrayMemoryObject =
+        arrayAddress.getAddressValue(arrayAP);
+    SymbolicValue arrayValue = arrayMemoryObject->getValue();
+    if (arrayValue.getKind() != SymbolicValue::Array) {
+      return invalidOperand();
+    }
+
+    // Create a new array storage by appending the \c element to the existing
+    // storage, and create a new array using the new storage.
+    SymbolicValue arrayStorage = arrayValue.getStorageOfArray();
+    CanType elementType;
+    ArrayRef<SymbolicValue> oldElements =
+        arrayStorage.getStoredElements(elementType);
+    SmallVector<SymbolicValue, 4> newElements(oldElements.begin(),
+                                              oldElements.end());
+    newElements.push_back(element);
+
+    SymbolicValueAllocator &allocator = evaluator.getAllocator();
+    SymbolicValue newStorage = SymbolicValue::getSymbolicArrayStorage(
+        newElements, elementType, allocator);
+    SymbolicValue newArray = SymbolicValue::getArray(arrayValue.getArrayType(),
+                                                     newStorage, allocator);
+    arrayMemoryObject->setIndexedElement(arrayAP, newArray, allocator);
+    return None;
   }
   case WellKnownFunction::StringInitEmpty: { // String.init()
     assert(conventions.getNumDirectSILResults() == 1 &&
