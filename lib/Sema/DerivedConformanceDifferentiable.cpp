@@ -461,7 +461,9 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  SmallVector<TypeLoc, 2> inherited{diffableType, addArithType};
+  auto *kpiProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
+  auto kpiType = TypeLoc::withoutLoc(kpiProto->getDeclaredType());
+  TypeLoc inherited[3] = {diffableType, addArithType, kpiType};
   auto *structDecl = new (C) StructDecl(SourceLoc(), vectorSpaceId, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
