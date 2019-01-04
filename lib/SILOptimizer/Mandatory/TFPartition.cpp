@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "tf-partition"
 #include "TFCanonicalizeCFG.h"
+#include "TFDeabstraction.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -4527,6 +4528,9 @@ void TFPartition::run() {
   tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
   if (!tfModule)
     return;
+
+  TFDeabstractionHelper helper(*this, module);
+  helper.deabstractFunctions(/*acceleratorOnly*/false);
 
   SILFunction *mainFunc = nullptr;
   // We use a two-pass design below. The first pass partitions and lowers those

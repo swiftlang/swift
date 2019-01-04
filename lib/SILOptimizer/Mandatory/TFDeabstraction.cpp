@@ -25,6 +25,7 @@
 
 #define DEBUG_TYPE "tf-deabstraction"
 #include "TFConstExpr.h"
+#include "TFDeabstraction.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
@@ -2610,31 +2611,6 @@ void TFDeabstraction::doIt() {
   maybeLogFuncSize(fn, "AfterDA");
 }
 
-namespace {
-
-/// A helper class to launch deabstraction on functions.
-class TFDeabstractionHelper {
-public:
-  TFDeabstractionHelper(SILTransform &transform, SILModule *module)
-      : transform(transform), module(module), constantEvaluator(*module) {}
-  /// Deabstract functions. If acceleratorOnly is set, tensorflow convention
-  /// functions are deabstracted. Otherwise, all functions other than tensorflow
-  /// convention functions are deabstracted,
-  void deabstractFunctions(bool acceleratorOnly);
-
-private:
-  /// Deabstract the given function and returns true if this function was
-  /// deabstracted. If the flag forceTFFunctions is true, forces partitioning of
-  /// functions that operate on Tensors even if it would have been rejected
-  /// otherwise.
-  bool deabstract(SILFunction &fn, bool forceTFFunctions);
-
-  SILTransform &transform;
-  SILModule *module;
-  ConstExprEvaluator constantEvaluator;
-  TensorFunctionClassifier tfc;
-};
-
 bool TFDeabstractionHelper::deabstract(SILFunction &fn, bool forceTFFunctions) {
   if (!tfc.shouldBePartitioned(&fn, forceTFFunctions))
     return false;
@@ -2718,8 +2694,6 @@ void TFDeabstractionHelper::deabstractFunctions(bool acceleratorOnly) {
   return;
 }
 
-} // namespace
-
 namespace {
   struct TFDeabstractionPass : public SILModuleTransform {
     /// The entry point to the transformation, runs deabstraction on an entire
@@ -2751,12 +2725,7 @@ void TFDeabstractionPass::run() {
     return;
 
   TFDeabstractionHelper helper(*this, module);
-  if (PM->getStageName() == "TensorFlow Partitioning") {
-    helper.deabstractFunctions(/*acceleratorOnly*/false);
-  } else {
-    // This will be invoked as part of the mandatory diagnostic pipeline.
-    helper.deabstractFunctions(/*acceleratorOnly*/true);
-  }
+  helper.deabstractFunctions(/*acceleratorOnly*/true);
 }
 
 SILTransform *swift::createTFDeabstraction() {
