@@ -127,6 +127,7 @@ public:
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(TFParameter)
   IGNORED_ATTR(FieldwiseProductSpace)
+  IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -886,6 +887,7 @@ public:
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitTFParameterAttr(TFParameterAttr *attr);
   void visitFieldwiseProductSpaceAttr(FieldwiseProductSpaceAttr *attr);
+  void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2718,6 +2720,27 @@ void AttributeChecker::visitFieldwiseProductSpaceAttr(
   //
   // If we don't make this attribute user-facing, we can avoid doing checks
   // here: the assertions in TFDifferentiation suffice.
+}
+
+void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
+  auto *vd = dyn_cast<VarDecl>(D);
+  if (!vd) {
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+    return;
+  }
+  auto *structDecl = dyn_cast<StructDecl>(vd->getDeclContext());
+  if (!structDecl) {
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+    return;
+  }
+  auto *diffable = TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  if (!TC.conformsToProtocol(structDecl->getDeclaredInterfaceType(), diffable,
+                             structDecl->getDeclContext(),
+                             ConformanceCheckFlags::Used))
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
