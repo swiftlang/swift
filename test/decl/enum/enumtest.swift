@@ -332,7 +332,20 @@ enum Foo {
 	case none
 }
 
-let _: Foo? = .none // expected-warning {{the enum case is ambiguous}}
-let _: Foo?? = .none // expected-warning {{the enum case is ambiguous}}
+let _: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+let _: Foo?? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+
+let _: Foo = .none // ok
+let _: Foo = .bar // ok
 let _: Foo? = .bar // ok
 let _: Foo?? = .bar // ok
+let _: Foo = Foo.bar // ok
+let _: Foo = Foo.none // ok
+let _: Foo? = Foo.none // ok
+let _: Foo?? = Foo.none // ok
+
+func baz(_: Foo?) {}
+baz(.none) // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+
+let test: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+let answer = test == .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
