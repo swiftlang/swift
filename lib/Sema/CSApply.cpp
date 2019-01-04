@@ -2515,27 +2515,39 @@ namespace {
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 			
-      // If the base type is optional and we're referring to an enum case via the dot syntax
-      // and the enum case matches the Optional<T>.none case then emit a diagnostic
-      if (auto baseType = baseTy->lookThroughAllOptionalTypes()) {
+      // If the base type is optional and we're referring to an nominal type member via
+      // the dot syntax and the member name matches Optional<T>.none then emit a diagnostic
+      if (auto baseUnwrappedType = baseTy->lookThroughAllOptionalTypes()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
-          if (auto EED = dyn_cast<EnumElementDecl>(DSCE->getCalledValue())) {
-            if (EED->getParentEnum()->isOptionalDecl()) {
-              // Lookup the case in the original enum decl
-              auto baseTypeEnum = baseType->getEnumOrBoundGenericEnum();
-              auto results = tc.lookupMember(baseTypeEnum->getModuleContext(), baseType, EED->getName(), defaultMemberLookupOptions);
-              bool caseExistsInBase = false;
+          
+          Decl *structOrEnumMember = nullptr;
+          StringRef memberName;
+          auto calledValue = DSCE->getCalledValue();
+          bool isOptional = false;
+          
+          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
+            structOrEnumMember = EED;
+            memberName = EED->getNameStr();
+            isOptional = EED->getParentEnum()->isOptionalDecl();
+          } else if (auto VD = dyn_cast<VarDecl>(calledValue)) {
+            if (VD->isStatic()) {
+              structOrEnumMember = VD;
+              memberName = VD->getNameStr();
+              isOptional = VD->getType()->getOptionalObjectType() || nullptr;
+            }
+          }
+          
+          if (structOrEnumMember && isOptional && !memberName.empty()) {
+            auto baseTypeNominal = baseUnwrappedType->getNominalOrBoundGenericNominal();
+            auto memberNameAsIdentifier = cs.getASTContext().getIdentifier(memberName);
+            auto results = tc.lookupMember(baseTypeNominal->getModuleContext(), baseUnwrappedType, memberNameAsIdentifier, defaultMemberLookupOptions);
+            
+            for (LookupResultEntry result : results) {
+              auto resultValue = result.getValueDecl();
               
-              for (LookupResultEntry result : results) {
-                if (auto *eed = dyn_cast<EnumElementDecl>(result.getValueDecl())) {
-                  caseExistsInBase = true;
-                  break;
-                }
-              }
-              
-              // Emit a warning dignostic
-              if (caseExistsInBase) {
-                tc.diagnose(DSCE->getLoc(), swift::diag::ambiguous_enum_case, EED->getNameStr(), baseTypeEnum->getNameStr());
+              if (isa<EnumElementDecl>(resultValue) || isa<VarDecl>(resultValue)) {
+                tc.diagnose(DSCE->getLoc(), swift::diag::ambiguous_enum_case, baseTypeNominal->getDeclaredType()->getString(), memberName);
+                break;
               }
             }
           }
