@@ -276,7 +276,6 @@ if(SWIFT_CHECK_ESSENTIAL_STDLIB)
 endif()
 
 
-set(shared_only_libs)
 if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
@@ -303,8 +302,6 @@ add_swift_target_library(swiftCore
                     ${swift_core_private_link_libraries}
                   INCORPORATE_OBJECT_LIBRARIES
                     swiftRuntime swiftStdlibStubs
-                  INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
-                    ${shared_only_libs}
                   FRAMEWORK_DEPENDS
                     ${swift_core_framework_depends}
                   INSTALL_IN_COMPONENT
