@@ -2373,34 +2373,34 @@ public:
         TC.typeCheckPatternBinding(PBD, i);
     }
 		
-		// If the pattern is optional and we're referring to an enum case via the dot syntax (i.e .none)
-		// and the enum case matches the Optional<T>.none case then emit a diagnostic
-		for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-			if (auto baseType = PBD->getPattern(i)->getType()->getOptionalObjectType()) {
-				if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(PBD->getInit(i))) {
-					if (auto EED = dyn_cast<EnumElementDecl>(DSCE->getCalledValue())) {
-						if (EED->getParentEnum()->isOptionalDecl()) {
-							
-							// Lookup the case in the original enum decl
-							auto results = TC.lookupMember(PBD->getModuleContext(), baseType, EED->getName(), defaultMemberLookupOptions);
-							bool caseExistsInBase = false;
-							
-							for (LookupResultEntry result : results) {
-								if (auto *eed = dyn_cast<EnumElementDecl>(result.getValueDecl())) {
-									caseExistsInBase = true;
-									break;
-								}
-							}
-							
-							// Emit a warning dignostic
-							if (caseExistsInBase) {
-								TC.Diags.diagnose(DSCE->getLoc(), swift::diag::ambiguous_pattern_binding_enum);
-							}
-						}
-					}
-				}
-			}
-		}
+    // If the pattern is optional and we're referring to an enum case via the dot syntax (i.e .none)
+    // and the enum case matches the Optional<T>.none case then emit a diagnostic
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+      if (auto baseType = PBD->getPattern(i)->getType()->getOptionalObjectType()) {
+        if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(PBD->getInit(i))) {
+          if (auto EED = dyn_cast<EnumElementDecl>(DSCE->getCalledValue())) {
+            if (EED->getParentEnum()->isOptionalDecl()) {
+              
+              // Lookup the case in the original enum decl
+              auto results = TC.lookupMember(PBD->getModuleContext(), baseType, EED->getName(), defaultMemberLookupOptions);
+              bool caseExistsInBase = false;
+              
+              for (LookupResultEntry result : results) {
+                if (auto *eed = dyn_cast<EnumElementDecl>(result.getValueDecl())) {
+                  caseExistsInBase = true;
+                  break;
+                }
+              }
+              
+              // Emit a warning dignostic
+              if (caseExistsInBase) {
+                TC.Diags.diagnose(DSCE->getLoc(), swift::diag::ambiguous_pattern_binding_enum);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
