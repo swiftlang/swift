@@ -973,7 +973,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
   return B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false);
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,

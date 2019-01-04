@@ -1267,8 +1267,7 @@ void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
   recordClonedInstruction(
       Inst, getBuilder().createConvertEscapeToNoEscape(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), Inst->isEscapedByUser(),
-                Inst->isLifetimeGuaranteed()));
+                getOpType(Inst->getType()), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>

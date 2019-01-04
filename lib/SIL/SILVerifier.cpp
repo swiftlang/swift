@@ -3683,9 +3683,6 @@ public:
     // '[not_guaranteed]' or '[escaped]' attributes.
     if (!SkipConvertEscapeToNoescapeAttributes &&
         F.getModule().getStage() != SILStage::Raw) {
-      require(!ICI->isEscapedByUser(),
-              "convert_escape_to_noescape [escaped] not "
-              "allowed after mandatory passes");
       require(ICI->isLifetimeGuaranteed(),
               "convert_escape_to_noescape [not_guaranteed] not "
               "allowed after mandatory passes");
