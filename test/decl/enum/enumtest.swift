@@ -328,8 +328,8 @@ enum Lens<T> {
 }
 
 enum Foo {
-	case bar
-	case none
+  case bar
+  case none
 }
 
 let _: Foo? = .none // expected-warning {{the enum case is ambiguous}}
