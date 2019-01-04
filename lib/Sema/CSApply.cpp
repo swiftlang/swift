@@ -2554,8 +2554,7 @@ namespace {
               auto value = result.getValueDecl();
               
               if (isa<EnumElementDecl>(value) || isa<VarDecl>(value)) {
-                auto baseTypeName = baseTypeNominal->getDeclaredType()
-                                                   ->getString();
+                auto baseTypeName = baseUnwrappedType->getString();
                 auto loc = DSCE->getLoc();
                 auto startLoc = DSCE->getStartLoc();
                 
