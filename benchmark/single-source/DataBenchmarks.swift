@@ -57,11 +57,9 @@ public let DataBenchmarks = [
     runFunction: { withUnsafeMutableBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataCopyBytesSmall",
-    runFunction: run_CopyBytesSmall, tags: d),
+    runFunction: { copyBytes($0, data: small) }, tags: d),
   BenchmarkInfo(name: "DataCopyBytesMedium",
-    runFunction: run_CopyBytesMedium, tags: d),
-  BenchmarkInfo(name: "DataCopyBytesLarge",
-    runFunction: run_CopyBytesLarge, tags: skip),
+    runFunction: { copyBytes($0, data: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendBytesSmall",
     runFunction: run_AppendBytesSmall, tags: d),
@@ -194,7 +192,8 @@ func withUnsafeMutableBytes(_ N: Int, data: Data) {
   }
 }
 
-func benchmark_CopyBytes(_ N: Int, _ data: Data) {
+@inline(never)
+func copyBytes(_ N: Int, data: Data) {
   let amount = data.count
   var buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: amount)
   defer { buffer.deallocate() }
@@ -276,24 +275,6 @@ public func setCount(_ N: Int, data: Data, extra: Int) {
     copy.count = count
     copy.count = orig
   }
-}
-
-@inline(never)
-public func run_CopyBytesSmall(_ N: Int) {
-  let data = sampleData(.small)
-  benchmark_CopyBytes(N, data)
-}
-
-@inline(never)
-public func run_CopyBytesMedium(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_CopyBytes(N, data)
-}
-
-@inline(never)
-public func run_CopyBytesLarge(_ N: Int) {
-  let data = sampleData(.large)
-  benchmark_CopyBytes(N, data)
 }
 
 @inline(never)
