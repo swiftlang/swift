@@ -93,6 +93,7 @@ static SILValue scalarizeLoad(LoadInst *LI,
 //===----------------------------------------------------------------------===//
 
 namespace {
+
 class ElementUseCollector {
   SILModule &Module;
   const PMOMemoryObjectInfo &TheMemory;
@@ -118,9 +119,6 @@ public:
 private:
   LLVM_NODISCARD bool collectUses(SILValue Pointer);
   LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
-  void addElementUses(SILInstruction *User, PMOUseKind Kind);
-  LLVM_NODISCARD bool collectTupleElementUses(TupleElementAddrInst *TEAI);
-  LLVM_NODISCARD bool collectStructElementUses(StructElementAddrInst *SEAI);
 };
 } // end anonymous namespace
 
@@ -149,34 +147,6 @@ bool ElementUseCollector::collectFrom() {
   return true;
 }
 
-/// addElementUses - An operation (e.g. load, store, inout use, etc) on a value
-/// acts on all of the aggregate elements in that value.  For example, a load
-/// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
-/// to keep the Uses data structure up to date for aggregate uses.
-void ElementUseCollector::addElementUses(SILInstruction *User,
-                                         PMOUseKind Kind) {
-  Uses.emplace_back(User, Kind);
-}
-
-/// Given a tuple_element_addr or struct_element_addr, compute the new
-/// BaseEltNo implicit in the selected member, and recursively add uses of
-/// the instruction.
-bool ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI) {
-  // If we're walking into a tuple within a struct or enum, don't adjust the
-  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
-  // counted as uses of the struct or enum itself.
-  return collectUses(TEAI);
-}
-
-bool ElementUseCollector::collectStructElementUses(
-    StructElementAddrInst *SEAI) {
-  // Generally, we set the "InStructSubElement" flag and recursively process
-  // the uses so that we know that we're looking at something within the
-  // current element.
-  llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-  return collectUses(SEAI);
-}
-
 bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   for (Operand *UI : ABI->getUses()) {
     auto *User = UI->getUser();
@@ -200,7 +170,7 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     //
     // This will cause the dataflow to stop propagating any information at the
     // use block.
-    addElementUses(User, PMOUseKind::Escape);
+    Uses.emplace_back(User, PMOUseKind::Escape);
   }
 
   return true;
@@ -221,22 +191,26 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     auto *User = UI->getUser();
 
     // struct_element_addr P, #field indexes into the current element.
-    if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
-      if (!collectStructElementUses(SEAI))
+    if (auto *seai = dyn_cast<StructElementAddrInst>(User)) {
+      // Generally, we set the "InStructSubElement" flag and recursively process
+      // the uses so that we know that we're looking at something within the
+      // current element.
+      llvm::SaveAndRestore<bool> X(InStructSubElement, true);
+      if (!collectUses(seai))
         return false;
       continue;
     }
 
     // Instructions that compute a subelement are handled by a helper.
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
-      if (!collectTupleElementUses(TEAI))
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(User)) {
+      if (!collectUses(teai))
         return false;
       continue;
     }
 
     // Look through begin_access.
-    if (auto I = dyn_cast<BeginAccessInst>(User)) {
-      if (!collectUses(I))
+    if (auto *bai = dyn_cast<BeginAccessInst>(User)) {
+      if (!collectUses(bai))
         return false;
       continue;
     }
@@ -251,7 +225,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
-        addElementUses(User, PMOUseKind::Load);
+        Uses.emplace_back(User, PMOUseKind::Load);
       continue;
     }
 
@@ -279,7 +253,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       else
         Kind = PMOUseKind::Initialization;
 
-      addElementUses(User, Kind);
+      Uses.emplace_back(User, Kind);
       continue;
     }
 
@@ -321,7 +295,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       else
         Kind = PMOUseKind::Assign;
 
-      addElementUses(User, Kind);
+      Uses.emplace_back(User, Kind);
       continue;
     }
 
@@ -346,7 +320,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         if (InStructSubElement) {
           return false;
         }
-        addElementUses(User, PMOUseKind::Initialization);
+        Uses.emplace_back(User, PMOUseKind::Initialization);
         continue;
 
         // Otherwise, adjust the argument index.
@@ -367,7 +341,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
-        addElementUses(User, PMOUseKind::IndirectIn);
+        Uses.emplace_back(User, PMOUseKind::IndirectIn);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
@@ -377,7 +351,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
-        addElementUses(User, PMOUseKind::InOutUse);
+        Uses.emplace_back(User, PMOUseKind::InOutUse);
         continue;
       }
       }
@@ -390,14 +364,14 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       if (InStructSubElement) {
         return false;
       }
-      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Initialization));
+      Uses.emplace_back(User, PMOUseKind::Initialization);
       continue;
     }
 
     // open_existential_addr is a use of the protocol value,
     // so it is modeled as a load.
     if (isa<OpenExistentialAddrInst>(User)) {
-      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Load));
+      Uses.emplace_back(User, PMOUseKind::Load);
       // TODO: Is it safe to ignore all uses of the open_existential_addr?
       continue;
     }
@@ -418,7 +392,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(User, PMOUseKind::Escape);
+    Uses.emplace_back(User, PMOUseKind::Escape);
   }
 
   // Now that we've walked all of the immediate uses, scalarize any operations
@@ -483,8 +457,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
-    if (llvm::any_of(ElementAddrs, [&](SILValue V) {
-          return !collectTupleElementUses(cast<TupleElementAddrInst>(V));
+    if (llvm::any_of(ElementAddrs, [&](SILValue v) {
+          return !collectUses(cast<TupleElementAddrInst>(v));
         })) {
       return false;
     }

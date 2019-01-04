@@ -37,10 +37,28 @@ const IRLinkage IRLinkage::InternalLinkOnceODR = {
   llvm::GlobalValue::DefaultStorageClass,
 };
 
+const IRLinkage IRLinkage::InternalWeakODR = {
+  llvm::GlobalValue::WeakODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
 const IRLinkage IRLinkage::Internal = {
   llvm::GlobalValue::InternalLinkage,
   llvm::GlobalValue::DefaultVisibility,
   llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalImport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLImportStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalExport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLExportStorageClass,
 };
 
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {

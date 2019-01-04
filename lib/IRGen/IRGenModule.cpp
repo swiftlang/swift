@@ -659,8 +659,8 @@ IRGenModule::createStringConstant(StringRef Str,
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullTypeMetadataStructTy);            \
     if (useDllStorage() && !isStandardLibrary())                               \
-      cast<llvm::GlobalVariable>(NAME)->setDLLStorageClass(                    \
-          llvm::GlobalValue::DLLImportStorageClass);                           \
+      ApplyIRLinkage(IRLinkage::ExternalImport)                                \
+          .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \
   }
 
@@ -681,9 +681,8 @@ llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
     // struct objc_cache _objc_empty_cache;
     ObjCEmptyCachePtr = Module.getOrInsertGlobal("_objc_empty_cache",
                                                  OpaquePtrTy->getElementType());
-    if (useDllStorage())
-      cast<llvm::GlobalVariable>(ObjCEmptyCachePtr)
-          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(ObjCEmptyCachePtr));
   } else {
     // FIXME: Remove even the null value per rdar://problem/18801263
     ObjCEmptyCachePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
@@ -714,9 +713,8 @@ Address IRGenModule::getAddrOfObjCISAMask() {
   assert(TargetInfo.hasISAMasking());
   if (!ObjCISAMaskPtr) {
     ObjCISAMaskPtr = Module.getOrInsertGlobal("swift_isaMask", IntPtrTy);
-    if (useDllStorage())
-      cast<llvm::GlobalVariable>(ObjCISAMaskPtr)
-          ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(ObjCISAMaskPtr));
   }
   return Address(ObjCISAMaskPtr, getPointerAlignment());
 }
@@ -960,11 +958,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
         Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
-    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                    llvm::GlobalValue::DefaultVisibility,
-                    useDllStorage()
-                        ? llvm::GlobalValue::DLLImportStorageClass
-                        : llvm::GlobalValue::DefaultStorageClass})
+    ApplyIRLinkage(IRLinkage::ExternalImport)
         .to(cast<llvm::GlobalValue>(ForceImportThunk));
 
     buf += "_$";
@@ -975,10 +969,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
                                           /*isConstant=*/true,
                                           llvm::GlobalValue::WeakODRLinkage,
                                           ForceImportThunk, buf.str());
-      ApplyIRLinkage({llvm::GlobalValue::WeakODRLinkage,
-                      llvm::GlobalValue::HiddenVisibility,
-                      llvm::GlobalValue::DefaultStorageClass})
-          .to(ref);
+      ApplyIRLinkage(IRLinkage::InternalWeakODR).to(ref);
       auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
       LLVMUsed.push_back(casted);
     }
@@ -1090,12 +1081,7 @@ void IRGenModule::emitAutolinkInfo() {
         llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
-    ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                    llvm::GlobalValue::DefaultVisibility,
-                    useDllStorage()
-                        ? llvm::GlobalValue::DLLExportStorageClass
-                        : llvm::GlobalValue::DefaultStorageClass})
-        .to(ForceImportThunk);
+    ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
