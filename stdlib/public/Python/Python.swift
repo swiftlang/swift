@@ -1168,10 +1168,6 @@ public extension PythonObject {
   }
 }
 
-extension PythonObject : VectorNumeric {
-  public typealias Scalar = PythonObject
-}
-
 extension PythonObject : SignedNumeric {
   public init<T : BinaryInteger>(exactly value: T) {
     self.init(Int(value))
