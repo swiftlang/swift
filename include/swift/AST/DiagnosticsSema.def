@@ -1391,6 +1391,8 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+WARNING(ambiguous_pattern_binding_enum,none, "the enum case is ambiguous", ())
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
