@@ -2515,8 +2515,9 @@ namespace {
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 			
-      // If the base type is optional and we're referring to an nominal type member via
-      // the dot syntax and the member name matches Optional<T>.none then emit a diagnostic
+      // If the base type is optional and we're referring to an nominal
+      // type member via the dot syntax and the member name matches
+      // Optional<T>.none then emit a diagnostic
       if (auto baseUnwrappedType = baseTy->lookThroughAllOptionalTypes()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
           
@@ -2528,7 +2529,9 @@ namespace {
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             structOrEnumMember = EED;
             memberName = EED->getNameStr();
-            isOptional = EED->getParentEnum()->isOptionalDecl() && !EED->getParentEnum()->getElement(EED->getName())->hasAssociatedValues();
+            isOptional = EED->getParentEnum()->isOptionalDecl() &&
+                         !EED->getParentEnum()->getElement(EED->getName())
+                                              ->hasAssociatedValues();
           } else if (auto VD = dyn_cast<VarDecl>(calledValue)) {
             if (VD->isStatic()) {
               structOrEnumMember = VD;
@@ -2538,23 +2541,31 @@ namespace {
           }
           
           if (structOrEnumMember && isOptional && !memberName.empty()) {
-            auto baseTypeNominal = baseUnwrappedType->getNominalOrBoundGenericNominal();
-            auto memberNameAsIdentifier = cs.getASTContext().getIdentifier(memberName);
-            auto results = tc.lookupMember(baseTypeNominal->getModuleContext(), baseUnwrappedType, memberNameAsIdentifier, defaultMemberLookupOptions);
+            auto baseTypeNominal = baseUnwrappedType
+                                   ->getNominalOrBoundGenericNominal();
+            auto memberNameAsIdentifier = cs.getASTContext()
+                                            .getIdentifier(memberName);
+            auto results = tc.lookupMember(baseTypeNominal->getModuleContext(),
+                                           baseUnwrappedType,
+                                           memberNameAsIdentifier,
+                                           defaultMemberLookupOptions);
             
             for (LookupResultEntry result : results) {
-              auto resultValue = result.getValueDecl();
+              auto value = result.getValueDecl();
               
-              if (isa<EnumElementDecl>(resultValue) || isa<VarDecl>(resultValue)) {
-                auto baseTypeName = baseTypeNominal->getDeclaredType()->getString();
+              if (isa<EnumElementDecl>(value) || isa<VarDecl>(value)) {
+                auto baseTypeName = baseTypeNominal->getDeclaredType()
+                                                   ->getString();
                 auto loc = DSCE->getLoc();
                 auto startLoc = DSCE->getStartLoc();
                 
-                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref, baseTypeName, memberName);
+                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                            baseTypeName, memberName);
                 
-                tc.diagnose(loc, swift::diag::optional_fixit_for_optional_ambiguous_case_ref)
+                tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
                 .fixItInsert(startLoc, "Optional");
-                tc.diagnose(loc, swift::diag::type_fixit_for_optional_ambiguous_case_ref, baseTypeName, memberName)
+                tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+                            baseTypeName, memberName)
                 .fixItInsert(startLoc, baseTypeName);
                 
                 break;
