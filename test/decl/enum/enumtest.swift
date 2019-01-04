@@ -326,3 +326,13 @@ enum Lens<T> {
   case baz((inout T) -> ()) // ok
   case quux((inout T, inout T) -> ()) // ok
 }
+
+enum Foo {
+	case bar
+	case none
+}
+
+let _: Foo? = .none // expected-warning {{the enum case is ambiguous}}
+let _: Foo?? = .none // expected-warning {{the enum case is ambiguous}}
+let _: Foo? = .bar // ok
+let _: Foo?? = .bar // ok
