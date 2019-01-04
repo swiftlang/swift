@@ -229,7 +229,6 @@ sil @doubleWriteTopLevel : $@convention(thin) () -> () {
 sil @doubleWriteTupleElement : $@convention(thin) (Int64) -> () {
 bb0(%arg : $Int64):
   // Allocate and initialize the tuple to (1, 2).
-  // expected-note @+1 {{could not fold operation}}
   %0 = alloc_stack $(Int64, Int64), var, name "tup"
   %1 = tuple_element_addr %0 : $*(Int64, Int64), 0
   %2 = tuple_element_addr %0 : $*(Int64, Int64), 1
@@ -241,6 +240,7 @@ bb0(%arg : $Int64):
   store %7 to %2 : $*Int64
 
   // Store %arg, whose value is unknown, to the first element of the tuple.
+  // expected-note @+1 {{could not fold operation}}
   %addr = tuple_element_addr %0 : $*(Int64, Int64), 0
   store %arg to %addr : $*Int64
 
