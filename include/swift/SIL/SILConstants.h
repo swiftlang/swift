@@ -114,6 +114,12 @@ private:
 
     /// This represents an index *into* a memory object.
     RK_DerivedAddress,
+
+    /// This represents an array value.
+    RK_Array,
+
+    /// This represents an address of a memory object containing an array.
+    RK_ArrayAddress,
   };
 
   union {
@@ -157,6 +163,12 @@ private:
     /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
+
+    /// For RK_Array, this is the elements of the array.
+    ArraySymbolicValue *array;
+
+    /// For RK_ArrayAddress, this is the memory object referenced.
+    SymbolicValueMemoryObject *arrayAddress;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -208,6 +220,9 @@ public:
 
     /// This value represents the address of, or into, a memory object.
     Address,
+
+    /// This represents an array value.
+    Array,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -331,6 +346,20 @@ public:
 
   /// Return just the memory object for an address value.
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
+
+  /// Produce an array of elements.
+  static SymbolicValue getArray(ArrayRef<SymbolicValue> elements,
+                                CanType elementType,
+                                ASTContext &astContext);
+  static SymbolicValue
+  getArrayAddress(SymbolicValueMemoryObject *memoryObject) {
+    SymbolicValue result;
+    result.representationKind = RK_ArrayAddress;
+    result.value.directAddress = memoryObject;
+    return result;
+  }
+
+  ArrayRef<SymbolicValue> getArrayValue(CanType &elementType) const;
 
   //===--------------------------------------------------------------------===//
   // Helpers
