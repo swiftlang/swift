@@ -336,8 +336,8 @@ enum HasVariadic {
 
 // SR-2176
 enum Foo {
-	case bar
-	case none
+  case bar
+  case none
 }
 
 let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}} {{14-14=Optional}} {{14-14=Foo}}
@@ -359,7 +359,7 @@ let test: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.no
 let answer = test == .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}} {{21-21=Optional}} {{21-21=Foo}}
 
 enum Bar {
-	case baz
+  case baz
 }
 
 let _: Bar? = .none // ok
@@ -369,14 +369,14 @@ let _: Bar?? = .baz // ok
 let _: Bar = .baz // ok
 
 enum AnotherFoo {
-	case none(Any)
+  case none(Any)
 }
 
 let _: AnotherFoo? = .none // ok
 let _: AnotherFoo? = .none(0) // ok
 
 struct FooStruct {
-	static let none = FooStruct()
+  static let none = FooStruct()
 }
 
 let _: FooStruct? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}} {{20-20=Optional}} {{20-20=FooStruct}}
