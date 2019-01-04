@@ -1394,9 +1394,9 @@ ERROR(pattern_binds_no_variables,none,
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean 'Optional<%0>.%1'; did you mean '%0.%1' instead?",
         (StringRef, StringRef))
-NOTE(optional_fixit_for_optional_ambiguous_case_ref,none,
+NOTE(optional_fixit_ambiguous_case_ref,none,
      "explicitly specify 'Optional' to silence this warning", ())
-NOTE(type_fixit_for_optional_ambiguous_case_ref,none,
+NOTE(type_fixit_optional_ambiguous_case_ref,none,
      "use '%0.%1' instead", (StringRef, StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
