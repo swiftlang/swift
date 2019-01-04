@@ -368,10 +368,17 @@ let _: Bar? = .baz // ok
 let _: Bar?? = .baz // ok
 let _: Bar = .baz // ok
 
-struct Foo {
-	static let none = Foo()
+enum AnotherFoo {
+	case none(Any)
 }
 
-let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
-let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
-let _: Foo = .none // ok
+let _: AnotherFoo? = .none // ok
+let _: AnotherFoo? = .none(0) // ok
+
+struct FooStruct {
+	static let none = FooStruct()
+}
+
+let _: FooStruct? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}}
+let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}}
+let _: FooStruct = .none // ok
