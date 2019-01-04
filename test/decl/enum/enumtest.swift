@@ -336,12 +336,12 @@ enum HasVariadic {
 
 // SR-2176
 enum Foo {
-  case bar
-  case none
+	case bar
+	case none
 }
 
-let _: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
-let _: Foo?? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
 
 let _: Foo = .none // ok
 let _: Foo = .bar // ok
@@ -353,7 +353,25 @@ let _: Foo? = Foo.none // ok
 let _: Foo?? = Foo.none // ok
 
 func baz(_: Foo?) {}
-baz(.none) // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+baz(.none) // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
 
-let test: Foo? = .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
-let answer = test == .none // expected-warning {{enum case 'none' exists in both 'Foo' and 'Optional', using the one from Optional}}
+let test: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+let answer = test == .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+
+enum Bar {
+	case baz
+}
+
+let _: Bar? = .none // ok
+let _: Bar?? = .none // ok
+let _: Bar? = .baz // ok
+let _: Bar?? = .baz // ok
+let _: Bar = .baz // ok
+
+struct Foo {
+	static let none = Foo()
+}
+
+let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+let _: Foo = .none // ok
