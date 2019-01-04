@@ -1391,7 +1391,7 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
-WARNING(ambiguous_pattern_binding_enum,none, "the enum case is ambiguous", ())
+WARNING(ambiguous_enum_case,none, "enum case '%0' exists in both '%1' and 'Optional', using the one from Optional", (StringRef, StringRef))
 
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
