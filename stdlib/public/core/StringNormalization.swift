@@ -207,7 +207,6 @@ internal struct NormalizationResult {
 }
 
 //If this returns nil, it means the outputBuffer ran out of space
-@inline(__always)
 @_effects(releasenone)
 private func fastFill(
   _ sourceBuffer: UnsafeBufferPointer<UInt8>,
