@@ -58,18 +58,20 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
-///
-/// In automatic differentiation, differentiation will produce a Jacobian whose
-/// elements are of `Tangent` type.
 public protocol Differentiable {
-  /// The tangent vector space of this differentiable manifold.
-  associatedtype TangentVector : Differentiable, VectorNumeric
+  /// The tangent bundle of this differentiable manifold.
+  associatedtype TangentVector : Differentiable & AdditiveArithmetic
+    // FIXME(SR-9595): Unexpected error when type checking constrained
+    // associated types.
     where TangentVector.TangentVector == TangentVector,
-          TangentVector.Scalar : FloatingPoint
-  /// The cotangent space of this differentiable manifold.
-  associatedtype CotangentVector : Differentiable, VectorNumeric
-    where CotangentVector.CotangentVector == CotangentVector,
-          CotangentVector.Scalar : FloatingPoint
+          TangentVector.CotangentVector == CotangentVector
+
+  /// The cotangent bundle of this differentiable manifold.
+  associatedtype CotangentVector : Differentiable & AdditiveArithmetic
+    // FIXME(SR-9595): Unexpected error when type checking constrained
+    // associated types.
+    where CotangentVector.TangentVector == CotangentVector,
+          CotangentVector.CotangentVector == TangentVector
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -80,8 +82,11 @@ public protocol Differentiable {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
 }
 
+// FIXME: The `Self : AdditiveArithmetic` constraint should be implied by
+// `TangentVector == Self`, but the type checker errors out when it does not
+// exist.
 public extension Differentiable
-  where Self : VectorNumeric, TangentVector == Self {
+  where TangentVector == Self, Self : AdditiveArithmetic {
   func moved(along direction: TangentVector) -> Self {
     return self + direction
   }
