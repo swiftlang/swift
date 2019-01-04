@@ -1173,8 +1173,12 @@ static CanSILFunctionType getSILFunctionType(
       substFnInterfaceType->getExtInfo().getSILRepresentation()
         != SILFunctionType::Representation::Thick &&
       isa<FunctionType>(substFnInterfaceType)) {
-    origType = AbstractionPattern(M.Types.getCurGenericContext(),
-                                  substFnInterfaceType);
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!(substFnInterfaceType->getExtInfo().getSILRepresentation()
+          == SILFunctionType::Representation::TensorFlow)) {
+      origType = AbstractionPattern(M.Types.getCurGenericContext(),
+                                    substFnInterfaceType);
+    }
   }
 
   // Find the generic parameters.
@@ -1501,6 +1505,9 @@ static CanSILFunctionType getNativeSILFunctionType(
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILFunctionType::Representation::TensorFlow:
+    // The same as the rest, but with abstraction pattern pinned to opaque.
+    origType = AbstractionPattern::getOpaque();
+    LLVM_FALLTHROUGH;
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:

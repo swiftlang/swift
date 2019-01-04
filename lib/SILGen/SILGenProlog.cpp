@@ -97,12 +97,17 @@ public:
 
   ManagedValue visitType(CanType t, bool isInOut) {
     auto argType = SGF.getLoweredType(t);
-    if (isInOut)
-      argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
+
+    if (parameterInfo.isFormalIndirect()) {
+      isInOut = true;
+    }
+    if (isInOut)
+      argType = SILType::getPrimitiveAddressType(argType.getASTType());
+
     assert(
         argType
             == parent->getParent()->mapTypeIntoContext(
@@ -442,14 +447,14 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
   }
 }
 
-static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
+static bool emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
                                          DeclContext *DC) {
   // Expand tuples.
   if (auto tupleType = resultType->getAs<TupleType>()) {
     for (auto eltType : tupleType->getElementTypes()) {
       emitIndirectResultParameters(SGF, eltType, DC);
     }
-    return;
+    return true;
   }
 
   // If the return type is address-only, emit the indirect return argument.
@@ -458,7 +463,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
       SGF.getTypeLowering(DC->mapTypeIntoContext(resultType));
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
           resultTI.getLoweredType(), SGF.SGM.M)) {
-    return;
+    return false;
   }
   auto &ctx = SGF.getASTContext();
   auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
@@ -471,6 +476,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   auto *arg =
       SGF.F.begin()->createFunctionArgument(resultTI.getLoweredType(), var);
   (void)arg;
+  return true;
 }
 
 uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
@@ -482,7 +488,16 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
   auto *genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getCanonicalType(genericSig);
 
-  emitIndirectResultParameters(*this, resultType, DC);
+  if (!emitIndirectResultParameters(*this, resultType, DC)) {
+    // If we did emit an indirect result above, do so now. This means that we
+    // forced the result to be indirect via the convention.
+    // TODO: This should probably be unified with emitIndirectResultParameters
+    // somehow.
+    for (auto resultTy : F.getConventions().getIndirectSILResultTypes()) {
+      auto paramTy = F.mapTypeIntoContext(resultTy);
+      F.begin()->createFunctionArgument(paramTy);
+    }
+  }
 
   // Emit the argument variables in calling convention order.
   ArgumentInitHelper emitter(*this, F);
