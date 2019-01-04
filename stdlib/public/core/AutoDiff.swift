@@ -59,20 +59,18 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
 public protocol Differentiable {
-  /// The tangent vector space of this differentiable manifold.
-  associatedtype TangentVector : Differentiable & VectorNumeric
+  /// The tangent bundle of this differentiable manifold.
+  associatedtype TangentVector : Differentiable & AdditiveArithmetic
     // FIXME(SR-9595): Unexpected error when type checking constrained
     // associated types.
-    where // TangentVector.Scalar : FloatingPoint,
-          TangentVector.TangentVector == TangentVector,
+    where TangentVector.TangentVector == TangentVector,
           TangentVector.CotangentVector == CotangentVector
 
-  /// The cotangent vector space of this differentiable manifold.
-  associatedtype CotangentVector : Differentiable & VectorNumeric
+  /// The cotangent bundle of this differentiable manifold.
+  associatedtype CotangentVector : Differentiable & AdditiveArithmetic
     // FIXME(SR-9595): Unexpected error when type checking constrained
     // associated types.
-    where // CotangentVector.Scalar : FloatingPoint,
-          CotangentVector.TangentVector == CotangentVector,
+    where CotangentVector.TangentVector == CotangentVector,
           CotangentVector.CotangentVector == TangentVector
 
   /// Returns `self` moved along the value space towards the given tangent
@@ -84,11 +82,11 @@ public protocol Differentiable {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
 }
 
-// FIXME: The `Self : VectorNumeric` constraint should be implied by
+// FIXME: The `Self : AdditiveArithmetic` constraint should be implied by
 // `TangentVector == Self`, but the type checker errors out when it does not
 // exist.
 public extension Differentiable
-  where TangentVector == Self, Self : VectorNumeric {
+  where TangentVector == Self, Self : AdditiveArithmetic {
   func moved(along direction: TangentVector) -> Self {
     return self + direction
   }

@@ -784,20 +784,20 @@ extension VJPStruct {
 }
 
 extension VJPStruct {
-  @differentiable(wrt: (self), vjp: computedPropVJP)
+  @differentiable(vjp: computedPropVJP)
   var computedPropOk1: Float {
     return 0
   }
 
   var computedPropOk2: Float {
-    @differentiable(wrt: (self), vjp: computedPropVJP)
+    @differentiable(vjp: computedPropVJP)
     get {
       return 0
     }
   }
 
   // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
-  @differentiable(wrt: (self), vjp: computedPropVJP)
+  @differentiable(vjp: computedPropVJP)
   var computedPropWrongType: Double {
     return 0
   }
