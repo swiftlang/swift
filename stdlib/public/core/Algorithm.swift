@@ -157,4 +157,9 @@ extension EnumeratedSequence: Sequence {
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
+
+  @inlinable
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
 }
