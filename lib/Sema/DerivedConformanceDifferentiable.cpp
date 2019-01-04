@@ -454,14 +454,13 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
     return structDecl;
   }
 
-  // Otherwise, synthesize a new vector space struct.
+  // Otherwise, synthesize a new vector space struct, conforming to
+  // `Differentiable` and `AdditiveArithmetic`.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  auto *kpiProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
-  auto kpiType = TypeLoc::withoutLoc(kpiProto->getDeclaredType());
-  TypeLoc inherited[3] = {diffableType, addArithType, kpiType};
+  TypeLoc inherited[2] = {diffableType, addArithType};
   auto *structDecl = new (C) StructDecl(SourceLoc(), vectorSpaceId, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
