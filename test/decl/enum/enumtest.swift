@@ -334,5 +334,8 @@ enum Foo {
 
 let _: Foo? = .none // expected-warning {{the enum case is ambiguous}}
 let _: Foo?? = .none // expected-warning {{the enum case is ambiguous}}
+
+let _: Foo = .none // ok
+let _: Foo = .bar // ok
 let _: Foo? = .bar // ok
 let _: Foo?? = .bar // ok
