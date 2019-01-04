@@ -135,35 +135,6 @@ PMOMemoryObjectInfo::getPathStringToElement(unsigned Element,
   return nullptr;
 }
 
-/// If the specified value is a 'let' property in an initializer, return true.
-bool PMOMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
-  // If we aren't representing 'self' in a non-delegating initializer, then we
-  // can't have 'let' properties.
-  return IsLet;
-}
-
-//===----------------------------------------------------------------------===//
-//                        PMOMemoryUse Implementation
-//===----------------------------------------------------------------------===//
-
-/// onlyTouchesTrivialElements - Return true if all of the accessed elements
-/// have trivial type.
-bool PMOMemoryUse::onlyTouchesTrivialElements(
-    const PMOMemoryObjectInfo &MI) const {
-  auto &Module = Inst->getModule();
-
-  for (unsigned i = FirstElement, e = i + NumElements; i != e; ++i) {
-    // Skip 'super.init' bit
-    if (i == MI.getNumMemoryElements())
-      return false;
-
-    auto EltTy = MI.getElementType(i);
-    if (!EltTy.isTrivial(Module))
-      return false;
-  }
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 //                          Scalarization Logic
 //===----------------------------------------------------------------------===//
