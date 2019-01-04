@@ -516,8 +516,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   if (!Val) {
     auto *Load =
         B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
-    Uses.push_back(PMOMemoryUse(Load, PMOUseKind::Load, FirstElt,
-                                getNumSubElements(Load->getType(), M)));
+    Uses.emplace_back(Load, PMOUseKind::Load);
     return Load;
   }
 
