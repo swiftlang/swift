@@ -95,7 +95,7 @@ public let DataBenchmarks = [
     runFunction: run_ReplaceLargeBuffer, tags: skip),
 
   BenchmarkInfo(name: "DataAppendSequence",
-    runFunction: run_AppendSequence, tags: d),
+    runFunction: { append($0, sequenceLength: 809, to: medium) }, tags: d),
 
   BenchmarkInfo(name: "DataAppendDataSmallToSmall",
     runFunction: { append($0, data: small, to: small) }, tags: d),
@@ -232,11 +232,12 @@ func append(_ N: Int, arraySize: Int, to data: Data) {
   }
 }
 
-func benchmark_AppendSequence(_ N: Int, _ count: Int, _ data_: Data) {
-  let bytes = repeatElement(UInt8(0xA0), count: count)
+@inline(never)
+func append(_ N: Int, sequenceLength: Int, to data: Data) {
+  let bytes = repeatElement(UInt8(0xA0), count: sequenceLength)
   for _ in 0..<10000*N {
-    var data = data_
-    data.append(contentsOf: bytes)
+    var copy = data
+    copy.append(contentsOf: bytes)
   }
 }
 
@@ -343,12 +344,6 @@ public func run_ReplaceLargeBuffer(_ N: Int) {
   replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
     benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
   }
-}
-
-@inline(never)
-public func run_AppendSequence(_ N: Int) {
-  let data = sampleData(.medium)
-  benchmark_AppendSequence(N, 809, data)
 }
 
 @inline(never)
