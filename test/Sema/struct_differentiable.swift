@@ -23,7 +23,7 @@ assert(mixed.tangentVector(from: mixed) == mixed)
 // it's only necessary to synthesis typealiases:
 // `typealias TangentVector = Generic`
 // `typealias CotangentVector = Generic`
-struct Generic<T> : VectorNumeric, Differentiable
+struct Generic<T : VectorNumeric> : VectorNumeric, Differentiable
   where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
 {
   var w: T
