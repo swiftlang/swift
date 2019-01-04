@@ -27,7 +27,7 @@ public enum Result<Success, Failure: Error> {
   /// instance when it represents a success. The following example transforms
   /// the integer success value of a result into a string:
   ///
-  ///     func getNextInteger() -> Result<Int, Error> { ... }
+  ///     func getNextInteger() -> Result<Int, Error> { /* ... */ }
   ///
   ///     let integerResult = getNextInteger()
   ///     // integerResult == .success(5)
@@ -66,7 +66,7 @@ public enum Result<Success, Failure: Error> {
   ///         }
   ///     }
   ///
-  ///     let result: Result<Int, Error> = ...
+  ///     let result: Result<Int, Error> = // ...
   ///     // result == .failure(<error value>)
   ///     let resultWithDatedError = result.mapError({ e in DatedError(e) })
   ///     // result == .failure(DatedError(error: <error value>, date: <date>))
@@ -136,7 +136,7 @@ public enum Result<Success, Failure: Error> {
   ///     }
   ///     // Prints "The value is 5."
   ///
-  /// - Returns: The success value, if the instance represent a success.
+  /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
   public func get() throws -> Success {
     switch self {
