@@ -77,10 +77,6 @@ public:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-  /// True if the memory object being analyzed represents a 'let', which is
-  /// initialize-only (reassignments are not allowed).
-  bool IsLet = false;
-
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for derive classes).
@@ -108,11 +104,7 @@ public:
     return dyn_cast<AllocBoxInst>(MemoryInst);
   }
 
-  /// getNumMemoryElements - Return the number of elements, without the extra
-  /// "super.init" tracker in initializers of derived classes.
-  unsigned getNumMemoryElements() const {
-    return NumElements - unsigned(false);
-  }
+  unsigned getNumMemoryElements() const { return NumElements; }
 
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
@@ -122,9 +114,6 @@ public:
   /// be determined, return it.  Otherwise, return null.
   ValueDecl *getPathStringToElement(unsigned Element,
                                     std::string &Result) const;
-
-  /// If the specified value is a 'let' property in an initializer, return true.
-  bool isElementLetProperty(unsigned Element) const;
 };
 
 enum PMOUseKind {
@@ -185,10 +174,6 @@ struct PMOMemoryUse {
     return i >= FirstElement &&
            i < static_cast<unsigned>(FirstElement + NumElements);
   }
-
-  /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-  /// have trivial type.
-  bool onlyTouchesTrivialElements(const PMOMemoryObjectInfo &MemoryInfo) const;
 
   /// getElementBitmask - Return a bitmask with the touched tuple elements
   /// set.
