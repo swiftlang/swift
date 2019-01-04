@@ -77,11 +77,6 @@ public:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-  /// This is the count of elements being analyzed.  For memory objects that are
-  /// tuples, this is the flattened element count.  For 'self' members in init
-  /// methods, this is the local field count (+1 for derive classes).
-  unsigned NumElements;
-
 public:
   PMOMemoryObjectInfo(AllocationInst *MemoryInst);
 
@@ -103,8 +98,6 @@ public:
   AllocBoxInst *getContainer() const {
     return dyn_cast<AllocBoxInst>(MemoryInst);
   }
-
-  unsigned getNumMemoryElements() const { return NumElements; }
 
   /// getElementType - Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
@@ -155,32 +148,13 @@ struct PMOMemoryUse {
   /// This is what kind of access it is, load, store, escape, etc.
   PMOUseKind Kind;
 
-  /// For memory objects of (potentially recursive) tuple type, this keeps
-  /// track of which tuple elements are affected.
-  unsigned short FirstElement, NumElements;
-
-  PMOMemoryUse(SILInstruction *Inst, PMOUseKind Kind, unsigned FE, unsigned NE)
-      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-    assert(FE == FirstElement && NumElements == NE &&
-           "more than 64K elements not supported yet");
-  }
+  PMOMemoryUse(SILInstruction *Inst, PMOUseKind Kind)
+      : Inst(Inst), Kind(Kind) {}
 
   PMOMemoryUse() : Inst(nullptr) {}
 
   bool isInvalid() const { return Inst == nullptr; }
   bool isValid() const { return Inst != nullptr; }
-
-  bool usesElement(unsigned i) const {
-    return i >= FirstElement &&
-           i < static_cast<unsigned>(FirstElement + NumElements);
-  }
-
-  /// getElementBitmask - Return a bitmask with the touched tuple elements
-  /// set.
-  APInt getElementBitmask(unsigned NumMemoryTupleElements) const {
-    return APInt::getBitsSet(NumMemoryTupleElements, FirstElement,
-                             FirstElement + NumElements);
-  }
 };
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
