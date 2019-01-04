@@ -2019,8 +2019,8 @@ function(add_swift_target_library name)
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
           TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
           RUNTIME DESTINATION "bin"
-          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
           PERMISSIONS ${file_permissions})
       else()
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
