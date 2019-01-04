@@ -1052,23 +1052,23 @@ class ApplyIRLinkage {
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
   void to(llvm::GlobalValue *GV) const {
+    llvm::Module *M = GV->getParent();
+    const llvm::Triple Triple(M->getTargetTriple());
+
     GV->setLinkage(IRL.Linkage);
     GV->setVisibility(IRL.Visibility);
-    GV->setDLLStorageClass(IRL.DLLStorage);
+    if (Triple.isOSBinFormatCOFF() && !Triple.isOSCygMing())
+      GV->setDLLStorageClass(IRL.DLLStorage);
+
+    // TODO: BFD and gold do not handle COMDATs properly
+    if (Triple.isOSBinFormatELF())
+      return;
 
     if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
-        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage) {
-      llvm::Module *M = GV->getParent();
-      const llvm::Triple Triple(M->getTargetTriple());
-
-      // TODO: BFD and gold do not handle COMDATs properly
-      if (Triple.isOSBinFormatELF())
-        return;
-
+        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
       if (Triple.supportsCOMDAT())
         if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
           GO->setComdat(M->getOrInsertComdat(GV->getName()));
-    }
   }
 };
 
