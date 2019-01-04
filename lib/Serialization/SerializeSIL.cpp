@@ -1489,8 +1489,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
       if (cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed())
         attrs |= 0x01;
-      if (cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser())
-        attrs |= 0x02;
     }
     if (SI.getKind() == SILInstructionKind::ConvertFunctionInst) {
       if (cast<ConvertFunctionInst>(SI).withoutActuallyEscaping())

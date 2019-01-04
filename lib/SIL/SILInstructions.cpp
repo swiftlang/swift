@@ -1993,8 +1993,7 @@ ConvertFunctionInst *ConvertFunctionInst::create(
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes, bool isEscapedByUser,
-    bool isLifetimeGuaranteed) {
+    SILOpenedArchetypesState &OpenedArchetypes, bool isLifetimeGuaranteed) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2002,9 +2001,8 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
-  auto *CFI = ::new (Buffer)
-      ConvertEscapeToNoEscapeInst(DebugLoc, Operand, TypeDependentOperands, Ty,
-                                  isEscapedByUser, isLifetimeGuaranteed);
+  auto *CFI = ::new (Buffer) ConvertEscapeToNoEscapeInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, isLifetimeGuaranteed);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
