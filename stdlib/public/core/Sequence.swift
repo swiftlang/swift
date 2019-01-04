@@ -494,6 +494,11 @@ extension PrefixSequence: Sequence {
     let length = Swift.min(maxLength, self._maxLength)
     return PrefixSequence(_base, maxLength: length)
   }
+
+  @inlinable
+  public var underestimatedCount: Int {
+    return Swift.min(_base.underestimatedCount, _maxLength)
+  }
 }
 
 
