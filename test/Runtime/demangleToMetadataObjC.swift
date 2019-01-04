@@ -108,5 +108,9 @@ DemangleToMetadataTests.test("runtime conformance check for @objc protocol inher
   expectEqual(F<P3>.self, _typeByName("4main1FCyAA2P3PG")!)
 }
 
+DemangleToMetadataTests.test("Objective-C generics") {
+  expectEqual(NSArray.self, _typeByName("So7NSArrayCySo8NSStringCG")!)
+}
+
 runAllTests()
 
