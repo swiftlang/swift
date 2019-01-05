@@ -6831,6 +6831,14 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
           auto locA = (*a)->constraint.source->getLoc();
           auto locB = (*b)->constraint.source->getLoc();
 
+          // Put invalid locations after valid ones.
+          if (locA.isInvalid() || locB.isInvalid()) {
+            if (locA.isInvalid() != locB.isInvalid())
+              return locA.isInvalid() ? 1 : -1;
+
+            return 0;
+          }
+
           auto bufferA = sourceMgr.findBufferContainingLoc(locA);
           auto bufferB = sourceMgr.findBufferContainingLoc(locB);
 
