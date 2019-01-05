@@ -23,10 +23,6 @@
 
 namespace swift {
 
-enum class AutoDiffMode {
-  Forward, Reverse
-};
-
 class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };
@@ -318,6 +314,11 @@ public:
   }
 };
 
+/// The kind of an associated type.
+enum class AutoDiffAssociatedVectorSpaceKind : unsigned {
+  Tangent = 0, Cotangent = 1
+};
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
@@ -347,115 +348,74 @@ bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
 } // end namespace autodiff
 
 class BuiltinFloatType;
-class NominalTypeDecl;
-class StructDecl;
+class NominalOrBoundGenericNominalType;
 class TupleType;
-class EnumDecl;
 
-/// A type that represents the tangent space of a differentiable type.
-class TangentSpace {
+/// A type that represents a vector space.
+class VectorSpace {
 public:
   /// A tangent space kind.
   enum class Kind {
     /// `Builtin.FP<...>`.
-    BuiltinRealScalar,
-    /// A type that conforms to `FloatingPoint`.
-    RealScalar,
-    /// A type that conforms to `VectorNumeric` where the associated
-    /// `ScalarElement` conforms to `FloatingPoint`.
-    RealVector,
-    /// A product of tangent spaces as a struct.
-    ProductStruct,
-    /// A product of tangent spaces as a tuple.
-    ProductTuple,
-    /// A sum of tangent spaces.
-    Sum
+    BuiltinFloat,
+    /// A type that conforms to `VectorNumeric`.
+    Vector,
+    /// A product of vector spaces as a tuple.
+    Tuple,
   };
 
 private:
   Kind kind;
   union Value {
-    // BuiltinRealScalar
+    // Builtin float
     BuiltinFloatType *builtinFPType;
-    // RealScalar or RealVector
-    NominalTypeDecl *realNominalType;
-    // ProductStruct
-    StructDecl *structDecl;
-    // ProductTuple
+    // Vector
+    Type vectorType;
+    // Tuple
     TupleType *tupleType;
-    // Sum
-    EnumDecl *enumDecl;
 
     Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
-    Value(NominalTypeDecl *nominal) : realNominalType(nominal) {}
-    Value(StructDecl *structDecl) : structDecl(structDecl) {}
+    Value(Type vectorType) : vectorType(vectorType) {}
     Value(TupleType *tupleType) : tupleType(tupleType) {}
-    Value(EnumDecl *enumDecl) : enumDecl(enumDecl) {}
   } value;
 
-  TangentSpace(Kind kind, Value value)
+  VectorSpace(Kind kind, Value value)
       : kind(kind), value(value) {}
 
 public:
-  TangentSpace() = delete;
+  VectorSpace() = delete;
 
-  static TangentSpace
-  getBuiltinRealScalarSpace(BuiltinFloatType *builtinFP) {
-    return {Kind::BuiltinRealScalar, builtinFP};
+  static VectorSpace getBuiltinFloat(BuiltinFloatType *builtinFP) {
+    return {Kind::BuiltinFloat, builtinFP};
   }
-  static TangentSpace getRealScalarSpace(NominalTypeDecl *typeDecl) {
-    return {Kind::RealScalar, typeDecl};
+  static VectorSpace getVector(Type vectorType) {
+    return {Kind::Vector, vectorType};
   }
-  static TangentSpace getRealVectorSpace(NominalTypeDecl *typeDecl) {
-    return {Kind::RealVector, typeDecl};
-  }
-  static TangentSpace getProductStruct(StructDecl *structDecl) {
-    return {Kind::ProductStruct, structDecl};
-  }
-  static TangentSpace getProductTuple(TupleType *tupleTy) {
-    return {Kind::ProductTuple, tupleTy};
-  }
-  static TangentSpace getSum(EnumDecl *enumDecl) {
-    return {Kind::Sum, enumDecl};
+  static VectorSpace getTuple(TupleType *tupleTy) {
+    return {Kind::Tuple, tupleTy};
   }
 
-  bool isBuiltinRealScalarSpace() const {
-    return kind == Kind::BuiltinRealScalar;
-  }
-  bool isRealScalarSpace() const { return kind == Kind::RealScalar; }
-  bool isRealVectorSpace() const { return kind == Kind::RealVector; }
-  bool isProductStruct() const { return kind == Kind::ProductStruct; }
-  bool isProductTuple() const { return kind == Kind::ProductTuple; }
+  bool isBuiltinFloat() const { return kind == Kind::BuiltinFloat; }
+  bool isVector() const { return kind == Kind::Vector; }
+  bool isTuple() const { return kind == Kind::Tuple; }
 
   Kind getKind() const { return kind; }
-  BuiltinFloatType *getBuiltinRealScalarSpace() const {
-    assert(kind == Kind::BuiltinRealScalar);
+  BuiltinFloatType *getBuiltinFloat() const {
+    assert(kind == Kind::BuiltinFloat);
     return value.builtinFPType;
   }
-  NominalTypeDecl *getRealScalarSpace() const {
-    assert(kind == Kind::RealScalar);
-    return value.realNominalType;
+  Type getVector() const {
+    assert(kind == Kind::Vector);
+    return value.vectorType;
   }
-  NominalTypeDecl *getRealVectorSpace() const {
-    assert(kind == Kind::RealVector);
-    return value.realNominalType;
-  }
-  NominalTypeDecl *getRealScalarOrVectorSpace() const {
-    assert(kind == Kind::RealScalar || kind == Kind::RealVector);
-    return value.realNominalType;
-  }
-  StructDecl *getProductStruct() const {
-    assert(kind == Kind::ProductStruct);
-    return value.structDecl;
-  }
-  TupleType *getProductTuple() const {
-    assert(kind == Kind::ProductTuple);
+  TupleType *getTuple() const {
+    assert(kind == Kind::Tuple);
     return value.tupleType;
   }
-  EnumDecl *getSum() const {
-    assert(kind == Kind::Sum);
-    return value.enumDecl;
-  }
+
+  Type getType() const;
+  CanType getCanonicalType() const;
+  NominalTypeDecl *getNominal() const;
 };
 
 } // end namespace swift

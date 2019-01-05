@@ -26,7 +26,7 @@
 //
 // Each function in this file is the adjoint of some corresponding function
 // defined in Ops.swift with respect to all of its parameters. The attribute
-// '@differentiable(reverse, adjoint: ...)' is used to define the adjoint for a
+// '@differentiable(adjoint: ...)' is used to define the adjoint for a
 // function. The automatic differentiation pass will pick up these adjoints
 // and chain them together for arbitrary differentiable programs.
 //
@@ -265,7 +265,9 @@ extension Tensor {
 // Normalization
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : BinaryFloatingPoint {
+extension Tensor where Scalar : BinaryFloatingPoint,
+                       Scalar : Differentiable,
+                       Scalar.CotangentVector == Scalar {
   // TODO: Verify that these calculations are correct.
   @inlinable
   func _adjointBatchNormalized(
@@ -306,7 +308,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @inlinable
   @differentiable(
-    reverse, wrt: (.1, .2),
+    wrt: (.1, .2),
     adjoint: _adjointTFConv2DBackpropInput(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropInput(
@@ -327,7 +329,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the filter.
   @inlinable
   @differentiable(
-    reverse, wrt: (.0, .2),
+    wrt: (.0, .2),
     adjoint: _adjointTFConv2DBackpropFilter(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropFilter(

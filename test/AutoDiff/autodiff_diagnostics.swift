@@ -26,10 +26,32 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 
 // expected-note @+3 {{differentiating generic functions is not supported yet}}
 // expected-error @+2 {{function is not differentiable}}
-@differentiable(reverse)
-func generic<T: FloatingPoint>(_ x: T) -> T {
+@differentiable()
+func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   return x + 1
 }
+
+//===----------------------------------------------------------------------===//
+// Non-differentiable stored properties
+//===----------------------------------------------------------------------===//
+
+struct S {
+  let p: Float
+}
+
+extension S : Differentiable, VectorNumeric {
+  static var zero: S { return S(p: 0) }
+  typealias Scalar = Float
+  static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
+  static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
+  static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
+
+  typealias TangentVector = S
+  typealias CotangentVector = S
+}
+
+// expected-error @+1 {{property is not differentiable}}
+_ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
 //===----------------------------------------------------------------------===//
 // Function composition

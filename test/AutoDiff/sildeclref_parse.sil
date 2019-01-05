@@ -3,7 +3,7 @@
 import Swift
 
 protocol Proto {
-  @differentiable(reverse)
+  @differentiable()
   func f(_ x: Float, _ y: Float) -> Float
 }
 

@@ -126,6 +126,8 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(TensorFlowGraph)
   IGNORED_ATTR(TFParameter)
+  IGNORED_ATTR(FieldwiseProductSpace)
+  IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -884,6 +886,8 @@ public:
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
   void visitTFParameterAttr(TFParameterAttr *attr);
+  void visitFieldwiseProductSpaceAttr(FieldwiseProductSpaceAttr *attr);
+  void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2132,9 +2136,9 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
                 specifier.Name);
   };
 
-  // If the original function and the associated functions different parents,
-  // or if they both have no type context and are in different modules, then
-  // it's an error. Returns true on error.
+  // If the original function and the associated function have different
+  // parents, or if they both have no type context and are in different modules,
+  // then it's an error. Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both are top-level.
     if (!original->getInnermostTypeContext() &&
@@ -2190,19 +2194,36 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 }
 
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // Forward mode is unsupported.
-  if (attr->getMode() == AutoDiffMode::Forward) {
-    TC.diagnose(attr->getModeLoc(),
-                diag::differentiable_attr_forward_mode_unsupported);
+  auto &ctx = TC.Context;
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+
+  FuncDecl *original = nullptr;
+  bool isProperty = false;
+  if (auto *vd = dyn_cast<VarDecl>(D)) {
+    // When used on a storage decl, @differentiable refers to its getter.
+    original = vd->getGetter();
+    isProperty = true;
+  } else if (auto *fd = dyn_cast<FuncDecl>(D)) {
+    original = fd;
+    if (auto *accessor = dyn_cast<AccessorDecl>(fd)) {
+      isProperty = true;
+      // We do not support setters yet because inout is not supported yet.
+      if (accessor->isSetter())
+        original = nullptr;
+    }
+  }
+  
+  if (!original) {
+    // Global immutable vars, for example, have no getter, and therefore trigger
+    // this.
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
     return;
   }
 
-  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
-  auto *original = cast<FuncDecl>(D);
+  TC.resolveDeclSignature(original);
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   auto isInstanceMethod = original->isInstanceMember();
-  auto &ctx = original->getASTContext();
-  AnyFunctionType *originalFnTy =
-      original->getInterfaceType()->castTo<AnyFunctionType>();
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
@@ -2310,12 +2331,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       originalFnTy);
 
   if (uncheckedWrtParams.empty()) {
-    // If 'wrt:' is not specified, the wrt parameters are all the parameters in
-    // the main parameter group. Self is intentionally excluded.
-    unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
-        (isMethod ? 1 : 0);
-    for (unsigned i : range(numNonSelfParameters))
-      autoDiffParameterIndicesBuilder.setParameter(i);
+    if (isProperty)
+      autoDiffParameterIndicesBuilder.setParameter(0);
+    else {
+      // If 'wrt:' is not specified, the wrt parameters are all the parameters
+      // in the main parameter group. Self is intentionally excluded except when
+      // it's a property.
+      unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
+          (isMethod ? 1 : 0);
+      for (unsigned i : range(numNonSelfParameters))
+        autoDiffParameterIndicesBuilder.setParameter(i);
+    }
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
@@ -2373,17 +2399,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Predicate checking if a type conforms to Differentiable.
-  auto *differentiableProtocol =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  assert(differentiableProtocol && "could not find differentiable protocol");
-  auto conformsToDifferentiable = [&](Type type) -> bool {
-    auto *nomTy = type->getAnyNominal();
-    if (!nomTy)
-      return false;
-    SmallVector<ProtocolConformance *, 2> conformances;
-    return nomTy->lookupConformance(D->getDeclContext()->getParentModule(),
-                                    differentiableProtocol, conformances);
+  // Predicate checking if a type has associated tangent and cotangent spaces.
+  auto hasAssociatedSpaces = [&](Type type) -> bool {
+    return (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Tangent, lookupConformance) &&
+           (bool)type->getAutoDiffAssociatedVectorSpace(
+               AutoDiffAssociatedVectorSpaceKind::Cotangent, lookupConformance);
   };
 
   // Check that the user has only selected wrt params with allowed types.
@@ -2407,11 +2428,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    // We also require that all the wrt params conform to Differentiable. But
-    // only for attrs that have JVP or VJP, because there are a lot of attrs
-    // using the legacy primal/adjoint whose wrt params do not conform.
-    bool hasJVPorVJP = attr->getJVP() || attr->getVJP();
-    if (hasJVPorVJP && !conformsToDifferentiable(wrtParamType)) {
+    // We also require that all the wrt params have associated tangent/cotangent
+    // spaces.
+    if (!hasAssociatedSpaces(wrtParamType)) {
       TC.diagnose(loc, diag::differentiable_attr_wrt_not_differentiable,
                   wrtParamType);
       attr->setInvalid();
@@ -2419,17 +2438,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     }
   }
 
-  // Check that all the result types are differentiable. But only for attrs that
-  // have JVP or VJP, because there are a lot of attrs using the legacy
-  // primal/adjoint whose results do not conform.
-  if (attr->getJVP() || attr->getVJP()) {
+  // Check that all the result types have associated tangent/cotangent spaces.
+  {
     auto *unwrapped = originalFnTy;
     if (isMethod)
       unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
     Type originalResult = unwrapped->getResult();
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       for (auto &resultTupleElt : resultTuple->getElements()) {
-        if (!conformsToDifferentiable(resultTupleElt.getType())) {
+        if (!hasAssociatedSpaces(resultTupleElt.getType())) {
           TC.diagnose(attr->getLocation(),
                       diag::differentiable_attr_result_not_differentiable,
                       resultTupleElt.getType());
@@ -2438,7 +2455,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         }
       }
     } else {
-      if (!conformsToDifferentiable(originalResult)) {
+      if (!hasAssociatedSpaces(originalResult)) {
         TC.diagnose(attr->getLocation(),
                     diag::differentiable_attr_result_not_differentiable,
                     originalResult);
@@ -2494,8 +2511,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TupleType *primalResultTy =
         primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
     AnyFunctionType *expectedAdjointFnTy =
-        originalFnTy->getAutoDiffAdjointFunctionType(checkedWrtParamIndices,
-                                                     primalResultTy, isMethod);
+        originalFnTy->getAutoDiffAdjointFunctionType(
+            checkedWrtParamIndices, primalResultTy, lookupConformance,
+            isMethod);
 
     auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
       TC.validateDeclForNameLookup(adjointCandidate);
@@ -2522,7 +2540,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            lookupConformance);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDeclForNameLookup(jvpCandidate);
@@ -2549,7 +2567,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         originalFnTy->getAutoDiffAssociatedFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            LookUpConformanceInModule(D->getDeclContext()->getParentModule()));
+            lookupConformance);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDeclForNameLookup(vjpCandidate);
@@ -2703,6 +2721,40 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::tfparameter_attr_not_in_parameterized,
                           attr->getAttrName());
   }
+}
+
+void AttributeChecker::visitFieldwiseProductSpaceAttr(
+    FieldwiseProductSpaceAttr *attr) {
+  // If we make this attribute user-facing, we'll need to do various checks.
+  //   - check that this attribute is on a Tangent/Cotangent type alias
+  //   - check that we can access the raw fields of the Tangent/Cotangent from
+  //     this module (e.g. the Tangent can't be a public resilient struct
+  //     defined in a different module).
+  //   - check that the stored properties of the Tangent/Cotangent match
+  //
+  // If we don't make this attribute user-facing, we can avoid doing checks
+  // here: the assertions in TFDifferentiation suffice.
+}
+
+void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
+  auto *vd = dyn_cast<VarDecl>(D);
+  if (!vd) {
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+    return;
+  }
+  auto *structDecl = dyn_cast<StructDecl>(vd->getDeclContext());
+  if (!structDecl) {
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+    return;
+  }
+  auto *diffable = TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  if (!TC.conformsToProtocol(structDecl->getDeclaredInterfaceType(), diffable,
+                             structDecl->getDeclContext(),
+                             ConformanceCheckFlags::Used))
+    diagnoseAndRemoveAttr(attr,
+        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

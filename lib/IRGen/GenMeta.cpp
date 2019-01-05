@@ -4061,6 +4061,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Numeric:
+  case KnownProtocolKind::KeyPathIterable:
   case KnownProtocolKind::ParameterGroup:
   case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorArrayProtocol:

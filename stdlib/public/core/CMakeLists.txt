@@ -88,6 +88,8 @@ set(SWIFTLIB_ESSENTIAL
   IntegerTypes.swift.gyb
   Join.swift
   KeyPath.swift
+  # SWIFT_ENABLE_TENSORFLOW
+  KeyPathIterable.swift
   KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift

@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s -check-prefix=CHECK-AST
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s -check-prefix=CHECK-SILGEN
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 func thin(x: Float) -> Float { return x }
 
@@ -21,15 +22,17 @@ func apply() {
 // CHECK-AST-NEXT:       (function_conversion_expr implicit type='(Float) -> (Float)'
 // CHECK-AST-NEXT:         (declref_expr type='(Float) -> Float'
 
-// CHECK-SIL-LABEL: @{{.*}}myfunction{{.*}}
-// CHECK-SIL: bb0([[DIFFED:%.*]] : @guaranteed $@autodiff @callee_guaranteed (Float) -> Float):
-// CHECK-SIL:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float
-// CHECK-SIL:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@autodiff @callee_guaranteed (Float) -> Float
-// CHECK-SIL:   [[ORIG_COPY:%.*]] = copy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
-// CHECK-SIL:   return [[ORIG_COPY]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN-LABEL: @{{.*}}myfunction{{.*}}
+// CHECK-SILGEN: bb0([[DIFFED:%.*]] : @guaranteed $@autodiff @callee_guaranteed (Float) -> Float):
+// CHECK-SILGEN:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_COPY]] : $@autodiff @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[ORIG_COPY:%.*]] = copy_value [[ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   return [[ORIG_COPY]] : $@callee_guaranteed (Float) -> Float
 
-// CHECK-SIL-LABEL: @{{.*}}apply{{.*}}
-// CHECK-SIL:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
-// CHECK-SIL-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
-// CHECK-SIL-NEXT:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN-LABEL: @{{.*}}apply{{.*}}
+// CHECK-SILGEN:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
+// CHECK-SILGEN-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN-NEXT:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
 
+// CHECK-SIL:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] {{%.*}} : $@callee_guaranteed (Float) -> Float
+// CHECK-SIL:  release_value [[DIFFED]] : $@autodiff @callee_guaranteed (Float) -> Float

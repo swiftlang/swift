@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 460; // Last change: delete `gradient` instruction
+const uint16_t SWIFTMODULE_VERSION_MINOR = 461; // Last change: delete differentiation mode
 
 using DeclIDField = BCFixed<31>;
 
@@ -1575,7 +1575,6 @@ namespace decls_block {
   // SWIFT_ENABLE_TENSORFLOW
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
-    BCFixed<1>, // Differentiation mode ('forward' or 'reverse').
     IdentifierIDField, // Primal name.
     DeclIDField, // Primal function declaration.
     IdentifierIDField, // Adjoint name.

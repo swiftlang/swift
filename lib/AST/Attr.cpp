@@ -551,18 +551,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@differentiable");
     Printer << '(';
     auto *attr = cast<DifferentiableAttr>(this);
-    switch (attr->getMode()) {
-    case AutoDiffMode::Forward:
-      Printer << "forward";
-      break;
-    case AutoDiffMode::Reverse:
-      Printer << "reverse";
-      break;
-    }
     auto params = attr->getParameters();
+
+    // Print comma if not leading clause.
+    bool isLeadingClause = true;
+    auto printCommaIfNecessary = [&] {
+      if (isLeadingClause) {
+        isLeadingClause = false;
+        return;
+      }
+      Printer << ", ";
+    };
+
     // Print differentiation parameters, if any.
     if (!params.empty()) {
-      Printer << ", wrt: (";
+      printCommaIfNecessary();
+      Printer << "wrt: (";
       interleave(params, [&](const AutoDiffParameter &param) {
         switch (param.getKind()) {
         case AutoDiffParameter::Kind::Index:
@@ -578,17 +582,25 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ")";
     }
     // Print primal function name if any.
-    if (auto primal = attr->getPrimal())
-      Printer << ", primal: " << primal->Name;
+    if (auto primal = attr->getPrimal()) {
+      printCommaIfNecessary();
+      Printer << "primal: " << primal->Name;
+    }
     // Print adjoint function name.
-    if (auto adjoint = attr->getAdjoint())
-      Printer << ", adjoint: " << adjoint->Name;
+    if (auto adjoint = attr->getAdjoint()) {
+      printCommaIfNecessary();
+      Printer << "adjoint: " << adjoint->Name;
+    }
     // Print jvp function name.
-    if (auto jvp = attr->getJVP())
-      Printer << ", jvp: " << jvp->Name;
+    if (auto jvp = attr->getJVP()) {
+      printCommaIfNecessary();
+      Printer << "jvp: " << jvp->Name;
+    }
     // Print vjp function name.
-    if (auto vjp = attr->getVJP())
-      Printer << ", vjp: " << vjp->Name;
+    if (auto vjp = attr->getVJP()) {
+      printCommaIfNecessary();
+      Printer << "vjp: " << vjp->Name;
+    }
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
@@ -1000,7 +1012,6 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                                       AutoDiffMode mode, SourceLoc modeLoc,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<DeclNameWithLoc> primal,
                                        Optional<DeclNameWithLoc> adjoint,
@@ -1008,7 +1019,7 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
-    Mode(mode), ModeLoc(modeLoc), NumParameters(parameters.size()),
+    NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
     JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
@@ -1016,8 +1027,7 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
 
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
-                           SourceRange baseRange, AutoDiffMode mode,
-                           SourceLoc modeLoc,
+                           SourceRange baseRange,
                            ArrayRef<AutoDiffParameter> parameters,
                            Optional<DeclNameWithLoc> primal,
                            Optional<DeclNameWithLoc> adjoint,
@@ -1028,10 +1038,9 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
   unsigned size = sizeof(DifferentiableAttr) +
     numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, mode, modeLoc,
-                                      parameters, std::move(primal),
-                                      std::move(adjoint), std::move(jvp),
-                                      std::move(vjp), clause);
+  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
+                                      std::move(primal), std::move(adjoint),
+                                      std::move(jvp), std::move(vjp), clause);
 }
 
 ArrayRef<AutoDiffParameter>

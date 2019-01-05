@@ -46,12 +46,13 @@ public protocol ParameterGroup {
 /// If all parameters have the same type, the compiler also synthesizes a
 /// conformance of `Parameters` to `ParameterGroup`.
 ///
-public protocol Parameterized {
+public protocol Parameterized : Differentiable {
   /// The type representing all parameters, synthesized from stored properties
   /// marked with `@TFParameter`.
-  associatedtype Parameters
+  associatedtype Parameters : Differentiable & KeyPathIterable
+    where TangentVector == Parameters.TangentVector,
+          CotangentVector == Parameters.CotangentVector
 
-  /// A synthesized instance of `Parameters`.
   var allParameters: Parameters { get set }
 }
 
@@ -67,51 +68,26 @@ public extension Parameterized where Parameters : ParameterGroup {
 }
 
 //===----------------------------------------------------------------------===//
-// Extend common types to conform to ParameterGroup and Parameterized
+// `Array` conformances
 //===----------------------------------------------------------------------===//
 
-// Tensors conform to the protocols by "identity".
-extension Tensor : Parameterized {
-  public typealias Parameters = Tensor<Scalar>
-
-  public var allParameters: Parameters {
-    get {
-      return self
-    }
-    set {
-      self = newValue
-    }
-  }
-}
-
-extension Tensor : ParameterGroup {
-  public typealias Parameter = Tensor<Scalar>
-
-  public mutating func update(
-    withGradients gradients: Tensor<Scalar>,
-    _ updateParameter: (inout Parameter, Parameter) -> Void
-  ) {
-    updateParameter(&self, gradients)
-  }
-}
-
 // Arrays conform to the protocols if their elements conform to them.
-extension Array : Parameterized where Element : Parameterized {
-  public typealias Parameters = [Element.Parameters]
+// extension Array : Parameterized where Element : Parameterized {
+//   public typealias Parameters = [Element.Parameters]
+//
+//   public var allParameters: Parameters {
+//     get {
+//       return self.map { $0.allParameters }
+//     }
+//     set(newParameters) {
+//       for idx in self.indices {
+//         self[idx].allParameters = newParameters[idx]
+//       }
+//     }
+//   }
+// }
 
-  public var allParameters: Parameters {
-    get {
-      return self.map { $0.allParameters }
-    }
-    set(newParameters) {
-      for idx in self.indices {
-        self[idx].allParameters = newParameters[idx]
-      }
-    }
-  }
-}
-
-extension Array : ParameterGroup where Element : ParameterGroup  {
+extension Array : ParameterGroup where Element : ParameterGroup {
   public typealias Parameter = Element.Parameter
 
   public mutating func update(

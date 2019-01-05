@@ -3208,10 +3208,11 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   // Applies a thunk to all the components by extracting them, applying thunks
   // to all of them, and then putting them back together.
 
-  // FIXME: The `ManagedValue`s, `forward`s, etc, in here are probably wrong
-  // because I don't understand how they work.
-
   auto sourceType = fn.getType().castTo<SILFunctionType>();
+
+  // We're never going to pass `fn` into anything that consumes it, so get its
+  // value without disabling cleanup.
+  auto fnValue = fn.getValue();
 
   auto withoutDifferentiableType = [](CanAnyFunctionType type)
       -> CanAnyFunctionType {
@@ -3233,10 +3234,12 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
-  ManagedValue original = SGF.emitManagedRValueWithCleanup(
-      SGF.B.createAutoDiffFunctionExtractOriginal(loc, fn.forward(SGF)));
+  SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(loc, fnValue);
+  auto managedOriginal = original->getType().isTrivial(SGF.SGM.M)
+                             ? ManagedValue::forTrivialObjectRValue(original)
+                             : ManagedValue::forBorrowedObjectRValue(original);
   ManagedValue originalThunk = createThunk(
-      SGF, loc, original, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
+      SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
 
   // TODO: Use parameter indices specified in the function type.
@@ -3270,11 +3273,13 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                                    kind);
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
-    auto assocFn = SGF.emitManagedRValueWithCleanup(
-        SGF.B.createAutoDiffFunctionExtract(loc, kind,
-                                            /*differentiationOrder*/ 1,
-                                            fn.forward(SGF)));
-    return createThunk(SGF, loc, assocFn, assocFnInputOrigType,
+    auto assocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, kind,
+        /*differentiationOrder*/ 1, fnValue);
+    auto managedAssocFn = assocFn->getType().isTrivial(SGF.SGM.M)
+                              ? ManagedValue::forTrivialObjectRValue(assocFn)
+                              : ManagedValue::forBorrowedObjectRValue(assocFn);
+    return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
                        assocFnInputSubstType, assocFnOutputOrigType,
                        assocFnOutputSubstType, assocFnExpectedTL);
   };
@@ -3284,8 +3289,10 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   SILValue convertedBundle = SGF.B.createAutoDiffFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
-      /*differentiationOrder*/ 1, originalThunk.forward(SGF),
-      {jvpThunk.forward(SGF), vjpThunk.forward(SGF)});
+      /*differentiationOrder*/ 1,
+      originalThunk.ensurePlusOne(SGF, loc).forward(SGF),
+      {jvpThunk.ensurePlusOne(SGF, loc).forward(SGF),
+       vjpThunk.ensurePlusOne(SGF, loc).forward(SGF)});
   return SGF.emitManagedRValueWithCleanup(convertedBundle);
 }
 

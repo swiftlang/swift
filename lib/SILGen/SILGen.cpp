@@ -719,60 +719,62 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // [differentiable] attributes only make sense on functions with
-  // bodies, because [differentiable] attributes declare actual primals
-  // and adjoints corresponding to the function body.
+  // [differentiable] attributes only make sense on functions with bodies,
+  // because [differentiable] attributes declare actual associated functions
+  // corresponding to the function body.
   if (!AFD->hasBody())
     return;
 
-  // If the declaration has a @differentiable(reverse) attribute, turn it into a
-  // SIL [differentiable] attribute with lowered associated function names and
-  // lowered differentiation parameter indices.
-  //
+  // Look for a @differentiable attribute on the decl.
   // FIXME: Handle multiple @differentiable attributes.
-  if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
-        AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
-    switch (diffAttr->getMode()) {
-    case AutoDiffMode::Forward:
-      // TODO: Handle forward mode once [forward_differentiable] is implemented.
-      llvm_unreachable("Unimplemented");
-      break;
-    case AutoDiffMode::Reverse: {
-      auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
-      // Either only adjoint is specified, or both primal and adjoint are
-      // spcified.
-      StringRef primName, adjName, jvpName, vjpName;
-      bool hasPrimitiveAdjoint = false;
-      if (auto *primFn = diffAttr->getPrimalFunction())
-        primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
-      if (auto *adjointFn = diffAttr->getAdjointFunction()) {
-        // If the adjoint is specified but the primal is not, then we treat the
-        // original as the primal.
-        if (primName.empty())
-          primName = silOriginalFn->getName();
-        adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
-        hasPrimitiveAdjoint = true;
-      }
-      else {
-        assert(primName.empty() &&
-               "Primal cannot be present if adjoint is not");
-      }
-      if (auto *jvpFn = diffAttr->getJVPFunction())
-        jvpName = getFunction(SILDeclRef(jvpFn), ForDefinition)->getName();
-      if (auto *vjpFn = diffAttr->getVJPFunction())
-        vjpName = getFunction(SILDeclRef(vjpFn), ForDefinition)->getName();
-      // Get lowered argument indices.
-      auto paramIndices = diffAttr->getCheckedParameterIndices()->getLowered(
-          AFD->getInterfaceType()->castTo<AnyFunctionType>());
-      SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
-      silOriginalFn->addDifferentiableAttr(
-          SILDifferentiableAttr::create(
-            M, indices, primName, adjName,
-            /*primitive*/ hasPrimitiveAdjoint, jvpName, vjpName));
-      break;
-    }
+  DifferentiableAttr *diffAttr = nullptr;
+  if (AFD->getAttrs().hasAttribute<DifferentiableAttr>())
+    diffAttr = AFD->getAttrs().getAttribute<DifferentiableAttr>();
+  // If the AFD is the getter for a storage decl, also look for a
+  // @differentiable attribute on the storage decl, because @differentiable
+  // attributes on storage decls modify the getter.
+  if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+    if (accessor->isGetter()) {
+      auto &storageAttrs = accessor->getStorage()->getAttrs();
+      if (storageAttrs.hasAttribute<DifferentiableAttr>())
+        diffAttr = storageAttrs.getAttribute<DifferentiableAttr>();
     }
   }
+
+  if (!diffAttr)
+    return;
+
+  // The declaration (or its storage decl) has a @differentiable attribute, so
+  // turn it into a SIL [differentiable] attribute with lowered associated
+  // function names and lowered differentiation parameter indices.
+  auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
+  // Either only adjoint is specified, or both primal and adjoint are
+  // spcified.
+  StringRef primName, adjName, jvpName, vjpName;
+  bool hasPrimitiveAdjoint = false;
+  if (auto *primFn = diffAttr->getPrimalFunction())
+    primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
+  if (auto *adjointFn = diffAttr->getAdjointFunction()) {
+    // If the adjoint is specified but the primal is not, then we treat the
+    // original as the primal.
+    if (primName.empty())
+      primName = silOriginalFn->getName();
+    adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+    hasPrimitiveAdjoint = true;
+  } else {
+    assert(primName.empty() && "Primal cannot be present if adjoint is not");
+  }
+  if (auto *jvpFn = diffAttr->getJVPFunction())
+    jvpName = getFunction(SILDeclRef(jvpFn), ForDefinition)->getName();
+  if (auto *vjpFn = diffAttr->getVJPFunction())
+    vjpName = getFunction(SILDeclRef(vjpFn), ForDefinition)->getName();
+  // Get lowered argument indices.
+  auto paramIndices = diffAttr->getCheckedParameterIndices()->getLowered(
+      AFD->getInterfaceType()->castTo<AnyFunctionType>());
+  SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
+  silOriginalFn->addDifferentiableAttr(SILDifferentiableAttr::create(
+      M, indices, primName, adjName,
+      /*primitive*/ hasPrimitiveAdjoint, jvpName, vjpName));
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {

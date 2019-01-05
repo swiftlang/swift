@@ -1078,6 +1078,22 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Return the associated tangent or cotangent type. Return the null type if
+  /// there is no associated tangent/cotangent type.
+  ///
+  /// `kind` specifies whether to return the tangent or cotangent type.
+  ///
+  /// If the type conforms to `Differentiable`, then the associated
+  /// tangent/cotangent type is the associated `TangentVector`/`CotangentVector`
+  /// from the `Differentiable` requirement. If the type is a tuple, then the
+  /// associated tangent/cotangent type is the elementwise tangent/cotangent
+  /// type of its elements. If the type is a builtin float, then the associated
+  /// tangent/cotangent type is itself. Otherwise, there is no associated type.
+  Optional<VectorSpace>
+  getAutoDiffAssociatedVectorSpace(AutoDiffAssociatedVectorSpaceKind kind,
+                                   LookupConformanceFn lookupConformance);
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -3094,10 +3110,9 @@ public:
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance);
 
-  AnyFunctionType *
-  getAutoDiffAdjointFunctionType(AutoDiffParameterIndices *indices,
-                                 const TupleType *primalResultTy,
-                                 bool isMethod);
+  AnyFunctionType *getAutoDiffAdjointFunctionType(
+      AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
+      LookupConformanceFn lookupConformance, bool isMethod);
 
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
@@ -4151,10 +4166,7 @@ public:
 
   CanType getSelfInstanceType() const;
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  CanSILFunctionType getGradientType(
-      const SILAutoDiffConfig &config, SILModule &M);
-
+  // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 

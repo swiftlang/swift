@@ -1824,7 +1824,7 @@ extension FloatingPoint {
   // SWIFT_ENABLE_TENSORFLOW
   // FIXME: This causes AD to register a differentiation task for this function
   // twice.
-  // @differentiable(reverse, wrt: (self), adjoint: _adjointSquareRoot)
+  // @differentiable(wrt: (self), adjoint: _adjointSquareRoot)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
@@ -1854,7 +1854,9 @@ extension FloatingPoint {
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
+  // FIXME: Need to make FloatingPoint refine Differentiable to make this
+  // method differentiable, but that causes stdlib compilation to crash.
+  // @differentiable(wrt: (self, .0, .1), adjoint: _adjointAddingProduct)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)

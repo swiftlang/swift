@@ -17,15 +17,15 @@ public struct Vector<T> : VectorNumeric {
 // This exists to minimize generated SIL.
 @inline(never) func abort() -> Never { fatalError() }
 
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func + <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func - <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }
-@differentiable(reverse, adjoint: fakeAdj)
+@differentiable(adjoint: fakeAdj)
 public func * <T>(lhs: Vector<T>, rhs: Vector<T>) -> Vector<T> {
   abort()
 }

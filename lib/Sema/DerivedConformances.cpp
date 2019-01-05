@@ -63,6 +63,22 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::KeyPathIterable)
+    return canDeriveKeyPathIterable(Nominal);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
+    return canDeriveAdditiveArithmetic(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::VectorNumeric)
+    return canDeriveVectorNumeric(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::Differentiable)
+    return canDeriveDifferentiable(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
   // The only requirement for deriving Parameterized is that there exist some
   // stored properties marked with @TFParameter. The `Parameters` struct can
   // always be derived, even if parameters have different types.
@@ -207,10 +223,20 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::CodingKey);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // AdditiveArithmetic.zero
+    if (name.isSimpleName(ctx.Id_zero))
+      return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.allKeyPaths
+    if (name.isSimpleName(ctx.Id_allKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // Parameterized.allParameters
     if (name.isSimpleName(ctx.Id_allParameters))
       return getRequirement(KnownProtocolKind::Parameterized);
-
+    
     return nullptr;
   }
 
@@ -231,6 +257,47 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
         return getRequirement(KnownProtocolKind::Hashable);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // AdditiveArithmetic.+
+    // AdditiveArithmetic.-
+    if (func->isOperator() && (name.getBaseName() == "+" ||
+                               name.getBaseName() == "-")) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2)
+        return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // VectorNumeric.*
+    if (func->isOperator() && name.getBaseName() == "*") {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2) {
+        return getRequirement(KnownProtocolKind::VectorNumeric);
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.moved(along:)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_moved) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("along")) {
+        return getRequirement(KnownProtocolKind::Differentiable);
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.tangentVector(from:)
+    if (name.isCompoundName() &&
+        name.getBaseName() == ctx.Id_tangentVector) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("from")) {
+        return getRequirement(KnownProtocolKind::Differentiable);
+      }
     }
 
     // SWIFT_ENABLE_TENSORFLOW
@@ -280,6 +347,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::CaseIterable);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // KeyPathIterable.AllKeyPaths
+    if (name.isSimpleName(ctx.Id_AllKeyPaths))
+      return getRequirement(KnownProtocolKind::KeyPathIterable);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.TangentVector
+    // Differentiable.CotangentVector
+    if (name.isSimpleName(ctx.Id_TangentVector) ||
+        name.isSimpleName(ctx.Id_CotangentVector))
+      return getRequirement(KnownProtocolKind::Differentiable);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // Parameterized.Parameters
     if (name.isSimpleName(ctx.Id_Parameters))
       return getRequirement(KnownProtocolKind::Parameterized);
@@ -288,6 +367,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     // ParameterGroup.Parameter
     if (name.isSimpleName(ctx.Id_Parameter))
       return getRequirement(KnownProtocolKind::ParameterGroup);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // VectorNumeric.Scalar
+    if (name.isSimpleName(ctx.Id_Scalar))
+      return getRequirement(KnownProtocolKind::VectorNumeric);
 
     return nullptr;
   }

@@ -225,23 +225,33 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
   if (!DA->getCheckedParameterIndices())
     return;
 
-  auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-    AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-    DA->getCheckedParameterIndices(), SwiftModule->getASTContext());
-  auto vjpConstant = constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
-  emitCurryThunk(vjpConstant);
+  SmallVector<SILDeclRef, 2> assocFnConstants;
+  for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
+                    AutoDiffAssociatedFunctionKind::VJP}) {
+    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        kind, /*differentiationOrder*/ 1, DA->getCheckedParameterIndices(),
+        SwiftModule->getASTContext());
+    auto assocFnConstant =
+        constant.asAutoDiffAssociatedFunction(autoDiffFuncId);
+    emitCurryThunk(assocFnConstant);
+    assocFnConstants.push_back(assocFnConstant);
+  }
+
+  SmallVector<StringRef, 2> assocFnNames;
+  for (auto assocFnConstant : assocFnConstants)
+    assocFnNames.push_back(SwiftModule->getASTContext()
+                               .getIdentifier(assocFnConstant.mangle())
+                               .str());
 
   auto loweredParamIndices = DA->getCheckedParameterIndices()->getLowered(
       fd->getInterfaceType()->castTo<AnyFunctionType>());
-  auto vjpName =
-      SwiftModule->getASTContext().getIdentifier(vjpConstant.mangle()).str();
   auto *SILDA = SILDifferentiableAttr::create(
       M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
       /*primalName*/ StringRef(),
       /*adjointName*/ StringRef(),
       /*adjointIsPrimitive*/ false,
-      /*jvpName*/ StringRef(),
-      /*vjpName*/ vjpName);
+      /*jvpName*/ assocFnNames[0],
+      /*vjpName*/ assocFnNames[1]);
   f->addDifferentiableAttr(SILDA);
 }
 

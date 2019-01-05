@@ -58,18 +58,20 @@ public protocol ShapedVectorNumeric : VectorNumeric {
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
-///
-/// In automatic differentiation, differentiation will produce a Jacobian whose
-/// elements are of `Tangent` type.
 public protocol Differentiable {
-  /// The tangent vector space of this differentiable manifold.
-  associatedtype TangentVector : Differentiable, VectorNumeric
+  /// The tangent bundle of this differentiable manifold.
+  associatedtype TangentVector : Differentiable & AdditiveArithmetic
+    // FIXME(SR-9595): Unexpected error when type checking constrained
+    // associated types.
     where TangentVector.TangentVector == TangentVector,
-          TangentVector.Scalar : FloatingPoint
-  /// The cotangent space of this differentiable manifold.
-  associatedtype CotangentVector : Differentiable, VectorNumeric
-    where CotangentVector.CotangentVector == CotangentVector,
-          CotangentVector.Scalar : FloatingPoint
+          TangentVector.CotangentVector == CotangentVector
+
+  /// The cotangent bundle of this differentiable manifold.
+  associatedtype CotangentVector : Differentiable & AdditiveArithmetic
+    // FIXME(SR-9595): Unexpected error when type checking constrained
+    // associated types.
+    where CotangentVector.TangentVector == CotangentVector,
+          CotangentVector.CotangentVector == TangentVector
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
@@ -80,18 +82,26 @@ public protocol Differentiable {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
 }
 
+// FIXME: The `Self : AdditiveArithmetic` constraint should be implied by
+// `TangentVector == Self`, but the type checker errors out when it does not
+// exist.
 public extension Differentiable
-  where Self : VectorNumeric, TangentVector == Self {
+  where TangentVector == Self, Self : AdditiveArithmetic {
   func moved(along direction: TangentVector) -> Self {
     return self + direction
   }
 }
 
+// FIXME: This is currently commented because the where clause leads to
+// associated type inference which conflicts with `Differentiable` derived
+// conformances.
+/*
 public extension Differentiable where TangentVector == CotangentVector {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }
 }
+*/
 
 //===----------------------------------------------------------------------===//
 // Differential Operators
@@ -106,6 +116,8 @@ public func valueWithDifferential<T, R>(
   return Builtin.autodiffApply_jvp(f, x)
 }
  */
+
+// Value with pullback
 
 @inlinable
 public func valueWithPullback<T, R>(
@@ -134,6 +146,8 @@ public func valueWithPullback<T, U, V, R>(
         R : Differentiable {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
+
+// Pullback
 
 @inlinable
 public func pullback<T, R>(
@@ -182,6 +196,8 @@ public func derivative<T, R>(
 }
  */
 
+// Value with gradient
+
 @inlinable
 public func valueWithGradient<T, R>(
   at x: T, in f: @autodiff (T) -> R
@@ -213,6 +229,41 @@ public func valueWithGradient<T, U, V, R>(
   return (y, pullback(1))
 }
 
+// Value with gradient (curried)
+
+@inlinable
+public func valueWithGradient<T, R>(
+  of f: @escaping @autodiff (T) -> R
+) -> (T) -> (value: R, gradient: T.CotangentVector)
+  where T : Differentiable, R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x in valueWithGradient(at: x, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, R>(
+  of f: @escaping @autodiff (T, U) -> R
+) -> (T, U) -> (value: R, gradient: (T.CotangentVector, U.CotangentVector))
+  where T : Differentiable, U : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y in valueWithGradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  of f: @escaping @autodiff (T, U, V) -> R
+) -> (T, U, V)
+    -> (value: R,
+        gradient: (T.CotangentVector, U.CotangentVector, V.CotangentVector))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
+}
+
+// Gradient
+
 @inlinable
 public func gradient<T, R>(
   at x: T, in f: @autodiff (T) -> R
@@ -240,7 +291,8 @@ public func gradient<T, U, V, R>(
   return pullback(at: x, y, z, in: f)(1)
 }
 
-/* FIXME(rxwei): Make @autodiff functions ref-countable.
+// Gradient (curried)
+
 @inlinable
 public func gradient<T, R>(
   of f: @escaping @autodiff (T) -> R
@@ -249,7 +301,26 @@ public func gradient<T, R>(
         R.CotangentVector == R {
   return { x in gradient(at: x, in: f) }
 }
- */
+
+@inlinable
+public func gradient<T, U, R>(
+  of f: @escaping @autodiff (T, U) -> R
+) -> (T, U) -> (T.CotangentVector, U.CotangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y in gradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  of f: @escaping @autodiff (T, U, V) -> R
+) -> (T, U, V) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        R : BinaryFloatingPoint & Differentiable,
+        R.CotangentVector == R {
+  return { x, y, z in gradient(at: x, y, z, in: f) }
+}
 
 //===----------------------------------------------------------------------===//
 // Builtins

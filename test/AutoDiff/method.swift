@@ -9,7 +9,12 @@ var MethodTests = TestSuite("Method")
 // ==== Tests with generated adjoint ====
 
 struct Parameter : Equatable {
+  @differentiable(wrt: (self), vjp: vjpX)
   let x: Float
+
+  func vjpX() -> (Float, (Float) -> Parameter) {
+    return (x, { dx in Parameter(x: dx) } )
+  }
 }
 
 extension Parameter {
@@ -132,7 +137,12 @@ MethodTests.test("static method with generated adjoint, wrt all params") {
 // ==== Tests with custom adjoint ====
 
 struct CustomParameter : Equatable {
+  @differentiable(wrt: (self), vjp: vjpX)
   let x: Float
+
+  func vjpX() -> (Float, (Float) -> CustomParameter) {
+    return (x, { dx in CustomParameter(x: dx) })
+  }
 }
 
 extension CustomParameter : Differentiable, VectorNumeric {
@@ -162,7 +172,7 @@ extension Float {
 }
 
 extension CustomParameter {
-  @differentiable(reverse, wrt: (self), adjoint: dSquared)
+  @differentiable(wrt: (self), adjoint: dSquared)
   func squared() -> Float {
     return x * x
   }
@@ -171,7 +181,7 @@ extension CustomParameter {
     return CustomParameter(x: (2 * x).clamped(to: -10.0...10.0) * seed)
   }
 
-  @differentiable(reverse, adjoint: dSquared)
+  @differentiable(adjoint: dSquared)
   static func squared(p: CustomParameter) -> Float {
     return p.x * p.x
   }
@@ -184,17 +194,17 @@ extension CustomParameter {
   // There is currently no way to define multiple custom adjoints wrt different
   // parameters on the same func, so we define a copy of this func per adjoint.
 
-  @differentiable(reverse, wrt: (self, .0), adjoint: dMultiplied_wrtAll)
+  @differentiable(wrt: (self, .0), adjoint: dMultiplied_wrtAll)
   func multiplied(with other: Float) -> Float {
     return x * other
   }
 
-  @differentiable(reverse, wrt: (.0), adjoint: dMultiplied_wrtOther)
+  @differentiable(wrt: (.0), adjoint: dMultiplied_wrtOther)
   func multiplied_constSelf(with other: Float) -> Float {
     return x * other
   }
 
-  @differentiable(reverse, wrt: (self), adjoint: dMultiplied_wrtSelf)
+  @differentiable(wrt: (self), adjoint: dMultiplied_wrtSelf)
   func multiplied_constOther(with other: Float) -> Float {
     return x * other
   }
@@ -215,19 +225,19 @@ extension CustomParameter {
     return dMultiplied_wrtAll(seed: seed, origVal: origVal, with: other).0
   }
 
-  @differentiable(reverse, adjoint: dMultiply_wrtAll)
+  @differentiable(adjoint: dMultiply_wrtAll)
   static func multiply(_ lhs: CustomParameter, _ rhs: CustomParameter)
       -> Float {
     return lhs.x * rhs.x
   }
 
-  @differentiable(reverse, wrt: (.1), adjoint: dMultiply_wrtRhs)
+  @differentiable(wrt: (.1), adjoint: dMultiply_wrtRhs)
   static func multiply_constLhs(_ lhs: CustomParameter, _ rhs: CustomParameter)
       -> Float {
     return lhs.x * rhs.x
   }
 
-  @differentiable(reverse, wrt: (.0), adjoint: dMultiply_wrtLhs)
+  @differentiable(wrt: (.0), adjoint: dMultiply_wrtLhs)
   static func multiply_constRhs(_ lhs: CustomParameter, _ rhs: CustomParameter)
       -> Float {
     return lhs.x * rhs.x

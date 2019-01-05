@@ -66,3 +66,4 @@ func methoddiff<T: Differentiable, U: Differentiable, R: Differentiable>(_ f: @a
 // CHECK-SIL:   dealloc_stack [[ORIG_FN_ARG2_COPY]] : $*U
 // CHECK-SIL:   dealloc_stack [[ORIG_FN_ARG1_COPY]] : $*T
 // CHECK-SIL:   return [[DIFFERENTIAL]] : $@callee_guaranteed (@in_guaranteed T, @in_guaranteed U) -> @out R.TangentVector
+

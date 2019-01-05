@@ -27,8 +27,12 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformanceEquatableHashable.cpp
   DerivedConformanceError.cpp
   # SWIFT_ENABLE_TENSORFLOW
+  DerivedConformanceAdditiveArithmeticVectorNumeric.cpp
+  DerivedConformanceDifferentiable.cpp
+  DerivedConformanceKeyPathIterable.cpp
   DerivedConformanceParameterGroup.cpp
   DerivedConformanceParameterized.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
   InstrumenterSupport.cpp

@@ -2543,8 +2543,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
-        AutoDiffMode autodiffMode = AutoDiffMode::Reverse;
-        unsigned autodiffModeValue;
         uint64_t primalNameId;
         DeclID primalDeclId;
         uint64_t adjointNameId;
@@ -2556,12 +2554,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         ArrayRef<uint64_t> paramValues;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, autodiffModeValue, primalNameId, primalDeclId,
-            adjointNameId, adjointDeclId, jvpNameId, jvpDeclId, vjpNameId,
-            vjpDeclId, paramValues);
-        autodiffMode = autodiffModeValue
-          ? AutoDiffMode::Reverse
-          : AutoDiffMode::Forward;
+            scratch, primalNameId, primalDeclId, adjointNameId, adjointDeclId,
+            jvpNameId, jvpDeclId, vjpNameId, vjpDeclId, paramValues);
 
         using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
         Optional<FuncSpecifier> primal;
@@ -2600,9 +2594,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         // TODO: Deserialize CheckedParameterIndices.
         // TODO: Deserialize trailing where clause.
         auto diffAttr =
-          DifferentiableAttr::create(ctx, loc, SourceRange(), autodiffMode,
-                                     loc, parameters, primal, adjoint, jvp,
-                                     vjp, /*TrailingWhereClause*/ nullptr);
+          DifferentiableAttr::create(ctx, loc, SourceRange(), parameters,
+                                     primal, adjoint, jvp, vjp,
+                                     /*TrailingWhereClause*/ nullptr);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
         diffAttr->setJVPFunction(jvpDecl);

@@ -474,23 +474,9 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   // SWIFT_ENABLE_TENSORFLOW
-  if (T->isDifferentiable()) {
-    auto extInfo = T->getExtInfo();
-    auto nondiffExtInfo = extInfo.withDifferentiable(false);
-    auto origTy = T->getWithExtInfo(nondiffExtInfo);
-    // TODO(rxwei): Use the parameter indices and diff order in the @autodiff
-    // function type.
-    auto jvpTy = origTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(T->getNumParameters(), true), /*resultIndex*/ 0,
-        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
-    auto vjpTy = origTy->getAutoDiffAssociatedFunctionType(
-        SmallBitVector(T->getNumParameters(), true), /*resultIndex*/ 0,
-        /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
-    return convertTupleType(TupleType::get({origTy, jvpTy, vjpTy}, IGM.Context)
-                                ->castTo<TupleType>());
-  }
+  if (T->isDifferentiable())
+    return convertDifferentiableFunctionType(T);
+
   switch (T->getRepresentation()) {
   case SILFunctionType::Representation::Block:
     return new BlockTypeInfo(CanSILFunctionType(T),
