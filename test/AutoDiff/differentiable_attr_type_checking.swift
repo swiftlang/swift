@@ -627,20 +627,20 @@ extension JVPStruct {
 }
 
 extension JVPStruct {
-  @differentiable(wrt: (self), jvp: computedPropJVP)
+  @differentiable(jvp: computedPropJVP)
   var computedPropOk1: Float {
     return 0
   }
 
   var computedPropOk2: Float {
-    @differentiable(wrt: (self), jvp: computedPropJVP)
+    @differentiable(jvp: computedPropJVP)
     get {
       return 0
     }
   }
 
   // expected-error @+1 {{'computedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
-  @differentiable(wrt: (self), jvp: computedPropJVP)
+  @differentiable(jvp: computedPropJVP)
   var computedPropWrongType: Double {
     return 0
   }
@@ -649,8 +649,8 @@ extension JVPStruct {
     get {
       return 0
     }
-    // expected-error @+1 {{cannot differentiate void function '_'}}
-    @differentiable(wrt: (self), jvp: computedPropJVP)
+    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    @differentiable(jvp: computedPropJVP)
     set {
       fatalError("unimplemented")
     }
@@ -721,18 +721,18 @@ func vjpNonDiffResult2(x: Float) -> (Float, Int) {
 struct VJPStruct {
   let p: Float
 
-  @differentiable(wrt: (self), vjp: storedPropVJP)
+  @differentiable(vjp: storedPropVJP)
   let storedImmutableOk: Float
 
   // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
-  @differentiable(wrt: (self), vjp: storedPropVJP)
+  @differentiable(vjp: storedPropVJP)
   let storedImmutableWrongType: Double
 
-  @differentiable(wrt: (self), vjp: storedPropVJP)
+  @differentiable(vjp: storedPropVJP)
   var storedMutableOk: Float
 
   // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.CotangentVector) -> VJPStruct.CotangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
-  @differentiable(wrt: (self), vjp: storedPropVJP)
+  @differentiable(vjp: storedPropVJP)
   var storedMutableWrongType: Double
 }
 
@@ -806,8 +806,8 @@ extension VJPStruct {
     get {
       return 0
     }
-    // expected-error @+1 {{cannot differentiate void function '_'}}
-    @differentiable(wrt: (self), vjp: computedPropVJP)
+    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    @differentiable(vjp: computedPropVJP)
     set {
       fatalError("unimplemented")
     }

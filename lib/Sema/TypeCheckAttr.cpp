@@ -2204,6 +2204,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     isProperty = true;
   } else if (auto *fd = dyn_cast<FuncDecl>(D)) {
     original = fd;
+    if (auto *accessor = dyn_cast<AccessorDecl>(fd)) {
+      isProperty = true;
+      // We do not support setters yet because inout is not supported yet.
+      if (accessor->isSetter())
+        original = nullptr;
+    }
   }
   
   if (!original) {
@@ -2326,9 +2332,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     if (isProperty)
       autoDiffParameterIndicesBuilder.setParameter(0);
     else {
-      // If 'wrt:' is not specified, the wrt parameters are all the parameters in
-      // the main parameter group. Self is intentionally excluded except when it's
-      // a property.
+      // If 'wrt:' is not specified, the wrt parameters are all the parameters
+      // in the main parameter group. Self is intentionally excluded except when
+      // it's a property.
       unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
           (isMethod ? 1 : 0);
       for (unsigned i : range(numNonSelfParameters))
