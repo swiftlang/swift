@@ -1861,24 +1861,7 @@ function(add_swift_target_library name)
       endif()
 
       foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
-        if("${lib}" STREQUAL "ICU_UC")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_UC}")
-          # temporary fix for atomic needing to be
-          # after object files for libswiftCore.so
-          if("${sdk}" STREQUAL "ANDROID")
-            list(APPEND swiftlib_private_link_libraries_targets
-                 "-latomic")
-          # the same issue on FreeBSD, missing symbols:
-          # __atomic_store, __atomic_compare_exchange, __atomic_load
-          elseif("${sdk}" STREQUAL "FREEBSD")
-            list(APPEND swiftlib_private_link_libraries_targets
-                 "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
-          endif()
-        elseif("${lib}" STREQUAL "ICU_I18N")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_I18N}")
-        elseif(TARGET "${lib}${VARIANT_SUFFIX}")
+        if(TARGET "${lib}${VARIANT_SUFFIX}")
           list(APPEND swiftlib_private_link_libraries_targets
               "${lib}${VARIANT_SUFFIX}")
         else()
