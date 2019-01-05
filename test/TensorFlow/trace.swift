@@ -1,11 +1,14 @@
 import CTensorFlow
 import TensorFlow
 
-// public func test1() {
-//   let x = Tensor<Float>(1.0)
-//   _ = x + x
-// }
+public func test1() {
+  let x = Tensor<Float>(1.0)
+  _ = x + x
+}
 
+/////////////////////////
+// Test 2: trace through func calls with input and return values
+////////////////////////
 @inline(never)
 func test2Helper(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
   return x + y
@@ -76,14 +79,17 @@ public func test4() {
   }
 }
 
-
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
   // let tracedFn = trace(test1)
   // let tracedFn = trace(test2)
   // let tracedFn = trace(test3)
-  let tracedFn = trace(test4)
-  tracedFn()
+  // let tracedFn = trace(test4)
+
+  let tracedFn = trace(test1)
+  withDevice(.gpu) {
+    tracedFn()
+  }
 }
 
 driver()

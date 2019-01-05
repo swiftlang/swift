@@ -499,22 +499,27 @@ public func trace(_ fn: () -> ()) -> () -> () {
     //   fatalError("ContextOptions object can never be nil.")
     // }
     let status = TF_NewStatus()
-    // let eagerContext = TFE_NewContext(opts, status)
-    // checkOk(status)
-    // TFE_DeleteContextOptions(opts)
 
     let opType = "MyTraceFn"
-    debugLog("Adding TF func \(opType) to eager context.")
+    debugLog("Adding trace func \(opType) to eager context.")
     TFE_ContextAddFunction(eagerContext, graphFn, status)
     checkOk(status)
     let op = TFE_NewOp(eagerContext, opType, status)
     checkOk(status)
+
+    let deviceName = _ExecutionContext.global.currentDeviceName
+    if let deviceName = deviceName {
+      debugLog("Placing the trace func on device \(deviceName).")
+      TFE_OpSetDevice(op, deviceName, status)
+      checkOk(status)
+    }
+
+    // TODO: support return values in the trace fn.
     var returnValueCount = Int32(0)
-    debugLog("Executing TF func \(opType).")
+    debugLog("Executing trace func \(opType).")
     TFE_Execute(op, nil, &returnValueCount, status) 
     checkOk(status)
     TF_DeleteStatus(status)
-    // TFE_DeleteContext(eagerContext)
    
     // The host function can produce arbitrary side effects and can
     // communicate with the trace, so we run it too. We don't want any of
