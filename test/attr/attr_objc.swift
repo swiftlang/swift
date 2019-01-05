@@ -2312,3 +2312,18 @@ protocol ObjCProtocolWithWeakProperty {
 protocol ObjCProtocolWithUnownedProperty {
    unowned var unownedProp: AnyObject { get set } // okay
 }
+
+// rdar://problem/46699152: errors about read/modify accessors being implicitly
+// marked @objc.
+@objc class MyObjCClass: NSObject {}
+
+@objc
+extension MyObjCClass {
+    @objc
+    static var objCVarInObjCExtension: Bool {
+        get {
+            return true
+        }
+        set {}
+    }
+}
