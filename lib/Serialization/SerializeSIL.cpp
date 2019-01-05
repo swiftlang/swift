@@ -433,6 +433,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
         indices.source, parameters);
+    S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

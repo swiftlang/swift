@@ -817,3 +817,68 @@ extension VJPStruct {
     fatalError("unimplemented")
   }
 }
+
+@differentiable(adjoint: adjWhere1, jvp: jvpWhere1, vjp: vjpWhere1 where T : Differentiable)
+func where1<T>(x: T) -> T {
+  return x
+}
+func adjWhere1<T : Differentiable>(seed: T.CotangentVector, originalResult: T, x: T) -> T.CotangentVector {
+  return seed
+}
+func jvpWhere1<T : Differentiable>(x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
+  return (x, { v in v })
+}
+func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector) {
+  return (x, { v in v })
+}
+
+struct Tensor<Scalar> {}
+extension Tensor : Differentiable where Scalar : Differentiable {
+  typealias TangentVector = Tensor
+  typealias CotangentVector = Tensor
+  func moved(along direction: Tensor) -> Tensor { return self }
+  func tangentVector(from cotangent: Tensor) -> Tensor { return cotangent }
+}
+@differentiable(where Scalar : Differentiable)
+func where2<Scalar : Numeric>(x: Tensor<Scalar>) -> Tensor<Scalar> {
+  return x
+}
+func adjWhere2<Scalar : Numeric & Differentiable>(seed: Tensor<Scalar>, originalResult: Tensor<Scalar>, x: Tensor<Scalar>) -> Tensor<Scalar> {
+  return seed
+}
+func jvpWhere2<Scalar : Numeric & Differentiable>(x: Tensor<Scalar>) -> (Tensor<Scalar>, (Tensor<Scalar>) -> Tensor<Scalar>) {
+  return (x, { v in v })
+}
+func vjpWhere2<Scalar : Numeric & Differentiable>(x: Tensor<Scalar>) -> (Tensor<Scalar>, (Tensor<Scalar>) -> Tensor<Scalar>) {
+  return (x, { v in v })
+}
+
+struct A<T> {
+  struct B<U, V> {
+    @differentiable(where T : Differentiable, V : Differentiable, V.TangentVector == V)
+    func whereInGenericContext<T>(x: T) -> T {
+      return x
+    }
+  }
+}
+
+extension FloatingPoint {
+  @differentiable(wrt: (self) where Self : Differentiable)
+  func whereClauseExtension() -> Self {
+    return self
+  }
+}
+
+// expected-error @+2 {{only conformances to protocol types are supported by @differentiable attribute}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
+@differentiable(where Scalar : Float)
+func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
+  return x
+}
+
+// expected-error @+2 {{layout constraints are only allowed inside '_specialize' attributes}}
+// expected-error @+1 {{empty 'where' clause in @differentiable attribute}}
+@differentiable(where Scalar : _Trivial)
+func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
+  return x
+}

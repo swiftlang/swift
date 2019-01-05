@@ -4156,17 +4156,21 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedVectorSpace(
 // with `params` parameters and `retTy` return type.
 static AnyFunctionType *
 makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy) {
-  if (auto *genFunctionType = copy->getAs<GenericFunctionType>()) {
-    return GenericFunctionType::get(genFunctionType->getGenericSignature(),
-                                    params, retTy, copy->getExtInfo());
-  }
+                 Type retTy, GenericSignature *whereClauseGenSig) {
+  auto genericSignature = whereClauseGenSig;
+  if (!genericSignature)
+    if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
+      genericSignature = genericFunctionType->getGenericSignature();
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, params, retTy,
+                                    copy->getExtInfo());
   return FunctionType::get(params, retTy, copy->getExtInfo());
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
-    LookupConformanceFn lookupConformance, bool isMethod) {
+    LookupConformanceFn lookupConformance, bool isMethod,
+    GenericSignature *whereClauseGenSig) {
   assert(!indices->isEmpty() && "there must be at least one wrt index");
 
   // Compute the return type of the adjoint.
@@ -4215,12 +4219,14 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
     adjointParams.push_back(param);
 
   // Build the adjoint type.
-  AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams, retTy);
+  AnyFunctionType *adjoint =
+      makeFunctionType(unwrapped, adjointParams, retTy,
+      isMethod ? nullptr : whereClauseGenSig);
 
   // If this is a method, wrap the adjoint type in an additional "(Self) ->"
   // curry level.
   if (isMethod)
-    adjoint = makeFunctionType(this, getParams(), adjoint);
+    adjoint = makeFunctionType(this, getParams(), adjoint, whereClauseGenSig);
 
   return adjoint;
 }
@@ -4228,7 +4234,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance) {
+    LookupConformanceFn lookupConformance,
+    GenericSignature *whereClauseGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4333,14 +4340,19 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   retElts.push_back(closure);
   auto retTy = TupleType::get(retElts, ctx);
   auto *associatedFunction = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), retTy);
+      curryLevels.back(), curryLevels.back()->getParams(), retTy,
+      curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
 
   // Wrap the associated function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto *curryLevel : reversed(curryLevelsWithoutLast))
+  for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
     associatedFunction = makeFunctionType(
-        curryLevel, curryLevel->getParams(), associatedFunction);
+        curryLevel, curryLevel->getParams(), associatedFunction,
+        i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
+  }
 
   return associatedFunction;
 }

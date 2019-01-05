@@ -2387,9 +2387,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       Out, ScratchRecord, abbrCode, primalName, primalRef, adjointName,
       adjointRef, jvpName, jvpRef, vjpName, vjpRef, parameters);
     // TODO: Serialize CheckedParameterIndices.
-    // TODO: Serialize trailing where clause.
-    // Type-checking where clause should be done first (mimicking the
-    // @_specialize attribute).
+    writeGenericRequirements(attr->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
   }

@@ -98,3 +98,66 @@ func vjpSimple(x: Float) -> Float {
 func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
+
+/*
+// FIXME: 'where' clauses don't show up after round-trip serialization/deserialization.
+
+// HECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
+// HECK-DAG: func testWhereClause<T : Numeric>(x: T) -> T {
+@differentiable(vjp: vjpTestWhereClause where T : Differentiable)
+func testWhereClause<T : Numeric>(x: T) -> T {
+  return x
+}
+func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector)
+  where T : Numeric, T : Differentiable
+{
+  return (x, { v in v })
+}
+
+protocol P {}
+extension P {
+  // HECK-DAG: @differentiable(wrt: (self), vjp: vjpTestWhereClause where Self : Differentiable)
+  // HECK-DAG: func testWhereClause() -> Self {
+  @differentiable(wrt: (self), vjp: vjpTestWhereClause where Self : Differentiable)
+  func testWhereClause() -> Self {
+    return self
+  }
+}
+extension P where Self : Differentiable {
+  func vjpTestWhereClause() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+    return (self, { v in v })
+  }
+}
+*/
+
+/*
+// NOTE: The failing tests involve where clauses with member type constraints.
+// They pass type-checking but crash during serialization.
+
+// HECK-DAG: @differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
+// HECK-DAG: func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
+@differentiable(vjp: vjpTestWhereClauseMemberTypeConstraint where T : Differentiable, T == T.CotangentVector)
+func testWhereClauseMemberTypeConstraint<T : Numeric>(x: T) -> T {
+  return x
+}
+func vjpTestWhereClauseMemberTypeConstraint<T>(x: T) -> (T, (T) -> T)
+  where T : Numeric, T : Differentiable, T == T.CotangentVector
+{
+  return (x, { v in v })
+}
+
+protocol P {}
+extension P {
+  // HECK-DAG: @differentiable(wrt: (self), vjp: vjpTestWhereClauseMemberTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
+  // HECK-DAG: func testWhereClauseMemberTypeConstraint() -> Self {
+  @differentiable(wrt: (self), vjp: vjpTestWhereClauseMemberTypeConstraint where Self.CotangentVector == Self, Self : Differentiable)
+  func testWhereClauseMemberTypeConstraint() -> Self {
+    return self
+  }
+}
+extension P where Self : Differentiable {
+  func vjpTestWhereClauseMemberTypeConstraint() -> (Self, (Self.CotangentVector) -> Self.CotangentVector) {
+    return (self, { v in v })
+  }
+}
+*/

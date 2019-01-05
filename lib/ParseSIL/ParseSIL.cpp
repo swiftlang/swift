@@ -180,8 +180,10 @@ namespace {
                                 GenericEnvironment *GenericEnv = nullptr,
                                 DeclContext *DC = nullptr);
 
+    /*
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
+     */
 
     ProtocolConformance *
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -193,6 +195,10 @@ namespace {
         : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
           TUState(*static_cast<SILParserTUState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
+
+    // SWIFT_ENABLE_TENSORFLOW
+    void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
+                             SmallVectorImpl<Requirement> &To);
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -1202,10 +1208,21 @@ static bool parseDifferentiableAttr(
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
+  // Parse a trailing 'where' clause if any.
+  TrailingWhereClause *WhereClause = nullptr;
+  if (P.Tok.is(tok::kw_where)) {
+    SourceLoc whereLoc;
+    SmallVector<RequirementRepr, 4> requirementReprs;
+    bool firstTypeInComplete;
+    P.parseGenericWhereClause(whereLoc, requirementReprs, firstTypeInComplete,
+                              /*AllowLayoutConstraints=*/false);
+    WhereClause = TrailingWhereClause::create(SP.SILMod.getASTContext(),
+                                              whereLoc, requirementReprs);
+  }
   // Create a SILDifferentiableAttr and we are done.
   auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsPrimitive, JVPName.str(), VJPName.str());
+      adjointIsPrimitive, JVPName.str(), VJPName.str(), WhereClause);
   DAs.push_back(Attr);
   return false;
 }
@@ -5937,6 +5954,16 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
               FunctionState.F->getModule(), requirements, Attr.exported,
               Attr.kind));
         }
+      }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      for (auto &attr : DiffAttrs) {
+        SmallVector<Requirement, 2> requirements;
+        // Resolve types and convert requirements.
+        FunctionState.convertRequirements(
+            FunctionState.F, attr->getWhereClause()->getRequirements(),
+            requirements);
+        attr->setRequirements(requirements);
       }
 
       // Parse the basic block list.

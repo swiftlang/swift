@@ -3108,11 +3108,13 @@ public:
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffParameterIndices *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      LookupConformanceFn lookupConformance);
+      LookupConformanceFn lookupConformance,
+      GenericSignature *whereClauseGenericSignature = nullptr);
 
   AnyFunctionType *getAutoDiffAdjointFunctionType(
       AutoDiffParameterIndices *indices, const TupleType *primalResultTy,
-      LookupConformanceFn lookupConformance, bool isMethod);
+      LookupConformanceFn lookupConformance, bool isMethod,
+      GenericSignature *whereClauseGenericSignature = nullptr);
 
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
@@ -4175,7 +4177,8 @@ public:
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
       const SmallBitVector &parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      SILModule &module, LookupConformanceFn lookupConformance);
+      SILModule &module, LookupConformanceFn lookupConformance,
+      GenericSignature *whereClauseGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
