@@ -219,10 +219,13 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     if (!SyntaxContext->isEnabled())
       return;
     MetatypeTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+    auto TypeOrProtocol = SyntaxContext->popToken();
+    auto Period = SyntaxContext->popToken();
+    auto BaseType = SyntaxContext->popIf<TypeSyntax>().getValue();
     Builder
-      .useTypeOrProtocol(SyntaxContext->popToken())
-      .usePeriod(SyntaxContext->popToken())
-      .useBaseType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      .useTypeOrProtocol(TypeOrProtocol)
+      .usePeriod(Period)
+      .useBaseType(BaseType);
     SyntaxContext->addSyntax(Builder.build());
   };
   
@@ -433,10 +436,13 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       auto InputNode = SyntaxContext->popIf<TypeSyntax>().getValue();
       if (auto TupleTypeNode = InputNode.getAs<TupleTypeSyntax>()) {
         // Decompose TupleTypeSyntax and repack into FunctionType.
+        auto LeftParen = TupleTypeNode->getLeftParen();
+        auto Arguments = TupleTypeNode->getElements();
+        auto RightParen = TupleTypeNode->getRightParen();
         Builder
-          .useLeftParen(TupleTypeNode->getLeftParen())
-          .useArguments(TupleTypeNode->getElements())
-          .useRightParen(TupleTypeNode->getRightParen());
+          .useLeftParen(LeftParen)
+          .useArguments(Arguments)
+          .useRightParen(RightParen);
       } else {
         Builder.addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(
             InputNode, /*TrailingComma=*/None, Context.getSyntaxArena()));
@@ -705,9 +711,11 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 
     if (SyntaxContext->isEnabled() && Status.isSuccess()) {
       CompositionTypeElementSyntaxBuilder Builder(Context.getSyntaxArena());
+      auto Ampersand = SyntaxContext->popToken();
+      auto Type = SyntaxContext->popIf<TypeSyntax>().getValue();
       Builder
-        .useAmpersand(SyntaxContext->popToken())
-        .useType(SyntaxContext->popIf<TypeSyntax>().getValue());
+        .useAmpersand(Ampersand)
+        .useType(Type);
       SyntaxContext->addSyntax(Builder.build());
     }
 
@@ -1114,12 +1122,17 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
         DictionaryTypeRepr(firstTy.get(), secondTy.get(), colonLoc, brackets);
     if (SyntaxContext->isEnabled()) {
       DictionaryTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      auto RightSquareBracket = SyntaxContext->popToken();
+      auto ValueType = SyntaxContext->popIf<TypeSyntax>().getValue();
+      auto Colon = SyntaxContext->popToken();
+      auto KeyType = SyntaxContext->popIf<TypeSyntax>().getValue();
+      auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(SyntaxContext->popToken())
-        .useValueType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useColon(SyntaxContext->popToken())
-        .useKeyType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useLeftSquareBracket(SyntaxContext->popToken());
+        .useRightSquareBracket(RightSquareBracket)
+        .useValueType(ValueType)
+        .useColon(Colon)
+        .useKeyType(KeyType)
+        .useLeftSquareBracket(LeftSquareBracket);
       SyntaxNode.emplace(Builder.build());
     }
   } else {
@@ -1127,10 +1140,13 @@ SyntaxParserResult<TypeSyntax, TypeRepr> Parser::parseTypeCollection() {
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
     if (SyntaxContext->isEnabled()) {
       ArrayTypeSyntaxBuilder Builder(Context.getSyntaxArena());
+      auto RightSquareBracket = SyntaxContext->popToken();
+      auto ElementType = SyntaxContext->popIf<TypeSyntax>().getValue();
+      auto LeftSquareBracket = SyntaxContext->popToken();
       Builder
-        .useRightSquareBracket(SyntaxContext->popToken())
-        .useElementType(SyntaxContext->popIf<TypeSyntax>().getValue())
-        .useLeftSquareBracket(SyntaxContext->popToken());
+        .useRightSquareBracket(RightSquareBracket)
+        .useElementType(ElementType)
+        .useLeftSquareBracket(LeftSquareBracket);
       SyntaxNode.emplace(Builder.build());
     }
   }
@@ -1212,9 +1228,11 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   if (SyntaxContext->isEnabled()) {
     ImplicitlyUnwrappedOptionalTypeSyntaxBuilder Builder(
         Context.getSyntaxArena());
+    auto ExclamationMark = SyntaxContext->popToken();
+    auto WrappedType = SyntaxContext->popIf<TypeSyntax>().getValue();
     Builder
-      .useExclamationMark(SyntaxContext->popToken())
-      .useWrappedType(SyntaxContext->popIf<TypeSyntax>().getValue());
+      .useExclamationMark(ExclamationMark)
+      .useWrappedType(WrappedType);
     SyntaxNode.emplace(Builder.build());
   }
   return makeSyntaxResult(SyntaxNode, TyR);
