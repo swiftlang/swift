@@ -152,55 +152,55 @@ public let StringHashing: [BenchmarkInfo] = [
 
 public let StringNormalization: [BenchmarkInfo] = [
   BenchmarkInfo(
-    name: "StringNormalization_ascii",
+    name: "NormalizedIterator_ascii",
     runFunction: run_StringNormalization_ascii,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_ascii) }
   ),
   BenchmarkInfo(
-    name: "StringNormalization_latin1",
+    name: "NormalizedIterator_latin1",
     runFunction: run_StringNormalization_latin1,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_latin1) },
 		legacyFactor: 2
   ),
   BenchmarkInfo(
-    name: "StringNormalization_fastPrenormal",
+    name: "NormalizedIterator_fastPrenormal",
     runFunction: run_StringNormalization_fastPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_fastPrenormal) },
 		legacyFactor: 10
   ),
   BenchmarkInfo(
-    name: "StringNormalization_slowerPrenormal",
+    name: "NormalizedIterator_slowerPrenormal",
     runFunction: run_StringNormalization_slowerPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_slowerPrenormal) },
 		legacyFactor: 10
   ),
   BenchmarkInfo(
-    name: "StringNormalization_nonBMPSlowestPrenormal",
+    name: "NormalizedIterator_nonBMPSlowestPrenormal",
     runFunction: run_StringNormalization_nonBMPSlowestPrenormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_nonBMPSlowestPrenormal) },
 		legacyFactor: 10
   ),
   BenchmarkInfo(
-    name: "StringNormalization_emoji",
+    name: "NormalizedIterator_emoji",
     runFunction: run_StringNormalization_emoji,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_emoji) },
 		legacyFactor: 4
   ),
   BenchmarkInfo(
-    name: "StringNormalization_abnormal",
+    name: "NormalizedIterator_abnormal",
     runFunction: run_StringNormalization_abnormal,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_abnormal) },
 		legacyFactor: 20
   ),
   BenchmarkInfo(
-    name: "StringNormalization_zalgo",
+    name: "NormalizedIterator_zalgo",
     runFunction: run_StringNormalization_zalgo,
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_zalgo) },
