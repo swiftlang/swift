@@ -79,6 +79,14 @@ public func test4() {
   }
 }
 
+/////////////////////////
+// Test 6: trace with return value
+////////////////////////
+@inline(never)
+func dataset() -> Tensor<Float> {
+  return Tensor<Float>(1.0)
+}
+
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
   // let tracedFn = trace(test1)
@@ -86,10 +94,18 @@ public func driver() {
   // let tracedFn = trace(test3)
   // let tracedFn = trace(test4)
 
-  let tracedFn = trace(test1)
-  withDevice(.gpu) {
-    tracedFn()
+  // test 5: with device
+  // let tracedFn = trace(test1)
+  // withDevice(.gpu) {
+  //   tracedFn()
+  // }
+
+  // test 6
+  let datasetTracedFn = trace(dataset)
+  let x: Tensor<Float> = withDevice(.cpu) {
+    return datasetTracedFn()
   }
+  _hostOp(x)
 }
 
 driver()
