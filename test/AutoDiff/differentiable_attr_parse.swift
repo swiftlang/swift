@@ -2,6 +2,11 @@
 
 /// Good
 
+struct Foo {
+  @differentiable
+  var x: Float
+}
+
 @differentiable(adjoint: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x

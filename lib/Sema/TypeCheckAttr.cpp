@@ -2199,12 +2199,21 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
 
   FuncDecl *original = nullptr;
-  if (isa<VarDecl>(D)) {
+  bool isProperty = false;
+  if (auto *vd = dyn_cast<VarDecl>(D)) {
     // When used on a storage decl, @differentiable refers to its getter.
-    original = cast<VarDecl>(D)->getGetter();
-  } else if (isa<FuncDecl>(D)) {
-    original = cast<FuncDecl>(D);
+    original = vd->getGetter();
+    isProperty = true;
+  } else if (auto *fd = dyn_cast<FuncDecl>(D)) {
+    original = fd;
+    if (auto *accessor = dyn_cast<AccessorDecl>(fd)) {
+      isProperty = true;
+      // We do not support setters yet because inout is not supported yet.
+      if (accessor->isSetter())
+        original = nullptr;
+    }
   }
+  
   if (!original) {
     // Global immutable vars, for example, have no getter, and therefore trigger
     // this.
@@ -2322,12 +2331,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       originalFnTy);
 
   if (uncheckedWrtParams.empty()) {
-    // If 'wrt:' is not specified, the wrt parameters are all the parameters in
-    // the main parameter group. Self is intentionally excluded.
-    unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
-        (isMethod ? 1 : 0);
-    for (unsigned i : range(numNonSelfParameters))
-      autoDiffParameterIndicesBuilder.setParameter(i);
+    if (isProperty)
+      autoDiffParameterIndicesBuilder.setParameter(0);
+    else {
+      // If 'wrt:' is not specified, the wrt parameters are all the parameters
+      // in the main parameter group. Self is intentionally excluded except when
+      // it's a property.
+      unsigned numNonSelfParameters = autoDiffParameterIndicesBuilder.size() -
+          (isMethod ? 1 : 0);
+      for (unsigned i : range(numNonSelfParameters))
+        autoDiffParameterIndicesBuilder.setParameter(i);
+    }
   } else {
     // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;

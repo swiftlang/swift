@@ -20,7 +20,7 @@ extension TangentSpace : Differentiable {
 struct Space {
   /// `x` is a computed property with a custom vjp.
   var x: Float {
-    @differentiable(wrt: (self), vjp: vjpX)
+    @differentiable(vjp: vjpX)
     get {
       return storedX
     }
@@ -33,7 +33,7 @@ struct Space {
   private let storedX: Float
 
   /// `y` is a stored property with a custom vjp for its getter.
-  @differentiable(wrt: (self), vjp: vjpY)
+  @differentiable(vjp: vjpY)
   let y: Float
 
   func vjpY() -> (Float, (Float) -> TangentSpace) {
