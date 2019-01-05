@@ -1066,6 +1066,21 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     if (VD->getFormalAccess() <= AccessLevel::FilePrivate)
       return false;
 
+    if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::DidSet:
+      case AccessorKind::Modify:
+      case AccessorKind::Read:
+      case AccessorKind::WillSet:
+        return false;
+
+      case AccessorKind::MutableAddress:
+      case AccessorKind::Address:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+        break;
+      }
+    }
     return true;
   };
 
@@ -1106,7 +1121,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
        cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
         .hasAttribute<NonObjCAttr>()))
     return None;
-  if (isMemberOfObjCClassExtension(VD))
+  if (isMemberOfObjCClassExtension(VD) && canInferImplicitObjC())
     return ObjCReason(ObjCReason::MemberOfObjCExtension);
   if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
     return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
