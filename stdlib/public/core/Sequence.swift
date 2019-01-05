@@ -906,8 +906,7 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i += 1
-        i %= maxLength
+        i = (i + 1) % maxLength
       }
     }
 
@@ -986,8 +985,7 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i += 1
-        i %= k
+        i = (i + 1) % k
       }
     }
     return result
