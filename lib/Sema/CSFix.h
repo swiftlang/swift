@@ -96,6 +96,9 @@ enum class FixKind : uint8_t {
 
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
+
+  /// Instead of spelling out `subscript` directly, use subscript operator.
+  UseSubscriptOperator,
 };
 
 class ConstraintFix {
@@ -445,6 +448,21 @@ public:
 
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
+};
+
+class UseSubscriptOperator final : public ConstraintFix {
+public:
+  UseSubscriptOperator(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseSubscriptOperator, locator) {}
+
+  std::string getName() const override {
+    return "replace '.subscript(...)' with subscript operator";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static UseSubscriptOperator *create(ConstraintSystem &cs,
+                                      ConstraintLocator *locator);
 };
 
 } // end namespace constraints

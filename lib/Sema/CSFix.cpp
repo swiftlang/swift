@@ -235,3 +235,12 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
+
+bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UseSubscriptOperator(cs, locator);
+}
