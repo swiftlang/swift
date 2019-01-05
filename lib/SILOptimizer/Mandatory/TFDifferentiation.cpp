@@ -252,6 +252,21 @@ static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
   return LoadOwnershipQualifier::Unqualified;
 }
 
+/// Assuming the given type conforms to `Differentiable`, returns the associated
+/// cotangent space type.
+static SILType getCotangentType(CanType type, SILModule &mod) {
+  return SILType::getPrimitiveObjectType(
+      type->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Cotangent,
+          LookUpConformanceInModule(mod.getSwiftModule()))->getCanonicalType());
+}
+
+/// Assuming the given type conforms to `Differentiable`, returns the associated
+/// cotangent space type.
+static SILType getCotangentType(SILType type, SILModule &mod) {
+  return getCotangentType(type.getASTType(), mod);
+}
+
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
 //===----------------------------------------------------------------------===//
@@ -2290,12 +2305,15 @@ public:
 
     // Use the FieldwiseProductSpace strategy, if appropriate.
     auto *structDecl = sei->getStructDecl();
-    auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
-    if (aliasLookup.size() >= 1) {
-      assert(aliasLookup.size() == 1);
-      assert(isa<TypeAliasDecl>(aliasLookup[0]));
-      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
-      if (aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>()) {
+    auto cotangentDeclLookup =
+        structDecl->lookupDirect(astCtx.Id_CotangentVector);
+    if (cotangentDeclLookup.size() >= 1) {
+      assert(cotangentDeclLookup.size() == 1);
+      auto cotangentTypeDecl = cotangentDeclLookup.front();
+      assert(isa<TypeAliasDecl>(cotangentTypeDecl) ||
+             isa<StructDecl>(cotangentTypeDecl));
+      if (cotangentTypeDecl->getAttrs()
+              .hasAttribute<FieldwiseProductSpaceAttr>()) {
         structExtractDifferentiationStrategies.insert(
             {sei, StructExtractDifferentiationStrategy::FieldwiseProductSpace});
         SILClonerWithScopes::visitStructExtractInst(sei);
@@ -2888,7 +2906,6 @@ public:
 private:
   static bool isLegalAggregate(ArrayRef<AdjointValue> elements, SILType type) {
     if (auto *structDecl = type.getASTType()->getStructOrBoundGenericStruct()) {
-      // TODO: Check whether this struct is @_fixed_layout and ABI public.
       for (auto pair : llvm::zip(structDecl->getStoredProperties(), elements))
         if (!std::get<0>(pair)->getType()->getCanonicalType()
                 ->isEqual(std::get<1>(pair).getSwiftType()))
@@ -3127,7 +3144,8 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
-        originalValue, AdjointValue::getZero(originalValue->getType()));
+        originalValue, AdjointValue::getZero(
+            getCotangentType(originalValue->getType(), getModule())));
     return insertion.first->getSecond();
   }
 
@@ -3137,6 +3155,15 @@ private:
                                 AdjointValue adjointValue) {
     assert(originalValue->getFunction() == &getOriginal());
     LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
+#ifndef NDEBUG
+    auto origTy = originalValue->getType().getASTType();
+    auto cotanSpace = origTy->getAutoDiffAssociatedVectorSpace(
+        AutoDiffAssociatedVectorSpaceKind::Cotangent,
+        LookUpConformanceInModule(getModule().getSwiftModule()));
+    // The adjoint value must be in the cotangent space.
+    assert(cotanSpace && adjointValue.getType().getASTType()
+               == cotanSpace->getCanonicalType());
+#endif
     auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
     auto inserted = insertion.second;
     auto &value = insertion.first->getSecond();
@@ -3641,33 +3668,38 @@ public:
   void visitStructInst(StructInst *si) {
     auto *decl = si->getStructDecl();
     auto av = getAdjointValue(si);
-    auto loc = si->getLoc();
     switch (av.getKind()) {
     case AdjointValue::Zero:
       for (auto *field : decl->getStoredProperties()) {
         auto fv = si->getFieldValue(field);
-        addAdjointValue(fv, AdjointValue::getZero(fv->getType()));
+        addAdjointValue(
+            fv, AdjointValue::getZero(getCotangentType(fv->getType(),
+                                                       getModule())));
       }
       break;
     case AdjointValue::Materialized: {
-      auto adjY = av.getMaterializedValue();
-      for (auto *field : decl->getStoredProperties())
-        addAdjointValue(si->getFieldValue(field),
-                        builder.createStructExtract(loc, adjY, field));
-      break;
+      // FIXME(SR-9602): If `CotangentVector` is not marked
+      // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
+      // auto adjY = av.getMaterializedValue();
+      // for (auto *field : decl->getStoredProperties())
+      //   addAdjointValue(si->getFieldValue(field),
+      //                   builder.createStructExtract(loc, adjY, field));
+      llvm_unreachable("Unhandled. Are you trying to differentiate a "
+                       "memberwise initializer?");
     }
     case AdjointValue::Aggregate: {
-      for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
-        addAdjointValue(std::get<0>(pair), std::get<1>(pair));
-      break;
+      // FIXME(SR-9602): If `CotangentVector` is not marked
+      // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
+      // for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
+      //   addAdjointValue(std::get<0>(pair), std::get<1>(pair));
+      llvm_unreachable("Unhandled. Are you trying to differentiate a "
+                       "memberwise initializer?");
     }
     }
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
     auto loc = remapLocation(sei->getLoc());
-    auto &astCtx = getContext().getASTContext();
-
     auto &differentiationStrategies =
         getDifferentiationTask()->getStructExtractDifferentiationStrategies();
     auto differentiationStrategyLookUp = differentiationStrategies.find(sei);
@@ -3689,14 +3721,11 @@ public:
       // `key`.
 
       // Find the decl of the cotangent space type.
-      auto *structDecl = sei->getStructDecl();
-      auto aliasLookup = structDecl->lookupDirect(astCtx.Id_CotangentVector);
-      assert(aliasLookup.size() == 1);
-      assert(isa<TypeAliasDecl>(aliasLookup[0]));
-      auto *aliasDecl = cast<TypeAliasDecl>(aliasLookup[0]);
-      assert(aliasDecl->getAttrs().hasAttribute<FieldwiseProductSpaceAttr>());
-      auto cotangentVectorTy =
-          aliasDecl->getUnderlyingTypeLoc().getType()->getCanonicalType();
+      auto structTy = sei->getOperand()->getType().getASTType();
+      auto cotangentVectorTy = structTy->getAutoDiffAssociatedVectorSpace(
+          AutoDiffAssociatedVectorSpaceKind::Cotangent,
+          LookUpConformanceInModule(getModule().getSwiftModule()))
+          ->getType()->getCanonicalType();
       assert(!getModule()
                   .Types.getTypeLowering(cotangentVectorTy)
                   .isAddressOnly());
@@ -3708,7 +3737,7 @@ public:
 
       // Find the corresponding field in the cotangent space.
       VarDecl *correspondingField = nullptr;
-      if (cotangentVectorDecl == structDecl)
+      if (cotangentVectorDecl == sei->getStructDecl())
         correspondingField = sei->getField();
       else {
         auto correspondingFieldLookup =
@@ -3741,9 +3770,9 @@ public:
           if (field == correspondingField)
             eltVals.push_back(av);
           else
-            eltVals.push_back(
-                AdjointValue::getZero(SILType::getPrimitiveObjectType(
-                    field->getType()->getCanonicalType())));
+            eltVals.push_back(AdjointValue::getZero(
+                getCotangentType(field->getType()->getCanonicalType(),
+                                 getModule())));
         }
         addAdjointValue(sei->getOperand(),
                         AdjointValue::getAggregate(cotangentVectorSILTy,
@@ -3791,12 +3820,15 @@ public:
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
       for (auto eltVal : ti->getElements())
-        addAdjointValue(eltVal, AdjointValue::getZero(eltVal->getType()));
+        addAdjointValue(eltVal,
+            AdjointValue::getZero(getCotangentType(eltVal->getType(),
+                                                   getModule())));
       break;
     case AdjointValue::Kind::Materialized:
       for (auto i : range(ti->getNumOperands()))
         addAdjointValue(ti->getOperand(i),
-                        builder.createTupleExtract(ti->getLoc(), ti, i));
+            builder.createTupleExtract(
+                ti->getLoc(), av.getMaterializedValue(), i));
       break;
     case AdjointValue::Kind::Aggregate:
       for (auto pair : llvm::zip(ti->getElements(), av.getAggregateElements()))
@@ -3811,12 +3843,12 @@ public:
   ///   adj[x] = tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *tupleTy = tei->getTupleType();
+    auto tupleCotanTy = getCotangentType(tupleTy->getCanonicalType(),
+                                         getModule());
     auto av = getAdjointValue(tei);
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
-      addAdjointValue(tei->getOperand(),
-                      AdjointValue::getZero(SILType::getPrimitiveObjectType(
-                          tupleTy->getCanonicalType())));
+      addAdjointValue(tei->getOperand(), AdjointValue::getZero(tupleCotanTy));
       break;
     case AdjointValue::Kind::Aggregate:
     case AdjointValue::Kind::Materialized: {
@@ -3824,15 +3856,13 @@ public:
       for (unsigned i : range(tupleTy->getNumElements())) {
         if (tei->getFieldNo() == i)
           elements.push_back(av);
-        else {
-          auto eltTy = SILType::getPrimitiveObjectType(
-              tupleTy->getElementType(i)->getCanonicalType());
-          elements.push_back(AdjointValue::getZero(eltTy));
-        }
+        else
+          elements.push_back(AdjointValue::getZero(
+              getCotangentType(tupleTy->getElementType(i)->getCanonicalType(),
+                               getModule())));
       }
       addAdjointValue(tei->getOperand(),
-          AdjointValue::getAggregate(tei->getOperand()->getType(),
-                                     elements, allocator));
+          AdjointValue::getAggregate(tupleCotanTy, elements, allocator));
       break;
     }
     }
@@ -4408,7 +4438,7 @@ void DifferentiationTask::createEmptyPrimal() {
   auto linkage = SILLinkage::Hidden;
   primal = fb.getOrCreateFunction(
       original->getLocation(), primalName, linkage, primalTy,
-      original->isBare(), original->isTransparent(), original->isSerialized());
+      original->isBare(), IsNotTransparent, original->isSerialized());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
@@ -4533,7 +4563,7 @@ void DifferentiationTask::createEmptyAdjoint() {
   auto linkage = SILLinkage::Hidden;
   adjoint = fb.createFunction(
       linkage, adjName, adjType, original->getGenericEnvironment(),
-      original->getLocation(), original->isBare(), original->isTransparent(),
+      original->getLocation(), original->isBare(), IsNotTransparent,
       original->isSerialized());
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
@@ -4558,7 +4588,7 @@ void DifferentiationTask::createJVP() {
   jvp = fb.createFunction(original->getLinkage(), jvpName, jvpType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
-                          original->isTransparent(), original->isSerialized());
+                          IsNotTransparent, original->isSerialized());
   jvp->setUnqualifiedOwnership();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
   attr->setJVPName(jvp->getName());
@@ -4615,7 +4645,7 @@ void DifferentiationTask::createVJP() {
   vjp = fb.createFunction(linkage, vjpName, vjpType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
-                          original->isTransparent(), original->isSerialized());
+                          IsNotTransparent, original->isSerialized());
   vjp->setUnqualifiedOwnership();
   vjp->setDebugScope(new (module)
                          SILDebugScope(original->getLocation(), vjp));

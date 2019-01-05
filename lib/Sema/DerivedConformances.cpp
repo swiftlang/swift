@@ -68,15 +68,15 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
-    return canDeriveAdditiveArithmetic(Nominal);
+    return canDeriveAdditiveArithmetic(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::VectorNumeric)
-    return canDeriveVectorNumeric(Nominal);
+    return canDeriveVectorNumeric(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::Differentiable)
-    return canDeriveDifferentiable(Nominal);
+    return canDeriveDifferentiable(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
   // The only requirement for deriving Parameterized is that there exist some
