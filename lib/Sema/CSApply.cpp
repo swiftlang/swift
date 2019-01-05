@@ -2533,11 +2533,6 @@ namespace {
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
             memberName = EED->getBaseName();
             isOptional = EED->getParentEnum()->isOptionalDecl();
-          } else if (auto VD = dyn_cast<VarDecl>(calledValue)) {
-            if (VD->isStatic()) {
-              memberName = VD->getBaseName();
-              isOptional = VD->getType()->getOptionalObjectType() || nullptr;
-            }
           }
           
           if (!isOptional) {
@@ -2555,31 +2550,30 @@ namespace {
           for (LookupResultEntry result : results) {
             auto value = result.getValueDecl();
             
-            if (isa<EnumElementDecl>(value) || isa<VarDecl>(value)) {
-              if (auto EED = dyn_cast<EnumElementDecl>(value)) {
-                if (EED->hasAssociatedValues()) {
-                  // TODO: Maybe check the associated types as well?
-                  // i.e check if both enum cases have the same assoc
-                  // types in the same order.
-                  break;
-                }
-              }
-              
-              auto baseTypeName = baseUnwrappedType->getString();
-              auto loc = DSCE->getLoc();
-              auto startLoc = DSCE->getStartLoc();
-              
-              tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                          baseTypeName, memberName.getIdentifier().str());
-              
-              tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-                .fixItInsert(startLoc, "Optional");
-              tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
-                          baseTypeName, memberName.getIdentifier().str())
-                .fixItInsert(startLoc, baseTypeName);
-              
+            if (!value && value->isInstanceMember()) {
               break;
             }
+            
+            if (auto EED = dyn_cast<EnumElementDecl>(value)) {
+              if (EED->hasAssociatedValues()) {
+                break;
+              }
+            }
+            
+            auto baseTypeName = baseUnwrappedType->getString();
+            auto loc = DSCE->getLoc();
+            auto startLoc = DSCE->getStartLoc();
+            
+            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                        baseTypeName, memberName.getIdentifier().str());
+            
+            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
+            .fixItInsert(startLoc, "Optional");
+            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+                        baseTypeName, memberName.getIdentifier().str())
+            .fixItInsert(startLoc, baseTypeName);
+            
+            break;
           }
         }
       }
