@@ -2330,31 +2330,28 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT)
+  set(options)
+  set(single_parameter_options SWIFT_COMPONENT)
+  set(multiple_parameter_options)
 
-  cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
-      ${ARGN})
+  cmake_parse_arguments(ASHT
+    "${options}"
+    "${single_parameter_options}"
+    "${multiple_parameter_options}"
+    ${ARGN})
 
-  precondition(ADDSWIFTHOSTTOOL_SWIFT_COMPONENT
+  precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  add_swift_executable(
-    ${executable} 
-    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-  )
+  add_swift_executable(${executable}
+    ${ASHT_UNPARSED_ARGUMENTS})
 
-  swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+  swift_install_in_component(${ASHT_SWIFT_COMPONENT}
     TARGETS ${executable}
     RUNTIME DESTINATION bin)
 
-  swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-    is_installing)
+  swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
