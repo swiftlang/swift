@@ -2568,10 +2568,10 @@ namespace {
                         baseTypeName, memberName.getIdentifier().str());
             
             tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-            .fixItInsert(startLoc, "Optional");
+              .fixItInsert(startLoc, "Optional");
             tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
                         baseTypeName, memberName.getIdentifier().str())
-            .fixItInsert(startLoc, baseTypeName);
+              .fixItInsert(startLoc, baseTypeName);
             
             break;
           }
