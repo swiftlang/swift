@@ -15,5 +15,4 @@ func mul3(_ x: Float) -> Float {
 let _ = gradient(at: 0, in: mul3)
 
 // CHECK-LABEL: sil{{.*}} @AD__{{.*}}mul3{{.*}}__primal{{.*}}
-// CHECK: function_ref static Float._adjointMultiply(_:_:_:_:)
-// CHECK: } // end sil function 'AD__{{.*}}mul3{{.*}}__primal{{.*}}'
+// CHECK: function_ref AD__$sSf1moiyS2f_SftFZ__vjp_src_0_wrt_0_1
