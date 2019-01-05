@@ -2514,67 +2514,75 @@ namespace {
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
-			
-      // If the base type is optional and we're referring to an nominal
-      // type member via the dot syntax and the member name matches
-      // Optional<T>.none then emit a diagnostic
+      
+      diagnoseAmbiguousNominalMember(baseTy, result);
+
+      return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
+    }
+    
+    /// Diagnose if the base type is optional, we're referring to a nominal
+    /// type member via the dot syntax and the member name matches
+    /// Optional<T>.{member name}
+    void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
       if (auto baseUnwrappedType = baseTy->lookThroughAllOptionalTypes()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
-          
-          Decl *structOrEnumMember = nullptr;
-          StringRef memberName;
+          DeclBaseName memberName;
           auto calledValue = DSCE->getCalledValue();
           bool isOptional = false;
           
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
-            structOrEnumMember = EED;
-            memberName = EED->getNameStr();
-            isOptional = EED->getParentEnum()->isOptionalDecl() &&
-                         !EED->getParentEnum()->getElement(EED->getName())
-                                              ->hasAssociatedValues();
+            memberName = EED->getBaseName();
+            isOptional = EED->getParentEnum()->isOptionalDecl();
           } else if (auto VD = dyn_cast<VarDecl>(calledValue)) {
             if (VD->isStatic()) {
-              structOrEnumMember = VD;
-              memberName = VD->getNameStr();
+              memberName = VD->getBaseName();
               isOptional = VD->getType()->getOptionalObjectType() || nullptr;
             }
           }
           
-          if (structOrEnumMember && isOptional && !memberName.empty()) {
-            auto baseTypeNominal = baseUnwrappedType
-                                   ->getNominalOrBoundGenericNominal();
-            auto memberNameAsIdentifier = cs.getASTContext()
-                                            .getIdentifier(memberName);
-            auto results = tc.lookupMember(baseTypeNominal->getModuleContext(),
-                                           baseUnwrappedType,
-                                           memberNameAsIdentifier,
-                                           defaultMemberLookupOptions);
+          if (!isOptional) {
+            return;
+          }
+          
+          auto baseTypeNominal = baseUnwrappedType
+                                 ->getNominalOrBoundGenericNominal();
+          auto &tc = cs.getTypeChecker();
+          auto results = tc.lookupMember(baseTypeNominal->getModuleContext(),
+                                         baseUnwrappedType,
+                                         memberName.getIdentifier(),
+                                         defaultMemberLookupOptions);
+          
+          for (LookupResultEntry result : results) {
+            auto value = result.getValueDecl();
             
-            for (LookupResultEntry result : results) {
-              auto value = result.getValueDecl();
-              
-              if (isa<EnumElementDecl>(value) || isa<VarDecl>(value)) {
-                auto baseTypeName = baseUnwrappedType->getString();
-                auto loc = DSCE->getLoc();
-                auto startLoc = DSCE->getStartLoc();
-                
-                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                            baseTypeName, memberName);
-                
-                tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-                .fixItInsert(startLoc, "Optional");
-                tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
-                            baseTypeName, memberName)
-                .fixItInsert(startLoc, baseTypeName);
-                
-                break;
+            if (isa<EnumElementDecl>(value) || isa<VarDecl>(value)) {
+              if (auto EED = dyn_cast<EnumElementDecl>(value)) {
+                if (EED->hasAssociatedValues()) {
+                  // TODO: Maybe check the associated types as well?
+                  // i.e check if both enum cases have the same assoc
+                  // types in the same order.
+                  break;
+                }
               }
+              
+              auto baseTypeName = baseUnwrappedType->getString();
+              auto loc = DSCE->getLoc();
+              auto startLoc = DSCE->getStartLoc();
+              
+              tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                          baseTypeName, memberName.getIdentifier().str());
+              
+              tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
+                .fixItInsert(startLoc, "Optional");
+              tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+                          baseTypeName, memberName.getIdentifier().str())
+                .fixItInsert(startLoc, baseTypeName);
+              
+              break;
             }
           }
         }
       }
-
-      return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
     
   private:
