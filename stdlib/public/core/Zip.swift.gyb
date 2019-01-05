@@ -40,7 +40,7 @@ ${ ",\n".join([ "    _ index{0}: Collection{0}.Index".format(position) for posit
 extension Zip${ arity }Index: Comparable {
   @inlinable // generic-performance
   public static func < (lhs: Zip${ arity }Index, rhs: Zip${ arity }Index) -> Bool {
-    precondition(
+    _precondition(
 ${ " &&\n".join([ "      lhs.index{0} <= rhs.index{0}".format(position) for position in positions ]) } ||
 ${ " &&\n".join([ "      lhs.index{0} >= rhs.index{0}".format(position) for position in positions ]) },
       "Indices failed to hold their asymmetric property when compared"
@@ -171,7 +171,7 @@ ${ ",\n".join([ "      _sequence{0}.endIndex".format(position) for position in p
 
   @inlinable // generic-performance
   public subscript (position: Index) -> Element {
-    precondition(position != endIndex, "Index out of range")
+    _precondition(position != endIndex, "Index out of range")
 
     return (
 ${ ",\n".join([ "      _sequence{0}[position.index{0}]".format(position) for position in positions ]) }
@@ -180,7 +180,7 @@ ${ ",\n".join([ "      _sequence{0}[position.index{0}]".format(position) for pos
 
   @inlinable // generic-performance
   public func index (after i: Index) -> Index {
-    precondition(i != endIndex, "Cannot increment beyond endIndex")
+    _precondition(i != endIndex, "Cannot increment beyond endIndex")
 
 %   for position in positions:
     let index${ position } = _sequence${ position }.index(after: i.index${ position })
@@ -198,7 +198,7 @@ extension Zip${ arity }Sequence: BidirectionalCollection where
 ${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {
   @inlinable // generic-performance
   public func index (before i: Index) -> Index {
-    precondition(i != startIndex, "Cannot decrement beyond startIndex")
+    _precondition(i != startIndex, "Cannot decrement beyond startIndex")
 
     return index(i, offsetBy: -1)
   }
@@ -236,7 +236,7 @@ ${ ",\n".join([ "        distance{0}".format(position) for position in positions
     let limit = distance < 0 ? startIndex : endIndex
     let offsetIndex = index(i, offsetBy: distance, limitedBy: limit)
 
-    precondition(offsetIndex != nil, "Index out of range")
+    _precondition(offsetIndex != nil, "Index out of range")
 
     return offsetIndex!
   }
@@ -244,7 +244,7 @@ ${ ",\n".join([ "        distance{0}".format(position) for position in positions
   @inlinable // generic-performance
   public func index (_ i: Index, offsetBy distance: Int,
       limitedBy limit: Index) -> Index? {
-    precondition(startIndex <= i && i <= endIndex, "Index out of range")
+    _precondition(startIndex <= i && i <= endIndex, "Index out of range")
 
     guard distance != 0 else {
       return i
@@ -264,7 +264,7 @@ ${ ",\n".join([ "      distanceFromStartIndexToIndex{0}".format(position) for po
 ${ ",\n".join([ "      count{0}".format(position) for position in positions ]) }
     )
 
-    precondition(
+    _precondition(
       0 <= distanceFromStartIndexToOffsetIndex &&
         distanceFromStartIndexToOffsetIndex <= count,
       "Index out of range"
@@ -397,7 +397,7 @@ ${ ",\n".join([ "      _sequence{0}.endIndex".format(position) for position in p
 
   @inlinable // generic-performance
   public subscript (position: Index) -> Element {
-    precondition(position != endIndex, "Index out of range")
+    _precondition(position != endIndex, "Index out of range")
 
     return (
 ${
@@ -412,7 +412,7 @@ ${
 
   @inlinable // generic-performance
   public func index (after i: Index) -> Index {
-    precondition(i != endIndex, "Cannot increment beyond endIndex")
+    _precondition(i != endIndex, "Cannot increment beyond endIndex")
 
     return Index(
 ${
@@ -430,7 +430,7 @@ extension ZipLongest${ arity }Sequence: BidirectionalCollection where
 ${ ",\n".join([ "    Sequence{0}: RandomAccessCollection".format(position) for position in positions ]) } {
   @inlinable // generic-performance
   public func index (before i: Index) -> Index {
-    precondition(i != startIndex, "Cannot decrement beyond startIndex")
+    _precondition(i != startIndex, "Cannot decrement beyond startIndex")
 
     return index(i, offsetBy: -1)
   }
@@ -468,7 +468,7 @@ ${ ",\n".join([ "        distance{0}".format(position) for position in positions
     let limit = distance < 0 ? startIndex : endIndex
     let offsetIndex = index(i, offsetBy: distance, limitedBy: limit)
 
-    precondition(offsetIndex != nil, "Index out of range")
+    _precondition(offsetIndex != nil, "Index out of range")
 
     return offsetIndex!
   }
@@ -476,7 +476,7 @@ ${ ",\n".join([ "        distance{0}".format(position) for position in positions
   @inlinable // generic-performance
   public func index (_ i: Index, offsetBy distance: Int,
       limitedBy limit: Index) -> Index? {
-    precondition(startIndex <= i && i <= endIndex, "i is not a valid index")
+    _precondition(startIndex <= i && i <= endIndex, "i is not a valid index")
 
     guard distance != 0 else {
       return i
@@ -497,7 +497,7 @@ ${ ",\n".join([ "        distanceFromStartIndexToIndex{0}".format(position) for 
 ${ ",\n".join([ "      count{0}".format(position) for position in positions ]) }
     )
 
-    precondition(
+    _precondition(
       0 <= distanceFromStartIndexToOffsetIndex &&
         distanceFromStartIndexToOffsetIndex <= count,
       "Index out of range"
