@@ -8,7 +8,6 @@ struct Foo {
   @noDerivative var flag: Bool
 }
 
-// expected-error @+1 {{type 'Bar' does not conform to protocol 'Differentiable'}}
 struct Bar : Differentiable {
   @noDerivative var flag: Bool
 }

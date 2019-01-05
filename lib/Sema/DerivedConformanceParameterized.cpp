@@ -414,7 +414,7 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   // If `Parameters` can derive `VectorNumeric`, then declare conformance to
   // `VectorNumeric`. Also, add vector space typealiases for both `Parameters`
   // and the parent nominal type.
-  if (DerivedConformance::canDeriveVectorNumeric(parametersDecl)) {
+  if (DerivedConformance::canDeriveVectorNumeric(parametersDecl, parentDC)) {
     auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
     auto vectorNumericType =
         TypeLoc::withoutLoc(vectorNumericProto->getDeclaredType());

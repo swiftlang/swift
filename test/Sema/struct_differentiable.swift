@@ -1,139 +1,164 @@
 // SWIFT_ENABLE_TENSORFLOW
-// RUN: %target-swift-frontend -typecheck -verify %s -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify %s
 
-struct Simple : VectorNumeric, Differentiable {
+struct Empty : Differentiable {}
+
+struct Simple : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
 }
-var simple = Simple(w: 1, b: 1)
+let simple = Simple(w: 1, b: 1)
 assert(simple.moved(along: simple) == simple + simple)
 assert(simple.tangentVector(from: simple) == simple)
 
 // Test type with mixed members.
-struct Mixed : VectorNumeric, Differentiable {
+struct Mixed : AdditiveArithmetic, Differentiable {
   var simple: Simple
   var float: Float
 }
-var mixed = Mixed(simple: simple, float: 1)
+let mixed = Mixed(simple: simple, float: 1)
 assert(mixed.moved(along: mixed) == mixed + mixed)
 assert(mixed.tangentVector(from: mixed) == mixed)
 
-// Test type with generic members that conform to `Differentiable`.
-// Since `T == T.TangentVector == T.CotangentVector`,
-// it's only necessary to synthesis typealiases:
-// `typealias TangentVector = Generic`
-// `typealias CotangentVector = Generic`
-struct Generic<T : VectorNumeric> : VectorNumeric, Differentiable
-  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
-{
-  var w: T
-  var b: T
-}
-var generic = Generic<Double>(w: 1, b: 1)
-assert(generic.moved(along: generic) == generic + generic)
-assert(generic.tangentVector(from: generic) == generic)
-
 // Test type with manual definition of vector space types to `Self`.
-struct VectorSpacesEqualSelf : VectorNumeric, Differentiable {
+struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
   typealias CotangentVector = VectorSpacesEqualSelf
 }
 
-// TODO: Support the cases below after `Differentiable` derived conformances
-// limitations are lifted.
+// Test generic type with vector space types to `Self`.
+struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
+  where T : AdditiveArithmetic, T : Differentiable,
+        T == T.TangentVector, T == T.CotangentVector
+{
+  var w: T
+  var b: T
+}
+let genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
+assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
+assert(genericSame.tangentVector(from: genericSame) == genericSame)
+
+// Test nested type.
+struct Nested : AdditiveArithmetic, Differentiable {
+  var simple: Simple
+  var mixed: Mixed
+  var generic: GenericVectorSpacesEqualSelf<Double>
+}
+let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
+assert(nested.moved(along: nested) == nested + nested)
+assert(nested.tangentVector(from: nested) == nested)
+
+_ = pullback(at: Nested(simple: simple, mixed: mixed, generic: genericSame)) { model in
+  model.simple + model.simple
+}
+
+// Test type whose stored properties doesn't conform to `AdditiveArithmetic`.
+// Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
+// Vector space structs types must be synthesized.
+// Note: it would be nice to emit a warning if conforming `Self` to
+// `AdditiveArithmetic` is possible.
+struct NotAdditiveArithmetic : Differentiable {
+  var w: Float
+  var b: Float
+}
+
+// Test type with immutable, differentiable stored property.
+struct ImmutableStoredProperty : Differentiable {
+  var w: Float
+  let fixedBias: Float = .pi
+}
+_ = ImmutableStoredProperty.TangentVector(w: 1, fixedBias: 1)
+
+// Test type whose properties are not all differentiable.
+struct DifferentiableSubset : Differentiable {
+  var w: Float
+  var b: Float
+  @noDerivative var flag: Bool
+  @noDerivative let technicallyDifferentiable: Float = .pi
+}
+let tangentSubset = DifferentiableSubset.TangentVector(w: 1, b: 1)
+let cotangentSubset = DifferentiableSubset.CotangentVector(w: 1, b: 1)
+
+_ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
+  model.w + model.b
+}
+
+// Test nested type whose properties are not all differentiable.
+struct NestedDifferentiableSubset : Differentiable {
+  var x: DifferentiableSubset
+  var mixed: Mixed
+  @noDerivative var technicallyDifferentiable: Float
+}
+
+// Test type that uses synthesized vector space types but provides custom
+// method.
+struct HasCustomMethod : Differentiable {
+  var simple: Simple
+  var mixed: Mixed
+  var generic: GenericVectorSpacesEqualSelf<Double>
+  func moved(along: TangentVector) -> HasCustomMethod {
+     print("Hello world")
+     return self
+  }
+}
 
 /*
 // Test type with generic members that conform to `Differentiable`.
 // Since it's not the case that
 // `T == T.TangentVector == T.CotangentVector`,
 // it's necessary to synthesize new vector space struct types.
-struct GenericNeedsVectorSpaceStructs<T> : VectorNumeric, Differentiable
-  where T : VectorNumeric, T : Differentiable
+
+// FIXME: Blocked by bug, potentially related to SR-9595.
+// Type checker is unable to infer `T.TangentVector : AdditiveArithmetic` due
+// to mutually recursive constraints:
+// - `TangentVector.CotangentVector == CotangentVector`
+// - `CotangentVector.CotangentVector == TangentVector`
+struct GenericNeedsVectorSpaceStructs<T> : Differentiable
+  where T : Differentiable
 {
   var w: T
   var b: T
 }
 
-// Test type that doesn't conform to `VectorNumeric`.
-// Thus, `Self` cannot be used as `TangentVector` or `CotangentVector`.
-// Vector space structs types must be synthesized.
-// Note: it would be nice to emit a warning if conforming `Self` to
-// `VectorNumeric` is possible.
-struct NotVectorNumeric : Differentiable {
-  var w: Float
-  var b: Float
+// Test generic type with vector space types to `Self`.
+struct GenericNotAdditiveArithmetic<T> : Differentiable
+  where T : Differentiable, T == T.TangentVector, T == T.CotangentVector
+{
+  var w: T
+  var b: T
+}
+
+// Test type in generic context.
+// FIXME: Blocked by bug, potentially related to SR-9595.
+struct A<T : Differentiable> {
+  struct B<U : Differentiable, V> : Differentiable {
+    struct InGenericContext {
+      var w: T
+      var b: U
+    }
+  }
 }
 */
-
-// Test type that doesn't conform to `VectorNumeric`.
-// Currently, vector space type synthesis is not possible.
-// TODO: Replace this test with above commented test once the vector space
-// synthesis restriction is lifted.
-struct NotVectorNumeric : Differentiable { // expected-error {{type 'NotVectorNumeric' does not conform to protocol 'Differentiable'}}
-  var w: Float
-  var b: Float
-}
 
 // Test errors.
 
 // Test manually customizing vector space types.
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
-struct VectorSpaceTypeAlias : VectorNumeric, Differentiable { // expected-error {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
+struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable { // expected-error {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
   var w: Float
   var b: Float
   typealias TangentVector = Simple
 }
-struct VectorSpaceCustomStruct : VectorNumeric, Differentiable { // expected-error {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
+struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable { // expected-error {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
   var w: Float
   var b: Float
-  struct CotangentVector : VectorNumeric, Differentiable {
+  struct CotangentVector : AdditiveArithmetic, Differentiable {
     var w: Float.CotangentVector
     var b: Float.CotangentVector
     typealias TangentVector = VectorSpaceCustomStruct.CotangentVector
     typealias CotangentVector = VectorSpaceCustomStruct.CotangentVector
-  }
-}
-
-
-// Test type whose properties are not all differentiable.
-struct DifferentiableSubset : Differentiable {
-  @differentiable(wrt: (self))
-  var w: Float
-  @differentiable(wrt: (self))
-  var b: Float
-  @noDerivative var flag: Bool
- 
-  @_fieldwiseProductSpace
-  struct TangentVector : Differentiable, VectorNumeric {
-    @_fieldwiseProductSpace
-    typealias TangentVector = DifferentiableSubset.TangentVector
-    @_fieldwiseProductSpace
-    typealias CotangentVector = DifferentiableSubset.CotangentVector
-    var w: Float
-    var b: Float
-    func tangentVector(from cotan: CotangentVector) -> TangentVector {
-      return TangentVector(w: cotan.w, b: cotan.b)
-    }
-  }
-  @_fieldwiseProductSpace
-  struct CotangentVector : Differentiable, VectorNumeric {
-    @_fieldwiseProductSpace
-    typealias TangentVector = DifferentiableSubset.CotangentVector
-    @_fieldwiseProductSpace
-    typealias CotangentVector = DifferentiableSubset.TangentVector
-    var w: Float
-    var b: Float
-    func tangentVector(from cotan: CotangentVector) -> TangentVector {
-      return TangentVector(w: cotan.w, b: cotan.b)
-    }
-  }
-  func tangentVector(from cotan: CotangentVector) -> TangentVector {
-    return TangentVector(w: cotan.w, b: cotan.b)
-  }
-  func moved(along v: TangentVector) -> DifferentiableSubset {
-    return DifferentiableSubset(w: w.moved(along: v.w), b: b.moved(along: v.b), flag: flag)
   }
 }
