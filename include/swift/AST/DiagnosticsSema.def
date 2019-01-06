@@ -1392,8 +1392,8 @@ ERROR(pattern_binds_no_variables,none,
       (unsigned))
 
 WARNING(optional_ambiguous_case_ref,none,
-        "assuming you mean 'Optional<%0>.%1'; did you mean '%0.%1' instead?",
-        (StringRef, StringRef))
+        "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
+        (StringRef, StringRef, StringRef))
 NOTE(optional_fixit_ambiguous_case_ref,none,
      "explicitly specify 'Optional' to silence this warning", ())
 NOTE(type_fixit_optional_ambiguous_case_ref,none,
