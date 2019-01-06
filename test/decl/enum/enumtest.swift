@@ -364,7 +364,9 @@ baz(.none) // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you
 let test: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{17-17=Optional}}
 // expected-note@-2 {{use 'Foo.none' instead}} {{17-17=Foo}}
-let answer = test == .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}} {{21-21=Optional}} {{21-21=Foo}}
+let answer = test == .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{21-21=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{21-21=Foo}}
 
 enum Bar {
   case baz
