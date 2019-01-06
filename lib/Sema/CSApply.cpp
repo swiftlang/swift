@@ -2537,14 +2537,14 @@ namespace {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
           auto calledValue = DSCE->getCalledValue();
           
-          // Check if the assigned value is an enum case
+          // Cast the assigned value to an enum case
           //
-          // This will be always true if the base is Optional as the
+          // This will always succeed if the base is Optional as the
           // Optional<T>.case will have the highest precedence.
           auto EED = dyn_cast<EnumElementDecl>(calledValue);
           auto memberName = EED->getBaseName().getIdentifier();
           
-          // Look up the enum case in the original type to check if it exists
+          // Look up the enum case in the unwrapped type to check if it exists
           // as a member
           auto baseTyNominalDecl = baseTyUnwrapped
                                    ->getNominalOrBoundGenericNominal();
@@ -2555,17 +2555,16 @@ namespace {
                                          defaultMemberLookupOptions);
           
           for (LookupResultEntry result : results) {
-            auto value = result.getValueDecl();
-            
-            // Lookup returned nothing or the value is an instance member,
+            auto member = result.getValueDecl();
+            // Lookup returned nothing or the member is an instance member,
             // so return
-            if (!value && value->isInstanceMember()) {
+            if (!member && member->isInstanceMember()) {
               break;
             }
             
-            // Return if the value is an enum case w/ assoc values, as we only
+            // Return if the member is an enum case w/ assoc values, as we only
             // care (for now) about cases with no assoc values (like none)
-            if (auto EED = dyn_cast<EnumElementDecl>(value)) {
+            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
               if (EED->hasAssociatedValues()) {
                 break;
               }
