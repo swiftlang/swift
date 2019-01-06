@@ -2536,6 +2536,7 @@ namespace {
         // Otherwise, continue digging
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
           auto calledValue = DSCE->getCalledValue();
+          auto isOptional = false;
           Identifier memberName;
           
           // Try cast the assigned value to an enum case
@@ -2543,12 +2544,13 @@ namespace {
           // This will always succeed if the base is Optional<T> & the
           // assigned case comes from Optional<T>
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
-            // Return if the enum case doesn't come from Optional<T>
-            if (!EED->getParentEnum()->isOptionalDecl()) {
-              return;
-            }
-            
+            isOptional = EED->getParentEnum()->isOptionalDecl();
             memberName = EED->getBaseName().getIdentifier();
+          }
+          
+          // Return if the enum case doesn't come from Optional<T>
+          if (!isOptional) {
+            return;
           }
           
           // Look up the enum case in the unwrapped type to check if it exists
