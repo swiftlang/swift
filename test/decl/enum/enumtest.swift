@@ -387,7 +387,7 @@ let _: AnotherFoo? = .none(0) // ok
 
 struct FooStruct {
   static let none = FooStruct()
-	static let one = FooStruct()
+  static let one = FooStruct()
 }
 
 let _: FooStruct? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}}
@@ -397,7 +397,7 @@ let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<Opt
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{21-21=Optional}}
 // expected-note@-2 {{use 'FooStruct.none' instead}} {{21-21=FooStruct}}
 let _: FooStruct = .none // ok
-let _: FooStruct = .some // ok
+let _: FooStruct = .one // ok
 let _: FooStruct? = .one // ok
 let _: FooStruct?? = .one // ok
 
