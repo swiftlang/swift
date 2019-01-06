@@ -123,44 +123,52 @@ private:
 } // end anonymous namespace
 
 bool ElementUseCollector::collectFrom() {
-  bool shouldOptimize = false;
-
-  if (auto *ABI = TheMemory.getContainer()) {
-    shouldOptimize = collectContainerUses(ABI);
-  } else {
-    shouldOptimize = collectUses(TheMemory.getAddress());
+  if (auto *abi = TheMemory.getContainer()) {
+    return collectContainerUses(abi);
   }
 
-  if (!shouldOptimize)
-    return false;
-
-  // Collect information about the retain count result as well.
-  for (auto *op : TheMemory.MemoryInst->getUses()) {
-    auto *user = op->getUser();
-
-    // If this is a strong_release, stash it.
-    if (isa<StrongReleaseInst>(user)) {
-      Releases.push_back(user);
-    }
-  }
-
-  return true;
+  return collectUses(TheMemory.getAddress());
 }
 
-bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (Operand *UI : ABI->getUses()) {
-    auto *User = UI->getUser();
+bool ElementUseCollector::collectContainerUses(AllocBoxInst *abi) {
+  for (auto *ui : abi->getUses()) {
+    auto *user = ui->getUser();
 
-    // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User))
-      continue;
-    if (isa<StrongRetainInst>(User))
-      continue;
-    if (isa<StrongReleaseInst>(User))
+    // dealloc_box deallocated a box containing uninitialized memory. This can
+    // not effect any value stored into the box.
+    if (isa<DeallocBoxInst>(user))
       continue;
 
-    if (auto project = dyn_cast<ProjectBoxInst>(User)) {
-      if (!collectUses(project))
+    // Retaining the box doesn't effect the value inside the box.
+    if (isa<StrongRetainInst>(user) || isa<RetainValueInst>(user))
+      continue;
+
+    // Since we are trying to promote loads/stores, any releases of the box are
+    // not considered uses of the underlying value due to:
+    //
+    // 1. If this is not the last release of the box, then the underlying value
+    // is not effected implying we do not add this value.
+    //
+    // 2. If this is the last release of the box, then the box's destruction
+    // will result in a release of the underlying value. If there are any
+    // loads/stores after this point, the behavior would be undefined so we can
+    // ignore this possibility.
+    //
+    // That being said, if we want to eliminate the box completely we need to
+    // know where the releases are so that we can release the value that would
+    // have been at +1 in the box at that time. So we add these to the Releases
+    // array.
+    //
+    // FIXME: Since we do not support promoting strong_release or release_value
+    // today this will cause the underlying allocation to never be
+    // eliminated. That should be implemented and fixed.
+    if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user)) {
+      Releases.push_back(user);
+      continue;
+    }
+
+    if (auto *p = dyn_cast<ProjectBoxInst>(user)) {
+      if (!collectUses(p))
         return false;
       continue;
     }
@@ -170,7 +178,7 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     //
     // This will cause the dataflow to stop propagating any information at the
     // use block.
-    Uses.emplace_back(User, PMOUseKind::Escape);
+    Uses.emplace_back(user, PMOUseKind::Escape);
   }
 
   return true;
