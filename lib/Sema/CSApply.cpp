@@ -2592,7 +2592,7 @@ namespace {
               .fixItInsert(startLoc, "Optional");
             tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
                         baseTypeNameUnwrapped, memberName.str())
-              .fixItInsert(startLoc, baseTypeName);
+              .fixItInsert(startLoc, baseTypeNameUnwrapped);
             break;
           }
         }
