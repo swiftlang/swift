@@ -341,7 +341,7 @@ enum Foo {
 }
 
 let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}} {{14-14=Optional}} {{14-14=Foo}}
-let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}} {{15-15=Optional}} {{15-15=Foo}}
+let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}} {{15-15=Optional}} {{15-15=Foo}}
 
 let _: Foo = .none // ok
 let _: Foo = .bar // ok
@@ -380,7 +380,7 @@ struct FooStruct {
 }
 
 let _: FooStruct? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}} {{20-20=Optional}} {{20-20=FooStruct}}
-let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<FooStruct>.none'; did you mean 'FooStruct.none' instead?}} {{21-21=Optional}} {{21-21=FooStruct}}
+let _: FooStruct?? = .none // expected-warning {{assuming you mean 'Optional<Optional<FooStruct>>.none'; did you mean 'FooStruct.none' instead?}} {{21-21=Optional}} {{21-21=FooStruct}}
 let _: FooStruct = .none // ok
 
 struct NestedBazEnum {
@@ -391,7 +391,7 @@ struct NestedBazEnum {
 }
 
 let _: NestedBazEnum.Baz? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnum.Baz>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}} {{28-28=Optional}} {{28-28=NestedBazEnum.Baz}}
-let _: NestedBazEnum.Baz?? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnum.Baz>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}} {{29-29=Optional}} {{29-29=NestedBazEnum.Baz}}
+let _: NestedBazEnum.Baz?? = .none // expected-warning {{assuming you mean 'Optional<Optional<NestedBazEnum.Baz>>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}} {{29-29=Optional}} {{29-29=NestedBazEnum.Baz}}
 let _: NestedBazEnum.Baz = .none // ok
 let _: NestedBazEnum.Baz = .one // ok
 let _: NestedBazEnum.Baz? = .one // ok
@@ -405,7 +405,7 @@ struct NestedBazEnumGeneric {
 }
 
 let _: NestedBazEnumGeneric.Baz<Int>? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnumGeneric.Baz<Int>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}} {{40-40=Optional}} {{40-40=NestedBazEnumGeneric.Baz<Int>}}
-let _: NestedBazEnumGeneric.Baz<Int>?? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnumGeneric.Baz<Int>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}} {{41-41=Optional}} {{41-41=NestedBazEnumGeneric.Baz<Int>}}
+let _: NestedBazEnumGeneric.Baz<Int>?? = .none // expected-warning {{assuming you mean 'Optional<Optional<NestedBazEnumGeneric.Baz<Int>>>.none'; did you mean 'NestedBazEnumGeneric.Baz<Int>.none' instead?}} {{41-41=Optional}} {{41-41=NestedBazEnumGeneric.Baz<Int>}}
 let _: NestedBazEnumGeneric.Baz<Int> = .none // ok
 let _: NestedBazEnumGeneric.Baz<Int> = .one // ok
 let _: NestedBazEnumGeneric.Baz<Int>? = .one // ok
