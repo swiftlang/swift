@@ -1,7 +1,8 @@
 // FIXME(integers): add tests that perform the same checks in generic code
 
 %{
-import gyb
+from SwiftIntTypes import all_integer_types, int_max, int_min
+from SwiftFloatingPointTypes import all_floating_point_types
 }%
 
 import StdlibUnittest
@@ -34,15 +35,7 @@ func getTooLargeMessage() -> String {
   return ""
 }
 
-%{
-
-int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
-"""
-%{
-from SwiftIntTypes import all_integer_types, int_max, int_min
-from SwiftFloatingPointTypes import all_floating_point_types
-
-}%
+% word_bits = int(target_ptrsize)
 % for self_ty in all_integer_types(word_bits):
 %   selfBits = self_ty.bits
 %   selfSigned = self_ty.is_signed
@@ -50,6 +43,7 @@ from SwiftFloatingPointTypes import all_floating_point_types
 %   selfMax = self_ty.max
 %   Self = self_ty.stdlib_name
 
+%   # Test conversion behaviors for all integer types
 %   for other_ty in all_integer_types(word_bits):
 %     otherBits = other_ty.bits
 %     otherSigned = other_ty.is_signed
@@ -58,11 +52,11 @@ from SwiftFloatingPointTypes import all_floating_point_types
 %     Other = other_ty.stdlib_name
 
 %     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
-
 %       if testValue < otherMin or testValue > otherMax:
 %          # Can't construct `other` value, do nothing and continue.
-
+%          pass
 %       elif testValue >= selfMin and testValue <= selfMax:
+%          # Test value can be represented by Self, test conversion succeeds
 
 /// Always-safe conversion from ${Other}(${testValue}) to ${Self}.
 FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
@@ -80,6 +74,7 @@ FixedPointConversionFailure.test("${Other}To${Self}FailableConversion/dest=${tes
 }
 
 %       else:
+%         # Test value is out of range of Self, test conversion fails
 
 /// Always-failing conversion from ${Other}(${testValue}) to ${Self}.
 FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
@@ -96,11 +91,12 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
   let input = get${Other}(${testValue})
   expectNil(${Self}(exactly: input))
 }
-%       end
 
+%       end
 %     end # for testValue in ...
 %   end # for in all_integer_types (Other)
 
+%   # Test conversion behaviors for all floating-point types
 %   for other_type in all_floating_point_types():
 %     Other = "Float" + str(other_type.bits)
 %     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
@@ -110,12 +106,22 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
-%     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
+%     # Int64.min - 0.1 can not be fully represented by a double-precision
+%     # value. Python can not leverage extended precision, so the resulting
+%     # value incorrectly rounds to an integer which compares as less than
+%     # Int64.min, even though in Swift a Float80 literal will have the correct
+%     # value since Swift 5. Skip the bad case for now.
+%     testValues = [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]
+%     if Other == 'Float80' and selfBits > 63 and selfSigned:
+%       del testValues[2]
+%     end
 
+%     for testValue in testValues:
 %       if testValue < otherMin or testValue > otherMax:
 %         # Can't construct `other` value to test from, do nothing and continue.
-
-%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
+%         pass
+%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1.0 == 0:
+%         # Test value can be represented exactly by Self, test two-way conversion
 
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
@@ -126,20 +132,22 @@ FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${test
 
 FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
-  expectNil(${Self}(exactly: input))
+  expectNotNil(${Self}(exactly: input))
 }
 
 %       else:
-
-%         if testValue > selfMax:
+%         if int(testValue) > selfMax:
+%           # Test value exceeds maximum value of Self, test for too large message
 FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
 .crashOutputMatches(getTooLargeMessage()).code {
   expectCrashLater()
-%         elif testValue < selfMin:
+%         elif int(testValue) < selfMin:
+%           # Test value doesn't reach minimum value of Self, test for too small message
 FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
 .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
 %         else:
+%           # Test value can be represented inexactly by Self, test for truncation
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
 %         end
   let input = get${Other}(${testValue})
@@ -207,27 +215,5 @@ FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
 
 %   end # for in all_floating_point_types (Other)
 % end # for in all_integer_types (Self)
-
-""")
-
-}%
-
-#if arch(i386) || arch(arm)
-
-  ${gyb.execute_template(
-      int_to_int_conversion_template,
-      word_bits=32)}
-
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-
-  ${gyb.execute_template(
-      int_to_int_conversion_template,
-      word_bits=64)}
-
-#else
-
-_UnimplementedError()
-
-#endif
 
 runAllTests()
