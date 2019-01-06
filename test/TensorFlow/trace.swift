@@ -74,17 +74,22 @@ func test4HelperLayer(_ x: Tensor<Float>) -> Tensor<Float> {
 public func test4() {
   var x = test3HelperX()
   let layerCount = readInt()
-  for i in 0..<layerCount {
+  for _ in 0..<layerCount {
     x = test4HelperLayer(x)
   }
 }
 
 /////////////////////////
-// Test 6: trace with return value
+// Test 6: trace with input and return values
 ////////////////////////
 @inline(never)
 func dataset() -> Tensor<Float> {
   return Tensor<Float>(1.0)
+}
+
+@inline(never)
+func model(_ x: Tensor<Float>) -> Tensor<Float> {
+  return x + x
 }
 
 public func driver() {
@@ -106,6 +111,12 @@ public func driver() {
     return datasetTracedFn()
   }
   _hostOp(x)
+
+  let modelTracedFn = trace(model)
+  let y: Tensor<Float> = withDevice(.gpu) {
+    return modelTracedFn(x)
+  }
+  _hostOp(y)
 }
 
 driver()
