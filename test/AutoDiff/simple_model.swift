@@ -107,7 +107,7 @@ SimpleModelTests.test("gradient") {
   let model = Model(l1: layer, l2: layer, l3: layer)
   let label: Float = 3
   let input: Float = 1
-  let gradModel = gradient(at: model) { (model: Model) -> Float in
+  let gradModel = model.gradient { model -> Float in
     let pred = model.prediction(for: input)
     return model.loss(of: pred, from: label)
   }
