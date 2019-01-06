@@ -92,6 +92,11 @@ func model(_ x: Tensor<Float>) -> Tensor<Float> {
   return x + x
 }
 
+@inline(never)
+func model2(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
+  return x + y
+}
+
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
   // let tracedFn = trace(test1)
@@ -117,6 +122,13 @@ public func driver() {
     return modelTracedFn(x)
   }
   _hostOp(y)
+
+  let model2TracedFn = trace(model2)
+  let z: Tensor<Float> = withDevice(.gpu) {
+    return model2TracedFn(x, y)
+  }
+  _hostOp(z)
+
 }
 
 driver()

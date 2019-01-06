@@ -110,9 +110,14 @@ private class S4TFTrace {
   let graph = TF_NewGraph()
 
   // Used to create unique graph node names.
-  var uniqueCounter = 0
+  var traceGraphNodeCounter = 0
 
+  // This actually maps to the concrete inputs.
+  // TODO: find better naming
   var abstractInputs: [TF_Output] = []
+
+  // Tracks the # inputs added/processed so far in the input list `abstractInputs`
+  private var concreteInputProcessed = 0
 
   // Populated tracing a graph function. The "execution" of that graph function
   // in tracing mode will create a graph node in the trace graph function, and
@@ -136,7 +141,7 @@ private class S4TFTrace {
       checkOk(status)
       abstractInputs.append(TF_Output(oper: result, index: 0))
     }
-    uniqueCounter = inputValueCount
+    traceGraphNodeCounter = inputValueCount
   }
 
   deinit {
@@ -144,6 +149,25 @@ private class S4TFTrace {
     TF_DeleteStatus(status)
   }
 
+  func addInput(_ inputTensorHandle: CTensorHandle) -> TF_Output {
+    let abstractInput: TF_Output
+    if TFE_TensorHandleIsTensorBuffer(inputTensorHandle) != 0 {
+      debugLog("  Got a concrete input, which is the \(concreteInputProcessed)-th")
+      internalConsistencyCheck(concreteInputProcessed < abstractInputs.count)
+
+      // this is a concrete tensor, and that means the input is fed into the
+      // trace region, instead of a local tensor produced within the trace
+      // region.
+      abstractInput = abstractInputs[concreteInputProcessed]
+      concreteInputProcessed += 1
+    } else {
+      debugLog("  Got an abstract input")
+      internalConsistencyCheck(concreteInputProcessed == 0)
+      abstractInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle)
+    }
+    internalConsistencyCheck(abstractInput.oper != nil)
+    return abstractInput
+  }
 
   func finalizeAndExecute(tracedFunctionName: String,
                           inputs: [Tensor<Float>],
@@ -644,6 +668,37 @@ public func trace(_ fn: (Tensor<Float>) -> Tensor<Float>) -> (Tensor<Float>) -> 
   }
 }
 
+// 2 inputs and 1 return value.
+public func trace(_ fn: (Tensor<Float>, Tensor<Float>) -> Tensor<Float>)
+  -> (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
+  // Verify that we are not already tracing.
+  // assert(_RuntimeConfig.traceState == .notTracing)
+  // Switch to tracing mode, allocating a TF_Function.
+  _RuntimeConfig.traceState = .tracing(S4TFTrace(inputValueCount: 2))
+  // NOTE: Argument handling code goes here, defined in a section below.
+
+  // Run the body, this builds the trace, adding ops to currentTrace.
+  // TODO: how to handle outputs
+  let dummyInput = Tensor<Float>(1.0)
+  _ = fn(dummyInput, dummyInput)
+
+  // The result is a closure that captures 'fn' and captures and executes
+  // the tracedFn.
+  return { (input1: Tensor<Float>, input2: Tensor<Float>) -> Tensor<Float> in
+    // 2I means 2 input values; 1R means 1 return value
+    let opType = "MyTraceFn_2I1R"
+    // Ok, we are done tracing.
+    let returnValues = finalizeAndExecuteTraceFn(fnName: opType,
+                                                 inputs: [input1, input2],
+                                                 returnValueCount: 1)
+
+    let returnValue = returnValues[0]
+    assert(TFE_TensorHandleIsTensorBuffer(returnValue) != 0)
+    let handle = TensorHandle<Float>(_owning: returnValue)
+    return Tensor<Float>(handle: handle)
+  }
+}
+
 /// Returns a valid TF device string such as
 /// "/job:localhost/replica:0/task:0/device:CPU:0", which corresponds to the
 /// closest enclosing withDevice() construct.
@@ -923,12 +978,12 @@ private class TFEState {
       if let tracedFn = _RuntimeConfig.traceState.getFunction {
         // let opType = "trace_s5trace3fooyyF.tf_0_CPU.device_partition"
         // let opType = "trace_main.tf_0_CPU.device_partition"
-        let opName = "\(opType)_\(tracedFn.uniqueCounter)"
+        let opName = "\(opType)_\(tracedFn.traceGraphNodeCounter)"
         let opDesc = TF_NewOperation(tracedFn.graph, opType, opName)
         internalConsistencyCheck(opDesc != nil)
         debugLog("Creating trace graph node \(opDesc!) named \(opName) for graph fn \(opType) via TF_NewOperation().")
         op_descs.append(opDesc!)
-        tracedFn.uniqueCounter += 1
+        tracedFn.traceGraphNodeCounter += 1
       } else {
       debugLog("Creating a new op based on type \(opType).")
       let op: CTFEOp? = TFE_NewOp(context.eagerContext, opType, status)
@@ -975,21 +1030,7 @@ extension TFEState {
   func addInput(_ inputTensorHandle: CTensorHandle) {
     if let tracedFn = _RuntimeConfig.traceState.getFunction {
       debugLog("Calling TF_AddInput() on trace graph node desc \(op_descs[0])")
-      let abstractInput: TF_Output
-      if TFE_TensorHandleIsTensorBuffer(inputTensorHandle) != 0 {
-        debugLog("  Got a concrete input")
-        // this is a concrete tensor, and that means the input is fed into the
-        // trace region, instead of a local tensor produced within the trace
-        // region.
-        //
-        // TODO: need to find a way to know which of the abtractInputs this
-        // input tensor corresponds to. For now we assume the 0-th.
-        abstractInput = tracedFn.abstractInputs[0]
-      } else {
-        debugLog("  Got an abstract input")
-        abstractInput = TFE_GetTFOutputFromTensorHandle(inputTensorHandle)
-      }
-      internalConsistencyCheck(abstractInput.oper != nil)
+      let abstractInput = tracedFn.addInput(inputTensorHandle)
       debugLog(" The abstract input graph node is \(abstractInput.oper!)")
       TF_AddInput(op_descs[0], abstractInput);
     } else {
