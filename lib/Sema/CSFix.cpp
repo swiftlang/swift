@@ -237,7 +237,8 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 }
 
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 UseSubscriptOperator *UseSubscriptOperator::create(ConstraintSystem &cs,

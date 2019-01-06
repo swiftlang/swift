@@ -265,8 +265,12 @@ func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 }
 
 struct SubscriptTest1 {
-  subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
-  subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
+  subscript(keyword:String) -> Bool { return true }
+  // expected-note@-1 2 {{found this candidate}}
+  // expected-note@-2 2 {{candidate requires use of the subscript operator}}
+  subscript(keyword:String) -> String? {return nil }
+  // expected-note@-1 2 {{found this candidate}}
+  // expected-note@-2 2 {{candidate requires use of the subscript operator}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
@@ -285,7 +289,7 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript((true, (5, baz: SubSubClass())), "hello")
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
   _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot convert value of type '(fo: Bool, (Int, baz: SubClass))' to expected argument type '(foo: Bool, bar: (Int, baz: SubClass))'}}
   _ = s1.subscript(SubSubClass())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
   _ = s1.subscript(ClassConformingToProtocol())
@@ -293,13 +297,15 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript(ClassConformingToRefinedProtocol())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
   _ = s1.subscript(true)
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(Bool)'}}
+  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript(SuperClass())
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(SuperClass)'}}
+  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript("hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+  // expected-error@-1 {{ambiguous reference to subscript 'subscript(_:)'}}
   _ = s1.subscript("hello"
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-27=]}}
+  // expected-error@-1 {{ambiguous reference to subscript 'subscript(_:)'}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]

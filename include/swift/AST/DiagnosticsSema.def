@@ -64,6 +64,9 @@ ERROR(ambiguous_reference_to_decl,none,
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
       (Type, Type))
+NOTE(ambiguous_subscript_candidate_requires_operator,none,
+     "candidate requires use of the subscript operator", ())
+
 ERROR(could_not_find_value_subscript,none,
       "value of type %0 has no subscripts",
       (Type))
