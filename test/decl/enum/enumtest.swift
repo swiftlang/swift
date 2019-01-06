@@ -344,8 +344,8 @@ let _: Foo? = .none // expected-warning {{assuming you mean 'Optional<Foo>.none'
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{15-15=Optional}}
 // expected-note@-2 {{use 'Foo.none' instead}} {{15-15=Foo}}
 let _: Foo?? = .none // expected-warning {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
-// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{15-15=Optional}}
-// expected-note@-2 {{use 'Foo.none' instead}} {{15-15=Foo}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{16-16=Optional}}
+// expected-note@-2 {{use 'Foo.none' instead}} {{16-16=Foo}}
 
 let _: Foo = .none // ok
 let _: Foo = .bar // ok
@@ -410,10 +410,10 @@ struct NestedBazEnum {
 
 let _: NestedBazEnum.Baz? = .none // expected-warning {{assuming you mean 'Optional<NestedBazEnum.Baz>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}}
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{29-29=Optional}}
-// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{28-28=NestedBazEnum.Baz}}
+// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{29-29=NestedBazEnum.Baz}}
 let _: NestedBazEnum.Baz?? = .none // expected-warning {{assuming you mean 'Optional<Optional<NestedBazEnum.Baz>>.none'; did you mean 'NestedBazEnum.Baz.none' instead?}}
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}} {{30-30=Optional}}
-// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{29-29=NestedBazEnum.Baz}}
+// expected-note@-2 {{use 'NestedBazEnum.Baz.none' instead}} {{30-30=NestedBazEnum.Baz}}
 let _: NestedBazEnum.Baz = .none // ok
 let _: NestedBazEnum.Baz = .one // ok
 let _: NestedBazEnum.Baz? = .one // ok
