@@ -2413,9 +2413,7 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     }
     break;
   case ReferenceOwnershipOptionality::Allowed:
-    if (!isOptional)
-      break;
-    LLVM_FALLTHROUGH;
+    break;
   case ReferenceOwnershipOptionality::Required:
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_ownership_is_let,

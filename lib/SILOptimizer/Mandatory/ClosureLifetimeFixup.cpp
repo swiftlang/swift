@@ -98,7 +98,7 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
 
   SILBuilderWithScope B(Cvt);
   auto NewCvt = B.createConvertEscapeToNoEscape(
-      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
   Cvt->replaceAllUsesWith(NewCvt);
   Cvt->eraseFromParent();
   Cvt = NewCvt;
@@ -189,11 +189,6 @@ static SILInstruction *lookThroughRebastractionUsers(
 static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *Cvt,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
-  // Don't optimize converts that might have been escaped by the function call
-  // (materializeForSet 'escapes' its arguments into the writeback buffer).
-  if (Cvt->isEscapedByUser())
-    return false;
-
   // If there is a single user that is an apply this is simple: extend the
   // lifetime of the operand until after the apply.
   auto SingleUser = lookThroughRebastractionUsers(Cvt, Memoized);
@@ -215,7 +210,7 @@ static bool tryExtendLifetimeToLastUse(
     {
       SILBuilderWithScope B(Cvt);
       auto NewCvt = B.createConvertEscapeToNoEscape(
-          Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+          Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
       Cvt->replaceAllUsesWith(NewCvt);
       Cvt->eraseFromParent();
       Cvt = NewCvt;
@@ -264,11 +259,6 @@ static bool tryExtendLifetimeToLastUse(
 ///   diamonds. And a destroy of %closure at the last destroy of
 ///   %convertOptionalBlock.
 static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
-  // Don't optimize converts that might have been escaped by the function call
-  // (materializeForSet 'escapes' its arguments into the writeback buffer).
-  if (Cvt->isEscapedByUser())
-    return false;
-
   auto *blockArg = dyn_cast<SILArgument>(Cvt->getOperand());
   if (!blockArg)
     return false;
@@ -314,7 +304,7 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
   {
     SILBuilderWithScope B(Cvt);
     auto NewCvt = B.createConvertEscapeToNoEscape(
-        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
+        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
   }

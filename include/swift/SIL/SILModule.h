@@ -316,8 +316,10 @@ public:
   mutable Lowering::TypeConverter Types;
 
   /// Look up the TypeLowering for a SILType.
-  const Lowering::TypeLowering &getTypeLowering(SILType t) {
-    return Types.getTypeLowering(t);
+  const Lowering::TypeLowering &
+  getTypeLowering(SILType t, ResilienceExpansion expansion =
+                               ResilienceExpansion::Minimal) {
+    return Types.getTypeLowering(t, expansion);
   }
 
   /// Invalidate cached entries in SIL Loader.

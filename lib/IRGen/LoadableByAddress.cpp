@@ -2632,7 +2632,7 @@ void LoadableByAddress::recreateConvInstrs() {
       auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
       newInstr = convBuilder.createConvertEscapeToNoEscape(
           instr->getLoc(), instr->getOperand(), newType,
-          instr->isEscapedByUser(), instr->isLifetimeGuaranteed());
+          instr->isLifetimeGuaranteed());
       break;
     }
     case SILInstructionKind::MarkDependenceInst: {

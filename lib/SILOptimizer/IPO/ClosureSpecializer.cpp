@@ -708,7 +708,7 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
   calleeValue = cloneCalleeConversion(Cvt->getOperand(), NewClosure, Builder,
                                       NeedsRelease);
   return Builder.createConvertEscapeToNoEscape(
-      CallSiteDesc.getLoc(), calleeValue, Cvt->getType(), false, true);
+      CallSiteDesc.getLoc(), calleeValue, Cvt->getType(), true);
 }
 
 /// Populate the body of the cloned closure, modifying instructions as

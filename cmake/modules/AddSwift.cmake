@@ -1433,11 +1433,13 @@ function(add_swift_host_library name)
     INSTALL_IN_COMPONENT "dev"
     )
 
-  swift_install_in_component(dev
-    TARGETS ${name}
-    ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-    LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-    RUNTIME DESTINATION bin)
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(dev
+      TARGETS ${name}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+      RUNTIME DESTINATION bin)
+  endif()
 
   swift_is_installing_component(dev is_installing)
   if(NOT is_installing)
@@ -2019,8 +2021,8 @@ function(add_swift_target_library name)
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
           TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
           RUNTIME DESTINATION "bin"
-          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
+          LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+          ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
           PERMISSIONS ${file_permissions})
       else()
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
@@ -2328,31 +2330,28 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT)
+  set(options)
+  set(single_parameter_options SWIFT_COMPONENT)
+  set(multiple_parameter_options)
 
-  cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
-      ${ARGN})
+  cmake_parse_arguments(ASHT
+    "${options}"
+    "${single_parameter_options}"
+    "${multiple_parameter_options}"
+    ${ARGN})
 
-  precondition(ADDSWIFTHOSTTOOL_SWIFT_COMPONENT
+  precondition(ASHT_SWIFT_COMPONENT
                MESSAGE "Swift Component is required to add a host tool")
 
   # Create the executable rule.
-  add_swift_executable(
-    ${executable} 
-    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-  )
+  add_swift_executable(${executable}
+    ${ASHT_UNPARSED_ARGUMENTS})
 
-  swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+  swift_install_in_component(${ASHT_SWIFT_COMPONENT}
     TARGETS ${executable}
     RUNTIME DESTINATION bin)
 
-  swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-    is_installing)
+  swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
