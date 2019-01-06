@@ -2536,13 +2536,20 @@ namespace {
         // Otherwise, continue digging
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
           auto calledValue = DSCE->getCalledValue();
+          Identifier memberName;
           
-          // Cast the assigned value to an enum case
+          // Try cast the assigned value to an enum case
           //
-          // This will always succeed if the base is Optional as the
-          // Optional<T>.case will have the highest precedence.
-          auto EED = dyn_cast<EnumElementDecl>(calledValue);
-          auto memberName = EED->getBaseName().getIdentifier();
+          // This will always succeed if the base is Optional<T> & the
+          // assigned value comes from Optional<T>
+          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
+            // Return if the enum value doesn't come from Optional<T>
+            if (!EED->getParentEnum()->isOptionalDecl()) {
+              return;
+            }
+            
+            memberName = EED->getBaseName().getIdentifier();
+          }
           
           // Look up the enum case in the unwrapped type to check if it exists
           // as a member
