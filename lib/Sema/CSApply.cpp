@@ -2528,8 +2528,8 @@ namespace {
     /// Optional<T>.{member name}
     void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
       if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
-        // Return if this is an extension on Optional
-        if (isa<PrimaryArchetypeType>(baseTyUnwrapped->getCanonicalType())) {
+        // Return if the base type doesn't have a nominal type decl
+        if (!baseTyUnwrapped->getNominalOrBoundGenericNominal()) {
           return;
         }
         
@@ -2541,9 +2541,9 @@ namespace {
           // Try cast the assigned value to an enum case
           //
           // This will always succeed if the base is Optional<T> & the
-          // assigned value comes from Optional<T>
+          // assigned case comes from Optional<T>
           if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
-            // Return if the enum value doesn't come from Optional<T>
+            // Return if the enum case doesn't come from Optional<T>
             if (!EED->getParentEnum()->isOptionalDecl()) {
               return;
             }
