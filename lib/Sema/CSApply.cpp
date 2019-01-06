@@ -2514,8 +2514,11 @@ namespace {
             /*implicit=*/expr->isImplicit(), Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
-      
-      diagnoseAmbiguousNominalMember(baseTy, result);
+			
+			// Check for ambigious member if the base is an Optional
+			if (baseTy->getOptionalObjectType()) {
+				diagnoseAmbiguousNominalMember(baseTy, result);
+			}
 
       return coerceToType(result, resultTy, cs.getConstraintLocator(expr));
     }
@@ -2524,53 +2527,69 @@ namespace {
     /// type member via the dot syntax and the member name matches
     /// Optional<T>.{member name}
     void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
-      if (auto baseUnwrappedType = baseTy->lookThroughAllOptionalTypes()) {
+      if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
+				// Return if this is an extension on Optional
+				if (isa<PrimaryArchetypeType>(baseTyUnwrapped->getDesugaredType())) {
+					return;
+				}
+				
+				// Otherwise, continue digging
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(result)) {
-          DeclBaseName memberName;
           auto calledValue = DSCE->getCalledValue();
-          bool isOptional = false;
-          
-          if (auto EED = dyn_cast<EnumElementDecl>(calledValue)) {
-            memberName = EED->getBaseName();
-            isOptional = EED->getParentEnum()->isOptionalDecl();
-          }
-          
+					
+					// Check if the assigned value is an enum case
+					//
+					// This will be always true if the base is Optional as the
+					// Optional<T>.case will have the highest precedence.
+					auto EED = dyn_cast<EnumElementDecl>(calledValue);
+					auto memberName = EED->getBaseName().getIdentifier();
+					auto isOptional = EED->getParentEnum()->isOptionalDecl();
+					
+					// Bail out if the enum case doesn't come from Optional<T>
           if (!isOptional) {
             return;
           }
-          
-          auto baseTypeNominal = baseUnwrappedType
-                                 ->getNominalOrBoundGenericNominal();
+					
+					// Look up the enum case in the original type to check if it exists
+					// as a member
+          auto baseTyNominalDecl = baseTyUnwrapped
+                                   ->getNominalOrBoundGenericNominal();
           auto &tc = cs.getTypeChecker();
-          auto results = tc.lookupMember(baseTypeNominal->getModuleContext(),
-                                         baseUnwrappedType,
-                                         memberName.getIdentifier(),
+          auto results = tc.lookupMember(baseTyNominalDecl->getModuleContext(),
+                                         baseTyUnwrapped,
+                                         memberName,
                                          defaultMemberLookupOptions);
           
           for (LookupResultEntry result : results) {
             auto value = result.getValueDecl();
-            
+						
+						// Lookup returned nothing or the value is an instance member,
+						// so return
             if (!value && value->isInstanceMember()) {
               break;
             }
-            
+						
+						// Return if the value is an enum case w/ assoc values, as we only
+						// care (for now) about cases with no assoc values (like none)
             if (auto EED = dyn_cast<EnumElementDecl>(value)) {
               if (EED->hasAssociatedValues()) {
                 break;
               }
             }
-            
-            auto baseTypeName = baseUnwrappedType->getString();
+						
+						// Emit a diagnostic with some fixits
+						auto baseTypeName = baseTy->getCanonicalType().getString();
+						auto baseTypeNameUnwrapped = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
             auto startLoc = DSCE->getStartLoc();
             
             tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                        baseTypeName, memberName.getIdentifier().str());
+                        baseTypeName, baseTypeNameUnwrapped, memberName.str());
             
             tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
               .fixItInsert(startLoc, "Optional");
             tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
-                        baseTypeName, memberName.getIdentifier().str())
+                        baseTypeNameUnwrapped, memberName.str())
               .fixItInsert(startLoc, baseTypeName);
             break;
           }
