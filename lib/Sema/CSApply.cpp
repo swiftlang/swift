@@ -2515,7 +2515,7 @@ namespace {
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 			
-      // Check for ambigious member if the base is an Optional
+      // Check for ambiguous member if the base is an Optional
       if (baseTy->getOptionalObjectType()) {
         diagnoseAmbiguousNominalMember(baseTy, result);
       }
@@ -2529,7 +2529,7 @@ namespace {
     void diagnoseAmbiguousNominalMember(Type baseTy, Expr *result) {
       if (auto baseTyUnwrapped = baseTy->lookThroughAllOptionalTypes()) {
         // Return if this is an extension on Optional
-        if (isa<PrimaryArchetypeType>(baseTyUnwrapped->getDesugaredType())) {
+        if (isa<PrimaryArchetypeType>(baseTyUnwrapped->getCanonicalType())) {
           return;
         }
         
@@ -2543,12 +2543,6 @@ namespace {
           // Optional<T>.case will have the highest precedence.
           auto EED = dyn_cast<EnumElementDecl>(calledValue);
           auto memberName = EED->getBaseName().getIdentifier();
-          auto isOptional = EED->getParentEnum()->isOptionalDecl();
-          
-          // Bail out if the enum case doesn't come from Optional<T>
-          if (!isOptional) {
-            return;
-          }
           
           // Look up the enum case in the original type to check if it exists
           // as a member
