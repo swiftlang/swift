@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var ProtocolRequirementAutodiffTests = TestSuite("ProtocolRequirementAutodiff")
 
-func pullback<T, U, R>(
+func _pullback<T, U, R>(
   at x: (T, U), in f: @autodiff (T) -> (U) -> R
 ) -> (R.CotangentVector) -> (T.CotangentVector, U.CotangentVector)
   where T : Differentiable, U : Differentiable, R : Differentiable {
@@ -19,7 +19,7 @@ protocol DiffReq : Differentiable {
 
 extension DiffReq {
   func gradF(at x: Float) -> (Self.CotangentVector, Float) {
-    return pullback(at: (self, x), in: Self.f)(1)
+    return _pullback(at: (self, x), in: Self.f)(1)
   }
 }
 

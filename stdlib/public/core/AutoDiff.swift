@@ -92,30 +92,98 @@ public extension Differentiable
   }
 }
 
-// FIXME: This is currently commented because the where clause leads to
-// associated type inference which conflicts with `Differentiable` derived
-// conformances.
-/*
-public extension Differentiable where TangentVector == CotangentVector {
-  func tangentVector(from cotangent: CotangentVector) -> TangentVector {
-    return cotangent
+//===----------------------------------------------------------------------===//
+// Functional utilities
+//===----------------------------------------------------------------------===//
+
+/// Create a differentiable function from a vector-Jacobian products function.
+@inlinable
+public func differentiableFunction<T : Differentiable, R : Differentiable>(
+  from vjp: @escaping (T)
+           -> (value: R, pullback: (R.CotangentVector) -> T.CotangentVector)
+) -> @autodiff (T) -> R {
+  @differentiable(vjp: _vjp)
+  func original(_ x: T) -> R {
+    return vjp(x).value
+  }
+  func _vjp(_ x: T) -> (R, (R.CotangentVector) -> T.CotangentVector) {
+    return vjp(x)
+  }
+  return original
+}
+
+//===----------------------------------------------------------------------===//
+// Method-style differential operators
+//===----------------------------------------------------------------------===//
+
+public extension Differentiable {
+  @inlinable
+  func valueWithPullback<R : Differentiable>(
+    in f: @autodiff (Self) -> R
+  ) -> (value: R, pullback: (R.CotangentVector) -> CotangentVector) {
+    return Builtin.autodiffApply_vjp_arity1(f, self)
+  }
+
+  @inlinable
+  func pullback<R : Differentiable>(
+    in f: @autodiff (Self) -> R
+  ) -> (R.CotangentVector) -> CotangentVector {
+    return Builtin.autodiffApply_vjp_arity1(f, self).1
+  }
+
+  @inlinable
+  func gradient<R : Differentiable>(
+    in f: @autodiff (Self) -> R
+  ) -> CotangentVector
+    where R : BinaryFloatingPoint, R.CotangentVector == R {
+    return self.pullback(in: f)(R(1))
+  }
+
+  @inlinable
+  func valueWithGradient<R : Differentiable>(
+    in f: @autodiff (Self) -> R
+  ) -> (value: R, gradient: CotangentVector)
+    where R : BinaryFloatingPoint, R.CotangentVector == R {
+    let (y, pb) = self.valueWithPullback(in: f)
+    return (y, pb(R(1)))
+  }
+
+  @inlinable
+  func valueWithPullback<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> R
+  ) -> (value: R,
+        pullback: (R.CotangentVector) -> (CotangentVector, T.CotangentVector)) {
+    return Builtin.autodiffApply_vjp_arity2(f, self, x)
+  }
+
+  @inlinable
+  func pullback<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> R
+  ) -> (R.CotangentVector) -> (CotangentVector, T.CotangentVector) {
+    return Builtin.autodiffApply_vjp_arity2(f, self, x).1
+  }
+
+  @inlinable
+  func gradient<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> R
+  ) -> (CotangentVector, T.CotangentVector)
+    where R : BinaryFloatingPoint, R.CotangentVector == R {
+    return self.pullback(at: x, in: f)(R(1))
+  }
+
+  @inlinable
+  func valueWithGradient<T : Differentiable, R : Differentiable>(
+    at x: T, in f: @autodiff (Self, T) -> R
+  ) -> (value: R, gradient: (CotangentVector, T.CotangentVector))
+    where R : BinaryFloatingPoint, R.CotangentVector == R {
+    let (y, pb) = self.valueWithPullback(at: x, in: f)
+    return (y, pb(R(1)))
   }
 }
-*/
 
 //===----------------------------------------------------------------------===//
-// Differential Operators
+// Free-function-style differential operators
 //===----------------------------------------------------------------------===//
-
-/* TODO: This will be available when we support forward-mode differentiation.
-@inlinable
-public func valueWithDifferential<T, R>(
-  at x: T, in f: @autodiff (T) -> R
-) -> (value: R, differential: (T.TangentVector) -> R.TangentVector)
-  where T : Differentiable, R : Differentiable {
-  return Builtin.autodiffApply_jvp(f, x)
-}
- */
 
 // Value with pullback
 
@@ -174,27 +242,6 @@ public func pullback<T, U, V, R>(
         R : Differentiable {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z).1
 }
-
-/* TODO: These will be available when we support forward-mode differentiation.
-@inlinable
-public func derivative<T, R>(
-  at x: T, in f: @autodiff (T) -> R
-) -> R.TangentVector
-  where T : BinaryFloatingPoint & Differentiable, R : Differentiable,
-        T.TangentVector == T {
-  let (y, differential) = valueWithDifferential(at: x, in: f)
-  return differential(1)
-}
-
-@inlinable
-public func derivative<T, R>(
-  of f: @escaping @autodiff (T) -> R
-) -> (T) -> R.TangentVector
-  where T : BinaryFloatingPoint & Differentiable, R : Differentiable,
-        T.TangentVector == T {
-  return { x in derivative(at: x, in: f) }
-}
- */
 
 // Value with gradient
 
