@@ -1349,6 +1349,7 @@ class DifferentiableActivityAnalysis
     : public FunctionAnalysisBase<DifferentiableActivityInfo> {
 private:
   DominanceAnalysis *dominanceAnalysis = nullptr;
+  PostDominanceAnalysis *postDominanceAnalysis = nullptr;
 
 public:
   explicit DifferentiableActivityAnalysis()
@@ -1403,10 +1404,12 @@ private:
   SmallVector<SmallDenseSet<SILValue>, 4> variedValueSets;
 
   /// Perform analysis and populate sets.
-  void analyze();
+  void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
 public:
-  explicit DifferentiableActivityInfo(SILFunction &f);
+  explicit DifferentiableActivityInfo(SILFunction &f,
+                                      DominanceInfo *di,
+                                      PostDominanceInfo *pdi);
 
   bool isIndependent(SILValue value,
                      const SILAutoDiffIndices &indices) const;
@@ -1428,74 +1431,29 @@ public:
 std::unique_ptr<DifferentiableActivityInfo>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  return llvm::make_unique<DifferentiableActivityInfo>(*f);
+  assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
+  return llvm::make_unique<DifferentiableActivityInfo>(
+      *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }
 
 void DifferentiableActivityAnalysis::initialize(SILPassManager *pm) {
   dominanceAnalysis = pm->getAnalysis<DominanceAnalysis>();
+  postDominanceAnalysis = pm->getAnalysis<PostDominanceAnalysis>();
 }
 
 SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
   return new DifferentiableActivityAnalysis();
 }
 
-DifferentiableActivityInfo::DifferentiableActivityInfo(SILFunction &f)
+DifferentiableActivityInfo::DifferentiableActivityInfo(SILFunction &f,
+                                                       DominanceInfo *di,
+                                                       PostDominanceInfo *pdi)
     : function(f) {
-  analyze();
+  analyze(di, pdi);
 }
 
-/// Recursively find all "varied" values relative to the given value.
-///
-/// NOTE: The given value will **not** be considered varied.
-static void collectVariedValues(SILValue value,
-                                SmallDenseSet<SILValue> &variedValues,
-                                unsigned inputIndex,
-                                SmallDenseSet<SILValue> &visited) {
-  auto insertion = visited.insert(value);
-  if (!insertion.second)
-    return;
-  for (auto use : value->getUses()) {
-    auto *inst = use->getUser();
-    // If there's a `store` of this value, we consider the destination varied.
-    if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
-      SILValue buffer = storeInst->getDest();
-      // If the def is `begin_access`, then its operand is the actual buffer.
-      if (auto *def = dyn_cast_or_null<BeginAccessInst>(
-              buffer->getDefiningInstruction()))
-        buffer = def->getOperand();
-      LLVM_DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
-                                    << buffer << '\n');
-      variedValues.insert(buffer);
-      visited.insert(buffer);
-      collectVariedValues(buffer, variedValues, inputIndex, visited);
-      continue;
-    }
-    // For other instructions, consider their results varied.
-    for (auto val : inst->getResults()) {
-      LLVM_DEBUG(getADDebugStream() << "VARIED @ " << inputIndex << ":\n"
-                                    << val << '\n');
-      variedValues.insert(val);
-      // Recursively collect.
-      collectVariedValues(val, variedValues, inputIndex, visited);
-    }
-  }
-}
-
-/// Recursively find all "useful" values relative to the given value.
-///
-/// NOTE: The given value will be considered useful.
-static void collectUsefulValues(SILValue value,
-                                SmallDenseSet<SILValue> &usefulValues,
-                                unsigned outputIndex) {
-  LLVM_DEBUG(getADDebugStream() << "USEFUL @ " << outputIndex << ":\n"
-                                << value << '\n');
-  usefulValues.insert(value);
-  if (auto *def = value->getDefiningInstruction())
-    for (auto &op : def->getAllOperands())
-      collectUsefulValues(op.get(), usefulValues, outputIndex);
-}
-
-void DifferentiableActivityInfo::analyze() {
+void DifferentiableActivityInfo::analyze(DominanceInfo *di,
+                                         PostDominanceInfo *pdi) {
   LLVM_DEBUG(getADDebugStream()
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
@@ -1517,19 +1475,38 @@ void DifferentiableActivityInfo::analyze() {
     for (auto val : outputValues)
       s << val << '\n';
   });
-  // Initialize sets to store useful values and varied values.
-  usefulValueSets.append(outputValues.size(), {});
-  variedValueSets.append(inputValues.size(), {});
-  // Mark varied values for each independent varible.
-  for (auto valAndIdx : enumerate(inputValues)) {
-    SmallDenseSet<SILValue> visitedVariedValues;
-    collectVariedValues(valAndIdx.first, variedValueSets[valAndIdx.second],
-                        valAndIdx.second, visitedVariedValues);
+
+  // Mark inputs as varied.
+  assert(variedValueSets.empty());
+  for (auto input : inputValues)
+    variedValueSets.push_back({input});
+  // Propagate varied-ness through the function in dominance order.
+  DominanceOrder domOrder(function.getEntryBlock(), di);
+  while (auto *block = domOrder.getNext()) {
+    for (auto &inst : *block)
+      for (auto &op : inst.getAllOperands())
+        for (auto i : indices(inputValues))
+          if (isVaried(op.get(), i))
+            for (auto result : inst.getResults())
+              variedValueSets[i].insert(result);
+    domOrder.pushChildren(block);
   }
-  // Mark useful values for each dependent variable.
-  for (auto valAndIdx : enumerate(outputValues))
-    collectUsefulValues(valAndIdx.first, usefulValueSets[valAndIdx.second],
-                        valAndIdx.second);
+
+  // Mark outputs as useful.
+  assert(usefulValueSets.empty());
+  for (auto output : outputValues)
+    usefulValueSets.push_back({output});
+  // Propagate usefulness through the function in post-dominance order.
+  PostDominanceOrder postDomOrder(&*function.findReturnBB(), pdi);
+  while (auto *block = postDomOrder.getNext()) {
+    for (auto &inst : reversed(*block))
+      for (auto result : inst.getResults())
+        for (auto i : indices(outputValues))
+          if (isUseful(result, i))
+            for (auto &op : inst.getAllOperands())
+              usefulValueSets[i].insert(op.get());
+    postDomOrder.pushChildren(block);
+  }
 }
 
 bool DifferentiableActivityInfo::isIndependent(
