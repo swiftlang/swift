@@ -23,8 +23,8 @@ using namespace swift;
 //                           Alias Analysis Result
 //===----------------------------------------------------------------------===//
 
-static ModRefInfo getConservativeModRefForKind(const llvm::Instruction &I) {
-  switch (classifyInstruction(I)) {
+static ModRefInfo getConservativeModRefForKind(const llvm::CallBase &Call) {
+  switch (classifyInstruction(Call)) {
 #define KIND(Name, MemBehavior) case RT_ ## Name: return ModRefInfo:: MemBehavior;
 #include "LLVMSwift.def"
   }
@@ -32,17 +32,16 @@ static ModRefInfo getConservativeModRefForKind(const llvm::Instruction &I) {
   llvm_unreachable("Not a valid Instruction.");
 }
 
-ModRefInfo SwiftAAResult::getModRefInfo(llvm::ImmutableCallSite CS,
+ModRefInfo SwiftAAResult::getModRefInfo(llvm::CallBase *Call,
                                         const llvm::MemoryLocation &Loc) {
   // We know at compile time that certain entry points do not modify any
   // compiler-visible state ever. Quickly check if we have one of those
   // instructions and return if so.
-  if (ModRefInfo::NoModRef ==
-      getConservativeModRefForKind(*CS.getInstruction()))
+  if (ModRefInfo::NoModRef == getConservativeModRefForKind(*Call))
     return ModRefInfo::NoModRef;
 
   // Otherwise, delegate to the rest of the AA ModRefInfo machinery.
-  return AAResultBase::getModRefInfo(CS, Loc);
+  return AAResultBase::getModRefInfo(Call, Loc);
 }
 
 //===----------------------------------------------------------------------===//
