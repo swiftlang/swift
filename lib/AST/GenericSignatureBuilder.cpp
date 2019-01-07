@@ -6840,7 +6840,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
           // Put invalid locations after valid ones.
           if (locA.isInvalid() || locB.isInvalid()) {
             if (locA.isInvalid() != locB.isInvalid())
-              return locA.isInvalid() ? 1 : -1;
+              return locA.isValid() ? 1 : -1;
 
             return 0;
           }
