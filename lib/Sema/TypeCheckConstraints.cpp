@@ -2029,8 +2029,7 @@ public:
             [](const std::pair<ConstraintLocator *, ProtocolConformanceRef>
                    &conformance) -> bool {
               auto &ref = conformance.second;
-              return ref.isConcrete() && (ref.getConcrete()->isInvalid() ||
-                                          ref.getConcrete()->isIncomplete());
+              return ref.isConcrete() && ref.getConcrete()->isInvalid();
             }))
       return;
 
