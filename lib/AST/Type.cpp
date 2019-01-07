@@ -853,7 +853,6 @@ Type TypeBase::getMetatypeInstanceType() {
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
-  // For mutable value type methods, we need to dig through inout types.
   return this;
 }
 
