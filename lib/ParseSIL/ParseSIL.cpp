@@ -5952,8 +5952,11 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       // SWIFT_ENABLE_TENSORFLOW
       for (auto &attr : DiffAttrs) {
+        // Resolve where clause requirements.
+        // If no where clause, continue.
+        if (!attr->getWhereClause())
+          continue;
         SmallVector<Requirement, 2> requirements;
-        // Resolve types and convert requirements.
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
