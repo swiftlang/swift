@@ -886,12 +886,12 @@ public extension TensorFlowScalar {
 extension Tensor : Equatable where Scalar : Equatable {
   @inlinable @inline(__always)
   public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsEqual(rhs).all()
+    return (lhs .== rhs).all()
   }
 
   @inlinable @inline(__always)
   public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsNotEqual(rhs).any()
+    return (lhs .== rhs).any()
   }
 }
 

@@ -238,7 +238,7 @@ TensorTests.testAllBackends("Concatenation") {
 TensorTests.test("EwiseComparison") {
   let x = Tensor<Float>([0, 1, 2])
   let y = Tensor<Float>([2, 1, 3])
-  expectEqual(x.elementsLess(y).scalars, [true, false, true])
+  expectEqual((x .< y).scalars, [true, false, true])
 }
 
 TensorTests.test("LexicographicalComparison") {

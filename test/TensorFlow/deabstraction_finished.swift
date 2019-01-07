@@ -199,7 +199,7 @@ public func testShapeList2() {
 
 @TensorFlowGraph
 func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
-  return x.elementsEqual(Tensor<Float>(0));
+  return x .== Tensor<Float>(0)
 }
 
 public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Bool>) {
