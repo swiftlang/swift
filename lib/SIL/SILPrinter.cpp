@@ -3219,7 +3219,7 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
          return;
       }
       // Use GenericEnvironment to produce user-friendly
-      // names instead of something like t_0_0.
+      // names instead of something like 't_0_0'.
       auto FirstTy = genericEnv->getSugaredType(req.getFirstType());
       if (req.getKind() != RequirementKind::Layout) {
         auto SecondTy =

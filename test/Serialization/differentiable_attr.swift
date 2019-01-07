@@ -98,11 +98,8 @@ func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
 
-/*
-// FIXME: 'where' clauses don't show up after round-trip serialization/deserialization.
-
-// HECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
-// HECK-DAG: func testWhereClause<T : Numeric>(x: T) -> T {
+// CHECK-DAG: @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
+// CHECK-DAG: func testWhereClause<T>(x: T) -> T where T : Numeric
 @differentiable(vjp: vjpTestWhereClause where T : Differentiable)
 func testWhereClause<T : Numeric>(x: T) -> T {
   return x
@@ -115,8 +112,8 @@ func vjpTestWhereClause<T>(x: T) -> (T, (T.CotangentVector) -> T.CotangentVector
 
 protocol P {}
 extension P {
-  // HECK-DAG: @differentiable(wrt: (self), vjp: vjpTestWhereClause where Self : Differentiable)
-  // HECK-DAG: func testWhereClause() -> Self {
+  // CHECK-DAG: @differentiable(wrt: (self), vjp: vjpTestWhereClause where Self : Differentiable)
+  // CHECK-DAG: func testWhereClause() -> Self
   @differentiable(wrt: (self), vjp: vjpTestWhereClause where Self : Differentiable)
   func testWhereClause() -> Self {
     return self
@@ -127,7 +124,6 @@ extension P where Self : Differentiable {
     return (self, { v in v })
   }
 }
-*/
 
 /*
 // NOTE: The failing tests involve where clauses with member type constraints.

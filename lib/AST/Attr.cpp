@@ -1054,8 +1054,10 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
-  std::copy(parameters.begin(), parameters.end(), getParametersData());
+    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause),
+    NumRequirements(clause ? clause->getRequirements().size() : 0) {
+  std::copy(parameters.begin(), parameters.end(),
+            getTrailingObjects<AutoDiffParameter>());
 }
 
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
@@ -1068,8 +1070,12 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    JVP(std::move(jvp)), VJP(std::move(vjp)) {
-  std::copy(parameters.begin(), parameters.end(), getParametersData());
+    JVP(std::move(jvp)), VJP(std::move(vjp)),
+    NumRequirements(requirements.size()) {
+  std::copy(parameters.begin(), parameters.end(),
+            getTrailingObjects<AutoDiffParameter>());
+  std::copy(requirements.begin(), requirements.end(),
+            getTrailingObjects<Requirement>());
 }
 
 DifferentiableAttr *
@@ -1081,11 +1087,8 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            TrailingWhereClause *clause) {
-  unsigned numParams = parameters.size();
-  unsigned size = sizeof(DifferentiableAttr) +
-      numParams * sizeof(AutoDiffParameter);
-  if (clause)
-    size += clause->getRequirements().size() * sizeof(Requirement);
+  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
+      parameters.size(), clause ? clause->getRequirements().size() : 0);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
                                       std::move(primal), std::move(adjoint),
@@ -1101,10 +1104,8 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            ArrayRef<Requirement> requirements) {
-  unsigned numParams = parameters.size();
-  unsigned size = sizeof(DifferentiableAttr) +
-      numParams * sizeof(AutoDiffParameter) +
-      requirements.size() * sizeof(Requirement);
+  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
+      parameters.size(), requirements.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
                                       std::move(primal), std::move(adjoint),
@@ -1112,25 +1113,13 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                                       requirements);
 }
 
-ArrayRef<AutoDiffParameter>
-DifferentiableAttr::getParameters() const {
-  return const_cast<DifferentiableAttr *>(this)->getParameters();
-}
-
-ArrayRef<Requirement>
-DifferentiableAttr::getRequirements() const {
-  return const_cast<DifferentiableAttr *>(this)->getRequirements();
-}
-
 void DifferentiableAttr::setRequirements(ASTContext &ctx,
                                          ArrayRef<Requirement> requirements) {
-  unsigned numClauseRequirements =
-      WhereClause ? WhereClause->getRequirements().size() : 0;
-  assert(requirements.size() <= numClauseRequirements &&
-         "Requirements size must not exceed number of requirements used for "
-         "allocation");
-  NumRequirements = numClauseRequirements;
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+  assert(requirements.size() <= NumRequirements &&
+         "Requirements size must not exceed number of allocated requirements");
+  NumRequirements = requirements.size();
+  std::copy(requirements.begin(), requirements.end(),
+            getTrailingObjects<Requirement>());
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

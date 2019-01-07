@@ -1314,13 +1314,18 @@ public:
 /// For example:
 ///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
 ///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
-class DifferentiableAttr : public DeclAttribute {
+class DifferentiableAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DifferentiableAttr, AutoDiffParameter,
+                                    Requirement> {
 public:
   struct DeclNameWithLoc {
     DeclName Name;
     DeclNameLoc Loc;
   };
 private:
+  friend TrailingObjects;
+
   /// The number of parameters specified in 'wrt:'.
   unsigned NumParameters;
   /// The primal function.
@@ -1350,12 +1355,6 @@ private:
   /// The number of requirements in the trailing where clause, to be resolved
   /// by the type checker.
   unsigned NumRequirements = 0;
-  /// The requirements of the trailing where clause, to be resolved by the type
-  /// checker.
-  MutableArrayRef<Requirement> Requirements;
-  /// The generic environment of the trailing where clause, to be resolved by
-  /// the type checker.
-  GenericEnvironment *WhereClauseGenericEnvironment = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                               ArrayRef<AutoDiffParameter> parameters,
@@ -1404,32 +1403,29 @@ public:
     CheckedParameterIndices = pi;
   }
 
-  AutoDiffParameter *getParametersData() {
-    return reinterpret_cast<AutoDiffParameter *>(this+1);
-  }
-
   /// The differentiation parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
-  ArrayRef<AutoDiffParameter> getParameters() const;
-  MutableArrayRef<AutoDiffParameter> getParameters() {
-    return { getParametersData(), NumParameters };
+  ArrayRef<AutoDiffParameter> getParameters() const {
+    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
   }
+  MutableArrayRef<AutoDiffParameter> getParameters() {
+    return { getTrailingObjects<AutoDiffParameter>(), NumParameters };
+  }
+  size_t numTrailingObjects(OverloadToken<AutoDiffParameter>) const {
+    return NumParameters;
+ }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  Requirement *getRequirementsData() {
-    return reinterpret_cast<Requirement *>(getParametersData()+NumParameters);
+  ArrayRef<Requirement> getRequirements() const {
+    return { getTrailingObjects<Requirement>(), NumRequirements };
   }
-  ArrayRef<Requirement> getRequirements() const;
   MutableArrayRef<Requirement> getRequirements() {
-    return { getRequirementsData(), NumRequirements };
+    return { getTrailingObjects<Requirement>(), NumRequirements };
   }
   void setRequirements(ASTContext &ctx, ArrayRef<Requirement> requirements);
-  GenericEnvironment *getWhereClauseGenericEnvironment() {
-    return WhereClauseGenericEnvironment;
-  }
-  void setWhereClauseGenericEnvironment(GenericEnvironment *genEnv) {
-    WhereClauseGenericEnvironment = genEnv;
+  size_t numTrailingObjects(OverloadToken<Requirement>) const {
+    return NumRequirements;
   }
 
   FuncDecl *getPrimalFunction() const { return PrimalFunction; }
