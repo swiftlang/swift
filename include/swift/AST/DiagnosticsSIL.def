@@ -376,6 +376,8 @@ ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
 ERROR(autodiff_property_not_differentiable,none,
       "property is not differentiable", ())
+ERROR(autodiff_expression_is_not_differentiable_error,none,
+      "expression is not differentiable", ())
 NOTE(autodiff_function_generic_functions_unsupported,none,
      "differentiating generic functions is not supported yet", ())
 NOTE(autodiff_value_defined_here,none,
