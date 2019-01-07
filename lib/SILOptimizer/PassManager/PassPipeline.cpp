@@ -415,6 +415,7 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P,
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionElimination();
+  P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
   // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
