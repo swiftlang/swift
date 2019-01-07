@@ -37,6 +37,9 @@ enum class AvailabilitySpecKind {
 
     /// A language-version constraint of the form "swift X.Y.Z"
     LanguageVersionConstraint,
+
+    /// A PackageDescription version constraint of the form "_PackageDescription X.Y.Z"
+    PackageDescriptionVersionConstraint,
 };
 
 /// The root class for specifications of API availability in availability
@@ -101,22 +104,27 @@ public:
 };
 
 /// An availability specification that guards execution based on the
-/// compile-time language version, e.g., swift >= 3.0.1.
-class LanguageVersionConstraintAvailabilitySpec : public AvailabilitySpec {
-  SourceLoc SwiftLoc;
+/// compile-time platform agnostic version, e.g., swift >= 3.0.1,
+/// package-description >= 4.0.
+class PlatformAgnosticVersionConstraintAvailabilitySpec : public AvailabilitySpec {
+  SourceLoc PlatformAgnosticNameLoc;
 
   llvm::VersionTuple Version;
   SourceRange VersionSrcRange;
 
 public:
-  LanguageVersionConstraintAvailabilitySpec(SourceLoc SwiftLoc,
-                                            llvm::VersionTuple Version,
-                                            SourceRange VersionSrcRange)
-    : AvailabilitySpec(AvailabilitySpecKind::LanguageVersionConstraint),
-      SwiftLoc(SwiftLoc), Version(Version),
-      VersionSrcRange(VersionSrcRange) {}
+  PlatformAgnosticVersionConstraintAvailabilitySpec(
+      AvailabilitySpecKind AvailabilitySpecKind,
+      SourceLoc PlatformAgnosticNameLoc, llvm::VersionTuple Version,
+      SourceRange VersionSrcRange)
+      : AvailabilitySpec(AvailabilitySpecKind),
+        PlatformAgnosticNameLoc(PlatformAgnosticNameLoc), Version(Version),
+        VersionSrcRange(VersionSrcRange) {
+    assert(AvailabilitySpecKind == AvailabilitySpecKind::LanguageVersionConstraint ||
+           AvailabilitySpecKind == AvailabilitySpecKind::PackageDescriptionVersionConstraint);
+  }
 
-  SourceLoc getSwiftLoc() const { return SwiftLoc; }
+  SourceLoc getPlatformAgnosticNameLoc() const { return PlatformAgnosticNameLoc; }
 
   // The platform version to compare against.
   llvm::VersionTuple getVersion() const { return Version; }
@@ -124,15 +132,20 @@ public:
 
   SourceRange getSourceRange() const;
 
+  bool isLanguageVersionSpecific() const {
+      return getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
+  }
+
   void print(raw_ostream &OS, unsigned Indent) const;
 
   static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
+    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint ||
+      Spec->getKind() == AvailabilitySpecKind::PackageDescriptionVersionConstraint;
   }
 
   void *
   operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(LanguageVersionConstraintAvailabilitySpec)){
+               unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };

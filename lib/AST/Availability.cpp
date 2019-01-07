@@ -134,7 +134,8 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
     if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx) ||
-        AvailAttr->isLanguageVersionSpecific()) {
+        AvailAttr->isLanguageVersionSpecific() ||
+        AvailAttr->isPackageDescriptionVersionSpecific()) {
       continue;
     }
 
