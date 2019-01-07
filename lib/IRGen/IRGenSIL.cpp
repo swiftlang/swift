@@ -3519,7 +3519,7 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-
+  
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
 
