@@ -313,9 +313,9 @@ internal final class _DataStorage {
     @inlinable
     func append(_ otherData: Data) {
         guard otherData.count > 0 else { return }
-        otherData.withUnsafeBytes {
-        append($0.baseAddress!, length: $0.count)
-    }
+        otherData.withContiguousUnsafeBytes {
+            append($0.baseAddress!, length: $0.count)
+        }
     }
     
     @inlinable
@@ -1950,7 +1950,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inlinable
     public init(repeating repeatedValue: UInt8, count: Int) {
         self.init(count: count)
-        withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) -> Void in
+        withContiguousUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) -> Void in
             memset(buffer.baseAddress, Int32(repeatedValue), buffer.count)
         }
     }
@@ -2074,7 +2074,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public init<S: Sequence>(_ elements: S) where S.Element == UInt8 {
         // If the sequence is already contiguous, access the underlying raw memory directly.
         if let contiguous = elements as? ContiguousBytes {
-            _representation = contiguous.withUnsafeBytes { return _Representation($0) }
+            _representation = contiguous.withContiguousUnsafeBytes { return _Representation($0) }
             return
         }
 
@@ -2161,7 +2161,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Access the bytes in the data.
     ///
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    @available(swift, deprecated: 5, message: "use `withUnsafeBytes<R>(_: (UnsafeRawBufferPointer) throws -> R) rethrows -> R` instead")
+    @available(swift, deprecated: 5, message: "use `withContiguousUnsafeBytes<R>(_: (UnsafeRawBufferPointer) throws -> R) rethrows -> R` instead")
     public func withUnsafeBytes<ResultType, ContentType>(_ body: (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeBytes {
             return try body($0.baseAddress?.assumingMemoryBound(to: ContentType.self) ?? UnsafePointer<ContentType>(bitPattern: 0xBAD0)!)
@@ -2169,7 +2169,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     @inlinable
-    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+    public func withContiguousUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeBytes(body)
     }
 
@@ -2177,7 +2177,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// This function assumes that you are mutating the contents.
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    @available(swift, deprecated: 5, message: "use `withUnsafeMutableBytes<R>(_: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R` instead")
+    @available(swift, deprecated: 5, message: "use `withContiguousUnsafeMutableBytes<R>(_: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R` instead")
     public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeMutableBytes {
             return try body($0.baseAddress?.assumingMemoryBound(to: ContentType.self) ?? UnsafeMutablePointer<ContentType>(bitPattern: 0xBAD0)!)
@@ -2185,7 +2185,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
 
     @inlinable
-    public mutating func withUnsafeMutableBytes<ResultType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+    public mutating func withContiguousUnsafeMutableBytes<ResultType>(_ body: (UnsafeMutableRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
         return try _representation.withUnsafeMutableBytes(body)
     }
     
@@ -2334,7 +2334,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inlinable
     public mutating func append(_ other: Data) {
         guard other.count > 0 else { return }
-        other.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+        other.withContiguousUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             _representation.append(contentsOf: buffer)
         }
     }
@@ -2358,7 +2358,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func append<S: Sequence>(contentsOf elements: S) where S.Element == Element {
         // If the sequence is already contiguous, access the underlying raw memory directly.
         if let contiguous = elements as? ContiguousBytes {
-            contiguous.withUnsafeBytes {
+            contiguous.withContiguousUnsafeBytes {
                 _representation.append(contentsOf: $0)
             }
 
@@ -2420,7 +2420,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter data: The replacement data.
     @inlinable
     public mutating func replaceSubrange(_ subrange: Range<Index>, with data: Data) {
-        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+        data.withContiguousUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             _representation.replaceSubrange(subrange, with: buffer.baseAddress, count: buffer.count)
         }
     }
@@ -2474,7 +2474,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         let slice = self[range]
 
-        return slice.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Data in
+        return slice.withContiguousUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Data in
             return Data(bytes: buffer.baseAddress!, count: buffer.count)
         }
     }
@@ -2517,7 +2517,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public func advanced(by amount: Int) -> Data {
         let length = count - amount
         precondition(length > 0)
-        return withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> Data in
+        return withContiguousUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> Data in
             return Data(bytes: ptr.baseAddress!.advanced(by: amount), count: length)
         }
     }
@@ -2612,7 +2612,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         guard !isEmpty else { return (makeIterator(), buffer.startIndex) }
         let cnt = Swift.min(count, buffer.count)
         
-        withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+        withContiguousUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             _ = memcpy(UnsafeMutableRawPointer(buffer.baseAddress), bytes.baseAddress, cnt)
         }
         
@@ -2693,10 +2693,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         set { fatalError() }
     }
     
-    @available(*, unavailable, message: "use withUnsafeBytes instead")
+    @available(*, unavailable, message: "use withContiguousUnsafeBytes instead")
     public var bytes: UnsafeRawPointer { fatalError() }
     
-    @available(*, unavailable, message: "use withUnsafeMutableBytes instead")
+    @available(*, unavailable, message: "use withContiguousUnsafeMutableBytes instead")
     public var mutableBytes: UnsafeMutableRawPointer { fatalError() }
     
     /// Returns `true` if the two `Data` arguments are equal.
@@ -2707,8 +2707,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             return false
         }
         if length1 > 0 {
-            return d1.withUnsafeBytes { (b1: UnsafeRawBufferPointer) in
-                return d2.withUnsafeBytes { (b2: UnsafeRawBufferPointer) in
+            return d1.withContiguousUnsafeBytes { (b1: UnsafeRawBufferPointer) in
+                return d2.withContiguousUnsafeBytes { (b2: UnsafeRawBufferPointer) in
                     return memcmp(b1.baseAddress!, b2.baseAddress!, b2.count) == 0
                 }
             }
@@ -2734,7 +2734,7 @@ extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomRe
         var children: [(label: String?, value: Any)] = []
         children.append((label: "count", value: nBytes))
         
-        self.withUnsafeBytes { (bytes : UnsafeRawBufferPointer) in
+        withContiguousUnsafeBytes { (bytes : UnsafeRawBufferPointer) in
             children.append((label: "pointer", value: bytes.baseAddress!))
         }
         
@@ -2816,7 +2816,7 @@ extension Data : Codable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.unkeyedContainer()
-        try withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+        try withContiguousUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             try container.encode(contentsOf: buffer)
         }
     }

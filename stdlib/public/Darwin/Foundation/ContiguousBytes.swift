@@ -21,32 +21,55 @@ public protocol ContiguousBytes {
     ///         the same buffer pointer will be passed in every time.
     /// - warning: The buffer argument to the body should not be stored or used
     ///            outside of the lifetime of the call to the closure.
-    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+    func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
+}
+
+extension Data {
+    @inlinable
+    @available(swift, introduced: 5)
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        return try withContiguousUnsafeBytes(body)
+    }
 }
 
 //===--- Collection Conformances ------------------------------------------===//
 
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
-extension Array : ContiguousBytes where Element == UInt8 { }
+extension Array : ContiguousBytes where Element == UInt8 {
+    @inlinable
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        return try withUnsafeBytes(body)
+    }
+}
 
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
-extension ArraySlice : ContiguousBytes where Element == UInt8 { }
+extension ArraySlice : ContiguousBytes where Element == UInt8 {
+    @inlinable
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        return try withUnsafeBytes(body)
+    }
+}
 
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
-extension ContiguousArray : ContiguousBytes where Element == UInt8 { }
+extension ContiguousArray : ContiguousBytes where Element == UInt8 {
+    @inlinable
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        return try withUnsafeBytes(body)
+    }
+}
 
 //===--- Pointer Conformances ---------------------------------------------===//
 
 extension UnsafeRawBufferPointer : ContiguousBytes {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         return try body(self)
     }
 }
 
 extension UnsafeMutableRawBufferPointer : ContiguousBytes {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         return try body(UnsafeRawBufferPointer(self))
     }
 }
@@ -54,7 +77,7 @@ extension UnsafeMutableRawBufferPointer : ContiguousBytes {
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
 extension UnsafeBufferPointer : ContiguousBytes where Element == UInt8 {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         return try body(UnsafeRawBufferPointer(self))
     }
 }
@@ -62,7 +85,7 @@ extension UnsafeBufferPointer : ContiguousBytes where Element == UInt8 {
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
 extension UnsafeMutableBufferPointer : ContiguousBytes where Element == UInt8 {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         return try body(UnsafeRawBufferPointer(self))
     }
 }
@@ -70,7 +93,7 @@ extension UnsafeMutableBufferPointer : ContiguousBytes where Element == UInt8 {
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
 extension EmptyCollection : ContiguousBytes where Element == UInt8 {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         return try body(UnsafeRawBufferPointer(start: nil, count: 0))
     }
 }
@@ -78,7 +101,7 @@ extension EmptyCollection : ContiguousBytes where Element == UInt8 {
 // FIXME: When possible, expand conformance to `where Element : Trivial`.
 extension CollectionOfOne : ContiguousBytes where Element == UInt8 {
     @inlinable
-    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+    public func withContiguousUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         let element = self.first!
         return try Swift.withUnsafeBytes(of: element) {
             return try body($0)
@@ -89,9 +112,9 @@ extension CollectionOfOne : ContiguousBytes where Element == UInt8 {
 //===--- Conditional Conformances -----------------------------------------===//
 
 extension Slice : ContiguousBytes where Base : ContiguousBytes {
-    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+    public func withContiguousUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
         let offset = base.distance(from: base.startIndex, to: self.startIndex)
-        return try base.withUnsafeBytes { ptr in
+        return try base.withContiguousUnsafeBytes { ptr in
             let slicePtr = ptr.baseAddress?.advanced(by: offset)
             let sliceBuffer = UnsafeRawBufferPointer(start: slicePtr, count: self.count)
             return try body(sliceBuffer)

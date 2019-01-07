@@ -125,7 +125,7 @@ extension DataProtocol {
                 break
             }
 
-            region.withUnsafeBytes { buffer in
+            region.withContiguousUnsafeBytes { buffer in
                 let offsetPtr = UnsafeMutableRawBufferPointer(rebasing: ptr[offset...])
                 let buf = UnsafeRawBufferPointer(start: buffer.baseAddress, count: Swift.min(buffer.count, amountToCopy))
                 offsetPtr.copyMemory(from: buf)
@@ -206,7 +206,7 @@ extension DataProtocol where Self : ContiguousBytes {
         precondition(ptr.baseAddress != nil)
 
         let concreteRange = range.relative(to: self)
-        withUnsafeBytes { fullBuffer in
+        withContiguousUnsafeBytes { fullBuffer in
             let adv = distance(from: startIndex, to: concreteRange.lowerBound)
             let delta = distance(from: concreteRange.lowerBound, to: concreteRange.upperBound)
             memcpy(ptr.baseAddress!, fullBuffer.baseAddress?.advanced(by: adv), delta)

@@ -41,7 +41,7 @@ extension DispatchData : DataProtocol {
             return index + bytes.count
         }
 
-        public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+        public func withContiguousUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
             return try body(UnsafeRawBufferPointer(bytes))
         }
     }
