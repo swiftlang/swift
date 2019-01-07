@@ -71,7 +71,7 @@ public let StringHashing: [BenchmarkInfo] = [
 public let StringNormalization: [BenchmarkInfo] = [
 % for Name in NormalizationWorkloads:
   BenchmarkInfo(
-    name: "StringNormalization_${Name}",
+    name: "NormalizedIterator_${Name}",
     runFunction: run_StringNormalization_${Name},
     tags: [.validation, .String],
     setUpFunction: { blackHole(Workload_${Name}) }${legacyFactor(Name)}
