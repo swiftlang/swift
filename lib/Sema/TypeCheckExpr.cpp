@@ -658,6 +658,7 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
+  bool performLocalLookup = true;
 
   // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
   if (protocol ==
@@ -711,6 +712,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
                                    KnownProtocolKind::ExpressibleByArrayLiteral)){
     type = &ArrayLiteralType;
     name = "Array";
+    performLocalLookup = false;
   }
   // ExpressibleByDictionaryLiteral -> Dictionary
   else if (protocol == getProtocol(
@@ -718,6 +720,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
                          KnownProtocolKind::ExpressibleByDictionaryLiteral)) {
     type = &DictionaryLiteralType;
     name = "Dictionary";
+    performLocalLookup = false;
   }
   // _ExpressibleByColorLiteral -> _ColorLiteralType
   else if (protocol == getProtocol(
@@ -746,7 +749,8 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
 
   // If we haven't found the type yet, look for it now.
   if (!*type) {
-    *type = lookupDefaultLiteralType(*this, dc, name);
+    if (performLocalLookup)
+      *type = lookupDefaultLiteralType(*this, dc, name);
 
     if (!*type)
       *type = lookupDefaultLiteralType(*this, getStdlibModule(dc), name);
