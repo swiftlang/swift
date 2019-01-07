@@ -181,7 +181,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
     def test_gets_list_of_precommit_benchmarks(self):
         self.subprocess_mock.expect(
             '/benchmarks/Benchmark_O --list --delim=\t'.split(' '),
-            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n1\tBenchmark2\t[t3]\n')
+            '#\tTest\t[Tags]\n1\tBenchmark1\t[t1, t2]\n2\tBenchmark2\t[t3]\n')
         driver = BenchmarkDriver(
             self.args, _subprocess=self.subprocess_mock)
         self.subprocess_mock.assert_called_all_expected()
@@ -189,6 +189,8 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
                           ['Benchmark1', 'Benchmark2'])
         self.assertEquals(driver.all_tests,
                           ['Benchmark1', 'Benchmark2'])
+        self.assertEquals(driver.test_number['Benchmark1'], "1")
+        self.assertEquals(driver.test_number['Benchmark2'], "2")
 
     list_all_tests = (
         '/benchmarks/Benchmark_O --list --delim=\t --skip-tags='.split(' '),
