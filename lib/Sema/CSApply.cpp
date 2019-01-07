@@ -2563,37 +2563,40 @@ namespace {
                                          memberName,
                                          defaultMemberLookupOptions);
           
-          for (LookupResultEntry result : results) {
-            auto member = result.getValueDecl();
-            // Lookup returned nothing or the member is an instance member,
+          // Lookup didn't find anything, so return
+          if (results.empty()) {
+            return;
+          }
+          
+          if (auto member = results.front().getValueDecl()) {
+            // Lookup returned a member that is an instance member,
             // so return
-            if (!member && member->isInstanceMember()) {
-              break;
+            if (member->isInstanceMember()) {
+              return;
             }
             
             // Return if the member is an enum case w/ assoc values, as we only
             // care (for now) about cases with no assoc values (like none)
             if (auto EED = dyn_cast<EnumElementDecl>(member)) {
               if (EED->hasAssociatedValues()) {
-                break;
+                return;
               }
             }
             
             // Emit a diagnostic with some fixits
-            auto baseTypeName = baseTy->getCanonicalType().getString();
-            auto baseTypeNameUnwrapped = baseTyUnwrapped->getString();
+            auto baseTyName = baseTy->getCanonicalType().getString();
+            auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
             auto startLoc = DSCE->getStartLoc();
             
             tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                        baseTypeName, baseTypeNameUnwrapped, memberName.str());
+                        baseTyName, baseTyUnwrappedName, memberName.str());
             
             tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
               .fixItInsert(startLoc, "Optional");
             tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
-                        baseTypeNameUnwrapped, memberName.str())
-              .fixItInsert(startLoc, baseTypeNameUnwrapped);
-            break;
+                        baseTyUnwrappedName, memberName.str())
+              .fixItInsert(startLoc, baseTyUnwrappedName);
           }
         }
       }
