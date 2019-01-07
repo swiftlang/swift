@@ -984,6 +984,7 @@ extension ${Self}: ${SelfProtocol} {
   /// - Parameter base: The collection to wrap.
   ///
   /// - Complexity: O(1).
+  @inline(__always)
   @inlinable
   public init<C : ${SubProtocol}>(_ base: C) where C.Element == Element {
     // Traversal: ${Traversal}
