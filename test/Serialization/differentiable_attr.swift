@@ -1,5 +1,4 @@
 // SWIFT_ENABLE_TENSORFLOW
-// TODO: Handle trailing where clause in @differentiable attribute.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t

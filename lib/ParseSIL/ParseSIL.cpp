@@ -180,10 +180,8 @@ namespace {
                                 GenericEnvironment *GenericEnv = nullptr,
                                 DeclContext *DC = nullptr);
 
-    /*
     void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
                              SmallVectorImpl<Requirement> &To);
-     */
 
     ProtocolConformance *
     parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -195,10 +193,6 @@ namespace {
         : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
           TUState(*static_cast<SILParserTUState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
-
-    // SWIFT_ENABLE_TENSORFLOW
-    void convertRequirements(SILFunction *F, ArrayRef<RequirementRepr> From,
-                             SmallVectorImpl<Requirement> &To);
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
