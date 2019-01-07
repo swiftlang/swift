@@ -147,12 +147,17 @@ class BenchmarkDriver(object):
             test, num_samples, num_iters, sample_time,
             verbose, measure_memory, quantile)
         output = self._invoke(cmd)
-        result = self.parser.results_from_string(output).items()[0][1]
-        return result
+        results = self.parser.results_from_string(output)
+        return results.items()[0][1] if test else results
 
     def _cmd_run(self, test, num_samples, num_iters, sample_time,
                  verbose, measure_memory, quantile):
-        cmd = [self.test_harness, test]
+        cmd = [self.test_harness]
+        if test:
+            cmd.append(test)
+        else:
+            cmd.extend([self.test_number.get(name, name)
+                        for name in self.tests])
         if num_samples > 0:
             cmd.append('--num-samples={0}'.format(num_samples))
         if num_iters > 0:
@@ -206,7 +211,6 @@ class BenchmarkDriver(object):
         from this method. When `csv_console` is False, the console output
         format is justified columns.
         """
-
         format = (
             (lambda values: ','.join(values)) if csv_console else
             (lambda values: self.RESULT.format(*values)))  # justified columns

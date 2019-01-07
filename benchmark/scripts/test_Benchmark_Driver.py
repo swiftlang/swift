@@ -293,9 +293,29 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--verbose'))
 
+    def test_run_batch(self):
+        """Run all active tests in a single execution of the Benchmark_X.
+
+        Known test names are passed to the harness in a compressed form as test
+        numbers.
+        """
+        self.driver.tests = ['b1', 'bx']
+        self.driver.run()
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', '1', 'bx'))
+
     def test_parse_results_from_running_benchmarks(self):
-        self.driver.run('b')
+        """Parse measurements results using LogParser.
+
+        Individual test run returns the first PerformanceTestResult directly.
+        Batch run returns the dictionary of PerformanceTestResults.
+        """
+        r = self.driver.run('b')
         self.assertTrue(self.parser_stub.results_from_string_called)
+        self.assertEquals(r.name, 'b1')  # non-matching name, just 1st result
+        r = self.driver.run()
+        self.assertTrue(isinstance(r, dict))
+        self.assertEquals(r['b1'].name, 'b1')
 
     def test_measure_memory(self):
         self.driver.run('b', measure_memory=True)
