@@ -776,16 +776,12 @@ public:
   Type BaseTy;
   const DeclContext *DC;
   LazyResolver *TypeResolver;
-  bool IsTypeLookup = false;
 
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
-      : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
+      : BaseTy(BaseTy->getMetatypeInstanceType()),
+        DC(DC), TypeResolver(resolver) {
     assert(!BaseTy->hasLValueType());
-    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>()) {
-      BaseTy = MetaTy->getInstanceType();
-      IsTypeLookup = true;
-    }
     assert(DC && BaseTy);
   }
 
