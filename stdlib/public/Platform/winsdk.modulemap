@@ -54,6 +54,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // api-ms-win-core-Path-l1-0.dll
+    module path {
+      header "PathCch.h"
+      export *
+    }
+
     // api-ms-win-core-processthreads-l1-1-2.dll
     module processthreads {
       header "processthreadsapi.h"
@@ -79,5 +85,9 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  module Shell {
+    header "ShlObj.h"
+    export *
+  }
 }
 
