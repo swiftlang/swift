@@ -601,7 +601,40 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       printCommaIfNecessary();
       Printer << "vjp: " << vjp->Name;
     }
-    // FIXME: Print 'where' clause, if any.
+    // Print 'where' clause, if any.
+    if (!attr->getRequirements().empty()) {
+      Printer << " where ";
+      std::function<Type(Type)> getInterfaceType;
+      auto *original = dyn_cast<AbstractFunctionDecl>(D);
+      if (auto varDecl = dyn_cast<VarDecl>(D)) {
+        original = varDecl->getGetter();
+      }
+      if (!original || !original->getGenericEnvironment())
+        getInterfaceType = [](Type Ty) -> Type { return Ty; };
+      else {
+        // Use GenericEnvironment to produce user-friendly
+        // names instead of something like 't_0_0'.
+        auto *genericEnv = original->getGenericEnvironment();
+        assert(genericEnv);
+        getInterfaceType = [=](Type Ty) -> Type {
+          return genericEnv->getSugaredType(Ty);
+        };
+      }
+      interleave(attr->getRequirements(), [&](Requirement req) {
+        auto FirstTy = getInterfaceType(req.getFirstType());
+        if (req.getKind() != RequirementKind::Layout) {
+          auto SecondTy = getInterfaceType(req.getSecondType());
+          Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+          ReqWithDecls.print(Printer, Options);
+        } else {
+          Requirement ReqWithDecls(req.getKind(), FirstTy,
+          req.getLayoutConstraint());
+          ReqWithDecls.print(Printer, Options);
+        }
+      }, [&] {
+        Printer << ", ";
+      });
+    }
     Printer << ")";
     break;
   }
@@ -1021,8 +1054,28 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     NumParameters(parameters.size()),
     Primal(std::move(primal)), Adjoint(std::move(adjoint)),
-    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
-  std::copy(parameters.begin(), parameters.end(), getParametersData());
+    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause),
+    NumRequirements(clause ? clause->getRequirements().size() : 0) {
+  std::copy(parameters.begin(), parameters.end(),
+            getTrailingObjects<AutoDiffParameter>());
+}
+
+DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                                       ArrayRef<AutoDiffParameter> parameters,
+                                       Optional<DeclNameWithLoc> primal,
+                                       Optional<DeclNameWithLoc> adjoint,
+                                       Optional<DeclNameWithLoc> jvp,
+                                       Optional<DeclNameWithLoc> vjp,
+                                       ArrayRef<Requirement> requirements)
+  : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
+    NumParameters(parameters.size()),
+    Primal(std::move(primal)), Adjoint(std::move(adjoint)),
+    JVP(std::move(jvp)), VJP(std::move(vjp)),
+    NumRequirements(requirements.size()) {
+  std::copy(parameters.begin(), parameters.end(),
+            getTrailingObjects<AutoDiffParameter>());
+  std::copy(requirements.begin(), requirements.end(),
+            getTrailingObjects<Requirement>());
 }
 
 DifferentiableAttr *
@@ -1034,18 +1087,39 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            TrailingWhereClause *clause) {
-  unsigned numParams = parameters.size();
-  unsigned size = sizeof(DifferentiableAttr) +
-    numParams * sizeof(AutoDiffParameter);
+  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
+      parameters.size(), clause ? clause->getRequirements().size() : 0);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
                                       std::move(primal), std::move(adjoint),
                                       std::move(jvp), std::move(vjp), clause);
 }
 
-ArrayRef<AutoDiffParameter>
-DifferentiableAttr::getParameters() const {
-  return const_cast<DifferentiableAttr *>(this)->getParameters();
+DifferentiableAttr *
+DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
+                           SourceRange baseRange,
+                           ArrayRef<AutoDiffParameter> parameters,
+                           Optional<DeclNameWithLoc> primal,
+                           Optional<DeclNameWithLoc> adjoint,
+                           Optional<DeclNameWithLoc> jvp,
+                           Optional<DeclNameWithLoc> vjp,
+                           ArrayRef<Requirement> requirements) {
+  unsigned size = totalSizeToAlloc<AutoDiffParameter, Requirement>(
+      parameters.size(), requirements.size());
+  void *mem = context.Allocate(size, alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
+                                      std::move(primal), std::move(adjoint),
+                                      std::move(jvp), std::move(vjp),
+                                      requirements);
+}
+
+void DifferentiableAttr::setRequirements(ASTContext &ctx,
+                                         ArrayRef<Requirement> requirements) {
+  assert(requirements.size() <= NumRequirements &&
+         "Requirements size must not exceed number of allocated requirements");
+  NumRequirements = requirements.size();
+  std::copy(requirements.begin(), requirements.end(),
+            getTrailingObjects<Requirement>());
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

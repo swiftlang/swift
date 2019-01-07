@@ -647,9 +647,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       parametersBitVector[i] = parameters[i];
     SILAutoDiffIndices indices(source, parametersBitVector);
 
-    auto *attr = SILDifferentiableAttr::create(SILMod, indices, primalName,
-                                               adjointName, adjointIsPrimitive,
-                                               jvpName, vjpName);
+    SmallVector<Requirement, 8> requirements;
+    MF->readGenericRequirements(requirements, SILCursor);
+
+    auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements,
+                                               primalName, adjointName,
+                                               adjointIsPrimitive, jvpName,
+                                               vjpName);
     fn->addDifferentiableAttr(attr);
   }
 

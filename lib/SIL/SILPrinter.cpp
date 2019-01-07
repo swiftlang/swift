@@ -3207,6 +3207,34 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   if (!VJPName.empty()) {
     OS << " vjp @" << VJPName;
   }
+  if (!getRequirements().empty()) {
+    OS << " where ";
+    SILFunction *original = getOriginal();
+    assert(original);
+    auto genericEnv = original->getGenericEnvironment();
+    PrintOptions SubPrinter = PrintOptions::printSIL();
+    interleave(getRequirements(), [&](Requirement req) {
+      if (!genericEnv) {
+         req.print(OS, SubPrinter);
+         return;
+      }
+      // Use GenericEnvironment to produce user-friendly
+      // names instead of something like 't_0_0'.
+      auto FirstTy = genericEnv->getSugaredType(req.getFirstType());
+      if (req.getKind() != RequirementKind::Layout) {
+        auto SecondTy =
+        genericEnv->getSugaredType(req.getSecondType());
+        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+        ReqWithDecls.print(OS, SubPrinter);
+      } else {
+        Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                 req.getLayoutConstraint());
+        ReqWithDecls.print(OS, SubPrinter);
+      }
+    }, [&] {
+      OS << ", ";
+    });
+  }
 }
 
 //===----------------------------------------------------------------------===//

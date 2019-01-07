@@ -2552,6 +2552,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         uint64_t vjpNameId;
         DeclID vjpDeclId;
         ArrayRef<uint64_t> paramValues;
+        SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
             scratch, primalNameId, primalDeclId, adjointNameId, adjointDeclId,
@@ -2592,11 +2593,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
           parameters.push_back(parameter);
         }
         // TODO: Deserialize CheckedParameterIndices.
-        // TODO: Deserialize trailing where clause.
+        readGenericRequirements(requirements, DeclTypeCursor);
+
         auto diffAttr =
           DifferentiableAttr::create(ctx, loc, SourceRange(), parameters,
-                                     primal, adjoint, jvp, vjp,
-                                     /*TrailingWhereClause*/ nullptr);
+                                     primal, adjoint, jvp, vjp, requirements);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
         diffAttr->setJVPFunction(jvpDecl);

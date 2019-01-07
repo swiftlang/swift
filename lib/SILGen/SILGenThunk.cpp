@@ -247,6 +247,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef constant) {
       fd->getInterfaceType()->castTo<AnyFunctionType>());
   auto *SILDA = SILDifferentiableAttr::create(
       M, SILAutoDiffIndices(/*source*/ 0, loweredParamIndices),
+      /*requirements*/ DA->getRequirements(),
       /*primalName*/ StringRef(),
       /*adjointName*/ StringRef(),
       /*adjointIsPrimitive*/ false,

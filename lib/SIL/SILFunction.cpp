@@ -63,10 +63,26 @@ SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                       StringRef adjointName,
                       bool adjointIsPrimitive,
                       StringRef jvpName,
-                      StringRef vjpName)
+                      StringRef vjpName,
+                      TrailingWhereClause *whereClause)
   : indices(indices), PrimalName(primalName), AdjointName(adjointName),
-    AdjointIsPrimitive(adjointIsPrimitive), JVPName(jvpName), VJPName(vjpName)
-    {}
+    AdjointIsPrimitive(adjointIsPrimitive), JVPName(jvpName), VJPName(vjpName),
+    WhereClause(whereClause),
+    NumRequirements(whereClause ? whereClause->getRequirements().size() : 0) {}
+
+SILDifferentiableAttr::
+SILDifferentiableAttr(const SILAutoDiffIndices &indices,
+                      StringRef primalName,
+                      StringRef adjointName,
+                      bool adjointIsPrimitive,
+                      StringRef jvpName,
+                      StringRef vjpName,
+                      ArrayRef<Requirement> requirements)
+  : indices(indices), PrimalName(primalName), AdjointName(adjointName),
+    AdjointIsPrimitive(adjointIsPrimitive), JVPName(jvpName), VJPName(vjpName),
+    NumRequirements(requirements.size()) {
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+}
 
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
@@ -75,12 +91,50 @@ SILDifferentiableAttr::create(SILModule &M,
                               StringRef adjointName,
                               bool adjointIsPrimitive,
                               StringRef jvpName,
-                              StringRef vjpName) {
-  void *mem = M.allocate(sizeof(SILDifferentiableAttr),
-                         alignof(SILDifferentiableAttr));
+                              StringRef vjpName,
+                              TrailingWhereClause *whereClause) {
+  unsigned size = sizeof(SILDifferentiableAttr);
+  if (whereClause)
+    size += whereClause->getRequirements().size() * sizeof(Requirement);
+  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
   return ::new (mem)
       SILDifferentiableAttr(indices, primalName, adjointName,
-                            adjointIsPrimitive, jvpName, vjpName);
+                            adjointIsPrimitive, jvpName, vjpName,
+                            whereClause);
+}
+
+SILDifferentiableAttr *
+SILDifferentiableAttr::create(SILModule &M,
+                              const SILAutoDiffIndices &indices,
+                              ArrayRef<Requirement> requirements,
+                              StringRef primalName,
+                              StringRef adjointName,
+                              bool adjointIsPrimitive,
+                              StringRef jvpName,
+                              StringRef vjpName) {
+  unsigned size = sizeof(SILDifferentiableAttr) +
+      requirements.size() * sizeof(Requirement);
+  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
+  return ::new (mem)
+      SILDifferentiableAttr(indices, primalName, adjointName,
+                            adjointIsPrimitive, jvpName, vjpName,
+                            requirements);
+}
+
+void SILDifferentiableAttr::setRequirements(
+    ArrayRef<Requirement> requirements) {
+  unsigned numClauseRequirements =
+      WhereClause ? WhereClause->getRequirements().size() : 0;
+  assert(requirements.size() <= numClauseRequirements &&
+         "Requirements size must not exceed number of requirements used for "
+         "allocation");
+  NumRequirements = numClauseRequirements;
+  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+}
+
+void SILFunction::addDifferentiableAttr(SILDifferentiableAttr *attr) {
+  attr->Original = this;
+  DifferentiableAttrs.push_back(attr);
 }
 
 SILFunction *SILFunction::create(

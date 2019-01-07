@@ -773,7 +773,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       AFD->getInterfaceType()->castTo<AnyFunctionType>());
   SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
   silOriginalFn->addDifferentiableAttr(SILDifferentiableAttr::create(
-      M, indices, primName, adjName,
+      M, indices, diffAttr->getRequirements(), primName, adjName,
       /*primitive*/ hasPrimitiveAdjoint, jvpName, vjpName));
 }
 
