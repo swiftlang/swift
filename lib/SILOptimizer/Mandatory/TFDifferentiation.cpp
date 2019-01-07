@@ -4931,6 +4931,7 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
   SILFunction *parent = adfi->getFunction();
   auto origFnOperand = adfi->getOriginalFunction();
   SILBuilder builder(adfi);
+  auto loc = parent->getLocation();
 
   SmallVector<SILValue, 2> assocFns;
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
@@ -4953,10 +4954,11 @@ bool Differentiation::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi,
     assert(assocFnAndIndices->second == desiredIndices &&
            "FIXME: We could emit a thunk that converts the VJP to have the "
            "desired indices.");
+    auto assocFn = assocFnAndIndices->first;
+    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFnAndIndices->first);
   }
 
-  auto loc = parent->getLocation();
   auto *newADFI = builder.createAutoDiffFunction(
       loc, adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
       origFnOperand, assocFns);

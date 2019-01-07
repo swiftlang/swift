@@ -474,6 +474,8 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
     // Skip members with `@noDerivative`.
     if (member->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
+    // Add this member's corresponding vector space to the parent's vector space
+    // struct.
     auto memberAssocType = getVectorSpaceType(member, nominal, kind);
     auto newMember = new (C) VarDecl(
         member->isStatic(), member->getSpecifier(), member->isCaptureList(),
@@ -491,6 +493,24 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
     C.addSynthesizedDecl(newMember);
+
+    // Now that this member is in the associated vector space, it should be
+    // marked `@differentiable` so that the differentiation transform will
+    // synthesize associated functions for it. We only add this to public
+    // stored properties, because their access outside the module will go
+    // through a call to the getter.
+    if (member->getEffectiveAccess() > AccessLevel::Internal &&
+        !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      auto *diffableAttr = DifferentiableAttr::create(
+          C, SourceLoc(), SourceLoc(), ArrayRef<AutoDiffParameter>(), None,
+          None, None, None, nullptr);
+      member->getAttrs().add(diffableAttr);
+      auto *getterType =
+          member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
+      AutoDiffParameterIndicesBuilder builder(getterType);
+      builder.setParameter(0);
+      diffableAttr->setCheckedParameterIndices(builder.build(C));
+    }
   }
 
   // The implicit memberwise constructor must be explicitly created so that it

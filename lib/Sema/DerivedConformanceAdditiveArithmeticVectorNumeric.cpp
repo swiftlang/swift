@@ -158,9 +158,9 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->getType())
+    if (!v->hasInterfaceType() || !v->getType())
       C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->getType())
+    if (!v->hasInterfaceType() || !v->getType())
       return false;
     auto declType = v->getType()->hasArchetype()
                         ? v->getType()
