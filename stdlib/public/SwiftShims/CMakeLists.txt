@@ -64,7 +64,8 @@ foreach(input ${sources})
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_if_different"
         "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${input}")
+        "${output_dir}/${input}"
+      COMMENT "Copying ${input} to ${output_dir}")
   list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
