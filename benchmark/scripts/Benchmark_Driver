@@ -132,25 +132,30 @@ class BenchmarkDriver(object):
         return sorted(list(
             benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
 
-    def run(self, test, num_samples=None, num_iters=None,
-            verbose=None, measure_memory=False, quantile=None):
+    def run(self, test=None, num_samples=None, num_iters=None,
+            sample_time=None, verbose=None, measure_memory=False,
+            quantile=None):
         """Execute benchmark and gather results."""
         num_samples = num_samples or 0
         num_iters = num_iters or 0  # automatically determine N to run for 1s
+        sample_time = sample_time or 0  # default is 1s
 
         cmd = self._cmd_run(
-            test, num_samples, num_iters, verbose, measure_memory, quantile)
+            test, num_samples, num_iters, sample_time,
+            verbose, measure_memory, quantile)
         output = self._invoke(cmd)
         result = self.parser.results_from_string(output).items()[0][1]
         return result
 
-    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory,
-                 quantile):
+    def _cmd_run(self, test, num_samples, num_iters, sample_time,
+                 verbose, measure_memory, quantile):
         cmd = [self.test_harness, test]
         if num_samples > 0:
             cmd.append('--num-samples={0}'.format(num_samples))
         if num_iters > 0:
             cmd.append('--num-iters={0}'.format(num_iters))
+        if sample_time > 0:
+            cmd.append('--sample-time={0}'.format(sample_time))
         if verbose:
             cmd.append('--verbose')
         if measure_memory:

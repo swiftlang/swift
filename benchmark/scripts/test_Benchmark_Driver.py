@@ -281,6 +281,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--num-iters=1'))
 
+    def test_run_benchmark_for_specified_time(self):
+        self.driver.run('b', sample_time=0.5)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--sample-time=0.5'))
+
     def test_run_benchmark_in_verbose_mode(self):
         self.driver.run('b', verbose=True)
         self.subprocess_mock.assert_called_with(
