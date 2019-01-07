@@ -1851,12 +1851,11 @@ func testDeDuped(_ x: dedupS) {
   x#^PROTOCOL_EXT_DEDUP_1^#
 // FIXME: Should produce 3 items (?)
 
-// PROTOCOL_EXT_DEDUP_1: Begin completions, 6 items
+// PROTOCOL_EXT_DEDUP_1: Begin completions, 5 items
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
 // PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/Super:            .bar[#Int#]; name=bar
-// PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/Super:              [{#Self.T#}][#Self.T#]; name=[Self.T]
 // PROTOCOL_EXT_DEDUP_1: Keyword[self]/CurrNominal:          .self[#dedupS#]; name=self
 // PROTOCOL_EXT_DEDUP_1: End completions
 }
