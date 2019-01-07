@@ -763,17 +763,6 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 
 namespace {
 
-/// Hack to guess at whether substituting into the type of a declaration will
-/// be okay.
-/// FIXME: This is awful. We should either have Type::subst() work for
-/// GenericFunctionType, or we should kill it outright.
-static bool shouldSubstIntoDeclType(Type type) {
-  auto genericFnType = type->getAs<GenericFunctionType>();
-  if (!genericFnType) return true;
-
-  return false;
-}
-
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
@@ -865,8 +854,7 @@ public:
 
     auto FoundSignature = VD->getOverloadSignature();
     auto FoundSignatureType = VD->getOverloadSignatureType();
-    if (FoundSignatureType && shouldSubst &&
-        shouldSubstIntoDeclType(FoundSignatureType)) {
+    if (FoundSignatureType && shouldSubst) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
       if (auto CT = FoundSignatureType.subst(subs))
         FoundSignatureType = CT->getCanonicalType();
@@ -883,8 +871,7 @@ public:
 
       auto OtherSignature = OtherVD->getOverloadSignature();
       auto OtherSignatureType = OtherVD->getOverloadSignatureType();
-      if (OtherSignatureType && shouldSubst &&
-          shouldSubstIntoDeclType(OtherSignatureType)) {
+      if (OtherSignatureType && shouldSubst) {
         auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignatureType.subst(subs))
           OtherSignatureType = CT->getCanonicalType();
