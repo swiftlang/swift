@@ -262,6 +262,7 @@ SourceLoc WhereClauseOwner::getLoc() const {
   if (auto attr = source.dyn_cast<SpecializeAttr *>())
     return attr->getLocation();
 
+  // SWIFT_ENABLE_TENSORFLOW
   if (auto attr = source.dyn_cast<DifferentiableAttr *>())
     return attr->getLocation();
 
@@ -300,7 +301,7 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
-
+    
     return { };
   }
 
