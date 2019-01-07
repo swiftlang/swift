@@ -106,16 +106,16 @@ class BenchmarkDriver(object):
 
     def _get_tests(self):
         """Return a list of performance tests to run."""
-        index_name_pairs = [
+        number_name_pairs = [
             line.split('\t')[:2] for line in
             self._invoke(self._cmd_list_benchmarks).split('\n')[1:-1]
         ]
         # unzip list of pairs into 2 lists
-        indices, self.all_tests = map(list, zip(*index_name_pairs))
+        test_numbers, self.all_tests = map(list, zip(*number_name_pairs))
         if self.args.filters:
             return self._tests_matching_patterns()
         if self.args.benchmarks:
-            return self._tests_by_name_or_index(indices)
+            return self._tests_by_name_or_number(test_numbers)
         return self.all_tests
 
     def _tests_matching_patterns(self):
@@ -124,13 +124,14 @@ class BenchmarkDriver(object):
                                 for name in self.all_tests
                                 if pattern.match(name)])))
 
-    def _tests_by_name_or_index(self, indices):
+    def _tests_by_name_or_number(self, test_numbers):
         benchmarks = set(self.args.benchmarks)
-        index_to_name = dict(zip(indices, self.all_tests))
-        indexed_names = [index_to_name[i]
-                         for i in benchmarks.intersection(set(indices))]
-        return sorted(list(
-            benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
+        number_to_name = dict(zip(test_numbers, self.all_tests))
+        tests_by_number = [number_to_name[i]
+                           for i in benchmarks.intersection(set(test_numbers))]
+        return sorted(list(benchmarks
+                           .intersection(set(self.all_tests))
+                           .union(tests_by_number)))
 
     def run(self, test=None, num_samples=None, num_iters=None,
             sample_time=None, verbose=None, measure_memory=False,
