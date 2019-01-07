@@ -3519,9 +3519,13 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
 
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   const LoweredValue &calleeLV = getLoweredValue(site.getCallee());
-  
+
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  assert(!origCalleeType->isDifferentiable() && "Differentiable functions "
+         "should not reach here");
   
   auto args = site.getArguments();
   SILFunctionConventions origConv(origCalleeType, getSILModule());
