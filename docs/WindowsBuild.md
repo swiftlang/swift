@@ -88,10 +88,10 @@ VsDevCmd -arch=x86
   `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um` and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
 ```cmd
-mklink %UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap S:\swift\stdlib\public\Platform\ucrt.modulemap
-mklink %VCToolsInstallDir%\include\module.modulemap S:\swift\stdlib\public\Platform\visualc.modulemap
-mklink %VCToolsInstallDir%\include\visualc.apinotes S:\swift\stdlib\public\Platform\visualc.apinotes
-mklink %UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap S:\swift\stdlib\public\Platform\winsdk.modulemap
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
+mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\visualc.modulemap
+mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Platform\visualc.apinotes
+mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
 ```
 
 ### 5. Build CMark
