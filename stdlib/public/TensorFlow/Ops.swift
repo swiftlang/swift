@@ -40,6 +40,13 @@
 
 infix operator ++ : AdditionPrecedence
 
+infix operator .< : ComparisonPrecedence
+infix operator .<= : ComparisonPrecedence
+infix operator .>= : ComparisonPrecedence
+infix operator .> : ComparisonPrecedence
+infix operator .== : ComparisonPrecedence
+infix operator .!= : ComparisonPrecedence
+
 // TODO:
 // - Consider explicit broadcasting for elementwise binary ops when
 //   scalarization and rank getter are implemented.
@@ -104,6 +111,7 @@ extension Tensor : ShapedVectorNumeric where Scalar : Numeric {}
 extension Tensor : Differentiable where Scalar : FloatingPoint {
   public typealias TangentVector = Tensor
   public typealias CotangentVector = Tensor
+  @inlinable @inline(__always)
   public func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
   }
@@ -307,52 +315,96 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : Numeric & Comparable {
-  /// Computes `self < other` element-wise.
+  /// Computes `lhs < rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
   @inlinable @inline(__always)
-  func elementsLess(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.less(self, other)
+  static func .< (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.less(lhs, rhs)
   }
 
-  /// Computes `self < other`, broadcasting `other`.
+  /// Computes `lhs <= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
   @inlinable @inline(__always)
-  func elementsLess(_ other: Scalar) -> Tensor<Bool> {
-    return elementsLess(Tensor(other))
+  static func .<= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.lessEqual(lhs, rhs)
   }
 
-  /// Computes `self <= other` element-wise.
+  /// Computes `lhs > rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
   @inlinable @inline(__always)
-  func elementsLessOrEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.lessEqual(self, other)
+  static func .> (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.greater(lhs, rhs)
   }
 
-  /// Computes `self <= other`, broadcasting `other`.
+  /// Computes `lhs >= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
   @inlinable @inline(__always)
-  func elementsLessOrEqual(_ other: Scalar) -> Tensor<Bool> {
-    return elementsLessOrEqual(Tensor(other))
+  static func .>= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.greaterEqual(lhs, rhs)
   }
 
-  /// Computes `self > other` element-wise.
+  /// Computes `lhs < rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.<` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsGreater(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.greater(self, other)
+  static func .< (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.less(Tensor(lhs), rhs)
   }
 
-  /// Computes `self > other`, broadcasting `other`.
+  /// Computes `lhs <= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.<=` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsGreater(_ other: Scalar) -> Tensor<Bool> {
-    return elementsGreater(Tensor(other))
+  static func .<= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.lessEqual(Tensor(lhs), rhs)
   }
 
-  /// Computes `self >= other` element-wise.
+  /// Computes `lhs > rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.>` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsGreaterOrEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.greaterEqual(self, other)
+  static func .> (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.greater(Tensor(lhs), rhs)
   }
 
-  /// Computes `self >= other`, broadcasting `other`.
+  /// Computes `lhs >= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.>=` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsGreaterOrEqual(_ other: Scalar) -> Tensor<Bool> {
-    return elementsGreaterOrEqual(Tensor(other))
+  static func .>= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.greaterEqual(Tensor(lhs), rhs)
+  }
+
+  /// Computes `lhs < rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.<` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .< (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return Raw.less(lhs, Tensor(rhs))
+  }
+
+  /// Computes `lhs <= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.<=` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .<= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return Raw.lessEqual(lhs, Tensor(rhs))
+  }
+
+  /// Computes `lhs > rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.>` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .> (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return Raw.greater(lhs, Tensor(rhs))
+  }
+
+  /// Computes `lhs >= rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.>=` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .>= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return Raw.greaterEqual(lhs, Tensor(rhs))
   }
 }
 
@@ -361,28 +413,28 @@ extension Tensor : Comparable where Scalar : Numeric & Comparable {
   /// is lexicographically less than that of the second argument.
   @inlinable @inline(__always)
   public static func < (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsLess(rhs).all()
+    return (lhs .< rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically less than or equal to that of the second argument.
   @inlinable @inline(__always)
   public static func <= (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsLessOrEqual(rhs).all()
+    return (lhs .<= rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than that of the second argument.
   @inlinable @inline(__always)
   public static func > (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsGreater(rhs).all()
+    return (lhs .> rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than or equal to that of the second argument.
   @inlinable @inline(__always)
   public static func >= (lhs: Tensor, rhs: Tensor) -> Bool {
-    return lhs.elementsGreaterOrEqual(rhs).all()
+    return (lhs .>= rhs).all()
   }
 }
 
@@ -391,56 +443,78 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// is lexicographically less than that of the second argument.
   @inlinable @inline(__always)
   static func < (lhs: Tensor, rhs: Scalar) -> Bool {
-    return lhs.elementsLess(rhs).all()
+    return (lhs .< rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically less than or equal to that of the second argument.
   @inlinable @inline(__always)
   static func <= (lhs: Tensor, rhs: Scalar) -> Bool {
-    return lhs.elementsLessOrEqual(rhs).all()
+    return (lhs .<= rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than that of the second argument.
   @inlinable @inline(__always)
   static func > (lhs: Tensor, rhs: Scalar) -> Bool {
-    return lhs.elementsGreater(rhs).all()
+    return (lhs .> rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than or equal to that of the second argument.
   @inlinable @inline(__always)
   static func >= (lhs: Tensor, rhs: Scalar) -> Bool {
-    return lhs.elementsGreaterOrEqual(rhs).all()
+    return (lhs .>= rhs).all()
   }
 }
 
 public extension Tensor where Scalar : Equatable {
-  /// Computes `self == other` element-wise.
-  /// - Note: `elementsEqual` supports broadcasting.
+  /// Computes `lhs != rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.==` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.equal(self, other)
+  static func .==(lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.equal(lhs, rhs)
   }
 
-  /// Computes `self == other` element-wise, broadcasting `other`.
+  /// Computes `lhs != rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.!=` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsEqual(_ other: Scalar) -> Tensor<Bool> {
-    return elementsEqual(Tensor(other))
+  static func .!=(lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
+    return Raw.notEqual(lhs, rhs)
   }
 
-  /// Computes `self != other` element-wise.
-  /// - Note: `elementsNotEqual` supports broadcasting.
+  /// Computes `lhs == rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.==` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsNotEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.notEqual(self, other)
+  static func .==(lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) .== rhs
   }
 
-  /// Computes `self != other` element-wise, broadcasting `other`.
+  /// Computes `lhs != rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.!=` supports broadcasting.
   @inlinable @inline(__always)
-  func elementsNotEqual(_ other: Scalar) -> Tensor<Bool> {
-    return elementsNotEqual(Tensor(other))
+  static func .!=(lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
+    return Tensor(lhs) .!= rhs
+  }
+
+  /// Computes `lhs == rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.==` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .==(lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return lhs .== Tensor(rhs)
+  }
+
+  /// Computes `lhs != rhs` element-wise and returns a `Tensor` of Boolean
+  /// scalars.
+  /// - Note: `.!=` supports broadcasting.
+  @inlinable @inline(__always)
+  static func .!=(lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
+    return lhs .!= Tensor(rhs)
   }
 }
 
@@ -1133,7 +1207,7 @@ public extension Tensor where Scalar : Numeric {
     let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
     let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
     let paddedShape = ones ++ otherShape
-    let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
+    let nonEqualIndices = paddedShape .!= shapeTensor
     let broadcastIndices = Raw.where_(nonEqualIndices).flattened()
     let unbroadcasted: Tensor = Raw.sum(
       self, reductionIndices: Tensor<Int32>(broadcastIndices), keepDims: false)

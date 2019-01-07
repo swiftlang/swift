@@ -87,9 +87,9 @@ extension Tensor where Scalar : Numeric {
 func _adjointMinMax<T : Numeric & Comparable>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>, _ y: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
-  let denom = 1 + Tensor<T>(x.elementsEqual(y))
-  let dfdx = seed * Tensor<T>(x.elementsEqual(originalValue)) / denom
-  let dfdy = seed * Tensor<T>(y.elementsEqual(originalValue)) / denom
+  let denom = 1 + Tensor<T>(x .== y)
+  let dfdx = seed * Tensor<T>(x .== originalValue) / denom
+  let dfdy = seed * Tensor<T>(y .== originalValue) / denom
   return (dfdx.unbroadcast(like: x), dfdy.unbroadcast(like: y))
 }
 
@@ -451,5 +451,5 @@ extension Tensor where Scalar : BinaryFloatingPoint {
 func _adjointRelu<T : BinaryFloatingPoint>(
   _ seed: Tensor<T>, _ originalValue: Tensor<T>, _ x: Tensor<T>
 ) -> Tensor<T> {
-  return Tensor(x.elementsGreater(0)) * seed
+  return Tensor(x .> 0) * seed
 }
