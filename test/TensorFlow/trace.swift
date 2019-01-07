@@ -97,6 +97,27 @@ func model2(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
   return x + y
 }
 
+
+/////////////////////////
+// Test 7: use the abstract CTensorHandle as the "symbol table" to track
+// intermediate and result tensors in the trace region.
+////////////////////////
+
+// @inline(never)
+// func test7() -> Tensor<Float> {
+//   let x = dataset()
+//   let y = model(x)
+//   return model2(x, y)
+// }
+
+// Should return 1.0, not 2.0.
+@inline(never)
+func test7() -> Tensor<Float> {
+  let x = dataset()
+  _ = model(x)
+  return x
+}
+
 public func driver() {
   _RuntimeConfig.printsDebugLog = true
   // let tracedFn = trace(test1)
@@ -111,24 +132,27 @@ public func driver() {
   // }
 
   // test 6
-  let datasetTracedFn = trace(dataset)
-  let x: Tensor<Float> = withDevice(.cpu) {
-    return datasetTracedFn()
-  }
-  _hostOp(x)
+  // let datasetTracedFn = trace(dataset)
+  // let x: Tensor<Float> = withDevice(.cpu) {
+  //   return datasetTracedFn()
+  // }
+  // _hostOp(x)
 
-  let modelTracedFn = trace(model)
-  let y: Tensor<Float> = withDevice(.gpu) {
-    return modelTracedFn(x)
-  }
-  _hostOp(y)
+  // let modelTracedFn = trace(model)
+  // let y: Tensor<Float> = withDevice(.gpu) {
+  //   return modelTracedFn(x)
+  // }
+  // _hostOp(y)
 
-  let model2TracedFn = trace(model2)
-  let z: Tensor<Float> = withDevice(.gpu) {
-    return model2TracedFn(x, y)
-  }
+  // let model2TracedFn = trace(model2)
+  // let z: Tensor<Float> = withDevice(.gpu) {
+  //   return model2TracedFn(x, y)
+  // }
+  // _hostOp(z)
+
+  let tracedFn = trace(test7)
+  let z = tracedFn()
   _hostOp(z)
-
 }
 
 driver()
