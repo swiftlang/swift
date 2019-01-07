@@ -909,17 +909,17 @@ public extension Tensor where Scalar : Numeric & Comparable {
   // NOTE: This overload is necessary, otherwise `min()` would refer
   // to the variadic method `min(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
-  func min() -> Scalar {
+  func min() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(Raw.min(self, reductionIndices: axes).handle)
+    return Raw.min(self, reductionIndices: axes)
   }
 
   // NOTE: This overload is necessary, otherwise `max()` would refer
   // to the variadic method `max(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
-  func max() -> Scalar {
+  func max() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(Raw.max(self, reductionIndices: axes).handle)
+    return Raw.max(self, reductionIndices: axes)
   }
 
   /// Returns the maximum values along the specified axes. The reduced
@@ -978,14 +978,14 @@ public extension Tensor where Scalar : Numeric & Comparable {
 
   /// Returns the index of the maximum value of the flattened scalars.
   @inlinable @inline(__always)
-  func argmax() -> Int32 {
-    return _TFGetScalarOrDie(flattened().argmax(squeezingAxis: 0).handle)
+  func argmax() -> Tensor<Int32> {
+    return flattened().argmax(squeezingAxis: 0)
   }
 
   /// Returns the index of the minimum value of the flattened scalars.
   @inlinable @inline(__always)
-  func argmin() -> Int32 {
-    return _TFGetScalarOrDie(flattened().argmin(squeezingAxis: 0).handle)
+  func argmin() -> Tensor<Int32> {
+    return flattened().argmin(squeezingAxis: 0)
   }
 }
 
@@ -993,25 +993,25 @@ public extension Tensor where Scalar : Numeric {
   // NOTE: This overload is necessary, otherwise `mean()` would refer
   // to the variadic method `mean(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
-  func mean() -> Scalar {
+  func mean() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(Raw.mean(self, reductionIndices: axes).handle)
+    return Raw.mean(self, reductionIndices: axes)
   }
 
   // NOTE: This overload is necessary, otherwise `sum()` would refer
   // to the variadic method `sum(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
-  func sum() -> Scalar {
+  func sum() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(Raw.sum(self, reductionIndices: axes).handle)
+    return Raw.sum(self, reductionIndices: axes)
   }
 
   // NOTE: This overload is necessary, otherwise `sum()` would refer
   // to the variadic method `sum(squeezingAxes:)` with zero indices.
   @inlinable @inline(__always)
-  func product() -> Scalar {
+  func product() -> Tensor {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return _TFGetScalarOrDie(Raw.prod(self, reductionIndices: axes).handle)
+    return Raw.prod(self, reductionIndices: axes)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced

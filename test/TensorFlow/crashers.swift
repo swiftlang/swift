@@ -141,7 +141,7 @@ public func sinkTensorToScalarCrash() {
 
   for _ in 0...10000 {
     w2 -= w1
-    loss = w2.mean()
+    loss = w2.mean().scalarized()
   }
 
   opaqueGenericFunction(loss)
