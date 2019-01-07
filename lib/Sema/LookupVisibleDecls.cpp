@@ -837,7 +837,8 @@ public:
     // don't substitute either.
     bool shouldSubst = (!BaseTy->isAnyObject() &&
                         !BaseTy->hasTypeVariable() &&
-                        BaseTy->getNominalOrBoundGenericNominal() &&
+                        (BaseTy->getNominalOrBoundGenericNominal() ||
+                         BaseTy->is<ArchetypeType>()) &&
                         VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();
 
