@@ -495,9 +495,10 @@ getOrSynthesizeVectorSpaceStruct(DerivedConformance &derived,
     C.addSynthesizedDecl(newMember);
 
     // Now that this member is in the associated vector space, it should be
-    // marked `@differentiable` so that the differentition transform will
+    // marked `@differentiable` so that the differentiation transform will
     // synthesize associated functions for it. We only add this to public
-    // functions, because they are the only ones whose access go through
+    // stored properties, because their access outside the module will go
+    // through a call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       auto *diffableAttr = DifferentiableAttr::create(
