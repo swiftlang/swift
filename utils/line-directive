@@ -11,6 +11,12 @@
 #
 # ----------------------------------------------------------------------------
 from __future__ import print_function
+import bisect
+import os
+import re
+import shlex
+import subprocess
+import sys
 
 usage = '''"#sourceLocation" is a directive used by tools like the Swift
 compiler and debugger to adjust the lines reported in diagnostics and to
@@ -47,13 +53,6 @@ You do this:
   gyb bar.swift.gyb -o bar.swift
   line-directive foo.swift bar.swift -- swiftc foo.swift bar.swift baz.swift
 '''
-
-import bisect
-import os
-import re
-import shlex
-import subprocess
-import sys
 
 line_pattern = re.compile(
     r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
