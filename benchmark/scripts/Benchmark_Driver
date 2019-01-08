@@ -442,7 +442,7 @@ class BenchmarkDoctor(object):
                     [[result.samples.min for result in i_series]
                      for i_series in
                      [select(measurements, num_iters=i) for i in [1, 2]]]]
-        setup = int(round(2.0 * (ti1 - ti2)))
+        setup = int(round(2.0 * (ti1 - ti2))) if ti2 > 20 else 0
         ratio = (setup / ti1) if ti1 > 0 else 0
         return (setup, ratio)
 
