@@ -22,6 +22,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
+#include "swift/Syntax/SyntaxArena.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -117,8 +119,15 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
+  std::shared_ptr<SyntaxTreeCreator> STreeCreator;
+  if (SF.shouldBuildSyntaxTree()) {
+    STreeCreator = std::make_shared<SyntaxTreeCreator>(
+                   SF.SyntaxParsingCache, SF.getASTContext().getSyntaxArena());
+  }
+
   SharedTimer timer("Parsing");
-  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr, PersistentState);
+  Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
+           PersistentState, STreeCreator);
   PrettyStackTraceParser StackTrace(P);
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
@@ -132,6 +141,11 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     FoundSideEffects = FoundSideEffects || hasSideEffects;
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
+
+  if (STreeCreator) {
+    auto rawNode = P.finalizeSyntaxTree();
+    STreeCreator->acceptSyntaxRoot(rawNode.getOpaqueNode(), SF);
+  }
 
   return FoundSideEffects;
 }

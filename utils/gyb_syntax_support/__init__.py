@@ -77,6 +77,34 @@ def check_child_condition_raw(child):
     return result
 
 
+def check_parsed_child_condition_raw(child):
+    """
+    Generates a C++ closure to check whether a given raw syntax node can
+    satisfy the requirements of child.
+    """
+    result = '[](const ParsedRawSyntaxNode &Raw) {\n'
+    result += ' // check %s\n' % child.name
+    if child.token_choices:
+        result += 'if (!Raw.isToken()) return false;\n'
+        result += 'auto TokKind = Raw.getTokenKind();\n'
+        tok_checks = []
+        for choice in child.token_choices:
+            tok_checks.append("TokKind == tok::%s" % choice.kind)
+        result += 'return %s;\n' % (' || '.join(tok_checks))
+    elif child.text_choices:
+        result += 'return Raw.isToken();\n'
+    elif child.node_choices:
+        node_checks = []
+        for choice in child.node_choices:
+            node_checks.append(
+                check_parsed_child_condition_raw(choice) + '(Raw)')
+        result += 'return %s;\n' % ((' || ').join(node_checks))
+    else:
+        result += 'return Parsed%s::kindof(Raw.getKind());' % child.type_name
+    result += '}'
+    return result
+
+
 def make_missing_swift_child(child):
     """
     Generates a Swift call to make the raw syntax for a given Child object.

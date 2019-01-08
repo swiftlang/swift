@@ -33,3 +33,7 @@ public let TRUE: BOOL = 1
 // handleapi.h
 public let INVALID_HANDLE_VALUE: HANDLE = HANDLE(bitPattern: -1)!
 
+// shellapi.h
+public let FOF_NO_UI: DWORD =
+    DWORD(FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR)
+

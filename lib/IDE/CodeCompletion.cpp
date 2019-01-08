@@ -31,6 +31,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
