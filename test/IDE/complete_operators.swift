@@ -279,8 +279,8 @@ func testInfix15<T: P where T.T == S2>() {
   T#^INFIX_15^#
 }
 // INFIX_15: Begin completions, 3 items
-// INFIX_15-NEXT: Decl[AssociatedType]/Super:         .T; name=T
-// INFIX_15-NEXT: Decl[InstanceMethod]/Super:         .foo({#self: P#})[#() -> S2#]; name=foo(P)
+// INFIX_15-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
+// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#self: P#})[#() -> S2#]; name=foo(P)
 // INFIX_15-NEXT: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
 // INFIX_15: End completions
 
