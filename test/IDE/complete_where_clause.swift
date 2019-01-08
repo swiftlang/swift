@@ -118,7 +118,7 @@ class C1<T> where #^CLASS_1^# {}
 class C2<T> where T.#^CLASS_2^# {}
 enum E1<T> where #^ENUM_1^# {}
 enum E2<T> where T.#^ENUM_2^# {}
-// GEN_T_NOMINAL: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// GEN_T_NOMINAL: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 
 protocol P2 {
   associatedtype T where #^ASSOC_1^#
@@ -126,9 +126,9 @@ protocol P2 {
 }
 
 // P2: Begin completions
-// P2-DAG: Decl[GenericTypeParam]/{{Super|CurrNominal}}: Self[#Self#];
-// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}:   T;
-// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}:   U;
+// P2-DAG: Decl[GenericTypeParam]/Local: Self[#Self#];
+// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: T;
+// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: U;
 // P2: End completions
 
 // U_DOT: Begin completions
