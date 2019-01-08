@@ -1012,6 +1012,12 @@ static ValueDecl *getTypeJoinMetaOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getTriggerFallbackDiagnosticOperation(ASTContext &Context,
+                                                        Identifier Id) {
+  // () -> Void
+  return getBuiltinFunction(Id, {}, Context.TheEmptyTupleType);
+}
+
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
                                              Identifier Id) {
   // <T> T.Type -> Builtin.Int8
@@ -1876,7 +1882,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTypeJoinInoutOperation(Context, Id);
 
   case BuiltinValueKind::TypeJoinMeta:
-    return getTypeJoinMetaOperation(Context, Id);      
+    return getTypeJoinMetaOperation(Context, Id);
+
+  case BuiltinValueKind::TriggerFallbackDiagnostic:
+    return getTriggerFallbackDiagnosticOperation(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
