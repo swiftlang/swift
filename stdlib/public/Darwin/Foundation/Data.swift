@@ -612,36 +612,28 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Index = Int
     public typealias Indices = Range<Int>
 
+    // A small inline buffer of bytes suitable for stack-allocation of small data.
+    // Inlinability strategy: everything here should be inlined for direct operation on the stack wherever possible.
     @usableFromInline
     @_fixed_layout
     internal struct InlineData {
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
-        @usableFromInline
-        typealias Buffer = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
-                            UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) //len  //enum
-        @usableFromInline
-        var bytes: Buffer
+        @usableFromInline typealias Buffer = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                                              UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) //len  //enum
+        @usableFromInline var bytes: Buffer
 #elseif arch(i386) || arch(arm)
-        @usableFromInline
-        typealias Buffer = (UInt8, UInt8, UInt8, UInt8,
-                            UInt8, UInt8) //len  //enum
-        @usableFromInline
-        var bytes: Buffer
+        @usableFromInline typealias Buffer = (UInt8, UInt8, UInt8, UInt8,
+                                              UInt8, UInt8) //len  //enum
+        @usableFromInline var bytes: Buffer
 #endif
-        @usableFromInline
-        var length: UInt8
+        @usableFromInline var length: UInt8
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         static func canStore(count: Int) -> Bool {
             return count <= MemoryLayout<Buffer>.size
         }
 
-        @inlinable
-        init() {
-            self.init(count: 0)
-        }
-
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ srcBuffer: UnsafeRawBufferPointer) {
             self.init(count: srcBuffer.count)
             if srcBuffer.count > 0 {
@@ -651,19 +643,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
-        init(count: Int) {
+        @inlinable // This is @inlinable as a trivial initializer.
+        init(count: Int = 0) {
             assert(count <= MemoryLayout<Buffer>.size)
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
             bytes = (UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0))
 #elseif arch(i386) || arch(arm)
-            bytes = (UInt8(0), UInt8(0), UInt8(0), UInt8(0),
-                     UInt8(0), UInt8(0))
+            bytes = (UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0))
 #endif
             length = UInt8(count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ slice: InlineSlice, count: Int) {
             self.init(count: count)
             Swift.withUnsafeMutableBytes(of: &bytes) { dstBuffer in
@@ -673,7 +664,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ slice: LargeSlice, count: Int) {
             self.init(count: count)
             Swift.withUnsafeMutableBytes(of: &bytes) { dstBuffer in
@@ -683,15 +674,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         var capacity: Int {
             return MemoryLayout<Buffer>.size
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         var count: Int {
             get {
-                return numericCast(length)
+                return Int(length)
             }
             set(newValue) {
                 precondition(newValue <= MemoryLayout<Buffer>.size)
@@ -699,29 +690,33 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
-        var startIndex: Int { return 0 }
+        @inlinable // This is @inlinable as trivially computable.
+        var startIndex: Int {
+            return 0
+        }
 
-        @inlinable
-        var endIndex: Int { return count }
+        @inlinable // This is @inlinable as trivially computable.
+        var endIndex: Int {
+            return count
+        }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         func withUnsafeBytes<Result>(_ apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
-            let count: Int = numericCast(length)
+            let count = Int(length)
             return try Swift.withUnsafeBytes(of: bytes) { (rawBuffer) throws -> Result in
                 return try apply(UnsafeRawBufferPointer(start: rawBuffer.baseAddress, count: count))
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         mutating func withUnsafeMutableBytes<Result>(_ apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
-            let count: Int = numericCast(length)
+            let count = Int(length)
             return try Swift.withUnsafeMutableBytes(of: &bytes) { (rawBuffer) throws -> Result in
                 return try apply(UnsafeMutableRawBufferPointer(start: rawBuffer.baseAddress, count: count))
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
             guard buffer.count > 0 else { return }
             assert(count + buffer.count <= MemoryLayout<Buffer>.size)
@@ -729,11 +724,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _ = Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
                 rawBuffer.baseAddress?.advanced(by: cnt).copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
             }
-            length += UInt8(buffer.count)
 
+            length += UInt8(buffer.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         subscript(index: Index) -> UInt8 {
             get {
                 assert(index <= MemoryLayout<Buffer>.size)
@@ -751,7 +746,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         mutating func resetBytes(in range: Range<Index>) {
             assert(range.lowerBound <= MemoryLayout<Buffer>.size)
             assert(range.upperBound <= MemoryLayout<Buffer>.size)
@@ -759,12 +754,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             if count < range.upperBound {
                 count = range.upperBound
             }
-            Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
-                bzero(rawBuffer.baseAddress?.advanced(by: range.lowerBound), range.upperBound - range.lowerBound)
+
+            let _ = Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
+              memset(rawBuffer.baseAddress?.advanced(by: range.lowerBound), 0, range.upperBound - range.lowerBound)
             }
         }
 
-        @inlinable
+        @usableFromInline // This is not @inlinable as it is a non-trivial, non-generic function.
         mutating func replaceSubrange(_ subrange: Range<Index>, with replacementBytes: UnsafeRawPointer?, count replacementLength: Int) {
             assert(subrange.lowerBound <= MemoryLayout<Buffer>.size)
             assert(subrange.upperBound <= MemoryLayout<Buffer>.size)
@@ -788,7 +784,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             count = resultingLength
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         func copyBytes(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
             precondition(startIndex <= range.lowerBound, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             precondition(range.lowerBound <= endIndex, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
