@@ -40,7 +40,7 @@ struct G0<T> {
   subscript(x: T) -> #^GEN_RETURN_0^# { return 0 }
 }
 // GEN_TOP_LEVEL_0: Keyword/None:                       Any[#Any#];
-// GEN_TOP_LEVEL_0: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// GEN_TOP_LEVEL_0: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
 // GEN_TOP_LEVEL_0: Decl[Struct]/CurrModule:            S0[#S0#];
 // GEN_TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]:    Int[#Int#];
 
