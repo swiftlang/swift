@@ -68,7 +68,7 @@ while true {
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/CurrNominal: Key[#Key#]; name=Key
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/Local:       Key[#Key#]; name=Key
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#CustomGenericCollection<Key>.Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
 

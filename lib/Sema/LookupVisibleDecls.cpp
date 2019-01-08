@@ -225,26 +225,7 @@ static void lookupTypeMembers(Type BaseType, Type LookupType,
   NominalTypeDecl *D = LookupType->getAnyNominal();
   assert(D && "should have a nominal type");
 
-  bool LookupFromChildDeclContext = false;
-  const DeclContext *TempDC = CurrDC;
-  while (!TempDC->isModuleContext()) {
-    if (TempDC == D) {
-      LookupFromChildDeclContext = true;
-      break;
-    }
-    TempDC = TempDC->getParent();
-  }
-
   SmallVector<ValueDecl*, 2> FoundDecls;
-
-  if (LookupFromChildDeclContext) {
-    // Current decl context is contained inside 'D', so generic parameters
-    // are visible.
-    if (D->getGenericParams())
-      for (auto Param : *D->getGenericParams())
-        if (isDeclVisibleInLookupMode(Param, LS, CurrDC, TypeResolver))
-          FoundDecls.push_back(Param);
-  }
 
   for (Decl *Member : D->getMembers()) {
     if (auto *VD = dyn_cast<ValueDecl>(Member))
@@ -674,6 +655,23 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 
 } // namespace llvm
 
+// If a class 'Base' conforms to 'Proto', and my base type is a subclass
+// 'Derived' of 'Base', use 'Base' not 'Derived' as the 'Self' type in the
+// substitution map.
+static Type getBaseTypeForMember(ModuleDecl *M, ValueDecl *OtherVD, Type BaseTy) {
+  if (auto *Proto = OtherVD->getDeclContext()->getSelfProtocolDecl()) {
+    if (BaseTy->getClassOrBoundGenericClass()) {
+      if (auto Conformance = M->lookupConformance(BaseTy, Proto)) {
+        auto *Superclass = Conformance->getConcrete()->getRootConformance()
+            ->getType()->getClassOrBoundGenericClass();
+        return BaseTy->getSuperclassForDecl(Superclass);
+      }
+    }
+  }
+
+  return BaseTy;
+}
+
 namespace {
 
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
@@ -784,7 +782,8 @@ public:
       auto OtherSignature = OtherVD->getOverloadSignature();
       auto OtherSignatureType = OtherVD->getOverloadSignatureType();
       if (OtherSignatureType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
+        auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
+        auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignatureType.subst(subs))
           OtherSignatureType = CT->getCanonicalType();
       }
@@ -845,7 +844,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleScopeContext()) {
-    const ValueDecl *BaseDecl = nullptr;
+    GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     auto LS = LookupState::makeUnqualified();
 
@@ -869,7 +868,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
       DC = DC->getParent();
-      BaseDecl = DC->getSelfNominalTypeDecl();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
 
       // Look for local variables; normally, the parser resolves these
@@ -888,9 +886,10 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(
         AFD->getParameters());
 
+      GenericParams = AFD->getGenericParams();
+
       if (AFD->getDeclContext()->isTypeContext()) {
         ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-        BaseDecl = AFD->getImplicitSelfDecl();
         DC = DC->getParent();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
@@ -906,14 +905,34 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getSelfTypeInContext();
-      if (ExtendedType)
-        BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getSelfTypeInContext();
-      BaseDecl = ND;
     }
 
-    if (BaseDecl && ExtendedType)
+    // If we're inside a function context, we've already moved to
+    // the parent DC, so we have to check the function's generic
+    // parameters first.
+    if (GenericParams) {
+      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+      localVal.checkGenericParams(GenericParams);
+    }
+
+    // Check the generic parameters of our context.
+    GenericParamList *dcGenericParams = nullptr;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+      dcGenericParams = nominal->getGenericParams();
+    else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+      dcGenericParams = ext->getGenericParams();
+    else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+      dcGenericParams = subscript->getGenericParams();
+
+    while (dcGenericParams) {
+      namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+      localVal.checkGenericParams(dcGenericParams);
+      dcGenericParams = dcGenericParams->getOuterParameters();
+    }
+
+    if (ExtendedType)
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver, nullptr);
 
