@@ -3179,19 +3179,10 @@ public:
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
 
-    // This is horrible
     ExprType = ExprType->getRValueType();
+    assert(!ExprType->hasTypeParameter());
+
     this->ExprType = ExprType;
-    if (ExprType->hasTypeParameter()) {
-      DeclContext *DC = nullptr;
-      if (VD)
-        DC = VD->getInnermostDeclContext();
-      else if (auto NTD = ExprType->getInOutObjectType()
-                   ->getMetatypeInstanceType()->getAnyNominal())
-        DC = NTD;
-      if (DC)
-        ExprType = DC->mapTypeIntoContext(ExprType);
-    }
 
     // Handle special cases
     bool isIUO = VD && VD->getAttrs()
