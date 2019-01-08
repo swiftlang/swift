@@ -12,6 +12,7 @@ list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
+list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 
 add_subdirectory(AST)
 add_subdirectory(ASTSectionImporter)
