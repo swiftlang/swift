@@ -806,81 +806,79 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
 
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
-    @usableFromInline
-    internal typealias HalfInt = Int32
+    @usableFromInline internal typealias HalfInt = Int32
 #elseif arch(i386) || arch(arm)
-    @usableFromInline
-    internal typealias HalfInt = Int16
+    @usableFromInline internal typealias HalfInt = Int16
 #endif
 
+    // A buffer of bytes too large to fit in an InlineData, but still small enough to fit a storage pointer + range in two words.
+    // Inlinability strategy: everything here should be easily inlinable as large _DataStorage methods should not inline into here.
     @usableFromInline
     @_fixed_layout
     internal struct InlineSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
-        @usableFromInline
-        var slice: Range<HalfInt>
-        @usableFromInline
-        var storage: _DataStorage
+        @usableFromInline var slice: Range<HalfInt>
+        @usableFromInline var storage: _DataStorage
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         static func canStore(count: Int) -> Bool {
             return count < HalfInt.max
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
             assert(buffer.count < HalfInt.max)
             self.init(_DataStorage(bytes: buffer.baseAddress, length: buffer.count), count: buffer.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(capacity: Int) {
             assert(capacity < HalfInt.max)
             self.init(_DataStorage(capacity: capacity), count: 0)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(count: Int) {
             assert(count < HalfInt.max)
             self.init(_DataStorage(length: count), count: count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData) {
             assert(inline.count < HalfInt.max)
             self.init(inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }, count: inline.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ inline: InlineData, range: Range<Int>) {
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
             self.init(inline.withUnsafeBytes { return _DataStorage(bytes: $0.baseAddress, length: $0.count) }, range: range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ large: LargeSlice) {
             assert(large.range.lowerBound < HalfInt.max)
             assert(large.range.upperBound < HalfInt.max)
             self.init(large.storage, range: large.range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a convenience initializer.
         init(_ large: LargeSlice, range: Range<Int>) {
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
             self.init(large.storage, range: range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, count: Int) {
             assert(count < HalfInt.max)
             self.storage = storage
             slice = 0..<HalfInt(count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a trivial initializer.
         init(_ storage: _DataStorage, range: Range<Int>) {
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
@@ -888,34 +886,39 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             slice = HalfInt(range.lowerBound)..<HalfInt(range.upperBound)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable (and inlining may help avoid retain-release traffic).
         mutating func ensureUniqueReference() {
             if !isKnownUniquelyReferenced(&storage) {
                 storage = storage.mutableCopy(self.range)
             }
         }
 
-        @inlinable
-        var startIndex: Int { return numericCast(slice.lowerBound) }
-        @inlinable
-        var endIndex: Int { return numericCast(slice.upperBound) }
+        @inlinable // This is @inlinable as trivially computable.
+        var startIndex: Int {
+            return Int(slice.lowerBound)
+        }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
+        var endIndex: Int {
+            return Int(slice.upperBound)
+        }
+
+        @inlinable // This is @inlinable as trivially computable.
         var capacity: Int {
             return storage.capacity
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable (and inlining may help avoid retain-release traffic).
         mutating func reserveCapacity(_ minimumCapacity: Int) {
             ensureUniqueReference()
             // the current capacity can be zero (representing externally owned buffer), and count can be greater than the capacity
             storage.ensureUniqueBufferReference(growingTo: Swift.max(minimumCapacity, count))
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         var count: Int {
             get {
-                return numericCast(slice.upperBound - slice.lowerBound)
+                return Int(slice.upperBound - slice.lowerBound)
             }
             set(newValue) {
                 assert(newValue < HalfInt.max)
@@ -925,10 +928,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially computable.
         var range: Range<Int> {
             get {
-                return numericCast(slice.lowerBound)..<numericCast(slice.upperBound)
+                return Int(slice.lowerBound)..<Int(slice.upperBound)
             }
             set(newValue) {
                 assert(newValue.lowerBound < HalfInt.max)
@@ -937,26 +940,26 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         func withUnsafeBytes<Result>(_ apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
             return try storage.withUnsafeBytes(in: range, apply: apply)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as a generic, trivially forwarding function.
         mutating func withUnsafeMutableBytes<Result>(_ apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
             ensureUniqueReference()
             return try storage.withUnsafeMutableBytes(in: range, apply: apply)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
             assert(endIndex + buffer.count < HalfInt.max)
             ensureUniqueReference()
             storage.replaceBytes(in: NSRange(location: range.upperBound, length: storage.length - (range.upperBound - storage._offset)), with: buffer.baseAddress, length: buffer.count)
-            slice = slice.lowerBound..<HalfInt(numericCast(slice.upperBound) + buffer.count)
+            slice = slice.lowerBound..<HalfInt(Int(slice.upperBound) + buffer.count)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         subscript(index: Index) -> UInt8 {
             get {
                 assert(index < HalfInt.max)
@@ -973,12 +976,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as trivially forwarding.
         func bridgedReference() -> NSData {
             return storage.bridgedReference(self.range)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func resetBytes(in range: Range<Index>) {
             assert(range.lowerBound < HalfInt.max)
             assert(range.upperBound < HalfInt.max)
@@ -990,7 +993,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer?, count cnt: Int) {
             precondition(startIndex <= subrange.lowerBound, "index \(subrange.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             precondition(subrange.lowerBound <= endIndex, "index \(subrange.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
@@ -1005,7 +1008,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             slice = slice.lowerBound..<HalfInt(resultingUpper)
         }
 
-        @inlinable
+        @inlinable // This is @inlinable as reasonably small.
         func copyBytes(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
             precondition(startIndex <= range.lowerBound, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
             precondition(range.lowerBound <= endIndex, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
