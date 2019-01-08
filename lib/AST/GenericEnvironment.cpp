@@ -123,6 +123,8 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
 
 Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   auto archetype = cast<ArchetypeType>(type);
+  if (isa<OpaqueTypeArchetypeType>(archetype->getRoot()))
+    return type;
   
   return archetype->getInterfaceType();
 }

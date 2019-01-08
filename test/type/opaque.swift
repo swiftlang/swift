@@ -150,6 +150,70 @@ func marcia() -> __opaque P {
   return [marcia(), marcia(), marcia()] // expected-error{{defines the opaque type in terms of itself}}
 }
 
+protocol R {
+  associatedtype S: P, Q // expected-note*{{}}
+
+  func r_out() -> S
+  func r_in(_: S)
+}
+
+extension Int: R {
+  func r_out() -> String {
+    return ""
+  }
+  func r_in(_: String) {}
+}
+
+func candace() -> __opaque R {
+  return 0
+}
+func doug() -> __opaque R {
+  return 0
+}
+
+func gary<T: R>(_ x: T) -> __opaque R {
+  return x
+}
+
+func sameType<T>(_: T, _: T) {}
+
+func associatedTypeIdentity() {
+  let c = candace()
+  let d = doug()
+
+  var cr = c.r_out()
+  cr = candace().r_out()
+  cr = doug().r_out() // expected-error{{}}
+
+  var dr = d.r_out()
+  dr = candace().r_out() // expected-error{{}}
+  dr = doug().r_out()
+
+  c.r_in(cr)
+  c.r_in(c.r_out())
+  c.r_in(dr) // expected-error{{}}
+  c.r_in(d.r_out()) // expected-error{{}}
+
+  d.r_in(cr) // expected-error{{}}
+  d.r_in(c.r_out()) // expected-error{{}}
+  d.r_in(dr)
+  d.r_in(d.r_out())
+
+  cr.paul()
+  cr.priscilla()
+  cr.quinn()
+  dr.paul()
+  dr.priscilla()
+  dr.quinn()
+
+  sameType(cr, c.r_out())
+  sameType(dr, d.r_out())
+  sameType(cr, dr) // expected-error{{}}
+  sameType(gary(candace()).r_out(), gary(candace()).r_out())
+  sameType(gary(doug()).r_out(), gary(doug()).r_out())
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
+}
+
 /* TODO: diagnostics
 struct DoesNotConform {}
 
@@ -157,3 +221,5 @@ func doesNotConform() -> __opaque P {
   return DoesNotConform()
 }
 */
+
+
