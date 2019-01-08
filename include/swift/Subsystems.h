@@ -53,6 +53,7 @@ namespace swift {
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
+  typedef void *OpaqueSyntaxNode;
   class Parser;
   class PersistentParserState;
   class SerializationOptions;
@@ -61,6 +62,7 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParseActions;
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
@@ -335,6 +337,7 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
+               std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
@@ -342,7 +345,7 @@ namespace swift {
 
     ~ParserUnit();
 
-    void parse();
+    OpaqueSyntaxNode parse();
 
     Parser &getParser();
     SourceFile &getSourceFile();

@@ -18,10 +18,9 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Syntax/SyntaxBuilders.h"
-#include "swift/Syntax/SyntaxFactory.h"
-#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -1267,8 +1266,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList(
-                SyntaxContext->getArena()));
+            ParsedSyntaxRecorder::makeBlankFunctionCallArgumentList(
+                Tok.getLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -1557,10 +1556,11 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                      : VarDecl::Specifier::Var;
       auto pattern = createBindingFromPattern(loc, name, specifier);
       if (SyntaxContext->isEnabled()) {
-        PatternSyntax PatternNode = SyntaxFactory::makeIdentifierPattern(
-            SyntaxContext->popToken(), SyntaxContext->getArena());
-        ExprSyntax ExprNode = SyntaxFactory::makeUnresolvedPatternExpr(
-            PatternNode, SyntaxContext->getArena());
+        ParsedPatternSyntax PatternNode =
+            ParsedSyntaxRecorder::makeIdentifierPattern(
+                                    SyntaxContext->popToken(), *SyntaxContext);
+        ParsedExprSyntax ExprNode =
+            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(PatternNode);
         SyntaxContext->addSyntax(ExprNode);
       }
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
@@ -1668,8 +1668,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       if (SyntaxContext->isEnabled()) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
-            SyntaxFactory::makeBlankFunctionCallArgumentList(
-                SyntaxContext->getArena()));
+            ParsedSyntaxRecorder::makeBlankFunctionCallArgumentList(
+                Tok.getLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -1864,7 +1864,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                        SyntaxKind::ExpressionSegment);
 
       // Backslash is part of an expression segment.
-      Token BackSlash(tok::backslash, "\\");
+      Token BackSlash(tok::backslash,
+                      CharSourceRange(Segment.Loc.getAdvancedLoc(-1), 1).str());
       ExprContext.addToken(BackSlash, EmptyTrivia, EmptyTrivia);
       // Create a temporary lexer that lexes from the body of the string.
       LexerState BeginState =
@@ -2013,15 +2014,19 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // We are now sure this is a string interpolation expression.
   LocalContext.setCreateSyntax(SyntaxKind::StringInterpolationExpr);
-  StringRef Quote;
+  StringRef OpenQuoteStr, CloseQuoteStr;
   tok QuoteKind;
-  std::tie(Quote, QuoteKind) = Tok.isMultilineString() ?
-    std::make_tuple("\"\"\"", tok::multiline_string_quote) :
-    std::make_tuple("\"", tok::string_quote);
+  std::tie(OpenQuoteStr, CloseQuoteStr, QuoteKind) = Tok.isMultilineString() ?
+    std::make_tuple(Tok.getRawText().take_front(3),
+                    Tok.getRawText().take_back(3),
+                    tok::multiline_string_quote) :
+    std::make_tuple(Tok.getRawText().take_front(1),
+                    Tok.getRawText().take_back(1),
+                    tok::string_quote);
 
   // Make unknown tokens to represent the open and close quote.
-  Token OpenQuote(QuoteKind, Quote);
-  Token CloseQuote(QuoteKind, Quote);
+  Token OpenQuote(QuoteKind, OpenQuoteStr);
+  Token CloseQuote(QuoteKind, CloseQuoteStr);
   Trivia EmptyTrivia;
   Trivia EntireTrailingTrivia = TrailingTrivia;
 
@@ -2168,8 +2173,9 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
     consumeToken(tok::l_paren);
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(SyntaxFactory::makeBlankDeclNameArgumentList(
-          SyntaxContext->getArena()));
+      SyntaxContext->addSyntax(
+          ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
+            Tok.getLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -2215,6 +2221,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
     loc = DeclNameLoc(baseNameLoc);
+    ArgCtxt.setBackTracking();
     ArgsCtxt.setBackTracking();
     return baseName;
   }
@@ -3363,7 +3370,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
-          SyntaxFactory::makeBlankArrayElementList(Context.getSyntaxArena()));
+          ParsedSyntaxRecorder::makeBlankArrayElementList(
+                                Tok.getLoc(), *SyntaxContext));
     RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(
