@@ -785,7 +785,9 @@ public:
 
     // If this kind of declaration doesn't participate in overriding, there's
     // no filtering to do here.
-    if (!isa<AbstractFunctionDecl>(VD) && !isa<AbstractStorageDecl>(VD)) {
+    if (!isa<AbstractFunctionDecl>(VD) &&
+        !isa<AbstractStorageDecl>(VD) &&
+        !isa<AssociatedTypeDecl>(VD)) {
       DeclsToReport.insert(FoundDeclTy(VD, Reason));
       return;
     }
