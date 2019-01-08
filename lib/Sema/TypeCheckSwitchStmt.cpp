@@ -1015,7 +1015,8 @@ namespace {
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
       // Decide whether we want an error or a warning.
-      auto mainDiagType = diag::non_exhaustive_switch;
+      Optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
+          diag::non_exhaustive_switch;
       if (unknownCase) {
         switch (defaultReason) {
         case RequiresDefault::EmptySwitchBody:
@@ -1042,7 +1043,7 @@ namespace {
       switch (uncovered.checkDowngradeToWarning()) {
       case DowngradeToWarning::No:
         break;
-      case DowngradeToWarning::ForUnknownCase:
+      case DowngradeToWarning::ForUnknownCase: {
         if (TC.Context.LangOpts.DebuggerSupport ||
             TC.Context.LangOpts.Playground ||
             !TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics) {
@@ -1050,8 +1051,17 @@ namespace {
           // playgrounds.
           return;
         }
-        // Missing '@unknown' is just a warning.
-        mainDiagType = diag::non_exhaustive_switch_warn;
+        assert(defaultReason == RequiresDefault::No);
+        Type subjectType = Switch->getSubjectExpr()->getType();
+        bool shouldIncludeFutureVersionComment = false;
+        if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+          shouldIncludeFutureVersionComment =
+              theEnum->getParentModule()->isSystemModule();
+        }
+        TC.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                    subjectType, shouldIncludeFutureVersionComment);
+        mainDiagType = None;
+      }
         break;
       }
 
@@ -1066,7 +1076,7 @@ namespace {
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        TC.diagnose(startLoc, mainDiagType);
+        TC.diagnose(startLoc, mainDiagType.getValue());
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1083,7 +1093,9 @@ namespace {
       // If there's nothing else to diagnose, bail.
       if (uncovered.isEmpty()) return;
 
-      TC.diagnose(startLoc, mainDiagType);
+      // Check if we still have to emit the main diganostic.
+      if (mainDiagType.hasValue())
+        TC.diagnose(startLoc, mainDiagType.getValue());
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =
