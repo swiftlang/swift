@@ -1237,7 +1237,10 @@ def main():
              Line directive format string, which will be
              provided 2 substitutions, `%%(line)d` and `%%(file)s`.
 
-             Example: `// #sourceLocation(file: "%%(file)s", line: %%(line)d)`
+             Example: `#sourceLocation(file: "%%(file)s", line: %%(line)d)`
+
+             The default works automatically with the `line-directive` tool, 
+             which see for more information.
              ''')
 
     args = parser.parse_args(sys.argv[1:])
