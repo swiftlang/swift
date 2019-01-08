@@ -4231,6 +4231,9 @@ NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
+WARNING(non_exhaustive_switch_unknown_only,none,
+        "switch covers known cases, but %0 may have additional unknown values"
+        "%select{|, possibly added in future versions}1", (Type, bool))
 
 WARNING(override_nsobject_hashvalue,none,
         "override of 'NSObject.hashValue' is deprecated; "
