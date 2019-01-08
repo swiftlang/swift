@@ -367,6 +367,7 @@ public struct String {
   ///     let empty = ""
   ///     let alsoEmpty = String()
   @inlinable @inline(__always)
+  @_semantics("string.init_empty")
   public init() { self.init(_StringGuts()) }
 }
 

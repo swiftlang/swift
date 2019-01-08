@@ -37,6 +37,22 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
 // general framework.
 
+enum class WellKnownFunction {
+  Unknown,
+  // String.init()
+  StringInitEmpty,
+  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  StringMakeUTF8
+};
+
+static WellKnownFunction classifyFunction(SILFunction *fn) {
+  if (fn->hasSemanticsAttr("string.init_empty"))
+    return WellKnownFunction::StringInitEmpty;
+  if (fn->hasSemanticsAttr("string.makeUTF8"))
+    return WellKnownFunction::StringMakeUTF8;
+  return WellKnownFunction::Unknown;
+}
+
 //===----------------------------------------------------------------------===//
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
@@ -149,6 +165,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // immediately.
   if (auto *ili = dyn_cast<IntegerLiteralInst>(value))
     return SymbolicValue::getInteger(ili->getValue(), evaluator.getASTContext());
+  if (auto *sli = dyn_cast<StringLiteralInst>(value))
+    return SymbolicValue::getString(sli->getValue(), evaluator.getASTContext());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
     return SymbolicValue::getFunction(fri->getReferencedFunction());
@@ -538,6 +556,39 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                 UnknownReason::Default);
 
   SILFunction *callee = calleeFn.getFunctionValue();
+
+  // If this is a well-known function, do not step into it.
+  switch (classifyFunction(callee)) {
+  default:
+    break;
+  case WellKnownFunction::StringInitEmpty: { // String.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected String.init() signature");
+    auto result = SymbolicValue::getString("", evaluator.getASTContext());
+    setValue(apply, result);
+    return None;
+  }
+  case WellKnownFunction::StringMakeUTF8: {
+    // String.init(_builtinStringLiteral start: Builtin.RawPointer,
+    //             utf8CodeUnitCount: Builtin.Word,
+    //             isASCII: Builtin.Int1)
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 4 && "unexpected signature");
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::String)
+      break;
+    auto literalVal = literal.getStringValue();
+
+    auto byteCount = getConstantValue(apply->getOperand(2));
+    if (byteCount.getKind() != SymbolicValue::Integer ||
+        byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
+      break;
+    setValue(apply, literal);
+    return None;
+  }
+  }
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;
