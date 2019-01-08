@@ -642,12 +642,11 @@ static void lookupVisibleMemberDeclsImpl(
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
           BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
-          getReasonForSuper(Reason), TypeResolver, GSB, Visited);
+          Reason, TypeResolver, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
-                                   getReasonForSuper(Reason), TypeResolver,
-                                   GSB, Visited);
+                                   Reason, TypeResolver, GSB, Visited);
     return;
   }
 

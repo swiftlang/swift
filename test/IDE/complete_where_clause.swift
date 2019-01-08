@@ -76,8 +76,7 @@ func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
 func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
 
 // GEN_T_ASSOC_E: Begin completions, 2 items
-// GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/Super: E; name=E
-// GEN_T_ASSOC_E-NOT:  Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/{{Super|CurrNominal}}: E; name=E
 // GEN_T_ASSOC_E-NEXT: Keyword/None:               Type[#T.Type#];
 // GEN_T_ASSOC_E: End completions
 
@@ -94,7 +93,7 @@ func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: End completions
 func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC^# {}
 // GEN_T_ASSOC_DOT: Begin completions
-// GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/Super:         Q;
+// GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: Q;
 // GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#T.Type#];
 // GEN_T_ASSOC_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_ASSOC_DOT: End completions
@@ -127,9 +126,9 @@ protocol P2 {
 }
 
 // P2: Begin completions
-// P2-DAG: Decl[GenericTypeParam]/Super: Self[#Self#];
-// P2-DAG: Decl[AssociatedType]/Super:   T;
-// P2-DAG: Decl[AssociatedType]/Super:   U;
+// P2-DAG: Decl[GenericTypeParam]/{{Super|CurrNominal}}: Self[#Self#];
+// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}:   T;
+// P2-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}:   U;
 // P2: End completions
 
 // U_DOT: Begin completions

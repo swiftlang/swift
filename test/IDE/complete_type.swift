@@ -456,7 +456,7 @@ typealias FooTypealias = Int
 //===---
 
 // TYPE_IN_PROTOCOL: Begin completions
-// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/Super: Self[#Self#]{{; name=.+$}}
+// TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/CurrNominal: Self[#Self#]{{; name=.+$}}
 // TYPE_IN_PROTOCOL: End completions
 
 protocol TestSelf1 {
@@ -1013,7 +1013,7 @@ func testTypeIdentifierGeneric1<
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_1^#
 
 // TYPE_IDENTIFIER_GENERIC_1: Begin completions
-// TYPE_IDENTIFIER_GENERIC_1-NEXT: Decl[AssociatedType]/Super: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_1-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
 // TYPE_IDENTIFIER_GENERIC_1-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
 // TYPE_IDENTIFIER_GENERIC_1-NEXT: End completions
 
@@ -1022,8 +1022,8 @@ func testTypeIdentifierGeneric2<
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_2^#
 
 // TYPE_IDENTIFIER_GENERIC_2: Begin completions
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/Super: BarTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/Super: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: BarTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
 // TYPE_IDENTIFIER_GENERIC_2-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
 // TYPE_IDENTIFIER_GENERIC_2-NEXT: End completions
 
