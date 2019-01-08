@@ -175,3 +175,6 @@ extension Operation {
   }
 }
 
+public func dontCrash(a: Any)  {
+  (a as AnyObject).treeishChildren()
+}
