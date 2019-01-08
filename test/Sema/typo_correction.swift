@@ -113,10 +113,12 @@ struct Generic<T> {
 }
 
 protocol P { // expected-note {{'P' previously declared here}}
+  // expected-note@-1 {{did you mean 'P'?}}
   typealias a = Generic
 }
 
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
+// expected-note@-1 {{did you mean 'P'?}}
 
 func hasTypo() {
   _ = P.a.a // expected-error {{type 'P.a' (aka 'Generic') has no member 'a'}}
@@ -170,7 +172,7 @@ class CircularValidationWithTypo {
 // Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
 protocol PP {}
 
-func boo() { // expected-note {{did you mean 'boo'?}}
+func boo() {
   extension PP { // expected-error {{declaration is only valid at file scope}}
     func g() {
       booo() // expected-error {{use of unresolved identifier 'booo'}}
@@ -196,4 +198,23 @@ func test_underscored_match() {
 func testFwdRef() {
   let _ = forward_refX + 1 // expected-error {{use of unresolved identifier 'forward_refX'}}
   let forward_ref1 = 4
+}
+
+// Crash with protocol members.
+protocol P1 {
+  associatedtype A1
+  associatedtype A2
+}
+
+protocol P2 {
+  associatedtype A1
+  associatedtype A2
+
+  func method<T: P1>(_: T) where T.A1 == A1, T.A2 == A2
+}
+
+extension P2 {
+  func f() { // expected-note {{did you mean 'f'?}}
+    _ = a // expected-error {{use of unresolved identifier 'a'}}
+  }
 }
