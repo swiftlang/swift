@@ -87,9 +87,11 @@ extension _SmallString {
     }
   }
 
+  // Get an integer equivalent to the _StringObject.discriminatedObjectRawBits
+  // computed property.
   @inlinable @inline(__always)
   internal var rawDiscriminatedObject: UInt64 {
-    // Discriminator is the most significant byte.
+    // Reverse the bytes on big-endian systems.
     return _storage.1.littleEndian
   }
 
@@ -317,7 +319,9 @@ extension _SmallString {
 #endif
 
 extension UInt64 {
-  // Fetches the `i`th byte, from left to right.
+  // Fetches the `i`th byte in memory order. On little-endian systems the byte
+  // at i=0 is the least significant byte (LSB) while on big-endian systems the
+  // byte at i=7 is the LSB.
   @inlinable @inline(__always)
   internal func _uncheckedGetByte(at i: Int) -> UInt8 {
     _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
@@ -329,7 +333,9 @@ extension UInt64 {
     return UInt8(truncatingIfNeeded: (self &>> shift))
   }
 
-  // Sets the `i`th byte, from left to right.
+  // Sets the `i`th byte in memory order. On little-endian systems the byte
+  // at i=0 is the least significant byte (LSB) while on big-endian systems the
+  // byte at i=7 is the LSB.
   @inlinable @inline(__always)
   internal mutating func _uncheckedSetByte(at i: Int, to value: UInt8) {
     _internalInvariant(i >= 0 && i < MemoryLayout<UInt64>.stride)
