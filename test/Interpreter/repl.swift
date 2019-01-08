@@ -222,3 +222,12 @@ if true && true { if true && true { print(true && true) } }
 "ok"
 // CHECK: = "ok"
 
+// Make sure that class inheritance works
+class A {}
+class B : A {
+  override init() {}
+  func foo() -> String { return "ok" }
+}
+
+let _ = B().foo()
+// CHECK: = "ok"
